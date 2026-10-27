@@ -12,8 +12,10 @@ import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { describeFairValue, describeTrade, type JournalTrade } from '@/lib/research/journal-trade';
 import {
   createResearchDecision,
+  linkResearchDecisionTrade,
   reviewResearchExpectations,
   type ResearchDecisionJournalEntry,
   type ResearchExpectationReview,
@@ -350,11 +352,15 @@ export function DecisionAndRealityPanel({
   ticker,
   decisions,
   reviews,
+  trades = [],
 }: {
   ticker: string;
   decisions: ResearchDecisionJournalEntry[];
   reviews: ResearchExpectationReview[];
+  /** Compras/ventas del ticker (IBKR o manuales) que se pueden enlazar. */
+  trades?: JournalTrade[];
 }) {
+  const selectClass = 'h-10 rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-200';
   return (
     <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="rounded-lg border border-gray-800 bg-surface-1 p-5">
@@ -378,6 +384,14 @@ export function DecisionAndRealityPanel({
           </select>
           <Textarea aria-label="Motivo de la decisión" className="border-gray-700 bg-transparent text-gray-100" name="rationale" placeholder="Qué evidencia justifica esta decisión" required />
           <Textarea aria-label="Qué debe cumplirse" className="border-gray-700 bg-transparent text-gray-100" name="what_must_be_true" placeholder="Una condición verificable por línea" />
+          {trades.length > 0 ? (
+            <select aria-label="Operación ejecutada (opcional)" className={selectClass} defaultValue="" name="transaction_id">
+              <option value="">Sin operación (solo la decisión)</option>
+              {trades.map((trade) => (
+                <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
+              ))}
+            </select>
+          ) : null}
           <Button type="submit">Registrar decisión</Button>
         </MutationForm>
         <div className="mt-5 space-y-3">
@@ -391,6 +405,26 @@ export function DecisionAndRealityPanel({
               </div>
               <p className="mt-2 text-sm text-gray-300">{entry.rationale}</p>
               <p className="mt-2 text-xs text-gray-500">Tesis {entry.thesis_version_id ?? '—'} · Modelo {entry.model_version_id ?? '—'}</p>
+              {entry.transaction ? (
+                <div className="mt-2 rounded border border-teal-900/50 bg-teal-950/10 p-2 text-xs leading-5 text-gray-300">
+                  <p><span className="text-teal-300">Operación:</span> {describeTrade(entry.transaction)}</p>
+                  <p className="text-gray-400" title="Margen = valor justo / precio de ejecución − 1">{describeFairValue(entry.fair_value_on_day)}</p>
+                  <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Operación desenlazada">
+                    <input name="transaction_id" type="hidden" value="" />
+                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">Desenlazar</button>
+                  </MutationForm>
+                </div>
+              ) : trades.length > 0 ? (
+                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage="Decisión enlazada a la operación">
+                  <select aria-label="Enlazar a una operación" className={`${selectClass} h-8 text-xs`} defaultValue="" name="transaction_id" required>
+                    <option disabled value="">Enlazar a una operación…</option>
+                    {trades.map((trade) => (
+                      <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" type="submit" variant="outline">Enlazar</Button>
+                </MutationForm>
+              ) : null}
             </div>
           ))}
         </div>

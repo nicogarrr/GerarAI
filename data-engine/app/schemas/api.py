@@ -159,6 +159,7 @@ class SnapshotThesisSummaryOut(BaseModel):
     hypothesis: str | None = None
     catalysts: list | None = None
     invalidation_criteria: list | None = None
+    invalidation_rules: list | None = None
     scenario_probabilities: dict | None = None
     created_at: datetime
 
@@ -325,6 +326,7 @@ class ThesisOut(BaseModel):
     hypothesis: str | None = None
     catalysts: list | None = None
     invalidation_criteria: list | None = None
+    invalidation_rules: list | None = None
     scenario_probabilities: dict | None = None
     # Inputs pendientes (human-in-the-loop): lo que falta para completar la
     # tesis. None = sin informacion (empresa sin modelo fundamental

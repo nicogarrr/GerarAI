@@ -178,6 +178,11 @@ class StandardDCFEngine(ValuationEngine):
             )
             return result
 
+        # Puente completo EV -> equity: también restan los intereses
+        # minoritarios y las acciones preferentes cuando el emisor los declara
+        # (sin hecho = no existen; se deja constancia en la traza).
+        minority_interest = snapshot.value("minority_interest") or 0.0
+        preferred_stock = snapshot.value("preferred_stock") or 0.0
         base_inputs = DCFInputs(
             revenue=revenue,
             revenue_growth=growth,
@@ -186,6 +191,8 @@ class StandardDCFEngine(ValuationEngine):
             terminal_growth=terminal,
             net_debt=net_debt,
             shares_outstanding=shares,
+            minority_interest=minority_interest,
+            preferred_stock=preferred_stock,
         )
 
         # Only the facts the DCF actually consumes may move the evidence
@@ -218,6 +225,8 @@ class StandardDCFEngine(ValuationEngine):
                     terminal_growth=float(scenario.assumptions["terminal_growth"]),
                     net_debt=net_debt,
                     shares_outstanding=shares,
+                    minority_interest=minority_interest,
+                    preferred_stock=preferred_stock,
                 )
             )
             scenario_results[scenario.name] = {
@@ -257,6 +266,8 @@ class StandardDCFEngine(ValuationEngine):
                     terminal_growth=terminal,
                     net_debt=net_debt,
                     shares_outstanding=shares,
+                    minority_interest=minority_interest,
+                    preferred_stock=preferred_stock,
                 )
             )
             # Base explicita: la cifra solo se entiende con el margen FCF y el
@@ -352,6 +363,9 @@ class StandardDCFEngine(ValuationEngine):
                 "inferred_inputs_ignored": dropped_inferred,
                 "wacc": wacc,
                 "net_debt": net_debt,
+                "minority_interest": minority_interest,
+                "preferred_stock": preferred_stock,
+                "equity_bridge": "EV - net_debt - minority_interest - preferred_stock",
                 "adr_ratio": ratio,
                 "comparable_price": comparable_price,
                 "terminal_value_share": terminal_share,

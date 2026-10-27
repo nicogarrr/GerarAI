@@ -326,6 +326,45 @@ def test_alerts_disabled_still_updates_state(db, monkeypatch):
     assert _alerts(db) == []
 
 
+def test_actor_with_alerts_disabled_persists_levels_and_sends_no_email(db, monkeypatch):
+    """Extremo a extremo por el actor diario con los avisos apagados.
+
+    Es el default de la rama ``corr/dca-defaults-off`` (DCA_ALERTS_ENABLED=false
+    y sin correo): la evaluacion tiene que guardar el nivel (UBER cae un 45 %
+    -> 4X) y no debe salir ningun aviso ni ningun correo.
+    """
+    from app.services.notification_service import NotificationService
+    from app.workers import dramatiq_app
+
+    monkeypatch.setenv("DCA_ALERTS_ENABLED", "false")
+    get_settings.cache_clear()
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(55.0))
+    real_evaluate = svc.evaluate_watchlist
+    dispatched: list[int] = []
+    monkeypatch.setattr(
+        svc, "evaluate_watchlist", lambda session: real_evaluate(
+            session, fetcher=fetcher, now=NOW, today=date(2026, 10, 27), params=PARAMS
+        )
+    )
+    monkeypatch.setattr(NotificationService, "dispatch", lambda self, session, alert: dispatched.append(alert.id) or {})
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: db)
+    monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda name, **kw: "tok")
+    monkeypatch.setattr(dramatiq_app, "release_job_lease", lambda name, token, **kw: None)
+
+    out = dramatiq_app.evaluate_dca_signals.fn(1, "u-1")
+
+    assert out["status"] == "ok"
+    assert out["evaluated"] == 1 and out["alerted"] == [] and out["alerts_enabled"] is False
+    state = _state(db, "UBER")
+    assert state.level == 4 and state.period == "2026-10"
+    assert state.last_alerted_level is None
+    assert _alerts(db) == []
+    # Ningun canal (in_app, email, Telegram) se despacha: todo pasa por dispatch.
+    assert dispatched == []
+
+
 def test_tracked_symbols_dedups(db):
     company = _company(db, "ASTS")
     db.add(Position(tenant_id=1, company_id=company.id, quantity=Decimal("5")))

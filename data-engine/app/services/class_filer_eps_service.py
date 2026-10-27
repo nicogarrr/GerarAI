@@ -271,6 +271,26 @@ def backfill_class_based_eps(
 
 CLASS_SHARES_FILERS: tuple[str, ...] = ("META", "GOOGL", "BRK.B", "ASTS", "V")
 
+# Ratio de conversion de cada clase a la clase COTIZADA del ticker (acciones
+# de la clase cotizada por cada accion de esa clase). Revisado a mano: sumar
+# clases en bruto solo es correcto cuando todas valen lo mismo (META, GOOGL,
+# ASTS: 1:1). BRK.B: una accion A se convierte en 1.500 B (estatutos de
+# Berkshire desde el split de 2010, 10-K Item 5): el saldo en "equivalentes
+# B" es A*1500 + B. Si el emisor declara una clase que no esta en su mapa, no
+# se escribe nada (no se adivina un ratio).
+CLASS_CONVERSION_TO_LISTED: dict[str, dict[str, Decimal]] = {
+    "BRK.B": {
+        "CommonClassAMember": Decimal(1500),
+        "CommonClassBMember": Decimal(1),
+    },
+}
+
+# Emisores cuyo ratio de conversion entre clases VARIA en el tiempo y no esta
+# revisado: Visa (las B-1/B-2 se convierten en A a un ratio que se ajusta por
+# los litigios y la C a 4:1). Sin ratio fiable, la suma bruta mentiria: no se
+# escribe shares_outstanding derivado.
+CLASS_RATIOS_UNREVIEWED: frozenset[str] = frozenset({"V"})
+
 
 def _latest_instance_url(
     cik: str, fetch_json: Callable[[str], dict], forms: tuple[str, ...] = ("10-K", "10-Q")
@@ -349,7 +369,24 @@ def backfill_class_shares_outstanding(
     if not by_member:
         return ClassSharesResult(company.ticker, False, None, (), None,
                                  skipped_reason="sin ECSO dimensionado por clase")
-    total = sum(f.value for f in by_member.values())
+    ticker_key = (company.ticker or "").upper()
+    if ticker_key in CLASS_RATIOS_UNREVIEWED:
+        return ClassSharesResult(company.ticker, False, None, tuple(sorted(by_member)), None,
+                                 skipped_reason="ratio de conversion entre clases sin revisar")
+    ratios = CLASS_CONVERSION_TO_LISTED.get(ticker_key)
+    if ratios is not None:
+        unmapped = sorted(m for m in by_member if m not in ratios)
+        if unmapped:
+            return ClassSharesResult(
+                company.ticker, False, None, tuple(sorted(by_member)), None,
+                skipped_reason=f"clase sin ratio de conversion revisado: {', '.join(unmapped)}",
+            )
+    # Equivalentes de la clase cotizada: cada clase pesa por su ratio (1:1 si
+    # el emisor no tiene mapa, p. ej. META o GOOGL).
+    total = sum((
+        f.value * (ratios[m] if ratios is not None else Decimal(1))
+        for m, f in by_member.items()
+    ), Decimal(0))
     if total <= 0:
         return ClassSharesResult(company.ticker, False, None, (), None,
                                  skipped_reason="suma de clases no positiva")
@@ -387,9 +424,16 @@ def backfill_class_shares_outstanding(
         **(document.metadata_ or {}),
         "class_shares_provenance": {
             "concept": "dei:EntityCommonStockSharesOutstanding",
-            "derivation": "sum_of_class_members",
+            "derivation": (
+                "sum_of_class_members" if ratios is None else "as_converted_to_listed_class"
+            ),
             "as_of": as_of.isoformat(),
             "members": {m: str(f.value) for m, f in sorted(by_member.items())},
+            **(
+                {"conversion_ratios": {m: str(ratios[m]) for m in sorted(by_member)}}
+                if ratios is not None
+                else {}
+            ),
         },
     }
     db.flush()

@@ -1,13 +1,48 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models import Company
 from app.schemas import ValuationResponse
 from app.services.company_resolver import resolve_company
+from app.services.fair_value_service import (
+    PRECEDENCE_TEXT,
+    resolve_fair_value,
+    resolve_fair_values,
+)
 from app.services.historical_valuation_service import HistoricalValuationService
 from app.services.valuation_service import ValuationService
 
 router = APIRouter()
+
+
+# Va ANTES de "/{ticker}": si no, «fair-value» se resolvería como ticker.
+@router.get("/fair-value")
+def fair_values(
+    tickers: str = Query(..., description="CSV de tickers, máx. 60"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Valor justo único por ticker (tesis o motor), con su procedencia.
+
+    Por lotes no se recalcula el motor: se usa su última valoración persistida.
+    """
+    wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
+    companies = db.scalars(select(Company).where(Company.ticker.in_(wanted))).all()
+    readings = resolve_fair_values(db, companies)
+    return {
+        "precedence": PRECEDENCE_TEXT,
+        "items": {reading["ticker"]: reading for reading in readings.values()},
+    }
+
+
+@router.get("/{ticker}/fair-value")
+def fair_value(ticker: str, db: Session = Depends(get_db)) -> dict:
+    """Valor justo único de un ticker; recalcula el motor si la tesis no basta."""
+    company = resolve_company(db, ticker)
+    if not company:
+        raise HTTPException(status_code=404, detail="Company not found")
+    return {**resolve_fair_value(db, company, live=True), "precedence": PRECEDENCE_TEXT}
 
 
 @router.get("/{ticker}", response_model=ValuationResponse)

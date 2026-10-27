@@ -685,10 +685,11 @@ def gate_adr_ratio_basis(case: dict) -> dict:
         problems.append(f"trace.comparable_price {_fmt(comparable)} != precio / {ratio}")
     expected_value = _number(artifact.get("expected_value"))
     margin = _number(artifact.get("margin_of_safety"))
-    if comparable and margin is not None and expected_value is not None:
-        if not _close(margin, expected_value / comparable - 1):
+    if comparable and margin is not None and expected_value:
+        # Margen de seguridad estándar (Graham): (V − P)/V = 1 − P/V.
+        if not _close(margin, 1 - comparable / expected_value):
             problems.append(
-                f"margin_of_safety {_fmt(margin)} != expected/comparable - 1"
+                f"margin_of_safety {_fmt(margin)} != 1 - comparable/expected"
             )
     if problems:
         return _result("adr_ratio_basis", False, problems)

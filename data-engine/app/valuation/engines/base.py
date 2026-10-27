@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.models import CalculatedMetric, Company
 from app.services.inferred_input_service import InferredInputService, pick_rate_pair
+from app.valuation.adr_ratios import table_adr_ratio
 from app.valuation.financial_snapshot import FinancialSnapshot, FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 
@@ -84,7 +85,14 @@ ADR_TAG_PREFIX = "adr:"
 
 
 def adr_ratio(company: Company) -> float | None:
-    """Ordinary shares represented by one ADR, or ``None`` if not applicable."""
+    """Ordinary shares represented by one ADR, or ``None`` if not applicable.
+
+    Precedencia: la etiqueta ``adr:N`` de ``factor_tags`` y, si no la hay, la
+    tabla citada de :mod:`app.valuation.adr_ratios` (BABA 8, TM 10, TSM 5...).
+    Una etiqueta mal formada (``adr:0``, ``adr:x``) o dos ratios distintos
+    devuelven None aunque la tabla tenga fila: un dato contradictorio no se
+    tapa con la tabla.
+    """
     ratios: set[float] = set()
     for tag in company.factor_tags or []:
         text = str(tag).strip().lower()
@@ -96,7 +104,10 @@ def adr_ratio(company: Company) -> float | None:
             if not math.isfinite(ratio) or ratio <= 0:
                 return None
             ratios.add(ratio)
-    return next(iter(ratios)) if len(ratios) == 1 else None
+    if ratios:
+        return next(iter(ratios)) if len(ratios) == 1 else None
+    row = table_adr_ratio(company.ticker)
+    return float(row.ordinary_per_adr) if row is not None else None
 
 
 def is_adr_without_ratio(company: Company) -> bool:
@@ -270,18 +281,41 @@ def default_terminal_growth(company: Company) -> float:
 
 
 def margin_of_safety(expected_value: float | None, current_price: float | None) -> float | None:
+    """Margen de seguridad estándar: (V − P) / V.
+
+    Es el descuento del precio sobre el valor estimado (Graham, *The
+    Intelligent Investor*, cap. 20; Klarman, *Margin of Safety*). No es el
+    potencial de revalorización V/P − 1, que la versión anterior calculaba
+    con el mismo nombre: con V = 130 y P = 100, el margen es 23,1 % y el
+    potencial 30 %. El signo coincide en los dos (V > P ⇔ margen > 0), así
+    que el veredicto atractivo/caro no cambia de lado. Con V ≤ 0 el cociente
+    no tiene lectura y se devuelve None (N/D).
+    """
     if expected_value is None or current_price is None or current_price <= 0:
         return None
-    return expected_value / current_price - 1
+    if expected_value <= 0:
+        return None
+    return (expected_value - current_price) / expected_value
+
+
+def upside_from_margin_of_safety(margin: float) -> float:
+    """Potencial V/P − 1 equivalente a un margen (V − P)/V: 1/(1 − m) − 1."""
+    return 1 / (1 - margin) - 1
+
+
+def margin_of_safety_from_upside(upside: float) -> float:
+    """Margen (V − P)/V equivalente a un potencial V/P − 1: 1 − 1/(1 + u)."""
+    return 1 - 1 / (1 + upside)
 
 
 def margin_of_safety_reference(valuation: dict[str, Any]) -> tuple[str, float] | None:
     """Valor contra el que se calculo ``margin_of_safety`` y su etiqueta.
 
-    Todos los motores calculan MoS = valor esperado / precio - 1. Un texto que
-    lo presente «respecto al escenario base» con un MoS de valor esperado
-    muestra una cifra que no sale de los numeros citados (MSFT: -31% con base
-    309,10 y precio 529,05, cuando base/precio - 1 = -41,6%). Sin valor
+    Todos los motores calculan MoS = (valor esperado − precio) / valor
+    esperado. Un texto que lo presente «respecto al escenario base» con un MoS
+    de valor esperado muestra una cifra que no sale de los numeros citados
+    (MSFT con base 309,10 y precio 529,05: el margen respecto a la base es
+    (309,10 − 529,05)/309,10 = −71,2 %, no el del valor esperado). Sin valor
     esperado (valoraciones parciales) se cae al escenario base, como antes.
     """
     expected = valuation.get("expected_value")

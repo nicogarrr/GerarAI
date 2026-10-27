@@ -138,6 +138,142 @@ def test_xirr_money_weighted_return(db, monkeypatch):
     assert xirr == pytest.approx(0.10, abs=1e-4)
 
 
+def _freeze_today(monkeypatch):
+    today = date.today()
+
+    class _FixedDate(date):
+        @classmethod
+        def today(cls):
+            return today
+
+    import app.services.portfolio_intelligence_service as pi_module
+
+    monkeypatch.setattr(pi_module, "date", _FixedDate)
+    return today
+
+
+def test_xirr_sale_proceeds_in_cash_are_not_counted_twice(db, monkeypatch):
+    """Caso de la auditoria (xirr_caja_doble_conteo).
+
+    Compra 10 @ 100 hace un ano (-1.000), venta 10 @ 110 hoy (+1.100) y la caja
+    del broker queda en 1.100. Sin depositos registrados el XIRR es de
+    INVERSION: flujos = compras/ventas/dividendos y valor final = solo
+    posiciones (aqui 0). A mano: -1.000 + 1.100/(1+r) = 0 -> r = 10 %.
+    Antes se sumaba ademas la caja como valor final: -1.000, +1.100, +1.100
+    -> r ~ 120 % (la venta contada dos veces).
+    """
+    from app.models.entities import CashBalance
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    company = _company(db)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.add_all([
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id,
+            trade_date=today - timedelta(days=365), action="buy",
+            quantity=Decimal("10"), price=Decimal("100"), currency="EUR",
+            external_id="xirr-dc-buy",
+        ),
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id, trade_date=today,
+            action="sell", quantity=Decimal("10"), price=Decimal("110"),
+            currency="EUR", external_id="xirr-dc-sell",
+        ),
+        CashBalance(currency="EUR", balance=Decimal("1100")),
+    ])
+    db.commit()
+
+    xirr, meta = PortfolioIntelligenceService()._xirr(db, [])
+    assert meta["status"] == "calculated"
+    assert meta["perspective"] == "investment"
+    assert xirr == pytest.approx(0.10, abs=1e-6)
+
+
+def test_xirr_account_perspective_uses_only_external_flows(db, monkeypatch):
+    """Con depositos/retiradas registrados el XIRR es de CUENTA: flujos =
+    solo aportaciones y retiradas externas, valor final = posiciones + caja
+    (CFA Level I, money-weighted return; GIPS 2020, "external cash flow").
+
+    Deposito de 1.000 hace un ano (IBKR "Deposits/Withdrawals"), compra
+    10 @ 100 ese dia, dividendo de 50 a mitad de ano (queda en caja) y hoy
+    posicion 1.100 + caja 50. A mano: -1.000 + 1.150/(1+r) = 0 -> r = 15 %.
+    La compra y el dividendo son movimientos INTERNOS de la cuenta: ya estan
+    dentro del valor final. Antes entraban el deposito como salida (-1.000)
+    Y la compra (-1.000): r salia negativo.
+    """
+    from app.models.entities import CashBalance
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    company = _company(db)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    start = today - timedelta(days=365)
+    db.add_all([
+        Transaction(
+            portfolio_id=portfolio.id, company_id=None, trade_date=start,
+            action="cash_misc", quantity=Decimal("1"), price=Decimal("1000"),
+            currency="EUR", external_id="xirr-acc-dep",
+            raw_payload={"type": "Deposits/Withdrawals"},
+        ),
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id, trade_date=start,
+            action="buy", quantity=Decimal("10"), price=Decimal("100"),
+            currency="EUR", external_id="xirr-acc-buy",
+        ),
+        Transaction(
+            portfolio_id=portfolio.id, company_id=company.id,
+            trade_date=start + timedelta(days=184), action="dividend",
+            quantity=Decimal("1"), price=Decimal("50"), currency="EUR",
+            external_id="xirr-acc-div",
+        ),
+        CashBalance(currency="EUR", balance=Decimal("50")),
+    ])
+    position = Position(
+        portfolio_id=portfolio.id, company_id=company.id,
+        quantity=Decimal("10"), market_price=Decimal("110"),
+        market_value_base=Decimal("1100"), currency="EUR", as_of=today,
+    )
+    db.add(position)
+    db.commit()
+
+    xirr, meta = PortfolioIntelligenceService()._xirr(db, [(position, company)])
+    assert meta["status"] == "calculated"
+    assert meta["perspective"] == "account"
+    assert meta["external_flows"] == 1
+    assert xirr == pytest.approx(0.15, abs=1e-6)
+
+
+def test_xirr_account_withdrawal_is_an_inflow_to_the_investor(db, monkeypatch):
+    """Deposito manual de 1.000 hace un ano y retirada de 200 hoy; hoy la
+    cuenta vale 900 (solo caja). A mano: -1.000 + (200 + 900)/(1+r) = 0
+    -> r = 10 %."""
+    from app.models.entities import CashBalance
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    today = _freeze_today(monkeypatch)
+    portfolio = PortfolioFXService().ensure_portfolio(db)
+    db.add_all([
+        Transaction(
+            portfolio_id=portfolio.id, company_id=None,
+            trade_date=today - timedelta(days=365), action="deposit",
+            quantity=Decimal("1"), price=Decimal("1000"), currency="EUR",
+            external_id="xirr-w-dep",
+        ),
+        Transaction(
+            portfolio_id=portfolio.id, company_id=None, trade_date=today,
+            action="withdrawal", quantity=Decimal("1"), price=Decimal("200"),
+            currency="EUR", external_id="xirr-w-wd",
+        ),
+        CashBalance(currency="EUR", balance=Decimal("900")),
+    ])
+    db.commit()
+
+    xirr, meta = PortfolioIntelligenceService()._xirr(db, [])
+    assert meta["perspective"] == "account"
+    assert xirr == pytest.approx(0.10, abs=1e-6)
+
+
 def test_xirr_honest_when_cashflows_insufficient(db):
     service = PortfolioIntelligenceService()
     xirr, meta = service._xirr(db, [])

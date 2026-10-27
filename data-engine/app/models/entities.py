@@ -1207,6 +1207,11 @@ class ThesisVersion(TenantOwnedMixin, Base, TimestampMixin):
     hypothesis: Mapped[str | None] = mapped_column(Text, nullable=True)
     catalysts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     invalidation_criteria: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Criterios de invalidacion ESTRUCTURADOS y opcionales: lista de
+    # {metric, operator, threshold, description}. A diferencia del texto libre
+    # de arriba, se evaluan: el evaluador de alertas los comprueba en cada
+    # pasada (app/services/thesis_invalidation_rules.py). None = sin criterios.
+    invalidation_rules: Mapped[list | None] = mapped_column(JSON, nullable=True)
     scenario_probabilities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Analisis narrativo (capa LLM opcional): secciones compuestas por
     # seleccion de plantillas con slots deterministicos. Null en versiones
@@ -1946,6 +1951,12 @@ class DecisionJournalEntry(TenantOwnedMixin, Base, TimestampMixin):
     price: Mapped[Decimal | None] = mapped_column(Numeric(20, 4), nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="open", index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    # Operacion real (compra/venta importada de IBKR o manual) que ejecuto esta
+    # decision. Opcional: una decision de "vigilar" no tiene operacion. Si se
+    # borra la operacion, la entrada del diario se conserva (SET NULL).
+    transaction_id: Mapped[int | None] = mapped_column(
+        ForeignKey("transactions.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
 
 class ExpectationReview(TenantOwnedMixin, Base, TimestampMixin):
@@ -2016,6 +2027,9 @@ class KnowledgeDocument(TenantOwnedMixin, Base, TimestampMixin):
     language: Mapped[str] = mapped_column(String(20), default="en")
     status: Mapped[str] = mapped_column(String(40), default="ready", index=True)
     checksum: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    # Empresa a la que se refiere el documento (opcional, normalizado strip +
+    # upper). Lo usa la ficha /research/[ticker] para listar sus lecturas.
+    ticker: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
 

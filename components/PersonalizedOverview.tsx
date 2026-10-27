@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, BellRing, Eye, Gem, Wallet } from 'lucide-react';
 import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBreakdown';
+import { DcaLevelChip, useHoldingSignals } from '@/components/portfolio/HoldingSignals';
+import { fairValueGapPercent } from '@/lib/portfolio/holding-signals';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
 import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
 import { sectionError } from '@/lib/section-error';
@@ -59,6 +61,23 @@ interface UndervaluedStock {
     /** true = el DCF no es publicable (inputs sin trazabilidad datada):
      *  la ficha lo muestra como orientacion del motor, no como valoracion final. */
     orientation?: boolean;
+    /** Procedencia del valor justo único (misma cifra que la watchlist). */
+    fairValueLabel?: string;
+    fairValueAsOf?: string | null;
+}
+
+/** Valor justo único de una posición en el inicio: margen frente al precio y su fuente. */
+function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; signals: ReturnType<typeof useHoldingSignals> }) {
+    if (signals === null) return null;
+    const fair = signals.fairValues[holding.symbol.toUpperCase()];
+    if (!fair) return <span className="text-[11px] text-gray-500">Sin valor justo</span>;
+    const gap = fairValueGapPercent(holding.currentPrice, holding.nativeCurrency, fair);
+    return (
+        <span className="text-[11px] text-gray-400" title={`Valor justo · ${fair.label}`}>
+            VJ {gap !== null ? formatPercent(gap, { fromRatio: false, digits: 0, signDisplay: 'always' }) : formatNumber(fair.value)}
+            <span className="text-gray-500"> · {fair.source === 'tesis' ? 'tesis' : fair.source === 'motor' ? 'motor' : 'motor orient.'}</span>
+        </span>
+    );
 }
 
 /** El universo del screener es todo lo que devuelve /api/screeners/real por
@@ -326,6 +345,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             .slice(0, 4);
     }, [portfolioSummary]);
 
+    // Nivel DCA y valor justo único de las posiciones que se ven en el inicio.
+    const holdingSignals = useHoldingSignals(sortedHoldings.map((h) => h.symbol));
+
     /** Frase "tu cartera en una línea": derivada solo del resumen, nunca
      *  del waterfall de oportunidades (F38). */
     const insight = useMemo(() => buildPortfolioInsight(portfolioSummary), [portfolioSummary]);
@@ -395,7 +417,13 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                             href={`/research/${h.symbol}`}
                                             className="flex min-h-[44px] items-center justify-between gap-2 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
                                         >
-                                            <span className="text-white font-semibold">{h.symbol}</span>
+                                            <span className="flex min-w-0 flex-col gap-1">
+                                                <span className="text-white font-semibold">{h.symbol}</span>
+                                                <span className="flex flex-wrap items-center gap-1">
+                                                    <DcaLevelChip symbol={h.symbol} signals={holdingSignals} />
+                                                    <HomeFairValueHint holding={h} signals={holdingSignals} />
+                                                </span>
+                                            </span>
                                             {holdingDisplayMode(h) === 'gain' ? (
                                                 <span className={`font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                     {formatPercent(h.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
@@ -647,8 +675,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 {visibleOpportunities.map((op) => {
                                     // La ficha DCF muestra el precio en la divisa del
                                     // listado y el valor justo SIN símbolo: el modelo
-                                    // (/api/valuation/{ticker}) sí trae `currency` pero
-                                    // getFairValueReading no la propaga, así que se declara N/D
+                                    // (valor justo único, /api/valuation/{ticker}/fair-value)
+                                    // no garantiza la divisa del listado, así que se declara N/D
                                     // en la etiqueta en vez de suponer dólares.
                                     const priceLabel = isValidCurrencyCode(op.currency) ? 'Precio' : 'Precio (divisa N/D)';
                                     return (
@@ -672,6 +700,11 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                     />
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-2 text-right">Valor justo (divisa N/D): {formatNumber(op.fairValue)}</p>
+                                                {op.fairValueLabel ? (
+                                                    <p className="text-[11px] text-gray-500 mt-0.5 text-right">
+                                                        Fuente: {op.fairValueLabel}{op.fairValueAsOf ? ` · ${formatMarketDate(op.fairValueAsOf)}` : ''}
+                                                    </p>
+                                                ) : null}
                                                 {op.orientation ? (
                                                     <p className="text-xs text-amber-500/90 mt-1 text-right">Orientación del motor, no valoración final</p>
                                                 ) : null}

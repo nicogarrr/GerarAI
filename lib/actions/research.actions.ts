@@ -8,6 +8,8 @@ import { sourcesPageInfo } from '@/lib/research/sources-inventory';
 import { researchRequest } from '@/lib/research/client';
 import { paginateAll } from '@/lib/paginate-all';
 import type { components } from '@/lib/research/openapi.generated';
+import type { JournalFairValue, JournalTrade } from '@/lib/research/journal-trade';
+import type { ResearchTtm } from '@/lib/research/ttm-display';
 
 
 type ResearchCompany = {
@@ -211,6 +213,9 @@ export type ResearchThesis = {
   hypothesis?: string | null;
   catalysts?: ResearchThesisCatalyst[] | null;
   invalidation_criteria?: string[] | null;
+  /** Criterios MEDIBLES (métrica, operador, umbral) que vigila el evaluador de
+   *  alertas; null = sin criterios medibles. */
+  invalidation_rules?: Array<{ metric: string; operator: string; threshold: number; description?: string | null }> | null;
   scenario_probabilities?: Record<string, number> | null;
   /** Human-in-the-loop: inputs que faltan para completar la tesis (nunca se
    *  inventan; la app los pide). null = sin informacion. */
@@ -624,6 +629,11 @@ export type ResearchDecisionJournalEntry = {
   price: number | null;
   status: string;
   metadata: Record<string, unknown>;
+  /** Operación real (compra/venta IBKR o manual) que ejecutó la decisión. */
+  transaction_id?: number | null;
+  transaction?: JournalTrade | null;
+  /** Valor justo vigente el día de la operación (point-in-time). */
+  fair_value_on_day?: JournalFairValue | null;
 };
 
 export type ResearchExpectationReview = {
@@ -880,26 +890,30 @@ export async function getResearchThesisWorkspace(ticker: string) {
 
 export async function getResearchChangesWorkspace(ticker: string) {
   const encoded = encodeURIComponent(ticker.toUpperCase());
-  const [changes, reviews, alerts, decisions, expectations] = await Promise.all([
+  const [changes, reviews, alerts, decisions, expectations, trades] = await Promise.all([
     getJson<ResearchThesisChange[]>(`/api/memory/thesis/${encoded}/changes?limit=100`, []),
     getJson<ResearchReview[]>(`/api/reviews?ticker=${encoded}`, []),
     getJson<ResearchAlert[]>(`/api/alerts?ticker=${encoded}&include_snoozed=true`, []),
     getJson<ResearchDecisionJournalEntry[]>(`/api/companies/${encoded}/decision-journal`, []),
     getJson<ResearchExpectationReview[]>(`/api/companies/${encoded}/expectation-reality`, []),
+    // Compras/ventas del ticker para enlazarlas al diario; [] si no hay o falla.
+    getJson<JournalTrade[]>(`/api/companies/${encoded}/decision-journal/trades`, []),
   ]);
-  return { changes, reviews, alerts, decisions, expectations };
+  return { changes, reviews, alerts, decisions, expectations, trades };
 }
 
 export async function getResearchFinancialsWorkspace(ticker: string) {
   const encoded = encodeURIComponent(ticker.toUpperCase());
-  const [facts, metrics] = await Promise.all([
+  const [facts, metrics, ttm] = await Promise.all([
     getJson<ResearchFact[]>(`/api/companies/${encoded}/facts?limit=250`, []),
     getJson<{ metrics: ResearchCalculatedMetric[] }>(
       `/api/companies/${encoded}/metrics/calculated`,
       { metrics: [] },
     ),
+    // Fundamentales actuales en TTM (últimos 4 trimestres) con respaldo FY.
+    getJson<ResearchTtm | null>(`/api/companies/${encoded}/ttm`, null),
   ]);
-  return { facts, calculatedMetrics: metrics.metrics };
+  return { facts, calculatedMetrics: metrics.metrics, ttm };
 }
 
 export async function getResearchLongTermModel(ticker: string) {
@@ -964,10 +978,32 @@ export async function createResearchDecision(ticker: string, formData: FormData)
   if (rationale.length < 5) {
     throw new ValidationError('Explica la decisión con al menos 5 caracteres', 'rationale');
   }
+  const rawTransaction = String(formData.get('transaction_id') ?? '').trim();
+  const transactionId = /^\d+$/.test(rawTransaction) ? Number(rawTransaction) : null;
   await postJson(
     `/api/companies/${encodeURIComponent(normalizedTicker)}/decision-journal`,
     null,
-    { decision, rationale, what_must_be_true: whatMustBeTrue },
+    {
+      decision,
+      rationale,
+      what_must_be_true: whatMustBeTrue,
+      ...(transactionId ? { transaction_id: transactionId } : {}),
+    },
+  );
+  revalidatePath(`/research/${normalizedTicker}`);
+}
+
+/** PUT /api/companies/{ticker}/decision-journal/{id}/transaction: enlaza una
+ *  entrada existente a una compra/venta (o la desenlaza con valor vacío). */
+export async function linkResearchDecisionTrade(ticker: string, entryId: number, formData: FormData) {
+  await requireAuthenticatedUser();
+  const normalizedTicker = ticker.toUpperCase();
+  const raw = String(formData.get('transaction_id') ?? '').trim();
+  if (raw !== '' && !/^\d+$/.test(raw)) throw new ValidationError('Operación no válida', 'transaction_id');
+  if (!Number.isInteger(entryId) || entryId <= 0) throw new ValidationError('Entrada no válida', 'entry_id');
+  await researchRequest(
+    `/api/companies/${encodeURIComponent(normalizedTicker)}/decision-journal/${entryId}/transaction`,
+    { method: 'PUT', body: JSON.stringify({ transaction_id: raw === '' ? null : Number(raw) }) },
   );
   revalidatePath(`/research/${normalizedTicker}`);
 }
@@ -999,6 +1035,30 @@ export async function refreshCompanyResearchModel(ticker: string) {
   );
   revalidatePath(`/research/${normalizedTicker}`);
 }
+/** Resultado como valor: un Server Action en producción oculta el mensaje de
+ *  las excepciones, y el 422 del backend explica qué criterio no es válido. */
+export type SaveInvalidationRulesResult = { ok: true; count: number } | { ok: false; error: string };
+
+/** PUT /api/thesis/{ticker}/invalidation-rules: guarda los criterios medibles
+ *  en la última versión de la tesis; el evaluador de alertas los vigila. */
+export async function saveThesisInvalidationRules(
+  ticker: string,
+  rules: Array<{ metric: string; operator: string; threshold: number; description?: string | null }>,
+): Promise<SaveInvalidationRulesResult> {
+  await requireAuthenticatedUser();
+  const normalizedTicker = ticker.toUpperCase();
+  try {
+    const result = await researchRequest<{ invalidation_rules: unknown[] }>(
+      `/api/thesis/${encodeURIComponent(normalizedTicker)}/invalidation-rules`,
+      { method: 'PUT', body: JSON.stringify({ rules }) },
+    );
+    revalidatePath(`/research/${normalizedTicker}`);
+    return { ok: true, count: Array.isArray(result?.invalidation_rules) ? result.invalidation_rules.length : 0 };
+  } catch (error) {
+    return { ok: false, error: getSafeErrorMessage(error) || 'No se pudieron guardar los criterios.' };
+  }
+}
+
 export async function createResearchClaim(ticker: string, formData: FormData) {
   const normalizedTicker = ticker.toUpperCase();
   const statement = String(formData.get('statement') ?? '').trim();

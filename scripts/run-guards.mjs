@@ -16,7 +16,7 @@
  *  - exit code propagado tal cual: un guard rojo hunde el script.
  */
 import { spawnSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
+import { mkdirSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -47,7 +47,26 @@ const files = guards.map((name) => path.posix.join('scripts', name));
 
 console.log(`run-guards: ${files.length} guard(s) descubiertos en scripts/*.test.{ts,mjs}`);
 
-const result = spawnSync(process.execPath, ['--experimental-strip-types', '--experimental-test-module-mocks', '--test', ...files], {
+// `--coverage`: además mide qué líneas de lib/, components/ y middleware.ts
+// ejecutan los guards (cobertura nativa de node:test) y la deja en LCOV para
+// scripts/frontend-coverage-summary.mjs. Sin el flag, el runner es el de
+// siempre. Ver docs/FRONTEND_TESTS.md.
+const withCoverage = process.argv.includes('--coverage');
+const coverageArgs = withCoverage
+  ? [
+      '--experimental-test-coverage',
+      '--test-coverage-include=lib/**',
+      '--test-coverage-include=components/**',
+      '--test-coverage-include=middleware.ts',
+      '--test-reporter=spec',
+      '--test-reporter-destination=stdout',
+      '--test-reporter=lcov',
+      `--test-reporter-destination=${path.posix.join('coverage', 'frontend', 'guards.lcov')}`,
+    ]
+  : [];
+if (withCoverage) mkdirSync(path.join(REPO_ROOT, 'coverage', 'frontend'), { recursive: true });
+
+const result = spawnSync(process.execPath, ['--experimental-strip-types', '--experimental-test-module-mocks', ...coverageArgs, '--test', ...files], {
   cwd: REPO_ROOT,
   stdio: 'inherit',
 });

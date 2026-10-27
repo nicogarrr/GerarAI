@@ -6,7 +6,10 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { PieChart as PieChartIcon } from 'lucide-react';
 import { formatMoney, formatPercent } from '@/lib/format';
-import { COLORS, buildAllocationSlices, CASH_SLICE_SYMBOL, type AllocationSlice } from './PortfolioAllocationChart';
+// Datos y colores desde módulos ligeros: importar valores de
+// './PortfolioAllocationChart' metía recharts en la carga inicial de /portfolio.
+import { COLORS } from './allocation-colors';
+import { buildAllocationSlices, CASH_SLICE_SYMBOL, type AllocationSliceData as AllocationSlice } from '@/lib/portfolio-allocation';
 
 const PortfolioAllocationChart = dynamic(() => import('./PortfolioAllocationChart'), {
     ssr: false,

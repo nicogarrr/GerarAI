@@ -80,9 +80,22 @@ TREATY_DIVIDEND_RATES = {
     # España-EE.UU. (BOE-A-1990-30940, art. 10.2.b): 15% para persona física
     # minorista (el 5% del art. 10.2.a exige sociedad con >=10% del capital).
     "US": Decimal("0.15"),
+    # España-China 2018 (BOE-A-2021-4911, art. 10.2.b): 10% "en todos los
+    # demás casos" (el 5% del art. 10.2.a exige sociedad con >=25%).
+    # Ojo: muchos ADR chinos (BABA, BIDU…) son sociedades de las Islas
+    # Caimán; si el domicilio del emisor es KY no hay convenio y va a
+    # revisión manual.
+    "CN": Decimal("0.10"),
+    # España-Reino Unido 2013 (BOE-A-2014-5171, art. 10.2.a.i): 10%. El 15%
+    # del art. 10.2.a.ii (vehículos inmobiliarios tipo REIT) no se distingue
+    # aquí. El Reino Unido no retiene en origen sobre dividendos ordinarios,
+    # así que lo normal es retención 0 y deducción 0.
+    "GB": Decimal("0.10"),
 }
 TREATY_RATE_SOURCES = {
     "US": "BOE-A-1990-30940 art. 10.2.b (convenio España-EE.UU.)",
+    "CN": "BOE-A-2021-4911 art. 10.2.b (convenio España-China 2018)",
+    "GB": "BOE-A-2014-5171 art. 10.2.a.i (convenio España-Reino Unido)",
 }
 
 UNKNOWN_COUNTRY = "??"
@@ -234,6 +247,60 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
     }
 
 
+def _treaty_creditable(bucket: dict, gross: Decimal, withheld: Decimal, rate: Decimal) -> Decimal:
+    """Retención acreditable con el tope del convenio aplicado DIVIDENDO A DIVIDENDO.
+
+    El convenio limita la retención exigible al tipo del convenio sobre el
+    importe bruto de CADA dividendo (España-EE.UU., BOE-A-1990-30940, art.
+    10.2.b: "15 por 100 del importe bruto de los dividendos"), y el art. 80.1.a
+    LIRPF solo deja deducir el impuesto "efectivamente satisfecho" que el
+    convenio permite: el exceso se reclama en origen. Por eso el tope es
+    Σ_i min(retención_i, tipo × bruto_i), nunca min(Σ retención, tipo × Σ
+    bruto): sumado por país, la retención baja de un valor (p. ej. 10 %)
+    "hace hueco" al exceso de otro (30 % sin W-8BEN) y la deducción sale inflada.
+
+    Dividendo = pago del bloque (ticker) en una fecha, a partir de las filas
+    ``payments``. Una retención sin dividendo ese día (ajuste o reversión
+    posterior) se imputa al dividendo anterior más cercano del mismo valor (o
+    al primero si no hay anterior). Si las filas no concilian con los totales
+    del bloque (falta un importe, fila ambigua o sin filas), el tope se aplica
+    por valor (bloque), que es la granularidad más fina disponible.
+    """
+    block_cap = min(max(withheld, Decimal("0")), gross * rate)
+    gross_by_date: dict[str, Decimal] = {}
+    withheld_by_date: dict[str, Decimal] = {}
+    for payment in bucket.get("payments") or []:
+        kind = payment.get("type")
+        if kind not in {"dividend", "withholding"}:
+            continue
+        amount = payment.get("amount_base")
+        if amount is None or payment.get("ambiguous") or not payment.get("date"):
+            return block_cap
+        target = gross_by_date if kind == "dividend" else withheld_by_date
+        day = str(payment["date"])
+        target[day] = target.get(day, Decimal("0")) + Decimal(str(amount))
+    if not gross_by_date:
+        return block_cap
+    tolerance = Decimal("0.01") * (len(gross_by_date) + len(withheld_by_date))
+    if (
+        abs(sum(gross_by_date.values(), Decimal("0")) - gross) > tolerance
+        or abs(sum(withheld_by_date.values(), Decimal("0")) - withheld) > tolerance
+    ):
+        return block_cap
+    dates = sorted(gross_by_date)
+    assigned = dict.fromkeys(dates, Decimal("0"))
+    for day, amount in withheld_by_date.items():
+        if day in assigned:
+            assigned[day] += amount
+            continue
+        prior = [d for d in dates if d < day]
+        assigned[prior[-1] if prior else dates[0]] += amount
+    return sum(
+        (min(max(assigned[d], Decimal("0")), gross_by_date[d] * rate) for d in dates),
+        Decimal("0"),
+    )
+
+
 def build_double_taxation(
     dividends: list[dict],
     country_by_ticker: dict[str, str | None],
@@ -244,7 +311,8 @@ def build_double_taxation(
 
     La deducción es el MENOR de:
       (a) la retención extranjera soportada, con tope en el tipo del convenio
-          sobre el íntegro (solo países con tipo verificado en el BOE), y
+          sobre el íntegro de CADA dividendo (Σ min(retención_i, tipo ×
+          bruto_i); solo países con tipo verificado en el BOE), y
       (b) la cuota que correspondería en España, calculada con el TIPO MEDIO
           EFECTIVO DE GRAVAMEN (TME) de la declaración COMPLETA: cuota
           íntegra estatal y autonómica ×100 / base liquidable del ahorro,
@@ -330,9 +398,19 @@ def build_double_taxation(
                 ),
             })
             continue
-        entry = by_country.setdefault(country, {"gross": Decimal("0"), "withheld": Decimal("0")})
-        entry["gross"] += Decimal(str(gross or 0))
-        entry["withheld"] += Decimal(str(withheld or 0))
+        entry = by_country.setdefault(
+            country, {"gross": Decimal("0"), "withheld": Decimal("0"), "creditable": Decimal("0")}
+        )
+        gross_d = Decimal(str(gross or 0))
+        withheld_d = Decimal(str(withheld or 0))
+        entry["gross"] += gross_d
+        entry["withheld"] += withheld_d
+        if country != "ES":
+            # Tope del convenio por DIVIDENDO (no por país): art. 10.2.b del
+            # convenio y art. 80.1.a LIRPF; ver _treaty_creditable.
+            entry["creditable"] += _treaty_creditable(
+                bucket, gross_d, withheld_d, TREATY_DIVIDEND_RATES[country]
+            )
 
     countries = []
     total_deduction = Decimal("0")
@@ -347,7 +425,7 @@ def build_double_taxation(
         if data["withheld"] <= 0:
             continue
         treaty_rate = TREATY_DIVIDEND_RATES[country]
-        creditable = min(data["withheld"], data["gross"] * treaty_rate)
+        creditable = data["creditable"]
         if data["withheld"] > creditable:
             any_excess = True  # hay exceso reclamable en origen: se señala
         if tme is not None:
@@ -610,5 +688,92 @@ def build_loss_compensation(
             "aquí se reserva primero la 0446.",
             "No se computan saldos negativos de rendimientos del capital "
             "mobiliario (dividendos IBKR no los generan en la práctica).",
+        ],
+    }
+
+
+# --- Intereses (rendimientos del capital mobiliario, base del ahorro) -------
+#
+# Casilla 0027 (Renta 2025): "Intereses de cuentas, depósitos y de activos
+# financieros en general" — incluye los intereses que el bróker abona por el
+# efectivo de la cuenta (art. 25.2 LIRPF; Manual de ayuda Renta 2025, apdo.
+# 7.2.3.1). Para intereses de cuentas y depósitos "en ningún caso podrán
+# computarse gastos deducibles" (mismo apartado): los intereses PAGADOS por
+# el margen (préstamo del bróker) no restan ni de estos intereses ni de los
+# dividendos (art. 26.1.a LIRPF solo admite gastos de administración y
+# depósito de valores). Para una persona física que no ejerce actividad
+# económica, el interés del margen no es deducible en el IRPF.
+CASILLA_INTERESES = "0027"
+
+
+def build_interest(misc_rows: list[dict], fiscal_year: int) -> dict:
+    """Intereses cobrados (casilla 0027) e intereses de margen pagados (no deducibles).
+
+    ``misc_rows`` son las filas ``misc`` del informe (tipo ``interest``,
+    ``fee`` o ``cash_misc``). Una fila ``interest`` con importe positivo es un
+    interés cobrado; con importe negativo, un interés pagado (margen). Si una
+    fila de interés no tiene importe en EUR (falta FX o fila ambigua), el
+    total de la casilla queda en ``None`` y la fila va a revisión manual:
+    nunca se publica un total parcial con pinta de exacto.
+    """
+    received = Decimal("0")
+    paid = Decimal("0")
+    received_rows = 0
+    paid_rows = 0
+    manual_review: list[dict] = []
+    for row in misc_rows:
+        if row.get("type") != "interest":
+            continue
+        native = row.get("amount_native")
+        amount = row.get("amount_base")
+        if amount is None or native is None or row.get("ambiguous"):
+            manual_review.append({
+                "date": row.get("date"),
+                "currency": row.get("currency"),
+                "amount_native": native,
+                "reason": (
+                    "Interés sin importe en EUR (falta el tipo de cambio de su "
+                    "fecha o la fila es ambigua): revisar a mano."
+                ),
+            })
+            continue
+        value = Decimal(str(amount))
+        if value >= 0:
+            received += value
+            received_rows += 1
+        else:
+            paid += -value
+            paid_rows += 1
+    incomplete = bool(manual_review)
+    casilla_ok = fiscal_year in CASILLAS_YEARS
+    return {
+        "basis": "art-25.2-y-26.1.a-lirpf",
+        "received": {
+            "casilla": CASILLA_INTERESES if casilla_ok else None,
+            "amount_base": None if incomplete else _money(received),
+            "rows": received_rows,
+            "status": "SIN_DATOS" if incomplete else "calculada",
+        },
+        "margin_interest_paid": {
+            "amount_base": None if incomplete else _money(paid),
+            "rows": paid_rows,
+            "deductible": False,
+            "reason": (
+                "Los intereses pagados por el margen no son gasto deducible en "
+                "el IRPF de una persona física: para intereses de cuentas no se "
+                "admite ningún gasto y para dividendos solo los de "
+                "administración y depósito (art. 26.1.a LIRPF; Manual de ayuda "
+                "Renta 2025, apdo. 7.2.3.1). No los restes en la declaración."
+            ),
+        },
+        "manual_review": manual_review,
+        "incomplete": incomplete,
+        "notas": [
+            "IBKR (Irlanda) no practica retención española sobre los "
+            "intereses: la casilla de retenciones de este bloque suele ir a "
+            "cero. Contrasta el importe con el informe anual del bróker.",
+            "Los intereses entran en el saldo de rendimientos del capital "
+            "mobiliario del ahorro (0029 + 0027 …), que también fija el "
+            "límite del 25 % para compensar pérdidas patrimoniales.",
         ],
     }

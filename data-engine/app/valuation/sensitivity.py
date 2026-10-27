@@ -42,6 +42,8 @@ def sensitivity_grid(
                         net_debt=base.net_debt,
                         shares_outstanding=base.shares_outstanding,
                         years=base.years,
+                        minority_interest=base.minority_interest,
+                        preferred_stock=base.preferred_stock,
                     )
                 ).value_per_share
             except ValueError:

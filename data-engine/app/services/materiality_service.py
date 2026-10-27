@@ -279,13 +279,27 @@ class MaterialityService:
         if company is None:
             return 0.0
         positions = list(db.scalars(select(Position)).all())
-        total_equity = sum(Decimal(position.market_value) for position in positions)
+        # El peso es un cociente de importes: solo vale si todos están en la
+        # misma divisa. Con una cartera en una sola divisa sirve el importe
+        # nativo; si se mezclan (USD, EUR, JPY…) se usa el valor en divisa base
+        # de cada posición. Antes se sumaban 2.000.000 JPY con 100.000 EUR como
+        # si fueran la misma unidad y el peso de la acción japonesa salía 95 %.
+        single_currency = len({position.currency for position in positions}) <= 1
+        values: list[tuple[Position, Decimal]] = []
+        for position in positions:
+            if single_currency:
+                values.append((position, Decimal(position.market_value)))
+            elif position.market_value_base is not None:
+                values.append((position, Decimal(position.market_value_base)))
+            elif position.currency == position.base_currency:
+                values.append((position, Decimal(position.market_value)))
+            # Sin valor en base no hay forma honesta de sumarla: queda fuera.
+        total_equity = sum((value for _, value in values), Decimal("0"))
         if total_equity <= 0:
             return 0.0
         company_value = sum(
-            Decimal(position.market_value)
-            for position in positions
-            if position.company_id == company.id
+            (value for position, value in values if position.company_id == company.id),
+            Decimal("0"),
         )
         return float(company_value / total_equity)
 

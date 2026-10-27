@@ -68,12 +68,24 @@ SEC_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
         ["PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets"],
         "USD",
     ),
+    # Mismos alias que la ingesta completa (SEC_METRIC_MAP). Desde ASU 2016-18
+    # muchos emisores solo presentan el tag combinado con caja restringida:
+    # POOL dejo de informar CashAndCashEquivalentsAtCarryingValue tras FY2018 y
+    # la tesis se quedaba con la caja de 2016-2018 y «falta deuda neta». Va el
+    # ultimo: a igual periodo manda la caja sin restringida.
     "cash_and_equivalents": (
-        ["CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsAndShortTermInvestments"],
+        [
+            "CashAndCashEquivalentsAtCarryingValue",
+            "CashCashEquivalentsAndShortTermInvestments",
+            "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents",
+        ],
         "USD",
     ),
+    # Orden por alcance: el combinado (largo + corto plazo) es la deuda total;
+    # LongTermDebtNoncurrent deja fuera la parte corriente (POOL FY2025:
+    # 1.186,4 M frente a 1.199,5 M del total) y por eso va el ultimo.
     "total_debt": (
-        ["LongTermDebtNoncurrent", "LongTermDebt", "DebtLongtermAndShorttermCombinedAmount"],
+        ["DebtLongtermAndShorttermCombinedAmount", "LongTermDebt", "LongTermDebtNoncurrent"],
         "USD",
     ),
 }
@@ -237,6 +249,7 @@ class ThesisEvidenceService:
         bundle["sources"]["transcript"] = self._collect_transcript(db, company)
         bundle["sources"]["ir"] = self._ingest_ir(db, company)
         bundle["sources"]["external_theses"] = self._collect_external_theses(db, company)
+        bundle["sources"].update(self._collect_ownership(db, company))
         db.flush()
         return bundle
 
@@ -253,8 +266,21 @@ class ThesisEvidenceService:
                 "news": self._collect_news(db, company),
                 "transcript": self._collect_transcript(db, company),
                 "external_theses": self._collect_external_theses(db, company),
+                **self._collect_ownership(db, company),
             },
         }
+
+    @staticmethod
+    def _collect_ownership(db: Session, company: Company) -> dict[str, Any]:
+        """Insider (Form 4) y fondos 13F ya persistidos: solo lectura, nunca lanza.
+
+        Conexion 10b: la tesis lee las operaciones insider y el cambio 13F de
+        los gestores revisados como dos bloques de evidencia mas.
+        """
+        from app.services.ticker_ownership_signals import ownership_signals
+
+        signals = ownership_signals(db, company.ticker)
+        return {"insider": signals["insider"], "holders": signals["holders"]}
 
     # -- 1. fundamentales SEC -------------------------------------------------
     def _ingest_fundamentals(

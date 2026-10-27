@@ -356,8 +356,8 @@ def test_section_templates_titles_and_slots():
     assert sections["lo_que_cambio"]["parrafos"][-1] == FRAGMENTS["caveat_titulares"]
     # Hechos vs interpretacion con el numero como slot.
     assert any(
-        "margen de seguridad del -68,0 % (escenario base/precio - 1" in p
-        and "equivale al 32 % del precio actual" in p
+        "margen de seguridad del -68,0 % ((escenario base - precio)/escenario base" in p
+        and "el precio actual equivale al 168 % del escenario base" in p
         for p in sections["lo_que_descuenta"]["parrafos"]
     )
 

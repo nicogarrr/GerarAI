@@ -173,6 +173,74 @@ def test_double_taxation_us_treaty_cap_15pct():
     assert result["status"] == "pendiente_tme"
 
 
+def test_double_taxation_treaty_cap_is_per_dividend_not_per_country():
+    """Tope del convenio por DIVIDENDO (art. 10.2.b convenio España-EE.UU.,
+    BOE-A-1990-30940; art. 80.1.a LIRPF), no por país.
+
+    A mano: AAPL bruto 1.000 con 300 retenidos (30 %, sin W-8BEN) y KO bruto
+    500 con 50 retenidos (10 %), TME 20 %.
+      Tope por dividendo: min(300, 150) + min(50, 75) = 150 + 50 = 200.
+      Cuota española: 1.500 × 20 % = 300 → deducción = min(200, 300) = 200.
+    Agrupando por país saldría min(350, 1.500 × 15 % = 225) = 225: la
+    retención baja de KO "hacía hueco" al exceso de AAPL (25 € de más).
+    """
+    dividends = [
+        {"ticker": "AAPL", "dividends_base": 1000.0, "withholding_base": 300.0,
+         "missing_fx": False, "payments": []},
+        {"ticker": "KO", "dividends_base": 500.0, "withholding_base": 50.0,
+         "missing_fx": False, "payments": []},
+    ]
+    result = build_double_taxation(
+        dividends, {"AAPL": "US", "KO": "US"}, 2025, tme=Decimal("0.20"))
+    us = result["countries"][0]
+    assert us["treaty_cap_base"] == 200.0
+    assert us["deduction_base"] == 200.0
+    assert us["excess_reclaimable_base"] == 150.0   # 350 retenidos − 200
+    assert result["total_deduction_base"] == 200.0
+
+
+def _div(day, amount):
+    return {"date": day, "type": "dividend", "raw_action": "Dividend",
+            "amount_native": amount, "amount_base": amount}
+
+
+def _wht(day, amount):
+    return {"date": day, "type": "withholding", "raw_action": "Withholding Tax",
+            "amount_native": amount, "amount_base": amount}
+
+
+def test_double_taxation_treaty_cap_per_payment_within_one_ticker():
+    """Dentro de un mismo valor, cada pago tiene su propio tope.
+
+    A mano: dos dividendos de 100. El primero con 30 retenidos (30 %, antes de
+    entregar el W-8BEN) y el segundo con 10 (10 %).
+      Por dividendo: min(30, 15) + min(10, 15) = 15 + 10 = 25.
+      Por valor (suma): min(40, 200 × 15 % = 30) = 30 → 5 € de más.
+    """
+    dividends = [{
+        "ticker": "MSFT", "dividends_base": 200.0, "withholding_base": 40.0,
+        "missing_fx": False,
+        "payments": [_div("2025-03-13", 100.0), _wht("2025-03-13", 30.0),
+                     _div("2025-06-12", 100.0), _wht("2025-06-12", 10.0)],
+    }]
+    result = build_double_taxation(dividends, {"MSFT": "US"}, 2025)
+    us = result["countries"][0]
+    assert us["treaty_cap_base"] == 25.0
+    assert us["excess_reclaimable_base"] == 15.0
+
+
+def test_double_taxation_late_withholding_row_goes_to_previous_dividend():
+    """Una retención registrada al día siguiente se imputa al dividendo
+    anterior más cercano: 100 de bruto con 15 retenidos → tope 15 (no 0)."""
+    dividends = [{
+        "ticker": "JNJ", "dividends_base": 100.0, "withholding_base": 15.0,
+        "missing_fx": False,
+        "payments": [_div("2025-03-11", 100.0), _wht("2025-03-12", 15.0)],
+    }]
+    result = build_double_taxation(dividends, {"JNJ": "US"}, 2025)
+    assert result["countries"][0]["treaty_cap_base"] == 15.0
+
+
 def test_double_taxation_with_manual_tme_computes_deduction():
     # Con TME del borrador (entrada manual): deducción = min(tope, bruto×TME).
     dividends = [{
@@ -290,9 +358,10 @@ def test_compute_report_attaches_filing_layer(db):
     assert filing["available"] is True
 
 
-def test_filing_unavailable_when_portfolio_base_is_not_eur(db):
-    # Las casillas del Modelo 100 son importes en EUR: con cartera en USD no
-    # se publican cifras bajo rótulos IRPF.
+def test_irpf_in_eur_even_when_portfolio_base_is_usd(db):
+    # La divisa base es una preferencia de visualizacion: con la cartera en
+    # USD el IRPF se sigue calculando en EUR al tipo BCE de cada operacion, y
+    # las casillas no se bloquean por la divisa base.
     db.add(Portfolio(name="Main", base_currency="USD", is_default=True))
     db.commit()
     c = _company(db, "AAPL", country="US")
@@ -300,10 +369,9 @@ def test_filing_unavailable_when_portfolio_base_is_not_eur(db):
     _tx(db, c, date(2025, 6, 1), "sell", 10, 150, currency="USD")
 
     report = TaxReportService().compute_report(db, 2025)
-    assert report["summary"]["base_currency"] == "USD"
+    assert report["summary"]["base_currency"] == "EUR"
     filing = report["filing"]
-    assert filing["available"] is False
-    assert "EUR" in filing["reason"]
+    assert "divisa base" not in (filing.get("reason") or "")
 
 
 # --- Integración importación IBKR → informe: pagos especiales (fail-closed) --

@@ -67,7 +67,7 @@ Publication blockers
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from app.valuation.dividend_equity import (
     MIN_COST_OF_EQUITY_SPREAD,
@@ -170,9 +170,11 @@ FCFE_ALIASES = {
         "net_debt_issued",
     ),
     "total_debt_prior_period": ("total_debt_prior_period", "total_debt_prior_year"),
+    # Signo de INVERSION (+ = el circulante sube y consume caja), el que resta
+    # el puente FCFE. change_in_working_capital NO es alias: va en signo de
+    # flujo de caja (el contrario) y se niega aparte (ver _cash_flow_wc_as_delta).
     "delta_working_capital": (
         "delta_working_capital",
-        "change_in_working_capital",
         "working_capital_investment",
     ),
     "working_capital": ("working_capital", "net_working_capital"),
@@ -312,6 +314,28 @@ def _scenario_pair(
         bull["cost_of_equity"] = cost_of_equity
         notes.append("bull cost-of-equity discount dropped: the spread floor binds at base.")
     return bear, base, bull, notes
+
+
+CASH_FLOW_WC_METRIC = "change_in_working_capital"
+
+
+def _cash_flow_wc_as_delta(
+    raw: dict[str, SourcedFact], rows: dict[str, SourcedFact]
+) -> bool:
+    """Usa ``change_in_working_capital`` como ΔCC del puente, NEGADO.
+
+    El hecho se guarda en signo de flujo de caja (FMP ``changeInWorkingCapital``:
+    − = el circulante absorbió caja); el puente FCFE resta un AUMENTO del
+    circulante, que es el signo contrario. Solo entra si no hay un
+    ``delta_working_capital`` declarado. Devuelve True si lo usó.
+    """
+    if rows.get("delta_working_capital") is not None:
+        return False
+    cash_flow = raw.get(CASH_FLOW_WC_METRIC)
+    if cash_flow is None:
+        return False
+    rows["delta_working_capital"] = replace(cash_flow, value=-cash_flow.value)
+    return True
 
 
 def _resolve_delta(
@@ -738,8 +762,13 @@ class FreeCashFlowToEquityEngine(_EquityMethodEngine):
         if refusal is not None:
             return refusal
 
-        raw = latest_facts(context.db, company.id, sorted({alias for group in FCFE_ALIASES.values() for alias in group}))
+        raw = latest_facts(
+            context.db,
+            company.id,
+            sorted({alias for group in FCFE_ALIASES.values() for alias in group} | {CASH_FLOW_WC_METRIC}),
+        )
         rows = resolve_aliases(raw, FCFE_ALIASES)
+        wc_from_cash_flow = _cash_flow_wc_as_delta(raw, rows)
 
         missing: list[str] = []
         for key_name, label in (
@@ -765,6 +794,8 @@ class FreeCashFlowToEquityEngine(_EquityMethodEngine):
             current="working_capital",
             prior="working_capital_prior_period",
         )
+        if wc_from_cash_flow:
+            delta_wc_source = "negated_cash_flow_change_in_working_capital"
         if delta_debt is None:
             missing.append("delta_total_debt_or_total_debt_pair")
         if delta_wc is None:

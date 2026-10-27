@@ -41,10 +41,14 @@ def test_compute_metrics_matches_hand_calculation():
     vol = statistics.stdev(RETURNS)
     assert result["sharpe"] == pytest.approx(mean / vol * math.sqrt(252), rel=1e-9)
 
-    downside = [r for r in RETURNS if r < 0]
+    # Sortino & Price (1994): desviacion a la baja sobre N, objetivo 0.
+    # Negativos: -0.005, -0.015, -0.002 -> suma cuadrados 0.000254;
+    # DD = sqrt(0.000254 / 8) = 0.0056347; media 0.003875 -> Sortino ~ 10.917.
+    downside_dev = math.sqrt(sum(min(r, 0.0) ** 2 for r in RETURNS) / len(RETURNS))
     assert result["sortino"] == pytest.approx(
-        mean / statistics.stdev(downside) * math.sqrt(252), rel=1e-9
+        mean / downside_dev * math.sqrt(252), rel=1e-9
     )
+    assert result["sortino"] == pytest.approx(10.917, rel=1e-3)
 
     wealth, peak, mdd = 1.0, 1.0, 0.0
     for r in RETURNS:
@@ -189,3 +193,14 @@ def test_build_without_portfolio_degrades():
     assert result["status"] == "no_portfolio"
     assert result["metrics"] is None
     assert result["exposure"] is None
+
+
+def test_sortino_with_single_negative_period_is_finite():
+    """Con un solo periodo negativo la desviacion a la baja (sobre N) existe.
+
+    Retornos [0.02, -0.01, 0.03, 0.01]: media 0.0125;
+    DD = sqrt(0.0001 / 4) = 0.005; Sortino (anual 12) = 0.0125/0.005*sqrt(12)
+    = 8.660.
+    """
+    result = compute_metrics([0.02, -0.01, 0.03, 0.01], periods=12, risk_free=0.0)
+    assert result["sortino"] == pytest.approx(2.5 * math.sqrt(12), rel=1e-9)

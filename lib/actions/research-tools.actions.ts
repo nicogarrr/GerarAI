@@ -7,6 +7,7 @@ import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { researchErrorDetail } from '@/lib/research/error-detail';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
+import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -30,6 +31,8 @@ export type KnowledgeDocument = {
   language: string;
   status: string;
   checksum: string;
+  /** Empresa a la que se refiere el documento (normalizado en mayúsculas) o null. */
+  ticker: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
 };
@@ -406,6 +409,22 @@ export async function ingestLettersCorpusNow(): Promise<CorpusIngestResult> {
   }
 }
 
+/** Lecturas de la biblioteca enlazadas a un ticker (para la ficha /research/[ticker]). */
+export async function getKnowledgeDocumentsForTicker(ticker: string) {
+  return requestJson<KnowledgeDocument[]>(libraryReadingsPath(ticker));
+}
+
+/** Asigna, cambia o quita (campo vacío) el ticker de un documento de la biblioteca. */
+export async function setKnowledgeDocumentTicker(documentId: number, formData: FormData) {
+  const ticker = knowledgeTickerFormValue(formData.get('ticker'));
+  await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ ticker }),
+  });
+  revalidatePath('/knowledge');
+  if (ticker) revalidatePath(`/research/${encodeURIComponent(ticker)}`);
+}
+
 export async function getKnowledgeDocuments() {
   return requestJson<KnowledgeDocument[]>('/api/knowledge/documents?limit=500');
 }
@@ -499,7 +518,7 @@ export async function uploadKnowledgeDocument(formData: FormData) {
   if (!(file instanceof File) || file.size === 0) {
     throw new ValidationError('Choose a non-empty document', 'file');
   }
-  for (const key of ['collection_id', 'author', 'source_url', 'publication_date']) {
+  for (const key of ['collection_id', 'author', 'source_url', 'publication_date', 'ticker']) {
     if (!String(formData.get(key) ?? '').trim()) formData.delete(key);
   }
   await requestJson('/api/knowledge/documents/upload', { method: 'POST', body: formData });

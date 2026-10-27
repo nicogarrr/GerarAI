@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { RecordDetail, RecordList, type DataRecord } from '@/components/data/RecordViews';
 import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
+import ContributionSplitCard from '@/components/plan/ContributionSplitCard';
+import type { ContributionSplit } from '@/lib/plan/contribution-split';
 import { formatMoney, formatNumber, formatPercent, formatMarketDate, NA } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { t } from '@/lib/i18n/t';
@@ -14,6 +16,8 @@ interface PlanViewProps {
     initialPlan: DataRecord | null;
     initialContributions: DataRecord[];
     initialDrift: DataRecord | null;
+    /** Reparto de la aportación de este mes por nivel DCA (null = no disponible). */
+    initialSplit?: ContributionSplit | null;
 }
 
 /** Etiquetas de las claves que devuelve GET /api/plan
@@ -193,7 +197,7 @@ function extractPlanTickers(drift: DataRecord | null, plan: DataRecord | null): 
     return [...found].filter(Boolean).sort();
 }
 
-export default function PlanView({ initialPlan, initialContributions, initialDrift }: PlanViewProps) {
+export default function PlanView({ initialPlan, initialContributions, initialDrift, initialSplit = null }: PlanViewProps) {
     const tickers = extractPlanTickers(initialDrift, initialPlan);
 
     return (
@@ -212,6 +216,8 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 emptyAction={<PlanSetupDialog />}
                 actions={initialPlan?.plan_exists === true ? <PlanSetupDialog triggerLabel="Editar plan" initial={initialPlan} /> : undefined}
             />
+
+            {initialPlan?.plan_exists === true ? <ContributionSplitCard split={initialSplit} /> : null}
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
                 <CardHeader className="border-b border-gray-700/50 pb-4">

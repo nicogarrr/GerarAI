@@ -187,12 +187,21 @@ _CSV_COLUMN_ALIASES = {
     "price": {"price", "tradeprice", "avgprice"},
     "date": {"date", "tradedate", "datetime"},
     "fees": {"fees", "commission", "ibcommission"},
-    "currency": {"currency"},
+    "currency": {"currency", "currencyprimary"},
 }
 
 
+def _normalize_csv_header(cell: str) -> str:
+    """Nombre de columna comparable con los alias.
+
+    Sin BOM (Excel «CSV UTF-8»), en minusculas y solo letras, digitos y ``_``:
+    la Flex Query de IBKR exporta «Buy/Sell» y debe casar con ``buysell``.
+    """
+    return re.sub(r"[^a-z0-9_]", "", cell.replace("\ufeff", "").strip().lower())
+
+
 def _map_csv_columns(header: list[str]) -> dict[str, int] | None:
-    normalized = [cell.strip().lower() for cell in header]
+    normalized = [_normalize_csv_header(cell) for cell in header]
     mapping: dict[str, int] = {}
     for canonical, aliases in _CSV_COLUMN_ALIASES.items():
         for position, cell in enumerate(normalized):

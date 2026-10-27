@@ -2002,11 +2002,17 @@ def evaluate_dca_signals(
     tenant_id: int | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """Senales DCA (1X-4X + recortes) de watchlist + cartera y avisos por cambio de nivel."""
+    """Senales DCA (1X-4X + recortes) de watchlist + cartera y avisos por cambio de nivel.
+
+    La evaluacion (guardar el nivel de cada ticker para las insignias de la
+    watchlist) depende solo de DCA_EVALUATION_ENABLED. Los avisos los filtra el
+    servicio con DCA_ALERTS_ENABLED: con los avisos apagados se sigue evaluando
+    y guardando el nivel, pero no sale ningun aviso ni correo.
+    """
     from app.core.config import get_settings
     from app.services.dca_signal_service import evaluate_watchlist
 
-    if not get_settings().dca_alerts_enabled:
+    if not get_settings().dca_evaluation_enabled:
         return {"status": "skipped", "actor": "evaluate_dca_signals", "reason": "disabled"}
     db = _session(tenant_id, user_id)
     try:

@@ -192,8 +192,24 @@ def load_screener_ratios(
         if equity_shares:
             equity, shares = equity_shares
             if equity.value > 0 and _unit_currency(equity.unit) == currency and (shares.unit or "").lower() == "shares":
-                metrics["pb"] = _ratio(close / (equity.value / shares.value))
-                provenance["facts"]["pb"] = {"ids": [equity.id, shares.id], "sources": [equity.source_type, shares.source_type], "year": equity.fiscal_year}
+                # Mismo ajuste que el PER: el precio es de HOY y las acciones
+                # son del cierre del ejercicio. Tras un split posterior el
+                # recuento se expresa en acciones actuales (x factor
+                # acumulado); sin ajuste el P/B salia dividido por el factor.
+                shares_split_factor = cumulative_split_factor_after(
+                    splits_by_company.get(company.id, []),
+                    period_end_date(shares.period),
+                )
+                metrics["pb"] = _ratio(
+                    close / (equity.value / (shares.value * shares_split_factor))
+                )
+                pb_prov: dict = {"ids": [equity.id, shares.id], "sources": [equity.source_type, shares.source_type], "year": equity.fiscal_year}
+                if shares_split_factor != 1:
+                    pb_prov["split_factor"] = format(shares_split_factor.normalize(), "f")
+                    pb_prov["calculation"] = (
+                        "close / (total_equity / (shares_diluted * cumulative_split_factor))"
+                    )
+                provenance["facts"]["pb"] = pb_prov
         income_equity = pair("net_income", "total_equity")
         if income_equity:
             income, equity = income_equity

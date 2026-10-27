@@ -21,7 +21,7 @@ from app.services.connectors.base import UpstreamRateLimited
 from app.services.connectors.ecb import ECBClient, ECBRates
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.fmp import FMPClient
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.risk_service import RiskService
@@ -487,6 +487,27 @@ class MarketRefreshService:
                     source="ECB",
                 )
                 fx_updated += 1
+            if base_currency.upper() != TAX_CURRENCY:
+                # La fiscalidad (IRPF, Modelo 720) va SIEMPRE en euros al tipo
+                # BCE: con una divisa base distinta (USD) se guardan tambien
+                # los tipos contra EUR, que es como los publica el BCE.
+                tax_quotes = (quote_currencies | {base_currency.upper()}) - {TAX_CURRENCY}
+                tax_snapshot = await self.fx_provider.fetch(
+                    base_currency=TAX_CURRENCY,
+                    quote_currencies=tax_quotes,
+                )
+                for currency in tax_quotes:
+                    rate = tax_snapshot.rates.get(currency)
+                    if rate is None:
+                        continue
+                    fx.upsert_rate(
+                        db,
+                        base_currency=TAX_CURRENCY,
+                        quote_currency=currency,
+                        rate=rate,
+                        rate_date=tax_snapshot.rate_date,
+                        source="ECB",
+                    )
             db.commit()
         except Exception as exc:
             db.rollback()
