@@ -145,3 +145,34 @@ def test_build_package_payloads_happy_path(monkeypatch):
     assert p["package_urls"]["2024-12-31"] == "https://x/2024.zip"
     rev = p["facts"]["ifrs-full:Revenue"]["iso4217:EUR"]
     assert {e["end"] for e in rev if not e["dims"]} == {"2024-12-31", "2025-12-31"}
+
+
+def test_typed_dimensions_never_look_consolidated():
+    # Synthetic fixture, not evidence of affected live issuer data.
+    from lxml import etree
+
+    for axis in (' dimension="ifrs-full:BusinessAxis"', ''):
+        for container in ('segment', 'scenario'):
+            xml = DOC.replace(
+                '<xbrli:segment><xbrldi:explicitMember dimension="ifrs-full:SegmentsAxis">x:MemberA</xbrldi:explicitMember></xbrli:segment>',
+                f'<xbrli:{container}><xbrldi:typedMember{axis}>'
+                '<ifrs-full:Business>Example segment</ifrs-full:Business>'
+                f'</xbrldi:typedMember></xbrli:{container}>',
+            )
+            # scenario is valid outside entity; scope parsing must work there.
+            if container == 'scenario':
+                root = etree.fromstring(xml.encode())
+                ns = '{http://www.xbrl.org/2003/instance}'
+                ctx = root.find('.//' + ns + 'context[@id="c-2"]')
+                scenario = ctx.find('.//' + ns + 'scenario')
+                scenario.getparent().remove(scenario)
+                ctx.append(scenario)
+                xml = etree.tostring(root).decode()
+            parsed = parse_ixbrl_facts(io.BytesIO(xml.encode()))
+            revenue = parsed['facts']['ifrs-full:Revenue']['iso4217:EUR']
+            assert [e['val'] for e in revenue if not e['dims']] == ['6757600000.0']
+            typed = next(e for e in revenue if e['val'] == '1000000000.0')
+            assert typed['dims'] == [
+                'ifrs-full:BusinessAxis' if axis else '__unknown_dimension__'
+            ]
+            assert parsed['dropped'] == 1  # unchanged invalid numeric fixture
