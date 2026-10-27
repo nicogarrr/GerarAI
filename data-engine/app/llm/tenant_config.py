@@ -31,7 +31,7 @@ CUSTOM_HOST_SUFFIX_BLOCKLIST = (".local", ".internal", ".localhost", ".localdoma
 _MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$")
 _PROVIDER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
-REASONING_EFFORTS: tuple[str, ...] = ("none", "minimal", "low", "medium", "high")
+REASONING_EFFORTS: tuple[str, ...] = ("none", "minimal", "low", "medium", "high", "max")
 
 
 @dataclass(frozen=True, slots=True)

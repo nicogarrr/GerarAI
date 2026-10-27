@@ -124,3 +124,66 @@ def test_segment_axis_never_sums(db):
     assert result.written is False
     assert result.skipped_reason == "sin ECSO dimensionado por clase"
     assert db.scalars(select(FinancialFact)).all() == []
+
+
+BRK_ECSO_XML = """<?xml version="1.0"?>
+<xbrl xmlns="http://www.xbrl.org/2003/instance" xmlns:xbrli="http://www.xbrl.org/2003/instance"
+      xmlns:dei="http://xbrl.sec.gov/dei/2023" xmlns:us-gaap="http://fasb.org/us-gaap/2024">
+  <unit id="ushares"><measure>xbrli:shares</measure></unit>
+  <context id="iA"><entity><identifier scheme="s">X</identifier>
+    <segment><explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:CommonClassAMember</explicitMember></segment></entity>
+    <period><instant>2025-10-20</instant></period></context>
+  <context id="iB"><entity><identifier scheme="s">X</identifier>
+    <segment><explicitMember dimension="us-gaap:StatementClassOfStockAxis">us-gaap:CommonClassBMember</explicitMember></segment></entity>
+    <period><instant>2025-10-20</instant></period></context>
+  <dei:EntityCommonStockSharesOutstanding contextRef="iA" unitRef="ushares">600000</dei:EntityCommonStockSharesOutstanding>
+  <dei:EntityCommonStockSharesOutstanding contextRef="iB" unitRef="ushares">1300000000</dei:EntityCommonStockSharesOutstanding>
+</xbrl>
+"""
+
+
+def test_brk_b_classes_weighted_by_conversion_ratio(db):
+    """BRK.B: 1 accion A = 1.500 B. El saldo en equivalentes B (la clase
+    cotizada del ticker) es A*1500 + B, no A + B.
+
+    Calculo a mano: 600.000 A * 1.500 = 900.000.000 B equivalentes;
+    + 1.300.000.000 B = 2.200.000.000. La suma en bruto daria 1.300.600.000
+    (un 41 % menos: la capitalizacion de BRK.B saldria un 41 % corta).
+    """
+    company = _company(db, "BRK.B")
+    fetch_json, fetch_bytes = _fake_fetchers(BRK_ECSO_XML)
+    result = backfill_class_shares_outstanding(
+        db, company, cik="1067983", fetch_json=fetch_json, fetch_bytes=fetch_bytes)
+    assert result.written is True
+    assert result.shares_total == Decimal("2200000000")
+    row = db.scalar(select(FinancialFact))
+    assert row.value == Decimal("2200000000")
+    prov = (db.scalar(select(Document)).metadata_ or {})["class_shares_provenance"]
+    assert prov["derivation"] == "as_converted_to_listed_class"
+    assert prov["conversion_ratios"] == {"CommonClassAMember": "1500", "CommonClassBMember": "1"}
+    # El saldo por clase se guarda tal cual lo declaro el emisor:
+    assert prov["members"]["CommonClassAMember"] == "600000"
+
+
+def test_brk_b_unknown_class_is_not_guessed(db):
+    """Una clase sin ratio revisado en el mapa del emisor: no se escribe."""
+    company = _company(db, "BRK.B")
+    xml = BRK_ECSO_XML.replace("us-gaap:CommonClassAMember", "us-gaap:CommonClassCMember")
+    fetch_json, fetch_bytes = _fake_fetchers(xml)
+    result = backfill_class_shares_outstanding(
+        db, company, cik="1067983", fetch_json=fetch_json, fetch_bytes=fetch_bytes)
+    assert result.written is False
+    assert result.skipped_reason == "clase sin ratio de conversion revisado: CommonClassCMember"
+    assert db.scalars(select(FinancialFact)).all() == []
+
+
+def test_visa_variable_ratios_are_not_summed_raw(db):
+    """Visa (V = clase A): las B/C se convierten en A a ratios distintos de 1
+    (y variables). Sumarlas en bruto falsea el saldo: no se escribe."""
+    company = _company(db, "V")
+    fetch_json, fetch_bytes = _fake_fetchers(ECSO_XML)
+    result = backfill_class_shares_outstanding(
+        db, company, cik="1403161", fetch_json=fetch_json, fetch_bytes=fetch_bytes)
+    assert result.written is False
+    assert result.skipped_reason == "ratio de conversion entre clases sin revisar"
+    assert db.scalars(select(FinancialFact)).all() == []

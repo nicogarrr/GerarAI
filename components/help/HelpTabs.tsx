@@ -146,21 +146,21 @@ export default function HelpTabs() {
           {/* Help Philosophy */}
           <div className="grid md:grid-cols-3 gap-6 mb-12">
             <div className="bg-gray-800 rounded-lg shadow-sm p-6 border hover:shadow-md transition-shadow">
-              <h3 className="text-lg font-semibold text-blue-500 mb-2">Aprende</h3>
+              <h2 className="text-lg font-semibold text-blue-500 mb-2">Aprende</h2>
               <p className="text-gray-200 text-sm">
                 La pestaña Documentación explica qué hace cada módulo hoy y cómo usarlo, con enlace a la metodología y las fuentes.
               </p>
             </div>
 
             <div className="bg-gray-800 rounded-lg shadow-sm p-6 border hover:shadow-md transition-shadow">
-              <h3 className="text-lg font-semibold text-green-500 mb-2">Soporte</h3>
+              <h2 className="text-lg font-semibold text-green-500 mb-2">Soporte</h2>
               <p className="text-gray-200 text-sm">
                 El soporte es por email y lo atiende quien mantiene el proyecto. No hay un plazo de respuesta garantizado.
               </p>
             </div>
 
             <div className="bg-gray-800 rounded-lg shadow-sm p-6 border hover:shadow-md transition-shadow">
-              <h3 className="text-lg font-semibold text-purple-500 mb-2">Datos con fuente</h3>
+              <h2 className="text-lg font-semibold text-purple-400 mb-2">Datos con fuente</h2>
               <p className="text-gray-200 text-sm">
                 Las cifras de research indican su fuente y su fecha. Si no hay dato verificable, la app muestra N/D en vez de inventarlo.
               </p>

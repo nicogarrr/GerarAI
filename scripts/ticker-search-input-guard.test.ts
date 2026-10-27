@@ -17,26 +17,19 @@ describe('buscador de ticker unificado (autocompletado inline)', () => {
         assert.ok(action.includes('foldName(r.description) === foldName(listing.description)'));
         assert.ok(action.includes('r.symbol.toUpperCase().startsWith(prefix)'));
     });
-    it('reutiliza la búsqueda del buscador global, con gate F215, debounce y deadline', () => {
+    // Debounce de 300 ms, gate F215 (respuestas tardías), error de proveedor ≠
+    // «sin resultados», Enter/flechas/Escape y «elegir no reabre la lista» se
+    // comprueban usando el componente: tests/unit/components/TickerSearchInput.test.tsx.
+    it('reutiliza la búsqueda del buscador global, con deadline', () => {
         assert.ok(component.includes('searchStocksWithStatus'), 'misma acción que SearchCommand/WatchlistAddButton');
-        assert.ok(component.includes('createLatestRequestGate'), 'gate de petición más reciente');
-        assert.ok(component.includes('}, 300);'), 'debounce de 300 ms');
         assert.ok(component.includes('withFetchDeadline'), 'deadline de 6 s (patrón watchlist)');
         assert.ok(component.includes('6000'), 'deadline de 6 s');
-    });
-    it('distingue error de proveedor de "sin resultados" y declara ambos', () => {
-        assert.ok(component.includes("result.status === 'error'"), 'error de proveedor explícito');
-        assert.ok(component.includes('fallo del proveedor de datos'), 'mensaje de error honesto');
-        assert.ok(component.includes('Sin resultados para'), 'vacío real declarado');
     });
     it('móvil primero: dropdown superpuesto (no empuja ni rompe el scroll) y objetivos táctiles', () => {
         assert.ok(component.includes('PopoverContent'), 'portal existente evita el recorte en diálogos');
         assert.ok(component.includes('--radix-popover-content-available-height'), 'altura se adapta al espacio disponible');
         assert.ok(component.includes('overflow-auto'), 'scroll interno de la lista');
         assert.ok(component.includes('min-h-11'), 'objetivos táctiles >=44px');
-        assert.ok(component.includes('role="combobox"'), 'combobox accesible');
-        assert.ok(component.includes("event.key === 'Enter'"), 'selección por Enter');
-        assert.ok(component.includes('selected.current = stock.symbol'), 'seleccionar no vuelve a abrir la lista');
         assert.ok(component.includes('gate.invalidate()'), 'el desmontaje invalida respuestas tardías');
         assert.ok(component.includes('autoComplete="off"'), 'sin autocompletado nativo peleando con el de la app');
     });

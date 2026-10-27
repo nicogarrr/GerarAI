@@ -288,7 +288,7 @@ def test_target_price_uses_valuation_service_and_dated_price(db, valued):
     assert targets["base"]["etiqueta"] == "INFERIDO"
     assert targets["base"]["precio_actual"] == pytest.approx(100.0)
     assert targets["base"]["precio_fecha"] == "2026-10-08"
-    assert targets["base"]["mos"] == pytest.approx(fcf5_ps * 25.0 / 100.0 - 1)
+    assert targets["base"]["mos"] == pytest.approx((fcf5_ps * 25.0 - 100.0) / (fcf5_ps * 25.0))
     assert payload["aviso_coherencia"] is None
     assert targets["bear"]["valor"] < targets["base"]["valor"] < targets["bull"]["valor"]
 

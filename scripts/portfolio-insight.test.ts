@@ -126,9 +126,6 @@ describe('hasCostBasis (F2)', () => {
     );
   });
 
-  it('el resumen de cartera muestra N/D en vez de 0,00 sin base de coste', () => {
-    const summary = source('components/portfolio/PortfolioSummary.tsx');
-    assert.ok(summary.includes('hasCostBasis(summary)'));
-    assert.ok(summary.includes('noData ? NA : format(summary.totalCost)'));
-  });
+  // El resumen de cartera (N/D sin base de coste) se comprueba renderizándolo:
+  // tests/unit/components/PortfolioSummary.test.tsx.
 });

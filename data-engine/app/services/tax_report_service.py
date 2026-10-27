@@ -59,11 +59,12 @@ from app.models import (
     Tenant,
     Transaction,
 )
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.tax_irpf_filing import (
     SPECIAL_PAYMENT_TOKENS,
     build_casillas,
     build_double_taxation,
+    build_interest,
     build_loss_compensation,
 )
 
@@ -170,6 +171,38 @@ def cash_amount(transaction) -> Decimal:
     return Decimal(str(quantity)) if quantity is not None else Decimal("0")
 
 
+# Claves que solo escribe el importador Flex de IBKR (``dict(element.attrib)``).
+# El CSV canonico (``source: ibkr_csv``) no entra: su signo lo escribe el usuario.
+_BROKER_PAYLOAD_KEYS = ("type", "trxID", "transactionID", "accountId")
+
+
+def is_broker_signed_cash_row(transaction) -> bool:
+    """True si la fila viene de IBKR, que firma la caja desde la cuenta.
+
+    IBKR publica la retencion como importe NEGATIVO y su reversion como
+    POSITIVO; la entrada manual guarda la retencion en positivo.
+    """
+    payload = getattr(transaction, "raw_payload", None) or {}
+    if not isinstance(payload, dict):
+        return False
+    return any(key in payload for key in _BROKER_PAYLOAD_KEYS)
+
+
+def withholding_cost(transaction) -> Decimal:
+    """Retencion soportada por la fila, con signo: >0 retenido, <0 devuelto.
+
+    Filas de IBKR: coste = -importe, asi una reversion (+15) resta en vez de
+    sumar otra retencion. Resto (entrada manual, historico sin origen): el
+    valor absoluto, como hasta ahora.
+
+    Helper COMPARTIDO con ``portfolio_intelligence_service._xirr``.
+    """
+    amount = cash_amount(transaction)
+    if is_broker_signed_cash_row(transaction):
+        return -amount
+    return abs(amount)
+
+
 def cash_quantity_is_canonical(transaction) -> bool:
     """False si la fila de caja rompe la convencion (quantity fuera de {0, 1}).
 
@@ -242,10 +275,11 @@ class TaxReportService:
         self.settings = get_settings()
 
     def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None) -> dict:
-        # SOLO lectura: sin portfolio persistido se usa la divisa por defecto;
-        # crearlo aqui convertia cualquier GET del informe en una escritura.
-        portfolio = self.fx.portfolio(db)
-        base_currency = (portfolio.base_currency if portfolio else "EUR") or "EUR"
+        # IRPF y Modelo 720 se declaran SIEMPRE en euros al tipo del BCE de la
+        # fecha de cada operacion, sea cual sea la divisa base de la cartera
+        # (EUR, USD...). La divisa base es una preferencia de visualizacion;
+        # la fiscal la fija la AEAT.
+        base_currency = TAX_CURRENCY
 
         start = date(fiscal_year, 1, 1)
         end = date(fiscal_year, 12, 31)
@@ -340,7 +374,8 @@ class TaxReportService:
                 if company is None:
                     bucket["unattributed"] = True
                 if "withholding" in action or "tax" in action:
-                    withheld = abs(amount_native)
+                    withheld = withholding_cost(transaction)
+                    withheld_base = withheld * rate if rate is not None else None
                     if ambiguous_cash_row:
                         # Fila ambigua: NO entra en los agregados ni en las
                         # casillas derivadas hasta resolverla (None +
@@ -348,8 +383,8 @@ class TaxReportService:
                         bucket["ambiguous_cash"] = True
                     else:
                         bucket["withholding_native"] += withheld
-                        if amount_base is not None:
-                            bucket["withholding_base"] += abs(amount_base)
+                        if withheld_base is not None:
+                            bucket["withholding_base"] += withheld_base
                         else:
                             bucket["missing_fx"] = True
                     withholding_row = {
@@ -357,7 +392,7 @@ class TaxReportService:
                         "type": "withholding",
                         "raw_action": _raw_action_label(transaction),
                         "amount_native": _money(withheld),
-                        "amount_base": _money(abs(amount_base)) if amount_base is not None else None,
+                        "amount_base": _money(withheld_base) if withheld_base is not None else None,
                     }
                     if ambiguous_cash_row:
                         # Fila ambigua: la cifra derivada de price es un
@@ -592,11 +627,20 @@ class TaxReportService:
                 # compra única del Manual, y omitir las ventas rentables lo
                 # infla (bloquearía pérdidas que AEAT permite computar).
                 prior_sells.append((transaction.trade_date, transaction.quantity))
-                if gain_native < 0:
+                # Art. 33.5.f LIRPF: la pérdida que se difiere es la del IRPF,
+                # en EUROS (cada tramo a su tipo, art. 34-35). Una ganancia en
+                # divisa puede ser pérdida en euros (y al revés): se decide con
+                # el resultado en base; solo sin FX se recurre al de divisa.
+                is_loss = (
+                    gain_base_raw < 0 if gain_base_raw is not None else gain_native < 0
+                )
+                if is_loss:
                     sale = {
                         "date": transaction.trade_date,
                         "qty_unblocked": transaction.quantity,
-                        "loss_per_share": -gain_native / transaction.quantity,
+                        # Pérdida por acción en divisa; 0 si en divisa hubo
+                        # ganancia (la pérdida existe solo en euros).
+                        "loss_per_share": max(-gain_native, Decimal("0")) / transaction.quantity,
                         # Pérdida por acción en base (tramos a su tipo); 0 si
                         # en base no hay pérdida que diferir.
                         "loss_per_share_base": (
@@ -748,7 +792,7 @@ class TaxReportService:
                         "raw_gain_native": _money(entry["gain_native"]),
                         "blocked_loss_native": _money(blocked_native),
                         "blocked_loss_base": _money(blocked_base) if blocked_base is not None else None,
-                        "wash_sale_blocked": blocked_native > 0,
+                        "wash_sale_blocked": blocked_native > 0 or (blocked_base is not None and blocked_base > 0),
                         "wash_sale_window_open": window_open,
                         "over_sell": bool(entry["over_sell"]),
                         "over_sell_quantity": float(entry["over_sell_quantity"]),
@@ -969,9 +1013,18 @@ class TaxReportService:
                 }
             except (ValueError, TypeError, ArithmeticError):
                 declared_pending = None
+        interest = build_interest(data.get("misc") or [], fiscal_year)
+        # Saldo neto de rendimientos del capital mobiliario del ahorro: los
+        # dividendos MÁS los intereses cobrados (fija el 25 % de compensación).
+        rcm_net_base: Decimal | None = None
+        if summary.get("total_dividends_base") is not None and not interest["incomplete"]:
+            rcm_net_base = Decimal(str(summary["total_dividends_base"])) + Decimal(
+                str(interest["received"]["amount_base"] or 0)
+            )
         return {
             "available": True,
             "tme_percent_manual": float(tme * 100) if tme is not None else None,
+            "intereses": interest,
             "casillas": build_casillas(
                 data.get("dividends") or [], data.get("realized") or [], fiscal_year
             ),
@@ -985,8 +1038,7 @@ class TaxReportService:
                 prior_year_nets,
                 None if summary.get("total_realized_gain_base") is None
                 else Decimal(str(summary["total_realized_gain_base"])),
-                None if summary.get("total_dividends_base") is None
-                else Decimal(str(summary["total_dividends_base"])),
+                rcm_net_base,
                 fiscal_year,
                 declared_pending=declared_pending,
             ),
