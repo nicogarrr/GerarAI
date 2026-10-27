@@ -4117,6 +4117,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/llm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Llm Settings */
+        get: operations["get_llm_settings_api_settings_llm_get"];
+        /** Update Llm Settings */
+        put: operations["update_llm_settings_api_settings_llm_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/llm/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Test Llm Settings */
+        post: operations["test_llm_settings_api_settings_llm_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sources/audits": {
         parameters: {
             query?: never;
@@ -6763,6 +6798,112 @@ export interface components {
         LLMProposalRequest: {
             /** Ticker */
             ticker: string;
+        };
+        /** LLMProviderEntry */
+        LLMProviderEntry: {
+            /** Base Url */
+            base_url: string;
+            /** Default Model */
+            default_model: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+            /** Requires Custom Url */
+            requires_custom_url: boolean;
+        };
+        /** LLMSettingsResponse */
+        LLMSettingsResponse: {
+            /** Api Key Configured */
+            api_key_configured: boolean;
+            /** Api Key Last4 */
+            api_key_last4?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Billing Scope */
+            billing_scope: string;
+            /** Configured */
+            configured: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Encryption Available */
+            encryption_available: boolean;
+            /** Error */
+            error?: string | null;
+            /** Fallback Model */
+            fallback_model?: string | null;
+            /** Key Version */
+            key_version?: number | null;
+            /** Message */
+            message: string;
+            /** Model */
+            model?: string | null;
+            /** Provider */
+            provider: string;
+            /** Providers */
+            providers: components["schemas"]["LLMProviderEntry"][];
+            /** Reasoning Effort */
+            reasoning_effort?: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "platform" | "tenant";
+            /** Status */
+            status: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** LLMSettingsUpdateRequest */
+        LLMSettingsUpdateRequest: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /**
+             * Clear Api Key
+             * @default false
+             */
+            clear_api_key: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Fallback Model */
+            fallback_model?: string | null;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+            /** Reasoning Effort */
+            reasoning_effort?: string | null;
+        };
+        /** LLMTestRequest */
+        LLMTestRequest: {
+            /** Api Key */
+            api_key?: string | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Model */
+            model: string;
+            /** Provider */
+            provider: string;
+        };
+        /** LLMTestResponse */
+        LLMTestResponse: {
+            /** Base Url */
+            base_url: string;
+            /** Message */
+            message: string;
+            /** Model */
+            model: string;
+            /** Ok */
+            ok: boolean;
+            /** Provider */
+            provider: string;
+            /** Status Code */
+            status_code: number | null;
         };
         /** LibraryQuestion */
         LibraryQuestion: {
@@ -18559,6 +18700,128 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_llm_settings_api_settings_llm_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_llm_settings_api_settings_llm_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMSettingsUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMSettingsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    test_llm_settings_api_settings_llm_test_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMTestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMTestResponse"];
                 };
             };
             /** @description Validation Error */

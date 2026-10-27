@@ -34,6 +34,7 @@ from app.core.config import Settings, get_settings
 from app.llm.adapters import DisabledProvider
 from app.llm.base import LLMProvider
 from app.llm.factory import _opencode_go, create_llm_provider
+from app.llm.tenant_config import current_tenant_llm_config
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ def create_thesis_narrative_provider(
     válido, ``DisabledProvider`` con motivo si enabled e inválido.
     """
     settings = settings or get_settings()
+    if current_tenant_llm_config() is not None:
+        return create_llm_provider(settings, client=client)
     if not getattr(settings, "thesis_go_enabled", False):
         return create_llm_provider(settings, client=client)
 

@@ -8,6 +8,7 @@ from app.llm.base import LLMProvider
 from app.llm.cascade import CascadeProvider
 from app.llm.model_aliases import VERIFIED_FREE_MODELS
 from app.llm.response_cache import build_response_cache
+from app.llm.tenant_config import TenantLLMConfig, current_tenant_llm_config
 
 
 def _has_key(value: str | None) -> bool:
@@ -31,6 +32,17 @@ def create_llm_provider(
     settings.
     """
     settings = settings or get_settings()
+    tenant = current_tenant_llm_config()
+    if tenant is not None:
+        return _tenant_provider(
+            tenant,
+            settings,
+            client=client,
+            timeout_seconds=timeout_seconds,
+            max_retries=max_retries,
+            total_timeout_seconds=total_timeout_seconds,
+            reasoning_effort=reasoning_effort,
+        )
     if not settings.llm_enabled:
         return DisabledProvider("disabled_by_configuration")
 
@@ -85,6 +97,66 @@ def _pin_to_model(model: str) -> dict[str, str]:
 
     names = {route.model for route in ROUTES.values()} | set(MODEL_ALIASES.aliases)
     return dict.fromkeys(names, model)
+
+
+def _tenant_provider(
+    config: TenantLLMConfig,
+    settings: Settings,
+    *,
+    client: httpx.AsyncClient | None,
+    timeout_seconds: float | None,
+    max_retries: int | None,
+    total_timeout_seconds: float | None,
+    reasoning_effort: str | None,
+) -> LLMProvider:
+    """Proveedor del tenant; sin clave o fila corrupta se apaga (fail-closed).
+
+    Nunca cae al proveedor global: si la fila existe, la plataforma no pone
+    su clave. El unico camino que usa la clave de GerarAI es la ausencia total
+    de fila (tenant sin configuracion propia).
+    """
+    if not config.enabled:
+        return DisabledProvider("tenant_llm_disabled")
+    if config.error:
+        return DisabledProvider(config.error)
+    if not config.has_api_key:
+        return DisabledProvider("tenant_llm_key_missing")
+    overrides = _pin_to_model(config.model)
+    effort = config.reasoning_effort if reasoning_effort is None else reasoning_effort
+    try:
+        provider = OpenAICompatibleProvider(
+            api_key=str(config.api_key or ""),
+            base_url=config.base_url,
+            default_model=config.model,
+            provider_name=config.provider,
+            extra_headers={"User-Agent": "gerarai/1.0"},
+            model_overrides=overrides,
+            fallback_model=config.fallback_model or None,
+            reasoning_effort=effort,
+            reasoning_effort_models={
+                model for model in (config.model, config.fallback_model) if model
+            },
+            response_cache=build_response_cache(settings),
+            client=client,
+            timeout_seconds=(
+                settings.llm_timeout_seconds
+                if timeout_seconds is None
+                else timeout_seconds
+            ),
+            max_retries=(
+                settings.llm_max_retries if max_retries is None else max_retries
+            ),
+            total_timeout_seconds=(
+                settings.llm_total_timeout_seconds
+                if total_timeout_seconds is None
+                else total_timeout_seconds
+            ),
+            max_output_tokens=settings.llm_max_output_tokens,
+        )
+    except (ValueError, TypeError):
+        return DisabledProvider("tenant_llm_settings_invalid")
+    provider.billing_scope = "tenant"
+    return provider
 
 
 def _create_cascade(settings: Settings, *, client: httpx.AsyncClient | None) -> LLMProvider:

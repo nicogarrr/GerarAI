@@ -11,7 +11,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, CircleHelp, LogOut, Settings, ShieldCheck } from "lucide-react";
+import { BrainCircuit, ChevronDown, CircleHelp, LogOut, Settings, ShieldCheck } from "lucide-react";
 import { signOut } from "@/lib/actions/auth.actions";
 import { toast } from "sonner";
 import { runSignOut } from "@/lib/auth/sign-out-flow";
@@ -67,6 +67,13 @@ const UserDropdown = ({ user }: { user: User }) => {
                     Ayuda
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-gray-600" />
+                <DropdownMenuItem
+                    onClick={() => router.push("/settings#llm")}
+                    className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"
+                >
+                    <BrainCircuit aria-hidden="true" className="mr-2 hidden h-4 w-4 sm:block" />
+                    Modelo de IA
+                </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => router.push("/settings")}
                     className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"

@@ -90,6 +90,20 @@ class BudgetController:
         }
 
     def can_spend(self, db: Session, estimated_cost_eur: float) -> bool:
+        # Con clave propia el coste no es de GerarAI: los topes EUR no aplican
+        # (el usuario paga su factura). El proveedor sigue fail-closed si la
+        # fila esta corrupta o le falta la clave.
+        from app.llm.tenant_config import current_tenant_llm_config
+
+        tenant_llm = current_tenant_llm_config()
+        if (
+            tenant_llm is not None
+            and tenant_llm.billing_scope == "tenant"
+            and tenant_llm.error is None
+            and tenant_llm.enabled
+            and tenant_llm.has_api_key
+        ):
+            return True
         # Decision consciente de contexto: con tenant, el tope es por tenant
         # (un tenant no puede agotar el de los demas). Sin contexto de tenant
         # (sesiones anonimas, scripts admin, tests de servicio), el tope actua
@@ -111,12 +125,20 @@ class BudgetController:
         *,
         commit: bool = True,
     ) -> None:
+        from app.llm.tenant_config import current_tenant_llm_config
+
+        tenant_llm = current_tenant_llm_config()
+        billed_cost = (
+            0.0
+            if tenant_llm is not None and tenant_llm.billing_scope == "tenant"
+            else cost_eur
+        )
         db.add(
             BudgetUsage(
                 usage_date=date.today(),
                 model=model,
                 workflow=workflow,
-                cost_eur=Decimal(str(cost_eur)),
+                cost_eur=Decimal(str(billed_cost)),
                 token_count=tokens,
             )
         )
