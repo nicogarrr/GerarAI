@@ -22,6 +22,11 @@ from app.services.fact_deletion import (
     drop_shadowed_facts,
     tenant_condition,
 )
+from app.services.ttm_fundamentals import (
+    NON_ADDITIVE_FLOWS,
+    PeriodValue,
+    derive_quarters_from_ytd,
+)
 
 MetricSpec = tuple[str, str, str]
 
@@ -686,6 +691,43 @@ def _is_bank_like(company: Any) -> bool:
         str(getattr(company, "ticker", "") or "").strip().upper()
         in BANK_REVENUE_TICKERS
     )
+
+
+def _quarters_from_ytd(
+    by_end_q: dict[str, dict[str, Any]],
+    ytd_by_end: dict[str, dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Trimestres de 3 meses derivados de acumulados YTD de 10-Q.
+
+    Solo devuelve cierres que NO estan ya en ``by_end_q`` (un trimestre
+    presentado gana). La fila derivada hereda accn/filed/concepto del
+    acumulado mas reciente (el filing que la hace conocible) y lleva
+    ``_derived_from_ytd`` para persistirse como no reportada.
+    """
+    rows: list[PeriodValue] = []
+    for entry in [*by_end_q.values(), *ytd_by_end.values()]:
+        val = _decimal(entry.get("val"))
+        try:
+            start = date.fromisoformat(str(entry.get("start")))
+            end = date.fromisoformat(str(entry.get("end")))
+        except (TypeError, ValueError):
+            continue
+        if val is None:
+            continue
+        rows.append(PeriodValue(start=start, end=end, value=val))
+    derived: dict[str, dict[str, Any]] = {}
+    for quarter in derive_quarters_from_ytd(rows):
+        end = quarter.end.isoformat()
+        source = ytd_by_end.get(end)
+        if quarter.reported or end in by_end_q or source is None or quarter.start is None:
+            continue
+        derived[end] = {
+            **source,
+            "val": quarter.value,
+            "start": quarter.start.isoformat(),
+            "_derived_from_ytd": True,
+        }
+    return derived
 
 
 def _collect_by_concept(
@@ -1462,6 +1504,29 @@ class FinancialIngestionService:
                     as_of=as_of,
                 ).items():
                     by_end_q.setdefault(end, entry)
+            if metric not in NON_ADDITIVE_FLOWS:
+                # El estado de flujos de efectivo de un 10-Q suele venir SOLO
+                # acumulado (3, 6 y 9 meses: AAPL, flujo operativo y capex),
+                # asi que el filtro de 70-110 dias dejaba sin Q2/Q3. Se derivan
+                # restando acumulados del mismo ejercicio: Q(t) = YTD(t) -
+                # YTD(t-1). Un trimestre de 3 meses presentado siempre gana;
+                # las filas derivadas van con is_reported=False (INFERIDO).
+                ytd_by_end = _merge_for_metric(
+                    _collect_by_concept(
+                        us_gaap,
+                        metric_concepts_q,
+                        xbrl_unit_key,
+                        forms={"10-Q"},
+                        periods={"Q1", "Q2", "Q3", "Q4"},
+                        min_span=150,
+                        max_span=290,
+                        as_of=as_of,
+                        require_start=True,
+                    ),
+                    metric,
+                )
+                for end, entry in _quarters_from_ytd(by_end_q, ytd_by_end).items():
+                    by_end_q.setdefault(end, entry)
             if by_end_q:
                 q_sorted = sorted(
                     by_end_q.values(), key=lambda e: str(e["end"]), reverse=True
@@ -1475,6 +1540,7 @@ class FinancialIngestionService:
                     fp = _fiscal_quarter_from_end(
                         str(entry["end"]), modal_fy_month
                     ) or str(entry["fp"])
+                    derived_from_ytd = bool(entry.get("_derived_from_ytd"))
                     db.add(
                         FinancialFact(
                             company_id=company.id,
@@ -1486,8 +1552,8 @@ class FinancialIngestionService:
                             fiscal_quarter=fp,
                             source_id=document.id,
                             source_type="SEC",
-                            is_reported=True,
-                            confidence=Decimal("0.9"),
+                            is_reported=not derived_from_ytd,
+                            confidence=Decimal("0.85") if derived_from_ytd else Decimal("0.9"),
                             accession_number=entry.get("accn"),
                             filed=_publication_date(entry),
                         )
