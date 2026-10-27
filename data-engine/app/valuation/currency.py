@@ -92,6 +92,19 @@ def normalize_currency(raw: str | None) -> tuple[str | None, int]:
     return upper, 1
 
 
+def canonical_currency_code(raw: str | None) -> str:
+    """Codigo de divisa listo para guardar, sin perder la subunidad.
+
+    ``.upper()`` a secas convierte ``GBp`` (peniques) en ``GBP`` (libras) y
+    multiplica el importe por 100. Aqui una subunidad conocida conserva su
+    forma (``GBp``, ``ZAc``, ``ILa``, ``GBX``) y el resto va en mayusculas.
+    """
+    text = (raw or "").strip()
+    if text in MINOR_UNITS:
+        return text
+    return text.upper()
+
+
 def _ticker_suffix(ticker: str) -> str | None:
     text = (ticker or "").strip().upper()
     if "." not in text:

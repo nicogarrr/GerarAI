@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, Position, Transaction
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import PortfolioFXService, currency_key
+from app.valuation.currency import canonical_currency_code
 
 _UNSET = object()
 
@@ -210,7 +211,7 @@ class PortfolioLedgerService:
             quantity=quantity,
             price=price,
             fees=fees,
-            currency=currency.upper(),
+            currency=canonical_currency_code(currency),
             external_id=f"manual-{uuid4().hex}",
             raw_payload={"notes": notes} if notes else {},
         )
@@ -290,8 +291,9 @@ class PortfolioLedgerService:
                 snapshot.cost_basis_base = None
                 snapshot.realized_pnl_base = None
                 return snapshot
-        currencies = {transaction.currency.upper() for transaction in transactions}
-        if len(currencies) > 1:
+        currencies = {canonical_currency_code(transaction.currency) for transaction in transactions}
+        # GBP y GBp son unidades distintas: currency_key no las confunde.
+        if len({currency_key(code) for code in currencies}) > 1:
             raise PortfolioMixedCurrencyError(
                 "A position cannot mix transaction currencies; split the instrument or normalize the ledger"
             )

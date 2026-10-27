@@ -42,6 +42,7 @@ from app.services.risk_service import RiskService
 from app.services.tax_report_service import CASH_UNIT_QUANTITIES
 from app.services.tearsheet_service import TearsheetService
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
+from app.valuation.currency import canonical_currency_code
 
 router = APIRouter()
 
@@ -698,7 +699,7 @@ def update_transaction(
     # Omitir `fees` conserva la comision registrada (el default 0 del modelo no es un dato).
     if "fees" in payload.model_fields_set:
         transaction.fees = payload.fees
-    transaction.currency = payload.currency.upper()
+    transaction.currency = canonical_currency_code(payload.currency)
     transaction.raw_payload = {"notes": payload.notes} if payload.notes else {}
     try:
         # La sesion va con autoflush=False: sin volcar el cambio, la consulta
