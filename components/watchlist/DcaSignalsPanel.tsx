@@ -26,7 +26,7 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
         <section aria-labelledby="dca-signals-title" className="space-y-3" data-testid="dca-signals">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
-                    <h2 id="dca-signals-title" className="text-lg font-semibold text-gray-100">Señales DCA (watchlist + cartera)</h2>
+                    <h2 id="dca-signals-title" className="text-lg font-semibold text-gray-100">Señales de compra periódica (DCA)</h2>
                     <p className="text-xs text-gray-500">
                         Veredicto mensual con cierres diarios asentados · aviso mínimo global {data.global_min_level}X ·
                         recortes {data.trims_enabled ? 'con aviso' : 'sin aviso'} · canales: {channels.join(', ')}

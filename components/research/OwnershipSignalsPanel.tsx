@@ -28,7 +28,7 @@ export function OwnershipSignalsPanel({ ticker, signals }: { ticker: string; sig
   const holdersHref = `/research/${encodeURIComponent(ticker)}?view=holders`;
   if (signals === null) {
     return (
-      <Panel collapsible="mobile" title="Insiders y fondos (13F)">
+      <Panel collapsible="mobile" title="Qué compran y venden directivos y grandes fondos">
         <p className="text-sm text-gray-400">No se pudo cargar el resumen de insiders y 13F ahora mismo.</p>
       </Panel>
     );
@@ -38,12 +38,12 @@ export function OwnershipSignalsPanel({ ticker, signals }: { ticker: string; sig
     <Panel
       actions={<Link className="text-sm text-teal-300" href={holdersHref}>Ver propietarios</Link>}
       collapsible="mobile"
-      title="Insiders y fondos (13F)"
+      title="Qué compran y venden directivos y grandes fondos"
     >
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <section aria-label="Insiders (Form 4)">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-200">Insiders · Form 4{insider.status === 'ok' ? ` · ${insider.window_days} días` : ''}</h3>
+            <h3 className="text-sm font-semibold text-gray-200">Compras y ventas de directivos (Form 4){insider.status === 'ok' ? ` · ${insider.window_days} días` : ''}</h3>
             {insider.status === 'ok' ? <Badge className={TONE_CLASS[insiderTone(insider)]} variant="outline">{insider.reading}</Badge> : null}
           </div>
           <ul className="space-y-1 text-sm text-gray-400">
@@ -52,7 +52,7 @@ export function OwnershipSignalsPanel({ ticker, signals }: { ticker: string; sig
         </section>
         <section aria-label="Fondos (13F)">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-gray-200">Fondos · 13F</h3>
+            <h3 className="text-sm font-semibold text-gray-200">Grandes fondos (informe 13F)</h3>
             {holders.status === 'ok' ? <Badge className={TONE_CLASS[holdersTone(holders)]} variant="outline">{holders.holders_count} gestores</Badge> : null}
           </div>
           <ul className="space-y-1 text-sm text-gray-400">

@@ -16,7 +16,7 @@ describe('ajustes', () => {
   const llmAction = read('lib/actions/llm-settings.actions.ts');
   it('la pagina ofrece datos fiscales, modelo de IA y Telegram', () => {
     assert.match(page, /Datos fiscales del declarante/);
-    assert.match(page, /Modelo de IA \(LLM\)/);
+    assert.match(page, /title="Modelo de IA"/);
     assert.match(page, /id="llm"/);
     assert.match(page, /LlmSettingsForm/);
     assert.match(page, /href="\/alerts"/);
