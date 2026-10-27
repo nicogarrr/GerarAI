@@ -388,3 +388,23 @@ def test_isin_mismatch_blocks_despite_name_overlap(db, monkeypatch):
     db.commit()
     with pytest.raises(RuntimeError, match="company_mismatch"):
         asyncio.run(FinancialIngestionService().refresh_from_esef(db=db, company=bad))
+
+
+def test_new_package_presentation_cannot_delete_existing_history(db, monkeypatch):
+    import copy
+
+    company = _company(db)
+    existing = FinancialFact(company_id=company.id, metric='revenue',
+        value=Decimal('123'), unit='EUR', period='2020-01-31:FY',
+        source_type='ESEF', fiscal_year=2020, fiscal_quarter='FY', is_reported=True)
+    db.add(existing)
+    db.commit()
+    snapshot = copy.deepcopy(SNAPSHOT)
+    snapshot['requires_presentation_review'] = True
+    snapshot['presentation_archive'] = [{'facts': {'not_for_ingestion': {}}}]
+    monkeypatch.setattr(ingestion.esef_connector, 'read_esef_snapshot', lambda ticker: snapshot)
+    service = FinancialIngestionService()
+    with pytest.raises(RuntimeError, match='esef_presentation_review_required'):
+        asyncio.run(service.refresh_from_esef(db, company))
+    assert db.scalar(select(FinancialFact.value).where(FinancialFact.id == existing.id)) == Decimal('123')
+    assert len(db.scalars(select(FinancialFact)).all()) == 1

@@ -89,6 +89,7 @@ class PriceBar:
     close: Decimal
     adj_close: Decimal
     volume: int
+    quote_currency: str | None = None
 
 
 def fetch_history_yfinance(
@@ -100,10 +101,15 @@ def fetch_history_yfinance(
     out: dict[str, list[PriceBar]] = {}
     for symbol in symbols:
         try:
-            hist = yf.Ticker(symbol).history(period=period, auto_adjust=False)
+            instrument = yf.Ticker(symbol)
+            hist = instrument.history(period=period, auto_adjust=False)
         except Exception:
             out[symbol] = []
             continue
+        try:
+            unit = instrument.get_history_metadata().get("currency")
+        except Exception:
+            unit = None
         bars: list[PriceBar] = []
         for idx, row in hist.iterrows():
             close = row.get("Close")
@@ -124,6 +130,7 @@ def fetch_history_yfinance(
                     close=Decimal(str(round(float(close), 6))),
                     adj_close=Decimal(str(round(float(adj), 6))),
                     volume=int(row.get("Volume") or 0),
+                    quote_currency=unit,
                 )
             )
         out[symbol] = bars
@@ -174,6 +181,7 @@ def upsert_prices(
             "adj_close": bar.adj_close,
             "volume": bar.volume,
             "source": "yfinance",
+            "quote_currency": bar.quote_currency,
         }
         if db.bind is not None and db.bind.dialect.name == "postgresql":
             stmt = pg_insert(MarketPrice).values(**values)
@@ -184,6 +192,7 @@ def upsert_prices(
                     "adj_close": stmt.excluded.adj_close,
                     "volume": stmt.excluded.volume,
                     "source": stmt.excluded.source,
+                    "quote_currency": stmt.excluded.quote_currency,
                 },
             )
             db.execute(stmt)
@@ -199,6 +208,7 @@ def upsert_prices(
                 existing.adj_close = bar.adj_close
                 existing.volume = bar.volume
                 existing.source = "yfinance"
+                existing.quote_currency = bar.quote_currency
             else:
                 db.add(MarketPrice(**values))
         written += 1

@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, BellRing, Eye, Gem, Wallet } from 'lucide-react';
+import { ArrowRight, BellRing, CheckCircle2, Circle, Eye, Gem, Wallet } from 'lucide-react';
 import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBreakdown';
 import { DcaLevelChip, useHoldingSignals } from '@/components/portfolio/HoldingSignals';
 import { fairValueGapPercent } from '@/lib/portfolio/holding-signals';
@@ -118,6 +118,67 @@ const EMPTY_RETRY_TOKENS: Record<SectionKey, number> = {
  * sección escribía su propio `role="status"` con `aria-label` (que no se
  * anuncia) y cuatro variantes distintas de `animate-pulse`.
  */
+/**
+ * Primeros pasos (auditoría UX 2026-10-27): con la cartera vacía, la tarjeta
+ * «Tu Cartera Hoy» era un «Comienza tu viaje» genérico y el usuario nuevo no
+ * sabía por dónde empezar. Ocupa el mismo hueco que ya reservaba el esqueleto
+ * de la tarjeta (no inserta nada encima del resto, así que no añade saltos de
+ * maquetación) y marca como hecho lo que ya ha hecho.
+ */
+function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
+    const watchlistDone = (watchlistCount ?? 0) > 0;
+    const stepClass = 'flex min-h-[44px] items-start gap-3 rounded-lg border border-gray-700/40 bg-gray-900/30 p-3';
+    return (
+        <div>
+            <h3 className="text-base font-semibold text-white">Primeros pasos</h3>
+            <p className="mt-1 text-sm text-gray-400">Tres pasos para que el inicio te diga qué ha cambiado en tus empresas.</p>
+            <ol className="mt-4 space-y-2">
+                <li className={stepClass}>
+                    {watchlistDone
+                        ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-teal-400" />
+                        : <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />}
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-100">Sigue tus empresas</p>
+                        <p className="text-xs text-gray-400">
+                            {watchlistDone
+                                ? `Hecho: sigues ${watchlistCount} ${watchlistCount === 1 ? 'empresa' : 'empresas'}.`
+                                : 'Añádelas a la watchlist para ver precio, valoración y avisos.'}
+                        </p>
+                    </div>
+                    <Link href="/watchlist" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
+                        {watchlistDone ? 'Ver' : 'Añadir'}
+                        <span className="sr-only"> empresas a la watchlist</span>
+                    </Link>
+                </li>
+                <li className={stepClass}>
+                    <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-100">Registra tu primera compra</p>
+                        <p className="text-xs text-gray-400">Con tus posiciones verás el valor de la cartera y dónde poner la aportación del mes.</p>
+                    </div>
+                    <Link href="/portfolio" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
+                        Añadir<span className="sr-only"> inversión</span>
+                    </Link>
+                </li>
+                <li className={stepClass}>
+                    <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-100">Pregunta al Cerebro</p>
+                        <p className="text-xs text-gray-400">Por ejemplo: «¿Qué está barato de mi watchlist?»</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new Event('gerarai:open-brain'))}
+                        className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200"
+                    >
+                        Abrir<span className="sr-only"> el Cerebro</span>
+                    </button>
+                </li>
+            </ol>
+        </div>
+    );
+}
+
 function SectionSkeleton({ rows = 3, className }: { rows?: number; className?: string }) {
     return (
         <div className={className}>
@@ -387,7 +448,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 </CardHeader>
                 <CardContent className="pt-4">
                     {portfolioLoading ? (
-                        <SectionSkeleton rows={2} />
+                        // 5 filas ≈ alto de «Primeros pasos» y del resumen con
+                        // posiciones: el hueco queda reservado y la tarjeta no empuja
+                        // al resto del inicio al llegar los datos (CLS móvil).
+                        <SectionSkeleton rows={5} />
                     ) : portfolioError ? (
                         <InlineSectionError message={portfolioError} onRetry={() => retrySection('portfolio')} />
                     ) : portfolioSummary && portfolioSummary.holdings.length > 0 ? (
@@ -454,16 +518,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             </Link>
                         </div>
                     ) : (
-                        <div className="text-center py-10">
-                            <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Wallet aria-hidden="true" className="h-8 w-8 text-gray-500" />
-                            </div>
-                            <h3 className="text-lg font-medium text-white mb-2">Comienza tu viaje</h3>
-                            <p className="text-gray-400 text-sm max-w-xs mx-auto mb-6">Añade tu primera inversión para ver análisis y métricas detalladas.</p>
-                            <Link href="/portfolio" className="brand-btn inline-flex min-h-[44px] items-center justify-center px-6">
-                                Añadir inversión
-                            </Link>
-                        </div>
+                        <FirstSteps watchlistCount={watchlistLoading || watchlistError ? null : watchlistTotal} />
                     )}
                 </CardContent>
             </Card>
@@ -634,12 +689,11 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-gray-400 text-sm">Lista vacía.</p>
-                            {/* El buscador vive en el header (Ctrl+K) y en /search: el
-                                inicio ya no es la puerta de entrada, así que el CTA
-                                apunta allí y no a un "volver al inicio" circular. */}
-                            <Link href="/search" className="inline-flex min-h-[44px] items-center justify-center text-yellow-400 text-xs mt-2 hover:underline">
-                                Buscar acciones
+                            <p className="text-gray-400 text-sm">Aún no sigues ninguna empresa.</p>
+                            {/* /watchlist tiene su propio «Añadir empresa» (con alta por
+                                símbolo): es el destino directo, sin pasar por /search. */}
+                            <Link href="/watchlist" className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-yellow-400/30 px-4 text-sm text-yellow-400 hover:bg-yellow-950/30">
+                                Añadir empresas
                             </Link>
                         </div>
                     )}

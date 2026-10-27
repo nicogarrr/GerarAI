@@ -258,6 +258,28 @@ export default async function WatchlistPage({
     });
     const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
 
+    // Market Cap N/D: una sola leyenda por página en vez de repetir el motivo en cada tarjeta/fila.
+    const marketCapGaps = (['timedOut', 'notApplicable', 'unverifiable'] as const)
+        .map((reason) => ({
+            reason,
+            symbols: displayStocks
+                .filter((st) => st.marketCap === null && (reason === 'timedOut' ? st.timedOut : reason === 'notApplicable' ? !st.timedOut && st.metricsNotApplicable : !st.timedOut && !st.metricsNotApplicable))
+                .map((st) => st.symbol),
+        }))
+        .filter((group) => group.symbols.length > 0);
+    const MARKET_CAP_GAP_TEXT = {
+        timedOut: 'la lectura tardó más de 3 s; recarga para verla',
+        notApplicable: 'la fuente no cubre la capitalización de ese mercado',
+        unverifiable: 'la fuente no facilita una capitalización verificable',
+    } as const;
+    const marketCapLegend = marketCapGaps.length > 0 ? (
+        <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
+            {marketCapGaps.map((group) => (
+                <p key={group.reason}>* Market Cap N/D en {group.symbols.length === displayStocks.length ? 'todas las empresas de esta página' : group.symbols.join(', ')}: {MARKET_CAP_GAP_TEXT[group.reason]}.</p>
+            ))}
+        </div>
+    ) : null;
+
     const sortHref = (key: SortKey) => {
         if (key === 'added') return '/watchlist';
         const nextDir = sort === key ? (dir === 'asc' ? 'desc' : 'asc') : key === 'symbol' ? 'asc' : 'desc';
@@ -348,8 +370,9 @@ export default async function WatchlistPage({
                         <Eye className="mb-4 h-12 w-12 text-gray-500 sm:h-16 sm:w-16" aria-hidden="true" />
                         <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">Tu Watchlist está vacía</h2>
                         <p className="mb-6 max-w-md text-sm text-gray-500 sm:text-base">
-                            Busca la empresa en la búsqueda universal (o con Ctrl+K desde cualquier pantalla) y
-                            pulsa &ldquo;Añadir a Watchlist&rdquo; para monitorizarla aquí.
+                            Pulsa &ldquo;Añadir empresa&rdquo; y búscala por nombre o símbolo para seguirla aquí.
+                            {/* El atajo de teclado solo tiene sentido con teclado físico: en móvil se oculta. */}
+                            <span className="hidden md:inline"> También puedes abrir la búsqueda con Ctrl+K desde cualquier pantalla.</span>
                         </p>
                         <div className="flex flex-wrap items-center justify-center gap-3">
                             <WatchlistAddButton followedSymbols={[]} />
@@ -435,7 +458,7 @@ export default async function WatchlistPage({
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Market Cap</dt>
                                         <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.timedOut ? 'La lectura tardó más de 3 s; recarga para verla.' : stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </dd>
                                     </div>
                                     <div className="min-w-0">
@@ -460,6 +483,7 @@ export default async function WatchlistPage({
                                 </div>
                             </article>
                         ))}
+                        {marketCapLegend}
                     </div>
 
                     {/* Desktop (≥xl): tabla completa */}
@@ -546,7 +570,7 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{stock.timedOut ? 'La lectura tardó más de 3 s; recarga para verla.' : stock.metricsNotApplicable ? 'La fuente no cubre la capitalización de este mercado.' : 'La fuente no facilita capitalización verificable.'}</span> : null}
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
@@ -573,6 +597,7 @@ export default async function WatchlistPage({
                                 ))}
                             </TableBody>
                         </Table>
+                        {marketCapLegend ? <div className="border-t border-gray-700 px-4 py-2">{marketCapLegend}</div> : null}
                     </div>
                 </>
             )}

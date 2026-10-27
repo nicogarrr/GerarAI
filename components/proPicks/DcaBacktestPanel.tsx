@@ -81,6 +81,9 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                     <TrendingUp aria-hidden="true" className="h-6 w-6 text-teal-400" />
                     <h3 className="text-xl font-bold text-gray-100">Backtest DCA: plano vs por niveles</h3>
                 </div>
+                <p role="note" className="mb-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                    Experimental: este backtest simula datos históricos. No predice resultados futuros ni incluye necesariamente todos los costes, impuestos o restricciones de ejecución. No es una recomendación de inversión.
+                </p>
                 <p className="text-sm text-gray-400">
                     Fórmula Nico v1 (1X–4X según la distancia bajo la media de 30 meses ajustada por volatilidad).
                     Cada mes se decide con el cierre de ese mes y se compra al primer cierre del siguiente: sin mirar el futuro.

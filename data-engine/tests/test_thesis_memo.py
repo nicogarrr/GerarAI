@@ -380,3 +380,49 @@ def test_memo_money_uses_listing_currency_never_bare_dollar(db):
     assert "| Base | 3,60 EUR | 60 % |" in memo
     assert "Precio actual: 3,58 EUR · Valor esperado: 3,62 EUR · Margen de seguridad: 1,1 %" in memo
     assert "$" not in memo
+
+
+def test_historical_margin_without_convention_is_warned_not_rewritten(db):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.current_price = 343.46
+    thesis.expected_value = 120.53
+    thesis.margin_of_safety = -0.649
+    thesis.valuation_basis = {"model_version": "valuation-engines-v2"}
+    thesis.executive_summary = "Margen original -64,9 %"
+    db.flush()
+    memo = build_memo_markdown(db, company, thesis)
+    assert "sin convención de fórmula verificada" in memo
+    assert "No comparar este porcentaje" in memo
+    assert "Margen original -64,9 %" in memo
+    assert "Margen de seguridad: -64,9 %" in memo
+    assert float(thesis.margin_of_safety) == -0.649
+    assert "-185" not in memo
+
+
+@pytest.mark.parametrize("convention", [None, "future_unknown_convention"])
+def test_absent_or_unrecognized_margin_convention_is_not_assumed(db, convention):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.valuation_basis = {"margin_of_safety_convention": convention}
+    assert "sin convención de fórmula verificada" in build_memo_markdown(db, company, thesis)
+
+
+def test_explicit_margin_convention_prints_formula(db):
+    from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
+
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.valuation_basis = {"margin_of_safety_convention": MARGIN_OF_SAFETY_CONVENTION}
+    memo = build_memo_markdown(db, company, thesis)
+    assert "Convención del margen de seguridad: (V - P) / V" in memo
+    assert "sin convención de fórmula verificada" not in memo
+
+
+def test_draft_does_not_disclose_margin_provenance_or_number(db):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    memo = build_memo_markdown(db, company, thesis, draft=True)
+    assert "Convención del margen" not in memo
+    assert "margen de seguridad histórico" not in memo
+    assert "15,0 %" not in memo

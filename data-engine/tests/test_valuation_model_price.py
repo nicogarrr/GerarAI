@@ -14,7 +14,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -176,6 +176,7 @@ def test_golden_cgeo_l_peniques_a_libras(db: Session) -> None:
     # A mano: 4255 / 100 = 42,55 GBP.
     company = _company(db, ticker="CGEO.L", currency="USD")
     _close(db, company, date(2026, 10, 16), "4255")
+    db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id)).quote_currency = "GBX"
     db.commit()
 
     resolved = resolve_model_price(db, company.id)
@@ -198,3 +199,16 @@ def test_cgeo_l_mark_en_libras_no_se_divide(db: Session) -> None:
     assert resolved is not None
     assert resolved.value == pytest.approx(43.10)
     assert resolved.currency == "GBP"
+
+
+@pytest.mark.parametrize("unit,close,expected", [("GBP", "42.55", 42.55), ("GBX", "4255", 42.55), (None, "4255", None)])
+def test_model_price_respects_row_unit_not_london_guess(db, unit, close, expected):
+    company = _company(db, ticker="CGEO.L", currency="GBP")
+    db.add(MarketPrice(company_id=company.id, date=date(2026, 10, 26), close=Decimal(close), quote_currency=unit))
+    db.commit()
+    resolved = resolve_model_price(db, company.id)
+    if expected is None:
+        assert resolved is None
+    else:
+        assert resolved.value == pytest.approx(expected)
+        assert resolved.currency == "GBP"

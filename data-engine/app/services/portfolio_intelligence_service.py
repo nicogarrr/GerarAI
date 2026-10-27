@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
 from app.services.async_bridge import run_from_any_context
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import PortfolioFXService, currency_key
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
 from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
@@ -181,7 +181,7 @@ class PortfolioIntelligenceService:
         missing_fx: list[dict[str, Any]] = []
         for position, company in rows:
             value_base = position.market_value_base
-            if value_base is None and position.currency == base_currency:
+            if value_base is None and position.currency == base_currency and (position.market_value_native or position.market_value) > 0:
                 value_base = position.market_value_native or position.market_value
             if value_base is None:
                 missing_fx.append(
@@ -634,6 +634,7 @@ class PortfolioIntelligenceService:
         base = fx.base_currency(db)
         cashflows: list[tuple[date, float]] = []
         ambiguous_cash_excluded = 0
+        missing_fx: list[dict[str, Any]] = []
         all_transactions = list(db.scalars(select(Transaction).order_by(Transaction.trade_date)).all())
         external = {id(t) for t in all_transactions if _is_external_transfer(t)}
         perspective = "account" if external else "investment"
@@ -645,6 +646,13 @@ class PortfolioIntelligenceService:
             as_of_max=max((t.trade_date for t in all_transactions), default=None) or date.today(),
         ) if all_transactions else {}
         for transaction in all_transactions:
+            action = (transaction.action or "").lower()
+            # Only included flows need FX. Internal account movements and
+            # unidentified investment cash cannot make this return incomplete.
+            if perspective == "account" and id(transaction) not in external:
+                continue
+            if perspective == "investment" and action == "cash_misc":
+                continue
             rate = PortfolioFXService.rate_from_table(
                 flow_table,
                 quote_currency=transaction.currency,
@@ -652,6 +660,12 @@ class PortfolioIntelligenceService:
                 as_of=transaction.trade_date,
             )
             if rate is None:
+                missing_fx.append({
+                    "kind": "cashflow",
+                    "transaction_id": transaction.id,
+                    "currency": transaction.currency,
+                    "as_of": transaction.trade_date.isoformat(),
+                })
                 continue
             # Sign convention: a buy is an outflow, a sell an inflow, a
             # dividend/interest an inflow, and a fee or a withholding tax an
@@ -729,7 +743,18 @@ class PortfolioIntelligenceService:
                 "perspective": perspective,
                 "external_flows": len(external),
             }
-        ending_value = sum(float(position.market_value_base or 0) for position, _ in positions)
+        ending_value = 0.0
+        for position, company in positions:
+            value = position.market_value_base
+            if value is None and position.currency.upper() == base and position.market_value > 0:
+                value = position.market_value
+            if value is None:
+                missing_fx.append({
+                    "kind": "position", "ticker": company.ticker,
+                    "currency": position.currency,
+                })
+            else:
+                ending_value += float(value)
         # La caja solo entra en el valor final de la perspectiva de CUENTA.
         cash_rows = (
             list(db.scalars(select(CashBalance)).all()) if perspective == "account" else []
@@ -742,9 +767,19 @@ class PortfolioIntelligenceService:
             as_of=date.today(),
         )
         for cash in cash_rows:
-            rate = ending_rates.get(cash.currency.upper())
+            rate = ending_rates.get(currency_key(cash.currency))
             if rate is not None:
                 ending_value += float(cash.balance * rate)
+            elif cash.balance:
+                missing_fx.append({"kind": "ending_cash", "currency": cash.currency})
+        if missing_fx:
+            return None, {
+                "status": "incomplete_missing_fx",
+                "missing_fx": missing_fx,
+                "cashflows": len(cashflows),
+                "perspective": perspective,
+                "external_flows": len(external),
+            }
         if ending_value:
             cashflows.append((date.today(), ending_value))
         if len(cashflows) < 2 or not any(value < 0 for _, value in cashflows):

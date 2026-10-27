@@ -577,13 +577,16 @@ class ThesisEvidenceService:
                         MarketPrice.company_id == company.id, MarketPrice.date == quote_date
                     )
                 )
-                if existing:
+                if existing and existing.quote_currency is not None:
+                    result.update({"status": "unknown_price_unit", "detail": "Quote sin unidad verificable para esta barra ajustada."})
+                elif existing:
                     # Barra real ya persistida: se actualiza solo el close y se
                     # preservan OHLC y el adjusted autentico de esa fecha.
                     existing.close = price
                     if volume is not None:
                         existing.volume = volume
                     existing.source = "Finnhub"
+                    existing.quote_currency = None
                 else:
                     # Spot no es barra ajustada: adj_close NULL, nunca una copia
                     # de close que afirme un ajuste no realizado.
@@ -598,9 +601,11 @@ class ThesisEvidenceService:
                             adj_close=None,
                             volume=volume,
                             source="Finnhub",
+                            quote_currency=None,
                         )
                     )
-                result.update({"status": "ok", "price": float(price), "price_as_of": quote_date.isoformat()})
+                if result["status"] != "unknown_price_unit":
+                    result.update({"status": "ok", "price": float(price), "price_as_of": quote_date.isoformat()})
         else:
             result["detail"] = result.get("detail") or "Quote sin precio util (c<=0 o vacio)."
         try:

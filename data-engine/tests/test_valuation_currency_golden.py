@@ -399,3 +399,21 @@ def test_motor_dcf_real_es_homogeneo_en_la_divisa(db: Session, monkeypatch) -> N
     assert converted["base_value"] == pytest.approx(native["base_value"], rel=1e-6)
     assert converted["margin_of_safety"] == pytest.approx(native["margin_of_safety"], rel=1e-6)
     assert converted["current_price"] == pytest.approx(20.0)
+
+
+def test_computed_margin_convention_is_persisted_with_output(db: Session) -> None:
+    from sqlalchemy import select
+
+    from app.models import ValuationOutput
+    from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
+
+    company = _company(db, "CONV")
+    _facts(db, company, currency="USD", revenue=1000, fcf=100, shares=10, period="2025-12-31:FY")
+    _close(db, company, "100")
+    result = _value(db, company)
+    assert result["margin_of_safety"] == pytest.approx(1 / 3)
+    assert result["trace"]["margin_of_safety_convention"] == MARGIN_OF_SAFETY_CONVENTION
+    model = ValuationService().persist_output(db, company, result)
+    outputs = list(db.scalars(select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id)))
+    assert len(outputs) == 3
+    assert all(row.output_payload["trace"]["margin_of_safety_convention"] == MARGIN_OF_SAFETY_CONVENTION for row in outputs)

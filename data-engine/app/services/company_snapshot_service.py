@@ -24,6 +24,7 @@ from app.schemas import CompanySnapshotOut
 from app.services.document_visibility import without_archive_duplicates
 from app.services.news_headline_translation import display_translation, original_headline
 from app.services.thesis_change_identity import ChangeItem, group_change_items
+from app.valuation.margin_convention import margin_convention_known
 
 
 class CompanySnapshotService:
@@ -401,6 +402,15 @@ class CompanySnapshotService:
         else:
             health_status = "healthy"
 
+        margin_fields = {
+            "margin_of_safety": None,
+            "archived_margin_of_safety": thesis.margin_of_safety if thesis else None,
+            "margin_of_safety_convention": (thesis.valuation_basis or {}).get("margin_of_safety_convention") if thesis else None,
+            "margin_of_safety_status": "missing" if thesis is None or thesis.margin_of_safety is None else "unknown_convention",
+        }
+        if thesis and thesis.margin_of_safety is not None and margin_convention_known(thesis.valuation_basis):
+            margin_fields["margin_of_safety"] = thesis.margin_of_safety
+            margin_fields["margin_of_safety_status"] = "verified"
         thesis_summary = None
         if thesis is not None:
             thesis_summary = {
@@ -414,7 +424,7 @@ class CompanySnapshotService:
                 "base_value": thesis.base_value,
                 "bull_value": thesis.bull_value,
                 "expected_value": thesis.expected_value,
-                "margin_of_safety": thesis.margin_of_safety,
+                **margin_fields,
                 "data_confidence_score": thesis.data_confidence_score,
                 "source_coverage_score": thesis.source_coverage_score,
                 "hypothesis": getattr(thesis, "hypothesis", None),
@@ -468,7 +478,7 @@ class CompanySnapshotService:
                     "base_value": thesis.base_value if thesis else None,
                     "bull_value": thesis.bull_value if thesis else None,
                     "expected_value": thesis.expected_value if thesis else None,
-                    "margin_of_safety": thesis.margin_of_safety if thesis else None,
+                    **margin_fields,
                     "updated_at": (
                         valuation_model.updated_at if valuation_model else None
                     ),

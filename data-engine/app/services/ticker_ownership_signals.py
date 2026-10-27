@@ -186,10 +186,17 @@ def holders_signal(db: Session, ticker: str) -> dict[str, Any]:
             or "Sin CUSIP verificado para cruzar los 13F (emisor no estadounidense o identidad pendiente).",
         }
     if base.get("status") == "sin_datos":
+        # Las carteras 13F se guardan por cuenta y el cron es semanal (lunes
+        # 04:20 UTC): una cuenta nueva no tiene ninguna hasta su primera
+        # sincronizacion. La ruta encola esa primera descarga (realqa-20).
         return {
             "status": "sin_datos",
+            "reason": "sin_sincronizar",
             "source": HOLDERS_SOURCE,
-            "detail": "Aún no hay 13F sincronizados de los gestores revisados.",
+            "detail": (
+                "Aún no hay 13F sincronizados de los gestores revisados en tu cuenta. "
+                "Se actualizan automáticamente cada lunes por la mañana."
+            ),
         }
     cusip = str(base["cusip"])
     holders = list(base.get("holders") or [])

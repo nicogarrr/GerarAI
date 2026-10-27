@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import (
@@ -319,3 +319,20 @@ def test_all_counts_scoped_to_current_tenant(db: Session):
     expected_otro = {key: value * 2 for key, value in expected.items()}
     assert CompanySnapshotService._counts(db, company.id) == expected_otro
     assert CompanySnapshotService._counts_many(db, [company.id])[company.id] == expected_otro
+
+
+@pytest.mark.parametrize("convention,expected", [(None, None), ("future_formula", None), ("discount_to_value_v1", Decimal("0.3"))])
+def test_snapshot_margin_requires_provenance_preserving_archived_number(db, convention, expected):
+    company = _company(db, "MARGIN")
+    _fill(db, company, thesis_versions=1, changes=0)
+    thesis = db.scalar(select(ThesisVersion).where(ThesisVersion.company_id == company.id))
+    thesis.margin_of_safety = Decimal("0.3")
+    thesis.valuation_basis = {"margin_of_safety_convention": convention}
+    db.commit()
+    result = CompanySnapshotService().build(db, company)
+    for summary in (result.latest_thesis, result.valuation_summary):
+        assert summary.margin_of_safety == expected
+        assert summary.archived_margin_of_safety == Decimal("0.3")
+        assert summary.margin_of_safety_convention == convention
+        assert summary.margin_of_safety_status == ("verified" if expected else "unknown_convention")
+    assert thesis.margin_of_safety == Decimal("0.3")

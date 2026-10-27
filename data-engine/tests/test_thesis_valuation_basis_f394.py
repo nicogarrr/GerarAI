@@ -58,3 +58,19 @@ def test_basis_omits_fingerprint_key_without_model():
     """Sin modelo ligado la clave no aparece (contrato sin ruido)."""
     basis = ThesisService._valuation_basis({"value_per_share_basis": "ordinary_share"})
     assert "model_input_fingerprint" not in basis
+
+
+def test_margin_convention_survives_without_share_basis():
+    from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
+
+    basis = ThesisService._valuation_basis({
+        "trace": {"margin_of_safety_convention": MARGIN_OF_SAFETY_CONVENTION},
+    })
+    assert basis["margin_of_safety_convention"] == MARGIN_OF_SAFETY_CONVENTION
+    assert basis["value_per_share_basis"] is None
+
+
+def test_model_version_alone_does_not_establish_margin_convention():
+    assert ThesisService._valuation_basis({
+        "trace": {"model_version": "valuation-engines-v2"},
+    }) is None

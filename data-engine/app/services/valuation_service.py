@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
 from app.models import Company, MarketPrice, Position, ValuationModel, ValuationOutput
+from app.services.price_units import price_in_currency
 from app.valuation.currency import (
     listing_currency,
     listing_quote_unit,
+    normalize_currency,
     reporting_currencies,
     resolve_fx,
     scale_per_share_outputs,
@@ -28,6 +30,7 @@ from app.valuation.engines.base import (
     apply_publication_blockers,
     insufficient_result,
 )
+from app.valuation.margin_convention import MARGIN_OF_SAFETY_CONVENTION
 from app.valuation.point_in_time import (
     PRECISION_UNKNOWN,
     assert_period_no_lookahead,
@@ -147,11 +150,15 @@ def resolve_model_price(db: Session, company_id: int, as_of: date | None = None)
         price_query = price_query.where(MarketPrice.date <= as_of)
     market_price = db.scalar(price_query.order_by(desc(MarketPrice.date)).limit(1))
     if market_price and market_price.close and float(market_price.close) > 0:
-        converted = to_major_units(market_price.close, quote_unit)
+        major, _ = normalize_currency(quote_unit)
+        converted = price_in_currency(
+            market_price.close, quote_currency=market_price.quote_currency,
+            target_currency=major, company=company,
+        )
         if converted is not None:
             close = ModelPrice(
-                value=converted.value,
-                currency=converted.currency,
+                value=float(converted),
+                currency=major,
                 as_of=market_price.date,
                 source="market_close",
             )
@@ -367,6 +374,8 @@ class ValuationService:
         result["trace"] = result.get("trace") or {}
         result["trace"].setdefault("engine", resolve_engine_key(company))
         result["trace"].setdefault("model_version", MODEL_VERSION)
+        # Written only by a fresh computation, never added when reading history.
+        result["trace"]["margin_of_safety_convention"] = MARGIN_OF_SAFETY_CONVENTION
         result["trace"]["resolved_engine"] = resolve_engine_key(company)
         free_data = _free_data_trace(db, company)
         if free_data is not None:

@@ -543,6 +543,15 @@ def run_thesis_job(run_id: int) -> None:
         if tenant is not None:
             db.info["tenant_id"] = tenant.id
             db.info["user_id"] = str(user_id)
+            # This actor receives only run_id, so the broker middleware cannot
+            # infer its tenant. Bind after validating the durable envelope,
+            # and restore even when generation fails or this delivery is fenced.
+            from app.llm.tenant_config import tenant_llm_config_scope
+            from app.services.tenant_llm_settings_service import load_config_for_tenant
+
+            guard_stack.enter_context(
+                tenant_llm_config_scope(load_config_for_tenant(db, tenant.id))
+            )
         db.commit()
         # Fencing token del intento: si una entrega de recuperacion (lease
         # expirado, reconciler) toma el run MIENTRAS este intento genera,

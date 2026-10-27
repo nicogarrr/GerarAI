@@ -16,7 +16,7 @@ from app.models import (
     PositionDailySnapshot,
     Transaction,
 )
-from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_fx_service import PortfolioFXService, currency_key
 
 
 class PortfolioSnapshotService:
@@ -86,8 +86,8 @@ class PortfolioSnapshotService:
         )
         for position in positions:
             native = position.quantity * position.market_price
-            rate = position_rates.get(position.currency.upper())
-            base = native * rate if rate is not None else None
+            rate = position_rates.get(currency_key(position.currency))
+            base = native * rate if rate is not None and position.market_price > 0 else None
             if base is None or position.as_of != snapshot_date or position.valuation_hold_reason:
                 missing_pricing.append(
                     {
@@ -110,7 +110,7 @@ class PortfolioSnapshotService:
             as_of=snapshot_date,
         )
         for cash in cash_rows:
-            rate = cash_rates.get(cash.currency.upper())
+            rate = cash_rates.get(currency_key(cash.currency))
             base = cash.balance * rate if rate is not None else None
             if base is None or cash.as_of != snapshot_date:
                 missing_pricing.append(
@@ -395,7 +395,7 @@ class PortfolioSnapshotService:
             if transaction.action == "cash_misc":
                 ambiguous.append(transaction.id)
                 continue
-            rate = flow_rates.get(transaction.currency.upper())
+            rate = flow_rates.get(currency_key(transaction.currency))
             if rate is None:
                 ambiguous.append(transaction.id)
                 continue

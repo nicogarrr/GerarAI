@@ -126,7 +126,14 @@ def load_config_for_tenant(
         row = read_tenant_row(db, tenant_id)
     except SQLAlchemyError:
         logger.warning("tenant LLM settings table unavailable", exc_info=True)
-        return None
+        # None means a confirmed absence of tenant settings and permits the
+        # platform provider. A failed read cannot establish that absence.
+        return TenantLLMConfig(
+            provider=PROVIDER_CUSTOM,
+            base_url="",
+            model="",
+            error="tenant_llm_settings_unavailable",
+        )
     return config_from_row(row, settings) if row is not None else None
 
 
