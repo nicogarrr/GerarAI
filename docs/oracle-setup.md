@@ -87,7 +87,7 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
      0.0.0.0/0.
    - En la VM (Ubuntu): `sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT && sudo iptables -I INPUT 6 -m state --state NEW -p tcp --dport 443 -j ACCEPT && sudo netfilter-persistent save`
 4. **Dominio gratis para TLS**: DuckDNS (duckdns.org) > login > crea un
-   subdominio (p.ej. `cavaai-api.duckdns.org`) apuntando a la IP publica de
+   subdominio (p.ej. `<tu-subdominio>.duckdns.org`) apuntando a la IP publica de
    la VM. Es gratis y Caddy saca el certificado solo.
    - Por defecto Caddy publica en `0.0.0.0:80/443`. Si `tailscaled` ya ocupa
      el :443 en la IP tailnet (caso de la VM actual), define
@@ -109,13 +109,13 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
 7. **Apuntar Vercel al backend**: en el proyecto de Vercel define estas
    variables y redeploy (sin ellas el frontend prod no autentica ni firma
    contra el backend):
-   `FMP_BACKEND_URL=https://cavaai-api.duckdns.org`,
+   `FMP_BACKEND_URL=https://<tu-subdominio>.duckdns.org`,
    `RESEARCH_AUTH_SECRET` (el mismo valor que en la VM),
    `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL=https://<tu-app>.vercel.app`,
    `MONGODB_URI` (Atlas M0), `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID`.
 8. **Backups**: `crontab -e` y anade (horas UTC, sin solapar con el deploy):
    ```
-   17 4 * * * cd /home/ubuntu/GerarAI && RCLONE_REMOTE=r2:cavaai-backups ./scripts/backup.sh --stop-storage >> /var/log/cavaai-backup.log 2>&1
+   17 4 * * * cd /home/ubuntu/GerarAI && RCLONE_REMOTE=r2:<tu-bucket-de-backups> ./scripts/backup.sh --stop-storage >> /var/log/cavaai-backup.log 2>&1
    30 4 * * 0 cd /home/ubuntu/GerarAI && ./scripts/mongo-backup.sh >> /var/log/cavaai-mongo-backup.log 2>&1
    ```
    `--stop-storage` para backend, TODOS los workers, scheduler y MinIO durante
@@ -134,11 +134,11 @@ antes de subir su limite: el presupuesto global no debe pasar de 10 GiB.
 4. R2 free tier: 10 GB almacenamiento, sin costes de egreso. Con dumps
    diarios comprimidos de una app personal sobra; el script crea una carpeta
    por fecha asi que conviene borrar backups de mas de 30 dias
-   (`rclone delete r2:cavaai-backups --min-age 30d`, se puede anadir al cron).
+   (`rclone delete r2:<tu-bucket-de-backups> --min-age 30d`, se puede anadir al cron).
 
 ## Verificacion tras el despliegue
 
-- `curl -fsS https://cavaai-api.duckdns.org/health/ready` responde OK.
+- `curl -fsS https://<tu-subdominio>.duckdns.org/health/ready` responde OK.
 - `docker compose -f docker-compose.prod.yml --env-file .env.production ps`
   muestra todos los servicios `healthy` (incluido el scheduler).
 - En la app (Vercel): /portfolio, /research, /knowledge cargan datos en vez

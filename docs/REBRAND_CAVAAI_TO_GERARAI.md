@@ -33,9 +33,9 @@ compatibilidad con clientes ya instalados.
 | Snapshots Propicks | kind `cavaai-propicks-monthly-snapshot` | valida archivos ya descargados por usuarios |
 | EPUB | UID `cavaai-thesis-{ticker}-v{version}` | identidad DC estable; cambiarla duplicaria tesis en e-readers |
 | Auth / runtime | usuario Linux `cavaai`, sidecar `cavaai-tts`, sesion OpenCode `cavaai-prod` | despliegue actual |
-| Dominios / alias | `cavaai.vercel.app`, `cavaai-api.duckdns.org`, R2 `r2:cavaai-backups` | DNS, TLS y clientes existentes |
+| Dominios / alias | alias de Vercel, subdominio DuckDNS del backend y remoto R2 de backups (nombres reales fuera del repo, en el `.env` del servidor) | DNS, TLS y clientes existentes |
 | Paquete Python | `cavaai-data-engine` en `pyproject.toml`/`uv.lock` | nombre de proyecto del lock |
-| Checkout local | `C:\Users\nicoi\CavaAI` y tarea programada del `.vbs` | ruta real del equipo; cambiar el `.vbs` de sitio no cambia el disco |
+| Checkout local | ruta del checkout en el PC del dueño y tarea programada del `.vbs` | ruta real del equipo; cambiar el `.vbs` de sitio no cambia el disco |
 | Fuente legacy de riesgo | `CavaAI Postgres` -> se muestra como «Base de datos de GerarAI» | snapshots antiguos ya guardados |
 | Vault Obsidian | nota de migracion `CavaAI/` -> `GerarAI/` | los ficheros antiguos no se mueven solos |
 | Guards negativos | asserts de que `CavaAI` no aparece en respuestas visibles | protegen contra regresiones del nombre viejo |
