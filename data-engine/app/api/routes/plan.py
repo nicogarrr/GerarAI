@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.services.investment_plan_service import (
     PLAN_CURRENCY_UNSET,
+    ContributionConflict,
     InvestmentPlanService,
     plan_currency_enforced,
 )
@@ -149,6 +150,8 @@ def add_contribution(payload: ContributionInput, db: Session = Depends(get_db)) 
             external_id=payload.external_id,
             note=payload.note,
         )
+    except ContributionConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {

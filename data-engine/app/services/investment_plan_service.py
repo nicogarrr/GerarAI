@@ -26,6 +26,11 @@ from app.models import (
 )
 from app.services.portfolio_fx_service import PortfolioFXService
 
+
+class ContributionConflict(ValueError):
+    """An import key already identifies a different recorded contribution."""
+
+
 DEFAULT_BAND = Decimal("0.05")  # ±5 percentage points
 
 # Omiso != None: un cliente viejo que OMITE la divisa no debe borrar la ya
@@ -120,6 +125,16 @@ class InvestmentPlanService:
                 )
             )
             if existing is not None:
+                # Compare at the stored monetary precision, but do not rewrite
+                # historical rows or reinterpret currency units/case.
+                if (
+                    existing.date != date_
+                    or existing.amount != amount.quantize(Decimal("0.01"))
+                    or existing.currency != currency
+                ):
+                    raise ContributionConflict(
+                        "La referencia ya identifica otra aportación con fecha, importe o divisa distintos."
+                    )
                 return existing
         contribution = PlanContribution(
             plan_id=plan.id,
