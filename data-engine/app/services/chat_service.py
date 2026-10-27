@@ -1339,6 +1339,7 @@ class ChatService:
         # se ahorra la llamada LLM de sintesis. Sin key o ante fallo,
         # sintesis como siempre.
         if use_jev and ticker:
+            # nosemgrep: gerarai-broad-except-pass -- marca opcional de Jev; nunca rompe el chat
             try:
                 from app.services.jev_gates import (
                     CHAT_BASELINE_OK_THRESHOLD,
@@ -1589,8 +1590,9 @@ class ChatService:
             # posicion ya esta en la base. Un nativo en otra divisa sin
             # convertir NO se suma (mezclaria divisas): cuenta como sin valor.
             if pos.market_value_base is not None:
-                return float(pos.market_value_base or 0)
+                return float(pos.market_value_base)
             if (pos.currency or base) == base:
+                # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
                 return float(pos.market_value or 0)
             return 0.0
 
@@ -1768,11 +1770,19 @@ class ChatService:
         if not rows:
             return None
 
-        def _pair(pos: Position) -> tuple[float, float, str]:
+        def _pair(pos: Position) -> tuple[float | None, float, str]:
             if pos.market_value_base is not None and pos.cost_basis_base is not None:
                 return float(pos.cost_basis_base), float(pos.market_value_base), pos.base_currency or "EUR"
-            cost = float(pos.average_cost or 0) * float(pos.quantity or 0)
-            return cost, float(pos.market_value or 0), pos.currency or "EUR"
+            # average_cost se guarda 0 cuando no se conoce (default de la columna):
+            # un coste 0 no es "gratis", es desconocido. Contarlo como 0 inflaba la
+            # rentabilidad con todo el valor de esa posicion como ganancia ficticia.
+            avg = pos.average_cost
+            cost = (
+                float(avg) * float(pos.quantity)
+                if avg is not None and avg > 0 and pos.quantity is not None
+                else None
+            )
+            return cost, float(pos.market_value), pos.currency or "EUR"
 
         currencies = sorted({_pair(pos)[2] for pos, _ in rows})
         if len(currencies) > 1:
@@ -1788,8 +1798,11 @@ class ChatService:
                 llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0, "mixed_currency": True},
             )
         cur = currencies[0]
-        total_cost = sum(_pair(pos)[0] for pos, _ in rows)
-        total_value = sum(_pair(pos)[1] for pos, _ in rows)
+        pairs = [(_pair(pos), comp) for pos, comp in rows]
+        unknown_cost = sorted(comp.ticker for (cost, _v, _c), comp in pairs if cost is None)
+        known = [(cost, value) for (cost, value, _c), _comp in pairs if cost is not None]
+        total_cost = sum(cost for cost, _ in known)
+        total_value = sum(value for _, value in known)
         if total_cost <= 0:
             return ChatResponse(
                 answer="No tengo el coste de compra guardado de tus posiciones: sin él no calculo rentabilidad.",
@@ -1815,6 +1828,13 @@ class ChatService:
             "Es rentabilidad simple sobre el coste de las posiciones abiertas, no TWR: "
             "no cuenta caja, dividendos ni ventas cerradas."
         )
+        if unknown_cost:
+            answer += (
+                " Sin coste de compra guardado y fuera del cálculo: "
+                + ", ".join(unknown_cost[:10])
+                + (f" y {len(unknown_cost) - 10} más" if len(unknown_cost) > 10 else "")
+                + "."
+            )
         sources = [
             self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
             for pos, comp in rows[:15]
@@ -2269,14 +2289,21 @@ class ChatService:
         trace["method"] = "fifo" if fifo_cost is not None else "average_cost"
         if value_base is None or (fifo_cost is None and avg_cost is None):
             native_value = pos.market_value_native if pos.market_value_native is not None else pos.market_value
+            # average_cost 0 es el default de la columna: coste desconocido.
+            avg_known = pos.average_cost is not None and pos.average_cost > 0
             native_cost = (
                 pos.cost_basis_native if pos.cost_basis_native is not None
-                else Decimal(pos.average_cost or 0) * held
+                else (Decimal(pos.average_cost) * held if avg_known else None)
             )
             ccy = _currency_display(pos.currency)
+            avg_text = (
+                f"a un coste medio de {_fmt_money_es(float(pos.average_cost))} {ccy}"
+                if avg_known
+                else "sin coste medio guardado"
+            )
             answer = (
                 f"Tengo tu posición: {_fmt_number_es(float(held), 4)} acciones de {company.ticker} "
-                f"a un coste medio de {_fmt_money_es(float(pos.average_cost or 0))} {ccy}. "
+                f"{avg_text}. "
                 "Pero no puedo estimarte el IRPF en euros: falta "
                 + ("el valor actual en euros" if value_base is None and (fifo_cost is not None or avg_cost is not None)
                    else "el coste en euros (tipo de cambio de la fecha de compra)")
@@ -2304,6 +2331,7 @@ class ChatService:
             lot_texts = [
                 f"{_fmt_date_es(lot.trade_date.isoformat() if lot.trade_date else None)}, "
                 f"{_fmt_number_es(float(lot.quantity), 4)} acciones, "
+                # nosemgrep: gerarai-money-none-to-zero -- lote FIFO ya casado: cost_eur siempre calculado para lotes casados; solo es texto
                 f"coste {_fmt_money_es(float(lot.cost_eur or 0))} €"
                 for lot in fifo.lots
             ]
@@ -2312,6 +2340,7 @@ class ChatService:
                 "Lotes vendidos: " + "; ".join(lot_texts) + "."
             )
         else:
+            # nosemgrep: gerarai-money-none-to-zero -- aqui avg_cost es conocido: la rama de arriba (avg_known/fifo_cost None) ya respondio sin cifra
             cost = Decimal(avg_cost or 0) * share
             method = (
                 "Ojo: sin historial de lotes; estimación con coste medio, puede diferir de FIFO. "

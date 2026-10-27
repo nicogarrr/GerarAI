@@ -21,6 +21,7 @@ const LEDGER_REASON_LABELS: Record<string, string> = {
   missing_fx: 'sin tipo de cambio',
   missing_start_price: 'sin precio al inicio del horizonte',
   missing_start_fx: 'sin tipo de cambio al inicio del horizonte',
+  missing_end_value: 'sin valor actual en divisa base',
 };
 
 

@@ -202,3 +202,24 @@ def test_partial_ledger_is_honest_null(db):
     assert result["positions"][0]["reason"] == "incomplete_ledger"
     assert result["total_pnl"] is None
     assert result["coverage"]["reasons"] == {"incomplete_ledger": 1}
+
+
+def test_missing_end_value_in_base_is_honest_null_not_total_loss(db):
+    """Sin market_value_base (falta el FX de hoy) el valor final es
+    desconocido, no 0: antes la contribucion salia como una perdida del 100 %
+    (0 - 1200 = -1200) y entraba en el total."""
+    _usd_base(db)
+    company = _company(db)
+    position = _position(db, company, qty=10, price=150)
+    position.market_value_base = None
+    db.commit()
+    _tx(db, company, "buy", 10, 100, date(2025, 6, 1))
+    _price(db, company, CUTOFF - timedelta(days=1), 120)
+    result = PortfolioIntelligenceService()._ledger_contribution(
+        db, [(position, company)], CUTOFF
+    )
+    entry = result["positions"][0]
+    assert entry["contribution_pnl"] is None
+    assert entry["end_value"] is None
+    assert entry["reason"] == "missing_end_value"
+    assert result["total_pnl"] is None

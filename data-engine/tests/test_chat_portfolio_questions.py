@@ -223,3 +223,26 @@ def test_cuanto_pesa_ticker_con_posicion_da_su_peso(db):
     assert resp.llm_trace["path"] == "portfolio_position"
     assert "Tu posición guardada en ASTS" in resp.answer
     assert "97,6 %" in resp.answer
+
+
+def test_rentabilidad_no_cuenta_coste_desconocido_como_cero(db):
+    """average_cost=0 (default de la columna) es coste desconocido, no gratis:
+    antes la posicion sumaba todo su valor como ganancia ficticia (+400 %)."""
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    _position(db, a, 10, 10, 120)   # coste 100, valor 120 -> +20 %
+    _position(db, b, 5, 0, 380)     # coste desconocido
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué rentabilidad tiene mi cartera?", "portfolio", None))
+    assert resp.llm_trace["path"] == "portfolio_performance"
+    assert "+400 %" not in resp.answer
+    assert "+20 %" in resp.answer
+    assert "BBB" in resp.answer and "Sin coste de compra guardado" in resp.answer
+
+
+def test_rentabilidad_todas_sin_coste_no_inventa(db):
+    a = _company(db, "AAA", "Alpha")
+    _position(db, a, 10, 0, 120)
+    db.commit()
+    resp = asyncio.run(ChatService().answer(db, "¿Qué rentabilidad tiene mi cartera?", "portfolio", None))
+    assert "No tengo el coste de compra guardado" in resp.answer
