@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 const quote = readFileSync('components/research/CompanyHeaderQuote.tsx', 'utf8');
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+const navigation = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
 describe('ficha: cifra grande y métricas compactas', () => {
     it('precio grande y variación en píldora, neutro si es cero', () => {
         assert.match(quote, /text-4xl/);
@@ -22,7 +23,7 @@ describe('ficha: cifra grande y métricas compactas', () => {
         assert.match(quote, /isValidCurrencyCode\(currency\)/);
     });
     it('pestañas limpias sin borrar rutas ni módulos', () => {
-        assert.match(page, /activeModule.group === group.key \? 'border-teal-300 text-gray-100'/);
+        assert.match(navigation, /primary === group \? 'border-teal-300 text-gray-100'/);
         const views = readFileSync('lib/research/research-views.ts', 'utf8');
         for (const view of ['resumen', 'numeros', 'fuentes', 'mas']) assert.ok(views.includes(`key: '${view}'`));
         // Las 6 claves de grupo antiguas siguen abriendo su módulo (compat ?view=), en un Map (sin prototipo).

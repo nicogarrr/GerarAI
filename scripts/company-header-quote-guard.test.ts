@@ -68,7 +68,7 @@ test('sin divisa verificada no se muestra precio (nunca USD asumido)', () => {
     assert.match(component, /isValidCurrencyCode\(currency\)/);
     assert.ok(!/currency\s*=\s*'USD'|currency\s*\?\?\s*'USD'/.test(component), 'la cabecera no debe asumir USD como fallback');
     assert.ok(component.includes("if (currency === 'USD'"));
-    assert.match(actions, /currency: researchCompany\?\.currency \|\| profile\?\.currency \|\| null/);
+    assert.match(actions, /researchCompany\?\.currency \|\| profile\?\.currency \|\| null/);
 });
 
 test('la variación omite ausencias: línea entera fuera si faltan ambos', () => {

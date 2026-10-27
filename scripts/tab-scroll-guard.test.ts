@@ -24,15 +24,16 @@ function navBlock(src: string, ariaLabelStart: string): string {
 
 describe('pestañas con estado en la URL conservan el scroll', () => {
     it('ficha: los 3 pasos (Entender/Valorar/Seguir) no resetean el scroll', () => {
-        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        const nav = navBlock(page, 'aria-label="Etapas del research"');
+        const page = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
+        const nav = navBlock(page, 'aria-label="Secciones de la empresa"');
         assert.ok(nav.includes('scroll={false}'), 'los pasos llevan scroll={false}');
     });
     it('ficha: los módulos ?view= no resetean el scroll; las subrutas sí arrancan arriba', () => {
-        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        const nav = navBlock(page, 'aria-label={`Módulos de ');
+        const page = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
+        navBlock(page, 'aria-label={`Módulos de ');
+        // Los enlaces de módulo salen del helper link(), fuera del bloque <nav>.
         assert.ok(
-            nav.includes("scroll={!('path' in module)}"),
+            page.includes("scroll={!('path' in item)}"),
             'los módulos ?view= conservan el scroll y las subrutas navegan arriba',
         );
     });

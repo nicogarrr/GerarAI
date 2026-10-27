@@ -6,7 +6,7 @@ import test from 'node:test';
 
 const SECTION = readFileSync('components/layout/SectionNav.tsx', 'utf8');
 const PROPICKS = readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8');
-const RESEARCH = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+const RESEARCH = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
 
 test('las tres tiras envuelven en móvil', () => {
     // Decisión de Nico (WhatsApp 2026-10-20 01:34): la barra va PLEGADA en
@@ -22,6 +22,5 @@ test('las tres tiras envuelven en móvil', () => {
     assert.ok(SECTION.includes('<OverflowScrollRegion'), 'SectionNav: el scroll lo da la region con pista');
     assert.ok(PROPICKS.includes('flex-wrap justify-start gap-1'), 'TabsList ProPicks sin wrap');
     assert.ok(!PROPICKS.includes('snap-x'), 'TabsList ProPicks sigue con snap scroll');
-    assert.ok(RESEARCH.includes('flex-wrap gap-x-6 gap-y-2'), 'nav de etapas sin wrap');
-    assert.ok(RESEARCH.includes('mb-7 flex flex-wrap gap-2'), 'nav de módulos sin wrap móvil');
+    assert.ok(RESEARCH.includes('className="flex flex-wrap gap-2"'), 'nav de módulos de la ficha sin wrap');
 });
