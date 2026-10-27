@@ -216,9 +216,15 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
             # la regla de los 2 meses rompe la proporcionalidad).
             proceeds_base = sale.get("proceeds_base")
             cost_base = sale.get("cost_base")
+            over_sell = bool(sale.get("over_sell"))
             # Venta sin compras que la cubran: el remanente se valora a coste
-            # cero, así que las casillas de ganancia no son fiables.
-            if gain_base is None or proceeds_base is None or cost_base is None or sale.get("over_sell"):
+            # cero, así que la base de adquisición no se conoce y la fila da
+            # N/D en adquisición y resultado (nunca el importe con el coste
+            # inventado). La transmisión sí es un dato observado y se conserva.
+            if over_sell:
+                cost_base = None
+                gain_base = None
+            if gain_base is None or proceeds_base is None or cost_base is None:
                 incomplete = True
             rows.append({
                 "ticker": bucket["ticker"],
@@ -226,6 +232,7 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
                 "transmission_base": _money(Decimal(str(proceeds_base))) if proceeds_base is not None else None,
                 "acquisition_base": _money(Decimal(str(cost_base))) if cost_base is not None else None,
                 "gain_base": _money(Decimal(str(gain_base))) if gain_base is not None else None,
+                "over_sell": over_sell,
             })
             if proceeds_base is not None:
                 transmission += Decimal(str(proceeds_base))

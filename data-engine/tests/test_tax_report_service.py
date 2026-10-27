@@ -510,3 +510,121 @@ def test_realized_gain_converts_each_leg_at_its_own_fx_rate(db):
     sale = row["sales"][0]
     assert sale["cost_base"] == pytest.approx(900.0)
     assert sale["proceeds_base"] == pytest.approx(800.0)
+
+
+def test_over_sell_sale_amounts_are_nd_not_invented(db):
+    """Venta sin compras que la cubran: el exceso se valora a coste cero, así
+    que el coste y la ganancia de ESA venta no se conocen. N/D en la venta y
+    en el bloque del ticker; los datos observados (fecha, cantidad,
+    transmisión) se conservan."""
+    _eur_portfolio(db)
+    c = _company(db, "OVS")
+    _tx(db, c, date(2026, 3, 10), "sell", 5, 120)  # sin compras
+
+    report = TaxReportService().compute_report(db, 2026)
+    bucket = next(b for b in report["realized"] if b["ticker"] == "OVS")
+    assert bucket["over_sell"] is True
+    # Ganancia del ticker: N/D, no 600 con pinta de exacta.
+    assert bucket["gain_native"] is None
+    assert bucket["gain_base"] is None
+    sale = bucket["sales"][0]
+    assert sale["over_sell"] is True
+    assert sale["gain_native"] is None
+    assert sale["gain_base"] is None
+    assert sale["cost_native"] is None
+    assert sale["cost_base"] is None
+    assert sale["raw_gain_native"] is None
+    # Lo observado se conserva.
+    assert sale["proceeds_native"] == 600.0
+    assert sale["proceeds_base"] == 600.0
+    assert sale["quantity"] == 5.0
+    assert sale["date"] == "2026-03-10"
+    assert sale["warning"] is not None and "over_sell" in sale["warning"]
+
+
+def test_over_sell_bucket_gain_is_nd_but_other_tickers_keep_theirs(db):
+    """Un ticker con over_sell no arrastra los demás: sus ganancias sí se
+    calculan. Dentro del ticker afectado, la venta cubierta conserva su
+    resultado y la descubierta sale N/D."""
+    _eur_portfolio(db)
+    ok = _company(db, "OKT")
+    _tx(db, ok, date(2026, 1, 10), "buy", 10, 100)
+    _tx(db, ok, date(2026, 6, 1), "sell", 10, 150)  # +500, cubierta
+    ovs = _company(db, "OVS")
+    _tx(db, ovs, date(2026, 1, 10), "buy", 10, 100)
+    _tx(db, ovs, date(2026, 3, 1), "sell", 5, 150)   # +250, cubierta
+    _tx(db, ovs, date(2026, 6, 1), "sell", 10, 120)  # quedan 5: over_sell 5
+
+    report = TaxReportService().compute_report(db, 2026)
+    ok_bucket = next(b for b in report["realized"] if b["ticker"] == "OKT")
+    assert ok_bucket["over_sell"] is False
+    assert ok_bucket["gain_base"] == 500.0
+
+    bucket = next(b for b in report["realized"] if b["ticker"] == "OVS")
+    assert bucket["over_sell"] is True
+    # El bloque mezcla una venta con base desconocida: total N/D.
+    assert bucket["gain_native"] is None
+    assert bucket["gain_base"] is None
+    covered, uncovered = bucket["sales"]
+    assert covered["over_sell"] is False
+    assert covered["gain_base"] == 250.0
+    assert uncovered["over_sell"] is True
+    assert uncovered["gain_base"] is None
+    assert uncovered["cost_base"] is None
+    assert uncovered["proceeds_base"] == 1200.0
+
+
+def test_over_sell_casillas_row_is_nd_and_keeps_observed_proceeds(db):
+    """Integración con la capa IRPF: la fila de casillas de una venta
+    descubierta muestra N/D en adquisición y resultado, conserva la
+    transmisión observada y anula las casillas globales."""
+    _eur_portfolio(db)
+    c = _company(db, "OVS")
+    _tx(db, c, date(2025, 3, 10), "sell", 5, 120)  # sin compras
+
+    report = TaxReportService().compute_report(db, 2025)
+    block = report["filing"]["casillas"]["acciones_negociadas"]
+    assert block["incomplete"] is True
+    assert block["0328_transmision_global"] is None
+    assert block["0331_adquisicion_global"] is None
+    assert block["0339_suma_ganancias"] is None
+    assert block["0340_suma_perdidas"] is None
+    row = block["rows"][0]
+    assert row["over_sell"] is True
+    assert row["transmission_base"] == 600.0  # dato observado de la venta
+    assert row["acquisition_base"] is None
+    assert row["gain_base"] is None
+
+
+def test_legacy_persisted_oversell_is_sanitized_on_get_and_export_without_write(db, monkeypatch):
+    import asyncio
+    import json
+    from copy import deepcopy
+
+    from app.api.routes.export import export_year
+    from app.models import TaxReport
+
+    original = [{"ticker": "OVS", "currency": "EUR", "over_sell": True, "gain_native": 600.0, "gain_base": 600.0,
+                 "sales": [{"date": "2026-03-10", "quantity": 5, "proceeds_base": 600.0, "proceeds_native": 600.0,
+                            "cost_base": 0.0, "cost_native": 0.0, "gain_base": 600.0, "gain_native": 600.0,
+                            "raw_gain_native": 600.0, "over_sell": True}]}]
+    stored = TaxReport(fiscal_year=2026, summary={}, dividends=[], realized=deepcopy(original), misc=[])
+    db.add(stored)
+    db.commit()
+    monkeypatch.setattr(TaxReportService, "_build_filing", lambda *a, **k: {})
+    read = TaxReportService().get_report(db, 2026)
+    assert read["realized"][0]["gain_base"] is None
+    assert read["realized"][0]["sales"][0]["cost_base"] is None
+    assert read["realized"][0]["sales"][0]["proceeds_base"] == 600
+    assert stored.realized == original
+    assert not db.is_modified(stored, include_collections=True)
+
+    response = export_year(2026, format="json", db=db)
+    async def collect():
+        chunks = [chunk async for chunk in response.body_iterator]
+        return b"".join(chunk if isinstance(chunk, bytes) else chunk.encode() for chunk in chunks)
+    exported = json.loads(asyncio.run(collect()))
+    assert exported["tax"]["realized"][0]["gain_base"] is None
+    assert exported["tax"]["realized"][0]["sales"][0]["gain_native"] is None
+    db.expire(stored)
+    assert stored.realized == original
