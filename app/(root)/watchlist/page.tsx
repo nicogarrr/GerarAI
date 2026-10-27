@@ -12,6 +12,7 @@ import { WatchlistMembership, WatchlistEntry, WatchlistCount } from '@/component
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
+import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
 import type { DcaSignalItem } from '@/lib/dca/types';
@@ -243,20 +244,7 @@ export default async function WatchlistPage({
             default: return null;
         }
     };
-    const sortedStocks = [...watchlistStocks].sort((a, b) => {
-        if (!metricSort) {
-            // Orden del backend (recientes primero) o por símbolo ya aplicado
-            // a los items; aquí solo se hunden las filas sin precio.
-            return Number(a.price === null) - Number(b.price === null);
-        }
-        const va = metricValue(a);
-        const vb = metricValue(b);
-        if (va === null && vb === null) return 0;
-        if (va === null) return 1;
-        if (vb === null) return -1;
-        const cmp = typeof va === 'string' && typeof vb === 'string' ? va.localeCompare(vb) : Number(va) - Number(vb);
-        return dir === 'asc' ? cmp : -cmp;
-    });
+    const sortedStocks = sortWatchlistRows(watchlistStocks, sort, dir, metricValue);
     const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
 
     // Market Cap N/D: una sola leyenda por página en vez de repetir el motivo en cada tarjeta/fila.
