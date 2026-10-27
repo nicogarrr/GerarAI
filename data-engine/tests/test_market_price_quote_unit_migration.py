@@ -19,10 +19,14 @@ def test_quote_unit_upgrade_downgrade_and_drift():
         connection.exec_driver_sql("INSERT INTO market_prices VALUES (1,4255)")
         migration.op = Operations(MigrationContext.configure(connection))
         migration.upgrade()
-        migration.upgrade()  # create_all/adoption case: idempotent compatible schema
         assert connection.exec_driver_sql("SELECT close,quote_currency FROM market_prices").one() == (4255, None)
         migration.downgrade()
         assert connection.exec_driver_sql("SELECT close FROM market_prices").scalar() == 4255
+        migration.upgrade()
+        migration.upgrade()  # adopt compatible create_all column
+        migration.downgrade()
+        assert "quote_currency" in {c["name"] for c in sa.inspect(connection).get_columns("market_prices")}
+        connection.exec_driver_sql("ALTER TABLE market_prices DROP COLUMN quote_currency")
         connection.exec_driver_sql("ALTER TABLE market_prices ADD COLUMN quote_currency INTEGER")
         with pytest.raises(RuntimeError, match="schema mismatch"):
             migration.upgrade()

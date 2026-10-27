@@ -581,6 +581,8 @@ def test_refresh_london_price_unit_not_guessed(db, unit, close, expected):
     if expected is None:
         assert position.market_value_base is None
         assert position.market_value_native is None
+        # Zero is only a ledger sentinel, never a complete zero-valued snapshot.
+        assert result["stages"][2]["snapshot_pricing_coverage"] < 1
         assert result["stages"][2]["stale_prices"][0]["status"] == "unknown_price_unit"
     else:
         assert position.market_value == Decimal(expected)

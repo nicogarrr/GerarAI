@@ -181,7 +181,7 @@ class PortfolioIntelligenceService:
         missing_fx: list[dict[str, Any]] = []
         for position, company in rows:
             value_base = position.market_value_base
-            if value_base is None and position.currency == base_currency:
+            if value_base is None and position.currency == base_currency and (position.market_value_native or position.market_value) > 0:
                 value_base = position.market_value_native or position.market_value
             if value_base is None:
                 missing_fx.append(
