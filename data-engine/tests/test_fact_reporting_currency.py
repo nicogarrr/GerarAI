@@ -169,10 +169,10 @@ def test_divisa_de_reporte_sec():
     }
     assert _sec_reporting_currency(baba) == "CNY"
     assert _sec_reporting_currency({"Assets": {"units": {"USD": [{"val": 1}]}}}) == "USD"
-    assert _sec_reporting_currency({}) == "USD"
-    # Empate: USD.
+    assert _sec_reporting_currency({}) is None
+    # Empate: desconocido, no preferir USD ni orden alfabetico.
     tie = {"Assets": {"units": {"USD": [{"val": 1}], "EUR": [{"val": 1}]}}}
-    assert _sec_reporting_currency(tie) == "USD"
+    assert _sec_reporting_currency(tie) is None
 
 
 def test_unidades_sec_por_divisa():
@@ -182,3 +182,15 @@ def test_unidades_sec_por_divisa():
     assert _sec_unit_keys("shares", "CNY") == ("shares", "shares")
     assert _with_reporting_currency("decimal", "JPY") == "decimal"
     assert _with_reporting_currency("USD", None) == "USD"
+
+
+def test_sec_currency_tie_without_usd_is_also_unknown():
+    facts = {"Assets": {"units": {"CNY": [{"val": 1}], "EUR": [{"val": 1}]}}}
+    assert _sec_reporting_currency(facts) is None
+
+
+def test_sec_unknown_currency_omits_money_but_keeps_non_monetary():
+    assert _sec_unit_keys("USD", None) is None
+    assert _sec_unit_keys("USD/share", None) is None
+    assert _sec_unit_keys("shares", None) == ("shares", "shares")
+    assert _sec_unit_keys("decimal", None) == ("decimal", "decimal")
