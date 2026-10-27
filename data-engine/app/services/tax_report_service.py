@@ -1036,12 +1036,20 @@ class TaxReportService:
         # memoria sin la capa filing (evita recursion y dobles calculos).
         prior_year_nets = []
         for prior_year in range(fiscal_year - 4, fiscal_year):
-            prior_summary = self.compute_report(
-                db, prior_year, include_filing=False
-            )["summary"]
+            prior_data = self.compute_report(db, prior_year, include_filing=False)
+            prior_summary = prior_data["summary"]
+            # Rendimientos del ahorro del ejercicio previo (dividendos +
+            # intereses): fijan el 25 % que ya absorbió saldos negativos.
+            prior_interest = build_interest(prior_data.get("misc") or [], prior_year)
+            prior_rcm = None
+            if prior_summary.get("total_dividends_base") is not None and not prior_interest["incomplete"]:
+                prior_rcm = Decimal(str(prior_summary["total_dividends_base"])) + Decimal(
+                    str(prior_interest["received"]["amount_base"] or 0)
+                )
             prior_year_nets.append({
                 "year": prior_year,
                 "net_gyp_base": prior_summary.get("total_realized_gain_base"),
+                "net_rcm_base": prior_rcm,
                 "incomplete": prior_summary.get("incomplete_fx", False),
             })
         # Saldos pendientes declarados (anexo C.3 de la última declaración):
