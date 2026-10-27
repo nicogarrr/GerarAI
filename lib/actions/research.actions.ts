@@ -568,7 +568,7 @@ export type ResearchLongTermModel = {
     key: string;
     driver_type: 'revenue_driver' | 'kpi';
     required: boolean;
-    status: 'sourced' | 'missing';
+    status: 'sourced' | 'derived' | 'missing';
     value: number | null;
     unit: string;
     confidence: number;

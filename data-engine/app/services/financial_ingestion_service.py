@@ -268,6 +268,14 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # balance cuadre por la diferencia de NCI. Se usa la de la matriz.
     ("total_equity",      ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD"),
     ("goodwill",          ["Goodwill"],                                                                              "USD"),
+    # Componentes del NOI de un REIT (net operating income = ingresos por
+    # arrendamiento - gastos operativos de los inmuebles - impuestos sobre
+    # inmuebles). El NOI no es un concepto us-gaap: se DERIVA en el modelo
+    # fundamental a partir de estos tres hechos reportados (Camden FY2024:
+    # 1.543,8 - 365,7 - 193,1 = 985,0 M$).
+    ("lease_income",      ["OperatingLeaseLeaseIncome", "OperatingLeasesIncomeStatementLeaseRevenue"],            "USD"),
+    ("property_operating_expense", ["DirectCostsOfLeasedAndRentedPropertyOrEquipment"],                            "USD"),
+    ("real_estate_tax_expense", ["RealEstateTaxExpense"],                                                           "USD"),
     # Puente EV -> equity del DCF: patrimonio de minoritarios (NCI) y valor de
     # las preferentes. Saldos de balance (instantes).
     ("minority_interest", ["MinorityInterest"],                                                                     "USD"),
