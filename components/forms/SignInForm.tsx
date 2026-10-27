@@ -6,6 +6,7 @@ import InputField from '@/components/forms/InputField';
 import FooterLink from '@/components/forms/FooterLink';
 import AuthPitch from '@/components/forms/AuthPitch';
 import {signInWithEmail, verifyTwoFactorTotp} from "@/lib/actions/auth.actions";
+import {emailFieldValidation} from "@/lib/validation/email";
 import {toast} from "sonner";
 import {useRouter} from "next/navigation";
 import Link from "next/link";
@@ -145,13 +146,7 @@ const SignInForm = ({ passwordResetAvailable }: Props) => {
                     placeholder="email@ejemplo.com"
                     register={register}
                     error={errors.email}
-                    validation={{
-                      required: 'El email es obligatorio',
-                      pattern: {
-                        value: /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/,
-                        message: 'Introduce un email válido'
-                      }
-                    }}
+                    validation={emailFieldValidation}
                 />
 
                 <InputField
