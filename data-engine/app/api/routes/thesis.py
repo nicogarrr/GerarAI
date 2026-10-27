@@ -29,6 +29,7 @@ from app.services.thesis_epub_service import (
 )
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.thesis_memo import build_memo_markdown
+from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
 from app.services.thesis_service import ThesisService, latest_inputs_provenance, latest_missing_inputs
 
 router = APIRouter()
@@ -188,16 +189,17 @@ def thesis_epub(ticker: str, db: Session = Depends(get_db)) -> Response:
     claims = db.scalars(
         select(Claim).where(Claim.thesis_version_id == thesis.id)
     ).all()
+    reason = thesis_withheld_reason(db, thesis)
     data = ThesisEpubData(
         ticker=company.ticker,
         company_name=company.name or "",
         version=thesis.version,
-        rating=thesis.rating or "watch",
+        rating="insufficient_data" if reason else thesis.rating or "watch",
         status=thesis.status or "draft",
         generated_on=thesis.updated_at.date().isoformat() if thesis.updated_at else "",
-        executive_summary=thesis.executive_summary or "",
-        sections=[EpubSection(title=s.title, body=s.body or "") for s in sections],
-        citations=_epub_citations(db, list(claims)),
+        executive_summary=archived_thesis_notice(thesis, reason) if reason else thesis.executive_summary or "",
+        sections=[] if reason else [EpubSection(title=s.title, body=s.body or "") for s in sections],
+        citations=[] if reason else _epub_citations(db, list(claims)),
     )
     content = build_thesis_epub(data)
     filename = f"gerarai-thesis-{company.ticker}-v{thesis.version}.epub"
@@ -447,12 +449,16 @@ def _audio_context(db: Session, ticker: str, version: int | None = None) -> tupl
         db, company, thesis, stale=stale, latest_data_at=latest_data_at, draft=is_draft
     )
     text = thesis_audio_service.memo_to_speech_text(markdown, ticker=company.ticker, version=thesis.version)
-    return thesis_audio_service.audio_key(
+    key = thesis_audio_service.audio_key(
         company.ticker,
         thesis.version,
         draft=is_draft,
         data_day=thesis_audio_service.data_day(latest_data_at),
-    ), text
+    )
+    # Never serve a previously cached narration of the archived valuation.
+    if thesis_withheld_reason(db, thesis):
+        key += "-withheld-v1"
+    return key, text
 
 
 @router.get("/{ticker}/audio/status")

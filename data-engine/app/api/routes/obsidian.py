@@ -24,6 +24,7 @@ from app.services.obsidian_export import (
     build_obsidian_zip,
     find_mentions,
 )
+from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reasons
 
 router = APIRouter()
 vault_router = APIRouter()
@@ -114,6 +115,7 @@ def _load_thesis_notes_by_company(
                 tier=row.source_tier or "",
             )
         )
+    reasons = thesis_withheld_reasons(db, versions)
     notes: dict[int, list[Note]] = {}
     for v in versions:
         company = by_id[v.company_id]
@@ -123,8 +125,8 @@ def _load_thesis_notes_by_company(
                 version=v.version,
                 date=v.updated_at.date().isoformat() if v.updated_at else "",
                 status=v.status or "",
-                body=v.thesis_markdown
-                or "\n\n".join(
+                body=(archived_thesis_notice(v, reasons[v.id]) if reasons[v.id] else
+                v.thesis_markdown or "\n\n".join(
                     part
                     for part in [
                         v.executive_summary or "",
@@ -135,8 +137,8 @@ def _load_thesis_notes_by_company(
                         ),
                     ]
                     if part
-                ),
-                sources=sources[v.id],
+                )),
+                sources=[] if reasons[v.id] else sources[v.id],
             )
         )
     return notes
