@@ -178,3 +178,31 @@ def test_dated_rebuild_keeps_snapshot_without_inventing_ledger(db, quote):
     rebuilt = PortfolioLedgerService().rebuild_position(db, position.company_id, as_of=date.today())
     assert rebuilt.id == position.id and rebuilt.quantity == Decimal("12.5")
     assert rebuilt.source == "screenshot_confirmed" and rebuilt.cost_basis_base is None
+
+
+def test_edited_transaction_moved_to_snapshot_cannot_overwrite_it(db, quote):
+    import asyncio
+    from datetime import date
+
+    from app.services.portfolio_ledger_service import PortfolioLedgerService
+    result = asyncio.run(review_rows(db, "f" * 64, rows()))
+    confirm_review(db, result["review_id"], True)
+    snapshot = db.scalar(select(Position))
+    target_id = snapshot.company_id
+    original = Company(ticker="META", name="Meta Platforms", currency="USD", exchange="NASDAQ", sector="Tech", industry="Tech", company_type="standard", valuation_model="standard_dcf")
+    db.add(original)
+    db.flush()
+    original_id = original.id
+    trade = Transaction(tenant_id=1, company_id=original_id, trade_date=date.today(), action="buy", quantity=Decimal("1"), price=Decimal("10"), currency="USD", external_id="edit-test")
+    db.add(trade)
+    db.commit()
+    trade_id = trade.id
+    # Same mutation and flush as PUT /transactions/{id}; create_transaction is bypassed.
+    trade.company_id = target_id
+    db.flush()
+    with pytest.raises(ValueError, match="captura sin historial"):
+        PortfolioLedgerService().rebuild_position(db, target_id)
+    db.rollback()
+    assert db.get(Transaction, trade_id).company_id == original_id
+    kept = db.scalar(select(Position).where(Position.company_id == target_id))
+    assert kept.quantity == Decimal("12.5") and kept.source == "screenshot_confirmed"

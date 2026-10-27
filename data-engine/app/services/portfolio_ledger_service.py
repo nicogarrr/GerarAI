@@ -265,12 +265,20 @@ class PortfolioLedgerService:
                 .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
             ).all()
         )
-        if not transactions:
-            snapshot = db.scalar(select(Position).where(
+        snapshot = db.scalar(select(Position).where(
                 Position.company_id == company_id, *tenant_filters(db, Position),
                 Position.source == "screenshot_confirmed",
-            ))
-            if snapshot is not None:
+        ))
+        if snapshot is not None:
+            if transactions:
+                # Covers edits/reassignments and every rebuild caller, not only
+                # create_transaction: no ledger can replace an opening snapshot
+                # until a broker import has explicitly reconciled its source.
+                raise ValueError(
+                    "Esta posición procede de una captura sin historial. "
+                    "Importa el fichero del bróker para conciliar antes de modificar operaciones"
+                )
+            if not transactions:
                 # No opening trades were invented for this snapshot. A rebuild
                 # has nothing to replay and must not delete it or fabricate cost.
                 snapshot.base_currency = self.fx.base_currency(db)
