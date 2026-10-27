@@ -185,10 +185,14 @@ export async function addTransaction(
     date: Date,
     notes?: string,
     currency = 'USD',
+    fees = 0,
 ): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
         throw new ValidationError('Quantity must be positive and price cannot be negative');
+    }
+    if (!Number.isFinite(fees) || fees < 0) {
+        throw new ValidationError('Fees cannot be negative');
     }
     await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
         method: 'POST',
@@ -200,7 +204,7 @@ export async function addTransaction(
             trade_date: date.toISOString().slice(0, 10),
             notes: notes || null,
             currency: currency.toUpperCase(),
-            fees: 0,
+            fees,
         }),
     });
     invalidatePortfolioReads(canonicalUserId);
@@ -220,6 +224,7 @@ export async function getPortfolioTransactions(userId: string) {
         type: transaction.action,
         quantity: transaction.quantity,
         price: transaction.price,
+        fees: transaction.fees,
         date: transaction.trade_date,
         notes: transaction.notes ?? undefined,
         currency: transaction.currency,
@@ -311,10 +316,14 @@ export async function updateTransaction(
     date: Date,
     notes?: string,
     currency = 'USD',
+    fees?: number,
 ): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
         throw new ValidationError('Quantity must be positive and price cannot be negative');
+    }
+    if (fees !== undefined && (!Number.isFinite(fees) || fees < 0)) {
+        throw new ValidationError('Fees cannot be negative');
     }
     await researchRequest<ResearchPortfolioTransaction>(
         `/api/portfolio/transactions/${encodeURIComponent(transactionId)}`,
@@ -328,6 +337,8 @@ export async function updateTransaction(
                 trade_date: date.toISOString().slice(0, 10),
                 notes: notes || null,
                 currency: currency.toUpperCase(),
+                // Omitido = el backend conserva la comisión registrada.
+                ...(fees !== undefined ? { fees } : {}),
             }),
         },
     );

@@ -21,6 +21,7 @@ type Transaction = {
   type: 'buy' | 'sell';
   quantity: number;
   price: number;
+  fees?: number;
   date: string;
   notes?: string;
   currency?: string;
