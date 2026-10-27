@@ -1031,7 +1031,11 @@ class PortfolioIntelligenceService:
                     {
                         "ticker": company.ticker,
                         "contribution_pnl": None,
-                        "end_value": float(position.market_value_base or 0),
+                        "end_value": (
+                            float(position.market_value_base)
+                            if position.market_value_base is not None
+                            else None
+                        ),
                         "start_value": None,
                         "net_invested": None,
                         "income": None,
@@ -1079,15 +1083,22 @@ class PortfolioIntelligenceService:
                 if start_price_row is not None
                 else None
             )
-            end_value = float(position.market_value_base or 0)
+            end_value = (
+                float(position.market_value_base)
+                if position.market_value_base is not None
+                else None
+            )
             reason = None
             contribution = None
-            if fx_missing:
+            if end_value is None:
+                reason = "missing_end_value"
+            elif fx_missing:
                 reason = "missing_fx"
             elif qty_at_cutoff > 0 and (start_price_row is None or not start_price_row.adj_close):
                 reason = "missing_start_price"
             elif qty_at_cutoff > 0 and start_rate is None:
                 reason = "missing_start_fx"
+            start_value: float | None = None
             if reason is None:
                 start_value = (
                     qty_at_cutoff * float(start_price_row.adj_close) * float(start_rate)
@@ -1104,11 +1115,7 @@ class PortfolioIntelligenceService:
                     "ticker": company.ticker,
                     "contribution_pnl": contribution,
                     "end_value": end_value,
-                    "start_value": (
-                        qty_at_cutoff * float(start_price_row.adj_close) * float(start_rate)
-                        if qty_at_cutoff > 0 and start_price_row is not None and start_rate is not None
-                        else 0.0
-                    ),
+                    "start_value": start_value,
                     "net_invested": buys - sells,
                     "income": income,
                     "reason": reason,
