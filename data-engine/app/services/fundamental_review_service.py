@@ -33,10 +33,10 @@ class DecisionJournalService:
         what_must_be_true: list[str],
         transaction_id: int | None = None,
     ) -> DecisionJournalEntry:
-        from app.services.journal_trade_link import resolve_trade
+        from app.services.journal_trade_link import resolve_decision_trade
 
         # La operacion se valida ANTES de escribir nada (ValueError -> 422).
-        trade = resolve_trade(db, company, transaction_id) if transaction_id else None
+        trade = resolve_decision_trade(db, company, transaction_id, decision) if transaction_id else None
         thesis = db.scalar(
             select(ThesisVersion)
             .where(ThesisVersion.company_id == company.id)
@@ -97,7 +97,7 @@ class DecisionJournalService:
         No reescribe la fecha ni el precio de la decision: la entrada ya
         existia y su fecha es la de la decision, no la de la ejecucion.
         """
-        from app.services.journal_trade_link import resolve_trade
+        from app.services.journal_trade_link import resolve_decision_trade
 
         entry = db.scalar(
             select(DecisionJournalEntry).where(
@@ -107,7 +107,10 @@ class DecisionJournalService:
         )
         if entry is None:
             raise LookupError("Entrada del diario no encontrada")
-        entry.transaction_id = resolve_trade(db, company, transaction_id).id if transaction_id else None
+        entry.transaction_id = (
+            resolve_decision_trade(db, company, transaction_id, entry.decision).id
+            if transaction_id else None
+        )
         if transaction_id is None:
             # Desenlazar a mano es una decision del usuario: no se vuelve a
             # enlazar automaticamente.

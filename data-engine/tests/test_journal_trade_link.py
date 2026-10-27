@@ -360,3 +360,41 @@ def test_engine_updated_after_trade_does_not_leak_recalculated_value(db):
     assert reading["version"] == 1
     assert reading["value"] == 80.0
 
+
+
+@pytest.mark.parametrize("decision,action", [("buy", "sell"), ("sell", "buy"), ("trim", "buy"), ("watch", "buy"), ("hold", "sell"), ("avoid", "buy")])
+def test_create_rejects_execution_incompatible_with_decision(db, decision, action):
+    from sqlalchemy import func, select
+
+    company = _company(db)
+    tx = _trade(db, company, day=date(2026, 3, 12), action=action)
+    with pytest.raises(ValueError):
+        DecisionJournalService().create(db, company, decision=decision, rationale="synthetic only", what_must_be_true=[], transaction_id=tx.id)
+    assert db.scalar(select(func.count()).select_from(DecisionJournalEntry)) == 0
+
+
+@pytest.mark.parametrize("decision,action", [("buy", "sell"), ("sell", "buy"), ("trim", "buy"), ("watch", "buy"), ("hold", "sell"), ("avoid", "buy")])
+def test_link_rejects_incompatible_execution_without_mutating_entry(db, decision, action):
+    company = _company(db)
+    tx = _trade(db, company, day=date(2026, 3, 12), action=action)
+    service = DecisionJournalService()
+    entry = service.create(db, company, decision=decision, rationale="synthetic only", what_must_be_true=[])
+    old_date, old_price, old_meta = entry.decision_date, entry.price, dict(entry.metadata_)
+    with pytest.raises(ValueError):
+        service.link_transaction(db, company, entry.id, tx.id)
+    db.expire(entry)
+    assert entry.transaction_id is None
+    assert (entry.decision_date, entry.price, entry.metadata_) == (old_date, old_price, old_meta)
+
+
+@pytest.mark.parametrize("decision,action", [("buy", "buy"), ("sell", "sell"), ("trim", "sell")])
+def test_compatible_execution_create_link_and_unlink_still_work(db, decision, action):
+    company = _company(db)
+    tx = _trade(db, company, day=date(2026, 3, 12), action=action)
+    service = DecisionJournalService()
+    entry = service.create(db, company, decision=decision, rationale="synthetic only", what_must_be_true=[], transaction_id=tx.id)
+    assert entry.transaction_id == tx.id
+    service.link_transaction(db, company, entry.id, None)
+    assert entry.transaction_id is None
+    service.link_transaction(db, company, entry.id, tx.id)
+    assert entry.transaction_id == tx.id
