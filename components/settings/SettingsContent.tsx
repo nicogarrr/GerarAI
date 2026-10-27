@@ -34,7 +34,7 @@ export default function SettingsContent({ declarant, llm, currency, ibkr }: Sett
           </a>
         ))}
       </nav>
-      <Panel className="scroll-mt-24" id="ibkr" title="Conectar IBKR" description="Importa posiciones y caja, sin permisos de operativa.">
+      <Panel className="scroll-mt-24" id="ibkr" title="Conectar IBKR" description="">
         {ibkr ? <IBKRConnectionForm initial={ibkr} /> : <Unavailable />}
       </Panel>
       <Panel

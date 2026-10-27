@@ -58,14 +58,17 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-gray-700 p-3 text-sm">
-        <p className="font-medium text-gray-100">{connection.connected ? `IBKR · ${connection.account_id}` : 'IBKR sin conectar'}</p>
-        <p className="mt-1 text-gray-400">Una cuenta IBKR por cartera. Solo lectura: no puede operar ni mover dinero.</p>
+      <div className="rounded-lg border border-gray-700/70 bg-gray-900/30 p-4 text-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="font-medium text-gray-100">{connection.connected ? `IBKR · ${connection.account_id}` : 'Vincula tu cuenta de IBKR'}</p>
+          <span className="rounded-full border border-teal-700/60 px-2 py-1 text-xs text-teal-300">Solo lectura</span>
+        </div>
+        <p className="mt-2 text-gray-400">Una cuenta por cartera. Sin permisos para operar ni mover dinero.</p>
         {connection.last_success_at ? <p className="mt-2 text-gray-300">Última sincronización: {formatDate(connection.last_success_at)}. Extracto: {connection.statement_date ? formatDate(connection.statement_date) : 'sin fecha'}.</p> : null}
-        <p className="mt-2 text-gray-400">Sincronización diaria a las 06:50 UTC. Los datos son del cierre del extracto, no saldos en tiempo real.</p>
+        <p className="mt-2 text-xs leading-relaxed text-gray-400">Actualización diaria · 06:50 UTC<br />Posiciones y caja del último extracto, no en tiempo real.</p>
       </div>
-      <details className="rounded-lg border border-gray-800 p-3 text-sm">
-        <summary className="min-h-11 cursor-pointer py-2 text-teal-300">Cómo conseguir token y Query ID</summary>
+      <details className="rounded-lg border border-gray-800 px-4 py-2 text-sm">
+        <summary className="min-h-11 cursor-pointer py-3 text-teal-300">Cómo conseguir token y Query ID</summary>
         <ol className="mt-2 list-decimal space-y-3 pl-5 text-gray-300">
           <li>En la web de IBKR, abre Informes → Flex Queries. Crea una Activity Flex Query de una sola cuenta.</li>
           <li>Incluye Open Positions, Cash Report y Trades; selecciona todas sus columnas. Usa XML, fechas yyyyMMdd y el último día de actividad.</li>
@@ -76,7 +79,8 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
         <p className="mt-2 text-xs text-gray-400">El token caduca según el plazo elegido en IBKR. Se guarda cifrado y no se vuelve a mostrar. No necesitamos tu contraseña de IBKR.</p>
       </details>
       {!connection.connected ? (
-        <form className="space-y-4" onSubmit={connect} aria-label="Conectar IBKR">
+        <form className="space-y-4 rounded-lg border border-gray-800 p-4" onSubmit={connect} aria-label="Conectar IBKR">
+          <p className="text-sm font-medium text-gray-100">Datos de conexión</p>
           <label className="block space-y-1 text-sm text-gray-300" htmlFor="ibkr-token">
             <span>Token Flex</span>
             <Input className="h-11" autoComplete="new-password" id="ibkr-token" type="password" value={token} onChange={event => setToken(event.target.value)} disabled={busy} required />
@@ -91,16 +95,19 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
               <Input className="h-11" autoComplete="off" id="ibkr-account" placeholder="U1234567" value={account} onChange={event => setAccount(event.target.value)} disabled={busy || Boolean(connection.account_id)} required />
             </label>
           </div>
-          <label className="flex min-h-11 items-start gap-3 text-sm text-gray-300">
+          <details className="text-sm text-gray-400">
+            <summary className="min-h-11 cursor-pointer py-3 text-gray-300">Opciones de sincronización</summary>
+          <label className="flex min-h-11 items-start gap-3 pb-3 text-sm text-gray-300">
             <input className="mt-1 size-4 shrink-0" type="checkbox" checked={complete} onChange={event => setComplete(event.target.checked)} disabled={busy} />
             <span>Confirmo que la consulta incluye toda esta cuenta, sin filtros. Permito cerrar posiciones y quitar saldos importados de IBKR que ya no aparezcan. Si no lo marco, solo se añaden o actualizan datos.</span>
           </label>
-          <Button type="submit" disabled={busy || !token.trim() || !query.trim() || !account.trim()}>{busy ? 'Conectando…' : 'Conectar e importar'}</Button>
+          </details>
+          <Button className="h-11 w-full sm:w-auto" type="submit" disabled={busy || !token.trim() || !query.trim() || !account.trim()}>{busy ? 'Conectando…' : 'Conectar e importar'}</Button>
         </form>
       ) : (
         <div className="flex flex-wrap gap-3">
-          <Button disabled={busy} onClick={() => void sync()}>{busy ? 'Sincronizando…' : 'Sincronizar ahora'}</Button>
-          <Button variant="outline" disabled={busy} onClick={() => setConfirmDisconnect(true)}>Desconectar</Button>
+          <Button className="h-11" disabled={busy} onClick={() => void sync()}>{busy ? 'Sincronizando…' : 'Sincronizar ahora'}</Button>
+          <Button className="h-11" variant="outline" disabled={busy} onClick={() => setConfirmDisconnect(true)}>Desconectar</Button>
         </div>
       )}
       {confirmDisconnect ? (
@@ -109,7 +116,7 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
           <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={() => void disconnect()}>Confirmar desconexión</Button><Button variant="outline" disabled={busy} onClick={() => setConfirmDisconnect(false)}>Cancelar</Button></div>
         </div>
       ) : null}
-      <p role="status" aria-live="polite" className="text-sm text-gray-300">{message || connection.message}</p>
+      <p role="status" aria-live="polite" className="text-sm leading-relaxed text-gray-300">{message || (connection.connected || connection.status !== 'not_connected' ? connection.message : '')}</p>
     </div>
   );
 }
