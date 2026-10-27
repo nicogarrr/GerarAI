@@ -12,17 +12,21 @@ and it is not billed per token: the cost is the existing subscription.
 https://opencode.ai/zen/go/v1/chat/completions
 ```
 
-The owner approved this model explicitly. Decision 2026-10-27: every LLM call
-goes through the owner's OpenCode Go key with DeepSeek V4.1 Flash, and no other
-provider answers without an explicit opt-in. `GROQ_CHAT_FALLBACK_ENABLED` and
-`GEMINI_CHAT_FALLBACK_ENABLED` default to `auto`, which now means **off** even
-when the key and the free-plan confirmations are present. Only `true` turns a
-backup on (and then provider construction fails if the key or a confirmation is
-missing). The OpenRouter `:free` chat backup also needs
-`OPENROUTER_CHAT_FALLBACK_ENABLED=true`. The debate chain no longer appends the
-free OpenCode models behind the Go model, and with a tenant key it uses the
-tenant provider. Every call logs a `llm.call` line with provider, model and
-reasoning effort, so a backup answer is visible in the logs.
+The owner approved this model explicitly. Decision 2026-10-27 (revised the same
+day): OpenCode Go with DeepSeek V4.1 Flash is always the primary, and backups
+only run **after Go fails** (an error, an unusable answer, or Go running out of
+its time budget, which is 2/3 of the chat budget). There is no race and no
+2-second head start any more. `GROQ_CHAT_FALLBACK_ENABLED`,
+`GEMINI_CHAT_FALLBACK_ENABLED` and `OPENROUTER_CHAT_FALLBACK_ENABLED` default to
+`auto`: the backup is armed only if its key (and, for Groq and Gemini, the
+free-plan confirmations) exists. `true` arms it and fails provider construction
+when the key or a confirmation is missing. `false` turns it off completely.
+A backup answer is never presented as Go's: the chat prepends
+«Respondido por respaldo (Groq) porque OpenCode Go falló: <motivo>», the
+`fallback_trail` names the Go failure first, and a `llm.fallback` warning plus
+the per-call `llm.call` lines record provider, model and reasoning effort. The
+debate chain does not append the free OpenCode models behind the Go model, and
+with a tenant key it uses the tenant provider.
 
 - Groq (`openai/gpt-oss-120b`): chat and background backup.
 - Gemini AI Studio: optional backup after Groq; requires confirming the key's

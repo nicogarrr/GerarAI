@@ -516,13 +516,12 @@ class Settings(BaseSettings):
     # Respaldos del chat y de los trabajos en segundo plano (Groq, luego
     # Gemini) cuando falla el primario OpenCode Go. Decision del dueno
     # (2026-10-27): TODO el LLM va por su OpenCode Go con DeepSeek V4.1 Flash;
-    # ningun respaldo a otro proveedor entra sin pedirlo explicitamente.
-    #   None ("auto", por defecto) -> APAGADO, aunque haya clave y
-    #     confirmaciones (antes se encendia solo y Groq respondia el chat
-    #     sin que se viera).
-    #   True  -> encendido de forma explicita; falla el arranque del
-    #     proveedor si falta la clave o una confirmacion de plan gratuito.
-    #   False -> apagado.
+    # los respaldos solo entran DESPUES de que Go falle (error o plazo
+    #   agotado), nunca en carrera, y la respuesta lo dice de forma visible.
+    #   None ("auto", por defecto) -> activo si hay clave y confirmaciones.
+    #   True  -> activo; falla el arranque del proveedor si falta la clave o
+    #     una confirmacion de plan gratuito.
+    #   False -> apagado del todo.
     # Usa siempre `groq_chat_fallback_active` / `gemini_chat_fallback_active`.
     groq_chat_fallback_enabled: bool | None = None
     groq_free_plan_confirmed: bool = False
@@ -539,10 +538,10 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = Field(default=None, repr=False)
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "google/gemma-4-31b-it:free"
-    # OpenRouter :free como ultimo respaldo del chat: solo si se pide de forma
-    # explicita (antes bastaba con tener OPENROUTER_API_KEY y Groq activo).
+    # OpenRouter :free como ultimo respaldo del chat, solo tras fallar Go (y
+    # Groq): true/false fuerzan; auto (por defecto) = activo si hay clave.
     # Env: OPENROUTER_CHAT_FALLBACK_ENABLED.
-    openrouter_chat_fallback_enabled: bool = False
+    openrouter_chat_fallback_enabled: bool | None = None
     # Por miembro de la cascada: poco margen para que el siguiente tenga tiempo.
     llm_cascade_member_timeout_seconds: float = Field(default=20.0, gt=0)
     llm_cascade_member_total_timeout_seconds: float = Field(default=25.0, gt=0)
@@ -579,11 +578,9 @@ class Settings(BaseSettings):
     # ChatFallbackProvider). Fuente de verdad unica: compose y docs pasan o
     # documentan este mismo 45 s (antes config decia 20 y docs 45).
     chat_total_timeout_seconds: float = Field(default=45.0, gt=0)
-    # Ventaja del primario Go antes de lanzar el respaldo en paralelo. Default 2 s
-    # (igual que antes de #2142). Prueba real 25-oct: con la peticion real del chat
-    # (JSON estricto, max_tokens 1800) Go tardo 12-14 s y 1 de 3 salio truncada,
-    # asi que una ventaja de 8 s solo anadio espera. Se ajusta por entorno cuando
-    # haya medicion representativa.
+    # SIN USO desde 2026-10-27: ya no hay carrera Go/respaldo. Go tiene 2/3 del
+    # presupuesto del chat y el respaldo arranca solo si Go falla o lo agota.
+    # Se conserva para no romper entornos que aun fijan la variable.
     chat_go_head_start_seconds: float = Field(default=2.0, gt=0)
     # Suelo de max_tokens SOLO para el primario Go del chat. Medicion 25-oct con la
     # peticion real (JSON estricto): 1800 truncaba 1-2 de 3; 2600 dio 2/2 completas
@@ -705,7 +702,12 @@ class Settings(BaseSettings):
             raise ValueError("SQLite is not allowed as DATABASE_URL in production")
         return self
 
-    @field_validator("groq_chat_fallback_enabled", "gemini_chat_fallback_enabled", mode="before")
+    @field_validator(
+        "groq_chat_fallback_enabled",
+        "gemini_chat_fallback_enabled",
+        "openrouter_chat_fallback_enabled",
+        mode="before",
+    )
     @classmethod
     def parse_fallback_flag(cls, value: object) -> object:
         """``auto`` o vacio (``${VAR:-auto}`` en compose) -> None (modo auto)."""
@@ -715,19 +717,47 @@ class Settings(BaseSettings):
             return None
         return value
 
+    def _primary_is_opencode_go(self) -> bool:
+        requested = (self.llm_provider or "").strip().lower()
+        return requested in {"auto", "opencode", "opencode_go", "opencode-go"}
+
     @property
     def groq_chat_fallback_active(self) -> bool:
-        """Groq entra como respaldo SOLO con GROQ_CHAT_FALLBACK_ENABLED=true.
+        """Groq como respaldo SOLO cuando OpenCode Go falla (nunca en carrera).
 
-        "auto" (sin valor) ya no lo enciende aunque haya clave: el dueno exige
-        que todo vaya por OpenCode Go salvo decision explicita y visible.
+        Decision del dueno (2026-10-27): Go es siempre el primario. ``true`` =
+        respaldo activo, ``false`` = apagado del todo, ``auto`` (por defecto) =
+        activo si hay clave + plan gratuito + ZDR confirmados. Entra solo
+        despues de un error o del plazo agotado de Go, y la respuesta lo dice
+        de forma visible («Respondido por respaldo (Groq) porque OpenCode Go
+        fallo: ...»).
         """
-        return self.groq_chat_fallback_enabled is True
+        if self.groq_chat_fallback_enabled is not None:
+            return self.groq_chat_fallback_enabled
+        return bool(
+            self._primary_is_opencode_go()
+            and (self.groq_api_key or "").strip()
+            and self.groq_free_plan_confirmed
+            and self.groq_zdr_confirmed
+        )
 
     @property
     def gemini_chat_fallback_active(self) -> bool:
-        """Gemini entra como respaldo SOLO con GEMINI_CHAT_FALLBACK_ENABLED=true."""
-        return self.gemini_chat_fallback_enabled is True
+        """Gemini como respaldo SOLO cuando Go falla: true/false o auto con clave + plan gratis."""
+        if self.gemini_chat_fallback_enabled is not None:
+            return self.gemini_chat_fallback_enabled
+        return bool(
+            self._primary_is_opencode_go()
+            and (self.gemini_api_key or "").strip()
+            and self.gemini_free_plan_confirmed
+        )
+
+    @property
+    def openrouter_chat_fallback_active(self) -> bool:
+        """OpenRouter :free, ultimo respaldo del chat: true/false o auto con clave."""
+        if self.openrouter_chat_fallback_enabled is not None:
+            return self.openrouter_chat_fallback_enabled
+        return bool((self.openrouter_api_key or "").strip())
 
     @model_validator(mode="after")
     def validate_production_llm_model(self) -> Self:

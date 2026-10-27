@@ -94,7 +94,7 @@ class _LanguageRejected(ProviderResponseError):
 class ChatFallbackProvider(LLMProvider):
     name = "chat-independent-fallback"
 
-    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float = 2, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = (), backup_model: str = GROQ_MODEL, settings: Settings | None = None):
+    def __init__(self, primary: LLMProvider, backup: LLMProvider, *, total: float = 45, delay: float | None = None, validator: Callable[[LLMResponse], None] | None = None, on_response: Callable[[LLMResponse], None] | None = None, backup2: LLMProvider | None = None, extra_backups: tuple[tuple[LLMProvider, str], ...] = (), backup_model: str = GROQ_MODEL, settings: Settings | None = None):
         self.backup_model = backup_model
         self.backup2 = backup2
         self.extra_backups = extra_backups
@@ -104,7 +104,10 @@ class ChatFallbackProvider(LLMProvider):
         self.primary = primary
         self.backup = backup
         self.total = total
-        self.delay = min(delay, total * 2 / 3)
+        # Plazo de OpenCode Go antes de pasar al respaldo (no es una ventaja
+        # de salida: el respaldo NUNCA corre a la vez que Go). Por defecto 2/3
+        # del presupuesto total, y el tercio restante queda para el respaldo.
+        self.delay = min(delay, total * 2 / 3) if delay is not None else total * 2 / 3
         self.supported_capabilities = primary.supported_capabilities & backup.supported_capabilities
         # Honest composite route, never masquerades as the primary's free model.
         super().__init__(model_router=CascadeModelRouter((primary, backup)), max_retries=0)
@@ -199,19 +202,28 @@ class ChatFallbackProvider(LLMProvider):
         raise last
 
     async def _race(self, request: LLMRequest) -> LLMResponse:
+        """Go primero y SOLO despues el respaldo (nombre historico: ya no hay carrera).
+
+        Decision del dueno (2026-10-27): el respaldo arranca unicamente cuando
+        OpenCode Go devuelve un error, una respuesta inutilizable o agota su
+        plazo (``self.delay``). La respuesta del respaldo lleva en
+        ``fallback_trail`` el motivo del fallo de Go como primer elemento, para
+        que el chat lo muestre («Respondido por respaldo ...»).
+        """
         primary_model = self.primary.model_router.resolve(request) if getattr(self.primary, "model_router", None) else None
+        primary_name = getattr(self.primary, "name", "?")
+        rejected_primary = None
         if _is_cooling(self.primary, primary_model):
             # Cuota del primario agotada hace segundos: directo a la cadena.
-            return _with_trail(
-                await self._backup_chain(request),
-                [f"{getattr(self.primary, 'name', '?')}:{primary_model or '?'}:cooling"],
-            )
-        primary = asyncio.create_task(self._candidate(self.primary, request))
-        tasks = [primary]
-        rejected_primary = None
-        primary_label: str | None = None
-        try:
-            done, _ = await asyncio.wait({primary}, timeout=self.delay)
+            primary_label = f"{primary_name}:{primary_model or '?'}:cooling"
+        else:
+            primary = asyncio.create_task(self._candidate(self.primary, request))
+            try:
+                done, _ = await asyncio.wait({primary}, timeout=self.delay)
+            finally:
+                if not primary.done():
+                    primary.cancel()
+                await asyncio.gather(primary, return_exceptions=True)
             if done:
                 try:
                     response = primary.result()
@@ -223,48 +235,62 @@ class ChatFallbackProvider(LLMProvider):
                     primary_label = _failure_label(self.primary, primary_model, exc)
                     if isinstance(exc, _LanguageRejected):
                         rejected_primary = exc.response
-            # Pin backup explicitly. Never send DeepSeek aliases or effort=max.
-            backup = asyncio.create_task(self._backup_chain(request))
-            tasks.append(backup)
-            pending = {backup} | ({primary} if not done else set())
-            last = None
-            while pending:
-                done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
-                for task in tasks:  # prefer a valid primary if both finish together
-                    if task not in done:
-                        continue
-                    try:
-                        response = task.result()
-                        if response.degraded or response.finish_reason == "length":
-                            raise ProviderResponseError("chat response was truncated")
-                        if task is not primary:
-                            # Respondio la cadena de respaldo: el primario no llego a tiempo o fallo.
-                            # Sin error del primario = seguia pendiente (NO un TimeoutError real).
-                            label = primary_label or (
-                                f"{getattr(self.primary, 'name', '?')}:{primary_model or '?'}:pending_when_fallback_won"
-                            )
-                            response = _with_trail(response, [label])
-                        return response
-                    except _FALL_THROUGH as exc:
-                        last = exc
-                        if task is primary:
-                            primary_label = _failure_label(self.primary, primary_model, exc)
-                            _note_failure(self.primary, primary_model, exc)
-                        if task is primary and isinstance(exc, _LanguageRejected):
-                            rejected_primary = exc.response
-            # Only after all candidates fail, hand the primary's language
-            # rejection to complete_guarded so its RETRY_HINT can recover.
-            # It never wins a race or cancels an eligible valid candidate.
+            else:
+                primary_label = f"{primary_name}:{primary_model or '?'}:timeout"
+        try:
+            response = await self._backup_chain(request)
+        except _FALL_THROUGH:
+            # Todos fallan: el rechazo de idioma del primario vuelve a
+            # complete_guarded para que su RETRY_HINT lo intente recuperar.
             if rejected_primary is not None:
                 return rejected_primary
-            if last is not None:
-                raise last
-            raise ProviderResponseError("chat providers returned no usable response")
-        finally:
-            for task in tasks:
-                if not task.done():
-                    task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
+            raise
+        logger.warning(
+            "llm.fallback provider=%s model=%s because=%s",
+            response.provider, response.model, primary_label,
+        )
+        return _with_trail(response, [primary_label])
+
+
+_GO_PROVIDER_NAMES = frozenset({"opencode-go", GO_SUBSCRIPTION_PROVIDER})
+_PROVIDER_LABELS = {"groq": "Groq", "gemini": "Gemini", "openrouter": "OpenRouter"}
+
+
+def _reason_es(reason: str) -> str:
+    """Motivo del fallo de Go en espanol llano (sin URLs ni detalles internos)."""
+    if reason == "timeout":
+        return "no respondió a tiempo"
+    if reason == "cooling":
+        return "alcanzó su límite de uso hace un momento"
+    if reason.startswith("ProviderHTTPError"):
+        code = reason.removeprefix("ProviderHTTPError")
+        if code == "429":
+            return "límite de uso alcanzado (HTTP 429)"
+        if code.startswith("5"):
+            return f"error del servidor (HTTP {code})"
+        return f"error HTTP {code}" if code else "error HTTP"
+    if reason.startswith("ProviderTransportError"):
+        return "error de conexión"
+    if reason == "_LanguageRejected":
+        return "su respuesta no estaba en español"
+    if reason.startswith("ProviderResponseError"):
+        return "respuesta vacía o incompleta"
+    return f"error ({reason})"
+
+
+def fallback_notice(response: LLMResponse) -> str | None:
+    """Aviso visible cuando respondio un respaldo porque OpenCode Go fallo.
+
+    None si respondio Go (o una respuesta sin rastro de fallo de Go).
+    """
+    trail = getattr(response, "fallback_trail", ()) or ()
+    if not trail or response.provider in _GO_PROVIDER_NAMES:
+        return None
+    first = str(trail[0])
+    if first.split(":", 1)[0] not in _GO_PROVIDER_NAMES:
+        return None
+    name = _PROVIDER_LABELS.get(response.provider, response.provider)
+    return f"Respondido por respaldo ({name}) porque OpenCode Go falló: {_reason_es(first.rsplit(':', 1)[-1])}."
 
 
 _TRANSIENT_TRANSPORT_REASONS = frozenset({"read_timeout", "connect_timeout", "write_timeout", "pool_timeout", "timeout"})
@@ -475,10 +501,10 @@ def _gemini_backup(
 
 
 def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> tuple[tuple[OpenAICompatibleProvider, str], ...]:
-    """OpenRouter solo si se pide (OPENROUTER_CHAT_FALLBACK_ENABLED=true), hay clave y el modelo es :free."""
+    """OpenRouter :free como ultimo respaldo (tras fallar Go): flag true/auto con clave."""
     key = settings.openrouter_api_key
     model = settings.openrouter_model
-    if not settings.openrouter_chat_fallback_enabled:
+    if not settings.openrouter_chat_fallback_active:
         return ()
     if not (key and str(key).strip()) or not model.endswith(":free"):
         return ()
@@ -561,9 +587,10 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
         raise ValueError("Groq chat fallback requires the verified OpenCode primary")
     backup = _groq_backup(settings, client)
     assert backup is not None  # el flag de arriba lo garantiza
-    head_start = {"delay": settings.chat_go_head_start_seconds} if primary.name == GO_SUBSCRIPTION_PROVIDER else {}
+    # Sin carrera: Go tiene su plazo completo y el respaldo arranca solo si
+    # Go falla o lo agota (antes Groq arrancaba a los 2 s y solia ganar).
     return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2,
-                                extra_backups=_openrouter_backup(settings, client), settings=settings, **head_start)
+                                extra_backups=_openrouter_backup(settings, client), settings=settings)
 
 
 def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
