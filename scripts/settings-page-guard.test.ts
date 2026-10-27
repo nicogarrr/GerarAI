@@ -10,11 +10,14 @@ import { readFileSync } from 'node:fs';
 const read = (path: string) => readFileSync(path, 'utf8');
 
 describe('ajustes', () => {
-  const page = read('app/(root)/settings/page.tsx');
+  const route = read('app/(root)/settings/page.tsx');
+  const page = read('components/settings/SettingsContent.tsx');
   const form = read('components/settings/TaxDeclarantForm.tsx');
   const llmForm = read('components/settings/LlmSettingsForm.tsx');
   const llmAction = read('lib/actions/llm-settings.actions.ts');
   it('la pagina ofrece datos fiscales, modelo de IA y Telegram', () => {
+    assert.match(route, /requireAuthenticatedUser/);
+    assert.match(route, /SettingsContent/);
     assert.match(page, /Datos fiscales del declarante/);
     assert.match(page, /title="Modelo de IA"/);
     assert.match(page, /id="llm"/);
