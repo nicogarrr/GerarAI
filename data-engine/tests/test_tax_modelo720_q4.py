@@ -130,3 +130,66 @@ def test_q4_average_observacion_anterior_dentro_del_margen_si_cuenta():
     points = [(d, Decimal("1000")) for d in _weekly(date(2025, 9, 28), date(2025, 12, 31))]
     points.append((date(2025, 12, 31), Decimal("1000")))
     assert q4_average_native(points, 2025) == Decimal("1000")
+
+
+
+def test_q4_detail_capturas_semanales_es_estimacion():
+    """Auditoría A: con capturas semanales el saldo de los días intermedios se
+    arrastra; la media es una estimación, no el saldo medio diario exacto."""
+    from app.services.tax_modelo720_service import q4_average_detail
+
+    points = [(d, Decimal("12345")) for d in _weekly(date(2025, 10, 1), date(2025, 12, 31))]
+    detail = q4_average_detail(points, 2025)
+    assert detail is not None
+    assert detail["average"] == Decimal("12345")
+    assert detail["estimate"] is True
+    assert detail["observed_days"] == 14
+    assert detail["carried_days"] == 92 - 14
+
+
+def test_q4_detail_saldo_de_todos_los_dias_es_exacto():
+    from app.services.tax_modelo720_service import q4_average_detail
+
+    points = [(date(2025, 10, 1) + timedelta(days=i), Decimal("100")) for i in range(92)]
+    detail = q4_average_detail(points, 2025)
+    assert detail is not None
+    assert detail["estimate"] is False
+    assert detail["observed_days"] == 92 and detail["carried_days"] == 0
+
+
+def test_q4_detail_primera_captura_el_7_10_sigue_siendo_nd():
+    """Repro de la auditoría: primera captura el 7/10 y semanales hasta el
+    31/12, todas 12.345 €: los días 1–6/10 son desconocidos → N/D."""
+    from app.services.tax_modelo720_service import q4_average_detail
+
+    points = [(d, Decimal("12345")) for d in _weekly(date(2025, 10, 7), date(2025, 12, 31))]
+    points.append((date(2025, 12, 31), Decimal("12345")))
+    assert q4_average_detail(points, 2025) is None
+    assert q4_average_native(points, 2025) is None
+
+
+def test_720_cuentas_saldo_medio_semanal_marcado_como_estimacion(db):
+    tenant, portfolio = _seed(db)
+    for d in _weekly(date(2025, 10, 1), date(2025, 12, 31)):
+        _snap(db, tenant, portfolio, d, 20000)
+
+    cuentas = Modelo720Service().check_thresholds(db, 2025)["categories"]["cuentas"]
+    assert cuentas["average_q4_total_base"] == 18000.0
+    assert cuentas["average_q4_estimate"] is True
+    assert cuentas["average_q4_method"] == "estimado_arrastre_capturas"
+    assert cuentas["balances"][0]["average_q4_estimate"] is True
+    assert cuentas["balances"][0]["average_q4_observed_days"] == 14
+    assert any("ESTIMADO" in reason for reason in cuentas["reasons"])
+
+
+def test_720_cuentas_saldo_medio_diario_no_es_estimacion(db):
+    tenant, portfolio = _seed(db)
+    for i in range(92):
+        _snap(db, tenant, portfolio, date(2025, 10, 1) + timedelta(days=i), 20000)
+
+    cuentas = Modelo720Service().check_thresholds(db, 2025)["categories"]["cuentas"]
+    assert cuentas["average_q4_total_base"] == 18000.0
+    assert cuentas["average_q4_estimate"] is False
+    assert cuentas["average_q4_method"] == "saldo_diario_observado"
+    assert cuentas["balances"][0]["average_q4_estimate"] is False
+    assert not any("ESTIMADO" in reason for reason in cuentas["reasons"])
