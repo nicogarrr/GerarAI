@@ -140,3 +140,48 @@ async def backfill_ecb_rates(
         code for major, codes in major_for.items() if major not in published for code, _ in codes
     )
     return summary
+
+
+def fetch_ecb_csv_sync(codes: list[str], start: date, end: date) -> str:
+    """Igual que :func:`fetch_ecb_csv` pero sincrono (lo usa el ledger, que es sync)."""
+    url = ECB_DATA_URL.format(codes="+".join(sorted(codes)))
+    with httpx.Client(timeout=30) as client:
+        response = client.get(
+            url,
+            params={
+                "startPeriod": start.isoformat(),
+                "endPeriod": end.isoformat(),
+                "format": "csvdata",
+            },
+        )
+        response.raise_for_status()
+        return response.text
+
+
+def backfill_ecb_rates_sync(
+    db: Session,
+    *,
+    currencies: set[str],
+    start: date,
+    end: date,
+    fetcher: Callable[[list[str], date, date], str] = fetch_ecb_csv_sync,
+) -> dict:
+    """Version sincrona de :func:`backfill_ecb_rates` (misma escritura en ``fx_rates``)."""
+
+    async def _adapter(codes: list[str], s: date, e: date) -> str:
+        return fetcher(codes, s, e)
+
+    import asyncio
+
+    coro = backfill_ecb_rates(db, currencies=currencies, start=start, end=end, fetcher=_adapter)
+    # El adaptador no hace I/O asincrono: el bucle solo existe para reutilizar
+    # la unica implementacion de la escritura. Un hilo con su propio bucle evita
+    # chocar con el bucle de FastAPI si el llamante ya esta dentro de uno.
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, coro).result()
