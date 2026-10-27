@@ -171,8 +171,9 @@ class WaccInputService:
                     "page": DAMODARAN_ERP_PAGE,
                     "month": implied_erp.month.isoformat(),
                     "column": DAMODARAN_ERP_COLUMN,
-                    "erp_sustainable_payout": str(implied_erp.erp_sustainable_payout)
-                    if implied_erp.erp_sustainable_payout is not None
+                    # Referencia: la columna T12m (no se usa en el WACC).
+                    "erp_t12m_reference": str(implied_erp.erp_t12m)
+                    if implied_erp.erp_t12m is not None
                     else None,
                     "tbond_rate": str(implied_erp.tbond) if implied_erp.tbond is not None else None,
                     "date": as_of,

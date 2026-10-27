@@ -1,9 +1,11 @@
 """Damodaran (NYU Stern): ERP implicito mensual como input del WACC (conexion 10c).
 
 Fuente gratuita y citada: «Implied ERP by month» de Aswath Damodaran
-(ERPbymonth.xlsx). El ERP fijo de settings (4,33 %) es el de enero de 2025 en
-esa misma serie (columna «ERP (T12m)»); con el dato mensual el WACC deja de
-usar una prima congelada. Sin red o sin dato, se vuelve al valor de settings
+(ERPbymonth.xlsx). Se usa la columna «ERP (T12 m with sustainable payout)»
+(4,20 % en octubre de 2026), elegida por el backtest 2010–2026; la T12m queda
+como referencia. El ERP fijo de settings (4,33 %, enero de 2025 en la columna
+T12m) sigue de respaldo; con el dato mensual el WACC deja de usar una prima
+congelada. Sin red o sin dato, se vuelve al valor de settings
 y se declara la procedencia.
 """
 
@@ -60,15 +62,16 @@ SAMPLE = _workbook([
 ])
 
 
-def test_parse_lee_la_columna_erp_t12m_y_descarta_filas_invalidas():
+def test_parse_lee_la_columna_sustainable_payout_y_descarta_filas_invalidas():
     rows = parse_implied_erp_xlsx(SAMPLE)
     assert [r.month for r in rows] == [date(2025, 1, 1), date(2026, 9, 1), date(2026, 10, 1)]
     october = rows[-1]
-    assert october.erp == Decimal("0.037")
-    assert october.erp_sustainable_payout == Decimal("0.042")
+    # Octubre de 2026: 4,20 % (sustainable payout); T12m 3,70 % solo como referencia.
+    assert october.erp == Decimal("0.042")
+    assert october.erp_t12m == Decimal("0.037")
     assert october.tbond == Decimal("0.0529")
-    # El ERP fijo de settings (0,0433) es el de enero de 2025 en esta serie.
-    assert rows[0].erp == Decimal("0.0433")
+    # El ERP fijo de settings (0,0433) es el de enero de 2025 en la columna T12m.
+    assert rows[0].erp_t12m == Decimal("0.0433")
 
 
 def test_parse_sin_hoja_o_cabecera_esperada_falla_cerrado():
@@ -177,19 +180,19 @@ def _doc(db, company, source_type: str) -> Document | None:
 
 
 def test_refresh_usa_el_erp_implicito_de_damodaran_y_lo_cita(db, monkeypatch):
-    _setup(monkeypatch, ImpliedErp(date(2026, 10, 1), Decimal("0.037"), Decimal("0.042"), Decimal("0.0529")))
+    _setup(monkeypatch, ImpliedErp(date(2026, 10, 1), Decimal("0.042"), Decimal("0.037"), Decimal("0.0529")))
     company = _company(db)
     asyncio.run(WaccInputService().refresh(db, company))
 
     fact = _erp_fact(db, company)
-    assert fact.value == Decimal("0.037")
+    assert fact.value == Decimal("0.042")
     assert fact.confidence == Decimal("0.80")
     source = db.get(Document, fact.source_id)
     assert source is not None and source.source_type == "damodaran"
     assert source.metadata_["source_url"] == DAMODARAN_ERP_URL
     assert source.metadata_["month"] == "2026-10-01"
-    assert source.metadata_["column"] == "ERP (T12m)"
-    assert source.metadata_["erp_sustainable_payout"] == "0.042"
+    assert source.metadata_["column"] == "ERP (T12 m with sustainable payout)"
+    assert source.metadata_["erp_t12m_reference"] == "0.037"
     assert "Damodaran" in source.title
     policy = _doc(db, company, "wacc_policy")
     assert policy is not None

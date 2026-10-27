@@ -7,9 +7,11 @@ serie, columna «ERP (T12m)»); con este conector se usa la del mes vigente.
 
 Fuente: Aswath Damodaran, «Implied Equity Risk Premiums», NYU Stern,
 https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/implpr.html
-(datos gratuitos; citar la fuente). Se usa la columna «ERP (T12m)», la misma
-convencion del valor de settings; la de «sustainable payout» se guarda como
-referencia en los metadatos.
+(datos gratuitos; citar la fuente). Se usa la columna «ERP (T12 m with
+sustainable payout)»: en el backtest 2010–2026 dio mejor IC agregado y mejor
+calibración que «ERP (T12m)», que además está en mínimo histórico (payout de
+recompras no sostenible). La T12m se guarda solo como referencia en los
+metadatos. El valor de settings (0,0433) sigue siendo el respaldo sin red.
 
 Fail-closed: sin red, fichero cambiado o fila invalida -> lista vacia / None,
 y el WACC vuelve al valor de settings declarando la procedencia. Una descarga
@@ -33,8 +35,8 @@ logger = logging.getLogger("gerarai.damodaran")
 DAMODARAN_ERP_URL = "https://pages.stern.nyu.edu/~adamodar/pc/implprem/ERPbymonth.xlsx"
 DAMODARAN_ERP_PAGE = "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datafile/implpr.html"
 DAMODARAN_ERP_SHEET = "Historical ERP"
-DAMODARAN_ERP_COLUMN = "ERP (T12m)"
-_SUSTAINABLE_COLUMN = "ERP (T12 m with sustainable payout)"
+DAMODARAN_ERP_COLUMN = "ERP (T12 m with sustainable payout)"
+_T12M_REFERENCE_COLUMN = "ERP (T12m)"
 _TBOND_COLUMN = "T.Bond Rate"
 _HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:contact@example.com)"}
 CACHE_TTL_SECONDS = 12 * 3600
@@ -46,7 +48,7 @@ _MAX_PLAUSIBLE_ERP = Decimal("0.15")
 class ImpliedErp:
     month: date
     erp: Decimal
-    erp_sustainable_payout: Decimal | None
+    erp_t12m: Decimal | None
     tbond: Decimal | None
 
 
@@ -90,7 +92,7 @@ def parse_implied_erp_xlsx(content: bytes) -> list[ImpliedErp]:
     if DAMODARAN_ERP_COLUMN not in names or not names[0].lower().startswith("start of month"):
         return []
     erp_index = names.index(DAMODARAN_ERP_COLUMN)
-    sustainable_index = names.index(_SUSTAINABLE_COLUMN) if _SUSTAINABLE_COLUMN in names else None
+    t12m_index = names.index(_T12M_REFERENCE_COLUMN) if _T12M_REFERENCE_COLUMN in names else None
     tbond_index = names.index(_TBOND_COLUMN) if _TBOND_COLUMN in names else None
     out: dict[date, ImpliedErp] = {}
     for row in rows:
@@ -103,8 +105,8 @@ def parse_implied_erp_xlsx(content: bytes) -> list[ImpliedErp]:
         out[month] = ImpliedErp(
             month=month,
             erp=erp,
-            erp_sustainable_payout=_decimal(row[sustainable_index])
-            if sustainable_index is not None and sustainable_index < len(row)
+            erp_t12m=_decimal(row[t12m_index])
+            if t12m_index is not None and t12m_index < len(row)
             else None,
             tbond=_decimal(row[tbond_index]) if tbond_index is not None and tbond_index < len(row) else None,
         )
