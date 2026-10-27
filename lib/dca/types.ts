@@ -29,6 +29,10 @@ export interface DcaSignalState extends Omit<DcaZone, 'level'> {
     evaluated_at: string;
     last_alerted_level: number | null;
     last_alerted_period: string | null;
+    /** Días desde el último cierre usado. Ausente en backends antiguos. */
+    data_age_days?: number | null;
+    /** true cuando esa edad supera DCA_MAX_DATA_AGE_DAYS: el nivel no es actual. */
+    stale?: boolean;
 }
 
 export interface DcaSignalItem {
