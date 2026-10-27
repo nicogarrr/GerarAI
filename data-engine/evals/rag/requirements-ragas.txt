@@ -1,40 +1,44 @@
 # ragas (Apache-2.0) para el crossover de metricas del harness RAG.
 #
-# ESTE FICHERO NO LO USA EL CI TODAVIA. Es la lista de versiones que hay que
-# instalar para poder ejecutar:
+# NO lo usa el servicio ni la puerta de CI: los cuatro numeros gateables se
+# calculan con evals/rag/rag_metrics.py (sin dependencias de terceros). Este
+# fichero es el entorno AISLADO del crossover. Un solo comando, desde data-engine/:
 #
-#     python scripts/run_rag_evals.py --ragas-crossover
+#     bash scripts/ragas_crossover.sh
 #
-# que corre las metricas NO-LLM reales de ragas (NonLLMContextPrecisionWithReference
-# y NonLLMContextRecall) sobre las mismas muestras y las compara con las
-# deterministas de evals/rag/rag_metrics.py. Los cuatro numeros gateables NO
-# dependen de este paquete: se calculan con evals/rag/rag_metrics.py, que no
-# tiene dependencias de terceros, para que la puerta de CI no pueda romperse
-# por una dependencia.
+# (crea .venv-ragas con uv o, si no hay uv, con python3.12 -m venv + pip, instala
+# esto y corre `scripts/run_rag_evals.py --dry-run --ragas-crossover`).
 #
-# POR QUE NO VA EN requirements.txt:
-# ragas 0.2.x/0.3.x/0.4.x (las tres ultimas published) importan
-# `langchain_community.chat_models.vertexai`, que langchain-community >= 0.3
-# elimino, asi que hay que fijar langchain-community 0.2.x; y ragas fija
-# langchain-core < 0.3, mientras que el proyecto usa langgraph >= 1.2.11, que
-# exige langchain-core >= 1.4.7. Los dos requisitos son incompatibles en el
-# mismo entorno: instalar ragas en el venv del data-engine bajaria
-# langchain-core y romperia langgraph, es decir, el RAG y las tesis.
+# POR QUE ESTAS VERSIONES (verificado instalando y ejecutando, 2026-10-27, py3.12):
 #
-# Por eso el crossover va en un venv AISLADO, no en el del servicio.
+# - La version anterior de este fichero era insatisfacible: fijaba
+#   langchain==0.2.16 (langsmith<0.2) junto a langchain-core==1.3.3
+#   (langsmith>=0.3.45). `pip/uv install -r` fallaba antes de instalar nada.
+# - ragas 0.4.3 no pone techo a langchain-*, pero `ragas/llms/base.py` hace
+#   `from langchain_community.chat_models.vertexai import ChatVertexAI`.
+#   langchain-community 0.4.2+ ya no trae ese modulo -> ImportError en el
+#   primer `import ragas.metrics`. 0.4.0 y 0.4.1 si lo traen y funcionan con
+#   langchain-core 1.x, asi que se fija 0.4.1.
+# - Las metricas NonLLM usan NonLLMStringSimilarity, que exige rapidfuzz
+#   (ragas no lo declara): sin el, ImportError al instanciar la metrica.
+# - El resto se fija a lo que el resolutor eligio en la instalacion verificada,
+#   para que el crossover sea reproducible.
 #
-#   python -m venv .venv-ragas
-#   .venv-ragas\Scripts\python -m pip install -r evals/rag/requirements-ragas.txt
-#   .venv-ragas\Scripts\python scripts/run_rag_evals.py --ragas-crossover
-#
-# En Linux/macOS: .venv-ragas/bin/python.
+# Por que NO va en requirements.txt: langgraph (RAG y tesis) exige un
+# langchain-core reciente y el pin de langchain-community de aqui no debe
+# arrastrar al servicio. Venv aislado siempre.
 
-# metricas no-LLM de ragas, sin juez LLM
 ragas==0.4.3
-# langchain-core 0.2.x: la ultima major que ragas 0.2.15 aguanta.
-langchain-core==1.3.3
-langchain==0.2.16
-# huggingface_hub 0.2x: `README.md`, `AsReceived` y `snapshot_download` son los
-# nombres que usan los prompts de ragas; >= 0.26 renombro los ficheros de
-# prompt a .txt y el cruce sale con prompts vacios en silencio.
-huggingface-hub>=0.24,<0.26
+langchain-community==0.4.1
+langchain-core==1.7.0
+langchain==1.4.7
+langchain-classic==1.0.8
+langchain-openai==1.7.3
+langsmith==0.14.13
+rapidfuzz==3.14.6
+datasets==5.1.0
+huggingface-hub==2.3.0
+numpy==2.5.4
+pydantic==2.14.1
+openai==3.3.0
+instructor==1.17.0

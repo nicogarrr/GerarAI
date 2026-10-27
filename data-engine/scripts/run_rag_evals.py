@@ -331,15 +331,19 @@ def ragas_crossover(report: dict) -> int:
     try:
         import asyncio
 
-        from ragas.dataset import SingleTurnSample
+        # ragas >= 0.2 publica SingleTurnSample en `dataset_schema`; `ragas.dataset`
+        # es otro modulo desde 0.4 y ya no lo exporta.
+        try:
+            from ragas.dataset_schema import SingleTurnSample
+        except ImportError:  # ragas antiguo
+            from ragas.dataset import SingleTurnSample  # type: ignore[no-redef]
         from ragas.metrics import NonLLMContextPrecisionWithReference, NonLLMContextRecall
     except Exception as exc:
         print(
             "\nCROSSOVER RAGAS: no ejecutable. "
             f"{type(exc).__name__}: {exc}\n"
-            "Instala las versiones pineadas de evals/rag/requirements-ragas.txt en un "
-            "venv aislado: ragas fija langchain-core<0.3 y el proyecto usa "
-            "langgraph>=1.2, que exige langchain-core>=1.4, y no caben en el mismo entorno.",
+            "Ejecutalo en su venv aislado con un solo comando, desde data-engine/: "
+            "bash scripts/ragas_crossover.sh (ver evals/rag/requirements-ragas.txt).",
             file=sys.stderr,
         )
         return 0
