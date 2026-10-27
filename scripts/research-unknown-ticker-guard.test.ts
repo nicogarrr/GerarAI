@@ -78,6 +78,8 @@ void test('la página pinta los tres estados sin 404, sin CTA y sin panel fuera 
     // Fuera del master no hay CTA de generación, ni panel de mercado N/D,
     // ni una segunda consulta al master (la señal ya es exacta).
     assert.ok(!branch.includes('<ThesisGenerateButton'), 'sin CTA de generación fuera del master');
+    assert.match(branch, /Buscar otra empresa/, 'siguiente paso: buscar otra empresa');
+    assert.match(branch, /Reintentar/, 'siguiente paso: reintentar la comprobación');
     assert.ok(!branch.includes('<CompanyMarketPanel'), 'sin panel N/D fuera del master');
     assert.ok(!branch.includes('getCompanyMarketSnapshot'), 'sin fetch de mercado fuera del master');
     assert.ok(!branch.includes('getResearchCompanyBasics'), 'sin segunda consulta al master: el 404 del snapshot ya es la señal');
