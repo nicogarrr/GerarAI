@@ -12,6 +12,11 @@ describe('XIRR incomplete coverage explanation', () => {
     expect(xirrUnavailableReason('incomplete_ambiguous_cash')).toContain('ambiguos');
     expect(xirrUnavailableReason('insufficient_cashflows')).toContain('faltan flujos de caja');
   });
+  it('explains a missing account cash balance', () => {
+    const reason = xirrUnavailableReason('incomplete_missing_cash_balance');
+    expect(reason).toContain('saldo de caja');
+    expect(reason).not.toContain('sin flujos suficientes');
+  });
   it('has a safe fallback for old or missing status', () => {
     expect(xirrUnavailableReason(undefined)).toContain('sin flujos suficientes');
   });

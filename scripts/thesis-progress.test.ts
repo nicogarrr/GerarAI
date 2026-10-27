@@ -47,3 +47,10 @@ void test('el botón usa el texto de progreso y dice «Preparando» si corre sin
     assert.match(button, /thesisProgressText\(job, polledAt\)/);
     assert.match(button, /'Preparando la generación'/);
 });
+
+void test('los segundos avanzan cada 1 s con un reloj propio, no solo en cada sondeo de 3 s', () => {
+    const button = readFileSync('components/research/ThesisGenerateButton.tsx', 'utf8');
+    assert.match(button, /setInterval\(\(\) => setPolledAt\(Date\.now\(\)\), 1000\)/);
+    assert.match(button, /clearInterval\(clock\)/);
+    assert.match(button, /const POLL_MS = 3000|POLL_MS = 3_?000/); // el polling sigue igual
+});

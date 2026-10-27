@@ -90,6 +90,8 @@ class PriceBar:
     adj_close: Decimal
     volume: int
     quote_currency: str | None = None
+    market_timezone: str | None = None
+    session_end: datetime | None = None
 
 
 def fetch_history_yfinance(
@@ -107,9 +109,14 @@ def fetch_history_yfinance(
             out[symbol] = []
             continue
         try:
-            unit = instrument.get_history_metadata().get("currency")
+            metadata = instrument.get_history_metadata() or {}
         except Exception:
-            unit = None
+            metadata = {}
+        unit = metadata.get("currency")
+        timezone = metadata.get("exchangeTimezoneName")
+        regular = (metadata.get("currentTradingPeriod") or {}).get("regular") or {}
+        end = regular.get("end")
+        session_end = datetime.fromtimestamp(end, UTC) if isinstance(end, (int, float)) else None
         bars: list[PriceBar] = []
         for idx, row in hist.iterrows():
             close = row.get("Close")
@@ -131,6 +138,8 @@ def fetch_history_yfinance(
                     adj_close=Decimal(str(round(float(adj), 6))),
                     volume=int(row.get("Volume") or 0),
                     quote_currency=unit,
+                    market_timezone=timezone,
+                    session_end=session_end,
                 )
             )
         out[symbol] = bars
@@ -150,6 +159,29 @@ def _us_session_open(now: datetime) -> bool:
     return (local.hour, local.minute) < _SESSION_CLOSED_AFTER
 
 
+def _bar_is_final(company: Company, bar: PriceBar, now: datetime) -> bool:
+    """La fuente manda sobre el reloj. Sin metadatos no se adivina bolsa por ticker."""
+    try:
+        zone = ZoneInfo(bar.market_timezone) if bar.market_timezone else None
+    except (KeyError, ValueError):
+        zone = None
+    if zone is not None:
+        today = now.astimezone(zone).date()
+        if bar.day < today:
+            return True
+        if bar.day > today:
+            return False
+        end = bar.session_end
+        return bool(end and end.astimezone(zone).date() == bar.day and now >= end)
+    exchange = (company.exchange or "").upper()
+    if any(token in exchange for token in _US_EXCHANGE_TOKENS):
+        today = now.astimezone(_NY).date()
+        return bar.day < today or (bar.day == today and not _us_session_open(now))
+    # Un dia UTC completo de margen evita tratar un dia local desconocido
+    # como cerrado. No se publica la barra reciente sin evidencia del mercado.
+    return bar.day < now.astimezone(UTC).date() - timedelta(days=1)
+
+
 def upsert_prices(
     db: Session,
     company: Company,
@@ -159,17 +191,16 @@ def upsert_prices(
 ) -> int:
     """Upsert por (company_id, date). Devuelve barras escritas.
 
-    Con la sesion US abierta la barra de hoy es una foto intradia, no un
-    cierre: se descarta siempre. Estas filas se leen como cierre oficial
+    La barra actual requiere fin de sesión y zona de mercado de la fuente.
+    Sin metadatos, solo la bolsa US explícita conserva el gate conservador
+    anterior; para otros mercados se dejan pasar solo días antiguos. Estas filas se leen como cierre oficial
     (source="yfinance") en Movers, Mercado y watchlist, y una foto intradia
     escrita aquí salía en /screener como «Cierre {hoy}» a media sesión.
     """
     now = now or datetime.now(UTC)
-    skip_today = _us_session_open(now)
-    today_ny = now.astimezone(_NY).date()
     written = 0
     for bar in bars:
-        if skip_today and bar.day >= today_ny:
+        if not _bar_is_final(company, bar, now):
             continue
         values = {
             "company_id": company.id,

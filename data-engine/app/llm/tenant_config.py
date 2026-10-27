@@ -17,6 +17,8 @@ from contextvars import ContextVar, Token
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit, urlunsplit
 
+from app.llm.egress_guard import is_public_ip
+
 PROVIDER_CUSTOM = "custom"
 
 CUSTOM_HOST_BLOCKLIST = frozenset(
@@ -28,6 +30,7 @@ CUSTOM_HOST_BLOCKLIST = frozenset(
 )
 CUSTOM_HOST_SUFFIX_BLOCKLIST = (".local", ".internal", ".localhost", ".localdomain")
 
+_NUMERIC_LAST_LABEL = re.compile(r"^(\d+|0x[0-9a-f]*)$")
 _MODEL_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$")
 _PROVIDER_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 
@@ -141,6 +144,8 @@ def validate_base_url(provider: str, value: str | None) -> str:
     if parts.query or parts.fragment:
         raise ValueError("La base_url no puede incluir query ni fragmento.")
     host = parts.hostname.strip().lower().rstrip(".")
+    if not host.isascii():
+        raise ValueError("La base_url debe usar un host ASCII (punycode).")
     if (
         host in CUSTOM_HOST_BLOCKLIST
         or host.endswith(CUSTOM_HOST_SUFFIX_BLOCKLIST)
@@ -151,8 +156,14 @@ def validate_base_url(provider: str, value: str | None) -> str:
         address = ipaddress.ip_address(host)
     except ValueError:
         address = None
-    if address is not None and not address.is_global:
+    if address is not None and not is_public_ip(address):
         raise ValueError("La base_url no puede apuntar a una IP privada o reservada.")
+    if address is None and _NUMERIC_LAST_LABEL.match(host.rsplit(".", 1)[-1]):
+        # 127.1, 0x7f.1, 2130706433...: formas numericas que el sistema operativo
+        # interpreta como IPv4 pero ``ipaddress`` no. Solo se admite la forma canonica.
+        raise ValueError("La base_url debe usar un nombre de host o una IP en forma canonica.")
+    # Esto es solo texto: la resolucion DNS y la IP real se comprueban al conectar
+    # (app.llm.egress_guard), tambien en la prueba de conexion.
     path = parts.path.rstrip("/")
     return urlunsplit(("https", parts.netloc, path, "", ""))
 

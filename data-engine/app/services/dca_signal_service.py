@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.models import (
+    AlertDelivery,
     Company,
     DcaAlertOverride,
     DcaSignalState,
@@ -231,6 +232,18 @@ def settled_rows(rows: Sequence[PriceRow], now: datetime) -> list[PriceRow]:
     return [row for row in rows if row.day < today or (row.day == today and closed)]
 
 
+def _fresh_rows(rows: Sequence[PriceRow], today: date, max_age_days: int) -> list[PriceRow]:
+    """Vacio si el cierre mas reciente es mas viejo que el maximo permitido.
+
+    La historia antigua sigue sirviendo para backtests; aqui solo se impide que
+    emita una senal como si fuera actual.
+    """
+    if not rows:
+        return []
+    newest = max(row.day for row in rows)
+    return list(rows) if (today - newest).days <= max_age_days else []
+
+
 def build_bars(rows: Sequence[PriceRow]) -> tuple[list[DailyBar], float]:
     """Serie para el motor y factor serie->precio real del ultimo cierre."""
     ordered = sorted(rows, key=lambda r: r.day)
@@ -287,8 +300,8 @@ def _scaled(value: float | None, factor: float) -> float | None:
     return round(value * factor, 6) if value is not None else None
 
 
-def _emit_and_dispatch(db: Session, dca: dict[str, Any], *, company_id: int | None, settings: Any) -> dict:
-    from app.services.notification_service import NotificationService
+def _emit_alert_row(db: Session, dca: dict[str, Any], *, company_id: int | None, settings: Any) -> tuple[str, ResearchAlert | int]:
+    """Inserta la alerta SIN commit: va en la misma transaccion que el estado."""
     from app.services.review_alert_service import ReviewAlertService
 
     service = ReviewAlertService()
@@ -298,7 +311,7 @@ def _emit_and_dispatch(db: Session, dca: dict[str, Any], *, company_id: int | No
         select(ResearchAlert.id).where(ResearchAlert.fingerprint == fingerprint, *tenant_filters(db, ResearchAlert))
     )
     if exists is not None:
-        return {"status": "duplicate", "alert_id": exists}
+        return "duplicate", exists
     alert = service.emit_alert(
         db,
         company_id=company_id,
@@ -310,7 +323,25 @@ def _emit_and_dispatch(db: Session, dca: dict[str, Any], *, company_id: int | No
         channels=alert_channels(settings),
         metadata={"dca": dca},
     )
-    db.commit()
+    # Intencion de entrega DURABLE: una fila 'pending' por canal externo en la
+    # misma transaccion que la alerta. Si el despacho falla antes de crear las
+    # filas (o el proceso muere), el reconciliador las reclama tras el TTL.
+    for channel in alert.channels or []:
+        if channel in ("in_app", "telegram"):
+            continue
+        already = db.scalar(
+            select(AlertDelivery.id).where(AlertDelivery.alert_id == alert.id, AlertDelivery.channel == channel)
+        )
+        if already is None:
+            db.add(AlertDelivery(tenant_id=alert.tenant_id, alert_id=alert.id, channel=channel))
+    db.flush()
+    return "alerted", alert
+
+
+def _dispatch_alert(db: Session, alert: ResearchAlert) -> dict:
+    """Entrega tras el commit; un fallo de canal no pierde la alerta."""
+    from app.services.notification_service import NotificationService
+
     try:
         deliveries = NotificationService().dispatch(db, alert)
     except Exception:  # noqa: BLE001 - el aviso queda en la app aunque falle un canal
@@ -364,12 +395,23 @@ def evaluate_watchlist(
             except Exception as exc:  # noqa: BLE001 - un ticker roto no frena el barrido
                 summary["errors"].append({"symbol": symbol, "error": type(exc).__name__})
                 history = FetchedHistory(rows=[])
-        rows = settled_rows(history.rows, now)
+        max_age = int(settings.dca_max_data_age_days)
+        seen_days = [r.day for r in history.rows]
+        rows = _fresh_rows(settled_rows(history.rows, now), today, max_age)
         if not rows and use_db_fallback:
             fallback = _db_history(db, item.company)
-            rows = settled_rows(fallback.rows, now)
+            rows = _fresh_rows(settled_rows(fallback.rows, now), today, max_age)
             history = fallback
+            seen_days += [r.day for r in fallback.rows]
             source = "market_prices" if rows else source
+        if not rows:
+            newest = max((d for d in seen_days if d <= today), default=None)
+            if newest is not None:
+                # Historia vieja: no se trata como senal actual ni se avisa.
+                summary["skipped"].append(
+                    {"symbol": symbol, "reason": "datos_desactualizados", "last_price_date": newest.isoformat()}
+                )
+                continue
         bars, factor = build_bars(rows)
         verdict = current_verdict(bars, params=params, today=today) if bars else None
         if verdict is None:
@@ -426,12 +468,18 @@ def evaluate_watchlist(
             previous_level=previous_level,
             params=params,
         )
-        db.commit()
-        outcome = _emit_and_dispatch(db, dca, company_id=state.company_id, settings=settings)
-        state.last_alerted_level = verdict.level
-        state.last_alerted_period = verdict.period
-        db.commit()
-        if outcome["status"] == "alerted":
+        # Estado y alerta en UNA transaccion: un fallo entre ambos deja el nivel
+        # sin guardar y el reintento vuelve a emitir el aviso.
+        try:
+            status, emitted = _emit_alert_row(db, dca, company_id=state.company_id, settings=settings)
+            state.last_alerted_level = verdict.level
+            state.last_alerted_period = verdict.period
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        if status == "alerted":
+            outcome = _dispatch_alert(db, emitted)
             summary["alerted"].append({"symbol": symbol, "level": verdict.level, **outcome})
     # Los tickers que ya no se siguen dejan de mostrarse.
     for symbol, state in states.items():

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -44,7 +44,10 @@ def client(monkeypatch):
     months.reverse()
     for y, m in months[:-1]:
         rows.append(PriceRow(day=date(y, m, 1), close=100.0))
-    rows.append(PriceRow(day=date(months[-1][0], months[-1][1], 1), close=55.0))
+    # Ultimo cierre reciente: con la puerta de frescura una barra del dia 1 de
+    # hace semanas ya no cuenta como senal actual.
+    last_day = max(date(months[-1][0], months[-1][1], 1), today - timedelta(days=1))
+    rows.append(PriceRow(day=last_day, close=55.0))
 
     def fake_fetch(symbol: str) -> FetchedHistory:
         return FetchedHistory(rows=rows, currency="USD")

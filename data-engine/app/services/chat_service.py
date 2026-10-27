@@ -1941,6 +1941,17 @@ class ChatService:
         self, db: Session, question: str, lots: list, company: Company | None, label: str | None,
     ) -> ChatResponse:
         """Estimación con los lotes que da el usuario: mismo FIFO y misma escala del ahorro."""
+        from app.services.tax_sale_intent import sale_intent_issue
+
+        issue = sale_intent_issue(question)
+        if issue:
+            return ChatResponse(
+                answer=issue, sources=[], model="deterministic",
+                prompt_version=_SALE_TAX_PROMPT_VERSION, confidence=0.8,
+                llm_trace={"path": "portfolio_sale_tax", "generated": False, "provider_calls": 0,
+                           "clarification": "sale_clause_intent"},
+            )
+
         from app.services.sale_hypothetical import simulate_hypothetical_sale
 
         res = simulate_hypothetical_sale(db, lots=lots, question=question, company=company)
@@ -2045,6 +2056,17 @@ class ChatService:
         curso, como si fuera la única operación del ejercicio. Sin tenant
         devuelve None.
         """
+        from app.services.tax_sale_intent import sale_intent_issue
+
+        issue = sale_intent_issue(question)
+        if issue:
+            return ChatResponse(
+                answer=issue, sources=[], model="deterministic",
+                prompt_version=_SALE_TAX_PROMPT_VERSION, confidence=0.8,
+                llm_trace={"path": "portfolio_sale_tax", "generated": False, "provider_calls": 0,
+                           "clarification": "sale_clause_intent"},
+            )
+
         from app.services.sale_simulation import repurchase_deadline, simulate_fifo_sale
         from app.services.tax_irpf_filing import calculate_savings_tax
 

@@ -157,12 +157,12 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
             </label>
             <Input defaultValue="manual_feed" id="feed-source" name="source" />
           </div>
-          <Textarea
+          <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Noticias del lote (JSON)</span><Textarea
             className="min-h-[180px] border-gray-800 bg-black/30 font-mono text-xs text-gray-200 focus-visible:ring-teal-500"
             name="items"
             placeholder='[{"ticker":"MSFT","title":"MSFT recorta guía","text":"resultado por debajo y recorte de guía","url":"https://..."}]'
             required
-          />
+          /></label>
           <Button className="w-full sm:w-fit" type="submit" variant="outline">
             Importar lote
           </Button>

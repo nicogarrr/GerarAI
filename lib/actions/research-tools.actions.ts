@@ -386,14 +386,19 @@ function required(formData: FormData, key: string, label: string): string {
   return value;
 }
 
-export async function getKnowledgeLibrary() {
-  const [collections, documents, principles, jobs] = await Promise.all([
+export async function getKnowledgeLibrary(options: { documentOffset?: number; principleOffset?: number; status?: string } = {}) {
+  const documentOffset = Number.isSafeInteger(options.documentOffset) && options.documentOffset! >= 0 ? options.documentOffset! : 0;
+  const principleOffset = Number.isSafeInteger(options.principleOffset) && options.principleOffset! >= 0 ? options.principleOffset! : 0;
+  const status = options.status ? `&status=${encodeURIComponent(options.status)}` : '';
+  const [collections, documentPage, principlePage, jobs] = await Promise.all([
     requestJson<KnowledgeCollection[]>('/api/knowledge/collections'),
-    requestJson<KnowledgeDocument[]>('/api/knowledge/documents'),
-    requestJson<InvestmentPrinciple[]>('/api/knowledge/principles?limit=300'),
+    requestJson<{ items: KnowledgeDocument[]; total: number; collection_counts: Record<string, number> }>(`/api/knowledge/documents/page?limit=50&offset=${documentOffset}`),
+    requestJson<{ items: InvestmentPrinciple[]; total: number; proposed_total: number }>(`/api/knowledge/principles/page?limit=50&offset=${principleOffset}${status}`),
     requestJson<KnowledgeProcessingJob[]>('/api/knowledge/jobs?limit=100'),
   ]);
-  return { collections, documents, principles, jobs };
+  return { collections, documents: documentPage.items, documentTotal: documentPage.total,
+    collectionCounts: documentPage.collection_counts, principles: principlePage.items,
+    principleTotal: principlePage.total, proposedTotal: principlePage.proposed_total, jobs };
 }
 
 export type CorpusIngestResult = { success: true } | { success: false; message: string };

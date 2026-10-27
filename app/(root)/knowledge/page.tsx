@@ -23,6 +23,7 @@ import {
   extractKnowledgePrinciples,
   getKnowledgeDocumentChunks,
   getKnowledgeLibrary,
+  getKnowledgeDocument,
   installKnowledgeDefaults,
   mergeKnowledgePrinciple,
   reviseKnowledgePrinciple,
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
     'Libros, cartas y casos de estudio separados de la evidencia de empresas, con principios de inversión aprobados por humanos y trazables.',
 };
 
-type PageProps = { searchParams: Promise<{ document?: string; status?: string; tab?: string }> };
+type PageProps = { searchParams: Promise<{ document?: string; status?: string; tab?: string; documentOffset?: string; principleOffset?: string }> };
 
 /** Pestañas de la página. El estado vive en la URL (?tab=): los disparadores
  *  son enlaces, así que la vista se puede compartir, recargar y usar sin
@@ -143,10 +144,13 @@ function statusTone(status: string) {
 export default async function KnowledgeLibraryPage({ searchParams }: PageProps) {
   const query = await searchParams;
   const activeTab = asTab(query.tab);
-  const selectedDocumentId = Number(query.document) || null;
+  const documentId = Number(query.document);
+  const selectedDocumentId = Number.isSafeInteger(documentId) && documentId > 0 ? documentId : null;
+  const documentOffset = Number.isSafeInteger(Number(query.documentOffset)) && Number(query.documentOffset) >= 0 ? Number(query.documentOffset) : 0;
+  const principleOffset = Number.isSafeInteger(Number(query.principleOffset)) && Number(query.principleOffset) >= 0 ? Number(query.principleOffset) : 0;
   let library: Awaited<ReturnType<typeof getKnowledgeLibrary>>;
   try {
-    library = await getKnowledgeLibrary();
+    library = await getKnowledgeLibrary({ documentOffset, principleOffset, status: query.status });
   } catch (error) {
     if (isBackendUnavailableError(error)) {
       return <BackendOffline feature={t('knowledge.library')} retryHref="/knowledge" />;
@@ -154,14 +158,21 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
     throw error;
   }
   const { collections, documents, principles, jobs } = library;
-  // Un ?document= que ya no existe (enlace viejo o documento borrado) no
-  // puede tumbar la página entera: los fragmentos solo se piden cuando el
-  // documento existe; si no, la biblioteca se pinta sin el explorador.
-  const selectedExists = selectedDocumentId !== null && documents.some((document) => document.id === selectedDocumentId);
+  // Deep links resolve independently of the current page; 404 stays harmless.
+  let selectedDocument: Awaited<ReturnType<typeof getKnowledgeDocument>> = null;
+  if (selectedDocumentId !== null) {
+    try {
+      selectedDocument = await getKnowledgeDocument(selectedDocumentId);
+    } catch (error) {
+      if (isBackendUnavailableError(error)) return <BackendOffline feature={t('knowledge.library')} retryHref={`/knowledge?document=${selectedDocumentId}`} />;
+      throw error;
+    }
+  }
+  const selectedExists = selectedDocument !== null;
   let chunks: Awaited<ReturnType<typeof getKnowledgeDocumentChunks>> = [];
   if (selectedExists) {
     try {
-      chunks = await getKnowledgeDocumentChunks(selectedDocumentId);
+      chunks = await getKnowledgeDocumentChunks(selectedDocument!.id);
     } catch (error) {
       if (isBackendUnavailableError(error)) {
         return <BackendOffline feature={t('knowledge.library')} retryHref={`/knowledge?document=${selectedDocumentId}`} />;
@@ -169,17 +180,14 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
       throw error;
     }
   }
-  const visiblePrinciples = query.status
-    ? principles.filter((principle) => principle.status === query.status)
-    : principles;
+  const visiblePrinciples = principles;
   const collectionNames = new Map(collections.map((collection) => [collection.id, collection.name]));
   const documentNames = new Map(documents.map((document) => [document.id, document.title]));
-  const selectedDocument = documents.find((document) => document.id === selectedDocumentId);
   const activeJobs = jobs.filter((job) => job.status === 'queued' || job.status === 'running');
   const collectionsWithCount = (() => {
     const withCount = collections.map((collection) => ({
       collection,
-      count: documents.filter((document) => document.collection_id === collection.id).length,
+      count: library.collectionCounts[String(collection.id)] ?? 0,
     }));
     return {
       nonEmpty: withCount.filter((entry) => entry.count > 0),
@@ -237,8 +245,8 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         {[
           ['Colecciones', collections.length],
-          ['Documentos', documents.length],
-          ['Pendientes de aprobación', principles.filter((item) => item.status === 'proposed').length],
+          ['Documentos', library.documentTotal],
+          ['Pendientes de aprobación', library.proposedTotal],
         ].map(([label, value]) => (
           <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}>
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
@@ -262,9 +270,9 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
           <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required />
-            <Input className="h-11 w-full" name="collection_type" defaultValue="custom" placeholder="Tipo de colección" required />
-            <Textarea className="min-h-[88px] w-full sm:col-span-2" name="description" placeholder="Ámbito y uso previsto" />
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de colección</span><Input className="h-11 w-full" name="collection_type" defaultValue="custom" placeholder="Tipo de colección" required /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 sm:col-span-2"><span>Descripción (opcional)</span><Textarea className="min-h-[88px] w-full" name="description" placeholder="Ámbito y uso previsto" /></label>
             <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit">Crear colección</Button>
           </div>
         </MutationForm>
@@ -319,7 +327,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
         <div className="mb-4 flex items-center gap-2">            <BookOpen aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">{t('knowledge.documents')}</h2></div>
-        {!documents.length ? <div className="py-2 text-sm text-gray-500"><p>Aún no hay documentos de conocimiento.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
+        {!documents.length ? <div className="py-2 text-sm text-gray-500"><p>No hay documentos en esta página.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
         <div aria-label="Documentos de conocimiento" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
           <table className="w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">Documentos de conocimiento ingeridos, con colección, tipo, extractor, estado y acciones de extracción</caption>
@@ -370,6 +378,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         </div>
       </section>
 
+      <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
       {selectedDocument ? (
         <section className="min-w-0 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5">
           <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100">{selectedDocument.title}</h2></div><Button asChild size="sm" variant="ghost"><Link href="/knowledge">Cerrar</Link></Button></div>
@@ -474,6 +483,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         <TabsContent className="mt-2" value={TABS.principios}>
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center"><div className="flex items-center gap-2"><Sparkles aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">Principios de inversión</h2></div><div className="flex flex-wrap gap-2 md:ml-auto">{['', 'proposed', 'approved', 'rejected', 'merged', 'superseded'].map((status) => <Button asChild className="min-h-[44px]" key={status || 'all'} size="sm" variant={(query.status ?? '') === status ? 'default' : 'outline'}><Link href={status ? `/knowledge?tab=principios&status=${status}` : '/knowledge?tab=principios'} scroll={false}>{PRINCIPLE_STATUS_LABELS[status] ?? status}</Link></Button>)}</div></div>
+        <PageNavigation offset={principleOffset} count={principles.length} total={library.principleTotal} parameter="principleOffset" tab="principios" status={query.status} />
         <div className="grid gap-4 xl:grid-cols-2">
           {visiblePrinciples.map((principle) => (
             <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={principle.id}>
@@ -489,7 +499,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             </article>
           ))}
           {!visiblePrinciples.length ? (
-            principles.length ? (
+            library.principleTotal > 0 || query.status ? (
               <p className="text-sm text-gray-500">
                 Ningún principio coincide con este filtro.{' '}
                 <Link className="text-teal-300 underline underline-offset-2" href="/knowledge?tab=principios">Ver todos</Link>
@@ -515,4 +525,15 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
       </Tabs>
     </main>
   );
+}
+
+function PageNavigation({ offset, count, total, parameter, tab, status }: {
+  offset: number; count: number; total: number; parameter: string; tab: string; status?: string;
+}) {
+  const href = (next: number) => `/knowledge?${new URLSearchParams({ tab, [parameter]: String(next), ...(status ? { status } : {}) })}`;
+  return <nav aria-label={tab === 'principios' ? 'Páginas de principios' : 'Páginas de documentos'} className="my-4 flex flex-wrap items-center gap-3 text-sm text-gray-400">
+    <span>{count ? `${offset + 1}-${offset + count} de ${total}` : `0 de ${total}`}</span>
+    {offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={href(Math.max(0, offset - 50))}>Anteriores</Link></Button> : null}
+    {offset + count < total ? <Button asChild variant="outline" className="min-h-11"><Link href={href(offset + 50)}>Siguientes</Link></Button> : null}
+  </nav>;
 }

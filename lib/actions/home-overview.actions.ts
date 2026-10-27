@@ -71,7 +71,7 @@ export async function getHomeWatchlistPreview(limit: number): Promise<HomeWatchl
                 symbol: data.symbol,
                 name: data.name,
                 price: dated ? dated.price : data.price,
-                currency: data.currency,
+                currency: dated ? dated.currency : data.currency,
                 changePercent: dated ? dated.changePercent : data.changePercent,
                 priceKind: dated ? 'close' : data.priceKind,
                 priceAsOf: dated ? dated.date : data.priceAsOf,

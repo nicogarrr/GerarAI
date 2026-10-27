@@ -52,6 +52,9 @@ def _is_non_finite(value: Any) -> bool:
         return False
 
 
+_EVENT_KINDS = frozenset({"news_event", "earnings_run"})
+
+
 class AlertRuleService:
     def create(
         self,
@@ -141,6 +144,7 @@ class AlertRuleService:
             return result
 
         observed, observation = self._observe(db, rule)
+        event_kind = observation.get("kind") in _EVENT_KINDS
         stale_observation = observation.get("status") == "stale"
         matched = False if stale_observation else self._matches(
             observed,
@@ -261,6 +265,10 @@ class AlertRuleService:
             "observation": observation,
             "jev_urgency": jev_urgency,
         }
+        if event_kind:
+            self._advance_event_cursor(
+                rule, now, observation, pending=bool(matched and not triggered)
+            )
         rule.last_evaluated_at = now
         rule.last_value = None if observed is None else str(observed)[:160]
         rule.last_result = result
@@ -365,7 +373,13 @@ class AlertRuleService:
                     else "fresh"
                 ),
             }
-        since = self._aware(rule.last_evaluated_at) or self._aware(rule.created_at)
+        # Los eventos usan un cursor propio: avanzar last_evaluated_at durante el
+        # cooldown consumia el evento sin avisar de el.
+        since = (
+            self._event_cursor(rule)
+            or self._aware(rule.last_evaluated_at)
+            or self._aware(rule.created_at)
+        )
         if kind == "news_event":
             statement = (
                 select(NewsEvent)
@@ -470,6 +484,36 @@ class AlertRuleService:
             "news": {"kind": "news_event"},
             "earnings": {"kind": "earnings_run"},
         }[rule_type]
+
+    @staticmethod
+    def _event_cursor(rule: AlertRule) -> datetime | None:
+        raw = (rule.metadata_ or {}).get("event_cursor")
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(str(raw))
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+    def _advance_event_cursor(
+        self, rule: AlertRule, now: datetime, observation: dict[str, Any], *, pending: bool
+    ) -> None:
+        """Mueve el cursor de eventos solo si no queda un evento pendiente.
+
+        Pendiente = coincide pero el cooldown impidio avisar: el cursor se queda
+        donde estaba (o en el ultimo instante conocido) para verlo al acabar.
+        """
+        current = self._event_cursor(rule)
+        if pending:
+            if current is None:
+                current = self._aware(rule.last_evaluated_at) or self._aware(rule.created_at)
+            new = current
+        else:
+            new = now
+        if new is None:
+            return
+        rule.metadata_ = {**(rule.metadata_ or {}), "event_cursor": new.isoformat()}
 
     @staticmethod
     def _aware(value: datetime | None) -> datetime | None:

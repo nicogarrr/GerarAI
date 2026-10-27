@@ -28,6 +28,7 @@ type Transaction = {
     type: 'buy' | 'sell';
     quantity: number;
     price: number;
+    fees?: number;
     date: string;
     notes?: string;
     currency?: string;
@@ -49,6 +50,8 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
         type: transaction.type,
         quantity: transaction.quantity.toString(),
         price: transaction.price.toString(),
+        // Sin dato de comisión en la fila el campo queda vacío: guardar sin tocarlo OMITE fees y el backend conserva la registrada (nunca se resetea a 0).
+        fees: transaction.fees === undefined ? '' : transaction.fees.toString(),
         date: transaction.date.slice(0, 10),
         notes: transaction.notes || '',
         currency: transaction.currency || 'USD',
@@ -61,6 +64,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
             type: formData.type,
             quantity: formData.quantity,
             price: formData.price,
+            fees: formData.fees,
             date: formData.date,
         });
         setFieldErrors(errors);
@@ -78,6 +82,10 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                 new Date(formData.date),
                 formData.notes || undefined,
                 formData.currency,
+                // Sin dato de comisión en la fila no se envía (el backend conserva la registrada).
+                transaction.fees === undefined && formData.fees.trim() === ''
+                    ? undefined
+                    : (parseLocalizedNumber(formData.fees) ?? 0),
             );
             setOpen(false);
             toast.success('Transacción actualizada');
@@ -188,6 +196,23 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                                 <p role="alert" className="text-sm text-red-400">{fieldErrors.price}</p>
                             )}
                         </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="edit-fees" className="text-gray-300">Comisiones ({formData.currency}) (opcional)</Label>
+                      <Input
+                        id="edit-fees"
+                        type="number"
+                        step="any"
+                        min="0"
+                        placeholder="0,00"
+                        value={formData.fees}
+                        onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
+                        className="bg-gray-800 border-gray-700 text-gray-100"
+                      />
+                      {fieldErrors.fees && (
+                        <p role="alert" className="text-sm text-red-400">{fieldErrors.fees}</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">

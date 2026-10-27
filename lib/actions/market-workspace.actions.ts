@@ -146,7 +146,7 @@ export async function getCompanyMarketSnapshot(ticker: string): Promise<CompanyM
         // gemelo americano del ticker.
         name: researchCompany?.name || profile?.name || normalized,
         exchange: researchCompany?.exchange || profile?.exchange || null,
-        currency: researchCompany?.currency || profile?.currency || null,
+        currency: dated ? dated.currency : researchCompany?.currency || profile?.currency || null,
         quote: {
             price,
             change,

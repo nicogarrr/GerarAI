@@ -65,9 +65,31 @@ describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
         }
     });
 
+    it('el resumen omite la tarjeta de metadatos y conserva acceso al modelo completo', () => {
+        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+        const overviewStart = page.indexOf("if (activeView === 'overview') {");
+        const overviewEnd = page.indexOf("} else if (activeView === 'thesis')", overviewStart);
+        assert.ok(overviewStart > 0 && overviewEnd > overviewStart, 'región overview identificada');
+        const overview = page.slice(overviewStart, overviewEnd);
+        assert.doesNotMatch(overview, /title="Modelo fundamental a largo plazo"/, 'no restaurar la tarjeta redundante');
+        assert.doesNotMatch(overview, /model_summary\.(framework_key|engine_version|horizon_years)/, 'metadatos internos fuera del resumen');
+        assert.match(overview, /<Link[^>]+href=\{`[^`]+\?view=model`\}[^>]*>\{snapshot\.model_summary\.publishable \? 'publicable' : 'bloqueado'\}<\/Link>/, 'el estado sigue enlazando al modelo');
+        const modelStart = page.indexOf("} else if (activeView === 'model')");
+        const modelEnd = page.indexOf("} else if (activeView === 'market-opportunity')", modelStart);
+        assert.ok(modelStart > overviewEnd && modelEnd > modelStart, 'vista Modelo identificada');
+        const modelView = page.slice(modelStart, modelEnd);
+        assert.match(modelView, /await viewData\('model'\)/, 'sigue leyendo el modelo real');
+        assert.match(modelView, /<LongTermModelPanel model=\{model\?\.status === 'not_generated' \? null : model\} ticker=\{ticker\}/, 'conserva el panel completo y su estado vacío');
+        const richPanel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
+        assert.match(richPanel, />Modelo fundamental a largo plazo<\/h2>/, 'conserva el título en la vista rica');
+        assert.match(richPanel, /model\.horizon_years/, 'conserva el horizonte');
+        assert.match(richPanel, /frameworkLabel\(model\.framework\.label\)/, 'conserva el framework');
+        assert.match(richPanel, /model\.publishable/, 'conserva el estado publicable');
+    });
+
     it('los paneles del resumen van plegados por defecto en móvil (feedback Nico)', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        for (const title of ['Últimas noticias', 'Modelo fundamental a largo plazo', 'Calidad financiera según la empresa', 'Últimos cambios', 'Por dónde seguir', 'Satélites AST']) {
+        for (const title of ['Últimas noticias', 'Calidad financiera según la empresa', 'Últimos cambios', 'Por dónde seguir', 'Satélites AST']) {
             const i = page.indexOf(`title="${title}"`);
             assert.ok(i > 0, `panel ${title} existe`);
             const openTag = page.slice(page.lastIndexOf('<Panel', i), i);

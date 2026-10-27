@@ -316,6 +316,7 @@ export const getScreenerStocksRealWithStatus = cache(
       return {
         ...row,
         price: d.price,
+        currency: d.currency,
         change: d.change,
         changePercent: d.changePercent,
         prevClose: d.previousClose,

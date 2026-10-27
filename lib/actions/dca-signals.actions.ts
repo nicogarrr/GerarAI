@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
-import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
+import { AppError, classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import type { DcaBacktest, DcaEvaluateSummary, DcaHitRates, DcaSignalsResponse } from '@/lib/dca/types';
 
 /** Señales DCA (watchlist + cartera) del backend research. `unavailable`
@@ -57,16 +57,34 @@ export async function evaluateDcaSignalsNow(): Promise<DcaMutationResult & { sum
     }
 }
 
+export type DcaHitRatesState =
+    | { status: 'ok'; data: DcaHitRates }
+    | { status: 'not_evaluated' }
+    | { status: 'unavailable' };
+
+/** Como `getDcaHitRates` pero distingue «el backend dice que no hay señal
+    evaluada» (404) de «no se pudo consultar» (error, timeout, sin sesión). */
+export async function getDcaHitRatesState(symbol: string): Promise<DcaHitRatesState> {
+    try {
+        await requireAuthenticatedUser();
+        const data = await researchRequest<DcaHitRates>(`/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/hit-rates`);
+        return data ? { status: 'ok', data } : { status: 'unavailable' };
+    } catch (error) {
+        // Solo el 404 ESPECÍFICO del backend cuenta como «sin señal evaluada»; un
+        // 404 genérico (deploy, proxy, ruta) es «no disponible».
+        if (error instanceof AppError && error.statusCode === 404 && /sin señal DCA evaluada/i.test(error.message)) {
+            return { status: 'not_evaluated' };
+        }
+        console.error('getDcaHitRates error:', error);
+        return { status: 'unavailable' };
+    }
+}
+
 /** «¿Cuántas veces estaba más arriba?» de un ticker seguido (histórico de la
     última evaluación). null = servicio caído o ticker sin señal evaluada. */
 export async function getDcaHitRates(symbol: string): Promise<DcaHitRates | null> {
-    try {
-        await requireAuthenticatedUser();
-        return await researchRequest<DcaHitRates>(`/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/hit-rates`);
-    } catch (error) {
-        console.error('getDcaHitRates error:', error);
-        return null;
-    }
+    const state = await getDcaHitRatesState(symbol);
+    return state.status === 'ok' ? state.data : null;
 }
 
 /** Backtest DCA plano vs DCA por niveles (Fórmula Nico v1) de cualquier ticker.

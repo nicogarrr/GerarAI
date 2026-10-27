@@ -11,6 +11,7 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import desc, select
@@ -69,6 +70,12 @@ class FinancialSnapshot:
     # metric -> ids of the persisted facts it was derived from (e.g. net_debt
     # = total_debt - cash_and_equivalents). Derived facts are not persisted.
     derived: dict[str, list[int]] = field(default_factory=dict)
+    # Corte point-in-time por fecha de PUBLICACION (filed). None = sin corte
+    # (valoracion actual). Con corte, solo entran hechos con filed <= corte;
+    # los excluidos se cuentan para que el trace audite la cobertura real.
+    filed_cutoff: str | None = None
+    filed_excluded_future: int = 0
+    filed_excluded_unknown: int = 0
 
     def value(self, metric: str) -> float | None:
         """Return a finite float, or ``None``.
@@ -116,8 +123,50 @@ def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[Financi
     )
 
 
+def _available_at(
+    facts: list[FinancialFact], as_of: date | None
+) -> tuple[list[FinancialFact], int, int]:
+    """Filtra hechos por disponibilidad real en el corte (eje ``filed``).
+
+    Un hecho con ``filed`` posterior al corte es informacion del futuro en un
+    replay (V1). Un hecho con ``filed`` NULL no puede demostrar cuándo fue
+    conocible (filas no-SEC, anteriores a la migracion 0082 o derivadas sin
+    entradas fechadas): con corte explicito se excluye y se cuenta, en vez de
+    adivinar disponibilidad. Sin corte (``as_of=None``) todo pasa: la
+    valoracion actual no cambia de comportamiento.
+    """
+    if as_of is None:
+        return facts, 0, 0
+    available: list[FinancialFact] = []
+    future = 0
+    unknown = 0
+    for fact in facts:
+        if fact.filed is None:
+            unknown += 1
+        elif fact.filed <= as_of:
+            available.append(fact)
+        else:
+            future += 1
+    return available, future, unknown
+
+
+def _filed_cutoff_warning(as_of: date, future: int, unknown: int) -> str:
+    parts = []
+    if future:
+        parts.append(f"{future} publicados despues del corte")
+    if unknown:
+        parts.append(f"{unknown} sin fecha de publicacion demostrable")
+    return (
+        "Corte point-in-time "
+        f"{as_of.isoformat()}: {' y '.join(parts)}; "
+        "excluidos del snapshot (no eran conocibles en la fecha)."
+    )
+
+
 def _missing_without_revenue_anchor(
-    db: Session, company_id: int
+    db: Session,
+    company_id: int,
+    facts_provider=None,
 ) -> tuple[list[str], list[str]]:
     """Entradas genuinamente ausentes cuando falta el ancla de revenue.
 
@@ -128,17 +177,20 @@ def _missing_without_revenue_anchor(
     presente no esta «ausente»: solo se reportan las que faltan de verdad
     y las presentes quedan explicadas en warnings.
     """
+    provider = facts_provider or (
+        lambda metric: _facts_for_metric(db, company_id, metric)
+    )
     missing = ["revenue"]
     warnings: list[str] = []
-    if _facts_for_metric(db, company_id, "shares_diluted"):
+    if provider("shares_diluted"):
         warnings.append(
             "Hay acciones diluidas guardadas, pero no se usan porque falta "
             "el revenue."
         )
     else:
         missing.append("shares_diluted")
-    has_fcf = bool(_facts_for_metric(db, company_id, "free_cash_flow"))
-    has_margin = bool(_facts_for_metric(db, company_id, "fcf_margin"))
+    has_fcf = bool(provider("free_cash_flow"))
+    has_margin = bool(provider("fcf_margin"))
     if has_fcf or has_margin:
         warnings.append(
             "Hay flujo de caja libre guardado, pero no se usa porque falta "
@@ -350,14 +402,38 @@ class FinancialSnapshotBuilder:
                     i for i in (revenue.id,) if i is not None
                 ]
 
-    def build(self, db: Session, company: Company) -> FinancialSnapshot:
-        revenue_candidates = _facts_for_metric(db, company.id, "revenue")
+    def build(
+        self, db: Session, company: Company, *, as_of: date | None = None
+    ) -> FinancialSnapshot:
+        excluded_future = 0
+        excluded_unknown = 0
+        cache: dict[str, list[FinancialFact]] = {}
+
+        def facts_for(metric: str) -> list[FinancialFact]:
+            nonlocal excluded_future, excluded_unknown
+            if metric not in cache:
+                available, future, unknown = _available_at(
+                    _facts_for_metric(db, company.id, metric), as_of
+                )
+                cache[metric] = available
+                excluded_future += future
+                excluded_unknown += unknown
+            return cache[metric]
+
+        revenue_candidates = facts_for("revenue")
         if not revenue_candidates:
-            missing, warnings = _missing_without_revenue_anchor(db, company.id)
+            missing, warnings = _missing_without_revenue_anchor(
+                db, company.id, facts_provider=facts_for
+            )
+            if as_of is not None and (excluded_future or excluded_unknown):
+                warnings.append(_filed_cutoff_warning(as_of, excluded_future, excluded_unknown))
             return FinancialSnapshot(
                 missing_inputs=missing,
                 coherent=False,
                 warnings=warnings,
+                filed_cutoff=as_of.isoformat() if as_of is not None else None,
+                filed_excluded_future=excluded_future,
+                filed_excluded_unknown=excluded_unknown,
             )
 
         anchor = revenue_candidates[0]
@@ -373,11 +449,11 @@ class FinancialSnapshotBuilder:
         for metric in DURATION_METRICS:
             if metric == "revenue":
                 continue
-            match = _pick_matching(_facts_for_metric(db, company.id, metric), anchor, instant=False)
+            match = _pick_matching(facts_for(metric), anchor, instant=False)
             if match:
                 snapshot.facts[metric] = match
             else:
-                latest = _facts_for_metric(db, company.id, metric)
+                latest = facts_for(metric)
                 if latest:
                     snapshot.warnings.append(
                         f"{metric} latest period {latest[0].period} does not match "
@@ -393,7 +469,7 @@ class FinancialSnapshotBuilder:
                     )
 
         for metric in INSTANT_METRICS:
-            match = _pick_matching(_facts_for_metric(db, company.id, metric), anchor, instant=True)
+            match = _pick_matching(facts_for(metric), anchor, instant=True)
             if match:
                 snapshot.facts[metric] = match
                 if metric == "net_debt":
@@ -412,7 +488,7 @@ class FinancialSnapshotBuilder:
                 if metric == "shares_diluted":
                     snapshot.shares_period = match.period
             else:
-                latest = _facts_for_metric(db, company.id, metric)
+                latest = facts_for(metric)
                 if latest:
                     snapshot.warnings.append(
                         f"{metric} latest period {latest[0].period} is incompatible "
@@ -430,8 +506,8 @@ class FinancialSnapshotBuilder:
         self._derive_net_debt(
             snapshot,
             anchor,
-            _facts_for_metric(db, company.id, "total_debt"),
-            _facts_for_metric(db, company.id, "cash_and_equivalents"),
+            facts_for("total_debt"),
+            facts_for("cash_and_equivalents"),
         )
         self._derive_free_cash_flow(snapshot)
 
@@ -498,6 +574,14 @@ class FinancialSnapshotBuilder:
                     }
                 )
 
+        if as_of is not None:
+            snapshot.filed_cutoff = as_of.isoformat()
+            snapshot.filed_excluded_future = excluded_future
+            snapshot.filed_excluded_unknown = excluded_unknown
+            if excluded_future or excluded_unknown:
+                snapshot.warnings.append(
+                    _filed_cutoff_warning(as_of, excluded_future, excluded_unknown)
+                )
         snapshot.missing_inputs = missing
         snapshot.coherent = not missing
         return snapshot
