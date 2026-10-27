@@ -150,9 +150,10 @@ describe('icono de la web oficial', () => {
 
 describe('ruta /api/logo', () => {
   const route = readFileSync('app/api/logo/[ticker]/route.ts', 'utf8');
-  it('valida el ticker, cachea en CDN y nunca toma el dominio de la petición', () => {
+  it('valida el ticker, cachea solo en el navegador (privada, exige sesión) y nunca toma el dominio de la petición', () => {
     assert.match(route, /TICKER_RE\.test\(ticker\)/);
-    assert.match(route, /s-maxage=604800/);
+    assert.match(route, /'private, max-age=86400'/);
+    assert.doesNotMatch(route, /s-maxage|'public/, 'respuesta con sesión: sin caché compartida/CDN');
     assert.match(route, /companyDomainFor\(key\) \?\? \(await finnhubDomain\(key\)\)/);
     assert.doesNotMatch(route, /searchParams/, 'ni ?url= ni ?domain=: sin proxy abierto');
     assert.match(route, /X-Content-Type-Options/);
