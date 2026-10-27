@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { addToWatchlistCanonical } from '@/lib/actions/watchlist.actions';
 import { showErrorToast } from '@/lib/toast';
+import { SYMBOL_VALIDATION } from '@/lib/constants';
 
 
 /**
@@ -31,12 +32,23 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
     const [adding, setAdding] = useState<string | null>(null);
     const [added, setAdded] = useState<Set<string>>(new Set());
     const followed = new Set([...followedSymbols.map((s) => s.toUpperCase()), ...added]);
+    // Alta por símbolo (realqa-1): si la búsqueda no encuentra la empresa
+    // (proveedor sin clave, ticker poco común, mercado no cubierto), el
+    // diálogo era un callejón sin salida. El texto escrito, si tiene forma de
+    // ticker, se puede añadir tal cual; el servidor lo canonicaliza si el
+    // master lo conoce.
+    const manualSymbol = term.trim().toUpperCase();
+    const canAddManual =
+        manualSymbol.length >= SYMBOL_VALIDATION.MIN_LENGTH &&
+        manualSymbol.length <= SYMBOL_VALIDATION.MAX_LENGTH &&
+        SYMBOL_VALIDATION.PATTERN.test(manualSymbol) &&
+        !followed.has(manualSymbol);
 
     const handleAdd = async (stock: StockWithWatchlistStatus) => {
         if (adding || followed.has(stock.symbol.toUpperCase())) return;
         setAdding(stock.symbol);
         try {
-            const res = await addToWatchlistCanonical(stock.symbol, stock.name);
+            const res = await addToWatchlistCanonical(stock.symbol, stock.name || undefined);
             if (res.success) {
                 setAdded((current) => new Set(current).add(stock.symbol.toUpperCase()));
                 toast.success(`${stock.symbol} añadido a la watchlist`);
@@ -85,6 +97,19 @@ export default function WatchlistAddButton({ followedSymbols }: { followedSymbol
                     ariaLabel="Buscar acciones para añadir a la watchlist"
                     className="w-full border-gray-700 bg-gray-950 text-gray-200"
                 />
+                {canAddManual && !adding ? (
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                        <span>¿No aparece en la lista?</span>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => void handleAdd({ symbol: manualSymbol, name: '', exchange: '', type: '', isInWatchlist: false })}
+                            className="min-h-[44px] px-2 text-teal-300 hover:bg-teal-950/40 hover:text-teal-200"
+                        >
+                            Añadir «{manualSymbol}» por su símbolo
+                        </Button>
+                    </div>
+                ) : null}
                 {adding ? <p role="status" className="text-sm text-gray-400">Añadiendo {adding}…</p> : null}
             </DialogContent>
         </Dialog>
