@@ -170,6 +170,38 @@ def cash_amount(transaction) -> Decimal:
     return Decimal(str(quantity)) if quantity is not None else Decimal("0")
 
 
+# Claves que solo escribe el importador Flex de IBKR (``dict(element.attrib)``).
+# El CSV canonico (``source: ibkr_csv``) no entra: su signo lo escribe el usuario.
+_BROKER_PAYLOAD_KEYS = ("type", "trxID", "transactionID", "accountId")
+
+
+def is_broker_signed_cash_row(transaction) -> bool:
+    """True si la fila viene de IBKR, que firma la caja desde la cuenta.
+
+    IBKR publica la retencion como importe NEGATIVO y su reversion como
+    POSITIVO; la entrada manual guarda la retencion en positivo.
+    """
+    payload = getattr(transaction, "raw_payload", None) or {}
+    if not isinstance(payload, dict):
+        return False
+    return any(key in payload for key in _BROKER_PAYLOAD_KEYS)
+
+
+def withholding_cost(transaction) -> Decimal:
+    """Retencion soportada por la fila, con signo: >0 retenido, <0 devuelto.
+
+    Filas de IBKR: coste = -importe, asi una reversion (+15) resta en vez de
+    sumar otra retencion. Resto (entrada manual, historico sin origen): el
+    valor absoluto, como hasta ahora.
+
+    Helper COMPARTIDO con ``portfolio_intelligence_service._xirr``.
+    """
+    amount = cash_amount(transaction)
+    if is_broker_signed_cash_row(transaction):
+        return -amount
+    return abs(amount)
+
+
 def cash_quantity_is_canonical(transaction) -> bool:
     """False si la fila de caja rompe la convencion (quantity fuera de {0, 1}).
 
@@ -340,7 +372,8 @@ class TaxReportService:
                 if company is None:
                     bucket["unattributed"] = True
                 if "withholding" in action or "tax" in action:
-                    withheld = abs(amount_native)
+                    withheld = withholding_cost(transaction)
+                    withheld_base = withheld * rate if rate is not None else None
                     if ambiguous_cash_row:
                         # Fila ambigua: NO entra en los agregados ni en las
                         # casillas derivadas hasta resolverla (None +
@@ -348,8 +381,8 @@ class TaxReportService:
                         bucket["ambiguous_cash"] = True
                     else:
                         bucket["withholding_native"] += withheld
-                        if amount_base is not None:
-                            bucket["withholding_base"] += abs(amount_base)
+                        if withheld_base is not None:
+                            bucket["withholding_base"] += withheld_base
                         else:
                             bucket["missing_fx"] = True
                     withholding_row = {
@@ -357,7 +390,7 @@ class TaxReportService:
                         "type": "withholding",
                         "raw_action": _raw_action_label(transaction),
                         "amount_native": _money(withheld),
-                        "amount_base": _money(abs(amount_base)) if amount_base is not None else None,
+                        "amount_base": _money(withheld_base) if withheld_base is not None else None,
                     }
                     if ambiguous_cash_row:
                         # Fila ambigua: la cifra derivada de price es un
