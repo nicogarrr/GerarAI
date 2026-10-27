@@ -103,7 +103,8 @@ const MODEL_STATUS_LABELS: Record<string, string> = {
   ok: 'completo',
   blocked: 'bloqueado',
   insufficient_data: 'datos insuficientes',
-  missing_mandatory_drivers: 'faltan drivers obligatorios',
+  // Estado de snapshots anteriores al 27/10/2026; hoy un KPI sin dato no bloquea.
+  missing_mandatory_drivers: 'con datos operativos pendientes',
   preview_only: 'solo vista previa',
 };
 function translate(map: Record<string, string>, value: string | null | undefined, fallback = 's/d'): string {

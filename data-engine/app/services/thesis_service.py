@@ -25,6 +25,7 @@ from app.models import (
 )
 from app.services.claim_scope import supersede_claims_of
 from app.services.company_resolver import resolve_company
+from app.services.framework_terms_es import framework_term_es
 from app.services.inferred_input_service import validate as validate_inferred
 from app.services.long_term_model_service import LongTermModelService
 from app.services.memo_text_es import (
@@ -331,6 +332,40 @@ _CODE_ES = {
 def _ltm_version_es(version: object) -> str:
     """Versión del motor de largo plazo para el memo: nunca el `None` de Python."""
     return f"`{version}`" if version not in (None, "") else "sin versión persistida"
+
+
+_LTM_STATUS_ES = {
+    "ok": "completo",
+    "insufficient_data": "datos insuficientes (faltan ingresos, margen de caja o acciones)",
+    "preview_only": "vista previa (falta un WACC con fuentes)",
+    # Snapshots anteriores al 27/10/2026, cuando un KPI operativo sin dato
+    # bloqueaba el modelo.
+    "missing_mandatory_drivers": "con datos operativos pendientes",
+    "blocked": "bloqueado",
+}
+
+
+def _ltm_status_es(status: object) -> str:
+    """Estado del motor de largo plazo en español, nunca el código interno."""
+    if not status:
+        return "sin estado"
+    return _LTM_STATUS_ES.get(str(status)) or _code_es(status)
+
+
+def _driver_gaps_es(long_term_model: dict) -> str:
+    """KPIs del marco sin dato como «X: sin dato (motivo)»; no bloquean."""
+    gaps = long_term_model.get("driver_gaps")
+    if gaps is None:
+        gaps = [{"key": key, "motivo": None} for key in long_term_model.get("missing_mandatory_drivers") or []]
+    if not gaps:
+        return "todos con dato"
+    parts = []
+    for gap in gaps:
+        motivo = gap.get("motivo")
+        key = str(gap.get("key"))
+        label = framework_term_es(key) or term_es(key)
+        parts.append(f"{label}: sin dato ({motivo})" if motivo else f"{label}: sin dato")
+    return "; ".join(parts) + ". No bloquean la valoración, que proyecta con el crecimiento histórico"
 
 
 def _question_sentence_es(question: str) -> str:
@@ -754,12 +789,11 @@ class ThesisService:
         )
         _phase("run_valuation")
         valuation = self.valuation_service.value_company(db, company)
+        # Los KPIs operativos del marco sin dato ya no despublican la
+        # valoracion: se declaran «sin dato (motivo)» en el memo (seccion 3)
+        # y siguen en la traza. Solo los inputs centrales del modelo
+        # (status insufficient_data del motor) bloquean.
         missing_drivers = long_term_model.get("missing_mandatory_drivers") or []
-        if missing_drivers:
-            valuation["publishable"] = False
-            valuation["missing_inputs"] = sorted(
-                set((valuation.get("missing_inputs") or []) + missing_drivers)
-            )
         valuation.setdefault("trace", {})["fundamental_model"] = {
             "model_version_id": (long_term_model.get("persistence") or {}).get(
                 "model_version_id"
@@ -2057,7 +2091,6 @@ class ThesisService:
         )
         scenario_style = (valuation.get("trace") or {}).get("scenario_style", "n/a")
         framework = long_term_model.get("framework") or {}
-        mandatory_missing = long_term_model.get("missing_mandatory_drivers") or []
         market_opportunity = long_term_model.get("market_opportunity") or {}
         evidence = evidence or {}
         sources = evidence.get("sources") or {}
@@ -2107,7 +2140,7 @@ La pregunta invertible es si la evidencia respalda los supuestos detrás del mod
 ## 3. Modelo de negocio
 Sector: {sector_es(company.sector)}. Industria: {industry_es(company.industry)}.
 Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {_question_sentence_es(primary_question_es(framework.get("primary_question")))}
-Drivers obligatorios ausentes: {", ".join(term_es(m) for m in mandatory_missing) if mandatory_missing else "ninguno"}.
+Datos operativos del marco: {_driver_gaps_es(long_term_model)}.
 
 ## 4. Últimos resultados
 {self._facts_markdown(facts)}
@@ -2142,7 +2175,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 
 ### Motor fundamental de largo plazo
 Versión del modelo fundamental usada en esta corrida: {_ltm_version_es((long_term_model.get("persistence") or {}).get("version"))} (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
-Estado del análisis del modelo fundamental (no es el estado de esta tesis): `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
+Estado del análisis del modelo fundamental (no es el estado de esta tesis): {_ltm_status_es(long_term_model.get("status"))}. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
 ## 14. DCF inverso
 {reverse_line}

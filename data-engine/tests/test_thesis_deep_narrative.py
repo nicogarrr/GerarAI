@@ -554,7 +554,8 @@ def test_no_supply_facts_when_objects_absent_and_gaps_stay_honest():
     assert not any(t.startswith("Supuestos del motor") for t in textos)
     assert not any("periodos distintos NO son comparables" in t for t in textos)
     assert not any("Driver del marco con dato" in t for t in textos)
-    assert any("Drivers obligatorios del marco sin dato: daily_active_people" in t for t in textos)
+    gap = next(t for t in textos if "Datos operativos del marco sin dato" in t)
+    assert "personas activas al día" in gap and "daily_active_people" not in gap
 
 
 def test_visible_fuente_label_avoids_false_verification_claim():
