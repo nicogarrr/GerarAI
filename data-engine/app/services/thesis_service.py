@@ -250,6 +250,8 @@ _METRIC_LABELS_ES = {
     "capital_expenditure": "gasto de capital (CapEx)",
     "cash_and_equivalents": "efectivo y equivalentes",
     "total_debt": "deuda total",
+    "minority_interest": "intereses minoritarios",
+    "preferred_stock": "acciones preferentes",
 }
 
 
