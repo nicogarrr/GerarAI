@@ -12,7 +12,7 @@ from sqlalchemy import create_engine, inspect
 
 DATA_ENGINE_DIR = Path(__file__).resolve().parents[1]
 REVISION = "0085_thesis_invalidation_rules"
-DOWN_REVISION = "0082_financial_facts_filed"
+DOWN_REVISION = "0084_knowledge_document_ticker"
 
 
 def _alembic(database_url: str, *args: str) -> None:

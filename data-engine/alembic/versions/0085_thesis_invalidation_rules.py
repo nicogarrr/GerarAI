@@ -16,7 +16,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0085_thesis_invalidation_rules"
-down_revision = "0082_financial_facts_filed"
+down_revision = "0084_knowledge_document_ticker"
 branch_labels = None
 depends_on = None
 
