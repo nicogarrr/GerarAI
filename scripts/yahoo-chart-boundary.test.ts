@@ -13,6 +13,7 @@ test('REAL Yahoo adapter to REAL chart normalization preserves close-only absten
     const python = spawnSync('python3', ['scripts/fixtures/yahoo-close-only-adapter.py'], { input: JSON.stringify(payload), encoding: 'utf8' });
     assert.equal(python.status, 0, python.stderr);
     const adapted = JSON.parse(python.stdout);
+    assert.ok(adapted && adapted.s === 'ok', 'real adapter must return candles for the local fixture');
     assert.deepEqual(adapted.o, t.map(() => null));
     assert.deepEqual(adapted.h, t.map(() => null));
     assert.deepEqual(adapted.l, t.map(() => null));

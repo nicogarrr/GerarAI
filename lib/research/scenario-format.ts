@@ -29,5 +29,8 @@ export function formatScenarioMoney(
     currency: currency.code,
     notation: 'compact',
     maximumFractionDigits: digits,
+    // Compact notation suppresses trailing zeroes by default even for plain
+    // currency values. Keep the requested precision below the compact range.
+    ...(Math.abs(value) < 1000 ? { minimumFractionDigits: digits } : {}),
   }).format(value);
 }
