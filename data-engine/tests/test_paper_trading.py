@@ -306,3 +306,52 @@ def test_scoreboard_endpoint_exposes_calibration_block_nd_when_empty(db):
     cal = data["calibracion"]
     assert cal["brier"] is None and cal["muestra_insuficiente"] is True
     assert cal["etiqueta"] == "INFERIDO"
+
+
+@pytest.mark.parametrize("currency", [None, "USD"])
+def test_identical_proposal_retry_after_fill_uses_immutable_requested_currency(db, currency):
+    proposal = PaperProposal(**body(currency=currency))
+    row = create_proposal(db, proposal)
+    assert row.proposal_currency_known is True
+    assert row.proposal_currency == currency
+    row.created_at = NOW - timedelta(seconds=1)
+    assert apply_quote(row, quote(98), NOW)
+    db.commit()
+    assert row.currency == "USD"
+    assert create_proposal(db, proposal).id == row.id
+    assert row.proposal_currency == currency
+    # Omitting a requested currency, or adding one to an unrestricted proposal,
+    # changes its original terms even if the observed mark is USD in both cases.
+    with pytest.raises(ValueError):
+        create_proposal(db, PaperProposal(**body(currency="USD" if currency is None else None)))
+
+
+def test_historical_proposal_unknown_requested_currency_is_not_inferred_from_mark(db):
+    row = trade()
+    row.currency = "USD"
+    db.add(row)
+    db.commit()
+    assert row.proposal_currency_known is False
+    for currency in (None, "USD"):
+        with pytest.raises(ValueError, match="histórica"):
+            create_proposal(db, PaperProposal(**body(currency=currency)))
+    db.refresh(row)
+    assert row.currency == "USD"
+    assert row.proposal_currency is None
+    assert row.proposal_currency_known is False
+
+
+def test_historical_unknown_retry_route_is_explicit_409(db):
+    from fastapi import HTTPException
+
+    from app.api.routes.paper_trading import propose
+
+    row = trade()
+    row.currency = "USD"
+    db.add(row)
+    db.commit()
+    with pytest.raises(HTTPException) as caught:
+        propose(PaperProposal(**body()), db)
+    assert caught.value.status_code == 409
+    assert "histórica" in caught.value.detail
+    assert row.proposal_currency_known is False
