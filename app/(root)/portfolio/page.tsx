@@ -38,7 +38,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     Awaited<ReturnType<typeof getPortfolioTearsheet>>,
     Awaited<ReturnType<typeof getPortfolioForecast>> | null,
     Awaited<ReturnType<typeof getPortfolioDividendProjection>> | null,
-  ];
+  ] | null = null;
   let partialMessage: string | null = null;
   try {
     // Cada lectura va con su propio catch para que un módulo lento no
@@ -66,17 +66,20 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       // aviso con Reintentar.
       if (isAuthError(summaryResult.cause)) return redirectToSignIn();
       console.error('[portfolio] summary failed, rendering retry notice', summaryResult.cause);
-      return <BackendOffline feature="Tu cartera" retryHref="/portfolio" />;
+    } else {
+      result = [summaryResult.value, transactionsResult.value, scoresResult.value, tearsheetResult.value, forecastResult.value, dividendsResult.value];
+      const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
+        .filter((error): error is string => Boolean(error));
+      partialMessage = secondaryErrors.length ? `Algunas secciones no respondieron: ${[...new Set(secondaryErrors.map((error) => sectionError(new Error(error))))].join(' · ')}` : null;
     }
-    result = [summaryResult.value, transactionsResult.value, scoresResult.value, tearsheetResult.value, forecastResult.value, dividendsResult.value];
-    const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
-      .filter((error): error is string => Boolean(error));
-    partialMessage = secondaryErrors.length ? `Algunas secciones no respondieron: ${[...new Set(secondaryErrors.map((error) => sectionError(new Error(error))))].join(' · ')}` : null;
   } catch (error) {
-    if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature="Tu cartera" retryHref="/portfolio" />;
-    }
-    throw error;
+    if (!isBackendUnavailableError(error)) throw error;
+  }
+  // El JSX se construye FUERA del try/catch (react-hooks/error-boundaries):
+  // sin resumen —backend caído o lectura esencial fallida— se pinta el aviso
+  // con Reintentar.
+  if (!result) {
+    return <BackendOffline feature="Tu cartera" retryHref="/portfolio" />;
   }
   const [summary, transactions, scores, tearsheet, forecast, dividends] = result;
 

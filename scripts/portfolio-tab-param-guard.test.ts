@@ -39,6 +39,8 @@ describe('portfolio tab param guard (F137)', () => {
   });
 
   it('atrás/adelante sigue sincronizando el estado desde la URL', () => {
-    assert.match(source, /useEffect\(\(\) => \{[\s\S]*?\}, \[tabParam\]\)/, 'el efecto de sincronización depende de tabParam');
+    // Ajuste durante el render al cambiar tabParam (sin setState síncrono
+    // dentro de un efecto: react-hooks/set-state-in-effect).
+    assert.match(source, /if \(tabParam !== syncedTabParam\) \{\s*setSyncedTabParam\(tabParam\);\s*setActiveTab\(normalizeTab\(tabParam\)\);\s*\}/, 'la sincronización depende de tabParam');
   });
 });

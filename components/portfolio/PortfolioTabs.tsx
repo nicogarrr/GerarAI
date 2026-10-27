@@ -1,7 +1,7 @@
 'use client';
 
 import { formatDate, formatMoney, formatPercent } from '@/lib/format';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useActiveTabVisible } from './use-active-tab-visible';
@@ -76,11 +76,14 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
     const tabViewportRef = useActiveTabVisible(activeTab);
 
     // Navegación cliente posterior a la hidratación (atrás/adelante,
-    // enlaces con ?tab=): sincroniza el estado con la URL.
-    useEffect(() => {
-        const next = normalizeTab(tabParam);
-        setActiveTab((current) => (current === next ? current : next));
-    }, [tabParam]);
+    // enlaces con ?tab=): sincroniza el estado con la URL. Se ajusta durante
+    // el render al cambiar el parámetro (patrón de React para estado derivado
+    // de props) en vez de con un efecto que pinta primero la pestaña vieja.
+    const [syncedTabParam, setSyncedTabParam] = useState(tabParam);
+    if (tabParam !== syncedTabParam) {
+        setSyncedTabParam(tabParam);
+        setActiveTab(normalizeTab(tabParam));
+    }
 
     const handleTabChange = (value: string) => {
         const next = normalizeTab(value);
