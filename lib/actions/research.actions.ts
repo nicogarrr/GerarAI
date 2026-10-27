@@ -212,6 +212,9 @@ export type ResearchThesis = {
   hypothesis?: string | null;
   catalysts?: ResearchThesisCatalyst[] | null;
   invalidation_criteria?: string[] | null;
+  /** Criterios MEDIBLES (métrica, operador, umbral) que vigila el evaluador de
+   *  alertas; null = sin criterios medibles. */
+  invalidation_rules?: Array<{ metric: string; operator: string; threshold: number; description?: string | null }> | null;
   scenario_probabilities?: Record<string, number> | null;
   /** Human-in-the-loop: inputs que faltan para completar la tesis (nunca se
    *  inventan; la app los pide). null = sin informacion. */
@@ -1002,6 +1005,30 @@ export async function refreshCompanyResearchModel(ticker: string) {
   );
   revalidatePath(`/research/${normalizedTicker}`);
 }
+/** Resultado como valor: un Server Action en producción oculta el mensaje de
+ *  las excepciones, y el 422 del backend explica qué criterio no es válido. */
+export type SaveInvalidationRulesResult = { ok: true; count: number } | { ok: false; error: string };
+
+/** PUT /api/thesis/{ticker}/invalidation-rules: guarda los criterios medibles
+ *  en la última versión de la tesis; el evaluador de alertas los vigila. */
+export async function saveThesisInvalidationRules(
+  ticker: string,
+  rules: Array<{ metric: string; operator: string; threshold: number; description?: string | null }>,
+): Promise<SaveInvalidationRulesResult> {
+  await requireAuthenticatedUser();
+  const normalizedTicker = ticker.toUpperCase();
+  try {
+    const result = await researchRequest<{ invalidation_rules: unknown[] }>(
+      `/api/thesis/${encodeURIComponent(normalizedTicker)}/invalidation-rules`,
+      { method: 'PUT', body: JSON.stringify({ rules }) },
+    );
+    revalidatePath(`/research/${normalizedTicker}`);
+    return { ok: true, count: Array.isArray(result?.invalidation_rules) ? result.invalidation_rules.length : 0 };
+  } catch (error) {
+    return { ok: false, error: getSafeErrorMessage(error) || 'No se pudieron guardar los criterios.' };
+  }
+}
+
 export async function createResearchClaim(ticker: string, formData: FormData) {
   const normalizedTicker = ticker.toUpperCase();
   const statement = String(formData.get('statement') ?? '').trim();
