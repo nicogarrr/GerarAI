@@ -19,10 +19,10 @@ describe('cabecera de precio con fallback al cierre del gráfico', () => {
         assert.match(header, /Cotización en vivo no disponible ahora/);
         assert.match(header, /last\?\.open \?\? null/);
     });
-    it('no pinta fallback en subunidades (GBX) y rotula la vela parcial', () => {
-        assert.match(header, /subunitListing/);
+    it('subunidades (GBX): fallback solo con la divisa del listado ya en subunidad, y rotula la vela parcial', () => {
+        assert.match(header, /chartFallbackCurrency\(/);
         assert.match(header, /GBX/);
-        assert.match(header, /!subunitListing/);
+        assert.match(header, /isValidCurrencyCode\(fallbackCurrency\)/);
         assert.match(header, /Última vela del gráfico \(puede ser parcial\)/);
         assert.match(header, /lastIsClose/);
     });

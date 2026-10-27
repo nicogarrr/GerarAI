@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState } from 'react';
 import { NA, formatMarketDate, formatMoney, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
 import { extendedQuoteLabel, quoteDate, quoteTime, quoteSessionDate, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
+import { chartFallbackCurrency } from '@/lib/market/chart-fallback-currency';
 import { CompanyTechnicalWorkspace } from './CompanyTechnicalWorkspace';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 
@@ -121,13 +122,12 @@ export function CompanyHeaderQuote({
     const last = snapshot.history.at(-1) ?? null;
     const prev = snapshot.history.at(-2) ?? null;
     const fallbackPrice = last?.close ?? null;
-    const fallbackCurrency = snapshot.currency;
     // Listados en subunidad (LSE en peniques GBX, .JO, .TA): las velas no traen
-    // divisa propia y snapshot.currency sería la unidad grande (x100): sin fallback.
-    const subunitListing = /\.(L|JO|TA)$/i.test(symbol ?? snapshot.ticker)
-        || /LONDON|^LSE$|JOHANNESBURG|TEL AVIV/i.test(snapshot.exchange ?? '')
-        || ['GBX', 'GBp', 'ZAc', 'ILA'].includes(snapshot.currency ?? '');
-    const useFallback = !showPrice && (slow || settled) && !subunitListing && fallbackPrice != null && isValidCurrencyCode(fallbackCurrency);
+    // divisa propia; solo hay fallback si el maestro ya declara la subunidad
+    // (la misma divisa que rotula el gráfico). Con la unidad grande (GBP en un
+    // .L) la escala sería ambigua (x100): sin fallback.
+    const fallbackCurrency = chartFallbackCurrency({ ticker: snapshot.ticker, symbol, exchange: snapshot.exchange, currency: snapshot.currency });
+    const useFallback = !showPrice && (slow || settled) && fallbackPrice != null && isValidCurrencyCode(fallbackCurrency);
     // La vela de hoy puede ser parcial (sesión abierta): solo es «cierre» si es
     // anterior a la fecha actual en Nueva York; si no, se rotula «Última vela».
     const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
