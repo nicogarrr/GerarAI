@@ -469,12 +469,12 @@ export async function calculateAdvancedStockScore(
         momentum: sectorAverages.momentum === null ? null : categoryScores.momentum - sectorAverages.momentum,
         debtLiquidity: sectorAverages.debtLiquidity === null ? null : categoryScores.debtLiquidity - sectorAverages.debtLiquidity,
     } : {
-        value: 0, // Sin comparación disponible
-        growth: 0,
-        profitability: 0,
-        cashFlow: 0,
-        momentum: 0,
-        debtLiquidity: 0,
+        value: null, // Sin comparación disponible
+        growth: null,
+        profitability: null,
+        cashFlow: null,
+        momentum: null,
+        debtLiquidity: null,
     };
 
     // Calcular nota

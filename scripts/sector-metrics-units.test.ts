@@ -61,3 +61,12 @@ it('contrato de salida: nueve medias no sustituyen missing por 0 ni scores por d
   assert.match(scoring, /sectorMargin !== null && margin/);
   assert.doesNotMatch(scoring, /avg(?:RevenueGrowth|NetMargin)\s*(?:\?\?|\|\|)\s*0\.15/);
 });
+
+it('sin sectorData: los deltas ausentes son null, nunca cero/empate', () => {
+  const scoring = readFileSync('lib/utils/advancedStockScoring.ts', 'utf8');
+  const absent = scoring.slice(scoring.indexOf('} : {\n        value: null, // Sin comparación disponible'));
+  assert.ok(absent.length > 0);
+  for (const field of ['value', 'growth', 'profitability', 'cashFlow', 'momentum', 'debtLiquidity']) {
+    assert.match(absent.slice(0, absent.indexOf('};')), new RegExp(`${field}: null`));
+  }
+});
