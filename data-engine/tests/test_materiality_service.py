@@ -166,3 +166,37 @@ def test_event_type_catalog_is_exactly_the_known_six():
         assert f"{event_type}:" in labels_ts, (
             f"etiquetaTipoEvento no traduce '{event_type}' y se pintaría crudo"
         )
+
+
+def test_portfolio_weight_convierte_a_divisa_base_con_divisas_mezcladas():
+    """Peso de una acción japonesa: 2.000.000 JPY (12.000 € en base) frente a
+    100.000 € de otra posición. A mano: 12.000 / 112.000 = 10,71 %
+    (ajuste de materialidad +1). Antes se sumaban JPY y EUR como la misma
+    unidad: 2.000.000 / 2.100.000 = 95,2 % (ajuste +2)."""
+    from app.services.materiality_service import MaterialityService
+
+    cleanup_materiality_artifacts()
+    db = SessionLocal()
+    try:
+        target = create_company(db, TARGET_TICKER, "Materiality Target")
+        other = create_company(db, OTHER_TICKER, "Materiality Other")
+        db.add(Position(
+            company_id=target.id, quantity=Decimal("100"), average_cost=Decimal("20000"),
+            market_price=Decimal("20000"), market_value=Decimal("2000000"),
+            unrealized_pnl=Decimal("0"), currency="JPY", base_currency="EUR",
+            market_value_base=Decimal("12000"), source="test_materiality",
+        ))
+        db.add(Position(
+            company_id=other.id, quantity=Decimal("1000"), average_cost=Decimal("100"),
+            market_price=Decimal("100"), market_value=Decimal("100000"),
+            unrealized_pnl=Decimal("0"), currency="EUR", base_currency="EUR",
+            source="test_materiality",
+        ))
+        db.commit()
+        service = MaterialityService()
+        weight = service.portfolio_weight(db, target)
+        assert abs(weight - 12000 / 112000) < 1e-9
+        assert service._portfolio_adjustment(weight) == 1
+    finally:
+        db.close()
+        cleanup_materiality_artifacts()

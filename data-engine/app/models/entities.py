@@ -1207,6 +1207,11 @@ class ThesisVersion(TenantOwnedMixin, Base, TimestampMixin):
     hypothesis: Mapped[str | None] = mapped_column(Text, nullable=True)
     catalysts: Mapped[list | None] = mapped_column(JSON, nullable=True)
     invalidation_criteria: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Criterios de invalidacion ESTRUCTURADOS y opcionales: lista de
+    # {metric, operator, threshold, description}. A diferencia del texto libre
+    # de arriba, se evaluan: el evaluador de alertas los comprueba en cada
+    # pasada (app/services/thesis_invalidation_rules.py). None = sin criterios.
+    invalidation_rules: Mapped[list | None] = mapped_column(JSON, nullable=True)
     scenario_probabilities: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Analisis narrativo (capa LLM opcional): secciones compuestas por
     # seleccion de plantillas con slots deterministicos. Null en versiones

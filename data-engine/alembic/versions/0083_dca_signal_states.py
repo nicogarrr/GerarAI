@@ -20,7 +20,7 @@ import sqlalchemy.engine.mock
 from alembic import op
 
 revision = "0083_dca_signal_states"
-down_revision = "0084_knowledge_document_ticker"
+down_revision = "0085_thesis_invalidation_rules"
 branch_labels = None
 depends_on = None
 

@@ -11,7 +11,7 @@ from app.models.entities import DcaAlertOverride, DcaSignalState
 
 DATA_ENGINE_DIR = Path(__file__).resolve().parents[1]
 REVISION = "0083_dca_signal_states"
-DOWN_REVISION = "0084_knowledge_document_ticker"
+DOWN_REVISION = "0085_thesis_invalidation_rules"
 
 
 def _alembic(database_url: str, *args: str) -> subprocess.CompletedProcess:

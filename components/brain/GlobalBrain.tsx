@@ -16,7 +16,15 @@ import type { AssistantResponse } from '@/lib/research/assistant-contract';
 import { OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail } from '@/lib/brain/open-brain';
 import { brainPageContext } from '@/lib/brain/page-context';
 import { BrainGuideAnswer } from './BrainGuideAnswer';
-import ReactMarkdown from 'react-markdown';
+import dynamic from 'next/dynamic';
+
+// react-markdown (con micromark/mdast, ~110 kB sin comprimir) solo hace falta
+// cuando el Cerebro pinta una respuesta. Importado estático viajaba en el
+// layout autenticado, es decir, en la carga inicial de TODAS las páginas,
+// aunque el panel esté cerrado. Se carga al abrir el panel (ver efecto abajo).
+const ReactMarkdown = dynamic(() => import('react-markdown'), {
+    loading: () => <span className="block h-4 w-2/3 animate-pulse rounded bg-slate-700/60" aria-hidden="true" />,
+});
 import type { PortfolioChatCitation } from '@/lib/chat/citations';
 import { BrainSources } from './BrainSources';
 
@@ -49,6 +57,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const pathname = usePathname();
     const page = brainPageContext(pathname);
     const [isOpen, setIsOpen] = useState(false);
+    // Precarga el renderizador de markdown en cuanto se abre el panel, antes de
+    // que llegue la primera respuesta: así no se nota la carga diferida.
+    useEffect(() => {
+        if (isOpen) void import('react-markdown');
+    }, [isOpen]);
     // Pista de apertura: la etiqueta "Pregunta al Cerebro" se ve unos
     // segundos al cargar y se pliega sola (vuelve con hover/foco). Sin ella
     // el botón flotante era un cerebro suelto que nadie tocaba (Tester Nico).

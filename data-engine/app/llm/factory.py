@@ -123,13 +123,28 @@ def _tenant_provider(
         return DisabledProvider("tenant_llm_key_missing")
     overrides = _pin_to_model(config.model)
     effort = config.reasoning_effort if reasoning_effort is None else reasoning_effort
+    headers = {"User-Agent": "gerarai/1.0"}
+    is_opencode_go = config.provider == "opencode-go"
+    if is_opencode_go:
+        # OpenCode Go rechaza con HTTP 400 MissingSessionID cualquier peticion
+        # sin `x-opencode-session` (verificado en vivo el 2026-10-27 con la
+        # clave del dueno). Sin esta cabecera, configurar OpenCode Go en
+        # Ajustes dejaba el Cerebro y las tesis sin LLM.
+        headers["x-opencode-session"] = settings.opencode_go_session
+        if effort is None:
+            # "Sin especificar" en Ajustes = el nivel por defecto del despliegue
+            # (OPENCODE_GO_REASONING_EFFORT, `high`), igual que la ruta global.
+            effort = settings.opencode_go_reasoning_effort
     try:
         provider = OpenAICompatibleProvider(
             api_key=str(config.api_key or ""),
             base_url=config.base_url,
             default_model=config.model,
             provider_name=config.provider,
-            extra_headers={"User-Agent": "gerarai/1.0"},
+            extra_headers=headers,
+            # El endpoint Go rechaza `response_format` (json_schema) con 400;
+            # mismo tratamiento que la ruta global (_opencode_go).
+            strip_response_format=is_opencode_go,
             model_overrides=overrides,
             fallback_model=config.fallback_model or None,
             reasoning_effort=effort,

@@ -1485,6 +1485,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/ttm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Ttm
+         * @description Fundamentales actuales en TTM (últimos 4 trimestres), con respaldo FY.
+         *
+         *     Flujos = suma de los 4 últimos trimestres consecutivos (Q4 = FY − 9M si no
+         *     hay 10-Q del cuarto); balance = último trimestre. Cada métrica dice su base
+         *     (TTM / FY / Q / SIN_DATOS) y su procedencia (OFICIAL / INFERIDO).
+         */
+        get: operations["company_ttm_api_companies__ticker__ttm_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/corporate-actions": {
         parameters: {
             query?: never;
@@ -1763,6 +1787,29 @@ export interface paths {
          * @description Operaciones P/S agregadas por empresa de cartera + watchlist (persistidas).
          */
         get: operations["insider_operations_route_api_insider_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insider/ownership-signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insider Ownership Signals
+         * @description Resumen para la tesis y la ficha: insiders (Form 4, 180 dias) + fondos 13F.
+         *
+         *     Solo lee lo persistido (sin red). Nunca 500: un bloque que falla queda en
+         *     ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo.
+         */
+        get: operations["insider_ownership_signals_api_insider_ownership_signals_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3118,6 +3165,26 @@ export interface paths {
         get: operations["get_plan_api_plan_get"];
         /** Upsert Plan */
         put: operations["upsert_plan_api_plan_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plan/contribution-split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Contribution Split
+         * @description Reparto de la aportacion de este mes ponderado por nivel DCA.
+         */
+        get: operations["contribution_split_api_plan_contribution_split_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4807,6 +4874,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis/{ticker}/invalidation-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Invalidation Rules
+         * @description Guarda los criterios MEDIBLES de invalidacion en la ultima tesis.
+         *
+         *     Cada criterio (metrica, operador, umbral) queda vigilado por el evaluador
+         *     de alertas: cuando se cumple, llega un aviso. Lista vacia = sin criterios
+         *     (las reglas de aviso derivadas se desactivan). Los criterios se conservan
+         *     al regenerar la tesis.
+         */
+        put: operations["set_invalidation_rules_api_thesis__ticker__invalidation_rules_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/{ticker}/latest": {
         parameters: {
             query?: never;
@@ -6031,6 +6123,17 @@ export interface components {
                 [key: string]: components["schemas"]["CompanySnapshotOut"];
             };
         };
+        /** CompanyTtmOut */
+        CompanyTtmOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Formula */
+            formula: string;
+            /** Metrics */
+            metrics: components["schemas"]["TtmMetricOut"][];
+            /** Ticker */
+            ticker: string;
+        };
         /** ContextNews */
         ContextNews: {
             /**
@@ -7058,6 +7161,25 @@ export interface components {
              * @enum {string}
              */
             input_key: "fcf_margin" | "wacc" | "terminal_growth";
+        };
+        /** InvalidationRuleIn */
+        InvalidationRuleIn: {
+            /** Description */
+            description?: string | null;
+            /** Metric */
+            metric: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | "<" | ">=" | "<=" | "==" | "!=";
+            /** Threshold */
+            threshold: number | string;
+        };
+        /** InvalidationRulesRequest */
+        InvalidationRulesRequest: {
+            /** Rules */
+            rules?: components["schemas"]["InvalidationRuleIn"][];
         };
         /** KPIExtractionAction */
         KPIExtractionAction: {
@@ -8230,6 +8352,8 @@ export interface components {
             id: number;
             /** Invalidation Criteria */
             invalidation_criteria?: unknown[] | null;
+            /** Invalidation Rules */
+            invalidation_rules?: unknown[] | null;
             /** Margin Of Safety */
             margin_of_safety: string | null;
             /** Rating */
@@ -8554,6 +8678,8 @@ export interface components {
             }[] | null;
             /** Invalidation Criteria */
             invalidation_criteria?: unknown[] | null;
+            /** Invalidation Rules */
+            invalidation_rules?: unknown[] | null;
             /** Latest Data At */
             latest_data_at?: string | null;
             /** Margin Of Safety */
@@ -8661,6 +8787,49 @@ export interface components {
         ThesisTickersOut: {
             /** Tickers */
             tickers: string[];
+        };
+        /** TtmMetricOut */
+        TtmMetricOut: {
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "TTM" | "FY" | "Q" | "SIN_DATOS";
+            /** Fact Ids */
+            fact_ids?: number[];
+            /** Label */
+            label: string;
+            /** Metric */
+            metric: string;
+            /** Note */
+            note?: string | null;
+            /** Period End */
+            period_end: string | null;
+            /**
+             * Provenance
+             * @enum {string}
+             */
+            provenance: "OFICIAL" | "INFERIDO" | "SIN_DATOS";
+            /** Quarters */
+            quarters?: components["schemas"]["TtmQuarterOut"][];
+            /** Unit */
+            unit: string | null;
+            /** Value */
+            value: string | null;
+        };
+        /** TtmQuarterOut */
+        TtmQuarterOut: {
+            /** Origin */
+            origin: string;
+            /**
+             * Period End
+             * Format: date
+             */
+            period_end: string;
+            /** Reported */
+            reported: boolean;
+            /** Value */
+            value: string;
         };
         /** UniversalSearchRequest */
         UniversalSearchRequest: {
@@ -12394,6 +12563,46 @@ export interface operations {
             };
         };
     };
+    company_ttm_api_companies__ticker__ttm_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyTtmOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_actions_api_corporate_actions_get: {
         parameters: {
             query?: {
@@ -13007,6 +13216,48 @@ export interface operations {
         parameters: {
             query?: {
                 days?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insider_ownership_signals_api_insider_ownership_signals_get: {
+        parameters: {
+            query: {
+                ticker: string;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -16470,6 +16721,46 @@ export interface operations {
                 "application/json": components["schemas"]["PlanUpsertInput"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    contribution_split_api_plan_contribution_split_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -20696,6 +20987,52 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_invalidation_rules_api_thesis__ticker__invalidation_rules_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvalidationRulesRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

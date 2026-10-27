@@ -49,7 +49,7 @@ def test_collect_stored_reads_news_without_network(db, monkeypatch):
     news = out["sources"]["news"]
     assert news["status"] == "ok"
     assert [i["title"] for i in news["items"]] == ["Hycroft anuncia financiación"]
-    assert set(out["sources"]) == {"news", "transcript", "external_theses"}
+    assert set(out["sources"]) == {"news", "transcript", "external_theses", "insider", "holders"}
 
 
 def test_collect_stored_without_news_is_pending_not_error(db, monkeypatch):

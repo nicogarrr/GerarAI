@@ -19,9 +19,9 @@ export function percentToRatio(value: number): number {
     return value / 100;
 }
 
-export function netMarginPoints(rawMarginPct: number, sectorMargin: number): number {
+export function netMarginPoints(rawMarginPct: number, sectorMargin: number | null): number {
     const margin = percentToRatio(rawMarginPct);
-    return margin > sectorMargin * 1.3 ? 35 : margin > sectorMargin ? 30 : margin > 0.1 ? 25 : margin > 0 ? 15 : 0;
+    return sectorMargin !== null && margin > sectorMargin * 1.3 ? 35 : sectorMargin !== null && margin > sectorMargin ? 30 : margin > 0.1 ? 25 : margin > 0 ? 15 : 0;
 }
 
 export function roePoints(rawRoePct: number): number {
@@ -35,9 +35,9 @@ export function roaPoints(rawRoaPct: number): number {
 }
 
 /** Crecimiento de ventas (en %) frente al del sector (en fracción). */
-export function revenueGrowthPoints(rawGrowthPct: number, sectorGrowth: number): number {
+export function revenueGrowthPoints(rawGrowthPct: number, sectorGrowth: number | null): number {
     const growth = percentToRatio(rawGrowthPct);
-    return growth > sectorGrowth * 1.5 ? 40 : growth > sectorGrowth ? 35 : growth > 0 ? 25 : 10;
+    return sectorGrowth !== null && growth > sectorGrowth * 1.5 ? 40 : sectorGrowth !== null && growth > sectorGrowth ? 35 : growth > 0 ? 25 : 10;
 }
 
 export function epsGrowthPoints(rawGrowthPct: number): number {

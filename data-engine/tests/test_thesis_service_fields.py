@@ -177,8 +177,12 @@ def test_rating_matrix():
     assert service._rating(0.5, True, "insufficient_data") == "insufficient_data"
     assert service._rating(0.5, False, "ok") == "blocked"
     assert service._rating(None, True, "ok") == "incomplete_price"
-    assert service._rating(0.31, True, "ok") == "attractive"
-    assert service._rating(-0.21, True, "ok") == "expensive"
+    # Margen estándar (V - P)/V. Umbrales equivalentes a +30 % / -20 % de
+    # potencial V/P - 1: 1 - 1/1,3 = 0,2308 y 1 - 1/0,8 = -0,25.
+    assert service._rating(0.24, True, "ok") == "attractive"
+    assert service._rating(0.23, True, "ok") == "watch"
+    assert service._rating(-0.24, True, "ok") == "watch"
+    assert service._rating(-0.26, True, "ok") == "expensive"
     assert service._rating(0.0, True, "ok") == "watch"
 
 

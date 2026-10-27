@@ -26,6 +26,7 @@ const REASONING_OPTIONS = [
     { value: 'low', label: 'Bajo' },
     { value: 'medium', label: 'Medio' },
     { value: 'high', label: 'Alto' },
+    { value: 'max', label: 'Máximo' },
 ] as const;
 
 function statusLabel(settings: LlmSettings): string {

@@ -36,6 +36,11 @@ from app.services.driver_operating_model import DriverOperatingModel
 from app.services.fundamental_model_repository import FundamentalModelRepository
 from app.services.inferred_input_service import MIN_WACC_TERMINAL_SPREAD, InferredInputService
 from app.services.market_opportunity_service import MarketOpportunityEngine
+from app.services.owner_earnings import (
+    OWNER_EARNINGS_FORMULA,
+    WORKING_CAPITAL_SIGN_CONVENTION,
+    owner_earnings,
+)
 from app.valuation.engines.base import default_terminal_growth, default_wacc
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 
@@ -361,7 +366,6 @@ class LongTermModelService:
                 "depreciation_and_amortization",
                 "maintenance_capex",
                 "change_in_working_capital",
-                "normalized_change_in_working_capital",
                 "common_stock_repurchased",
                 "dividends_paid",
                 "total_debt",
@@ -1942,6 +1946,14 @@ class LongTermModelService:
         }
 
     def _owner_earnings(self, fact_cache: dict[str, list[FinancialFact]], year: int | None) -> dict[str, Any]:
+        """Beneficio del propietario de Buffett (carta de Berkshire de 1986).
+
+        OE = beneficio neto + D&A + ΔCC (signo de flujo de caja) − |capex de
+        mantenimiento|. Fórmula, signos y regla de estimación del
+        mantenimiento en app/services/owner_earnings.py (la misma que usan
+        las métricas calculadas). Sin ΔCC no hay número: tomarlo como 0
+        afirmaría que el circulante no se movió.
+        """
         net_income = self._fact_for_year(fact_cache["net_income"], year)
         # Ingestion writes the canonical key depreciation_amortization; the legacy
         # depreciation_and_amortization key is only a fallback (F410).
@@ -1949,12 +1961,50 @@ class LongTermModelService:
             fact_cache["depreciation_and_amortization"], year
         )
         maintenance = self._fact_for_year(fact_cache["maintenance_capex"], year)
-        wc = self._fact_for_year(fact_cache["normalized_change_in_working_capital"], year) or self._fact_for_year(fact_cache["change_in_working_capital"], year)
-        missing = [label for label, fact in (("net_income", net_income), ("depreciation_and_amortization", dna), ("maintenance_capex", maintenance), ("normalized_working_capital", wc)) if fact is None]
+        capex = self._fact_for_year(fact_cache["capital_expenditure"], year)
+        wc = self._fact_for_year(fact_cache["change_in_working_capital"], year)
+        missing = [
+            label
+            for label, present in (
+                ("net_income", net_income is not None),
+                ("depreciation_and_amortization", dna is not None),
+                ("maintenance_capex_or_capital_expenditure", maintenance is not None or capex is not None),
+                ("change_in_working_capital", wc is not None),
+            )
+            if not present
+        ]
+        base = {
+            "formula": OWNER_EARNINGS_FORMULA,
+            "working_capital_sign": WORKING_CAPITAL_SIGN_CONVENTION,
+            "source": "Buffett, Berkshire Hathaway shareholder letter 1986",
+        }
         if missing:
-            return {"status": "insufficient_data", "value": None, "formula": "net income + D&A - maintenance capex - normalized change in working capital", "missing_inputs": missing, "source_fact_ids": _unique_ids(net_income)}
-        values = [_float(item.value) or 0 for item in (net_income, dna, maintenance, wc)]
-        return {"status": "ok", "value": values[0] + values[1] - abs(values[2]) - values[3], "formula": "net income + D&A - maintenance capex - normalized change in working capital", "source_fact_ids": _unique_ids(net_income, dna, maintenance, wc), "period": net_income.period}
+            return {**base, "status": "insufficient_data", "value": None, "missing_inputs": missing, "source_fact_ids": _unique_ids(net_income)}
+        assert net_income is not None and dna is not None and wc is not None
+
+        def _dec(fact: FinancialFact | None) -> Decimal | None:
+            return Decimal(str(fact.value)) if fact is not None and fact.value is not None else None
+
+        result = owner_earnings(
+            net_income=_dec(net_income) or Decimal("0"),
+            depreciation_amortization=_dec(dna) or Decimal("0"),
+            change_in_working_capital=_dec(wc) or Decimal("0"),
+            capital_expenditure=_dec(capex),
+            maintenance_capex=_dec(maintenance),
+        )
+        if result is None:
+            return {**base, "status": "insufficient_data", "value": None, "missing_inputs": ["maintenance_capex_or_capital_expenditure"], "source_fact_ids": _unique_ids(net_income)}
+        return {
+            **base,
+            "status": "ok",
+            "value": float(result.value),
+            "maintenance_capex": float(result.maintenance_capex),
+            "maintenance_capex_rule": result.maintenance_capex_rule,
+            "estimated_growth_capex": float(result.estimated_growth_capex) if result.estimated_growth_capex is not None else None,
+            "change_in_working_capital": float(_dec(wc) or 0),
+            "source_fact_ids": _unique_ids(net_income, dna, maintenance, capex, wc),
+            "period": net_income.period,
+        }
 
     def _capex_analysis(self, fact_cache: dict[str, list[FinancialFact]], year: int | None) -> dict[str, Any]:
         total = self._fact_for_year(fact_cache["capital_expenditure"], year)

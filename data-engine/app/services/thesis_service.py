@@ -51,8 +51,13 @@ from app.services.thesis_provenance import (
     classify_origin,
     inputs_provenance_from_snapshot,
 )
+from app.services.ticker_ownership_signals import ownership_fact_lines, ownership_markdown
 from app.services.valuation_service import ValuationService
-from app.valuation.engines.base import MODEL_VERSION, margin_of_safety_reference
+from app.valuation.engines.base import (
+    MODEL_VERSION,
+    margin_of_safety_from_upside,
+    margin_of_safety_reference,
+)
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 
@@ -250,6 +255,8 @@ _METRIC_LABELS_ES = {
     "capital_expenditure": "gasto de capital (CapEx)",
     "cash_and_equivalents": "efectivo y equivalentes",
     "total_debt": "deuda total",
+    "minority_interest": "intereses minoritarios",
+    "preferred_stock": "acciones preferentes",
 }
 
 
@@ -319,6 +326,17 @@ _CODE_ES = {
     "net_margin": "margen neto",
     "unassigned": "sin asignar",
 }
+
+
+def _ltm_version_es(version: object) -> str:
+    """Versión del motor de largo plazo para el memo: nunca el `None` de Python."""
+    return f"`{version}`" if version not in (None, "") else "sin versión persistida"
+
+
+def _question_sentence_es(question: str) -> str:
+    """Cierra una pregunta en español: «¿...?», no «¿....»."""
+    text = question.rstrip(" .?!")
+    return f"{text}?" if text.startswith("¿") else f"{text}."
 
 
 def _code_es(code) -> str:
@@ -842,6 +860,11 @@ class ThesisService:
         # y fuentes anclada al paquete de hechos; fail-closed a la narrativa
         # de noticias/determinista. El modelo ejecutado queda en la traza de
         # la version para verificar que la tesis usa el modelo Go real.
+        evidence_sources = evidence.get("sources") or {}
+        ownership_evidence = {
+            "insider": evidence_sources.get("insider") or {},
+            "holders": evidence_sources.get("holders") or {},
+        }
         deep_narrative = maybe_deep_narrative(
             db,
             company,
@@ -852,6 +875,9 @@ class ThesisService:
             filing_items=filing_items,
             rag_context=rag_context,
             financial_facts=list(snapshot.facts.values()),
+            ownership_facts=ownership_fact_lines(
+                {"ticker": company.ticker.upper(), **ownership_evidence}
+            ),
         )
         narrative_model_trace = None
         if deep_narrative:
@@ -898,6 +924,13 @@ class ThesisService:
             thesis_markdown += f"\n### {section['titulo']}\n"
             thesis_markdown += "\n\n".join(section["parrafos"]) + "\n"
 
+        # Conexion 10b: insiders (Form 4) y fondos (13F) persistidos, como
+        # seccion propia del memo con su fuente y sus limites.
+        thesis_markdown += "\n\n## 24. Insiders (Form 4) y fondos (13F)\n\n"
+        thesis_markdown += ownership_markdown(
+            {"ticker": company.ticker.upper(), **ownership_evidence}
+        ) + "\n"
+
         def _dec(value) -> Decimal | None:
             return None if value is None else Decimal(str(value))
 
@@ -943,6 +976,13 @@ class ThesisService:
             hypothesis=hypothesis,
             catalysts=catalysts,
             invalidation_criteria=invalidation,
+            # Los criterios medibles los pone el usuario: sobreviven a cada
+            # regeneracion de la tesis (si no, el aviso dejaria de vigilarse).
+            invalidation_rules=(
+                list(previous.invalidation_rules)
+                if previous is not None and previous.invalidation_rules
+                else None
+            ),
             scenario_probabilities=scenario_probabilities,
             narrative_sections=narrative_sections,
             valuation_basis=valuation_basis,
@@ -1124,7 +1164,7 @@ class ThesisService:
         price_text = _thesis_money(float(price), currency)
         base_text = _thesis_money(float(base), currency)
         if base <= 0:
-            # Con un escenario base negativo o nulo el margen (base/precio - 1)
+            # Con un escenario base negativo o nulo el margen ((base - precio)/base)
             # no es interpretable: -249% sobre una base de -84.70 se leia como
             # un dato real. Se dice tal cual, sin porcentaje.
             return (
@@ -1142,7 +1182,7 @@ class ThesisService:
             if required_growth is not None
             else ""
         )
-        # MoS = valor esperado/precio - 1 (valuation/engines/base.py): se nombra
+        # MoS = (valor esperado - precio)/valor esperado (valuation/engines/base.py): se nombra
         # explicitamente su base. Describirlo como distancia precio/base ("un X% por
         # encima del escenario base") usaria el denominador equivocado: con
         # precio 336.56 y base 106.85 diria "68% por encima" cuando el precio
@@ -1306,9 +1346,12 @@ class ThesisService:
             return "blocked"
         if margin_of_safety is None:
             return "incomplete_price"
-        if margin_of_safety > 0.30:
+        # Umbrales en margen estándar (V - P)/V, equivalentes EXACTOS a los de
+        # antes en potencial V/P - 1 (+30 % y -20 %): 1 - 1/1,3 = 23,08 % y
+        # 1 - 1/0,8 = -25 %. El veredicto de cada valoración no cambia.
+        if margin_of_safety > margin_of_safety_from_upside(0.30):
             return "attractive"
-        if margin_of_safety < -0.20:
+        if margin_of_safety < margin_of_safety_from_upside(-0.20):
             return "expensive"
         return "watch"
 
@@ -1723,7 +1766,7 @@ class ThesisService:
             )
         else:
             lines.append(
-                f"Transcripción: {transcript.get('detail', 'pendiente transcripción')}."
+                f"Transcripción: {str(transcript.get('detail', 'pendiente transcripción')).rstrip('. ')}."
             )
             if transcript.get("action"):
                 lines.append(f"Acción: {transcript['action']}")
@@ -1760,6 +1803,8 @@ class ThesisService:
             "transcript": "Transcripción",
             "ir": "Relación con inversores",
             "external_theses": "Tesis externas",
+            "insider": "Insiders (Form 4)",
+            "holders": "Fondos (13F)",
         }
         for key, label in labels.items():
             block = sources.get(key) or {}
@@ -1820,6 +1865,19 @@ class ThesisService:
             return f"{block.get('source')}: {len(block.get('items') or [])} comunicados ({titles})"
         if key == "external_theses":
             return f"{len(block.get('items') or [])} tesis pegadas"
+        if key == "insider":
+            buys, sells = block.get("buys") or {}, block.get("sells") or {}
+            return (
+                f"{block.get('source')}: {buys.get('trades', 0)} compras y "
+                f"{sells.get('trades', 0)} ventas en {block.get('window_days')} días. "
+                f"{block.get('reading')}"
+            )
+        if key == "holders":
+            return (
+                f"{block.get('source')}: {block.get('holders_count', 0)} de "
+                f"{block.get('managers_with_data', 0)} gestores revisados lo declaran "
+                f"(periodo {block.get('report_date') or 'sin fecha'})"
+            )
         return str(block.get("source") or "ok")
 
     @staticmethod
@@ -2048,7 +2106,7 @@ La pregunta invertible es si la evidencia respalda los supuestos detrás del mod
 
 ## 3. Modelo de negocio
 Sector: {sector_es(company.sector)}. Industria: {industry_es(company.industry)}.
-Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {primary_question_es(framework.get("primary_question"))}.
+Marco específico de la empresa: {term_es(framework.get("key", "unknown"))}. Pregunta primaria: {_question_sentence_es(primary_question_es(framework.get("primary_question")))}
 Drivers obligatorios ausentes: {", ".join(term_es(m) for m in mandatory_missing) if mandatory_missing else "ninguno"}.
 
 ## 4. Últimos resultados
@@ -2074,7 +2132,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._news_markdown(sources)}
 
 ## 11. Riesgos
-{", ".join(company.special_risks) or "Sin riesgos específicos registrados para esta empresa."}
+{", ".join(term_es(risk) for risk in company.special_risks) or "Sin riesgos específicos registrados para esta empresa."}
 
 ## 12. Competencia y foso
 {self._moat_markdown(company, valuation)}
@@ -2083,7 +2141,7 @@ Recompras, dilución y dividendos se consultan en las pestañas «Dilución y re
 {self._valuation_markdown(valuation, excluded_present=excluded_present)}
 
 ### Motor fundamental de largo plazo
-Versión del modelo fundamental usada en esta corrida: `{(long_term_model.get("persistence") or {}).get("version")}` (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
+Versión del modelo fundamental usada en esta corrida: {_ltm_version_es((long_term_model.get("persistence") or {}).get("version"))} (versionado propio del motor, independiente del número de versión de esta tesis; que esta corrida lo muestre NO acredita persistencia duradera: en una corrida aislada con rollback el objeto existe solo en transacción, y la persistencia real la acredita el registro del motor).
 Estado del análisis del modelo fundamental (no es el estado de esta tesis): `{long_term_model.get("status")}`. Veredicto de oportunidad de mercado: `{(market_opportunity.get("verdict") or {}).get("label", "unknown")}`.
 
 ## 14. DCF inverso

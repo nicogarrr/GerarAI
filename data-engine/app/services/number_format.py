@@ -35,6 +35,10 @@ def format_number_es(value: NumericLike, maximum_fraction_digits: int = 2) -> st
     text = text.replace(",", "@").replace(".", ",").replace("@", ".")
     if "," in text:
         text = text.rstrip("0").rstrip(",")
+    # Un negativo que redondea a cero es cero: «-0» no existe en es-ES
+    # (ECMA-402 lo pinta sin signo con signDisplay «auto» tras redondear).
+    if text.startswith("-") and not any(ch in "123456789" for ch in text):
+        text = text[1:]
     return text
 
 
@@ -47,11 +51,15 @@ def format_compact_es(value: NumericLike, maximum_fraction_digits: int = 2) -> s
     parsed = _to_decimal(value)
     if parsed is None:
         return None
+    # La escala se elige con la cifra YA redondeada (como hace ECMA-402 con
+    # notation «compact»): 999.999.999 redondea a 1.000 M y debe salir
+    # «1 mil M», no «1.000 M».
+    quantum = Decimal(1).scaleb(-maximum_fraction_digits)
     abs_value = abs(parsed)
-    if abs_value >= Decimal("1e9"):
+    if abs_value >= Decimal("1e9") or (abs_value / Decimal("1e6")).quantize(quantum) >= 1000:
         scaled = format_number_es(parsed / Decimal("1e9"), maximum_fraction_digits)
         return f"{scaled} mil M"
-    if abs_value >= Decimal("1e6"):
+    if abs_value >= Decimal("1e6") or abs_value.quantize(quantum) >= Decimal("1e6"):
         scaled = format_number_es(parsed / Decimal("1e6"), maximum_fraction_digits)
         return f"{scaled} M"
     return format_number_es(parsed, maximum_fraction_digits)

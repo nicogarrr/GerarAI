@@ -1,8 +1,9 @@
 from decimal import Decimal
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, PeerRelationship
 from app.services.metric_calculation_service import METRIC_DEFINITIONS, MetricCalculationService, MetricResult
 
@@ -98,13 +99,23 @@ class PeerComparisonService:
                 select(Company).where(Company.id != company.id)
             ).all()
         )
-        target_market_cap = self._latest_market_cap(db, company.id)
+        # Una sola query de market cap para el target y TODOS los candidatos:
+        # antes era una por compania del universo (maestro + stubs + IBKR) y
+        # el coste de /peers crecia con el tamano de la tabla companies.
+        market_caps = self._latest_market_caps(
+            db, [company.id, *(candidate.id for candidate in candidates)]
+        )
+        target_market_cap = market_caps.get(company.id)
         scored: list[tuple[float, Company, list[str], dict]] = []
         for candidate in candidates:
             if candidate.id in selected_ids:
                 continue
             score, rationale, dimensions = self._peer_score(
-                db, company, candidate, target_market_cap
+                db,
+                company,
+                candidate,
+                target_market_cap,
+                candidate_market_cap=market_caps.get(candidate.id),
             )
             if score <= 0:
                 continue
@@ -157,6 +168,8 @@ class PeerComparisonService:
         target: Company,
         candidate: Company,
         target_market_cap: Decimal | None,
+        *,
+        candidate_market_cap: Decimal | None = None,
     ) -> tuple[float, list[str], dict]:
         score = 0.0
         rationale: list[str] = []
@@ -198,7 +211,6 @@ class PeerComparisonService:
             score += 0.03
             dimensions["exchange"] = 1.0
 
-        candidate_market_cap = self._latest_market_cap(db, candidate.id)
         if (
             target_market_cap is not None
             and target_market_cap > 0
@@ -213,6 +225,49 @@ class PeerComparisonService:
             dimensions["market_cap"] = round(size_score, 4)
             rationale.append(f"market-cap ratio {float(ratio):.2f}x")
         return score, rationale, dimensions
+
+    def _latest_market_caps(
+        self, db: Session, company_ids: list[int]
+    ) -> dict[int, Decimal]:
+        """Ultimo market cap por compania en UNA query (sin N+1).
+
+        Mismo criterio que ``_latest_market_cap``: ejercicio mas reciente
+        (NULL al final) y, a igualdad, el hecho creado mas tarde. El ranking
+        es una consulta de columnas, asi que lleva el filtro de tenant
+        explicito (``tenant_filters``): un hecho de otro tenant no puede
+        ocupar el puesto 1 y dejar a la compania sin valor.
+        """
+        if not company_ids:
+            return {}
+        ranked = (
+            select(
+                FinancialFact.id,
+                func.row_number()
+                .over(
+                    partition_by=FinancialFact.company_id,
+                    order_by=(
+                        FinancialFact.fiscal_year.desc().nullslast(),
+                        desc(FinancialFact.created_at),
+                        desc(FinancialFact.id),
+                    ),
+                )
+                .label("rank"),
+            )
+            .where(
+                FinancialFact.company_id.in_(set(company_ids)),
+                FinancialFact.metric == "market_cap",
+                *tenant_filters(db, FinancialFact),
+            )
+            .subquery()
+        )
+        return {
+            fact.company_id: fact.value
+            for fact in db.scalars(
+                select(FinancialFact)
+                .join(ranked, FinancialFact.id == ranked.c.id)
+                .where(ranked.c.rank == 1)
+            ).all()
+        }
 
     def _latest_market_cap(
         self, db: Session, company_id: int

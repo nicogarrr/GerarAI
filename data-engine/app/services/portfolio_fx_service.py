@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.models import FXRate, Portfolio
 
+# Divisa de la declaracion (IRPF, Modelo 720): euros al tipo BCE de cada fecha,
+# sea cual sea la divisa base de la cartera.
+TAX_CURRENCY = "EUR"
+
 
 class PortfolioFXService:
     """Tenant-scoped portfolio configuration and point-in-time FX lookup."""

@@ -5,8 +5,10 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import delete, desc, select
 from sqlalchemy.orm import Session
 
+from app.core.units import is_from_percent, to_fraction
 from app.models import CalculatedMetric, Company, FinancialFact
 from app.services.moat_profile import NONCOMPARABLE_PROFILES, PROFILE_LABELS, financial_quality_profile
+from app.services.owner_earnings import WORKING_CAPITAL_SIGN_CONVENTION, owner_earnings
 
 MetricFormula = tuple[str, str, tuple[str, ...], str]
 
@@ -49,6 +51,25 @@ WINDOWED_COMPOSED_METRICS = ("owner_earnings_5y", "capex_to_da_5y")
 # datos» - eso violaria veracidad: se calcula y se etiqueta de atipico en la
 # traza, con numerador y denominador visibles para su verificacion.
 MARGIN_METRICS = ("gross_margin", "operating_margin", "net_margin", "fcf_margin")
+
+# Ratios cuyo denominador negativo no es interpretable: se publican N/D en
+# vez de una cifra engañosa (Damodaran, "Return Measures": NI −50 / patrimonio
+# −200 = +25 % con pérdidas; EBITDA −10 con deuda neta 100 = −10x, que parece
+# mejor que 2x). Márgenes sobre ingresos negativos, igual.
+POSITIVE_DENOMINATOR_METRICS = frozenset(
+    {
+        "roe",
+        "roa",
+        "roic",
+        "roic_adjusted",
+        "net_debt_to_ebitda",
+        "fcf_conversion",
+        "fcf_margin",
+        "net_margin",
+        "operating_margin",
+        "gross_margin",
+    }
+)
 
 METRIC_DEFINITIONS: dict[str, MetricFormula] = {
     "fcf_margin": ("FCF_MARGIN_V1", "free_cash_flow / revenue", ("free_cash_flow", "revenue"), "decimal"),
@@ -115,10 +136,13 @@ METRIC_DEFINITIONS: dict[str, MetricFormula] = {
         ("net_income", "total_assets"),
         "decimal",
     ),
+    # Beneficio del propietario (Buffett, carta de Berkshire Hathaway de
+    # 1986). Definicion unica en app/services/owner_earnings.py: el ΔCC va en
+    # signo de flujo de caja y se SUMA; sin ΔCC no hay numero (V1 lo omitia).
     "owner_earnings": (
-        "OWNER_EARNINGS_V1",
-        "net_income + depreciation_amortization - maintenance_capex, where maintenance_capex = min(abs(capital_expenditure), depreciation_amortization); maintenance capex is not separately reported - declared conservative estimate (Buffet owner earnings)",
-        ("net_income", "depreciation_amortization", "capital_expenditure"),
+        "OWNER_EARNINGS_V2",
+        "net_income + depreciation_amortization + change_in_working_capital - maintenance_capex, where change_in_working_capital is in cash-flow sign (negative = working capital absorbed cash) and maintenance_capex = min(abs(capital_expenditure), depreciation_amortization); maintenance capex is not separately reported - declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)",
+        ("net_income", "depreciation_amortization", "capital_expenditure", "change_in_working_capital"),
         "USD",
     ),
     "cfroi_approx": (
@@ -128,9 +152,9 @@ METRIC_DEFINITIONS: dict[str, MetricFormula] = {
         "decimal",
     ),
     "owner_earnings_5y": (
-        "OWNER_EARNINGS_5Y_V1",
-        "mean of annual (net_income + depreciation_amortization - min(abs(capital_expenditure), depreciation_amortization)) over up to 5 most recent fiscal years, minimum 3; maintenance capex is a declared conservative estimate (Buffett owner earnings)",
-        ("net_income", "depreciation_amortization", "capital_expenditure"),
+        "OWNER_EARNINGS_5Y_V2",
+        "mean of annual (net_income + depreciation_amortization + change_in_working_capital - min(abs(capital_expenditure), depreciation_amortization)) over up to 5 most recent fiscal years, minimum 3; change_in_working_capital in cash-flow sign; maintenance capex is a declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)",
+        ("net_income", "depreciation_amortization", "capital_expenditure", "change_in_working_capital"),
         "USD",
     ),
     "capex_to_da_5y": (
@@ -276,9 +300,25 @@ def _capital_scale_conflict(equity_fact: FinancialFact, debt_fact: FinancialFact
     return True
 
 
+# Clave de db.info para la cache de hechos de calculate_all (ver alli).
+_FACTS_CACHE_KEY = "metric_calculation_facts_cache"
+
+
 class MetricCalculationService:
     def calculate_all(self, db: Session, company: Company, persist: bool = True) -> list[MetricResult]:
-        results = [self.calculate(db, company, metric, persist=persist) for metric in METRIC_DEFINITIONS]
+        # Cache de hechos SOLO durante este calculate_all: muchas metricas
+        # comparten entradas (revenue, net_income...) y cada una repetia la
+        # misma consulta. Vive en db.info (sesion por peticion, nunca
+        # compartida entre hilos) y se borra al terminar, asi que una llamada
+        # posterior ve siempre los hechos frescos.
+        owns_cache = _FACTS_CACHE_KEY not in db.info
+        if owns_cache:
+            db.info[_FACTS_CACHE_KEY] = {}
+        try:
+            results = [self.calculate(db, company, metric, persist=persist) for metric in METRIC_DEFINITIONS]
+        finally:
+            if owns_cache:
+                db.info.pop(_FACTS_CACHE_KEY, None)
         if persist:
             db.commit()
         return results
@@ -385,6 +425,12 @@ class MetricCalculationService:
         result_facts = {**facts, **supplemental_facts}
         unique_facts = self._unique_facts(result_facts)
         if denominator is None or denominator == 0 or numerator is None:
+            reason = "zero_or_invalid_denominator"
+        elif denominator < 0 and metric in POSITIVE_DENOMINATOR_METRICS:
+            reason = "non_positive_denominator"
+        else:
+            reason = None
+        if reason is not None:
             result = MetricResult(
                 metric=metric,
                 status="unavailable",
@@ -398,7 +444,7 @@ class MetricCalculationService:
                 source_fact_ids=[fact.id for fact in unique_facts],
                 calculation_trace={
                     **trace,
-                    "reason": "zero_or_invalid_denominator",
+                    "reason": reason,
                 },
                 confidence=Decimal("0.00"),
                 fiscal_year=next(iter(facts.values())).fiscal_year if facts else None,
@@ -504,7 +550,11 @@ class MetricCalculationService:
         return facts
 
     def _facts_for_metric(self, db: Session, company: Company, metric: str) -> list[FinancialFact]:
-        return list(
+        cache: dict[tuple[int, str], list[FinancialFact]] | None = db.info.get(_FACTS_CACHE_KEY)
+        key = (company.id, metric)
+        if cache is not None and key in cache:
+            return list(cache[key])
+        facts = list(
             db.scalars(
                 select(FinancialFact)
                 .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
@@ -512,6 +562,10 @@ class MetricCalculationService:
                 .limit(20)
             ).all()
         )
+        if cache is not None:
+            cache[key] = facts
+            return list(facts)
+        return facts
 
     def _match_fact(self, db: Session, company: Company, metric: str, anchor: FinancialFact) -> FinancialFact | None:
         candidates = self._facts_for_metric(db, company, metric)
@@ -562,21 +616,23 @@ class MetricCalculationService:
     ) -> tuple[Decimal | None, Decimal | None, dict, dict[str, FinancialFact]]:
         value = lambda key: Decimal(facts[key].value)
         if metric == "owner_earnings":
-            net_income = value("net_income")
-            depreciation = value("depreciation_amortization")
-            capex_abs = abs(value("capital_expenditure"))
-            maintenance_capex = min(capex_abs, depreciation)
+            oe = owner_earnings(
+                net_income=value("net_income"),
+                depreciation_amortization=value("depreciation_amortization"),
+                change_in_working_capital=value("change_in_working_capital"),
+                capital_expenditure=value("capital_expenditure"),
+            )
+            assert oe is not None and oe.estimated_growth_capex is not None
             trace = {
                 "method": "owner_earnings",
-                "maintenance_capex": str(_quantize(maintenance_capex)),
-                "maintenance_capex_rule": (
-                    "min(abs(capital_expenditure), depreciation_amortization); "
-                    "maintenance capex is not separately reported - declared "
-                    "conservative estimate"
-                ),
-                "estimated_growth_capex": str(_quantize(capex_abs - maintenance_capex)),
+                "source": "Buffett, Berkshire Hathaway shareholder letter 1986",
+                "maintenance_capex": str(_quantize(oe.maintenance_capex)),
+                "maintenance_capex_rule": oe.maintenance_capex_rule,
+                "estimated_growth_capex": str(_quantize(oe.estimated_growth_capex)),
+                "change_in_working_capital": str(_quantize(value("change_in_working_capital"))),
+                "working_capital_sign": WORKING_CAPITAL_SIGN_CONVENTION,
             }
-            return net_income + depreciation - maintenance_capex, Decimal("1"), trace, {}
+            return oe.value, Decimal("1"), trace, {}
         if metric == "cfroi_approx":
             tax_rate, tax_trace, tax_facts = self._tax_rate_for_period(
                 db,
@@ -715,7 +771,7 @@ class MetricCalculationService:
         rejected_inputs: list[str] = []
         if direct:
             _, fact = direct
-            rate, normalized = self._normalize_rate(fact.value)
+            rate, normalized = self._normalize_rate(fact.value, unit=fact.unit)
             if rate is not None and Decimal("0") <= rate <= Decimal("1"):
                 return rate, {
                     "tax_rate": str(rate),
@@ -896,13 +952,12 @@ class MetricCalculationService:
         self,
         raw_value: Decimal,
         allow_negative: bool = False,
+        unit: str | None = None,
     ) -> tuple[Decimal | None, bool]:
-        rate = Decimal(raw_value)
-        if rate > 1 and rate <= 100:
-            rate /= Decimal("100")
-            normalized = True
-        else:
-            normalized = False
+        # Helper único de unidades: la unidad del hecho manda; la heurística
+        # «>1 => %» solo queda para hechos sin unidad útil.
+        rate, method = to_fraction(Decimal(raw_value), unit)
+        normalized = is_from_percent(method)
         if rate < 0 and not allow_negative:
             return None, normalized
         if rate > 1:
@@ -1025,7 +1080,7 @@ class MetricCalculationService:
             )
             if direct_debt_cost:
                 facts["cost_of_debt"] = direct_debt_cost[1]
-                cost_of_debt, _ = self._normalize_rate(direct_debt_cost[1].value)
+                cost_of_debt, _ = self._normalize_rate(direct_debt_cost[1].value, unit=direct_debt_cost[1].unit)
                 cost_of_debt_source = "reported_cost_of_debt"
                 if cost_of_debt is None:
                     missing.append("valid_cost_of_debt")
@@ -1089,7 +1144,7 @@ class MetricCalculationService:
                 else:
                     facts["country_risk_premium"] = country_risk[1]
                     normalized_country_risk, _ = self._normalize_rate(
-                        country_risk[1].value
+                        country_risk[1].value, unit=country_risk[1].unit
                     )
                     if normalized_country_risk is None:
                         missing.append("valid_country_risk_premium")
@@ -1115,9 +1170,10 @@ class MetricCalculationService:
             risk_free_rate, rf_normalized = self._normalize_rate(
                 facts["risk_free_rate"].value,
                 allow_negative=True,
+                unit=facts["risk_free_rate"].unit,
             )
             equity_risk_premium, erp_normalized = self._normalize_rate(
-                facts["equity_risk_premium"].value
+                facts["equity_risk_premium"].value, unit=facts["equity_risk_premium"].unit
             )
             beta = Decimal(facts["beta"].value)
             debt = Decimal(facts["total_debt"].value)
@@ -1148,7 +1204,7 @@ class MetricCalculationService:
                 continue
 
             country_risk_rate = self._normalize_rate(
-                facts["country_risk_premium"].value
+                facts["country_risk_premium"].value, unit=facts["country_risk_premium"].unit
             )[0]
             assert country_risk_rate is not None
             assert tax_rate is not None
@@ -1384,7 +1440,9 @@ class MetricCalculationService:
             (
                 year
                 for year in set(numerators) & set(denominators)
-                if Decimal(denominators[year].value) != 0
+                # Años con denominador <= 0 (patrimonio/activo/ingresos
+                # negativos) no son interpretables: fuera de la ventana.
+                if Decimal(denominators[year].value) > 0
             ),
             reverse=True,
         )[:WINDOW_MAX_YEARS]
@@ -1460,8 +1518,16 @@ class MetricCalculationService:
             da = Decimal(facts_by_year["depreciation_amortization"][year].value)
             capex = abs(Decimal(facts_by_year["capital_expenditure"][year].value))
             if metric == "owner_earnings_5y":
-                ni = Decimal(facts_by_year["net_income"][year].value)
-                yearly[year] = ni + da - min(capex, da)
+                oe = owner_earnings(
+                    net_income=Decimal(facts_by_year["net_income"][year].value),
+                    depreciation_amortization=da,
+                    change_in_working_capital=Decimal(
+                        facts_by_year["change_in_working_capital"][year].value
+                    ),
+                    capital_expenditure=capex,
+                )
+                assert oe is not None
+                yearly[year] = oe.value
             else:  # capex_to_da_5y
                 if da == 0:
                     skipped_zero_da.append(year)
@@ -1574,8 +1640,8 @@ class MetricCalculationService:
         erp_facts = self._facts_for_metric(db, company, "equity_risk_premium")
         if not rf_facts or not beta_facts or not erp_facts:
             return None
-        risk_free, _ = self._normalize_rate(rf_facts[0].value, allow_negative=True)
-        erp, _ = self._normalize_rate(erp_facts[0].value)
+        risk_free, _ = self._normalize_rate(rf_facts[0].value, allow_negative=True, unit=rf_facts[0].unit)
+        erp, _ = self._normalize_rate(erp_facts[0].value, unit=erp_facts[0].unit)
         if risk_free is None or erp is None:
             return None
         beta = Decimal(beta_facts[0].value)
@@ -1588,7 +1654,7 @@ class MetricCalculationService:
         country_rate = Decimal("0")
         crp_facts = self._facts_for_metric(db, company, "country_risk_premium")
         if crp_facts:
-            normalized_crp, _ = self._normalize_rate(crp_facts[0].value)
+            normalized_crp, _ = self._normalize_rate(crp_facts[0].value, unit=crp_facts[0].unit)
             if normalized_crp is not None:
                 country_rate = normalized_crp
         cost_of_equity = risk_free + beta * erp + country_rate

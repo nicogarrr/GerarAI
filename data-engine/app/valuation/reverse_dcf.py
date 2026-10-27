@@ -15,6 +15,8 @@ class ReverseDCFInputs:
     low_growth: float = -0.25
     high_growth: float = 0.75
     years: int = 5
+    minority_interest: float = 0.0
+    preferred_stock: float = 0.0
 
 
 def _validate_inputs(inputs: ReverseDCFInputs) -> None:
@@ -42,6 +44,8 @@ def _value_at(inputs: ReverseDCFInputs, growth: float) -> float:
             net_debt=inputs.net_debt,
             shares_outstanding=inputs.shares_outstanding,
             years=inputs.years,
+            minority_interest=inputs.minority_interest,
+            preferred_stock=inputs.preferred_stock,
         )
     ).value_per_share
 
