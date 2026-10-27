@@ -319,6 +319,16 @@ export function getFriendlyErrorMessage(
     return options.duplicateMessage ?? 'Ya sigues este ticker.';
   }
 
+  // Sesión caducada o sin permiso: el mensaje interno ('User not
+  // authenticated', 'Access denied'...) está en inglés y no dice qué hacer.
+  // Se traduce por código, no por texto, para que ningún 401/403 local llegue
+  // crudo a un toast.
+  if (cause === 'auth' && error instanceof AppError) {
+    return error.code === 'AUTHORIZATION_ERROR'
+      ? 'No tienes permiso para esta operación.'
+      : 'Necesitas iniciar sesión para continuar.';
+  }
+
   const message = getErrorMessage(error);
   for (const [pattern, replacement] of MESSAGE_TRANSLATIONS) {
     if (pattern.test(message)) {
