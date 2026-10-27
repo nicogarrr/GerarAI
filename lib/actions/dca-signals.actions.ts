@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
-import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
+import { AppError, classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import type { DcaBacktest, DcaEvaluateSummary, DcaHitRates, DcaSignalsResponse } from '@/lib/dca/types';
 
 /** Señales DCA (watchlist + cartera) del backend research. `unavailable`
@@ -70,7 +70,11 @@ export async function getDcaHitRatesState(symbol: string): Promise<DcaHitRatesSt
         const data = await researchRequest<DcaHitRates>(`/api/watchlist/dca-signals/${encodeURIComponent(symbol)}/hit-rates`);
         return data ? { status: 'ok', data } : { status: 'unavailable' };
     } catch (error) {
-        if ((error as { statusCode?: number } | null)?.statusCode === 404) return { status: 'not_evaluated' };
+        // Solo el 404 ESPECÍFICO del backend cuenta como «sin señal evaluada»; un
+        // 404 genérico (deploy, proxy, ruta) es «no disponible».
+        if (error instanceof AppError && error.statusCode === 404 && /sin señal DCA evaluada/i.test(error.message)) {
+            return { status: 'not_evaluated' };
+        }
         console.error('getDcaHitRates error:', error);
         return { status: 'unavailable' };
     }
