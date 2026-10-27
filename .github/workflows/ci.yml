@@ -14,23 +14,20 @@ permissions:
   contents: read
 
 concurrency:
-  # El grupo incluye el ref A PROPOSITO: agrupar solo por workflow haria que un
-  # push a main cancelara el run de una rama (y al reves). Con el ref, los runs
-  # de ramas distintas nunca se tocan.
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  # Un grupo por ref: una PR no toca a main ni a otra rama (y al reves).
+  # Antes main se agrupaba por SHA: cada merge lanzaba un CI completo y nada se
+  # descartaba. El 27-oct, con un merge por minuto, habia 14 runs de main en cola
+  # desde hacia una hora y los checks de las PRs esperaban detras
+  # (tests/test_ci_concurrency_main.py).
+  group: ${{ github.workflow }}-${{ github.ref }}
   # PR -> true: el run viejo ya no describe el codigo que se revisa y lo que
   #   cuesta un runner es lo que se ahorra.
-  # main -> false: aqui NO se cancela. Dos razones concretas en este repo:
-  #   1. el rotator de modelos hace `git push` directo a main ([skip ci]); con
-  #      cancel-in-progress: true ese push podria matar el run del merge humano
-  #      que se estaba ejecutando.
-  #   2. dejar un run de main a medias consume runner igual y, si el push que
-  #      lo sustituyo falla al arrancar, el check que se ve queda en el commit
-  #      viejo.
-  # CI no publica nada (los artefactos de Playwright son por run), asi que la
-  # segunda razon es de coste/coherencia, no de artefacto corrupto. Los
-  # workflows que si publican (sbom-scan, restore-drill de otros agentes) usan
-  # false siempre.
+  # main -> false: el run EN CURSO nunca se cancela (no quedan runs a medias ni
+  #   checks en un commit viejo). Con el grupo por ref, GitHub solo descarta el run
+  #   que aun estaba PENDIENTE y lo sustituye por el del commit mas nuevo: como
+  #   mucho un run en curso y uno en espera, y el ultimo commit de main siempre
+  #   llega a tener su CI completo. (El rotador de modelos que hacia push directo
+  #   a main se retiro en #2294.)
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
