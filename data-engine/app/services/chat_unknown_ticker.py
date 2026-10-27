@@ -15,14 +15,7 @@ from collections.abc import Iterable
 
 # Siglas habituales en una pregunta de inversión que NO son tickers.
 _ACRONYMS = frozenset(
-    """
-    IA AI PER PEG EPS BPA ROE ROA ROIC ROCE FCF DCF EV EBIT EBITDA ETF ETFS IPO OPA OPV
-    CEO CFO CTO ADR ADRS ADS IRPF IVA PIB IPC BCE FED SEC FMP IBKR USD EUR GBP GBX JPY
-    CNY HKD CHF CAD AUD EEUU EE UU UE USA UK TIR VAN WACC CAPEX OPEX SBC TTM YTD FY LTM
-    DCA NAV PE PB PS MOS NYSE NASDAQ LSE BME IBEX MSCI LLM API PDF URL XIRR TWR CAGR
-    OK SA SL AG NV PLC INC LTD CORP Q1 Q2 Q3 Q4 H1 H2 GAAP IFRS KPI KPIS ARPU SAAS IT
-    TAM SAM SOM MOAT FCFF FCFE DDM SOTP RSI MACD SMA EMA VIX ESG
-    """.split()
+    ["IA", "AI", "PER", "PEG", "EPS", "BPA", "ROE", "ROA", "ROIC", "ROCE", "FCF", "DCF", "EV", "EBIT", "EBITDA", "ETF", "ETFS", "IPO", "OPA", "OPV", "CEO", "CFO", "CTO", "ADR", "ADRS", "ADS", "IRPF", "IVA", "PIB", "IPC", "BCE", "FED", "SEC", "FMP", "IBKR", "USD", "EUR", "GBP", "GBX", "JPY", "CNY", "HKD", "CHF", "CAD", "AUD", "EEUU", "EE", "UU", "UE", "USA", "UK", "TIR", "VAN", "WACC", "CAPEX", "OPEX", "SBC", "TTM", "YTD", "FY", "LTM", "DCA", "NAV", "PE", "PB", "PS", "MOS", "NYSE", "NASDAQ", "LSE", "BME", "IBEX", "MSCI", "LLM", "API", "PDF", "URL", "XIRR", "TWR", "CAGR", "OK", "SA", "SL", "AG", "NV", "PLC", "INC", "LTD", "CORP", "Q1", "Q2", "Q3", "Q4", "H1", "H2", "GAAP", "IFRS", "KPI", "KPIS", "ARPU", "SAAS", "IT", "TAM", "SAM", "SOM", "MOAT", "FCFF", "FCFE", "DDM", "SOTP", "RSI", "MACD", "SMA", "EMA", "VIX", "ESG"]
 )
 
 # Algo con forma de ticker escrito en mayúsculas: 2-6 caracteres (letra
