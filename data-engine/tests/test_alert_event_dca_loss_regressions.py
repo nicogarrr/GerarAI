@@ -196,3 +196,60 @@ def test_dispatch_failure_keeps_alert_and_state(db):
     assert out["alerted"][0]["deliveries"] == {"error": "dispatch_error"}
     assert db.query(ResearchAlert).count() == 1
     assert db.scalar(select(DcaSignalState)).last_alerted_level == 3
+
+
+def test_dca_external_channel_intent_survives_dispatch_failure_and_reconciles(db, monkeypatch):
+    """Despacho que falla ANTES de crear filas de canal: la intencion de entrega
+    ya es durable (fila pending) y el reconciliador envia el canal pendiente."""
+    from types import SimpleNamespace
+
+    from sqlalchemy import update
+
+    from app.models.entities import AlertDelivery
+    from app.services import notification_service
+
+    monkeypatch.setenv("DCA_ALERT_CHANNELS", "in_app,email")
+    get_settings.cache_clear()
+    _watch(db)
+    f = FakeFetcher()
+    f.set("DEMO", series(70))
+    with patch("app.services.notification_service.NotificationService.dispatch", side_effect=RuntimeError("boom")):
+        out = _run(db, f)
+    alert_id = out["alerted"][0]["alert_id"]
+    rows = {r.channel: r.status for r in db.scalars(select(AlertDelivery).where(AlertDelivery.alert_id == alert_id))}
+    assert rows == {"in_app": "delivered", "email": "pending"}
+
+    posts: list[str] = []
+
+    class _Client:
+        def __init__(self, **_k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_a):
+            return None
+
+        def post(self, url, json):
+            posts.append(url)
+            return SimpleNamespace(raise_for_status=lambda: None)
+
+    settings = SimpleNamespace(
+        telegram_enabled=False, telegram_bot_token=None, telegram_chat_id=None,
+        telegram_api_base_url="https://api.telegram.org", telegram_timeout_seconds=10,
+        alert_email_webhook_url="https://hooks.example/email", alert_push_webhook_url=None,
+    )
+    monkeypatch.setattr(notification_service.httpx, "Client", _Client)
+    monkeypatch.setattr(notification_service, "get_settings", lambda: settings)
+    monkeypatch.setattr(notification_service, "smtp_configured", lambda _s: False)
+    # Antes del TTL no se reclama (el despacho original puede seguir en curso).
+    assert notification_service.NotificationService().reconcile_stale_deliveries(db)["candidates"] == 0
+    db.execute(update(AlertDelivery).where(AlertDelivery.alert_id == alert_id).values(
+        updated_at=datetime.now(UTC) - timedelta(seconds=notification_service.STALE_CLAIM_SECONDS + 5)))
+    db.commit()
+    stats = notification_service.NotificationService().reconcile_stale_deliveries(db)
+    assert stats["candidates"] == 1 and stats["redispatched"] == 1
+    assert posts == ["https://hooks.example/email"]
+    rows = {r.channel: r.status for r in db.scalars(select(AlertDelivery).where(AlertDelivery.alert_id == alert_id))}
+    assert rows == {"in_app": "delivered", "email": "delivered"}

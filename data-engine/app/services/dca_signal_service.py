@@ -40,6 +40,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.models import (
+    AlertDelivery,
     Company,
     DcaAlertOverride,
     DcaSignalState,
@@ -322,6 +323,18 @@ def _emit_alert_row(db: Session, dca: dict[str, Any], *, company_id: int | None,
         channels=alert_channels(settings),
         metadata={"dca": dca},
     )
+    # Intencion de entrega DURABLE: una fila 'pending' por canal externo en la
+    # misma transaccion que la alerta. Si el despacho falla antes de crear las
+    # filas (o el proceso muere), el reconciliador las reclama tras el TTL.
+    for channel in alert.channels or []:
+        if channel in ("in_app", "telegram"):
+            continue
+        already = db.scalar(
+            select(AlertDelivery.id).where(AlertDelivery.alert_id == alert.id, AlertDelivery.channel == channel)
+        )
+        if already is None:
+            db.add(AlertDelivery(tenant_id=alert.tenant_id, alert_id=alert.id, channel=channel))
+    db.flush()
     return "alerted", alert
 
 
