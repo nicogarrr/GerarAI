@@ -193,6 +193,11 @@ export default function ThesisMemo({
 }) {
   const hideFigures = modelBlocked || (thesis.status !== 'published' && thesis.status !== 'approved');
   const probabilities = thesis.scenario_probabilities ?? {};
+  // Missing provenance stays unknown even against an older backend returning raw margin.
+  const knownMargin = thesis.valuation_basis?.margin_of_safety_convention === 'discount_to_value_v1';
+  const archivedMargin = thesis.archived_margin_of_safety ?? thesis.margin_of_safety;
+  const unknownMargin = !knownMargin && archivedMargin != null;
+
   // F394: cada tesis se muestra con SU base persistida; sin evidencia no se escala.
   const scenarios = thesisScenarioDisplay(
     {
@@ -207,6 +212,12 @@ export default function ThesisMemo({
 
   return (
     <div className="min-w-0 max-w-full space-y-5 [overflow-wrap:anywhere]">
+      {!hideFigures && unknownMargin ? (
+        <aside role="note" className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm leading-6 text-amber-200">
+          Margen histórico con fórmula no verificada: el porcentaje y el texto originales se conservan como archivo.
+          No los compares con el margen actual (V - P) / V ni los uses como señal actual.
+        </aside>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2">
         <Badge>{enumLabel(RATING_LABELS, thesis.rating)}</Badge>
         <Badge variant="outline">{enumLabel(STATUS_LABELS, thesis.status)}</Badge>
@@ -359,13 +370,15 @@ export default function ThesisMemo({
           <div className="rounded-lg border border-gray-800 bg-black/20 p-3">
             <div className="text-xs uppercase text-gray-500">
               <GlossaryTerm k="margen_seguridad" icon={false}>
-                Margen seguridad
+                {unknownMargin ? 'Margen archivado' : 'Margen seguridad'}
               </GlossaryTerm>
             </div>
             <div className="mt-1 text-base font-semibold text-gray-100">
-              {marginOfSafetyDisplay(thesis.margin_of_safety, thesis.base_value)}
+              {marginOfSafetyDisplay(knownMargin ? thesis.margin_of_safety : archivedMargin, thesis.base_value)}
             </div>
-            {scenarios.values.expected != null ? <div className="mt-0.5 text-xs text-gray-500">sobre valor esperado</div> : null}
+            <div className="mt-0.5 text-xs text-gray-500">
+              {unknownMargin ? 'Fórmula no verificada; no comparable' : knownMargin ? '(V - P) / V · base del modelo de esta versión' : 'Sin margen registrado'}
+            </div>
           </div>
         </div>
         )}

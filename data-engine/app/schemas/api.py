@@ -324,6 +324,9 @@ class ThesisOut(BaseModel):
     bull_value: Decimal | None
     expected_value: Decimal | None
     margin_of_safety: Decimal | None
+    archived_margin_of_safety: Decimal | None = None
+    margin_of_safety_convention: str | None = None
+    margin_of_safety_status: str = "unknown_convention"
     data_confidence_score: int
     source_coverage_score: int
     red_team_score: int
@@ -352,6 +355,22 @@ class ThesisOut(BaseModel):
     valuation_withheld_reason: str | None = None
 
     @model_validator(mode="after")
+    def _separate_archived_margin(self) -> "ThesisOut":
+        from app.valuation.margin_convention import margin_convention_known
+
+        if self.archived_margin_of_safety is None:
+            self.archived_margin_of_safety = self.margin_of_safety
+        self.margin_of_safety_convention = (self.valuation_basis or {}).get("margin_of_safety_convention")
+        if self.archived_margin_of_safety is None:
+            self.margin_of_safety_status = "missing"
+        elif margin_convention_known(self.valuation_basis):
+            self.margin_of_safety_status = "verified"
+        else:
+            self.margin_of_safety = None
+            self.margin_of_safety_status = "unknown_convention"
+        return self
+
+    @model_validator(mode="after")
     def _withhold_inferred_valuation(self) -> "ThesisOut":
         """Un margen/ingreso INFERIDO nunca pasa por dato: sin cifras por accion."""
         if not valuation_uses_inferred_inputs(self.valuation_basis):
@@ -359,6 +378,9 @@ class ThesisOut(BaseModel):
         self.bear_value = self.base_value = self.bull_value = None
         self.expected_value = None
         self.margin_of_safety = None
+        self.archived_margin_of_safety = None
+        self.margin_of_safety_convention = None
+        self.margin_of_safety_status = "withheld"
         self.rating = "insufficient_data"
         self.valuation_withheld_reason = VALUATION_WITHHELD_REASON
         self.executive_summary = VALUATION_WITHHELD_REASON
