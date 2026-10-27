@@ -259,8 +259,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
         ) : !published ? (
           <div className="mt-10">
             <EmptyState
-              action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink> : undefined}
-              description={latest ? `La v${latest.version} está en estado «${statusLabel(latest.status)}»: solo se enseñan las cifras y el margen de una versión publicada.` : undefined}
+              action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink> : <EmptyLink href={`/research/${encoded}`}>Generar la primera tesis desde la ficha</EmptyLink>}
+              description={latest ? `La v${latest.version} está en estado «${statusLabel(latest.status)}»: solo se enseñan las cifras y el margen de una versión publicada.` : `Todavía no se ha generado ninguna tesis de ${ticker}. Puedes generar la primera desde su ficha.`}
               title={`Aún no hay ninguna tesis publicada de ${ticker}.`}
               titleAs="h1"
             />
