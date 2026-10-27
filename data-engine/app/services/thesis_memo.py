@@ -262,8 +262,13 @@ def build_memo_markdown(
         lines.append(f"| Bajista | {_money(thesis.bear_value, company.currency)} | {_prob('bear')} |")
         lines.append(f"| Base | {_money(thesis.base_value, company.currency)} | {_prob('base')} |")
         lines.append(f"| Alcista | {_money(thesis.bull_value, company.currency)} | {_prob('bull')} |")
+        # El precio guardado es el que usó el modelo al generar la versión,
+        # no la cotización de hoy: se rotula como tal, con la fecha de la
+        # cotización solo si quedó persistida (nunca una fecha inventada).
+        price_as_of = (thesis.valuation_basis or {}).get("price_as_of")
+        price_label = "Precio del modelo" + (f" al {price_as_of}" if price_as_of else "")
         lines.append(
-            f"\nPrecio actual: {_money(thesis.current_price, company.currency)} · Valor esperado: "
+            f"\n{price_label}: {_money(thesis.current_price, company.currency)} · Valor esperado: "
             f"{_money(thesis.expected_value, company.currency)} · Margen de seguridad: "
             + (percent_es(float(thesis.margin_of_safety)) if thesis.margin_of_safety is not None else "pendiente")
         )

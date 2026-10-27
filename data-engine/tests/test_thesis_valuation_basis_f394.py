@@ -29,6 +29,7 @@ def test_thesis_persists_its_own_basis_not_a_later_valuation():
     basis = ThesisService._valuation_basis(valuation)
     assert basis == {
         "value_per_share_basis": "ordinary_share", "adr_ratio": 8.0,
+        "price_as_of": None,
         "listed_share_values": {"base": 256.3, "bear": 100.0, "bull": 400.0},
     }
 
@@ -74,3 +75,22 @@ def test_model_version_alone_does_not_establish_margin_convention():
     assert ThesisService._valuation_basis({
         "trace": {"model_version": "valuation-engines-v2"},
     }) is None
+
+
+def test_price_as_of_is_persisted_with_the_version():
+    """Auditoría v1.0 (2026-10-27): el precio persistido es el del MODELO al
+    generar la tesis, no la cotización en vivo; su fecha viaja en
+    valuation_basis para rotularlo ("Precio del modelo al <fecha>")."""
+    basis = ThesisService._valuation_basis({
+        "value_per_share_basis": "ordinary_share",
+        "trace": {"price_as_of": "2026-10-20"},
+    })
+    assert basis["price_as_of"] == "2026-10-20"
+
+
+def test_price_as_of_alone_justifies_the_dict():
+    """Una valoración con precio fechado pero sin base declarada conserva la
+    fecha; sin ella el dict sigue siendo None (fecha nunca inventada)."""
+    basis = ThesisService._valuation_basis({"trace": {"price_as_of": "2026-10-20"}})
+    assert basis is not None and basis["price_as_of"] == "2026-10-20"
+    assert ThesisService._valuation_basis({"trace": {"price_status": "ok"}}) is None
