@@ -55,7 +55,9 @@ function AlertsManager() {
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<{ message: string; cause: AlertsLoadCause } | null>(null);
-    const [open, setOpen] = useState(false);
+    // Deep-link desde QuickAlertButton (/alerts?symbol=MSFT&type=price_below&value=300):
+    // el diálogo arranca abierto y pre-rellenado desde la URL, sin efecto.
+    const [open, setOpen] = useState(() => searchParams.get('symbol') !== null);
     const [reviewing, setReviewing] = useState<string | null>(null);
     /** Borrado en curso: sin esto el boton se puede pulsar dos veces. */
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -71,13 +73,20 @@ function AlertsManager() {
     /** Estado de entrega del motor (evaluacion cada 5 min + Telegram). */
     const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
     const [triggered, setTriggered] = useState<TriggeredAlertDelivery[]>([]);
-    const [formData, setFormData] = useState<CreateAlertInput>({
-        symbol: '',
-        type: 'price_above',
-        condition: {
-            operator: '>',
-            value: '',
-        },
+    const [formData, setFormData] = useState<CreateAlertInput>(() => {
+        const symbol = searchParams.get('symbol');
+        if (!symbol) {
+            return { symbol: '', type: 'price_above', condition: { operator: '>', value: '' } };
+        }
+        const type = searchParams.get('type');
+        return {
+            symbol: symbol.toUpperCase(),
+            type: isAlertType(type) ? type : 'price_above',
+            condition: {
+                operator: type === 'price_below' || type === 'price_change' ? '<' : '>',
+                value: searchParams.get('value') ?? '',
+            },
+        };
     });
 
     const loadAlerts = async () => {
@@ -120,24 +129,9 @@ function AlertsManager() {
     };
 
     useEffect(() => {
-        loadAlerts();
-        // Deep-link desde QuickAlertButton: /alerts?symbol=MSFT&type=price_below&value=300
-        // pre-rellena el diálogo de creación y lo abre directamente.
-        const symbol = searchParams.get('symbol');
-        if (symbol) {
-            const type = searchParams.get('type');
-            const value = searchParams.get('value') ?? '';
-            setFormData({
-                symbol: symbol.toUpperCase(),
-                type: isAlertType(type) ? type : 'price_above',
-                condition: {
-                    operator: type === 'price_below' || type === 'price_change' ? '<' : '>',
-                    value,
-                },
-            });
-            setOpen(true);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Carga inicial tras montar: el setState de loadAlerts no es síncrono
+        // dentro del efecto.
+        queueMicrotask(() => void loadAlerts());
     }, []);
 
     useEffect(() => {

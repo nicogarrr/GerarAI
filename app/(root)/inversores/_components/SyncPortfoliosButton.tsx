@@ -45,7 +45,9 @@ export function SyncPortfoliosButton({
         } catch {
             return;
         }
-        void handleSync();
+        // Auto-sync al montar: el setState de handleSync no es síncrono
+        // dentro del efecto.
+        queueMicrotask(() => void handleSync());
     }, []);
 
     const loading = state === 'syncing';

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Download, FileDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,18 +22,16 @@ export default function ExportView() {
     // El año civil depende del reloj del navegador: leerlo en el render hace
     // que el HTML del servidor y la hidratación difieran en la frontera de
     // año. Se arranca con un estado fijo (0 = todavía sin montar) y se fija
-    // el año real en el primer efecto.
-    const [currentYear, setCurrentYear] = useState(0);
+    // el año real tras hidratar (useSyncExternalStore, sin efecto con setState).
+    const currentYear = useSyncExternalStore(
+        () => () => {},
+        () => new Date().getFullYear(),
+        () => 0,
+    );
     const [year, setYear] = useState(0);
     const [format, setFormat] = useState<ExportFormat>('csv');
     const [loading, setLoading] = useState(false);
     const [preview, setPreview] = useState<string | null>(null);
-
-    useEffect(() => {
-        const real = new Date().getFullYear();
-        setCurrentYear(real);
-        setYear((prev) => (prev === 0 ? real : prev));
-    }, []);
 
     const selectedYear = year || currentYear;
     const years = currentYear === 0
