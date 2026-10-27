@@ -15,6 +15,8 @@ const views = readFileSync(join(root, 'components/data/RecordViews.tsx'), 'utf8'
 
 describe('RecordDetail', () => {
     it('sincroniza el estado con la prop record', () => {
-        assert.match(views, /useEffect\(\(\) => \{\s*setData\(record\);\s*\}, \[record\]\)/);
+        // Ajuste durante el render (estado derivado de props) en vez de un
+        // efecto con setState síncrono (react-hooks/set-state-in-effect).
+        assert.match(views, /if \(record !== syncedRecord\) \{\s*setSyncedRecord\(record\);\s*setData\(record\);\s*\}/);
     });
 });
