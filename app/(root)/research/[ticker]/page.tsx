@@ -1,3 +1,4 @@
+import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
 import CompanyChatForm from '@/components/research/CompanyChatForm';
 import ChatAnswerMarkdown from '@/components/research/ChatAnswerMarkdown';
@@ -71,7 +72,6 @@ import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
 import { companyTypeLabel, etiquetaTierFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
-import { cleanThesisText } from '@/lib/research/thesis-text';
 import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -1039,11 +1039,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
                   ) : null}
                 </div>
-                {thesisIsPublic(snapshot.latest_thesis.status) ? (
-                  <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-300 md:line-clamp-none">{cleanThesisText(snapshot.latest_thesis.executive_summary)}</p>
-                ) : (
-                  <p className="mt-3 text-sm leading-6 text-gray-400">{snapshot.latest_thesis.status === 'insufficient_data' ? `La v${snapshot.latest_thesis.version} es provisional por datos insuficientes: sin veredicto ni valoración.` : `La v${snapshot.latest_thesis.version} está en borrador: sin veredicto ni valoración hasta que se publique.`}</p>
-                )}
+                <ThesisSummary thesis={snapshot.latest_thesis} model={snapshot.model_summary} />
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   {/*
                       Leer la tesis es la acción principal de una ficha (por eso
