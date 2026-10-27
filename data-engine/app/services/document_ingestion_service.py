@@ -36,6 +36,12 @@ MAX_OOXML_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
 MAX_OOXML_ENTRIES = 10_000
 MAX_OOXML_ENTRY_RATIO = 200
 OOXML_RATIO_MIN_ENTRY_BYTES = 1024 * 1024
+# El tamaño ZIP no limita una hoja dispersa: dos celdas pueden declarar
+# millones de filas/columnas. Presupuesto de recorrido, no de celdas pobladas.
+MAX_XLSX_SHEETS = 100
+MAX_XLSX_ROWS = 50_000
+MAX_XLSX_COLUMNS = 512
+MAX_XLSX_CELLS = 1_000_000
 
 
 def _guard_ooxml_zip(content: bytes) -> None:
@@ -474,25 +480,102 @@ class DocumentIngestionService:
 
         document = DocxDocument(BytesIO(content))
         blocks = []
-        for index, paragraph in enumerate(document.paragraphs):
-            text = _compact(paragraph.text)
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
+
+        def contents(parent):
+            element = parent._element.body if hasattr(parent._element, "body") else parent._tc
+            for child in element.iterchildren():
+                if child.tag.endswith("}p"):
+                    yield Paragraph(child, parent)
+                elif child.tag.endswith("}tbl"):
+                    yield Table(child, parent)
+
+        def table_text(table):
+            rows = []
+            for row in table.rows:
+                values = []
+                seen = set()
+                for cell in row.cells:
+                    # Las celdas fusionadas aparecen repetidas en row.cells.
+                    if cell._tc in seen:
+                        continue
+                    seen.add(cell._tc)
+                    parts = [table_text(item) if isinstance(item, Table) else item.text
+                             for item in contents(cell)]
+                    values.append(_compact(" ".join(parts)))
+                if any(values):
+                    rows.append(" | ".join(values))
+            return "\n".join(rows)
+
+        for index, item in enumerate(contents(document)):
+            is_table = isinstance(item, Table)
+            text = table_text(item) if is_table else _compact(item.text)
             if text:
-                blocks.append(ParsedBlock(text=text, metadata={"paragraph": index + 1}))
+                kind = "table" if is_table else "paragraph"
+                blocks.append(ParsedBlock(text=text, metadata={kind: index + 1}))
         return ParsedDocument(blocks=blocks, parser="python_docx")
 
     def _parse_xlsx(self, content: bytes) -> ParsedDocument:
-        from openpyxl import load_workbook
+        # Comprobar coordenadas XML ANTES de iter_rows: con dimension ausente
+        # openpyxl puede expandir una fila enorme antes de devolverla.
+        from xml.etree.ElementTree import iterparse
 
+        from openpyxl import load_workbook
+        from openpyxl.utils.cell import coordinate_to_tuple
+
+        total_area = 0
+        with zipfile.ZipFile(BytesIO(content)) as archive:
+            sheets = [name for name in archive.namelist()
+                      if re.fullmatch(r"xl/worksheets/[^/]+\.xml", name)]
+            if len(sheets) > MAX_XLSX_SHEETS:
+                raise ValueError("El XLSX tiene demasiadas hojas para ingerirlo")
+            for name in sheets:
+                height = width = 0
+                with archive.open(name) as stream:
+                    for _, element in iterparse(stream, events=("end",)):
+                        tag = element.tag.rsplit("}", 1)[-1]
+                        coordinates = []
+                        if tag == "dimension" and element.get("ref"):
+                            coordinates = element.get("ref").split(":")
+                        elif tag == "c" and element.get("r"):
+                            coordinates = [element.get("r")]
+                        elif tag == "row" and element.get("r"):
+                            height = max(height, int(element.get("r")))
+                        for coordinate in coordinates:
+                            row, column = coordinate_to_tuple(coordinate)
+                            height, width = max(height, row), max(width, column)
+                        if (height > MAX_XLSX_ROWS or width > MAX_XLSX_COLUMNS
+                                or total_area + height * width > MAX_XLSX_CELLS):
+                            raise ValueError("Las dimensiones del XLSX superan el limite de ingesta")
+                        element.clear()
+                total_area += height * width
         workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
         blocks = []
-        for sheet in workbook.worksheets:
-            rows = []
-            for row in sheet.iter_rows(values_only=True):
-                values = [str(value) for value in row if value is not None]
-                if values:
-                    rows.append(" | ".join(values))
-            if rows:
-                blocks.append(ParsedBlock(text="\n".join(rows), metadata={"sheet": sheet.title}))
+        cells = 0
+        try:
+            if len(workbook.worksheets) > MAX_XLSX_SHEETS:
+                raise ValueError("El XLSX tiene demasiadas hojas para ingerirlo")
+            for sheet in workbook.worksheets:
+                height, width = sheet.max_row or 0, sheet.max_column or 0
+                if (height > MAX_XLSX_ROWS or width > MAX_XLSX_COLUMNS
+                        or height * width > MAX_XLSX_CELLS - cells):
+                    raise ValueError("Las dimensiones del XLSX superan el limite de ingesta")
+                rows = []
+                # También se cuenta el recorrido real: dimensiones ausentes o
+                # incorrectas no pueden saltarse el presupuesto del documento.
+                for index, row in enumerate(sheet.iter_rows(values_only=True), start=1):
+                    cells += len(row)
+                    if (index > MAX_XLSX_ROWS or len(row) > MAX_XLSX_COLUMNS
+                            or cells > MAX_XLSX_CELLS):
+                        raise ValueError("El XLSX supera el limite de celdas de ingesta")
+                    values = [str(value) for value in row if value is not None]
+                    if values:
+                        rows.append(" | ".join(values))
+                if rows:
+                    blocks.append(ParsedBlock(text="\n".join(rows), metadata={"sheet": sheet.title}))
+        finally:
+            workbook.close()
         return ParsedDocument(blocks=blocks, parser="openpyxl")
 
     def _chunk_blocks(
