@@ -6,20 +6,7 @@ ficheros que hoy ya no existen en `main` (`.env.bak`, `docker.env.example`,
 `RESUMEN_FINAL.md`, `INSTRUCCIONES_DESPLIEGUE.md`). Borrar el fichero no las
 borra: cualquiera puede leerlas con `git log -p` o en GitHub.
 
-**Lo que de verdad protege es rotar.**
-
-## 0. Estado verificado (2026-10-28)
-
-Verificacion de las claves del historial contra cada proveedor (trufflehog
---only-verified + llamadas de solo lectura):
-
-| Clave | Estado 2026-10-28 | Accion |
-|---|---|---|
-| Marketstack (`b384...8b41`, en `.env.bak` y `docker.env.example`, commits dic 2025) | **SIGUE ACTIVA** (autentica contra la API) | **Rotar YA**: marketstack.com → Dashboard → Reset API access key |
-| Gemini ×3 (`AIzaSyD_…`, `AIzaSyB49…`, `AIzaSyCqw…`) | Muertas (HTTP 400) | Ninguna |
-| MongoDB Atlas (`mongodb+srv://…@jlcavaai.sj0wk0l.mongodb.net`, INSTRUCCIONES_DESPLIEGUE.md) | Password muerta (bad auth); el cluster sigue existiendo | Revisar usuarios y logs de acceso de Atlas por precaucion |
-| Finnhub, FMP, Twelve Data, Alpha Vantage, Polygon | No se encontraron claves suyas en el historial (trufflehog + gitleaks, todos los refs) | Ninguna por ahora |
- Purgar el historial es opcional y no
+**Lo que de verdad protege es rotar.** Purgar el historial es opcional y no
 sustituye a la rotación (cualquier clon o fork anterior conserva las claves).
 
 ## 1. Rotar cada proveedor (hoy)
