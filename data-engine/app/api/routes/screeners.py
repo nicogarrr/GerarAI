@@ -9,13 +9,17 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.core.tenancy import tenant_filters
 from app.models import CustomMetricDefinition, SavedScreen
-from app.services.screener_service import CustomMetricService, ScreenerService
+from app.services.screener_service import (
+    DUPLICATE_SCREEN_NAME,
+    CustomMetricService,
+    ScreenerService,
+)
 
 router = APIRouter()
 
@@ -131,24 +135,21 @@ def update_screen(screen_id: int, payload: ScreenCreate, db: Session = Depends(g
         if payload.ranking_formula:
             from app.services.screener_service import SafeFormula
             SafeFormula(payload.ranking_formula)
+        name = service.claim_screen_name(db, payload.name, exclude_id=screen.id)
     except ValueError as exc:
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    if not payload.name.strip():
-        raise HTTPException(status_code=400, detail="El nombre no puede estar vacío")
-    duplicate = db.scalar(select(SavedScreen.id).where(
-        SavedScreen.name == payload.name.strip(),
-        SavedScreen.id != screen.id,
-        *tenant_filters(db, SavedScreen),
-    ))
-    if duplicate is not None:
-        raise HTTPException(status_code=400, detail="Ya existe un filtro con ese nombre")
-    screen.name = payload.name.strip()
+    screen.name = name
     screen.description = payload.description.strip()
     screen.criteria = criteria
     screen.ranking_formula = payload.ranking_formula
     screen.ranking_direction = payload.ranking_direction
     screen.alerts_enabled = payload.alerts_enabled
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=DUPLICATE_SCREEN_NAME) from exc
     db.refresh(screen)
     return _screen_payload(screen)
 
