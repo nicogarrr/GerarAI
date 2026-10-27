@@ -393,6 +393,11 @@ def auto_link_journal_trades(
                 meta["auto_link"] = {"status": "ambiguous", "candidate_transaction_ids": ids, "at": now}
                 entry.metadata_ = meta
             summary["ambiguous"] += 1
+        elif (meta.get("auto_link") or {}).get("status") == "ambiguous":
+            # Ya no hay candidatas (fechas editadas, importacion corregida...): se limpia
+            # la marca para no ofrecer candidatas obsoletas.
+            meta.pop("auto_link", None)
+            entry.metadata_ = meta
     return summary
 
 

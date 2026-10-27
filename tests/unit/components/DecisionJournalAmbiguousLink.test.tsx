@@ -80,3 +80,18 @@ describe('Diario: enlace automático visible', () => {
         expect(screen.getByRole('button', { name: 'Corregir / desenlazar' })).toBeTruthy();
     });
 });
+
+describe('Diario: sin candidatas vigentes no se ofrecen todas las operaciones', () => {
+    it('no muestra selector si las candidatas ya no existen', () => {
+        render(
+            <DecisionAndRealityPanel
+                ticker="UBER"
+                decisions={[{ ...base, metadata: { auto_link: { status: 'ambiguous', candidate_transaction_ids: [1, 2] } } } as never]}
+                reviews={[]}
+                trades={[trade(11), trade(99)]}
+            />,
+        );
+        expect(screen.queryByLabelText('Enlazar a una operación')).toBeNull();
+        expect(screen.getByRole('button', { name: 'No enlazar (sin operación)' })).toBeTruthy();
+    });
+});

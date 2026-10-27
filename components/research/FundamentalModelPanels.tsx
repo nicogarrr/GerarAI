@@ -428,6 +428,8 @@ export function DecisionAndRealityPanel({
                       Hay varias operaciones posibles para esta decisión y no se ha enlazado ninguna sola. Elige cuál la ejecutó, o deja la decisión sin operación.
                     </p>
                   ) : null}
+                  {tradesForEntry(trades, entry.metadata).length > 0 ? (
+                    <>
                   <select aria-label="Enlazar a una operación" className={`${selectClass} h-8 text-xs`} defaultValue="" name="transaction_id" required>
                     <option disabled value="">Enlazar a una operación…</option>
                     {tradesForEntry(trades, entry.metadata).map((trade) => (
@@ -435,6 +437,8 @@ export function DecisionAndRealityPanel({
                     ))}
                   </select>
                   <Button size="sm" type="submit" variant="outline">Enlazar</Button>
+                    </>
+                  ) : null}
                 </MutationForm>
               ) : null}
               {!entry.transaction && ambiguousCandidateIds(entry.metadata) ? (
@@ -537,12 +541,12 @@ function ambiguousCandidateIds(metadata: Record<string, unknown> | undefined): n
   return ids.length > 0 ? ids : null;
 }
 
-/** Con ambigüedad, el selector ofrece SOLO las candidatas (si siguen existiendo); si no, todas. */
+/** Con ambigüedad, el selector ofrece SOLO las candidatas que siguen existiendo (puede quedar vacío); nunca todas. */
 function tradesForEntry(trades: JournalTrade[], metadata: Record<string, unknown> | undefined): JournalTrade[] {
   const ids = ambiguousCandidateIds(metadata);
   if (!ids) return trades;
   const subset = trades.filter((trade) => ids.includes(trade.id));
-  return subset.length > 0 ? subset : trades;
+  return subset;
 }
 
 function isAutoLinked(metadata: Record<string, unknown> | undefined): boolean {

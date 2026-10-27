@@ -292,3 +292,23 @@ def test_manual_link_is_never_undone_by_new_fills():
     assert auto_link_journal_trades(db) == {"linked": 0, "ambiguous": 0, "unlinked": 0}
     db.refresh(entry)
     assert entry.transaction_id == first.id
+
+
+def test_stale_ambiguous_mark_is_cleared_when_no_candidates_remain():
+    db = _db()
+    c = _company(db)
+    entry = _entry(db, c)
+    t1 = _trade(db, c, date(2026, 3, 10), qty="4")
+    t2 = _trade(db, c, date(2026, 3, 10), qty="6")
+    auto_link_journal_trades(db)
+    db.commit()
+    db.refresh(entry)
+    assert entry.metadata_["auto_link"]["status"] == "ambiguous"
+    for t in (t1, t2):
+        t.trade_date = date(2026, 4, 30)  # fuera de ventana
+    db.commit()
+    auto_link_journal_trades(db)
+    db.commit()
+    db.refresh(entry)
+    assert entry.transaction_id is None
+    assert "auto_link" not in (entry.metadata_ or {})
