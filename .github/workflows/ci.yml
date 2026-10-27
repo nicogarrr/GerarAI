@@ -593,17 +593,17 @@ jobs:
           cache: pip
           cache-dependency-path: data-engine/requirements.txt
       - run: npm ci
-      # Gate: solo dependencias que se envian (--omit=dev). Las advisories de la
-      # cadena de desarrollo (eslint/typescript-eslint) no llegan a produccion;
-      # se siguen mostrando en el paso informativo de abajo sin bloquear el PR.
-      # RECORDATORIO: volver a hacer bloqueante el audit completo (quitar
-      # `continue-on-error` del segundo paso) en cuanto braces publique
-      # parche para GHSA-vfj7-8cjw-p6xm.
+      # Dos pasos bloqueantes: produccion (--omit=dev) y el arbol completo
+      # (incluye desarrollo). Se mantienen separados para que el log diga si la
+      # advisory llega a lo que se envia o solo a la cadena de desarrollo.
+      # El segundo fue informativo (`continue-on-error`) mientras
+      # GHSA-vfj7-8cjw-p6xm (braces <=3.0.3) no tenia parche; GitHub retiro esa
+      # advisory y `npm audit` del arbol completo vuelve a dar 0 hallazgos, asi
+      # que vuelve a bloquear como pedia el recordatorio de #806.
       - name: Audit npm dependencies (produccion)
         run: npm audit --omit=dev --audit-level=high
-      - name: Audit npm dependencies (incluye desarrollo, informativo)
+      - name: Audit npm dependencies (incluye desarrollo)
         if: ${{ always() }}
-        continue-on-error: true
         run: npm audit --audit-level=high
       # `if: always()` en los dos pasos de pip: un `npm audit` en rojo no debe
       # dejar el lado Python sin auditar. Los dos hallazgos se ven juntos.
@@ -612,12 +612,11 @@ jobs:
         run: python -m pip install --upgrade pip pip-audit
       - name: Audit Python dependencies
         if: ${{ always() }}
-        # PYSEC-2026-3740 (GHSA-8mgp-746c-j5xp, nltk 3.10.3, transitiva de
-        # llama-index-core): sin version corregida publicada. Afecta a
-        # TransitionParser/PerceptronTagger (carga/guardado de modelos con rutas
-        # arbitrarias); el RAG de conocimiento no importa nltk ni esas APIs.
-        # QUITAR el --ignore-vuln en cuanto nltk publique parche.
-        run: python -m pip_audit -r data-engine/requirements.txt --ignore-vuln PYSEC-2026-3740
+        # Sin --ignore-vuln: PYSEC-2026-3740 (GHSA-8mgp-746c-j5xp, nltk 3.10.3,
+        # transitiva de llama-index-core) quedo corregida en nltk 3.10.4, que es
+        # la que resuelve requirements.txt y la que fija uv.lock. Si vuelve a
+        # hacer falta ignorar algo, que sea con fecha y motivo aqui mismo.
+        run: python -m pip_audit -r data-engine/requirements.txt
 
   e2e:
     name: Research API E2E
