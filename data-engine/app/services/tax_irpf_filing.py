@@ -137,7 +137,16 @@ def savings_bands(year: int) -> tuple:
     - 2012-2014: RDL 20/2011 (BOE-A-2011-20638), gravamen complementario: 21/25/27.
     - 2010-2011: Ley 26/2009 (PGE 2010): 19/21.
     - 2007-2009: Ley 35/2006: tipo unico del 18 %.
+
+    Fail-closed: sin escala verificada para el ejercicio se lanza
+    ValueError, nunca se aplica la de otro periodo en silencio (antes un
+    ejercicio < 2007 heredaba el 18 % de 2007-2009 como si fuera vigente).
     """
+    if year < 2007:
+        raise ValueError(
+            f"Escala del ahorro no verificada para el ejercicio {year}: "
+            "solo estan documentadas las escalas de 2007 en adelante."
+        )
     if year >= 2025:
         return _BRACKETS_2025
     if year >= 2023:
@@ -334,10 +343,18 @@ def _treaty_creditable(bucket: dict, gross: Decimal, withheld: Decimal, rate: De
             continue
         prior = [d for d in dates if d < day]
         assigned[prior[-1] if prior else dates[0]] += amount
-    return sum(
+    result = sum(
         (min(max(assigned[d], Decimal("0")), gross_by_date[d] * rate) for d in dates),
         Decimal("0"),
     )
+    if any(assigned[d] < 0 for d in dates):
+        # Reversion/ajuste que no cabe en el dividendo al que la fecha lo
+        # imputa: recortar con max(., 0) EVAPORA el negativo sobrante y la
+        # deduccion sale inflada (se acredita impuesto ya devuelto). La fecha
+        # no dice a que dividendo pertenece la reversion: suelo conservador,
+        # nunca por encima del neto retenido del bloque ni del tope por valor.
+        return min(result, block_cap)
+    return result
 
 
 def build_double_taxation(
@@ -416,6 +433,35 @@ def build_double_taxation(
                     "Tipo de pago especial (" + ", ".join(special) + "): no es "
                     "un dividendo ordinario y su tratamiento fiscal difiere; "
                     "no entra en la deducción automática."
+                ),
+            })
+            continue
+        bucket_payments = bucket.get("payments") or []
+        has_reversal = any(
+            payment.get("type") == "withholding"
+            and payment.get("amount_base") is not None
+            and Decimal(str(payment["amount_base"])) < 0
+            for payment in bucket_payments
+        )
+        dividend_dates = {
+            str(payment["date"])
+            for payment in bucket_payments
+            if payment.get("type") == "dividend" and payment.get("date")
+        }
+        if has_reversal and len(dividend_dates) > 1:
+            # Reversion (p. ej. devolucion del exceso de retencion) con varios
+            # dividendos en el ejercicio: la fecha no identifica el dividendo
+            # al que se aplica y una atribucion por proximidad infla o recorta
+            # la deduccion. Revision manual, nunca una cifra con pinta de exacta.
+            if may_be_es:
+                es_incomplete = True
+            manual_review.append({
+                "ticker": bucket["ticker"],
+                "reason": (
+                    "Reversion o ajuste de retencion con varios dividendos en el "
+                    "ejercicio: no se puede atribuir por fecha al dividendo que la "
+                    "origino; imputa la reversion a su dividendo y recalcula la "
+                    "deduccion a mano."
                 ),
             })
             continue
