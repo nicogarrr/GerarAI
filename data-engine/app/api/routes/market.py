@@ -303,7 +303,13 @@ def _fetch_yahoo_candles(
             v.append(optional_value(volumes_raw, index))
         if not c:
             return None
-        return {"s": "ok", "c": c, "t": t, "o": o, "h": h, "l": l, "v": v}
+        payload = {"s": "ok", "c": c, "t": t, "o": o, "h": h, "l": l, "v": v}
+        # Divisa de ESTA misma respuesta de Yahoo (GBp en LSE, ZAc en JSE...): las
+        # velas no la traen por fila, y sin ella la cabecera no puede probar la unidad.
+        meta_currency = (result.get("meta") or {}).get("currency")
+        if isinstance(meta_currency, str) and meta_currency.strip():
+            payload["currency"] = meta_currency.strip()
+        return payload
     except (KeyError, IndexError, TypeError, ValueError):
         return None
 

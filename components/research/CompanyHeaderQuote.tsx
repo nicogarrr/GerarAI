@@ -126,7 +126,7 @@ export function CompanyHeaderQuote({
     // divisa propia; solo hay fallback si el maestro ya declara la subunidad
     // (la misma divisa que rotula el gráfico). Con la unidad grande (GBP en un
     // .L) la escala sería ambigua (x100): sin fallback.
-    const fallbackCurrency = chartFallbackCurrency({ ticker: snapshot.ticker, symbol, exchange: snapshot.exchange, currency: snapshot.currency });
+    const fallbackCurrency = chartFallbackCurrency({ ticker: snapshot.ticker, symbol, exchange: snapshot.exchange, currency: snapshot.currency, candleCurrency: snapshot.historyCurrency });
     const useFallback = !showPrice && (slow || settled) && fallbackPrice != null && isValidCurrencyCode(fallbackCurrency);
     // La vela de hoy puede ser parcial (sesión abierta): solo es «cierre» si es
     // anterior a la fecha actual en Nueva York; si no, se rotula «Última vela».

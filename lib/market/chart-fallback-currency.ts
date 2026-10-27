@@ -27,10 +27,22 @@ export function isSubunitListing(input: { ticker: string; symbol?: string | null
         || (currency != null && SUBUNIT_CURRENCIES.has(currency));
 }
 
-/** null = no hay divisa fiable para rotular el cierre de las velas (sin fallback). */
-export function chartFallbackCurrency(input: { ticker: string; symbol?: string | null; exchange?: string | null; currency?: string | null }): string | null {
+/**
+ * null = no hay divisa fiable para rotular el cierre de las velas (sin fallback).
+ *
+ * `candleCurrency` es la divisa que el proveedor declara en la MISMA respuesta de
+ * velas (Yahoo `meta.currency`). En un listado en subunidad es obligatoria y debe
+ * coincidir con el maestro (tras normalizar GBp->GBX): si falta o discrepa, la
+ * escala (x100) no se puede probar y la cabecera queda en N/D. En el resto de
+ * listados, una divisa de velas que discrepa del maestro también anula el
+ * fallback; si no la trae (Finnhub), se mantiene el comportamiento anterior.
+ */
+export function chartFallbackCurrency(input: { ticker: string; symbol?: string | null; exchange?: string | null; currency?: string | null; candleCurrency?: string | null }): string | null {
     const currency = normalizeSubunitCurrency(input.currency);
     if (!currency || !/^[A-Z]{3}$/.test(currency)) return null;
+    const candle = normalizeSubunitCurrency(input.candleCurrency);
+    if (candle != null && candle !== currency) return null;
     if (!isSubunitListing(input)) return currency;
-    return SUBUNIT_CURRENCIES.has(currency) ? currency : null;
+    if (!SUBUNIT_CURRENCIES.has(currency)) return null;
+    return candle === currency ? currency : null;
 }
