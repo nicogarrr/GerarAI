@@ -233,6 +233,14 @@ def simulate_hypothetical_sale(
 ) -> HypoSale:
     """Ganancia FIFO en euros e IRPF de vender los lotes dados (o parte)."""
     today = today or date.today()
+    from app.services.tax_sale_intent import sale_intent_issue
+
+    issue = sale_intent_issue(question)
+    if issue:
+        return HypoSale(
+            quantity=Decimal("0"), held=sum((lot.quantity for lot in lots), Decimal("0")),
+            sale_price=None, sale_currency=TAX_CURRENCY, sale_price_source="falta", missing=[issue],
+        )
     explicit = next((lot.currency for lot in lots if lot.currency), None)
     sale = parse_sale_price(question)
     company_ccy = (company.currency or None) if company is not None else None
