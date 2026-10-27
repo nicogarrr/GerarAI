@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, MarketPrice, ProPickCandidate, ProPickRun
+from app.services.connectors.yahoo import yahoo_chart_symbol
 
 # Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
 # eran dias de bolsa y salian como ~4 y ~8 meses etiquetados 6m/12m.
@@ -43,6 +44,10 @@ _EXCHANGE_YAHOO_SUFFIX = {
     "BME": ".MC",
     "BOLSA DE MADRID": ".MC",
     "NYSE EURONEXT - EURONEXT AMSTERDAM": ".AS",
+    # Mismos alias que wacc_input_service (F156): en prod el exchange llega
+    # tambien como «EURONEXT AMSTERDAM» o «NYSE EURONEXT - AMSTERDAM».
+    "EURONEXT AMSTERDAM": ".AS",
+    "NYSE EURONEXT - AMSTERDAM": ".AS",
     "TORONTO STOCK EXCHANGE": ".TO",
     "SWISS EXCHANGE": ".SW",
     # XETRA -> .DE verificado contra Yahoo chart API 2026-09-27: SAP.DE =
@@ -66,7 +71,10 @@ def yahoo_symbol(company: Company) -> str | None:
     if not ticker:
         return None
     if "." in ticker:
-        return ticker
+        # Clase US con punto (BRK.B, convencion del master) -> guion (BRK-B):
+        # yfinance no devuelve barras para «BRK.B». Un sufijo de bolsa
+        # (SAN.MC, CGEO.L) pasa intacto.
+        return yahoo_chart_symbol(ticker)
     exchange = (getattr(company, "exchange", "") or "").strip().upper()
     currency = (getattr(company, "currency", "") or "").strip().upper()
     suffix = _EXCHANGE_YAHOO_SUFFIX.get(exchange)
