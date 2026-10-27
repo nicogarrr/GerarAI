@@ -10,7 +10,7 @@ function Fixture({ active }: { active: string }) {
 
 it('reveals a selected tab to the right on direct URL entry and to the left on URL changes', () => {
     let rect = { left: 480, right: 610 };
-    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
         return (this.getAttribute('role') === 'tab' ? rect : { left: 16, right: 374 }) as DOMRect;
     });
     const { getByTestId, rerender } = render(<Fixture active="posiciones" />);
