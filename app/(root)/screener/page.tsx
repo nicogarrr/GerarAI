@@ -221,8 +221,8 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         />
       </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-3">
-        <Card className="min-w-0 border-gray-800 lg:col-span-2">
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.4fr)]">
+        <Card className="min-w-0 border-gray-800">
           <CardHeader>
             <CardTitle className="text-base break-words">Oportunidades — {sectorEs(sector)}</CardTitle>
           </CardHeader>
@@ -376,12 +376,12 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
               <>
                 <div className="space-y-3">
                   {validIndices.map((i) => (
-                    <div key={i.symbol} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1">
-                      <span className="min-w-0 break-words text-gray-300">{i.name}</span>
+                    <div key={i.symbol} className="min-w-0 space-y-1 border-b border-gray-800 pb-3 last:border-0 last:pb-0">
+                      <span className="block text-sm leading-5 text-gray-300">{i.name}</span>
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ' ptos.' : ''}</span>
                       </div>
-                      <div className="col-span-2 text-right text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
+                      <div className="text-right text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open')}</div>
                     </div>
                   ))}
                   {validIndices.length === 0 && <p className="text-sm text-gray-500">Sin datos de índices</p>}
