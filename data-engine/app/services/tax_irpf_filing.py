@@ -80,9 +80,22 @@ TREATY_DIVIDEND_RATES = {
     # España-EE.UU. (BOE-A-1990-30940, art. 10.2.b): 15% para persona física
     # minorista (el 5% del art. 10.2.a exige sociedad con >=10% del capital).
     "US": Decimal("0.15"),
+    # España-China 2018 (BOE-A-2021-4911, art. 10.2.b): 10% "en todos los
+    # demás casos" (el 5% del art. 10.2.a exige sociedad con >=25%).
+    # Ojo: muchos ADR chinos (BABA, BIDU…) son sociedades de las Islas
+    # Caimán; si el domicilio del emisor es KY no hay convenio y va a
+    # revisión manual.
+    "CN": Decimal("0.10"),
+    # España-Reino Unido 2013 (BOE-A-2014-5171, art. 10.2.a.i): 10%. El 15%
+    # del art. 10.2.a.ii (vehículos inmobiliarios tipo REIT) no se distingue
+    # aquí. El Reino Unido no retiene en origen sobre dividendos ordinarios,
+    # así que lo normal es retención 0 y deducción 0.
+    "GB": Decimal("0.10"),
 }
 TREATY_RATE_SOURCES = {
     "US": "BOE-A-1990-30940 art. 10.2.b (convenio España-EE.UU.)",
+    "CN": "BOE-A-2021-4911 art. 10.2.b (convenio España-China 2018)",
+    "GB": "BOE-A-2014-5171 art. 10.2.a.i (convenio España-Reino Unido)",
 }
 
 UNKNOWN_COUNTRY = "??"
