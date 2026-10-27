@@ -94,18 +94,20 @@ def test_chat_and_debate_share_per_model_breaker():
 
 
 def test_paid_environment_cannot_reach_debate_transport():
+    # Con modelos no aprobados no hay debate: ni el modelo de pago ni un free
+    # de respaldo silencioso (antes caia a deepseek-v4.1-flash-free).
     calls = []
     def handle(req):
         calls.append(json.loads(req.content)["model"])
         return httpx.Response(200, json=envelope())
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
-            provider = create_free_interactive_provider(settings(
+            create_free_interactive_provider(settings(
                 opencode_go_model="paid", opencode_go_fallback_model="also-paid",
                 llm_model_overrides={"deepseek-v4.1-flash-free": "paid"}), client=client)
-            await provider.complete(LLMRequest([Message("user", "hola")], task="red_team"))
-    asyncio.run(run())
-    assert calls == ["deepseek-v4.1-flash-free"]
+    with pytest.raises(FreeLLMUnavailable):
+        asyncio.run(run())
+    assert calls == []
 
 
 def test_429_breaker_expiry_reprobes(monkeypatch):

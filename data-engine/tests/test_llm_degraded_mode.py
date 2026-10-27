@@ -1,9 +1,9 @@
 """Modo degradado y cascada de respaldo del LLM (revision GerarAI, hallazgo M1).
 
-Antes todo dependia del primario OpenCode Go y los respaldos gratuitos
-(Groq, Gemini) habia que encenderlos a mano con un flag. Ahora el flag tiene
-un modo ``auto`` (por defecto): el respaldo entra solo si su clave y las
-confirmaciones de plan gratuito existen; sin clave se salta, nunca se finge.
+Decision del dueno (2026-10-27): todo el LLM va por su OpenCode Go con
+DeepSeek V4.1 Flash. Los respaldos (Groq, Gemini) solo entran con el flag a
+``true`` explicito; ``auto`` (por defecto) los deja APAGADOS aunque haya clave
+y confirmaciones, para que nunca respondan sin que se vea.
 
 Pruebas deterministas: el transporte HTTP es un ``httpx.MockTransport``, no
 sale ninguna peticion real y no hace falta ninguna clave de verdad.
@@ -40,6 +40,8 @@ GROQ_READY = {
     "groq_zdr_confirmed": True,
 }
 GEMINI_READY = {"gemini_api_key": "gm-sintetica", "gemini_free_plan_confirmed": True}
+GROQ_ON = {**GROQ_READY, "groq_chat_fallback_enabled": True}
+GEMINI_ON = {**GEMINI_READY, "gemini_chat_fallback_enabled": True}
 
 
 def _settings(**over) -> Settings:
@@ -123,13 +125,17 @@ def test_auto_string_from_env_parses_to_auto(raw: str) -> None:
     assert settings.gemini_chat_fallback_enabled is None
 
 
-def test_env_var_auto_turns_fallbacks_on_when_keys_and_confirmations_exist(monkeypatch) -> None:
+def test_env_var_auto_keeps_fallbacks_off_even_with_keys_and_confirmations(monkeypatch) -> None:
     monkeypatch.setenv("GROQ_CHAT_FALLBACK_ENABLED", "auto")
     monkeypatch.setenv("GEMINI_CHAT_FALLBACK_ENABLED", "auto")
     settings = _settings(**GROQ_READY, **GEMINI_READY)
-    assert settings.groq_chat_fallback_active is True
-    assert settings.gemini_chat_fallback_active is True
-    provider = create_background_llm_provider(settings)
+    assert settings.groq_chat_fallback_active is False
+    assert settings.gemini_chat_fallback_active is False
+    assert create_background_llm_provider(settings).name == "opencode-go"
+
+
+def test_explicit_true_turns_the_background_chain_on() -> None:
+    provider = create_background_llm_provider(_settings(**GROQ_ON, **GEMINI_ON))
     assert isinstance(provider, SequentialFallbackProvider)
     assert provider.backup is not None and provider.backup.name == "groq"
     assert provider.backup2 is not None and provider.backup2.name == "gemini"
@@ -167,8 +173,14 @@ def test_auto_does_not_stack_platform_fallbacks_on_the_cascade_provider() -> Non
     assert settings.gemini_chat_fallback_active is False
 
 
-def test_chat_chain_is_built_in_auto_mode() -> None:
+def test_chat_in_auto_mode_is_only_the_owner_go_primary() -> None:
     chat = create_chat_llm_provider(_settings(**GROQ_READY, **GEMINI_READY))
+    assert getattr(chat, "backup", None) is None
+    assert chat.name == "opencode-go-subscription"
+
+
+def test_chat_chain_is_built_only_with_explicit_opt_in() -> None:
+    chat = create_chat_llm_provider(_settings(**GROQ_ON, **GEMINI_ON))
     backup, backup2 = getattr(chat, "backup", None), getattr(chat, "backup2", None)
     assert backup is not None and backup.name == "groq"
     assert backup2 is not None and backup2.name == "gemini"
@@ -183,7 +195,7 @@ def test_primary_down_falls_through_to_next_free_provider() -> None:
     async def scenario() -> tuple[str, str, str]:
         async with upstreams.client() as client:
             provider = create_background_llm_provider(
-                _settings(**GROQ_READY), client=client
+                _settings(**GROQ_ON), client=client
             )
             assert isinstance(provider, SequentialFallbackProvider)
             provider.retry_pause = 0
@@ -206,7 +218,7 @@ def test_groq_down_falls_through_to_gemini() -> None:
     async def scenario():
         async with upstreams.client() as client:
             provider = create_background_llm_provider(
-                _settings(**GROQ_READY, **GEMINI_READY), client=client
+                _settings(**GROQ_ON, **GEMINI_ON), client=client
             )
             provider.retry_pause = 0  # pyright: ignore[reportAttributeAccessIssue]
             return await provider.complete(REQ)
@@ -225,7 +237,7 @@ def test_all_providers_down_raises_and_chat_declares_degraded_answer() -> None:
     async def scenario():
         async with upstreams.client() as client:
             provider = create_background_llm_provider(
-                _settings(**GROQ_READY, **GEMINI_READY), client=client
+                _settings(**GROQ_ON, **GEMINI_ON), client=client
             )
             provider.retry_pause = 0  # pyright: ignore[reportAttributeAccessIssue]
             with pytest.raises(LLMError):

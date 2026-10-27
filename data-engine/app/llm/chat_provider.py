@@ -475,9 +475,11 @@ def _gemini_backup(
 
 
 def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> tuple[tuple[OpenAICompatibleProvider, str], ...]:
-    """OpenRouter solo si ya hay clave y el modelo es :free; nunca crea cuentas."""
+    """OpenRouter solo si se pide (OPENROUTER_CHAT_FALLBACK_ENABLED=true), hay clave y el modelo es :free."""
     key = settings.openrouter_api_key
     model = settings.openrouter_model
+    if not settings.openrouter_chat_fallback_enabled:
+        return ()
     if not (key and str(key).strip()) or not model.endswith(":free"):
         return ()
     return ((OpenAICompatibleProvider(
