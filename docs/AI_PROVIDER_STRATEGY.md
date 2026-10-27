@@ -12,10 +12,20 @@ and it is not billed per token: the cost is the existing subscription.
 https://opencode.ai/zen/go/v1/chat/completions
 ```
 
-The owner approved this model explicitly. The rest of the providers stay
-opt-in and OFF by default:
+The owner approved this model explicitly. The rest of the providers are free
+backups in `auto` mode (review finding M1): `GROQ_CHAT_FALLBACK_ENABLED` and
+`GEMINI_CHAT_FALLBACK_ENABLED` default to `auto`, which builds a backup ONLY
+when its key and its free-plan confirmations are present (Groq also needs
+`GROQ_ZDR_CONFIRMED=true`) and the primary is OpenCode Go. Without a key a
+backup is skipped, never faked; `false` keeps it off even with a key; `true`
+makes it mandatory (provider construction fails if something is missing).
+The chat and background chains then run Go -> Groq -> Gemini (OpenRouter
+`:free` after Groq in the chat). `tests/test_llm_degraded_mode.py` exercises
+the chain with a mocked transport, including "all providers down" and
+`LLM_PROVIDER=disabled` (deterministic answer flagged as fallback, no LLM
+text).
 
-- Groq (`openai/gpt-oss-120b`): optional chat-only backup.
+- Groq (`openai/gpt-oss-120b`): chat and background backup.
 - Gemini AI Studio: optional backup after Groq; requires confirming the key's
   project has no billing.
 - OpenRouter `:free`: optional last-resort chat backup; requires a key and a
@@ -104,8 +114,8 @@ override is rejected before any network call; the default configuration never
 returns `chat_primary_not_verified_free`. `LLM_PROVIDER=disabled` (or
 `LLM_ENABLED=false`) does not build the Go primary or any backup: chat returns
 `disabled_by_configuration` and readiness stays 503. Groq/Gemini/OpenRouter
-only join when their flags and confirmations are explicit; otherwise they are
-not built.
+only join when their keys and free-plan confirmations are present (flag
+`auto`, the default) or their flag is `true`; otherwise they are not built.
 
 `OPENCODE_GO_FALLBACK_MODEL` is passed to the Go subscription primary. If the
 primary model fails, the adapter retries once with that model; the fallback
