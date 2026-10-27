@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -13,6 +14,8 @@ from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, InsiderFiling, InsiderTransaction
 from app.services import insider_feed, insider_operations, insider_service
 from app.services.ticker_ownership_signals import ownership_signals
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -104,9 +107,45 @@ def insider_ownership_signals(
     """Resumen para la tesis y la ficha: insiders (Form 4, 180 dias) + fondos 13F.
 
     Solo lee lo persistido (sin red). Nunca 500: un bloque que falla queda en
-    ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo.
+    ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo. Si la cuenta
+    aun no tiene ningun 13F sincronizado, encola UNA vez su primera descarga
+    (no espera al cron del lunes) y lo dice en el detalle.
     """
-    return ownership_signals(db, ticker)
+    out = ownership_signals(db, ticker)
+    holders = out.get("holders")
+    if isinstance(holders, dict) and holders.get("reason") == "sin_sincronizar":
+        if _queue_first_13f_sync(db):
+            holders["sync"] = "queued"
+            holders["detail"] = (
+                "Tu cuenta aún no tenía los 13F de los gestores revisados: la primera descarga "
+                "de la SEC ya está en marcha y tarda unos minutos. Después se actualizan cada lunes."
+            )
+    return out
+
+
+# Primera descarga 13F por tenant: como mucho una cada 30 min por proceso; el
+# actor ademas toma un lease por tenant, asi que dos peticiones no duplican trabajo.
+_FIRST_13F_SYNC_COOLDOWN_SECONDS = 1800
+_first_13f_sync_at: dict[str, float] = {}
+
+
+def _queue_first_13f_sync(db: Session) -> bool:
+    import time
+
+    tenant = str(db.info.get("tenant_id") or "legacy")
+    now = time.monotonic()
+    last = _first_13f_sync_at.get(tenant)
+    if last is not None and now - last < _FIRST_13F_SYNC_COOLDOWN_SECONDS:
+        return True
+    try:
+        from app.workers.dramatiq_app import sync_investor_holdings
+
+        sync_investor_holdings.send(tenant_id=db.info.get("tenant_id"), user_id=db.info.get("user_id"))
+    except Exception:  # noqa: BLE001 - sin broker el resumen sigue respondiendo
+        logger.warning("no se pudo encolar la primera sincronizacion 13F", exc_info=True)
+        return False
+    _first_13f_sync_at[tenant] = now
+    return True
 
 
 @router.get("/filings")
