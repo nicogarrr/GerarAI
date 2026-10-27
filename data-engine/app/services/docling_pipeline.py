@@ -251,6 +251,23 @@ def count_table_pipe_lines(markdown: str) -> int:
     return pipe_lines
 
 
+# Palabras pegadas: algunos PDF (p. ej. la carta de Berkshire de 2008) no
+# llevan espacios reales entre palabras y MarkItDown/pdfminer los devuelve como
+# "Bewaretheinvestmentactivitythat...". Un texto normal casi no tiene palabras
+# de 20+ letras; con mas de un 2 % de ellas el carril rapido no sirve.
+_GLUED_MIN_WORD = 20
+_GLUED_MAX_RATIO = 0.02
+_GLUED_MIN_WORDS = 200
+
+
+def glued_words_ratio(text: str) -> float:
+    """Proporcion de palabras alfabeticas de 20+ letras (sintoma de espacios perdidos)."""
+    words = re.findall(r"[^\W\d_]+", text or "")
+    if len(words) < _GLUED_MIN_WORDS:
+        return 0.0
+    return sum(1 for word in words if len(word) >= _GLUED_MIN_WORD) / len(words)
+
+
 def decide_lane(
     fast_markdown: str | None,
     *,
@@ -591,6 +608,7 @@ def parse_pdf_two_lane(
     xbrl_facts: list[dict[str, Any]] = extract_xbrl_facts(content) if xbrl else []
 
     fast_markdown: str | None = None
+    glued_fast = False
     if flags["markitdown_enabled"]:
         try:
             fast_markdown = convert_fast_markitdown(content, filename, ext)
@@ -598,6 +616,16 @@ def parse_pdf_two_lane(
             warnings.append(f"{exc} Carril pypdf clasico.")
         except _LaneFailed as exc:
             warnings.append(f"{exc} Carril pypdf clasico.")
+        glued = glued_words_ratio(fast_markdown or "")
+        if glued > _GLUED_MAX_RATIO:
+            # pypdf respeta los huecos entre glifos y devuelve las palabras
+            # separadas: mejor texto para trocear y buscar.
+            warnings.append(
+                f"MarkItDown pego palabras ({glued:.1%} de palabras con {_GLUED_MIN_WORD}+ letras); "
+                "carril pypdf clasico."
+            )
+            fast_markdown = None
+            glued_fast = True
     else:
         warnings.append("MARKITDOWN_ENABLED=0: pre-filtro rapido desactivado; carril pypdf clasico.")
 
@@ -612,7 +640,9 @@ def parse_pdf_two_lane(
 
     blocks: list[ParsedBlock] = []
     parser = LANE_PYPDF
-    fast_empty = not (fast_markdown or "").strip()
+    # Un rapido descartado por palabras pegadas no es un escaneado: no se
+    # dispara el OCR pesado por eso.
+    fast_empty = not (fast_markdown or "").strip() and not glued_fast
     heavy_attempted = False
 
     def _attempt_heavy(reason: str) -> bool:
