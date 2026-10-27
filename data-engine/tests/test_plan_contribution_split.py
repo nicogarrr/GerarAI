@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.models import Company, Position
@@ -66,19 +66,8 @@ def _plan(db: Session, targets: list[dict], amount: str = "300") -> None:
 
 
 def _dca_table(db: Session, rows: list[tuple[str, int | None, int]]) -> None:
-    db.execute(
-        text(
-            "CREATE TABLE dca_signal_states (id INTEGER PRIMARY KEY, tenant_id VARCHAR, symbol VARCHAR,"
-            " company_id INTEGER, level INTEGER, status VARCHAR, period VARCHAR, signal_date DATE)"
-        )
-    )
-    for index, (symbol, company_id, level) in enumerate(rows, start=1):
-        db.execute(
-            text(
-                "INSERT INTO dca_signal_states VALUES (:i, :t, :s, :c, :l, 'forming', '2026-10', '2026-10-24')"
-            ),
-            {"i": index, "t": TENANT, "s": symbol, "c": company_id, "l": level},
-        )
+    for symbol, company_id, level in rows:
+        db.add(_real_dca_row(tenant=TENANT, symbol=symbol, level=level, company_id=company_id))
     db.commit()
 
 
@@ -135,6 +124,7 @@ def test_targets_without_dca_table_degrade_to_target_weights(db):
             {"kind": "sector", "label": "Tech", "target_pct": 50, "band_pct": 5},
         ],
     )
+    _drop_dca_table(db)
     result = build_contribution_split(db)
     assert result["dca_available"] is False
     assert result["basis"] == "objetivos_ticker"
@@ -170,12 +160,7 @@ def test_other_tenant_dca_rows_are_ignored(db):
     pool = _company(db, "POOL")
     _plan(db, [{"kind": "ticker", "label": "POOL", "target_pct": 100, "band_pct": 5}])
     _dca_table(db, [])
-    db.execute(
-        text(
-            "INSERT INTO dca_signal_states VALUES (99, 'otro', 'POOL', :c, 4, 'closed', '2026-09', '2026-09-30')"
-        ),
-        {"c": pool.id},
-    )
+    _other_tenant_dca_row(db, tenant="otro", symbol="POOL", level=4, company_id=pool.id)
     db.commit()
     row = build_contribution_split(db)["allocations"][0]
     assert row["dca_level"] is None
@@ -211,3 +196,37 @@ def test_route_returns_split(db):
     _company(db, "POOL")
     _plan(db, [{"kind": "ticker", "label": "POOL", "target_pct": 100, "band_pct": 5}])
     assert contribution_split(db)["allocations"][0]["amount"] == 300.0
+
+
+def _real_dca_row(*, tenant, symbol, level, company_id=None, status="forming",
+                  period="2026-10", day=None, close="100"):
+    """Fila del modelo real (#2310): la tabla ya la crea Base.metadata."""
+    from datetime import date as _d
+    from decimal import Decimal as _D
+
+    from app.models.entities import DcaSignalState
+
+    return DcaSignalState(
+        tenant_id=tenant, symbol=symbol, company_id=company_id, level=level, status=status,
+        period=period, signal_date=day or _d(2026, 10, 24), close=_D(close), currency="USD",
+        metrics={}, level_prices={}, sources=[], params_version="nico-v1", data_source="test",
+    )
+
+
+def _drop_dca_table(db) -> None:
+    """Simula «motor DCA no desplegado»: sin la tabla real."""
+    from app.models.entities import DcaSignalState
+
+    DcaSignalState.__table__.drop(db.get_bind())
+
+
+def _other_tenant_dca_row(db, *, tenant, symbol, level, company_id=None, status="closed"):
+    """Fila de OTRO tenant: el ORM bloquea escrituras cruzadas, se inserta en SQL."""
+    from sqlalchemy import text as _text
+
+    db.execute(_text(
+        "INSERT INTO dca_signal_states (tenant_id, symbol, company_id, level, status, period, signal_date,"
+        " close, metrics, level_prices, sources, params_version, evaluated_at, data_source, created_at,"
+        " updated_at) VALUES (:t, :s, :c, :l, :st, '2026-09', '2026-09-30', 100, '{}', '{}', '[]',"
+        " 'nico-v1', '2026-09-30', 'test', '2026-09-30', '2026-09-30')"
+    ), {"t": tenant, "s": symbol, "c": company_id, "l": level, "st": status})

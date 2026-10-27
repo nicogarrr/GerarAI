@@ -68,10 +68,8 @@ def db():
 
 
 def _dca(db: Session, symbol: str, level: int, company_id=None) -> None:
-    db.execute(sa.text(
-        "INSERT INTO dca_signal_states (symbol, company_id, level, status, period, signal_date) "
-        "VALUES (:s, :c, :l, 'forming', '2026-10', :d)"
-    ), {"s": symbol, "c": company_id, "l": level, "d": date(2026, 10, 26)})
+    db.add(_real_dca_row(tenant=db.info.get("tenant_id"), symbol=symbol, level=level,
+                         company_id=company_id, day=date(2026, 10, 26)))
     db.commit()
 
 
@@ -114,7 +112,6 @@ def test_dca_level_degrades_cleanly_without_the_dca_table(db):
 
 
 def test_dca_level_read_by_company_id_or_symbol(db):
-    db.execute(sa.text(DCA_DDL))
     pool, uber, aapl = _company(db, "POOL"), _company(db, "UBER"), _company(db, "AAPL")
     _dca(db, "POOL", 4, company_id=pool.id)
     _dca(db, "UBER", 3)  # sin company_id: se casa por ticker
@@ -126,7 +123,6 @@ def test_dca_level_read_by_company_id_or_symbol(db):
 
 
 def test_screener_combines_the_three_filters(db):
-    db.execute(sa.text(DCA_DDL))
     pool, uber, aapl = _company(db, "POOL"), _company(db, "UBER"), _company(db, "AAPL")
     for company, mos, level in ((pool, 0.30, 4), (uber, 0.25, 2), (aapl, -0.10, 1)):
         _valuation(db, company, version=1, status="final", mos=mos)
@@ -149,6 +145,28 @@ def test_metric_coverage_lists_context_metrics_with_data(db):
     assert "tiene_tesis" in coverage
     assert "nivel_dca" not in coverage  # sin tabla DCA, no se ofrece
     assert set(CONTEXT_METRICS) >= {"margen_seguridad", "tiene_tesis", "tesis_publicada", "nivel_dca"}
+
+
+def _real_dca_row(*, tenant, symbol, level, company_id=None, status="forming",
+                  period="2026-10", day=None, close="100"):
+    """Fila del modelo real (#2310): la tabla ya la crea Base.metadata."""
+    from datetime import date as _d
+    from decimal import Decimal as _D
+
+    from app.models.entities import DcaSignalState
+
+    return DcaSignalState(
+        tenant_id=tenant, symbol=symbol, company_id=company_id, level=level, status=status,
+        period=period, signal_date=day or _d(2026, 10, 24), close=_D(close), currency="USD",
+        metrics={}, level_prices={}, sources=[], params_version="nico-v1", data_source="test",
+    )
+
+
+def _drop_dca_table(db) -> None:
+    """Simula «motor DCA no desplegado»: sin la tabla real."""
+    from app.models.entities import DcaSignalState
+
+    DcaSignalState.__table__.drop(db.get_bind())
 
 
 @pytest.mark.parametrize("convention", [None, "valuation-engines-v2", "future_formula"])

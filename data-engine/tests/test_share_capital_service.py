@@ -166,6 +166,9 @@ def test_ingestion_capital_flows_duration_and_provenance(setup, monkeypatch):
                  "end": "2025-12-31", "val": 7777, "filed": "2026-02-03"},
             ]
             return {"facts": {"us-gaap": {
+                # #2384: sin Assets/Liabilities/Equity la divisa de reporte es
+                # desconocida y los flujos en USD no se guardan.
+                "Assets": {"units": {"USD": entries}},
                 "PaymentsForRepurchaseOfCommonStock": {"units": {"USD": entries}},
                 "ProceedsFromIssuanceOfCommonStock": {"units": {"USD": entries}},
                 "CommonStockSharesOutstanding": {"units": {"shares": [{

@@ -673,7 +673,8 @@ def test_adr_gate_passes_without_a_ratio():
 def test_adr_gate_passes_with_a_ratio_when_everything_is_converted():
     artifact = _artifact(
         current_price=200.0,
-        margin_of_safety=15.0 / 25.0 - 1,
+        # #2338: margen de seguridad estandar (V - P) / V sobre la base comparable.
+        margin_of_safety=(15.0 - 25.0) / 15.0,
         adr_ratio=8.0,
         value_per_share_basis="ordinary_share",
         comparable_price_basis="ordinary_share",

@@ -79,6 +79,12 @@ class _FakeSECDTE:
                 _fy(2024, "2024-12-31", 12_459_000_000, "2025-02-13"),
                 _fy(2025, "2025-12-31", 13_000_000_000, "2026-02-12"),
             ]}},
+            # #2384: sin evidencia de divisa (Assets/Liabilities/Equity) la
+            # divisa de reporte es desconocida y no se guardan hechos en USD.
+            # Todo 10-K real trae Assets; el fake tambien.
+            "Assets": {"units": {"USD": [
+                _fy(2025, "2025-12-31", 50_000_000_000, "2026-02-12"),
+            ]}},
         }}}
 
 

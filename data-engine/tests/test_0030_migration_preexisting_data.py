@@ -13,7 +13,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
@@ -84,7 +83,7 @@ def _seed_preexisting_rows(database_url: str) -> tuple[int, int]:
     """Siembra via ORM (0030 no anade columnas: el ORM vale sobre 0029)."""
     from sqlalchemy.orm import sessionmaker
 
-    from app.models.entities import DecisionJournalEntry, ModelAlias, Tenant
+    from app.models.entities import ModelAlias, Tenant
 
     engine = create_engine(database_url)
     session = sessionmaker(bind=engine)()
@@ -120,16 +119,16 @@ def _seed_preexisting_rows(database_url: str) -> tuple[int, int]:
         )
         session.flush()
         company_id = session.scalar(text("SELECT id FROM companies WHERE ticker='SEED30'"))
-        session.add(
-            DecisionJournalEntry(
-                tenant_id=db_tenant.id,
-                company_id=company_id,
-                decision_date=date(2024, 5, 1),
-                decision="buy",
-                rationale="seeded before 0030",
-                what_must_be_true=["revenue grows"],
-                price=Decimal("100.5"),
-            )
+        # Igual que companies: #2348 anade transaction_id a decision_journal_entries
+        # y el INSERT del ORM la incluiria sobre el esquema 0029.
+        session.execute(
+            text(
+                "INSERT INTO decision_journal_entries (tenant_id, company_id, decision_date, decision,"
+                " rationale, what_must_be_true, price, status, metadata, created_at, updated_at)"
+                " VALUES (:tenant, :company, '2024-05-01', 'buy', 'seeded before 0030',"
+                " '[\"revenue grows\"]', 100.5, 'open', '{}', '2024-05-01 00:00:00', '2024-05-01 00:00:00')"
+            ),
+            {"tenant": db_tenant.id, "company": company_id},
         )
         session.commit()
         alias_id = session.scalar(text("SELECT id FROM model_aliases WHERE internal_alias='seed-alias-0030'")) or 0

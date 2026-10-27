@@ -39,7 +39,6 @@ class FakeDcaSignalState(_FakeBase):
 def db():
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
-    _FakeBase.metadata.create_all(engine)
     with Session(engine) as session:
         session.info["tenant_id"] = 1
         yield session
@@ -52,7 +51,8 @@ def without_engine(monkeypatch):
 
 @pytest.fixture
 def with_engine(monkeypatch):
-    monkeypatch.setattr(models, "DcaSignalState", FakeDcaSignalState, raising=False)
+    # #2310 ya trae el modelo real: el lector usa models.DcaSignalState tal cual.
+    assert getattr(models, "DcaSignalState", None) is not None
 
 
 def _company(db, ticker, currency="USD"):
@@ -64,9 +64,15 @@ def _company(db, ticker, currency="USD"):
 
 
 def _state(db, symbol, level, *, tenant=1, status="forming", close="100"):
-    db.add(FakeDcaSignalState(tenant_id=tenant, symbol=symbol, level=level, status=status, period="2026-10",
-                              signal_date=date(2026, 10, 26), close=Decimal(close), currency="USD",
-                              params_version="nico-v1", evaluated_at=datetime(2026, 10, 27, tzinfo=UTC)))
+    from app.models.entities import DcaSignalState
+
+    if tenant != db.info.get("tenant_id"):
+        _other_tenant_dca_row(db, tenant=tenant, symbol=symbol, level=level, status=status)
+        return
+    db.add(DcaSignalState(tenant_id=tenant, symbol=symbol, level=level, status=status, period="2026-10",
+                          signal_date=date(2026, 10, 26), close=Decimal(close), currency="USD",
+                          metrics={}, level_prices={}, sources=[], data_source="test",
+                          params_version="nico-v1", evaluated_at=datetime(2026, 10, 27, tzinfo=UTC)))
 
 
 def test_without_dca_engine_the_answer_is_sin_nivel(db, without_engine):
@@ -166,3 +172,15 @@ def test_engine_failure_is_said_not_invented(db, monkeypatch):
     resp = answer_data_question(db, "¿AAPL está infravalorada según el DCF?")
     assert resp is not None
     assert "no ha podido valorar AAPL" in resp.answer
+
+
+def _other_tenant_dca_row(db, *, tenant, symbol, level, company_id=None, status="closed"):
+    """Fila de OTRO tenant: el ORM bloquea escrituras cruzadas, se inserta en SQL."""
+    from sqlalchemy import text as _text
+
+    db.execute(_text(
+        "INSERT INTO dca_signal_states (tenant_id, symbol, company_id, level, status, period, signal_date,"
+        " close, metrics, level_prices, sources, params_version, evaluated_at, data_source, created_at,"
+        " updated_at) VALUES (:t, :s, :c, :l, :st, '2026-09', '2026-09-30', 100, '{}', '{}', '[]',"
+        " 'nico-v1', '2026-09-30', 'test', '2026-09-30', '2026-09-30')"
+    ), {"t": tenant, "s": symbol, "c": company_id, "l": level, "st": status})
