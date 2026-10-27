@@ -362,7 +362,10 @@ def replay_tax_fifo(events, resolve_rate, start, end):
                 "unit": unit_native,
                 "unit_base": unit_native * buy_rate if buy_rate is not None else None,
                 "deferred": Decimal("0"),
-                "deferred_base": Decimal("0"),
+                # Sin tipo de cambio de compra el coste en base es
+                # desconocido: el diferido en base tambien (None, ver
+                # _defer_base), nunca un 0 con pinta de dato conocido.
+                "deferred_base": Decimal("0") if buy_rate is not None else None,
                 "capacity": transaction.quantity,
                 "date": transaction.trade_date,
                 "currency": transaction.currency or TAX_CURRENCY,
