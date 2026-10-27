@@ -9,8 +9,10 @@ Telegram con suscripcion "dca_levels").
 
 Reglas de aviso (deduplicacion):
 
-* Solo avisa un CAMBIO de nivel respecto al guardado (o la primera evaluacion
-  de un ticker, si ya esta en un nivel >= minimo).
+* Solo avisa una SUBIDA de nivel respecto al guardado (1X -> 2X, 3X -> 4X;
+  hacia recorte: 1X -> ligero -> fuerte). Bajar de nivel no avisa.
+* La primera evaluacion de un ticker (sin estado guardado, p. ej. recien
+  anadido a la watchlist) solo guarda el nivel, sin aviso.
 * Huella ``dca_level:{simbolo}:{mes}:{nivel}``: el mismo nivel en el mismo mes
   nunca vuelve a avisar aunque el mes en formacion oscile (3X -> 2X -> 3X).
 * Escalar (2X -> 3X -> 4X) avisa de nuevo; seguir en el mismo nivel al
@@ -188,14 +190,18 @@ def should_alert(
     min_level: int,
     trims_enabled: bool,
 ) -> bool:
-    """Regla de aviso por cambio de nivel (sin mirar la huella del mes)."""
-    if previous_level is not None and level == previous_level:
+    """Regla de aviso por subida de nivel (sin mirar la huella del mes).
+
+    Sin nivel previo (primera evaluacion) no se avisa: se siembra el estado.
+    """
+    if previous_level is None or level == previous_level:
         return False
     if min_level <= 0:
         return False
     if level >= 1:
-        return level >= min_level
-    return bool(trims_enabled)
+        return level > previous_level and level >= min_level
+    # Recortes: entrar en recorte o pasar de ligero a fuerte.
+    return bool(trims_enabled) and (previous_level >= 1 or level < previous_level)
 
 
 def _yahoo_symbol_for(item: TrackedSymbol) -> str | None:

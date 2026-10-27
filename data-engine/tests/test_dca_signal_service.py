@@ -114,15 +114,20 @@ def _state(db, symbol) -> DcaSignalState:
 @pytest.mark.parametrize(
     ("level", "previous", "min_level", "trims", "expected"),
     [
-        (2, None, 2, False, True),
+        (2, None, 2, False, False),  # primera evaluacion: solo siembra
+        (4, None, 2, False, False),
+        (-2, None, 2, True, False),
         (1, None, 2, False, False),
         (3, 3, 2, False, False),
         (4, 3, 2, False, True),
-        (2, 3, 2, False, True),
-        (1, 2, 1, False, True),
+        (3, 1, 2, False, True),
+        (2, 3, 2, False, False),  # bajar de nivel no avisa
+        (1, 2, 1, False, False),
         (4, 1, 0, False, False),
         (-1, 1, 2, False, False),
         (-1, 1, 2, True, True),
+        (-2, -1, 2, True, True),
+        (-1, -2, 2, True, False),
         (-2, -2, 2, True, False),
         (-2, 1, 0, True, False),
     ],
@@ -131,41 +136,56 @@ def test_should_alert_rules(level, previous, min_level, trims, expected):
     assert should_alert(level=level, previous_level=previous, min_level=min_level, trims_enabled=trims) is expected
 
 
-def test_first_evaluation_alerts_only_at_or_above_min(db):
+def test_first_evaluation_seeds_state_without_alert(db):
     _watch(db, "UBER")
     _watch(db, "AAPL")
     fetcher = FakeFetcher()
-    fetcher.set("UBER", series(70.0))  # caida 30 % -> 3X
+    fetcher.set("UBER", series(70.0))  # caida 30 % -> 3X, pero es la primera vez
     fetcher.set("AAPL", series(100.0))  # 1X
     summary = _run(db, fetcher)
     assert summary["evaluated"] == 2
+    assert summary["alerted"] == []
+    assert _alerts(db) == []
+    uber = _state(db, "UBER")
+    assert (uber.level, uber.last_alerted_level) == (3, None)
+    assert uber.sources == ["watchlist"]
+    assert _state(db, "AAPL").last_alerted_level is None
+
+
+def test_escalation_after_seed_alerts_with_details(db):
+    _watch(db, "UBER")
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(80.0))  # 2X: siembra
+    _run(db, fetcher)
+    fetcher.set("UBER", series(70.0))  # sube a 3X: avisa
+    _run(db, fetcher)
     alerts = _alerts(db)
     assert [a.title for a in alerts] == ["UBER entró en 3X DCA"]
     assert alerts[0].severity == "high"
     assert alerts[0].channels == ["in_app", "email"]
     dca = alerts[0].metadata_["dca"]
     assert dca["status"] == "forming" and dca["period"] == "2026-10"
+    assert dca["previous_level"] == 2
     assert "Caída desde máximo 36m: 30,0 %" in alerts[0].message
     uber = _state(db, "UBER")
     assert (uber.level, uber.last_alerted_level, uber.last_alerted_period) == (3, 3, "2026-10")
-    assert uber.sources == ["watchlist"]
-    assert _state(db, "AAPL").last_alerted_level is None
 
 
 def test_same_level_rerun_and_flicker_do_not_realert(db):
     _watch(db, "UBER")
     fetcher = FakeFetcher()
-    fetcher.set("UBER", series(70.0))
+    fetcher.set("UBER", series(80.0))  # 2X: siembra
+    _run(db, fetcher)
+    fetcher.set("UBER", series(70.0))  # 3X: avisa
     _run(db, fetcher)
     _run(db, fetcher)  # mismo nivel: nada
     assert len(_alerts(db)) == 1
-    fetcher.set("UBER", series(80.0))  # baja a 2X en el mismo mes: cambio -> avisa 2X
+    fetcher.set("UBER", series(80.0))  # baja a 2X: bajar no avisa
     _run(db, fetcher)
-    assert [a.title for a in _alerts(db)][-1] == "UBER entró en 2X DCA"
     fetcher.set("UBER", series(70.0))  # vuelve a 3X en el mismo mes: huella ya existe
     _run(db, fetcher)
     titles = [a.title for a in _alerts(db)]
-    assert titles == ["UBER entró en 3X DCA", "UBER entró en 2X DCA"]
+    assert titles == ["UBER entró en 3X DCA"]
     state = _state(db, "UBER")
     assert state.level == 3 and state.previous_level == 2
 
@@ -173,6 +193,8 @@ def test_same_level_rerun_and_flicker_do_not_realert(db):
 def test_escalation_alerts_again(db):
     _watch(db, "UBER")
     fetcher = FakeFetcher()
+    fetcher.set("UBER", series(100.0))  # 1X: siembra
+    _run(db, fetcher)
     fetcher.set("UBER", series(80.0))
     _run(db, fetcher)
     fetcher.set("UBER", series(70.0))
@@ -187,9 +209,12 @@ def test_escalation_alerts_again(db):
 def test_new_month_same_level_does_not_realert(db):
     _watch(db, "UBER")
     fetcher = FakeFetcher()
-    fetcher.set("UBER", series(70.0, end=(2026, 9)))
-    evaluate_watchlist(db, fetcher=fetcher, now=datetime(2026, 9, 30, 23, 0, tzinfo=UTC),
-                       today=date(2026, 9, 30), params=PARAMS)
+    sept_now = datetime(2026, 9, 30, 23, 0, tzinfo=UTC)
+    fetcher.set("UBER", series(100.0, end=(2026, 9)) + [PriceRow(day=date(2026, 9, 29), close=100.0)])
+    evaluate_watchlist(db, fetcher=fetcher, now=sept_now, today=date(2026, 9, 30), params=PARAMS)  # 1X: siembra
+    fetcher.set("UBER", series(70.0, end=(2026, 9)) + [PriceRow(day=date(2026, 9, 29), close=70.0)])
+    evaluate_watchlist(db, fetcher=fetcher, now=sept_now, today=date(2026, 9, 30), params=PARAMS)  # 3X: avisa
+    assert len(_alerts(db)) == 1
     rows = series(70.0, end=(2026, 9)) + [PriceRow(day=date(2026, 10, 15), close=70.0)]
     fetcher.set("UBER", rows)
     _run(db, fetcher)
@@ -227,7 +252,8 @@ def test_trims_only_with_flag(db, monkeypatch):
     # Con el flag, un cambio a recorte si avisa.
     monkeypatch.setenv("DCA_ALERT_TRIMS", "true")
     get_settings.cache_clear()
-    db.delete(_state(db, "NVDA"))
+    nvda = _state(db, "NVDA")
+    nvda.level = 1  # venia de 1X
     db.commit()
     _run(db, fetcher)
     alerts = _alerts(db)
@@ -245,6 +271,8 @@ def test_portfolio_and_watchlist_union_with_currency(db):
     _watch(db, "UBER")
     fetcher = FakeFetcher()
     fetcher.set("CGEO.L", series(1300.0, base=1300.0), currency="GBp")
+    fetcher.set("UBER", series(100.0))  # 1X: siembra
+    _run(db, fetcher)
     fetcher.set("UBER", series(70.0))
     _run(db, fetcher)
     uber = _state(db, "UBER")

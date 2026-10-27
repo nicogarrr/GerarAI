@@ -148,6 +148,12 @@ def _run(db, f):
     return svc.evaluate_watchlist(db, fetcher=f, now=NOW, today=NOW.date(), params=PARAMS)
 
 
+def _seed(db, f):
+    """Primera evaluacion en 1X: solo guarda el estado (sin aviso)."""
+    f.set("DEMO", series(100))
+    assert _run(db, f)["alerted"] == []
+
+
 def test_stale_history_does_not_emit_or_persist_signal(db):
     _watch(db)
     f = FakeFetcher()
@@ -163,6 +169,7 @@ def test_stale_history_does_not_emit_or_persist_signal(db):
 def test_fresh_history_still_evaluates(db):
     _watch(db)
     f = FakeFetcher()
+    _seed(db, f)
     f.set("DEMO", series(55))
     out = _run(db, f)
     assert out["evaluated"] == 1 and out["alerted"][0]["level"] == 4
@@ -171,11 +178,12 @@ def test_fresh_history_still_evaluates(db):
 def test_failure_before_alert_insert_does_not_persist_level_and_retry_alerts(db):
     _watch(db)
     f = FakeFetcher()
+    _seed(db, f)
     f.set("DEMO", series(70))
     with patch.object(svc, "_emit_alert_row", side_effect=RuntimeError("crash")):
         with pytest.raises(RuntimeError):
             _run(db, f)
-    assert db.scalar(select(DcaSignalState)) is None
+    assert db.scalar(select(DcaSignalState)).level == 1
     assert db.query(ResearchAlert).count() == 0
     out = _run(db, f)
     assert [a["level"] for a in out["alerted"]] == [3]
@@ -190,6 +198,7 @@ def test_failure_before_alert_insert_does_not_persist_level_and_retry_alerts(db)
 def test_dispatch_failure_keeps_alert_and_state(db):
     _watch(db)
     f = FakeFetcher()
+    _seed(db, f)
     f.set("DEMO", series(70))
     with patch("app.services.notification_service.NotificationService.dispatch", side_effect=RuntimeError("chan")):
         out = _run(db, f)
@@ -212,6 +221,7 @@ def test_dca_external_channel_intent_survives_dispatch_failure_and_reconciles(db
     get_settings.cache_clear()
     _watch(db)
     f = FakeFetcher()
+    _seed(db, f)
     f.set("DEMO", series(70))
     with patch("app.services.notification_service.NotificationService.dispatch", side_effect=RuntimeError("boom")):
         out = _run(db, f)
