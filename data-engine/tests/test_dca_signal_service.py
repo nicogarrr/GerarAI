@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -22,7 +22,13 @@ from app.models.entities import (
 )
 from app.services import dca_signal_service as svc
 from app.services.dca_signal_engine import DcaParams
-from app.services.dca_signal_service import FetchedHistory, PriceRow, evaluate_watchlist, should_alert
+from app.services.dca_signal_service import (
+    FetchedHistory,
+    PriceRow,
+    build_bars,
+    evaluate_watchlist,
+    should_alert,
+)
 
 # Parametros fijos para el test (los umbrales del motor se optimizan aparte).
 PARAMS = DcaParams(signal="drawdown", dd_thresholds=(0.15, 0.25, 0.40), min_months=12, version="test-v1")
@@ -329,6 +335,42 @@ def test_adjusted_series_reports_real_close(db):
     state = _state(db, "MSFT")
     assert float(state.close) == 70.0
     assert state.level_prices["2x"] == pytest.approx(85.0)
+
+
+def test_build_bars_one_row_without_adj_close_keeps_adjusted_series():
+    # Split 10:1 a mitad de serie: el ajustado es continuo, el bruto cae un 90 %.
+    days = [date(2026, 1, 1) + timedelta(days=i) for i in range(6)]
+    rows = [
+        PriceRow(day=days[0], close=1000.0, adj_close=100.0),
+        PriceRow(day=days[1], close=1000.0, adj_close=None),  # fila suelta sin ajuste
+        PriceRow(day=days[2], close=1000.0, adj_close=100.0),
+        PriceRow(day=days[3], close=100.0, adj_close=100.0),  # tras el split
+        PriceRow(day=days[4], close=99.0, adj_close=99.0),
+        PriceRow(day=days[5], close=98.0, adj_close=None),  # ultimo cierre aun sin ajuste
+    ]
+    bars, factor = build_bars(rows)
+    closes = [b.close for b in bars]
+    assert min(closes) >= 98.0  # ningun desplome del 90 %
+    assert [b.day for b in bars] == [days[0], days[2], days[3], days[4], days[5]]
+    assert closes[-1] == pytest.approx(98.0)
+    assert factor == pytest.approx(1.0)
+
+
+def test_build_bars_trailing_raw_rows_use_last_adjustment_factor():
+    rows = [
+        PriceRow(day=date(2026, 1, 1), close=200.0, adj_close=100.0),
+        PriceRow(day=date(2026, 1, 2), close=210.0, adj_close=None),
+    ]
+    bars, factor = build_bars(rows)
+    assert [b.close for b in bars] == [pytest.approx(100.0), pytest.approx(105.0)]
+    assert factor == pytest.approx(2.0)
+
+
+def test_build_bars_without_any_adj_close_uses_raw_closes():
+    rows = [PriceRow(day=date(2026, 1, 1), close=10.0), PriceRow(day=date(2026, 1, 2), close=11.0)]
+    bars, factor = build_bars(rows)
+    assert [b.close for b in bars] == [10.0, 11.0]
+    assert factor == 1.0
 
 
 def test_untracked_states_are_removed(db):
