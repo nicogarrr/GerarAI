@@ -98,6 +98,9 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
 
   'components/forms/SignInForm.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
   'app/(root)/error.tsx': 'useEffect, jsx-onClick',
+  'components/watchlist/DcaEvaluateButton.tsx': 'useState, useRouter, jsx-onClick',
+  'components/watchlist/DcaMinLevelSelect.tsx': 'useState, useRouter, jsx-onChange',
+  'components/watchlist/DcaHitRatesPopover.tsx': 'useState, useTransition, jsx-onClick',
   'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',
   'app/(root)/inversores/_components/IngestLettersButton.tsx': 'useState, jsx-onClick',
   'app/(root)/inversores/_components/LibraryChat.tsx': 'usePathname, useState, browser:navigator, jsx-onSubmit, jsx-onChange, jsx-onKeyDown, jsx-onClick',

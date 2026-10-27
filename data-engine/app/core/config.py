@@ -371,6 +371,35 @@ class Settings(BaseSettings):
     # Senales insider (Form 4 EDGAR): alerta Telegram 'insider buy' apagada
     # por defecto. Env: INSIDER_ALERTS_ENABLED.
     insider_alerts_enabled: bool = False
+    # Correo saliente por SMTP (canal "email" de las alertas). Vacio = sin SMTP:
+    # el canal email cae al webhook ALERT_EMAIL_WEBHOOK_URL si existe y si no
+    # queda "not_configured". Con Gmail hace falta una contrasena de aplicacion
+    # (no la de la cuenta). La contrasena nunca se registra en logs.
+    # Env: SMTP_HOST / SMTP_PORT / SMTP_USERNAME / SMTP_PASSWORD / SMTP_FROM /
+    # SMTP_STARTTLS / SMTP_SSL / SMTP_TIMEOUT_SECONDS / ALERT_EMAIL_TO.
+    smtp_host: str | None = None
+    smtp_port: int = Field(default=587, ge=1, le=65535)
+    smtp_username: str | None = None
+    smtp_password: str | None = Field(default=None, repr=False)
+    smtp_from: str | None = None
+    smtp_starttls: bool = True
+    smtp_ssl: bool = False
+    smtp_timeout_seconds: float = Field(default=20.0, gt=0, le=120)
+    # Destinatarios separados por comas.
+    alert_email_to: str | None = None
+    # DCA_EVALUATION_ENABLED: la evaluacion diaria de senales DCA (guarda el
+    # nivel 1X-4X de watchlist + cartera). Es independiente de los avisos: con
+    # DCA_ALERTS_ENABLED=false se sigue evaluando y solo se callan los avisos.
+    dca_evaluation_enabled: bool = True
+    # Senales DCA por niveles (1X-4X + recortes) sobre watchlist + cartera.
+    # DCA_ALERT_MIN_LEVEL: nivel minimo de compra que avisa (1-4) salvo ajuste
+    # por ticker. DCA_ALERT_TRIMS: avisar tambien de las zonas de recorte.
+    # DCA_ALERT_CHANNELS: canales base; Telegram se anade solo si el tenant
+    # tiene suscripcion "dca_levels" con chat vinculado.
+    dca_alerts_enabled: bool = True
+    dca_alert_min_level: int = Field(default=2, ge=1, le=4)
+    dca_alert_trims: bool = False
+    dca_alert_channels: str = "in_app,email"
     # Langfuse Cloud EU shadow tracing (stage 3): SOLO observabilidad.
     # Apagado por defecto; nunca es fuente de verdad de negocio (eso es
     # Postgres). Sin payloads: solo metadatos de la allowlist. Muestreo del
@@ -598,7 +627,9 @@ class Settings(BaseSettings):
         return not self.is_production
 
     @field_validator(
-        "ibkr_flex_tenant_id", "ibkr_flex_account_id", "ibkr_flex_complete_query_id", mode="before"
+        "ibkr_flex_tenant_id", "ibkr_flex_account_id", "ibkr_flex_complete_query_id",
+        "smtp_host", "smtp_username", "smtp_password", "smtp_from", "alert_email_to",
+        mode="before",
     )
     @classmethod
     def _blank_flex_tenant_is_none(cls, value):
@@ -659,6 +690,7 @@ class Settings(BaseSettings):
         for field_name, value in (
             ("TELEGRAM_BOT_TOKEN", self.telegram_bot_token),
             ("TELEGRAM_LINK_SECRET", self.telegram_link_secret),
+            ("SMTP_PASSWORD", self.smtp_password),
         ):
             if value:
                 _assert_not_placeholder(value, label=field_name)

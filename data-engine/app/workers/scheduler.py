@@ -19,6 +19,7 @@ from app.workers.dramatiq_app import (
     dispatch_insider_alerts,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
+    evaluate_dca_signals,
     freeze_propicks_snapshot,
     ingest_ca_insider_yahoo,
     ingest_class_shares_outstanding,
@@ -500,6 +501,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day_of_week="mon-fri",
         hour=22,
         minute=30,
+    )
+    # Senales DCA por niveles (watchlist + cartera): tras los cierres oficiales
+    # de las 22:30 UTC, para evaluar con el cierre del dia ya asentado.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, evaluate_dca_signals),
+        "cron",
+        job_id="dca_signals_daily",
+        day_of_week="mon-fri",
+        hour=23,
+        minute=15,
     )
     # Fechas de resultados (cartera + watchlist): dos veces al dia, las fechas
     # cambian poco. Misma cadencia para todos los tenants.
