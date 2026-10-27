@@ -50,6 +50,25 @@ WINDOWED_COMPOSED_METRICS = ("owner_earnings_5y", "capex_to_da_5y")
 # traza, con numerador y denominador visibles para su verificacion.
 MARGIN_METRICS = ("gross_margin", "operating_margin", "net_margin", "fcf_margin")
 
+# Ratios cuyo denominador negativo no es interpretable: se publican N/D en
+# vez de una cifra engañosa (Damodaran, "Return Measures": NI −50 / patrimonio
+# −200 = +25 % con pérdidas; EBITDA −10 con deuda neta 100 = −10x, que parece
+# mejor que 2x). Márgenes sobre ingresos negativos, igual.
+POSITIVE_DENOMINATOR_METRICS = frozenset(
+    {
+        "roe",
+        "roa",
+        "roic",
+        "roic_adjusted",
+        "net_debt_to_ebitda",
+        "fcf_conversion",
+        "fcf_margin",
+        "net_margin",
+        "operating_margin",
+        "gross_margin",
+    }
+)
+
 METRIC_DEFINITIONS: dict[str, MetricFormula] = {
     "fcf_margin": ("FCF_MARGIN_V1", "free_cash_flow / revenue", ("free_cash_flow", "revenue"), "decimal"),
     "net_margin": ("NET_MARGIN_V1", "net_income / revenue", ("net_income", "revenue"), "decimal"),
@@ -385,6 +404,12 @@ class MetricCalculationService:
         result_facts = {**facts, **supplemental_facts}
         unique_facts = self._unique_facts(result_facts)
         if denominator is None or denominator == 0 or numerator is None:
+            reason = "zero_or_invalid_denominator"
+        elif denominator < 0 and metric in POSITIVE_DENOMINATOR_METRICS:
+            reason = "non_positive_denominator"
+        else:
+            reason = None
+        if reason is not None:
             result = MetricResult(
                 metric=metric,
                 status="unavailable",
@@ -398,7 +423,7 @@ class MetricCalculationService:
                 source_fact_ids=[fact.id for fact in unique_facts],
                 calculation_trace={
                     **trace,
-                    "reason": "zero_or_invalid_denominator",
+                    "reason": reason,
                 },
                 confidence=Decimal("0.00"),
                 fiscal_year=next(iter(facts.values())).fiscal_year if facts else None,
@@ -1384,7 +1409,9 @@ class MetricCalculationService:
             (
                 year
                 for year in set(numerators) & set(denominators)
-                if Decimal(denominators[year].value) != 0
+                # Años con denominador <= 0 (patrimonio/activo/ingresos
+                # negativos) no son interpretables: fuera de la ventana.
+                if Decimal(denominators[year].value) > 0
             ),
             reverse=True,
         )[:WINDOW_MAX_YEARS]
