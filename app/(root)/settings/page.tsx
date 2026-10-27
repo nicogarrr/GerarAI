@@ -41,7 +41,7 @@ export default async function SettingsPage() {
         className="scroll-mt-24"
         description="Elige el proveedor y el modelo de IA de tu cuenta. Si usas tu propia API key, la llamada y su coste son tuyos."
         id="llm"
-        title="Modelo de IA (LLM)"
+        title="Modelo de IA"
       >
         {llm ? (
           <LlmSettingsForm initial={llm} />
