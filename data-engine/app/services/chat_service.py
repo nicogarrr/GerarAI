@@ -1220,6 +1220,7 @@ class ChatService:
             and not ticker
             and _PORTFOLIO_RANKING_RE.search(question or "")
             and not _ORDER_VERB_RE.search(question or "")
+            and not doctrine_question
         ):
             ranking_answer = self._portfolio_ranking(db, question or "")
             if ranking_answer is not None:
@@ -1241,6 +1242,7 @@ class ChatService:
             and _PORTFOLIO_SELF_RE.search(question or "")
             and _PORTFOLIO_ANALYSIS_RE.search(question or "")
             and not _ORDER_VERB_RE.search(question or "")
+            and not doctrine_question
         ):
             analysis_answer = self._portfolio_analysis(db)
             if analysis_answer is not None:
@@ -1257,11 +1259,31 @@ class ChatService:
                 or _PORTFOLIO_QUERY_RE.search(question or "")
             )
             and not _ORDER_VERB_RE.search(question or "")
+            # «¿Qué diría Numantia de mi cartera?»: pregunta mixta carta +
+            # cartera. El volcado de posiciones no usa la carta; sigue a la
+            # síntesis, que recibe la biblioteca y las posiciones.
+            and not doctrine_question
         ):
             portfolio_answer = self._portfolio_overview(db)
             if portfolio_answer is not None:
                 portfolio_answer.context = context_echo
                 return portfolio_answer
+        # Pregunta mixta carta + cartera («¿Qué diría Numantia de mi
+        # cartera?»): antes acababa en el volcado de posiciones o en la
+        # abstención general. Se responde con los fragmentos de la carta y
+        # las posiciones guardadas juntos.
+        if (
+            company is None
+            and not ticker
+            and doctrine_question
+            and _PORTFOLIO_SELF_RE.search(question or "")
+            and not _ORDER_VERB_RE.search(question or "")
+        ):
+            mixed_answer = await self._doctrine_portfolio_answer(
+                db, question or "", scope, history, context_echo
+            )
+            if mixed_answer is not None:
+                return mixed_answer
         # Seguimiento de cartera ("¿cuál tiene el coste medio más alto?"): sin
         # empresa ni orden y con la cartera ya en la conversación, se responde
         # con las posiciones guardadas en lugar de perder el hilo.
@@ -1270,6 +1292,7 @@ class ChatService:
             and not ticker
             and _history_is_portfolio(history)
             and not _ORDER_VERB_RE.search(question or "")
+            and not doctrine_question
         ):
             followup = self._portfolio_ranking(db, question or "")
             if followup is not None:
@@ -1369,6 +1392,100 @@ class ChatService:
                 history=history,
                 page=page_payload,
             )
+        response.context = context_echo
+        return response
+
+    def _portfolio_positions_context(self, db: Session, limit: int = 15) -> list[dict]:
+        """Posiciones guardadas en forma compacta para el prompt (sin LLM)."""
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return []
+        rows = list(
+            db.execute(
+                select(Position, Company)
+                .join(Company, Company.id == Position.company_id)
+                .where(Position.quantity > 0, Position.tenant_id == tenant_id)
+            ).all()
+        )
+        if not rows:
+            return []
+
+        def _value(pos: Position) -> float:
+            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
+            return float(raw or 0)
+
+        rows.sort(key=lambda row: _value(row[0]), reverse=True)
+        bases = {pos.base_currency or "EUR" for pos, _ in rows}
+        total = sum(_value(pos) for pos, _ in rows) if len(bases) == 1 else 0.0
+        out: list[dict] = []
+        for pos, comp in rows[:limit]:
+            out.append({
+                "ticker": comp.ticker,
+                "name": comp.name,
+                "sector": comp.sector,
+                "weight_pct": round(_value(pos) / total * 100, 1) if total > 0 else None,
+                "position_id": pos.id,
+            })
+        return out
+
+    def _letter_fragments_for_portfolio(
+        self, db: Session, question: str, positions: list[dict], limit: int = 3
+    ) -> list[dict]:
+        """Fragmentos de la carta pedida cuando la pregunta en sí no los encuentra.
+
+        «¿Qué diría Numantia de mi cartera?» no comparte palabras con la carta:
+        se busca por las empresas de la cartera y, si no, por los pasajes del
+        autor que hablan de cartera, riesgo o negocios.
+        """
+        from app.services.library_context import lexical_library_context, named_investors
+
+        authors = named_investors(question)
+        names = " ".join(
+            f"{row.get('ticker') or ''} {row.get('name') or ''}" for row in positions
+        )
+        rows = lexical_library_context(db, f"{question} {names}", authors=authors, limit=limit)
+        if not rows:
+            rows = lexical_library_context(
+                db,
+                "cartera negocios riesgo diversificación valoración margen de seguridad",
+                authors=authors,
+                limit=limit,
+            )
+        return rows
+
+    async def _doctrine_portfolio_answer(
+        self,
+        db: Session,
+        question: str,
+        scope: str,
+        history: list[ChatTurn] | None,
+        context_echo: dict | None,
+    ) -> ChatResponse | None:
+        positions = self._portfolio_positions_context(db)
+        if not positions:
+            return None
+        baseline = self._deterministic_answer(db, question, scope, None)
+        if not any(source.get("type") == "knowledge_chunk" for source in baseline.sources):
+            extra = self._letter_fragments_for_portfolio(db, question, positions)
+            baseline.sources = [*baseline.sources, *extra]
+        position_sources = [
+            self._source_entry("position", row["position_id"], f"Posición {row['ticker']}", url="/portfolio")
+            for row in positions
+        ]
+        prompt_positions = [{k: v for k, v in row.items() if k != "position_id"} for row in positions]
+        response = await ChatSynthesisService(self.provider).synthesize_general(
+            question=question,
+            baseline=baseline,
+            db=db,
+            history=history,
+            page=context_echo,
+            portfolio_context=prompt_positions,
+        )
+        if response.model not in {"abstain"} and (response.llm_trace or {}).get("path") != "author_source_missing":
+            response.sources = [*response.sources, *position_sources]
+            trace = dict(response.llm_trace or {})
+            trace["mixed"] = "doctrine_portfolio"
+            response.llm_trace = trace
         response.context = context_echo
         return response
 
