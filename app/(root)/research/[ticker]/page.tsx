@@ -896,6 +896,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             icon={ShieldAlert}
             title={state.title}
             titleAs="h1"
+            action={
+              // Siguiente paso sin CTA «Generar tesis»: buscar otra empresa o
+              // volver a comprobar (recarga completa: el proveedor pudo fallar).
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <EmptyLink className="min-h-11 px-4 text-sm" href="/search">
+                  Buscar otra empresa
+                </EmptyLink>
+                <a
+                  className="inline-flex min-h-11 items-center rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-gray-500 hover:text-gray-100"
+                  href={`/research/${encodeURIComponent(ticker)}`}
+                >
+                  Reintentar
+                </a>
+              </div>
+            }
           />
         </div>
       </main>
