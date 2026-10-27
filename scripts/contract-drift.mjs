@@ -353,7 +353,12 @@ export function scanContract({ root = ROOT, openapiPath } = {}) {
             const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
             const lineNo = line + 1;
             if (!matches.length) {
-              if (pat.startsWith('/')) stats.unmatched.push({ file: rel, line: lineNo, pattern: pat.replace(/\0/g, '${...}') });
+              if (pat.startsWith('/')) {
+                const method = helper.fixedMethod ?? methodFromInit(helper.initIndex != null ? node.arguments[helper.initIndex] : undefined);
+                const item = { file: rel, line: lineNo, pattern: pat.replace(/\0/g, '${...}') };
+                stats.unmatched.push({ ...item, reason: pat.includes('\0') ? 'dynamic-unresolved' : 'static-missing' });
+                if (!pat.includes('\0')) findings.push({ kind: 'ENDPOINT_NOT_IN_SPEC', ...item, endpoint: `${method.toUpperCase()} ${pat.split('?')[0]}` });
+              }
             } else {
               const specPath = matches[0];
               const method = helper.fixedMethod ?? methodFromInit(helper.initIndex != null ? node.arguments[helper.initIndex] : undefined);
