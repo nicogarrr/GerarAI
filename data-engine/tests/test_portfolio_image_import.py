@@ -104,6 +104,10 @@ def test_ambiguous_numbers(raw):
 
 def test_image_bad_format_size_no_ocr(monkeypatch):
     import io
+    import shutil
+
+    # Sin tesseract instalado (CI, local) el formato se sigue validando primero.
+    monkeypatch.setattr(shutil, "which", lambda name: None)
     with pytest.raises(ValueError):
         extract_image(b"hostile image text")
     with pytest.raises(ValueError):
@@ -113,6 +117,11 @@ def test_image_bad_format_size_no_ocr(monkeypatch):
     image.save(buffer, format="GIF")
     with pytest.raises(ValueError, match="PNG"):
         extract_image(buffer.getvalue())
+    # Una imagen valida sin tesseract si da el error de lectura local.
+    png = io.BytesIO()
+    image.save(png, format="PNG")
+    with pytest.raises(RuntimeError, match="lectura local"):
+        extract_image(png.getvalue())
 
 
 def test_hostile_ocr_is_only_data():
