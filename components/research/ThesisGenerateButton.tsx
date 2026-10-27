@@ -7,6 +7,7 @@ import { scrollToIdWhenReady } from '@/lib/utils/scroll-anchor';
 import { BrainCircuit, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getLatestThesisJob, getThesisJobStatus, startThesisJob, type ThesisJobStatus } from '@/lib/actions/thesis-jobs.actions';
+import { thesisProgressText } from '@/lib/research/thesis-progress';
 
 const PHASE_LABELS: Record<string, string> = {
     refresh_sec: 'Actualizando financieros SEC',
@@ -41,6 +42,8 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
     const startingRef = useRef(false);
     const [pollExhausted, setPollExhausted] = useState(false);
     const pollCountRef = useRef(0);
+    // Hora del último sondeo: los segundos transcurridos avanzan con cada poll (3 s).
+    const [polledAt, setPolledAt] = useState(0);
     // El resultado solo se anuncia para el trabajo lanzado en esta sesión: el
     // último job guardado puede ser de una versión anterior a la vigente.
     const [startedHere, setStartedHere] = useState(false);
@@ -98,6 +101,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
                 const next = await getThesisJobStatus(jobId);
                 if (disposed) return;
                 setJob(next);
+                setPolledAt(Date.now());
                 // Sin router.refresh() automatico: re-renderizaba la ruta
                 // entera (14k px) y el lector perdia su sitio ("reinicio").
                 // La nueva version se ofrece con una accion explicita.
@@ -155,7 +159,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
     // re-renderizaba la ruta entera y el lector perdía su sitio.
     const succeededHere = startedHere && job?.status === 'succeeded';
     const phaseLabel = job?.current_phase ? PHASE_LABELS[job.current_phase] ?? 'Análisis en curso' : null;
-    const doneCount = job?.phases.filter((p) => p.status === 'succeeded').length ?? 0;
+    const progressText = thesisProgressText(job, polledAt);
 
     return (
         <div className="flex flex-col gap-2">
@@ -175,7 +179,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
                     <span className="text-sm text-gray-400">
                         {pollExhausted
                             ? 'Estado desconocido: la generación no responde desde hace 30 min. El trabajo del servidor no se cancela; recarga la página para volver a leer su estado.'
-                            : `${phaseLabel ?? (job?.status === 'dispatch_failed' ? 'Esperando reconexión de la cola' : job?.status === 'retrying' ? 'Reintentando en el servidor' : 'En cola')}${doneCount > 0 ? ` · ${doneCount} fases completadas` : ''}`}
+                            : progressText ?? (phaseLabel ?? (job?.status === 'dispatch_failed' ? 'Esperando reconexión de la cola' : job?.status === 'retrying' ? 'Reintentando en el servidor' : job?.status === 'running' ? 'Preparando la generación' : 'En cola'))}
                     </span>
                 ) : null}
             </div>

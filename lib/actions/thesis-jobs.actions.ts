@@ -19,6 +19,8 @@ export interface ThesisJobStatus {
     ticker: string;
     phases: ThesisJobPhase[];
     current_phase?: string | null;
+    /** Fases reales previstas (7, u 8 con refresco SEC). Ausente en backends antiguos. */
+    total_phases?: number | null;
     result?: { thesis_version_id?: number; version?: number; status?: string } | null;
     error_class?: string | null;
     error_message?: string | null;

@@ -16,6 +16,7 @@ Contract:
 from __future__ import annotations
 
 import hashlib
+import logging
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import and_, desc, or_, select, text, update
@@ -25,6 +26,8 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import SessionLocal
 from app.models.entities import WorkflowRun, WorkflowStepRun
+
+logger = logging.getLogger(__name__)
 
 WORKFLOW_NAME = "GenerateThesisWorkflow"
 ACTIVE_STATUSES = ("queued", "running", "retrying", "dispatch_failed")
@@ -303,16 +306,63 @@ def reconcile_thesis_dispatches() -> dict:
     return stats
 
 
+def _live_phases(run: WorkflowRun) -> list[dict] | None:
+    """Progreso en vivo publicado por el worker mientras genera (realqa-21).
+
+    Las filas WorkflowStepRun solo se confirman al final (van dentro del
+    SAVEPOINT de la generacion), asi que durante los ~50 s de trabajo el
+    sondeo no veia ninguna fase y la UI decia «En cola». El worker publica
+    aparte, en result_payload["progress"], la fase en curso y las ya hechas.
+    """
+    if run.status != "running":
+        return None
+    progress = (run.result_payload or {}).get("progress") if isinstance(run.result_payload, dict) else None
+    if not isinstance(progress, dict) or not isinstance(progress.get("phases"), list):
+        return None
+    # Un intento recuperado no puede reutilizar la fase del worker anterior.
+    # La identidad incluye el inicio, no solo el contador (compatibilidad con
+    # registros viejos). Sin metadatos verificables no anunciamos progreso.
+    try:
+        started = _utc(run.started_at)
+        progress_started = _utc(datetime.fromisoformat(progress["started_at"]))
+        published = _utc(datetime.fromisoformat(progress["published_at"]))
+        if (
+            progress.get("attempt") != run.attempt
+            or started is None
+            or progress_started != started
+            or published is None
+            or published < started
+            or published > datetime.now(UTC)
+        ):
+            return None
+    except (KeyError, TypeError, ValueError):
+        return None
+    return [p for p in progress["phases"] if isinstance(p, dict) and p.get("name")]
+
+
 def job_payload(run: WorkflowRun) -> dict:
     """Honest status payload: real phases and timestamps, never an ETA."""
-    steps = sorted(run.steps or [], key=lambda s: s.position)
-    return {
-        "id": run.id,
-        "workflow_name": run.workflow_name,
-        "status": run.status,
-        "ticker": (run.input_payload or {}).get("ticker"),
-        "force": (run.input_payload or {}).get("force"),
-        "phases": [
+    steps = sorted(
+        (s for s in (run.steps or []) if s.attempt == run.attempt),
+        key=lambda s: s.position,
+    )
+    # Una fila confirmada (refresh_sec) puede convivir con fases nuevas aun
+    # dentro del SAVEPOINT. Solo el progreso del intento activo tiene prioridad;
+    # los estados terminales siempre usan los pasos confirmados.
+    live = _live_phases(run)
+    if live is not None:
+        phases = [
+            {
+                "name": p["name"],
+                "status": p.get("status", "running"),
+                "started_at": p.get("started_at"),
+                "finished_at": p.get("finished_at"),
+            }
+            for p in live
+        ]
+        current = next((p["name"] for p in reversed(phases) if p["status"] == "running"), None)
+    else:
+        phases = [
             {
                 "name": s.step_name,
                 "status": s.status,
@@ -320,9 +370,22 @@ def job_payload(run: WorkflowRun) -> dict:
                 "finished_at": s.finished_at.isoformat() if s.finished_at else None,
             }
             for s in steps
-        ],
-        "current_phase": next((s.step_name for s in reversed(steps) if s.status == "running"), None),
-        "result": run.result_payload,
+        ]
+        current = next((s.step_name for s in reversed(steps) if s.status == "running"), None)
+    tracked = bool((run.input_payload or {}).get("tracked"))
+    result = run.result_payload
+    if isinstance(result, dict) and "progress" in result and run.status != "succeeded":
+        result = {k: v for k, v in result.items() if k != "progress"} or None
+    return {
+        "id": run.id,
+        "workflow_name": run.workflow_name,
+        "status": run.status,
+        "ticker": (run.input_payload or {}).get("ticker"),
+        "force": (run.input_payload or {}).get("force"),
+        "phases": phases,
+        "current_phase": current,
+        "total_phases": len(THESIS_PHASES) + (1 if tracked else 0),
+        "result": result,
         "error_class": run.error_class,
         "error_message": run.error_message,
         "attempt": run.attempt,
@@ -451,6 +514,45 @@ def build_run_guard(run: WorkflowRun, settings, store=None, db: Session | None =
         raise LLMGuardAbort("guard_misconfigured") from None
 
 
+def _publish_live_progress(run_id: int, fence: int, started_at: datetime, phases: list[dict]) -> None:
+    """Confirma el progreso en una sesion propia y corta, fuera del SAVEPOINT.
+
+    Mejor esfuerzo: un fallo aqui nunca toca la generacion. Solo escribe si
+    el run sigue siendo de este intento (attempt == fence) y en curso, asi un
+    intento cercado no pisa el progreso del nuevo dueno. La fila final (exito
+    o fallo) sustituye result_payload, de modo que el progreso no sobrevive.
+    """
+    try:
+        with SessionLocal() as progress_db:
+            progress_db.execute(
+                update(WorkflowRun)
+                .where(
+                    WorkflowRun.id == run_id,
+                    WorkflowRun.attempt == fence,
+                    WorkflowRun.status == "running",
+                    WorkflowRun.started_at == started_at,
+                )
+                .values(result_payload={"progress": {
+                    "attempt": fence,
+                    "started_at": started_at.isoformat(),
+                    "published_at": datetime.now(UTC).isoformat(),
+                    "phases": phases,
+                }})
+            )
+            progress_db.commit()
+    except Exception:  # noqa: BLE001 - el progreso es informativo
+        logger.warning("no se pudo publicar el progreso del run %s", run_id, exc_info=True)
+
+
+def _live_progress_supported(db: Session) -> bool:
+    # SQLite (tests/dev) bloquea la base entera mientras la generacion tiene su
+    # transaccion de escritura abierta: una segunda sesion esperaria el
+    # busy-timeout en cada fase. En Postgres no hay conflicto: el worker solo
+    # toma FOR KEY SHARE sobre el run al insertar los pasos.
+    bind = db.get_bind()
+    return getattr(getattr(bind, "dialect", None), "name", "") != "sqlite"
+
+
 def run_thesis_job(run_id: int) -> None:
     """Run a thesis delivery with tenant context and recoverable retries."""
     import contextlib
@@ -540,6 +642,7 @@ def run_thesis_job(run_id: int) -> None:
         # recuperacion a mitad de la generacion en curso.
         run.started_at = now
         run.finished_at = None
+        run.result_payload = None  # Nunca reciclar progreso de un intento anterior.
         if tenant is not None:
             db.info["tenant_id"] = tenant.id
             db.info["user_id"] = str(user_id)
@@ -563,6 +666,7 @@ def run_thesis_job(run_id: int) -> None:
         fence = int(run.attempt or 1)
 
         state: dict[str, object] = {"position": 0, "open_step": None}
+        publish_progress = _live_progress_supported(db)
 
         def on_phase(name: str) -> None:
             now = datetime.now(UTC)
@@ -590,6 +694,14 @@ def run_thesis_job(run_id: int) -> None:
             db.flush()
             state["open_step"] = step
             state["open_step_name"] = name
+            live = state.setdefault("live", [])
+            if isinstance(live, list):
+                if live:
+                    live[-1]["status"] = "succeeded"
+                    live[-1]["finished_at"] = now.isoformat()
+                live.append({"name": name, "status": "running", "started_at": now.isoformat(), "finished_at": None})
+                if publish_progress:
+                    _publish_live_progress(run_id, fence, run.started_at, [dict(p) for p in live])
 
         try:
             # Guard por job (inactivo con max_posts=0). Dentro del try: un
