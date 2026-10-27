@@ -36,7 +36,7 @@ export function OwnershipSignalsPanel({ ticker, signals }: { ticker: string; sig
   const { insider, holders } = signals;
   return (
     <Panel
-      actions={<Link className="text-sm text-teal-300" href={holdersHref}>Ver propietarios</Link>}
+      actions={<Link className="inline-flex min-h-[44px] sm:min-h-0 items-center text-sm text-teal-300" href={holdersHref}>Ver propietarios</Link>}
       collapsible="mobile"
       title="Qué compran y venden directivos y grandes fondos"
     >

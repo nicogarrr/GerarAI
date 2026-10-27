@@ -71,7 +71,7 @@ function EmptyLink({
   return (
     <Link
       className={cn(
-        'inline-flex items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 transition hover:border-teal-600 hover:text-teal-200',
+        'inline-flex min-h-[44px] sm:min-h-0 items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 transition hover:border-teal-600 hover:text-teal-200',
         className
       )}
       href={href}

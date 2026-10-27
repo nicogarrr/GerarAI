@@ -47,3 +47,26 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
         assert.ok(page.includes('<summary className="cursor-pointer py-2.5'), 'summary con padding tactil en movil');
     });
 });
+
+describe('móvil: 44 px en biblioteca, estados vacíos y enlaces de panel (auditoría 375 px, 2026-10-27)', () => {
+    it('chat de la biblioteca: Preguntar, sugerencias y casilla de análisis', () => {
+        const chat = readFileSync('app/(root)/inversores/_components/LibraryChat.tsx', 'utf8');
+        assert.ok(chat.includes(`className="${AREA} sm:min-h-0 rounded-lg bg-teal-300`), 'Preguntar con area tactil');
+        assert.ok(chat.includes(`className="inline-flex ${AREA} sm:min-h-0 items-center rounded-full`), 'sugerencias con area tactil');
+        assert.ok(chat.includes(`<label className="flex ${AREA} sm:min-h-0 items-center gap-2 text-sm"><input type="checkbox"`), 'casilla de analisis con etiqueta tactil');
+    });
+    it('EmptyLink (CTA de los estados vacíos)', () => {
+        const empty = readFileSync('components/ui/empty-state.tsx', 'utf8');
+        assert.ok(empty.includes(`'inline-flex ${AREA} sm:min-h-0 items-center gap-2 rounded-md border border-teal-800`), 'EmptyLink con area tactil');
+    });
+    it('enlaces de acción de los paneles de la ficha', () => {
+        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+        for (const texto of ['Ver todas', 'Ver todos los cambios']) {
+            const i = page.indexOf(`              ${texto}\n`);
+            assert.ok(i > 0, `${texto} existe`);
+            assert.ok(page.slice(page.lastIndexOf('<Link', i), i).includes(AREA), `${texto} con area tactil`);
+        }
+        const own = readFileSync('components/research/OwnershipSignalsPanel.tsx', 'utf8');
+        assert.ok(own.includes(`inline-flex ${AREA} sm:min-h-0 items-center text-sm text-teal-300" href={holdersHref}`), 'Ver propietarios con area tactil');
+    });
+});

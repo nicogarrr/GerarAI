@@ -105,16 +105,16 @@ export function LibraryChat({ scope = 'letters', authors = [] }: { scope?: 'lett
           <option value="">Todos los autores</option>{authors.map(name => <option key={name} value={name}>{name}</option>)}
         </select>
       </label>}
-      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={analysis} onChange={event => setAnalysis(event.target.checked)} />Análisis estructurado (tesis, escenarios, modelos mentales)</label>
+      <label className="flex min-h-[44px] sm:min-h-0 items-center gap-2 text-sm"><input type="checkbox" checked={analysis} onChange={event => setAnalysis(event.target.checked)} />Análisis estructurado (tesis, escenarios, modelos mentales)</label>
       <label className="text-sm" htmlFor={`library-question-${scope}`}>Pregunta</label>
       <textarea id={`library-question-${scope}`} value={question} onChange={event => setQuestion(event.target.value)} onKeyDown={event => { if (isSubmitShortcut(event)) { event.preventDefault(); void ask(question); } }} required minLength={3} maxLength={1200} rows={2} placeholder="¿Qué dice Buffett sobre las recompras?" className="w-full rounded-lg border border-gray-700 bg-surface-1 p-3 text-sm" />
       <div className="flex flex-wrap items-center gap-3">
-        <button disabled={busy || question.trim().length < 3} className="rounded-lg bg-teal-300 px-4 py-2 text-sm font-medium text-gray-950 disabled:opacity-50">{busy ? 'Consultando…' : 'Preguntar'}</button>
+        <button disabled={busy || question.trim().length < 3} className="min-h-[44px] sm:min-h-0 rounded-lg bg-teal-300 px-4 py-2 text-sm font-medium text-gray-950 disabled:opacity-50">{busy ? 'Consultando…' : 'Preguntar'}</button>
         <span className="text-xs text-gray-500">Ctrl + Enter para enviar</span>
       </div>
     </form>
     {turns.length === 0 && !busy && <div className="flex flex-wrap gap-2" aria-label="Preguntas sugeridas">
-      {SUGGESTED_QUESTIONS.map(text => <button key={text} type="button" onClick={() => setQuestion(text)} className="rounded-full border border-gray-700 px-3 py-1 text-xs text-gray-300 hover:border-teal-300">{text}</button>)}
+      {SUGGESTED_QUESTIONS.map(text => <button key={text} type="button" onClick={() => setQuestion(text)} className="inline-flex min-h-[44px] sm:min-h-0 items-center rounded-full border border-gray-700 px-3 py-1 text-left text-xs text-gray-300 hover:border-teal-300">{text}</button>)}
     </div>}
     <div aria-live="polite" className="flex flex-col gap-5">
       {busy && <p className="text-sm text-gray-400">{analysis ? 'Preparando el análisis (puede tardar hasta un minuto)…' : 'Consultando…'}</p>}
