@@ -176,6 +176,16 @@ def _no_live_benchmark(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _reset_movers_cache():
+    """La caché de Movers es por proceso; cada test parte de una BD distinta."""
+    from app.services import movers_cache
+
+    movers_cache.clear_local()
+    yield
+    movers_cache.clear_local()
+
+
+@pytest.fixture(autouse=True)
 def _reset_chat_quota_cooldowns():
     from app.llm.chat_provider import reset_quota_cooldowns
 
