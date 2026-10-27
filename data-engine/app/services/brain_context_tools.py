@@ -291,6 +291,106 @@ def journal_answer(db: Session, tenant: int, company: Company | None = None) -> 
     return _response(lines, sources, "decision_journal")
 
 
+# ---------------------------------------------------------------- nivel DCA
+
+_DCA_RE = re.compile(r"(?i)\bdca\b|\bniveles?\s+de\s+(?:compra|entrada)\b|\bzona\s+de\s+compra\b")
+
+
+def _fmt_close(value: float | None, currency: str | None) -> str:
+    if value is None:
+        return "N/D"
+    text = f"{value:,.2f}".replace(",", "\x07").replace(".", ",").replace("\x07", ".")
+    return f"{text} {currency}".strip() if currency else text
+
+
+def dca_answer(db: Session, tenant: int, company: Company | None) -> ChatResponse:
+    """Nivel DCA guardado (último veredicto del motor); «sin nivel» si no hay."""
+    from app.services.dca_level_reader import read_dca_levels
+
+    symbols = [company.ticker] if company is not None else None
+    levels = read_dca_levels(db, tenant, symbols)
+    if levels is None:
+        return _response([
+            "Sin nivel DCA: el motor de niveles DCA todavía no está activo en esta instalación, "
+            "así que no tengo ningún nivel guardado que darte. No lo calculo a ojo."
+        ], [], "dca_level")
+    if company is not None:
+        reading = levels.get(company.ticker.upper())
+        if reading is None:
+            return _response([f"{company.ticker}: sin nivel DCA guardado todavía (no está evaluado)."], [], "dca_level")
+        state = "mes en formación, se confirma al cierre" if reading.forming else "mes cerrado"
+        lines = [
+            f"**{reading.symbol}: {reading.label}** ({reading.zone}).",
+            f"Cierre usado {_fmt_close(reading.close, reading.currency)} del {_day(reading.signal_date)}; {state}.",
+            "Es la lectura de tu fórmula DCA, no una orden de compra.",
+        ]
+        return _response(lines, [_source("dca_signal", reading.symbol, f"Nivel DCA {reading.symbol}",
+                                         "/watchlist")], "dca_level")
+    if not levels:
+        return _response(["Sin nivel DCA: todavía no hay ningún ticker evaluado."], [], "dca_level")
+    by_level: dict[int, list[str]] = {}
+    labels: dict[int, str] = {}
+    for reading in levels.values():
+        by_level.setdefault(reading.level, []).append(reading.symbol)
+        labels[reading.level] = reading.label
+    lines = ["Niveles DCA guardados (último veredicto de tu fórmula):"]
+    for level in sorted(by_level, key=lambda lv: (lv < 0, -lv)):
+        lines.append(f"- {labels[level]}: {', '.join(sorted(by_level[level]))}.")
+    forming = sum(1 for reading in levels.values() if reading.forming)
+    if forming:
+        lines.append(f"{forming} con el mes aún en formación: se confirman al cierre del mes.")
+    lines.append("Es la lectura de tu fórmula DCA, no una orden de compra.")
+    return _response(lines, [_source("dca_signal", "all", "Niveles DCA", "/watchlist")], "dca_level")
+
+
+# ---------------------------------------------------------------- valoración del motor
+
+_ENGINE_RE = re.compile(
+    r"(?i)\b(?:valor\s+(?:justo|intr[ií]nseco|razonable)|valoraci[oó]n\s+del\s+motor|motor\s+de\s+valoraci[oó]n|"
+    r"dcf|infravalorad\w*|sobrevalorad\w*)\b"
+)
+
+
+def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
+    """Salida del motor de valoración (escenarios, margen, publicable) sin LLM."""
+    from app.services.valuation_service import ValuationService
+
+    try:
+        result = ValuationService().value_company(db, company)
+    except Exception:  # noqa: BLE001 - un motor caído se dice, no se inventa
+        return _response([f"El motor de valoración no ha podido valorar {company.ticker} ahora mismo."],
+                         [], "engine_valuation")
+    ccy = company.currency
+    link = f"/research/{quote(company.ticker, safe='')}?view=valuation"
+    values = [(label, result.get(key)) for label, key in (
+        ("bajista", "bear_value"), ("base", "base_value"), ("alcista", "bull_value"), ("esperado", "expected_value"))]
+    values = [(label, value) for label, value in values if value is not None]
+    if not values:
+        missing = ", ".join(result.get("missing_inputs") or []) or "datos suficientes"
+        return _response([f"El motor no tiene valoración de {company.ticker}: faltan {missing}."],
+                         [_source("valuation", company.ticker, f"Valoración {company.ticker}", link)],
+                         "engine_valuation")
+    publishable = bool(result.get("publishable"))
+    head = (f"**Motor de valoración · {company.ticker}** ({result.get('model_type') or 'modelo'}"
+            f"{'' if publishable else ', orientativo: algún input no tiene fuente datada'}).")
+    lines = [head, "Escenarios por acción: " + ", ".join(f"{label} {_fmt_close(float(value), ccy)}"
+                                                        for label, value in values) + "."]
+    price = result.get("current_price")
+    as_of = (result.get("trace") or {}).get("price_as_of")
+    if price is not None:
+        lines.append(f"Precio usado {_fmt_close(float(price), ccy)}"
+                     f"{f' (cierre del {as_of})' if as_of else ''}; no es una cotización en directo.")
+    mos = result.get("margin_of_safety")
+    if mos is not None:
+        lines.append(f"Margen de seguridad del motor: {_pct(float(mos))}.")
+    blockers = result.get("publication_blockers") or []
+    if blockers and not publishable:
+        lines.append("Por qué no es publicable: " + "; ".join(str(b) for b in blockers[:3]) + ".")
+    lines.append("Es la salida del modelo, no una recomendación.")
+    return _response(lines, [_source("valuation", company.ticker, f"Valoración {company.ticker}", link)],
+                     "engine_valuation")
+
+
 # ---------------------------------------------------------------- router
 
 
@@ -300,13 +400,21 @@ def answer_context_question(
     tenant: int,
     resolve_company: Callable[[], Company | None],
 ) -> ChatResponse | None:
-    """None si la pregunta no es de avisos, riesgo o diario (no se adivina).
+    """None si la pregunta no es de nivel DCA, valoración, avisos, riesgo o diario.
 
     ``resolve_company`` solo se llama cuando la pregunta es de este módulo
     (recorre el catálogo para acotar a la empresa nombrada).
     """
-    if _ORDER_RE.search(question):
+    # «nivel/zona de compra» nombra el nivel DCA, no es una orden de compra.
+    if _ORDER_RE.search(_DCA_RE.sub(" ", question)):
         return None
+    if _DCA_RE.search(question):
+        return dca_answer(db, tenant, resolve_company())
+    # La tesis tiene su propia respuesta (margen/escenarios PUBLICADOS).
+    if _ENGINE_RE.search(question) and not re.search(r"(?i)\btesis\b", question):
+        company = resolve_company()
+        if company is not None:
+            return engine_valuation_answer(db, company)
     if _RISK_METRIC_RE.search(question):
         return portfolio_risk_answer(db, tenant)
     if _JOURNAL_RE.search(question):
@@ -318,6 +426,8 @@ def answer_context_question(
 
 __all__ = [
     "alerts_answer",
+    "dca_answer",
+    "engine_valuation_answer",
     "answer_context_question",
     "journal_answer",
     "portfolio_risk_answer",
