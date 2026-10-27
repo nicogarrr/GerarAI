@@ -33,14 +33,14 @@ def test_other_or_missing_owner_rejected_before_fetch_or_parse(monkeypatch, owne
 def test_missing_account_closed(monkeypatch):
     monkeypatch.setattr(portfolio, 'get_settings', lambda: settings(account=''))
     with pytest.raises(HTTPException) as exc:
-        portfolio._require_ibkr_owner(SimpleNamespace(info={'tenant_id': 1}))
+        portfolio._require_ibkr_owner(SimpleNamespace(info={'tenant_id': 1}, scalar=lambda query: None))
     assert exc.value.status_code == 503
 
 
 @pytest.mark.parametrize('mode', ['xml', 'download'])
 @pytest.mark.parametrize('account,age', [('OTHER', 0), ('U1', 6), ('U1', -1)])
 def test_owner_wrong_account_or_statement_date_rejected_without_writes(monkeypatch, mode, account, age):
-    engine = create_engine('sqlite:///:memory:'); Base.metadata.create_all(engine)
+    engine = create_engine('sqlite:///:memory:', connect_args={'check_same_thread': False}); Base.metadata.create_all(engine)
     with _tenant_session(engine) as db:
         monkeypatch.setattr(portfolio, 'get_settings', lambda: settings(owner=db.info['tenant_id']))
         day = (date.today() - timedelta(days=age)).strftime('%Y%m%d')
@@ -61,7 +61,7 @@ def test_owner_valid_statement_uses_merge_not_destructive_reconcile(monkeypatch)
     calls = []
     def fake(self, db, xml, **kw): calls.append(kw); return {'status': 'imported'}
     monkeypatch.setattr(IBKRImportService, 'import_flex_xml', fake)
-    portfolio.import_ibkr_xml(portfolio.IBKRXmlImportRequest(xml='<fake-statement-long-enough/>'), SimpleNamespace(info={'tenant_id': 1}))
+    portfolio.import_ibkr_xml(portfolio.IBKRXmlImportRequest(xml='<fake-statement-long-enough/>'), SimpleNamespace(info={'tenant_id': 1}, scalar=lambda query: None))
     assert calls == [{'expected_account_id': 'U1', 'max_statement_age_days': 5}]
 
 

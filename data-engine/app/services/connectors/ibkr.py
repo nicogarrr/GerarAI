@@ -57,11 +57,22 @@ class IBKRFlexClient:
     poll_attempts = 6
     poll_delay_seconds = 10.0
 
-    def __init__(self) -> None:
+    def __init__(self, *, token: str | None = None, query_id: str | None = None) -> None:
         self.settings = get_settings()
+        # Explicit credentials never fall back to another tenant's global key.
+        self._token = token
+        self._query_id = query_id
+
+    @property
+    def token(self) -> str | None:
+        return self.settings.ibkr_flex_token if self._token is None else self._token
+
+    @property
+    def query_id(self) -> str | None:
+        return self.settings.ibkr_flex_query_id if self._query_id is None else self._query_id
 
     def configured(self) -> bool:
-        return bool(self.settings.ibkr_flex_token and self.settings.ibkr_flex_query_id)
+        return bool(self.token and self.query_id)
 
     def _require_config(self) -> None:
         if not self.configured():
@@ -95,8 +106,8 @@ class IBKRFlexClient:
         """
         self._require_config()
         params = {
-            "t": self.settings.ibkr_flex_token,
-            "q": self.settings.ibkr_flex_query_id,
+            "t": self.token,
+            "q": self.query_id,
             "v": "3",
         }
         if from_date or to_date:
@@ -116,7 +127,7 @@ class IBKRFlexClient:
 
     async def fetch_statement(self, reference_code: str) -> str:
         self._require_config()
-        params = {"t": self.settings.ibkr_flex_token, "q": reference_code, "v": "3"}
+        params = {"t": self.token, "q": reference_code, "v": "3"}
         last = "sin respuesta"
         for attempt in range(self.poll_attempts):
             text = await self._get(self.get_url, params, 60)

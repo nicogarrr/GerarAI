@@ -1253,6 +1253,19 @@ def sync_ibkr_flex() -> dict[str, Any]:
 
     client = IBKRFlexClient()
     tenant_id = get_settings().ibkr_flex_tenant_id
+    # Once the owner has configured/unlinked a tenant connector, never silently
+    # revive server-global credentials after disconnect or duplicate its sync.
+    if tenant_id is not None:
+        from sqlalchemy import select
+
+        from app.core.database import SessionLocal
+        from app.models import IBKRConnection
+        with SessionLocal() as admin:
+            migrated = admin.scalar(select(IBKRConnection.id).where(
+                IBKRConnection.tenant_id == tenant_id,
+            ).execution_options(include_all_tenants=True))
+        if migrated is not None:
+            return {"actor": "sync_ibkr_flex", "status": "skipped", "reason": "tenant_connector"}
     account_id = (get_settings().ibkr_flex_account_id or "").strip()
     if not client.configured() or tenant_id is None or not account_id:
         return {"actor": "sync_ibkr_flex", "status": "skipped", "reason": "not_configured"}
@@ -3438,3 +3451,37 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
 
 # RAG de conocimiento: registra el actor de ingesta (cola "knowledge").
 import app.workers.knowledge_rag_actors  # noqa: E402,F401
+
+
+@dramatiq.actor(max_retries=0, time_limit=600_000)
+def sync_tenant_ibkr_connections() -> dict[str, Any]:
+    """Bounded daily reporting sync, one independently scoped account per tenant."""
+    from sqlalchemy import select
+
+    from app.core.database import SessionLocal
+    from app.models import IBKRConnection
+
+    with SessionLocal() as admin:
+        ids = set(admin.scalars(select(IBKRConnection.tenant_id).where(
+            IBKRConnection.enabled.is_(True),
+        ).execution_options(include_all_tenants=True)).all())
+    scheduled = 0
+    for tenant_id, user_id in tenant_contexts():
+        if tenant_id in ids:
+            sync_one_tenant_ibkr.send(tenant_id, user_id)
+            scheduled += 1
+    return {"scheduled": scheduled}
+
+
+@dramatiq.actor(max_retries=0, time_limit=300_000)
+def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
+    from app.services import ibkr_connection_service as ibkr
+
+    with _session(tenant_id, user_id) as db:
+        try:
+            token, query_id, account_id, revision = ibkr.credentials(db, get_settings())
+            xml = _run(ibkr.download(token, query_id))
+            return ibkr.import_report(db, xml, account_id, revision)
+        except Exception:
+            ibkr.record_failure(db)
+            return {"status": "error", "message": "IBKR no disponible; se conservan los datos anteriores."}
