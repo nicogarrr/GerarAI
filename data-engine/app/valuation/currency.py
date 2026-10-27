@@ -246,10 +246,16 @@ def resolve_fx(
     pivote (la tabla del BCE es EUR->X, asi que CNY->USD = CNY->EUR->USD).
     Nunca se inventa un tipo.
     """
-    src = from_currency.upper()
-    dst = to_currency.upper()
-    if src == dst:
-        return FxQuote(src, dst, 1.0, None, None, (src,))
+    # ``.upper()`` a secas convertiria ``GBp`` (peniques) en ``GBP`` (libras):
+    # tipo x100. La subunidad se conserva y el servicio FX aplica su divisor.
+    src = canonical_currency_code(from_currency)
+    dst = canonical_currency_code(to_currency)
+    src_major, src_divisor = normalize_currency(src)
+    dst_major, dst_divisor = normalize_currency(dst)
+    if src_major == dst_major:
+        # Misma divisa (quiza subunidad): conversion exacta, sin tabla FX.
+        path = (src,) if src == dst else (src, dst)
+        return FxQuote(src, dst, dst_divisor / src_divisor, None, None, path)
 
     def fresh(rate_date: date | None) -> bool:
         return rate_date is not None and (on - rate_date).days <= max_age_days
@@ -259,7 +265,7 @@ def resolve_fx(
         return FxQuote(src, dst, direct[0], direct[1], direct[2], (src, dst))
     for pivot in pivots:
         pivot = pivot.upper()
-        if pivot in {src, dst}:
+        if pivot in {src_major, dst_major}:
             continue
         first = _leg(db, src, pivot, on)
         second = _leg(db, pivot, dst, on)
