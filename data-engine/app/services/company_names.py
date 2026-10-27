@@ -24,6 +24,7 @@ import re
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from app.models.entities import Company
 
@@ -51,12 +52,36 @@ def _words(text: str) -> list[str]:
     return re.findall(r"[a-z0-9&]+", _fold(text))
 
 
+# Match dotted legal forms as a unit, only at the end. Never discard lone
+# "s"/"l" tokens: they may be part of a real commercial name.
+_DOTTED_LEGAL_END = re.compile(
+    r"(?<![a-z0-9&])(?:s\.\s*[al]|s\.\s*p\.\s*a|n\.\s*v|l\.\s*l\.\s*c|l\.\s*p)\.?[\s,;]*$"
+)
+
+
+@lru_cache(maxsize=8192)
+def _core_words(name: str) -> tuple[str, ...]:
+    # Only immutable text is retained, not ORM objects, ids or tenant state.
+    # The key is the current name, so renaming a company needs no invalidation.
+    folded = _fold(name).rstrip(" ,;.")
+    while True:
+        stripped = _DOTTED_LEGAL_END.sub("", folded).rstrip(" ,;.")
+        if stripped != folded:
+            folded = stripped
+            continue
+        words = _words(stripped)
+        if words and words[-1] in _LEGAL_SUFFIXES:
+            # Remove the terminal token in the source, then reconsider dotted
+            # suffixes (e.g. "Banco Santander S.A. ADR").
+            token = list(re.finditer(r"[a-z0-9&]+", stripped))[-1]
+            folded = stripped[:token.start()].rstrip(" ,;.")
+            continue
+        return tuple(words)
+
+
 def core_name(name: str) -> list[str]:
     """Palabras del nombre comercial sin la forma jurídica final."""
-    words = _words(name)
-    while words and words[-1] in _LEGAL_SUFFIXES:
-        words.pop()
-    return words
+    return list(_core_words(name))
 
 
 @dataclass
@@ -72,7 +97,12 @@ class NameMatches:
         return any(s <= start and end <= e for s, e in self.spans)
 
 
-def _phrase_re(words: list[str]) -> re.Pattern[str]:
+def _phrase_re(words: list[str] | tuple[str, ...]) -> re.Pattern[str]:
+    return _cached_phrase_re(tuple(words))
+
+
+@lru_cache(maxsize=4096)
+def _cached_phrase_re(words: tuple[str, ...]) -> re.Pattern[str]:
     return re.compile(r"(?<![a-z0-9])" + r"[\s\-.,]+".join(re.escape(w) for w in words) + r"(?![a-z0-9])")
 
 
@@ -86,17 +116,20 @@ def companies_named_in(question: str, companies: Iterable[Company]) -> NameMatch
     by_first: dict[str, list[Company]] = {}
     seen: set[int] = set()
     for company in companies:
-        words = core_name(company.name or "")
+        words = _core_words(company.name or "")
         if not words:
             continue
-        if len(words) >= 2:  # un nombre de una palabra va por la regla de la mayúscula
+        # A literal substring is a necessary (not sufficient) condition of
+        # this regex. Avoid compiling/searching patterns that cannot match.
+        # Unlike token-set filtering this also preserves names containing '&'.
+        if len(words) >= 2 and all(word in folded for word in words):
             for m in _phrase_re(words).finditer(folded):
                 if company.id not in seen:
                     seen.add(company.id)
                     out.companies.append(company)
                 out.spans.append((m.start(), m.end()))
         first = words[0]
-        if len(first) >= 4 and first not in _GENERIC_FIRST_WORDS:
+        if len(first) >= 4 and first not in _GENERIC_FIRST_WORDS and first in folded:
             by_first.setdefault(first, []).append(company)
     for first, candidates in by_first.items():
         for m in _phrase_re([first]).finditer(folded):

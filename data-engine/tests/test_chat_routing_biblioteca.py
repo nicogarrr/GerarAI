@@ -206,3 +206,15 @@ def test_doctrina_explicita_aun_consulta_biblioteca(db, library_calls, question)
 def test_palabras_comunes_no_ocultan_ticker_desconocido(db, question):
     path, _ = _route(db, question)
     assert path == "unknown_ticker"
+
+
+@pytest.mark.parametrize("suffix", ["S.A.", "S.L."])
+def test_generic_first_word_with_dotted_legal_suffix_resolves(db, suffix):
+    _company(db, "SAN", f"Banco Santander, {suffix}")
+    db.commit()
+    resolved = ChatService(provider=_StubProvider())._resolve_company(
+        db, "¿Cómo va Banco Santander?", "portfolio", None,
+    )
+    assert resolved is not None and resolved.ticker == "SAN"
+    path, _ = _route(db, "¿Cómo va Banco Santander?")
+    assert path not in {"unknown_ticker", "company_ambiguous", "general"}
