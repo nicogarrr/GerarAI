@@ -12,7 +12,13 @@ from app.schemas.paper_trading import PaperProposal
 from app.services.llm_proposal_runner import QuotaExceeded, generate_proposal
 from app.services.llm_proposal_service import ProposalRejected
 from app.services.paper_calibration_service import calibration
-from app.services.paper_trading_service import create_proposal, refresh_trades, scoreboard, trade_out
+from app.services.paper_trading_service import (
+    UnknownProposalCurrency,
+    create_proposal,
+    refresh_trades,
+    scoreboard,
+    trade_out,
+)
 
 router = APIRouter()
 
@@ -21,6 +27,9 @@ router = APIRouter()
 def propose(body: PaperProposal, db: Session = Depends(get_db)) -> dict:
     try:
         return trade_out(create_proposal(db, body))
+    except UnknownProposalCurrency as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     except (ValueError, IntegrityError) as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Clave de propuesta duplicada o en conflicto") from exc
@@ -43,6 +52,9 @@ async def llm_propose(body: LLMProposalRequest, db: Session = Depends(get_db)) -
         db.rollback()
         status = 503 if exc.reason in {"llm_deshabilitado", "presupuesto_agotado", "modelo_no_gratuito", "modelo_no_verificable", "fallback_no_gratuito"} else 422
         raise HTTPException(status_code=status, detail=f"Propuesta rechazada: {exc.reason}") from exc
+    except UnknownProposalCurrency as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     except (ValueError, IntegrityError) as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Clave de propuesta duplicada o en conflicto") from exc

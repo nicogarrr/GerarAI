@@ -2,7 +2,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -28,6 +28,10 @@ class PaperTrade(TenantOwnedMixin, Base, TimestampMixin):
     inference_label: Mapped[str] = mapped_column(String(16), default="inferencia")
     inference_basis: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(12), default="pending")
+    # Immutable proposal input, separate from the observed quote currency.
+    # Legacy rows remain explicitly unknown, never inferred from a mark.
+    proposal_currency: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    proposal_currency_known: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
     currency: Mapped[str | None] = mapped_column(String(8))
     entry_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
     entry_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

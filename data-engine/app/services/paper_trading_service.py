@@ -14,15 +14,24 @@ def utc(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
 
+class UnknownProposalCurrency(ValueError):
+    """Legacy proposal has no trustworthy immutable currency input."""
+
+
 def create_proposal(db: Session, proposal: PaperProposal) -> PaperTrade:
     existing = db.scalar(select(PaperTrade).where(PaperTrade.proposal_key == proposal.proposal_key))
     if existing:
-        values = proposal.model_dump()
+        if not existing.proposal_currency_known:
+            raise UnknownProposalCurrency("No se conoce la moneda original de esta propuesta histórica; no se puede verificar el reintento.")
+        values = proposal.model_dump(exclude={"currency"})
         values["ticker"] = proposal.ticker.upper()
-        if any(getattr(existing, key) != value for key, value in values.items()):
+        if existing.proposal_currency != proposal.currency or any(getattr(existing, key) != value for key, value in values.items()):
             raise ValueError("La clave ya pertenece a otra propuesta")
         return existing
-    row = PaperTrade(**{**proposal.model_dump(), "ticker": proposal.ticker.upper()})
+    row = PaperTrade(
+        **{**proposal.model_dump(), "ticker": proposal.ticker.upper()},
+        proposal_currency=proposal.currency, proposal_currency_known=True,
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
