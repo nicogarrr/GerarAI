@@ -425,3 +425,35 @@ def test_edge_pre_revenue_without_revenue_is_insufficient():
     finally:
         _cleanup(db, [ticker])
         db.close()
+
+
+def test_edge_minorities_and_preferred_are_subtracted_from_equity():
+    """Puente de equity completo: EV - deuda neta - minoritarios - preferentes
+    (Damodaran, *Investment Valuation*, cap. 16; CFA Level II, FCFF -> equity).
+
+    Mismas cifras con y sin 150 de intereses minoritarios y 50 de preferentes:
+    a mano, el valor por accion baja exactamente (150 + 50) / 100 acciones = 2,0.
+    """
+    init_db()
+    db = SessionLocal()
+    tickers = ["BRIDGEA", "BRIDGEB"]
+    try:
+        facts = {"revenue": 1000, "free_cash_flow": 150, "revenue_growth": 0.07,
+                 "shares_diluted": 100, "net_debt": 300}
+        plain = _make_company(db, "BRIDGEA", company_type="standard", valuation_model="standard_dcf")
+        _add_facts(db, plain, facts)
+        claims = _make_company(db, "BRIDGEB", company_type="standard", valuation_model="standard_dcf")
+        _add_facts(db, claims, {**facts, "minority_interest": 150, "preferred_stock": 50})
+        _add_traceable_wacc(db, plain)
+        _add_traceable_wacc(db, claims)
+        service = ValuationService()
+        result_a = service.value_company(db, db.scalar(select(Company).where(Company.ticker == "BRIDGEA")))
+        result_b = service.value_company(db, db.scalar(select(Company).where(Company.ticker == "BRIDGEB")))
+        assert result_a["status"] == "ok" and result_b["status"] == "ok"
+        assert abs((result_a["base_value"] - result_b["base_value"]) - 2.0) < 1e-6
+        inputs = result_b["trace"]["scenarios"]["base"]["trace"]["inputs"]
+        assert inputs["minority_interest"] == 150
+        assert inputs["preferred_stock"] == 50
+    finally:
+        _cleanup(db, tickers)
+        db.close()
