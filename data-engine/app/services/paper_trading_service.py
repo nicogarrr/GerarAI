@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.paper_trading import PaperTrade
@@ -18,22 +19,35 @@ class UnknownProposalCurrency(ValueError):
     """Legacy proposal has no trustworthy immutable currency input."""
 
 
+def _same_proposal(existing: PaperTrade, proposal: PaperProposal) -> PaperTrade:
+    if not existing.proposal_currency_known:
+        raise UnknownProposalCurrency("No se conoce la moneda original de esta propuesta histórica; no se puede verificar el reintento.")
+    values = proposal.model_dump(exclude={"currency"})
+    values["ticker"] = proposal.ticker.upper()
+    if existing.proposal_currency != proposal.currency or any(getattr(existing, key) != value for key, value in values.items()):
+        raise ValueError("La clave ya pertenece a otra propuesta")
+    return existing
+
+
 def create_proposal(db: Session, proposal: PaperProposal) -> PaperTrade:
     existing = db.scalar(select(PaperTrade).where(PaperTrade.proposal_key == proposal.proposal_key))
     if existing:
-        if not existing.proposal_currency_known:
-            raise UnknownProposalCurrency("No se conoce la moneda original de esta propuesta histórica; no se puede verificar el reintento.")
-        values = proposal.model_dump(exclude={"currency"})
-        values["ticker"] = proposal.ticker.upper()
-        if existing.proposal_currency != proposal.currency or any(getattr(existing, key) != value for key, value in values.items()):
-            raise ValueError("La clave ya pertenece a otra propuesta")
-        return existing
+        return _same_proposal(existing, proposal)
     row = PaperTrade(
         **{**proposal.model_dump(), "ticker": proposal.ticker.upper()},
         proposal_currency=proposal.currency, proposal_currency_known=True,
     )
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Un reintento idéntico concurrente ganó la carrera por (tenant, proposal_key):
+        # es el mismo envío, no un conflicto. Una clave con otro cuerpo sigue fallando.
+        db.rollback()
+        winner = db.scalar(select(PaperTrade).where(PaperTrade.proposal_key == proposal.proposal_key))
+        if winner is None:
+            raise
+        return _same_proposal(winner, proposal)
     db.refresh(row)
     return row
 
