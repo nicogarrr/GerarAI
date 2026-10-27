@@ -2167,7 +2167,8 @@ export interface paths {
         delete: operations["delete_document_api_knowledge_documents__document_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Document Ticker */
+        patch: operations["update_document_ticker_api_knowledge_documents__document_id__patch"];
         trace?: never;
     };
     "/api/knowledge/documents/{document_id}/chunks": {
@@ -5458,6 +5459,8 @@ export interface components {
             publication_date?: string | null;
             /** Source Url */
             source_url?: string | null;
+            /** Ticker */
+            ticker?: string | null;
             /** Title */
             title: string;
         };
@@ -6244,6 +6247,14 @@ export interface components {
             title: string;
             /** Url */
             url?: string | null;
+        };
+        /**
+         * DocumentTickerUpdate
+         * @description Ticker de la empresa a la que se refiere el documento; ``null`` lo quita.
+         */
+        DocumentTickerUpdate: {
+            /** Ticker */
+            ticker?: string | null;
         };
         /** DriverAssumptionCreate */
         DriverAssumptionCreate: {
@@ -13633,6 +13644,7 @@ export interface operations {
                 offset?: number;
                 document_type?: string | null;
                 status?: string | null;
+                ticker?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -13783,6 +13795,52 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_document_ticker_api_knowledge_documents__document_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                document_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DocumentTickerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
             /** @description Validation Error */
             422: {
