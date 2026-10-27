@@ -746,7 +746,7 @@ class PortfolioIntelligenceService:
         ending_value = 0.0
         for position, company in positions:
             value = position.market_value_base
-            if value is None and position.currency.upper() == base:
+            if value is None and position.currency.upper() == base and position.market_value > 0:
                 value = position.market_value
             if value is None:
                 missing_fx.append({
