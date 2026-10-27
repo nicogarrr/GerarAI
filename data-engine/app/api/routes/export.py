@@ -27,7 +27,11 @@ from app.models import (
 )
 from app.services.investment_plan_service import InvestmentPlanService
 from app.services.portfolio_fx_service import PortfolioFXService
-from app.services.tax_report_service import TaxReportService, sanitize_realized_over_sells
+from app.services.tax_report_service import (
+    TaxReportService,
+    sanitize_realized_over_sells,
+    sanitize_summary_over_sells,
+)
 
 router = APIRouter()
 
@@ -153,7 +157,7 @@ def export_year(
     )
     if tax_report is not None:
         tax = {
-            "summary": tax_report.summary,
+            "summary": sanitize_summary_over_sells(tax_report.summary, tax_report.realized),
             "dividends": tax_report.dividends,
             "realized": sanitize_realized_over_sells(tax_report.realized),
             "misc": tax_report.misc,
