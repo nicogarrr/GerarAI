@@ -314,7 +314,7 @@ def test_cross_engine_coherence_same_company():
             # Margen de seguridad consistente con precio 15.
             mos = result["margin_of_safety"]
             assert mos is not None, key
-            assert abs(mos - (result["expected_value"] / 15 - 1)) < 1e-9, key
+            assert abs(mos - ((result["expected_value"] - 15) / result["expected_value"])) < 1e-9, key
 
         # Mismo orden de magnitud entre motores (ratio < 50x).
         assert max(expected.values()) / min(expected.values()) < 50, expected

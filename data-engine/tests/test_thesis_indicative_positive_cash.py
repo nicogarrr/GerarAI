@@ -38,5 +38,7 @@ def test_positive_ocf_keeps_partial_indicative_range(monkeypatch):
     assert thesis["base_value"] is not None
     # B6: la etiqueta de indicativa viaja en la hipotesis; la cifra NO se oculta.
     assert "Valoración indicativa sobre supuestos" in thesis["executive_summary"]
-    assert "margen de seguridad del -97,9 %" in thesis["executive_summary"]
+    # Margen estándar (V - P)/V: con V muy por debajo de P sale muy negativo
+    # (antes, con V/P - 1, era -97,9 %; ambos describen V ~ 2,1 % de P).
+    assert "margen de seguridad del -4725,6 %" in thesis["executive_summary"]
     assert "RANGO INDICATIVO PARCIAL" in thesis["thesis_markdown"]

@@ -53,7 +53,11 @@ from app.services.thesis_provenance import (
 )
 from app.services.ticker_ownership_signals import ownership_fact_lines, ownership_markdown
 from app.services.valuation_service import ValuationService
-from app.valuation.engines.base import MODEL_VERSION, margin_of_safety_reference
+from app.valuation.engines.base import (
+    MODEL_VERSION,
+    margin_of_safety_from_upside,
+    margin_of_safety_reference,
+)
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 
@@ -1147,7 +1151,7 @@ class ThesisService:
         price_text = _thesis_money(float(price), currency)
         base_text = _thesis_money(float(base), currency)
         if base <= 0:
-            # Con un escenario base negativo o nulo el margen (base/precio - 1)
+            # Con un escenario base negativo o nulo el margen ((base - precio)/base)
             # no es interpretable: -249% sobre una base de -84.70 se leia como
             # un dato real. Se dice tal cual, sin porcentaje.
             return (
@@ -1165,7 +1169,7 @@ class ThesisService:
             if required_growth is not None
             else ""
         )
-        # MoS = valor esperado/precio - 1 (valuation/engines/base.py): se nombra
+        # MoS = (valor esperado - precio)/valor esperado (valuation/engines/base.py): se nombra
         # explicitamente su base. Describirlo como distancia precio/base ("un X% por
         # encima del escenario base") usaria el denominador equivocado: con
         # precio 336.56 y base 106.85 diria "68% por encima" cuando el precio
@@ -1329,9 +1333,12 @@ class ThesisService:
             return "blocked"
         if margin_of_safety is None:
             return "incomplete_price"
-        if margin_of_safety > 0.30:
+        # Umbrales en margen estándar (V - P)/V, equivalentes EXACTOS a los de
+        # antes en potencial V/P - 1 (+30 % y -20 %): 1 - 1/1,3 = 23,08 % y
+        # 1 - 1/0,8 = -25 %. El veredicto de cada valoración no cambia.
+        if margin_of_safety > margin_of_safety_from_upside(0.30):
             return "attractive"
-        if margin_of_safety < -0.20:
+        if margin_of_safety < margin_of_safety_from_upside(-0.20):
             return "expensive"
         return "watch"
 

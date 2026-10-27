@@ -604,7 +604,7 @@ def test_ddm_engine_publishes_the_reconciliation_and_an_ordered_range(db):
     assert result["bear_value"] <= result["expected_value"] <= result["bull_value"]
     assert result["base_value"] == pytest.approx(30.90, abs=1e-9)
     assert result["margin_of_safety"] == pytest.approx(
-        result["expected_value"] / 30.0 - 1
+        (result["expected_value"] - 30.0) / result["expected_value"]
     )
     reconciliation = result["ddm"]["reconciliation"]
     assert reconciliation["gordon_perpetuity_value"] == pytest.approx(30.90)
@@ -730,7 +730,7 @@ def test_ddm_engine_converts_to_the_listed_share_for_an_adr_with_a_ratio(db):
         result["base_value"] * 8.0
     )
     # The margin of safety is computed against the ORDINARY-share price.
-    assert result["margin_of_safety"] == pytest.approx(result["expected_value"] / 33.526369834189 - 1)
+    assert result["margin_of_safety"] == pytest.approx((result["expected_value"] - 33.526369834189) / result["expected_value"])
 
 
 def test_fcfe_engine_publishes_the_bridge_and_never_subtracts_net_debt(db):

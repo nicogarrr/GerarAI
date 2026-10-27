@@ -469,7 +469,8 @@ export function researchMoneyToNumber(
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-/** Margen de seguridad para mostrar. MoS = valor esperado/precio - 1 (base explícita en la UI): con un escenario base
+/** Margen de seguridad para mostrar. MoS = (valor esperado - precio)/valor esperado, el estándar de Graham
+ *  (no el potencial valor/precio - 1; base explícita en la UI): con un escenario base
  *  no positivo el numero (p. ej. -249 %) no es interpretable, asi que se muestra N/D
  *  en vez de un porcentaje que parece un dato. */
 export function marginOfSafetyDisplay(
