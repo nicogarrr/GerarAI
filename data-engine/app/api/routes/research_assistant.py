@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
-from app.schemas import ChatPageContext
+from app.schemas import ChatPageContext, ChatTurn
 from app.services.brain_service import resolve_page_context
 from app.services.research_assistant_narrative import synthesize
 from app.services.research_assistant_service import answer, guide_context
@@ -24,6 +24,8 @@ class AssistantRequest(BaseModel):
     ticker: str | None = Field(default=None, min_length=1, max_length=20)
     review_id: int | None = Field(default=None, ge=1)
     page: ChatPageContext | None = None
+    # Turnos previos del Cerebro: solo contexto para la síntesis, nunca evidencia.
+    history: list[ChatTurn] = Field(default_factory=list, max_length=8)
 
     @model_validator(mode="after")
     def validate_scope(self):
