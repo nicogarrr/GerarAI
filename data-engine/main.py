@@ -19,6 +19,7 @@ from app.core.raw_body import RawBodyMiddleware
 from app.llm.factory import validate_llm_configuration
 from app.llm.model_aliases import configure_model_aliases
 from app.seed import apply_master_taxonomy_to_stubs, ensure_company_master
+from app.services.tenant_llm_settings_service import bind_tenant_llm_settings
 
 try:  # preload optional probe modules during process startup, not in a request
     import urllib.request  # noqa: F401
@@ -164,6 +165,7 @@ private_dependencies = [
     Depends(get_research_principal),
     Depends(enforce_rate_limit),
     Depends(bind_llm_cache_tenant),
+    Depends(bind_tenant_llm_settings),
 ]
 
 

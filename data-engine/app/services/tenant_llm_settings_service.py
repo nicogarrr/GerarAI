@@ -1,0 +1,336 @@
+"""Persistencia, alcance y prueba del proveedor LLM propio de un tenant."""
+
+from __future__ import annotations
+
+import logging
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
+
+import httpx
+from fastapi import Depends
+from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+from app.core.config import Settings, get_settings
+from app.core.database import get_db
+from app.core.llm_settings_crypto import (
+    LLMSettingsCryptoError,
+    decrypt_api_key,
+    encrypt_api_key,
+    encryption_available,
+    last4,
+)
+from app.llm.tenant_config import (
+    PROVIDER_CATALOG,
+    PROVIDER_CUSTOM,
+    TenantLLMConfig,
+    current_tenant_llm_config,
+    models_endpoint,
+    normalize_model,
+    normalize_provider,
+    normalize_reasoning_effort,
+    provider_catalog,
+    reset_tenant_llm_config,
+    set_tenant_llm_config,
+    validate_base_url,
+)
+from app.models import TenantLLMSettings
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class TenantLLMUpdate:
+    provider: str
+    model: str
+    base_url: str | None = None
+    fallback_model: str | None = None
+    reasoning_effort: str | None = None
+    api_key: str | None = None
+    clear_api_key: bool = False
+    enabled: bool = True
+
+
+def read_tenant_row(db: Session, tenant_id: int | None = None) -> TenantLLMSettings | None:
+    tenant_id = tenant_id if tenant_id is not None else db.info.get("tenant_id")
+    if tenant_id is None:
+        return None
+    return db.scalar(
+        select(TenantLLMSettings)
+        .where(TenantLLMSettings.tenant_id == tenant_id)
+        .execution_options(include_all_tenants=True)
+    )
+
+
+def config_from_row(
+    row: TenantLLMSettings, settings: Settings | None = None
+) -> TenantLLMConfig:
+    settings = settings or get_settings()
+    error: str | None = None
+    provider = (row.provider or "").strip().lower()
+    try:
+        provider = normalize_provider(provider)
+    except ValueError:
+        error = "tenant_llm_provider_invalid"
+        provider = provider or "custom"
+    base_url = ""
+    try:
+        base_url = validate_base_url(provider, row.base_url)
+    except ValueError:
+        error = error or "tenant_llm_base_url_invalid"
+        base_url = (row.base_url or "").strip()
+    model = (row.model or "").strip()
+    try:
+        model = normalize_model(model)
+    except ValueError:
+        error = error or "tenant_llm_model_invalid"
+    fallback_model = (row.fallback_model or "").strip() or None
+    if fallback_model:
+        try:
+            fallback_model = normalize_model(fallback_model, field_name="fallback_model")
+        except ValueError:
+            error = error or "tenant_llm_fallback_model_invalid"
+    try:
+        reasoning_effort = normalize_reasoning_effort(row.reasoning_effort)
+    except ValueError:
+        error = error or "tenant_llm_reasoning_effort_invalid"
+        reasoning_effort = None
+    api_key: str | None = None
+    if row.api_key_ciphertext:
+        if not encryption_available(settings):
+            error = "llm_settings_encryption_not_configured"
+        else:
+            try:
+                api_key = decrypt_api_key(row.api_key_ciphertext, settings)
+            except LLMSettingsCryptoError:
+                error = "tenant_llm_settings_corrupt"
+    return TenantLLMConfig(
+        provider=provider,
+        base_url=base_url,
+        model=model,
+        fallback_model=fallback_model,
+        reasoning_effort=reasoning_effort,
+        api_key=api_key,
+        api_key_last4=row.api_key_last4,
+        enabled=bool(row.enabled),
+        billing_scope="tenant",
+        error=error,
+    )
+
+
+def load_config_for_tenant(
+    db: Session, tenant_id: int, settings: Settings | None = None
+) -> TenantLLMConfig | None:
+    try:
+        row = read_tenant_row(db, tenant_id)
+    except SQLAlchemyError:
+        logger.warning("tenant LLM settings table unavailable", exc_info=True)
+        return None
+    return config_from_row(row, settings) if row is not None else None
+
+
+async def bind_tenant_llm_settings(
+    db: Session = Depends(get_db),
+) -> AsyncIterator[None]:
+    """Fija el proveedor del tenant firmado durante todo el request."""
+    token = set_tenant_llm_config(None)
+    try:
+        tenant_id = db.info.get("tenant_id")
+        config = load_config_for_tenant(db, tenant_id) if tenant_id is not None else None
+        reset_tenant_llm_config(token)
+        token = set_tenant_llm_config(config)
+        yield
+    finally:
+        reset_tenant_llm_config(token)
+
+
+def _validated(
+    update: TenantLLMUpdate,
+) -> tuple[str, str, str, str | None, str | None]:
+    provider = normalize_provider(update.provider)
+    model = normalize_model(update.model)
+    base_url = validate_base_url(provider, update.base_url)
+    fallback_model = (update.fallback_model or "").strip() or None
+    if fallback_model:
+        fallback_model = normalize_model(fallback_model, field_name="fallback_model")
+    reasoning_effort = normalize_reasoning_effort(update.reasoning_effort)
+    return provider, model, base_url, fallback_model, reasoning_effort
+
+
+def save_tenant_settings(
+    db: Session,
+    update: TenantLLMUpdate,
+    settings: Settings | None = None,
+) -> TenantLLMSettings:
+    settings = settings or get_settings()
+    tenant_id = db.info.get("tenant_id")
+    if tenant_id is None:
+        raise ValueError("Se requiere el contexto del tenant.")
+    provider, model, base_url, fallback_model, reasoning_effort = _validated(update)
+    row = read_tenant_row(db, tenant_id)
+    if row is None:
+        row = TenantLLMSettings(tenant_id=tenant_id)
+        db.add(row)
+    row.provider = provider
+    row.model = model
+    row.base_url = base_url if provider == PROVIDER_CUSTOM else None
+    row.fallback_model = fallback_model
+    row.reasoning_effort = reasoning_effort
+    row.enabled = bool(update.enabled)
+    if update.clear_api_key:
+        row.api_key_ciphertext = None
+        row.api_key_last4 = None
+    elif update.api_key is not None and update.api_key.strip():
+        plaintext = update.api_key.strip()
+        row.api_key_ciphertext = encrypt_api_key(plaintext, settings)
+        row.api_key_last4 = last4(plaintext)
+        row.key_version = 1
+    db.flush()
+    return row
+
+
+def _platform_view(settings: Settings, db: Session) -> dict:
+    del db
+    from app.llm.readiness import llm_configuration_issue
+
+    configured = llm_configuration_issue(settings) is None
+    key_configured = bool((settings.opencode_go_api_key or "").strip())
+    return {
+        "source": "platform",
+        "status": "platform" if configured else "disabled",
+        "provider": settings.llm_provider or "opencode-go",
+        "base_url": None,
+        "model": settings.opencode_go_model if configured else None,
+        "fallback_model": settings.opencode_go_fallback_model or None,
+        "reasoning_effort": settings.opencode_go_reasoning_effort,
+        "enabled": configured,
+        "configured": configured,
+        "api_key_configured": key_configured,
+        "api_key_last4": None,
+        "key_version": None,
+        "billing_scope": "platform",
+        "message": (
+            "Estas usando el proveedor de GerarAI."
+            if configured
+            else "El proveedor de GerarAI no esta configurado."
+        ),
+    }
+
+
+def settings_view(db: Session, settings: Settings | None = None) -> dict:
+    settings = settings or get_settings()
+    view = _platform_view(settings, db)
+    row = read_tenant_row(db)
+    if row is None:
+        view["encryption_available"] = encryption_available(settings)
+        view["providers"] = provider_catalog()
+        return view
+    config = config_from_row(row, settings)
+    if config.error or not row.enabled:
+        status = "disabled"
+    elif not config.has_api_key:
+        status = "missing_key"
+    else:
+        status = "tenant"
+    message = {
+        "tenant": "Configurado con tu clave. El coste lo paga tu proveedor.",
+        "missing_key": "Falta la clave del proveedor: la IA esta desactivada.",
+        "disabled": "La IA propia esta desactivada o la configuracion es invalida.",
+    }[status]
+    view.update(
+        {
+            "source": "tenant",
+            "status": status,
+            "provider": config.provider,
+            "base_url": config.base_url,
+            "model": config.model,
+            "fallback_model": config.fallback_model,
+            "reasoning_effort": config.reasoning_effort,
+            "enabled": bool(row.enabled),
+            "configured": status == "tenant",
+            "api_key_configured": bool(row.api_key_ciphertext),
+            "api_key_last4": row.api_key_last4,
+            "key_version": row.key_version,
+            "billing_scope": "tenant",
+            "error": config.error,
+            "message": message,
+        }
+    )
+    view["encryption_available"] = encryption_available(settings)
+    view["providers"] = provider_catalog()
+    return view
+
+
+def stored_api_key(
+    db: Session, settings: Settings | None = None
+) -> str | None:
+    row = read_tenant_row(db)
+    if row is None or not row.api_key_ciphertext:
+        return None
+    try:
+        return decrypt_api_key(row.api_key_ciphertext, settings)
+    except LLMSettingsCryptoError as exc:
+        raise ValueError("No se pudo descifrar la clave guardada.") from exc
+
+
+async def probe_connection(
+    *, provider: str, base_url: str | None, api_key: str, model: str
+) -> dict:
+    """GET {base_url}/models con 5 s y sin reintentos; nunca devuelve la clave."""
+    provider = normalize_provider(provider)
+    url = validate_base_url(provider, base_url)
+    normalize_model(model)
+    endpoint = models_endpoint(url)
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "User-Agent": "gerarai/1.0",
+    }
+    try:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(5.0),
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
+            response = await client.get(endpoint, headers=headers)
+    except httpx.TimeoutException:
+        return {
+            "ok": False,
+            "status_code": None,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": "El proveedor no respondio en 5 segundos.",
+        }
+    except httpx.HTTPError:
+        return {
+            "ok": False,
+            "status_code": None,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": "No se pudo conectar con el proveedor.",
+        }
+    ok = 200 <= response.status_code < 300
+    return {
+        "ok": ok,
+        "status_code": response.status_code,
+        "provider": provider,
+        "base_url": url,
+        "model": model,
+        "message": (
+            "Conexion correcta."
+            if ok
+            else f"El proveedor respondio HTTP {response.status_code}."
+        ),
+    }
+
+
+def catalog_defaults(provider: str) -> tuple[str, str]:
+    provider = normalize_provider(provider)
+    spec = PROVIDER_CATALOG[provider]
+    return spec.base_url, spec.default_model
+
+
+def current_config_is_tenant() -> bool:
+    return current_tenant_llm_config() is not None

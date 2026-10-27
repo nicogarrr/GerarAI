@@ -247,3 +247,37 @@ def test_burn_proxy_source_no_se_inventa_en_resultado_incompleto():
     )
     assert result.status == "incomplete"
     assert result.burn_proxy_source is None
+
+
+def test_ocf_positivo_compensa_el_capex():
+    """OCF positivo financia parte del capex: el hueco usa la quema neta (capex - OCF).
+
+    Caja 100, OCF +20/año, capex 30/año, horizonte 2 años, colchón 50:
+    quema neta = (30 - 20) * 2 = 20; hueco = max(20 + 50 - 100, 0) = 0.
+    Antes se ignoraba el OCF positivo y salía (30 * 2) + 50 - 100 = 10.
+    """
+    result = estimate_funding_gap(
+        _snapshot_completo(operating_cash_flow=20.0), current_price=10.0, value_per_share=8.0
+    )
+    assert result.funding_gap == pytest.approx(0.0)
+    assert result.dilution is None
+
+
+def test_ocf_positivo_mayor_que_capex_solo_deja_el_colchon():
+    """FCF positivo (OCF 80 > capex 30) y sin caja: solo queda el colchón mínimo (50)."""
+    result = estimate_funding_gap(
+        _snapshot_completo(cash_and_equivalents=0.0, operating_cash_flow=80.0),
+        current_price=10.0,
+        value_per_share=8.0,
+    )
+    assert result.funding_gap == pytest.approx(50.0)
+
+
+def test_ocf_positivo_menor_que_capex_reduce_el_hueco():
+    """Caja 0, OCF +10, capex 30: (30 - 10) * 2 + 50 = 90 (antes 110)."""
+    result = estimate_funding_gap(
+        _snapshot_completo(cash_and_equivalents=0.0, operating_cash_flow=10.0),
+        current_price=10.0,
+        value_per_share=8.0,
+    )
+    assert result.funding_gap == pytest.approx(90.0)

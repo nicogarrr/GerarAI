@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
+import { researchErrorDetail } from '@/lib/research/error-detail';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 
@@ -330,8 +331,7 @@ export type KnowledgeGraph = {
 async function apiError(response: Response, path: string): Promise<never> {
   let detail = `${response.status} ${response.statusText}`.trim();
   try {
-    const payload = (await response.json()) as { detail?: string; message?: string };
-    detail = payload.detail ?? payload.message ?? detail;
+    detail = researchErrorDetail(await response.json(), detail);
   } catch {
     // Preserve the HTTP status when the service does not return JSON.
   }

@@ -20,6 +20,16 @@
 
 import { getSectorAverages } from '@/lib/actions/sectorData.actions';
 import { formatNumber, formatPercent } from '@/lib/format';
+import {
+    dailyChangePoints,
+    ebitdaGrowthPoints,
+    epsGrowthPoints,
+    netMarginPoints,
+    percentToRatio,
+    revenueGrowthPoints,
+    roaPoints,
+    roePoints,
+} from '@/lib/utils/profitabilityPoints';
 
 /**
  * Pesos calibrados del scoring general. ÚNICA fuente de verdad:
@@ -217,27 +227,22 @@ export async function calculateAdvancedStockScore(
     const ebitdaGrowth = getMetric('ebitdaCagr5Y', 'ebitdaGrowthTTM');
 
     if (revenueGrowth !== null) {
-        let growth = revenueGrowth / 100;
-        if (Math.abs(growth) > 1) growth = growth / 100;
+        // Finnhub da el crecimiento en % (150 = +150 %): se divide UNA sola vez.
+        const growth = percentToRatio(revenueGrowth);
 
         // Comparar con sector (crecimiento típico del sector)
         const sectorGrowth = (sectorMetrics?.avgRevenueGrowth || 0.15);
-        const growthScore = growth > sectorGrowth * 1.5 ? 40 : growth > sectorGrowth ? 35 : growth > 0 ? 25 : 10;
-        categoryScores.growth += growthScore;
+        categoryScores.growth += revenueGrowthPoints(revenueGrowth, sectorGrowth);
 
         if (growth > sectorGrowth * 1.3) {
             strengths.push(`Crecimiento superior al sector (${formatPercent(growth, { digits: 1 })} vs ${formatPercent(sectorGrowth, { digits: 1 })})`);
         }
     }
     if (epsGrowth !== null) {
-        let growth = epsGrowth / 100;
-        if (Math.abs(growth) > 1) growth = growth / 100;
-        categoryScores.growth += growth > 0.2 ? 30 : growth > 0.1 ? 25 : growth > 0 ? 20 : 10;
+        categoryScores.growth += epsGrowthPoints(epsGrowth);
     }
     if (ebitdaGrowth !== null) {
-        let growth = ebitdaGrowth / 100;
-        if (Math.abs(growth) > 1) growth = growth / 100;
-        categoryScores.growth += growth > 0.15 ? 30 : growth > 0 ? 20 : 10;
+        categoryScores.growth += ebitdaGrowthPoints(ebitdaGrowth);
     }
 
     categoryScores.growth = Math.min(100, categoryScores.growth);
@@ -248,22 +253,20 @@ export async function calculateAdvancedStockScore(
     const roa = getMetric('roaTTM', 'roa', 'returnOnAssets');
 
     if (netMargin !== null) {
-        const margin = Math.abs(netMargin) > 1 ? Math.abs(netMargin) / 100 : Math.abs(netMargin);
+        // Conserva el signo: un margen negativo es una pérdida, no rentabilidad.
+        const margin = percentToRatio(netMargin);
         const sectorMargin = sectorMetrics?.avgNetMargin || 0.15; // Margen promedio del sector real
-        const marginScore = margin > sectorMargin * 1.3 ? 35 : margin > sectorMargin ? 30 : margin > 0.1 ? 25 : margin > 0 ? 15 : 0;
-        categoryScores.profitability += marginScore;
+        categoryScores.profitability += netMarginPoints(netMargin, sectorMargin);
 
         if (margin > sectorMargin * 1.2) {
             strengths.push(`Margen neto superior al sector (${formatPercent(margin, { digits: 1 })} vs ${formatPercent(sectorMargin, { digits: 1 })})`);
         }
     }
     if (roe !== null) {
-        const roeValue = Math.abs(roe) > 1 ? Math.abs(roe) / 100 : Math.abs(roe);
-        categoryScores.profitability += roeValue > 0.2 ? 35 : roeValue > 0.15 ? 30 : roeValue > 0.1 ? 25 : roeValue > 0 ? 20 : 10;
+        categoryScores.profitability += roePoints(roe);
     }
     if (roa !== null) {
-        const roaValue = Math.abs(roa) > 1 ? Math.abs(roa) / 100 : Math.abs(roa);
-        categoryScores.profitability += roaValue > 0.1 ? 30 : roaValue > 0.05 ? 25 : roaValue > 0 ? 20 : 10;
+        categoryScores.profitability += roaPoints(roa);
     }
 
     categoryScores.profitability = Math.min(100, categoryScores.profitability);
@@ -339,8 +342,8 @@ export async function calculateAdvancedStockScore(
 
     // Usar cambio diario si no hay datos históricos
     if (quote.dp) {
-        const dailyChange = quote.dp / 100;
-        categoryScores.momentum += Math.abs(dailyChange) > 2 ? 15 : Math.abs(dailyChange) > 1 ? 10 : 5;
+        // quote.dp ya viene en % (Finnhub «Percent change»): umbrales +1 % / +2 %, con signo.
+        categoryScores.momentum += dailyChangePoints(Number(quote.dp));
     }
 
     // Comparación con S&P 500

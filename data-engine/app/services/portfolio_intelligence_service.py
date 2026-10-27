@@ -624,7 +624,13 @@ class PortfolioIntelligenceService:
                 net, sign = gross - fees, 1
             elif action in {"dividend", "interest"}:
                 net, sign = gross, 1
-            elif action in {"fee", "withholding", "cash_misc"}:
+            elif action in {"fee", "withholding"}:
+                # IBKR Flex informa retenciones y comisiones con importe
+                # NEGATIVO y la entrada manual en positivo: el coste siempre
+                # es una SALIDA para el inversor, sea cual sea el signo guardado
+                # (con -15 el flujo era -1 * -15 = +15 y la retencion sumaba).
+                net, sign = abs(gross), -1
+            elif action == "cash_misc":
                 net, sign = gross, -1
             else:
                 net, sign = gross, 1

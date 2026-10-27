@@ -62,6 +62,7 @@ def pytest_sessionfinish(session, exitstatus):  # noqa: ARG001
 # Settings(_env_file=None) must observe no secrets.
 _TEST_ISOLATED_ENV_VARS = (
     "RESEARCH_AUTH_SECRET",
+    "LLM_SETTINGS_ENCRYPTION_KEY",
     "DOCUMENT_STORAGE_BACKEND",
     "FMP_API_KEY",
     "FINNHUB_API_KEY",
@@ -78,6 +79,15 @@ _TEST_ISOLATED_ENV_VARS = (
     "INSIDER_ALERTS_ENABLED",
     "ALERT_EMAIL_WEBHOOK_URL",
     "ALERT_PUSH_WEBHOOK_URL",
+    # Respaldos LLM en modo auto: una clave del .env local no debe encenderlos.
+    "GROQ_API_KEY",
+    "GROQ_CHAT_FALLBACK_ENABLED",
+    "GROQ_FREE_PLAN_CONFIRMED",
+    "GROQ_ZDR_CONFIRMED",
+    "GEMINI_API_KEY",
+    "GEMINI_CHAT_FALLBACK_ENABLED",
+    "GEMINI_FREE_PLAN_CONFIRMED",
+    "OPENROUTER_API_KEY",
 )
 
 # Pydantic Settings still reads .env when the environment variable is absent.
@@ -94,6 +104,14 @@ _TEST_ISOLATED_ENV_DEFAULTS = {
     "INSIDER_ALERTS_ENABLED": "false",
     "ALERT_EMAIL_WEBHOOK_URL": "",
     "ALERT_PUSH_WEBHOOK_URL": "",
+    "GROQ_API_KEY": "",
+    "GROQ_CHAT_FALLBACK_ENABLED": "auto",
+    "GROQ_FREE_PLAN_CONFIRMED": "false",
+    "GROQ_ZDR_CONFIRMED": "false",
+    "GEMINI_API_KEY": "",
+    "GEMINI_CHAT_FALLBACK_ENABLED": "auto",
+    "GEMINI_FREE_PLAN_CONFIRMED": "false",
+    "OPENROUTER_API_KEY": "",
 }
 os.environ.update(_TEST_ISOLATED_ENV_DEFAULTS)
 

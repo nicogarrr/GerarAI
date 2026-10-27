@@ -30,6 +30,7 @@ from app.llm.factory import _pin_to_model, create_llm_provider
 from app.llm.interactive_deadline import remaining_seconds
 from app.llm.model_aliases import is_owner_approved_model
 from app.llm.response_cache import build_response_cache
+from app.llm.tenant_config import current_tenant_llm_config
 
 logger = logging.getLogger(__name__)
 
@@ -421,7 +422,7 @@ def _groq_backup(
     total_timeout_seconds: float = 15,
     max_output_tokens: int = 2400,
 ) -> OpenAICompatibleProvider | None:
-    if not settings.groq_chat_fallback_enabled:
+    if not settings.groq_chat_fallback_active:
         return None
     if not (settings.groq_api_key and settings.groq_free_plan_confirmed and settings.groq_zdr_confirmed):
         raise ValueError("Groq chat requires a verified free plan, ZDR and API key")
@@ -452,7 +453,7 @@ def _gemini_backup(
     total_timeout_seconds: float = 18,
     max_output_tokens: int = 8000,
 ) -> OpenAICompatibleProvider | None:
-    if not settings.gemini_chat_fallback_enabled:
+    if not settings.gemini_chat_fallback_active:
         return None
     if not (settings.gemini_api_key and settings.gemini_free_plan_confirmed):
         raise ValueError("Gemini chat requires a verified free plan (no billing) and API key")
@@ -488,6 +489,16 @@ def _openrouter_backup(settings: Settings, client: httpx.AsyncClient | None) -> 
 
 def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
     settings = settings or get_settings()
+    if current_tenant_llm_config() is not None:
+        # El tenant paga su clave: sin respaldos de plataforma (Groq/Gemini)
+        # ni modelos de OpenCode. Mismo contrato fail-closed del factory.
+        return create_llm_provider(
+            settings,
+            client=client,
+            max_retries=0,
+            timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
+            total_timeout_seconds=settings.chat_total_timeout_seconds,
+        )
     if not settings.llm_enabled or (settings.llm_provider or "").strip().lower() == "disabled":
         return DisabledProvider("disabled_by_configuration")
     # Chat interactivo: presupuesto corto propio (chat_total_timeout_seconds,
@@ -535,7 +546,7 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     backup2 = _gemini_backup(settings, client)
     if backup2 is not None:
         backup2.interactive_quota_breaker = True
-    if not settings.groq_chat_fallback_enabled:
+    if not settings.groq_chat_fallback_active:
         if backup2 is None:
             return primary
         return ChatFallbackProvider(
@@ -562,6 +573,10 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
     el primario solo ya es el comportamiento anterior.
     """
     settings = settings or get_settings()
+    if current_tenant_llm_config() is not None:
+        # Sin respaldos de plataforma: la clave del tenant nunca se mezcla con
+        # la de GerarAI, ni siquiera cuando su proveedor falla.
+        return create_llm_provider(settings, client=client, max_retries=0)
     # max_retries=0 en el primario: el reintento UNICO de la llamada larga lo
     # hace SequentialFallbackProvider ante error transitorio. Con reintentos
     # internos ademas, un bridge caido costaria 2x(120+120) s por lote antes

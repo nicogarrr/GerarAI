@@ -1,7 +1,8 @@
 """Hermetic tests: point-in-time guard against look-ahead bias.
 
 Unit-cover the guard helpers and prove HistoricalValuationService.build()
-refuses data dated after its ``as_of`` cutoff while accepting in-window data.
+leaves out data dated after its ``as_of`` cutoff (it filters, it does not
+raise: revision GerarAI A2) while accepting in-window data.
 """
 
 from __future__ import annotations
@@ -89,22 +90,24 @@ def _db_with(as_of: date, price_date: date, fact_year: int) -> tuple[Session, Co
     return db, company
 
 
-def test_build_rejects_future_price():
-    db, company = _db_with(AS_OF, price_date=date(2024, 7, 15), fact_year=2024)
+def test_build_excludes_future_price():
+    db, company = _db_with(AS_OF, price_date=date(2024, 7, 15), fact_year=2023)
     try:
-        with pytest.raises(LookaheadError, match="MarketPrice"):
-            HistoricalValuationService().build(db, company, as_of=AS_OF)
+        result = HistoricalValuationService().build(db, company, as_of=AS_OF)
     finally:
         db.close()
+    assert all(point["price"] is None for point in result["series"])
+    assert result["coverage"]["missing_by_metric"]["price"] == [2023]
 
 
-def test_build_rejects_future_fundamental():
+def test_build_excludes_future_fundamental():
     db, company = _db_with(AS_OF, price_date=date(2024, 5, 1), fact_year=2025)
     try:
-        with pytest.raises(LookaheadError, match="FinancialFact"):
-            HistoricalValuationService().build(db, company, as_of=AS_OF)
+        result = HistoricalValuationService().build(db, company, as_of=AS_OF)
     finally:
         db.close()
+    assert [point["year"] for point in result["series"]] == [2024]
+    assert result["series"][0]["eps"] is None
 
 
 def test_build_accepts_in_window_data():

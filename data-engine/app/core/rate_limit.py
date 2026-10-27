@@ -196,6 +196,42 @@ async def enforce_rate_limit(
     response.headers["X-RateLimit-Remaining"] = str(max(0, limit - count))
 
 
+LLM_TEST_LIMIT_PER_MINUTE = 10
+
+
+async def enforce_llm_test_rate_limit(
+    request: Request,
+    principal: ResearchPrincipal | None = Depends(get_research_principal),
+) -> None:
+    """Prueba de conexion LLM: 10/min por identidad (evita sondear a ciegas)."""
+    settings = get_settings()
+    if not settings.rate_limit_enabled:
+        return
+    limit = LLM_TEST_LIMIT_PER_MINUTE
+    if settings.is_local_environment:
+        limit = max(limit, settings.rate_limit_local_request_floor)
+    identity = _rate_limit_identity(principal, request)
+    digest = hashlib.sha256(f"{identity}:llm-test".encode()).hexdigest()
+    try:
+        count, retry_after = await _record_hit(
+            f"cavaai:rate:{digest}",
+            window_seconds=WINDOW_SECONDS,
+            use_redis=not settings.is_local_environment,
+            redis_url=settings.redis_url,
+            degrade_to_local=not settings.is_production,
+        )
+    except RateLimitBackendUnavailable as exc:
+        raise HTTPException(
+            status_code=503, detail="Rate limit backend unavailable"
+        ) from exc
+    if count > limit:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
 PUBLIC_FEED_LIMIT_PER_MINUTE = 60
 
 

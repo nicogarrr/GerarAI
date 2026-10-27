@@ -27,7 +27,7 @@ Production candidate: build exit 0; ESLint exit 0; 12/12 browser tests: 10 respo
 
 ## Public baseline, not before/after
 
-Earlier on the live alias https://cavaai.vercel.app/ (2026-10-16 09:28-09:30 CEST), three cold/warm browser-cache samples per route, viewport390x844 with the same CPU/network settings:
+Earlier on the live alias el alias de producción en Vercel (2026-10-16 09:28-09:30 CEST), three cold/warm browser-cache samples per route, viewport390x844 with the same CPU/network settings:
 
 | Route | Cold TTFB ms | Cold LCP ms | Cold JS bytes | Warm TTFB ms | Warm LCP ms |
 |---|---:|---:|---:|---:|---:|
