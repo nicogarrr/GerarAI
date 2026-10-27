@@ -9,6 +9,7 @@ que Movers, Mercado y watchlist consideran cierre."""
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
@@ -24,6 +25,8 @@ from app.services.propicks_price_service import (
     upsert_prices,
     yahoo_symbol,
 )
+
+logger = logging.getLogger(__name__)
 
 _NY = ZoneInfo("America/New_York")
 # Una barra del dia en curso solo es cierre cuando la sesion US ya termino.
@@ -53,9 +56,21 @@ def sync_official_closes(
     symbols = list(by_symbol)
     written = 0
     covered = 0
+    failed_chunks = 0
+    failed_symbols: list[str] = []
+    last_error: Exception | None = None
     for start in range(0, len(symbols), chunk):
         part = symbols[start : start + chunk]
-        history = fetcher(part, period=period)
+        try:
+            history = fetcher(part, period=period)
+        except Exception as exc:  # noqa: BLE001 - un lote caido no tumba el resto
+            # Un fallo de red/rate limit en un lote dejaba sin cierre a todos
+            # los lotes siguientes. Se registra y se sigue con el proximo.
+            logger.warning("market_close_sync: lote %s fallo: %s", start // chunk, exc)
+            failed_chunks += 1
+            failed_symbols.extend(part)
+            last_error = exc
+            continue
         for symbol in part:
             bars = history.get(symbol) or []
             if not bars:
@@ -65,8 +80,15 @@ def sync_official_closes(
             skipped += len(bars) - count
             covered += int(count > 0)
         db.commit()
+    if last_error is not None and len(failed_symbols) == len(symbols):
+        # Todo caido: se propaga para que el actor registre el error y
+        # reintente como antes (no un «ok» vacio).
+        raise last_error
+    status = "partial" if failed_chunks else "ok"
     return {
-        "status": "ok",
+        "status": status,
+        "failed_chunks": failed_chunks,
+        "failed_symbols": failed_symbols,
         "companies": len(companies),
         "with_symbol": len(symbols),
         "covered": covered,

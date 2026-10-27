@@ -102,6 +102,20 @@ class PriceBar:
     session_end: datetime | None = None
 
 
+def _volume(raw: Any) -> int:
+    """Volumen entero; NaN/None/no numerico -> 0.
+
+    yfinance devuelve Volume=NaN en algunas sesiones (indices, LSE, dias
+    festivos parciales). ``int(nan)`` lanzaba ValueError fuera del try por
+    simbolo y abortaba la descarga ENTERA del lote: ningun cierre escrito.
+    """
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return 0
+    return int(value) if math.isfinite(value) and value > 0 else 0
+
+
 def fetch_history_yfinance(
     symbols: Sequence[str], *, period: str = "1y"
 ) -> dict[str, list[PriceBar]]:
@@ -144,7 +158,7 @@ def fetch_history_yfinance(
                     day=idx.date(),
                     close=Decimal(str(round(float(close), 6))),
                     adj_close=Decimal(str(round(float(adj), 6))),
-                    volume=int(row.get("Volume") or 0),
+                    volume=_volume(row.get("Volume")),
                     quote_currency=unit,
                     market_timezone=timezone,
                     session_end=session_end,

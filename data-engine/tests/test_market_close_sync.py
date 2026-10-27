@@ -182,3 +182,37 @@ def test_enqueue_price_backfills_staggers_sends_and_skips_covered(db):
     assert [delay for *_ , delay in sent] == [0, 60_000, 120_000]
     assert {cid for cid, *_ in sent} == {ids["AAA"], ids["BBB"], ids["CCC"]}
     assert all(tenant == 7 and user == "u1" for _, tenant, user, _ in sent)
+
+
+def test_un_lote_caido_no_deja_sin_cierre_a_los_demas(db):
+    for ticker in ("AAPL", "MSFT"):
+        db.add(
+            Company(
+                ticker=ticker, name=ticker, exchange="NASDAQ", currency="USD", sector="S",
+                industry="I", company_type="holding", valuation_model="unassigned",
+                special_sources=[], special_risks=[], factor_tags=[],
+            )
+        )
+    db.flush()
+    bar = PriceBar(date(2026, 10, 15), Decimal("10"), Decimal("10"), 1)
+
+    def fetcher(symbols, period):
+        if symbols == ["AAPL"]:
+            raise TimeoutError("yahoo timeout")
+        return {s: [bar] for s in symbols}
+
+    now = datetime(2026, 10, 16, 22, 30, tzinfo=UTC)
+    out = sync_official_closes(db, fetcher=fetcher, now=now, chunk=1)
+    assert out["status"] == "partial"
+    assert out["failed_symbols"] == ["AAPL"]
+    assert out["covered"] == 1
+
+
+def test_todos_los_lotes_caidos_propaga_el_error(db):
+    _company(db)
+
+    def fetcher(symbols, period):
+        raise TimeoutError("yahoo timeout")
+
+    with pytest.raises(TimeoutError):
+        sync_official_closes(db, fetcher=fetcher, now=datetime(2026, 10, 16, 22, 30, tzinfo=UTC))
