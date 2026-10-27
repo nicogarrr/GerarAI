@@ -124,7 +124,8 @@ import { toChatCitations } from '@/lib/chat/citations';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
-import { getInsiderFilings } from '@/lib/actions/insider.actions';
+import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
+import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
 import { glossary, moatGlossaryKey } from '@/lib/glossary';
 import {
@@ -1002,7 +1003,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           .slice(0, 5)
           .sort((a, b) => b.date.localeCompare(a.date))
       : [];
-    const per = await getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' }));
+    // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
+    const [per, ownershipSignals] = await Promise.all([
+      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' })),
+      getOwnershipSignals(ticker).catch(() => null),
+    ]);
     content = (
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
@@ -1212,6 +1217,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             ))}
           </div>
         </Panel>
+        <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
         {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><p className="text-sm text-gray-400">Elementos orbitales de CelesTrak y evolución del semieje mayor.</p><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}

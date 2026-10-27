@@ -1771,6 +1771,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insider/ownership-signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Insider Ownership Signals
+         * @description Resumen para la tesis y la ficha: insiders (Form 4, 180 dias) + fondos 13F.
+         *
+         *     Solo lee lo persistido (sin red). Nunca 500: un bloque que falla queda en
+         *     ``pendiente`` y uno sin datos en ``sin_datos`` con su motivo.
+         */
+        get: operations["insider_ownership_signals_api_insider_ownership_signals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/insider/signals": {
         parameters: {
             query?: never;
@@ -12723,6 +12746,48 @@ export interface operations {
         parameters: {
             query?: {
                 days?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    insider_ownership_signals_api_insider_ownership_signals_get: {
+        parameters: {
+            query: {
+                ticker: string;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
