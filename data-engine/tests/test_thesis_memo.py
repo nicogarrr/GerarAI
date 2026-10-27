@@ -38,6 +38,15 @@ def _company(db: Session) -> Company:
         valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
     )
     db.add(company)
+    db.flush()
+    from app.models import FundamentalModelVersion
+
+    db.add(FundamentalModelVersion(
+        company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+        framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+        input_fingerprint="input", forecast_fingerprint="forecast",
+        market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+    ))
     db.commit()
     return company
 
@@ -363,6 +372,15 @@ def test_memo_money_uses_listing_currency_never_bare_dollar(db):
         valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
     )
     db.add(company)
+    db.flush()
+    from app.models import FundamentalModelVersion
+
+    db.add(FundamentalModelVersion(
+        company_id=company.id, version=1, engine_version="test", algorithm_version="test",
+        framework_key="dcf", horizon_years=10, status="ok", publishable=True,
+        input_fingerprint="input", forecast_fingerprint="forecast",
+        market_snapshot_fingerprint="market", valuation_snapshot_fingerprint="valuation",
+    ))
     db.commit()
     thesis = ThesisVersion(
         company_id=company.id, version=1, status="published", rating="hold",

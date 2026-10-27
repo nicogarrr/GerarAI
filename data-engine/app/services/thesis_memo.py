@@ -19,6 +19,7 @@ from app.core.tenancy import tenant_filters
 from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, money_thesis, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
+from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
 from app.valuation.margin_convention import (
     MARGIN_OF_SAFETY_CONVENTION,
     MARGIN_OF_SAFETY_FORMULA,
@@ -137,6 +138,15 @@ def build_memo_markdown(
     calidad de la evidencia. Sin rating, hipotesis, resumen, valoracion,
     secciones ni fuentes: pueden llevar cifras o veredicto que la ficha oculta.
     """
+    reason = thesis_withheld_reason(db, thesis)
+    if reason:
+        return (
+            f"# Memo de tesis - {company.ticker}\n\n"
+            f"{archived_thesis_notice(thesis, reason)}\n\n"
+            "El original persistido se conserva; este documento no publica su análisis archivado.\n\n"
+            "Documento informativo de investigación. NO es asesoramiento financiero "
+            "ni recomendación de compra o venta.\n"
+        )
     sections = list(
         db.scalars(
             select(ThesisSection)

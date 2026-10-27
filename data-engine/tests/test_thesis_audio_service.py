@@ -98,6 +98,7 @@ def _fake_route(monkeypatch, service_cls, memo_return="# Memo"):
         return memo_return
 
     monkeypatch.setattr(route, "ThesisService", service_cls)
+    monkeypatch.setattr(route, "thesis_withheld_reason", lambda *_: None)
     monkeypatch.setattr(route, "resolve_company", lambda db, t: SimpleNamespace(ticker="EXEL"))
     monkeypatch.setattr(route, "build_memo_markdown", fake_memo)
     return route, calls
