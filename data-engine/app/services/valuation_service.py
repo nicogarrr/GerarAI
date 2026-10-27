@@ -384,6 +384,16 @@ class ValuationService:
         # red team, snapshot o persistencia, y graba en el trace con que cutoff
         # se evaluo y con que precision se comprobo cada periodo.
         _assert_no_lookahead_guard(result, as_of=as_of)
+        # Cobertura del corte por fecha de publicacion (V1): cuantos hechos
+        # quedaron fuera por ser posteriores al corte o indemostrables. Sin
+        # corte (filed_cutoff None) no se escribe nada.
+        _snapshot = getattr(context, "snapshot", None)
+        if _snapshot is not None and getattr(_snapshot, "filed_cutoff", None):
+            _pit = result["trace"].get("point_in_time")
+            if isinstance(_pit, MutableMapping):
+                _pit["filed_cutoff"] = _snapshot.filed_cutoff
+                _pit["filed_excluded_future"] = _snapshot.filed_excluded_future
+                _pit["filed_excluded_unknown"] = _snapshot.filed_excluded_unknown
 
         if current_price is None:
             result["trace"]["price_status"] = "missing_market_price"
