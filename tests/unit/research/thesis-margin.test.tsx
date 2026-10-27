@@ -39,7 +39,7 @@ describe('actual ThesisMemo historical margin', () => {
   });
   it('does not leak a draft archived percentage', () => {
     render(<ThesisMemo thesis={{ ...fixture, status: 'draft' }} currency="USD" />);
-    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent('Texto archivado de v11');
     expect(screen.queryByText('-64,9 %')).not.toBeInTheDocument();
   });
   it('captures full real memo SSR for pixel review with interactive children stubbed', () => {

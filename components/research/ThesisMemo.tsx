@@ -219,7 +219,7 @@ export default function ThesisMemo({
         </aside>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{enumLabel(RATING_LABELS, thesis.rating)}</Badge>
+        <Badge>{modelBlocked ? 'datos insuficientes' : enumLabel(RATING_LABELS, thesis.rating)}</Badge>
         <Badge variant="outline">{enumLabel(STATUS_LABELS, thesis.status)}</Badge>
         <Badge variant="outline">v{thesis.version}</Badge>
         {generatedLabel ? (
@@ -319,9 +319,14 @@ export default function ThesisMemo({
 
       {ticker ? <ThesisHumanInputForm ticker={ticker} /> : null}
 
-      <p className="text-sm leading-6 text-gray-300">{cleanThesisText(thesis.executive_summary)}</p>
+      {hideFigures ? (
+        <aside role="note" className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm leading-6 text-amber-200">
+          Texto archivado de v{thesis.version}{generatedLabel ? `, generada el ${generatedLabel}` : ', sin fecha de generación verificada'}: resumen, narrativa y memorando retenidos porque {modelBlocked ? 'el modelo no es publicable' : 'la tesis no está publicada ni aprobada'}.
+          {' '}Pueden contener cifras de valoración antiguas sin verificar; no se presentan como análisis actual. El original se conserva guardado, sin cambios.
+        </aside>
+      ) : <p className="text-sm leading-6 text-gray-300">{cleanThesisText(thesis.executive_summary)}</p>}
 
-      {thesis.narrative_sections && thesis.narrative_sections.length > 0 ? (
+      {!hideFigures && thesis.narrative_sections && thesis.narrative_sections.length > 0 ? (
         <section
           aria-label="Análisis narrativo"
           className="space-y-4 rounded-lg border border-gray-800 bg-gray-900/40 p-4"
@@ -342,7 +347,7 @@ export default function ThesisMemo({
         </section>
       ) : null}
 
-      {hypothesisRepeatsSummary(thesis.hypothesis, thesis.executive_summary) ? null : (
+      {hideFigures || hypothesisRepeatsSummary(thesis.hypothesis, thesis.executive_summary) ? null : (
   <section className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-teal-300">Hipótesis</h3>
           <p className="mt-2 text-sm leading-6 text-gray-200">
@@ -358,7 +363,7 @@ export default function ThesisMemo({
         </h3>
         {hideFigures ? (
           <p className="text-sm text-gray-400">
-            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : thesis.status === 'insufficient_data' ? 'faltan datos' : 'la tesis es un borrador'}. El memo completo (sección 13) puede incluir un rango indicativo parcial, que no es un valor justo.
+            Sin cifras de valoración: {modelBlocked ? 'el modelo no es publicable todavía' : thesis.status === 'insufficient_data' ? 'faltan datos' : 'la tesis es un borrador'}. El texto guardado también se retiene para no mostrar esas cifras por otra vía.
           </p>
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
@@ -397,7 +402,7 @@ export default function ThesisMemo({
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      {!hideFigures ? <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-gray-800 p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">
             Catalizadores
@@ -448,9 +453,9 @@ export default function ThesisMemo({
             />
           ) : null}
         </section>
-      </div>
+      </div> : null}
 
-      <section>
+      {!hideFigures ? <section>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
           Debate bull/bear
         </h3>
@@ -461,9 +466,9 @@ export default function ThesisMemo({
             Debate no disponible sin ticker: recarga la ficha para contrastar la tesis.
           </p>
         )}
-      </section>
+      </section> : null}
 
-      <section>
+      {!hideFigures ? <section>
         <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
           Memorando completo
         </h3>
@@ -475,7 +480,7 @@ export default function ThesisMemo({
               .map((section) => ({ id: `s${section.id}`, title: section.title, body: `## ${section.title}\n\n${section.body}` })),
           ]}
         />
-      </section>
+      </section> : null}
     </div>
   );
 }
