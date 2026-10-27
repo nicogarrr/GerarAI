@@ -29,6 +29,18 @@ const SECTION_LABELS: Array<[RegExp, string]> = [
     [/^\/risk/, 'Riesgo'],
     [/^\/taxes/, 'Impuestos'],
     [/^\/security/, 'Seguridad'],
+    [/^\/research/, 'Research'],
+    [/^\/settings/, 'Ajustes'],
+];
+
+/** Rutas propias bajo /research: la ruta estática gana a [ticker] en el
+ * router, así que NUNCA son la ficha de una empresa. Sin esta lista el
+ * cerebro rotulaba /research/news como la empresa "NEWS" y pedía su ficha
+ * al catálogo (auditoría v1.0, 2026-10-27). */
+const RESEARCH_RESERVED_ROUTES: Array<[RegExp, string]> = [
+    [/^\/research\/news(?:\/|$)/i, 'Noticias'],
+    [/^\/research\/sources(?:\/|$)/i, 'Fuentes'],
+    [/^\/research\/assistant(?:\/|$)/i, 'Asistente'],
 ];
 
 const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/;
@@ -36,6 +48,11 @@ const TICKER_RE = /^[A-Z0-9.\-]{1,20}$/;
 /** Deriva el contexto de la ruta actual; null si la página no es identificable. */
 export function brainPageContext(pathname: string | null): BrainPageContext | null {
     if (!pathname) return null;
+    for (const [pattern, label] of RESEARCH_RESERVED_ROUTES) {
+        if (pattern.test(pathname)) {
+            return { path: pathname, label, ticker: null };
+        }
+    }
     const research = pathname.match(/^\/research\/([A-Za-z0-9.\-]{1,20})(?:\/|$)/);
     if (research) {
         const ticker = research[1].toUpperCase();
