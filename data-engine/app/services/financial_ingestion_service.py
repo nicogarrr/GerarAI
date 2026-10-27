@@ -196,6 +196,10 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # balance cuadre por la diferencia de NCI. Se usa la de la matriz.
     ("total_equity",      ["StockholdersEquity", "StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest"], "USD"),
     ("goodwill",          ["Goodwill"],                                                                              "USD"),
+    # Puente EV -> equity del DCF: patrimonio de minoritarios (NCI) y valor de
+    # las preferentes. Saldos de balance (instantes).
+    ("minority_interest", ["MinorityInterest"],                                                                     "USD"),
+    ("preferred_stock",   ["PreferredStockValue", "PreferredStockValueOutstanding"],                               "USD"),
     ("intangible_assets", SEC_INTANGIBLE_COMPONENTS,                                                                "USD"),
     ("operating_lease_liabilities", ["OperatingLeaseLiability", "OperatingLeaseLiabilityNoncurrent"],                "USD"),
     ("operating_cash_flow", ["NetCashProvidedByUsedInOperatingActivities"],                                         "USD"),
