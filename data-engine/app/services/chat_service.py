@@ -37,7 +37,7 @@ from app.services.brain_service import (
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import live_claims
 from app.services.company_resolver import resolve_company
-from app.services.library_context import retrieve_library_context
+from app.services.library_context import company_library_context, retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.source_hierarchy_service import source_tier_key
@@ -1778,6 +1778,20 @@ class ChatService:
             news = self._recent_news(db, company)
             db_chunks = self._document_chunks(db, company, question)
             rag_chunks = self._rag_chunks(db, question, company)
+            # Notas, informes y tesis propias que el usuario subio con este
+            # ticker: antes el chat de empresa no las leia nunca.
+            seen_library = {item["id"] for item in library_context}
+            own_documents = [
+                item for item in company_library_context(db, company, question)
+                if item["id"] not in seen_library
+            ]
+            sources.extend(own_documents)
+            own_document_lines = [
+                f"- Documento propio del usuario sobre {company.ticker} ({item['title']}), "
+                f"no es un dato oficial: {' '.join(str(item['text']).split())[:700]} "
+                f"[knowledge_chunk:{item['id']}]"
+                for item in own_documents
+            ]
             evidence_suggestions = list(
                 db.scalars(
                     select(EvidenceSuggestion)
@@ -2130,13 +2144,14 @@ class ChatService:
                 {
                     "key": "inferences",
                     "body": "\n".join(
-                        [thesis_text, *db_evidence_lines, *rag_evidence_lines]
+                        [thesis_text, *db_evidence_lines, *rag_evidence_lines, *own_document_lines]
                     )
-                    if (rag_evidence_lines or db_evidence_lines)
+                    if (rag_evidence_lines or db_evidence_lines or own_document_lines)
                     else thesis_text,
                     "citations": [
                         *([f"thesis_version:{thesis.id}"] if thesis else []),
                         *[f"knowledge_chunk:{item['id']}" for item in library_context],
+                        *[f"knowledge_chunk:{item['id']}" for item in own_documents],
                         *[
                             f"rag_chunk:{chunk.get('point_id')}"
                             for chunk in rag_chunks[:3]

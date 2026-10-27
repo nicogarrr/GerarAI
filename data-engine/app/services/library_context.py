@@ -206,3 +206,77 @@ def _vector_library_context(db: Session, question: str, limit: int, tenant_id: i
         if len(contexts) >= limit:
             break
     return contexts
+
+
+_OWN_NOTE_CUE_RE = re.compile(
+    r"(?i)\b(?:nota|notas|apunt\w*|informe|informes|mi tesis|mis tesis|pienso|opino|mi opini[oó]n|"
+    r"mis documentos|lo que (?:escrib|guard|sub)\w*)\b"
+)
+
+
+def company_library_context(db: Session, company, question: str, *, limit: int = 3) -> list[dict]:
+    """Documentos de la biblioteca etiquetados con el ticker de la empresa.
+
+    Las notas personales, informes sectoriales y tesis propias que el usuario
+    sube con un ticker se guardan con ``KnowledgeDocument.ticker``, pero el chat
+    de empresa no las leia nunca: "¿que apunte sobre la dilucion de ASTS?"
+    respondia sin su propia nota. Aqui se recuperan los fragmentos de esos
+    documentos que comparten terminos con la pregunta; si la pregunta habla de
+    "mis notas"/"el informe" y ningun fragmento casa, se trae el principio de
+    los documentos mas recientes.
+    """
+    from app.services.knowledge_chat import _terms
+
+    tenant_id = db.info.get("tenant_id")
+    ticker = (getattr(company, "ticker", None) or "").strip()
+    if type(tenant_id) is not int or tenant_id <= 0 or not ticker:
+        return []
+    try:
+        rows = list(
+            db.execute(
+                select(KnowledgeChunk, KnowledgeDocument)
+                .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.knowledge_document_id)
+                .where(
+                    KnowledgeChunk.tenant_id == tenant_id,
+                    KnowledgeDocument.tenant_id == tenant_id,
+                    KnowledgeDocument.status == "ready",
+                    KnowledgeDocument.ticker.is_not(None),
+                    KnowledgeDocument.ticker.ilike(ticker),
+                )
+                .order_by(KnowledgeDocument.id.desc(), KnowledgeChunk.chunk_index)
+                .limit(400)
+            ).all()
+        )
+    except Exception:
+        return []
+    rows = [(c, d) for c, d in rows if (c.content or "").strip()]
+    if not rows:
+        return []
+    company_words = {_fold(w) for w in re.findall(r"\w+", f"{ticker} {getattr(company, 'name', '') or ''}")}
+    terms = [t for t in _terms(question) if _fold(t) not in company_words and len(t) > 3]
+    expanded = expand_query_en(question)
+    if expanded:
+        terms = list(dict.fromkeys([*terms, *expanded.split()]))
+    folded_terms = [_fold(t) for t in terms]
+
+    def score(chunk) -> int:
+        text = _fold(chunk.content)
+        return sum(1 for t in folded_terms if t and t in text)
+
+    scored = sorted(rows, key=lambda row: -score(row[0]))
+    picked = [row for row in scored if score(row[0]) > 0][:limit]
+    if not picked and _OWN_NOTE_CUE_RE.search(question or ""):
+        seen: set[int] = set()
+        for chunk, document in rows:
+            if document.id not in seen:
+                seen.add(document.id)
+                picked.append((chunk, document))
+            if len(picked) >= limit:
+                break
+    out = []
+    for chunk, document in picked:
+        row = _context_row(chunk, document)
+        row["ticker"] = ticker
+        row["evidence_role"] = "user_document_about_company_not_official"
+        out.append(row)
+    return out
