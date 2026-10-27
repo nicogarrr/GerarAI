@@ -31,6 +31,7 @@ from app.schemas import ChatPageContext, ChatResponse, ChatTurn
 from app.services.brain_service import (
     LEADING_GREETING_RE,
     SMALL_TALK_RE,
+    ResolvedPageContext,
     resolve_page_context,
     small_talk_answer,
 )
@@ -170,6 +171,17 @@ def _fmt_period_es(period: str | None, fiscal_year: int | None = None,
             return f"{fiscal_quarter} {fiscal_year}"
         return f"ejercicio {fiscal_year}"
     return text or "periodo sin fecha"
+
+
+def _savings_scale_label(year: int) -> str:
+    """Última escala del ahorro verificada: 2025 (Ley 7/2024).
+
+    Para años posteriores se reutiliza y se dice, sin afirmar que sea la
+    vigente de ese año.
+    """
+    if year <= 2025:
+        return f"escala del ahorro {year}"
+    return f"escala del ahorro de 2025 (la última verificada; la de {year} no está confirmada)"
 
 
 def _fmt_date_es(iso_date: str | None) -> str:
@@ -640,13 +652,28 @@ _SALE_TAX_RE = re.compile(
 _SALE_QTY_RE = re.compile(
     r"(?i)\bvend\w*\s+(?:solo\s+|s[oó]lo\s+)?(\d+(?:[.,]\d+)?)\s*(?:acciones|t[ií]tulos|participaciones)?\b"
 )
-_SALE_TAX_PROMPT_VERSION = "portfolio-sale-tax-v2"
+_SALE_TAX_PROMPT_VERSION = "portfolio-sale-tax-v3"
 _SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
 # «¿cuántos impuestos paga UBER?» es la fiscalidad de la empresa, no la tuya:
 # hace falta venta, IRPF o primera persona para ir a la simulación.
 _SALE_CONTEXT_RE = re.compile(
     r"(?i)\b(?:vend\w*|venta|irpf|pagar[ií]a|pagar[ée]|tributar[ií]a|mis|tengo)\b"
 )
+# Venta propia explícita: con impuesto + venta la pregunta es SIEMPRE tu IRPF,
+# tengas o no el valor. Revisión de Nico: «¿cuánto IRPF pagaría si vendo
+# AAPL?» sin AAPL en cartera cambiaba a la información de la empresa sin
+# decir que no calculaba el impuesto.
+_SALE_VERB_RE = re.compile(r"(?i)\b(?:vend\w*|venta)\b")
+_NO_POSITION_OFFER = "Si me dices cuántas acciones, a qué precio y cuándo las compraste, te hago la estimación."
+# Primera palabra de un nombre que no identifica a una empresa por sí sola.
+_GENERIC_NAME_WORDS = frozenset({"grupo", "banco", "compania", "compañía", "company", "corporation", "holdings"})
+# «si vendo mis acciones de Apple»: nombre propio de lo que se vende cuando
+# no está en el maestro (no puede estar en tu cartera).
+_SALE_NAMED_RE = re.compile(
+    r"\b(?:acciones|participaciones|t[ií]tulos|vend\w*|venta)\s+(?:(?:de|mis|las|los|todo|todas|todos)\s+)*"
+    r"([A-ZÁÉÍÓÚÑ][\w&.\-]+(?:\s+[A-ZÁÉÍÓÚÑ][\w&.\-]+)?)"
+)
+_NO_POSITION_TICKER_RE = re.compile(r"No tienes (.+?) en cartera, así que no puedo calcular tu IRPF real")
 # Cuando la misma frase pide ademas caja o patrimonio se adjunta ese bloque.
 _RANK_HIGH_RE = re.compile(
     r"(?i)\b(?:m[aá]s\s+(?:alto|caro|grande|pesad[oa])|mayor|m[aá]xim[oa]|m[aá]s\s+peso|pesa\s+m[aá]s)\b"
@@ -1004,6 +1031,13 @@ class ChatService:
                 llm_trace={"path": "page_identity", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
+        # Tu IRPF al vender va antes que los datos de empresa, el ticker
+        # desconocido o el contexto personal: tengas el valor o no, se
+        # responde a esa pregunta y no a otra.
+        sale_tax = self._sale_tax_route(db, question, scope, ticker, page_context, history)
+        if sale_tax is not None:
+            sale_tax.context = context_echo
+            return sale_tax
         from app.services.brain_data_tools import (
             answer_data_question,
             dividend_ticker_without_records,
@@ -1815,6 +1849,174 @@ class ChatService:
             llm_trace={"path": "portfolio_position", "generated": False, "provider_calls": 0},
         )
 
+    def _no_position_sale_answer(self, label: str) -> ChatResponse:
+        """Sin posición no hay IRPF real: se dice y se ofrece la estimación, sin cambiar de tema."""
+        return ChatResponse(
+            answer=f"No tienes {label} en cartera, así que no puedo calcular tu IRPF real. {_NO_POSITION_OFFER}",
+            sources=[],
+            model="deterministic",
+            prompt_version=_SALE_TAX_PROMPT_VERSION,
+            confidence=0.9,
+            llm_trace={
+                "path": "portfolio_sale_tax", "generated": False, "provider_calls": 0,
+                "no_position": True, "ticker": label,
+            },
+        )
+
+    def _company_by_name(self, db: Session, question: str) -> Company | None:
+        """Empresa nombrada por su nombre («mis acciones de Apple»), solo si es única."""
+        words = {w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ]{4,}", question or "")}
+        found: dict[int, Company] = {}
+        for company in db.scalars(select(Company)).all():
+            first = re.findall(r"[A-Za-zÀ-ÿ]{4,}", company.name or "")
+            if first and first[0].lower() in words and first[0].lower() not in _GENERIC_NAME_WORDS:
+                found[company.id] = company
+        return next(iter(found.values())) if len(found) == 1 else None
+
+    def _sale_tax_route(
+        self,
+        db: Session,
+        question: str,
+        scope: str,
+        ticker: str | None,
+        page_context: ResolvedPageContext | None,
+        history: list[ChatTurn] | None,
+    ) -> ChatResponse | None:
+        """«¿Cuánto IRPF pagaría si vendo X?»: siempre tu IRPF, tengas X o no.
+
+        - Con posición: cálculo FIFO real (``_sale_tax_answer``).
+        - Sin posición: lo dice y ofrece la estimación hipotética.
+        - Con lotes en la pregunta (o en la respuesta a esa oferta): estimación
+          con el mismo FIFO y la misma escala del ahorro.
+        Nunca pasa a la información de la empresa. «¿Cuántos impuestos paga
+        X?» (los de la empresa) no lleva venta y no entra aquí.
+        """
+        from app.services.sale_hypothetical import parse_purchase_lots
+
+        q = question or ""
+        tenant_id = db.info.get("tenant_id")
+        if type(tenant_id) is not int or tenant_id <= 0:
+            return None
+        lots = parse_purchase_lots(q)
+        intent = bool(_SALE_TAX_RE.search(q) and _SALE_VERB_RE.search(q) and _SALE_CONTEXT_RE.search(q))
+        offered: str | None = None
+        if not intent:
+            if not lots:
+                return None
+            last = next((turn for turn in reversed(history or []) if turn.role == "assistant"), None)
+            match = _NO_POSITION_TICKER_RE.search(last.content or "") if last is not None else None
+            if match is None:
+                return None
+            offered = match.group(1)
+        company = self._resolve_company(db, q, scope, ticker)
+        label: str | None = None
+        if company is None:
+            from app.services.chat_unknown_ticker import unknown_ticker_mentions
+
+            unknown = unknown_ticker_mentions(q, list(db.scalars(select(Company.ticker)).all()))
+            if len(unknown) == 1:
+                label = unknown[0]
+            elif not unknown:
+                company = self._company_by_name(db, q)
+        if company is None and label is None:
+            label = (ticker or "").strip().upper() or offered
+            if label:
+                company = resolve_company(db, label)
+            elif page_context is not None and page_context.company is not None:
+                company = page_context.company
+        if company is not None:
+            label = company.ticker
+        elif label is None:
+            named = _SALE_NAMED_RE.search(q)
+            label = named.group(1) if named else None
+        if lots:
+            return self._hypothetical_sale_answer(db, q, lots, company, label)
+        if company is not None:
+            return self._sale_tax_answer(db, company, q)
+        if label:
+            return self._no_position_sale_answer(label)
+        return None
+
+    def _hypothetical_sale_answer(
+        self, db: Session, question: str, lots: list, company: Company | None, label: str | None,
+    ) -> ChatResponse:
+        """Estimación con los lotes que da el usuario: mismo FIFO y misma escala del ahorro."""
+        from app.services.sale_hypothetical import simulate_hypothetical_sale
+
+        res = simulate_hypothetical_sale(db, lots=lots, question=question, company=company)
+        trace: dict = {
+            "path": "portfolio_sale_tax", "generated": False, "provider_calls": 0,
+            "hypothetical": True, "method": "fifo", "ticker": label,
+        }
+        name = label or "esas acciones"
+        intro = f"Estimación hipotética de {name} con los datos que me das, no con tu cartera."
+        sources: list[dict] = []
+        if res.sale_price is None:
+            return ChatResponse(
+                answer=f"{intro} Me falta {', '.join(res.missing)}: ¿a qué precio las venderías?",
+                sources=[], model="deterministic", prompt_version=_SALE_TAX_PROMPT_VERSION,
+                confidence=0.8, llm_trace=trace,
+            )
+        qty_text = _fmt_number_es(float(res.quantity), 4)
+        price_text = _price_display(res.sale_price, res.sale_currency)
+        sale_text = f"{qty_text} acciones a {price_text}"
+        if res.sale_price_source == "cotización" and company is not None:
+            sale_text += f" (última cotización guardada, {_fmt_date_es(str(res.sale_price_date))})"
+            if res.sale_price_ref is not None:
+                sources.append(self._source_entry(
+                    "market_price", res.sale_price_ref, f"Cotización {company.ticker}",
+                    as_of=str(res.sale_price_date),
+                ))
+        fifo_lots = res.fifo.lots if res.fifo is not None else []
+        lot_texts = [
+            f"{_fmt_date_es(lot.trade_date.isoformat() if lot.trade_date else None)}, "
+            f"{_fmt_number_es(float(lot.quantity), 4)} acciones a {_price_display(lot.unit_cost_native, lot.currency)}"
+            + (f", coste {_fmt_money_es(float(lot.cost_eur))} €" if lot.cost_eur is not None else "")
+            for lot in fifo_lots
+        ]
+        method = (
+            "Método FIFO, obligatorio en IRPF (art. 37.2 LIRPF): salen primero las acciones más antiguas. "
+            "Lotes vendidos: " + "; ".join(lot_texts) + "."
+        )
+        if res.undated:
+            method += " Sin fechas de compra, tomo los lotes en el orden en que me los das."
+        if res.approx_dates:
+            method += " Donde solo me das mes y año, tomo el día 1 para el tipo de cambio."
+        if res.missing or res.gain_eur is None or res.value_eur is None or res.cost_eur is None:
+            answer = f"{intro} Para pasar a euros la venta de {sale_text} me falta {', '.join(res.missing)}."
+            if res.native_gain is not None:
+                kind = "ganancia" if res.native_gain >= 0 else "pérdida"
+                ccy = _currency_display(res.sale_currency)
+                answer += f" En {ccy}, sería una {kind} de {_fmt_money_es(float(abs(res.native_gain)))} {ccy}."
+            answer += f" Dímelo y te calculo el IRPF. {method}"
+            return ChatResponse(
+                answer=answer, sources=sources, model="deterministic",
+                prompt_version=_SALE_TAX_PROMPT_VERSION, confidence=0.6, llm_trace=trace,
+            )
+        head = (
+            f"{intro} Si vendieras {sale_text}: valor {_fmt_money_es(float(res.value_eur))} €, "
+            f"coste {_fmt_money_es(float(res.cost_eur))} €"
+        )
+        year = date.today().year
+        if res.gain_eur > 0 and res.tax_eur is not None:
+            rate = res.tax_eur / res.gain_eur * 100
+            answer = (
+                f"{head}, ganancia de {_fmt_money_es(float(res.gain_eur))} €. "
+                f"IRPF estimado: {_fmt_money_es(float(res.tax_eur))} € (un {_fmt_number_es(float(rate), 1)} % "
+                f"de la ganancia, {_savings_scale_label(year)}: 19 % hasta 6.000 €, 21 % hasta 50.000 €…). "
+                "Lo calculo como si fuera tu única operación del año."
+            )
+        else:
+            answer = (
+                f"{head}, pérdida de {_fmt_money_es(float(-res.gain_eur))} €. No pagarías IRPF por esta venta; "
+                "la pérdida compensa otras ganancias si no recompras en los dos meses siguientes."
+            )
+        answer += f" {method} Es una estimación, no asesoría fiscal."
+        return ChatResponse(
+            answer=answer, sources=sources, model="deterministic",
+            prompt_version=_SALE_TAX_PROMPT_VERSION, confidence=0.8, llm_trace=trace,
+        )
+
     def _sale_tax_answer(self, db: Session, company: Company, question: str) -> ChatResponse | None:
         """IRPF estimado si el usuario vendiera hoy su posición guardada en ``company``.
 
@@ -1842,17 +2044,7 @@ class ChatService:
             .order_by(Position.as_of.desc())
         ).scalars().first()
         if pos is None:
-            return ChatResponse(
-                answer=(
-                    f"No tienes ninguna posición guardada en {company.ticker}, así que no hay venta "
-                    "que simular. Si la tienes en el bróker, añádela en Cartera y te calculo el IRPF."
-                ),
-                sources=[],
-                model="deterministic",
-                prompt_version=_SALE_TAX_PROMPT_VERSION,
-                confidence=0.9,
-                llm_trace=trace,
-            )
+            return self._no_position_sale_answer(company.ticker)
         held = Decimal(pos.quantity)
         qty = held
         match = _SALE_QTY_RE.search(question)
@@ -1917,7 +2109,8 @@ class ChatService:
         if fifo is not None and fifo_cost is not None:
             cost = fifo_cost
             lot_texts = [
-                f"{_fmt_date_es(lot.trade_date.isoformat())}, {_fmt_number_es(float(lot.quantity), 4)} acciones, "
+                f"{_fmt_date_es(lot.trade_date.isoformat() if lot.trade_date else None)}, "
+                f"{_fmt_number_es(float(lot.quantity), 4)} acciones, "
                 f"coste {_fmt_money_es(float(lot.cost_eur or 0))} €"
                 for lot in fifo.lots
             ]
@@ -1937,12 +2130,7 @@ class ChatService:
             f"Si vendieras hoy {what} (datos a {_fmt_date_es(pos.as_of.isoformat())}): "
             f"valor {_fmt_money_es(float(value))} €, coste {_fmt_money_es(float(cost))} €"
         )
-        # Última escala del ahorro verificada: 2025 (Ley 7/2024). Para años posteriores se
-        # reutiliza y se dice, sin afirmar que sea la vigente de ese año.
-        scale_label = (
-            f"escala del ahorro {year}" if year <= 2025
-            else f"escala del ahorro de 2025 (la última verificada; la de {year} no está confirmada)"
-        )
+        scale_label = _savings_scale_label(year)
         if gain > 0:
             tax = calculate_savings_tax(gain, year)
             rate = (tax / gain * 100) if gain else Decimal("0")
