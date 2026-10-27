@@ -836,27 +836,38 @@ class TaxReportService:
                 if entry["over_sell"]:
                     bucket["over_sell"] = True
                     bucket["over_sell_count"] += 1
+                # Venta sin compras que la cubran: el exceso se valoro a
+                # coste cero, asi que la base de adquisicion de la venta (y
+                # por tanto su resultado) NO se conoce. N/D en coste y
+                # ganancia; la transmision si es un dato observado y se
+                # conserva (misma regla que los totales: nunca una cifra
+                # parcial con pinta de exacta).
+                sale_over_sell = bool(entry["over_sell"])
                 bucket["sales"].append(
                     {
                         "date": transaction.trade_date.isoformat(),
                         "quantity": float(transaction.quantity),
                         "proceeds_native": _money(entry["proceeds_native"]),
-                        "cost_native": _money(entry["cost_native"]),
+                        "cost_native": None if sale_over_sell else _money(entry["cost_native"]),
                         "proceeds_base": _money(entry["proceeds_base"]),
-                        "cost_base": _money(entry["cost_base"]),
-                        "gain_native": _money(computable_native),
-                        "gain_base": _money(computable_base) if computable_base is not None else None,
-                        "raw_gain_native": _money(entry["gain_native"]),
+                        "cost_base": None if sale_over_sell else _money(entry["cost_base"]),
+                        "gain_native": None if sale_over_sell else _money(computable_native),
+                        "gain_base": (
+                            None
+                            if sale_over_sell or computable_base is None
+                            else _money(computable_base)
+                        ),
+                        "raw_gain_native": None if sale_over_sell else _money(entry["gain_native"]),
                         "blocked_loss_native": _money(blocked_native),
                         "blocked_loss_base": _money(blocked_base) if blocked_base is not None else None,
                         "wash_sale_blocked": blocked_native > 0 or (blocked_base is not None and blocked_base > 0),
                         "wash_sale_window_open": window_open,
-                        "over_sell": bool(entry["over_sell"]),
+                        "over_sell": sale_over_sell,
                         "over_sell_quantity": float(entry["over_sell_quantity"]),
                         "warning": (
                             "over_sell: sold more shares than the recorded lots; "
                             "excess valued at zero cost, verify the ledger"
-                            if entry["over_sell"]
+                            if sale_over_sell
                             else None
                         ),
                     }
@@ -888,8 +899,15 @@ class TaxReportService:
                     "currency": bucket["currency"],
                     "proceeds_native": _money(bucket["proceeds_native"]),
                     "cost_native": _money(bucket["cost_native"]),
-                    "gain_native": _money(bucket["gain_native"]),
-                    "gain_base": None if bucket["missing_fx"] else _money(bucket["gain_base"]),
+                    # Con alguna venta descubierta, el resultado del ticker
+                    # mezcla una base desconocida: N/D, nunca la suma parcial
+                    # (la transmision y el coste registrado si son observados).
+                    "gain_native": None if bucket["over_sell"] else _money(bucket["gain_native"]),
+                    "gain_base": (
+                        None
+                        if bucket["missing_fx"] or bucket["over_sell"]
+                        else _money(bucket["gain_base"])
+                    ),
                     "blocked_loss_native": _money(bucket["blocked_loss_native"]),
                     "blocked_loss_base": None if bucket["missing_fx"] else _money(bucket["blocked_loss_base"]),
                     "wash_sale_window_open": bucket["wash_sale_window_open"],

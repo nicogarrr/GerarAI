@@ -712,3 +712,34 @@ def test_0597_ignores_incomplete_foreign_buckets():
     foreign = _es_bucket(ticker="NESN", withholding_base=None, missing_fx=True)
     out = build_double_taxation([_es_bucket(), foreign], {"SAN": "ES", "NESN": "CH"}, 2025)
     assert out["spanish_withholding_base"]["amount"] == 19.0
+
+
+def test_casillas_over_sell_row_is_nd_not_computable():
+    """Venta sin compras que la cubran: la base de adquisición no se conoce,
+    así que la fila da N/D en adquisición y resultado (nunca el importe con
+    coste cero inventado) y las globales quedan anuladas."""
+    sale = _sale("OVS", "2025-03-01", 600.0, 0.0, 600.0)
+    sale["sales"][0]["over_sell"] = True
+    block = build_casillas([], [sale], 2025)["acciones_negociadas"]
+    assert block["incomplete"] is True
+    assert block["0328_transmision_global"] is None
+    assert block["0331_adquisicion_global"] is None
+    assert block["0339_suma_ganancias"] is None
+    row = block["rows"][0]
+    assert row["transmission_base"] == 600.0  # transmisión observada
+    assert row["acquisition_base"] is None
+    assert row["gain_base"] is None
+    assert row["over_sell"] is True
+
+
+def test_casillas_over_sell_does_not_hide_other_rows():
+    realized = [
+        _sale("WIN", "2025-03-01", 1500.0, 1000.0, 500.0),
+        _sale("OVS", "2025-04-01", 600.0, 0.0, 600.0),
+    ]
+    realized[1]["sales"][0]["over_sell"] = True
+    block = build_casillas([], realized, 2025)["acciones_negociadas"]
+    assert block["incomplete"] is True
+    win, ovs = block["rows"]
+    assert win["gain_base"] == 500.0 and win["over_sell"] is False
+    assert ovs["gain_base"] is None and ovs["over_sell"] is True
