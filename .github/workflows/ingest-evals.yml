@@ -27,8 +27,10 @@ concurrency:
   # true JUSTIFICADO (FIX-3.6): este workflow NO publica artefactos (solo
   # informa en el log y en el summary) y no deja evidencia forense que
   # conservar. Un run superseded no describe el codigo que se revisa y cuesta
-  # un runner; se cancela.
-  cancel-in-progress: true
+  # un runner; se cancela. EN PRs: en main un run cancelado a medias deja el
+  # commit sin resultado (27-oct-2026: ningun run de main terminaba en la rafaga
+  # de merges), asi que en main el run en curso termina siempre.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   ingest-precision:
