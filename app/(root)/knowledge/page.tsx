@@ -204,7 +204,6 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-7xl flex-col gap-6 overflow-x-clip md:pr-20">
       <ExtractionRefresh active={activeJobs.length > 0} />
-      <LibraryChat scope="library" />
       <PageHeader
         kicker="Conocimiento de inversión"
         title={t('knowledge.library')}
@@ -240,6 +239,8 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             </TabsTrigger>
           ))}
         </TabsList>
+
+        <LibraryChat scope="library" />
 
         <TabsContent className="mt-2 space-y-6" value={TABS.biblioteca}>
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
