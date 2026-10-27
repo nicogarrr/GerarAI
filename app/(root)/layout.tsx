@@ -10,7 +10,7 @@ import OnlineBanner from "@/components/OnlineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { requireAuthenticatedUser } from "@/lib/auth/require-user";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { redirectToSignIn } from "@/lib/auth/sign-in-redirect";
 import React from "react";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +29,7 @@ async function getLayoutUser(): Promise<User> {
             email: user.email ?? '',
         };
     } catch {
-        redirect("/sign-in");
+        return redirectToSignIn();
     }
 }
 

@@ -2,6 +2,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { REQUESTED_PATH_HEADER } from '@/lib/auth/safe-redirect';
 import { config, middleware } from '@/middleware';
 
 function request(path: string, cookies: Record<string, string> = {}) {
@@ -28,6 +29,19 @@ describe('middleware de sesión', () => {
         const res = middleware(request('/portfolio', { [name]: 'tok' }));
         expect(res.headers.get('location')).toBeNull();
         expect(res.headers.get('x-middleware-next')).toBe('1');
+    });
+
+    it('con cookie anota la ruta pedida para que el layout vuelva a ella si la sesión caducó', () => {
+        const res = middleware(request('/research/ASTS?tab=tesis', { 'better-auth.session_token': 'tok' }));
+        expect(res.headers.get(`x-middleware-request-${REQUESTED_PATH_HEADER}`)).toBe('/research/ASTS?tab=tesis');
+    });
+
+    it('la cabecera de ruta enviada por el cliente se sobrescribe', () => {
+        const req = new NextRequest(new URL('/watchlist', 'https://gerarai.test'), {
+            headers: { [REQUESTED_PATH_HEADER]: '//evil.example' },
+        });
+        req.cookies.set('better-auth.session_token', 'tok');
+        expect(middleware(req).headers.get(`x-middleware-request-${REQUESTED_PATH_HEADER}`)).toBe('/watchlist');
     });
 
     it('una cookie vacía no cuenta como sesión', () => {

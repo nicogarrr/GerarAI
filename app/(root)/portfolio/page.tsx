@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
 import { getPortfolioSummary, getPortfolioTransactionPage, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -28,7 +28,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
   try {
     userId = (await requireAuthenticatedUser()).id;
   } catch {
-    redirect('/sign-in');
+    return redirectToSignIn();
   }
 
   let result: [
@@ -64,7 +64,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       // del resumen (429 tras el reintento, 5xx en arranque en frio) acababa
       // en HTTP 500. Un fallo de sesion vuelve al login; el resto degrada a
       // aviso con Reintentar.
-      if (isAuthError(summaryResult.cause)) redirect('/sign-in');
+      if (isAuthError(summaryResult.cause)) return redirectToSignIn();
       console.error('[portfolio] summary failed, rendering retry notice', summaryResult.cause);
       return <BackendOffline feature="Tu cartera" retryHref="/portfolio" />;
     }
