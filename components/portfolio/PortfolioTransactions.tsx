@@ -28,6 +28,7 @@ type Transaction = {
 
 type Props = {
   transactions: Transaction[];
+  page?: { total: number; offset: number };
   userId: string;
 };
 
@@ -41,7 +42,7 @@ function transactionCurrency(currency: string | undefined): string | null {
   return isValidCurrencyCode(currency) ? currency : null;
 }
 
-export default function PortfolioTransactions({ transactions, userId }: Props) {
+export default function PortfolioTransactions({ transactions, userId, page }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -64,7 +65,7 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
       <CardHeader className="pb-3 pt-5 border-b border-gray-800/50">
         <CardTitle className="text-gray-100 text-base font-medium flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-blue-500"></span>
-          Actividad Reciente
+          Historial de movimientos
         </CardTitle>
         {transactions.length > 0 ? (
           <p className="mt-1 text-[11px] leading-4 text-gray-500">
@@ -73,13 +74,18 @@ export default function PortfolioTransactions({ transactions, userId }: Props) {
           </p>
         ) : null}
       </CardHeader>
+      {page ? <nav aria-label="Páginas de movimientos" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
+        <span>{transactions.length ? `${page.offset + 1}-${page.offset + transactions.length} de ${page.total}` : `0 de ${page.total}`}</span>
+        {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${Math.max(0, page.offset - 50)}`}>Anteriores</Link></Button> : null}
+        {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${page.offset + 50}`}>Siguientes</Link></Button> : null}
+      </nav> : null}
       <CardContent className="p-0 flex-1 overflow-hidden">
         {transactions.length === 0 ? (
           <div className="text-center py-12 px-4">
             <div className="h-10 w-10 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-gray-500">?</span>
             </div>
-            <p className="text-gray-500 text-sm mb-4">Sin actividad reciente</p>
+            <p className="text-gray-500 text-sm mb-4">Sin movimientos en esta página</p>
             <div className="flex justify-center">
               <ImportIBKRButton userId={userId} />
             </div>

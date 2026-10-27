@@ -272,6 +272,27 @@ def update_document_ticker(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/documents/page")
+def documents_page(
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: Session = Depends(get_db),
+) -> dict:
+    # Aggregates require explicit tenant predicates, unlike ORM entity loads.
+    total = db.scalar(select(func.count()).select_from(KnowledgeDocument)
+                      .where(*tenant_filters(db, KnowledgeDocument))) or 0
+    counts = db.execute(
+        select(KnowledgeDocument.collection_id, func.count())
+        .where(*tenant_filters(db, KnowledgeDocument))
+        .group_by(KnowledgeDocument.collection_id)
+    ).all()
+    return {
+        "items": KnowledgeLibraryService.list_documents(db, limit=limit, offset=offset),
+        "total": total,
+        "collection_counts": {str(key): count for key, count in counts if key is not None},
+    }
+
+
 @router.get("/documents/{document_id}")
 def get_document(document_id: int, db: Session = Depends(get_db)) -> dict:
     document = KnowledgeLibraryService.get_document(db, document_id)
@@ -471,6 +492,32 @@ def get_job(job_id: int, db: Session = Depends(get_db)) -> dict:
     if job is None or job.job_type != "knowledge_principle_extraction":
         raise HTTPException(status_code=404, detail="Processing job not found")
     return _job(job)
+
+
+@router.get("/principles/page")
+def principles_page(
+    status: str | None = Query(default=None),
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: Session = Depends(get_db),
+) -> dict:
+    statement = select(InvestmentPrinciple)
+    count = select(func.count()).select_from(InvestmentPrinciple).where(
+        *tenant_filters(db, InvestmentPrinciple)
+    )
+    if status:
+        statement = statement.where(InvestmentPrinciple.status == status)
+        count = count.where(InvestmentPrinciple.status == status)
+    return {
+        "items": [_principle(item) for item in db.scalars(
+            statement.order_by(desc(InvestmentPrinciple.created_at), desc(InvestmentPrinciple.id))
+            .limit(limit).offset(offset)
+        ).all()],
+        "total": db.scalar(count) or 0,
+        "proposed_total": db.scalar(select(func.count()).select_from(InvestmentPrinciple)
+                                    .where(InvestmentPrinciple.status == "proposed",
+                                           *tenant_filters(db, InvestmentPrinciple))) or 0,
+    }
 
 
 @router.get("/principles")

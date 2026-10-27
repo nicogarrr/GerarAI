@@ -554,11 +554,25 @@ def transactions(
         select(Transaction, Company)
         .join(Company, Transaction.company_id == Company.id)
         .where(Transaction.action.in_(["buy", "sell"]))
-        .order_by(desc(Transaction.trade_date), desc(Transaction.created_at))
+        .order_by(desc(Transaction.trade_date), desc(Transaction.created_at), desc(Transaction.id))
         .limit(limit)
         .offset(offset)
     ).all()
     return [_transaction_payload(transaction, company) for transaction, company in rows]
+
+
+@router.get("/transactions/page")
+def transactions_page(
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: Session = Depends(get_db),
+) -> dict:
+    total = db.scalar(
+        select(func.count()).select_from(Transaction)
+        .join(Company, Transaction.company_id == Company.id)
+        .where(Transaction.action.in_(["buy", "sell"]), *tenant_filters(db, Transaction))
+    ) or 0
+    return {"items": transactions(limit=limit, offset=offset, db=db), "total": total}
 
 
 @router.post("/transactions", status_code=201)
