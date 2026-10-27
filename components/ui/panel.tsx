@@ -123,6 +123,7 @@ export function Panel({
                 {toggleable ? (
                     <button
                         disabled={!hydrated}
+                        aria-label={`${effectiveOpen ? 'Contraer' : 'Expandir'} ${title}`}
                         aria-controls={contentId}
                         aria-expanded={effectiveOpen}
                         className={cn(
@@ -135,7 +136,7 @@ export function Panel({
                         <ChevronDown
                             className={cn('h-5 w-5 transition-transform', effectiveOpen ? 'rotate-180' : 'rotate-0')}
                         />
-                        <span className="sr-only">
+                        <span aria-hidden="true" className="sr-only">
                             {effectiveOpen ? 'Contraer' : 'Expandir'} {title}
                         </span>
                     </button>
