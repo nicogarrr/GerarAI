@@ -10,7 +10,7 @@
 
 > Esto no es asesoramiento financiero. Los datos pueden llegar con retraso o estar incompletos según el proveedor.
 
-**Estado:** v0.9.0 (pre-release). La 1.0 se publicará cuando cierre la auditoría.
+**Estado:** v1.0.0. Novedades y notas de actualización en [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Qué hace
 
