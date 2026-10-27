@@ -29,3 +29,21 @@ const MANAGER_NAMES: Record<string, string> = {
 export function ownershipManagerName(cik: string, officialName: string): string {
   return MANAGER_NAMES[cik] ?? officialName;
 }
+
+/**
+ * Aviso para un 13F servido sin verificar (Auditoría A): la API ya no dice
+ * «ok» cuando los totales no cuadran con el resumen del propio filing o no se
+ * pudieron contrastar. Las cifras se muestran, pero nunca como verificadas.
+ */
+export function holdingsVerificationNote(status: string): string | null {
+  if (status === 'mismatch') {
+    return 'Los totales guardados no cuadran con el resumen del propio 13F: cifras sin verificar.';
+  }
+  if (status === 'unverified') {
+    return 'No se pudo leer el resumen del 13F para contrastar los totales: cifras sin verificar.';
+  }
+  if (status === 'partial') {
+    return 'Datos parciales: parte del informe no se pudo descargar o verificar.';
+  }
+  return null;
+}

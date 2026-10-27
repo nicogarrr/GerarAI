@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, Position
 from app.models.entities import InstrumentReference
 from app.services.investors import INVESTORS, _latest_view, _manager, _value_usd, most_bought
+from app.services.manager_holding_ingestion_service import public_coverage, verification_status
 
 
 def _isin_cusip(isin: str | None) -> str | None:
@@ -89,7 +90,7 @@ def portfolio_overlap(db: Session) -> dict:
             missing += 1
             continue
         available += 1
-        partial += int(manager.coverage == "partial")
+        partial += int(public_coverage(manager.coverage) == "partial")
         seen = set()
         for row in rows:
             if row.put_call or row.cusip not in by_cusip or row.cusip in seen:
@@ -98,7 +99,8 @@ def portfolio_overlap(db: Session) -> dict:
             periods.add(row.report_date.isoformat())
             holder = {"slug": inv.slug, "name": inv.name, "report_date": row.report_date.isoformat(),
                       "filing_date": row.filing_date.isoformat() if row.filing_date else None,
-                      "filing_url": row.filing_url, "coverage": manager.coverage}
+                      "filing_url": row.filing_url, "coverage": public_coverage(manager.coverage),
+                      "verification": verification_status(manager.coverage)}
             for position in by_cusip[row.cusip]:
                 position["holders"].append(holder)
                 position["status"] = "coincidencia"
@@ -162,7 +164,7 @@ def holders_by_ticker(db: Session, ticker: str) -> dict | None:
             missing += 1
             continue
         available += 1
-        partial += int(manager.coverage == "partial")
+        partial += int(public_coverage(manager.coverage) == "partial")
         seen = set()
         for row in rows:
             if row.put_call or row.cusip != cusip or row.cusip in seen:
@@ -174,7 +176,8 @@ def holders_by_ticker(db: Session, ticker: str) -> dict | None:
                 "report_date": row.report_date.isoformat() if row.report_date else None,
                 "filing_date": row.filing_date.isoformat() if row.filing_date else None,
                 "filing_url": row.filing_url or None,
-                "coverage": manager.coverage,
+                "coverage": public_coverage(manager.coverage),
+                "verification": verification_status(manager.coverage),
                 "value_usd": _value_usd(
                     row.value_usd_thousands,
                     row.report_date.isoformat() if row.report_date else None,

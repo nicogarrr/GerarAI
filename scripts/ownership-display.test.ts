@@ -20,3 +20,13 @@ test('traduce los cuatro límites incluso cuando vienen concatenados', () => {
   assert.ok(!text.includes('no sustituyen'));
   assert.equal(ownershipLimitations('Nueva advertencia del proveedor'), 'Nueva advertencia del proveedor');
 });
+
+// @ts-expect-error TS5097: ejecución directa con Node.
+import { holdingsVerificationNote } from '../lib/ownership-display.ts';
+
+test('Auditoría A: un 13F sin verificar nunca se presenta como verificado', () => {
+  assert.match(holdingsVerificationNote('mismatch') ?? '', /no cuadran/);
+  assert.match(holdingsVerificationNote('unverified') ?? '', /sin verificar/);
+  assert.match(holdingsVerificationNote('partial') ?? '', /parciales/);
+  assert.equal(holdingsVerificationNote('ok'), null);
+});
