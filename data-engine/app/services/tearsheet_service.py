@@ -173,6 +173,58 @@ def exposure_from_snapshot(
     }
 
 
+def latest_continuous_returns(
+    history: Sequence[PortfolioDailySnapshot],
+) -> tuple[list[float], dict[str, Any]]:
+    """Retornos del ultimo tramo continuo de la serie (Auditoria A).
+
+    Un ``daily_return=None`` despues de la base es un hueco: falta valoracion,
+    hay flujos ambiguos o la foto no cubre toda la cartera. Antes se
+    descartaban los None y se encadenaban los tramos de ambos lados como si
+    fueran dias consecutivos. Ahora las metricas usan solo el tramo continuo
+    mas reciente (la misma regla que ``verifiedPortfolioHistory`` en el
+    frontend) y ``qualification`` dice si la serie tenia huecos.
+    ``start_date`` es la foto base del tramo (la anterior a su primer retorno).
+    """
+    ordered = sorted(history, key=lambda row: row.snapshot_date)
+    segments: list[tuple[int, int]] = []  # [inicio, fin] de indices con retorno
+    start: int | None = None
+    breaks = 0
+    seen_return = False
+    for index, row in enumerate(ordered):
+        if row.daily_return is not None:
+            seen_return = True
+            if start is None:
+                start = index
+            continue
+        if start is not None:
+            segments.append((start, index - 1))
+            start = None
+        if seen_return:
+            breaks += 1
+    if start is not None:
+        segments.append((start, len(ordered) - 1))
+    total_returns = sum(last - first + 1 for first, last in segments)
+    if not segments:
+        return [], {
+            "continuous": True,
+            "series_breaks": breaks,
+            "excluded_returns": 0,
+            "start_date": None,
+            "end_date": None,
+        }
+    first, last = segments[-1]
+    returns = [float(row.daily_return) for row in ordered[first : last + 1]]  # type: ignore[arg-type]
+    base_index = first - 1 if first > 0 else first
+    return returns, {
+        "continuous": breaks == 0,
+        "series_breaks": breaks,
+        "excluded_returns": total_returns - len(returns),
+        "start_date": ordered[base_index].snapshot_date.isoformat(),
+        "end_date": ordered[last].snapshot_date.isoformat(),
+    }
+
+
 class TearsheetService:
     """Construye el tearsheet desde los snapshots persistidos del portfolio."""
 
@@ -191,6 +243,7 @@ class TearsheetService:
             return {
                 "status": "no_portfolio",
                 "metrics": None,
+                "qualification": None,
                 "exposure": None,
                 "trace": {"method": "tearsheet_numpy_pandas_v1"},
             }
@@ -201,11 +254,7 @@ class TearsheetService:
                 .order_by(PortfolioDailySnapshot.snapshot_date)
             ).all()
         )
-        returns = [
-            float(row.daily_return)
-            for row in history
-            if row.daily_return is not None
-        ]
+        returns, qualification = latest_continuous_returns(history)
         metrics = compute_metrics(returns, periods=periods, risk_free=risk_free)
         exposure: dict[str, Any] | None = None
         if history:
@@ -223,6 +272,7 @@ class TearsheetService:
         return {
             "status": metrics["status"],
             "metrics": metrics,
+            "qualification": qualification,
             "exposure": exposure,
             "trace": {
                 "method": "tearsheet_numpy_pandas_v1",
