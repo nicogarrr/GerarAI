@@ -42,6 +42,7 @@ from app.services.library_context import company_library_context, retrieve_libra
 from app.services.memory_service import MemoryService, remember_note
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.source_hierarchy_service import source_tier_key
+from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
 
 # Los nombres son los que persiste la ingesta (financial_ingestion_service):
 # el efectivo se guarda como "cash_and_equivalents"; pedir "cash" aqui dejaba
@@ -316,6 +317,7 @@ def _natural_company_answer(
     memory_notes: list[str] | None = None,
     market_cap_fact: FinancialFact | None = None,
     question: str = "",
+    thesis_withheld: str | None = None,
 ) -> str:
     """Respuesta visible: prosa natural en castellano.
 
@@ -352,7 +354,10 @@ def _natural_company_answer(
             f"Todavía no tengo hechos financieros fiables almacenados para "
             f"{company.ticker}; {primary_sources_hint(company)} y te respondo con cifras."
         )
-    if thesis:
+    if thesis and thesis_withheld:
+        thesis_line = archived_thesis_notice(thesis, thesis_withheld)
+        parts.append(thesis_line)
+    elif thesis:
         detalles = []
         estado = _THESIS_STATUS_ES.get((thesis.status or "").strip())
         rating_es = _THESIS_RATING_ES.get((thesis.rating or "").strip())
@@ -405,6 +410,7 @@ def _natural_company_answer(
         parts.append(f"Aun faltan datos almacenados de: {labels}.")
     lead = _answer_lead(
         question, company=company, facts=facts, thesis=thesis, thesis_line=thesis_line,
+        thesis_withheld=thesis_withheld,
         news=news, claims=claims, contradiction_claims=contradiction_claims,
         price_line=price_line, focus_metrics=focus_metrics,
     )
@@ -443,6 +449,7 @@ def _answer_lead(
     question: str, *, company: Company, facts: list[FinancialFact], thesis: ThesisVersion | None,
     thesis_line: str | None, news: list[NewsEvent], claims: list[Claim],
     contradiction_claims: list[Claim], price_line: str | None, focus_metrics: set[str],
+    thesis_withheld: str | None = None,
 ) -> str | None:
     """Primera frase que contesta lo preguntado con lo que hay guardado; nunca inventa.
 
@@ -460,7 +467,7 @@ def _answer_lead(
         pending = sum(1 for c in claims if c.status == "unverified")
         if pending:
             bits.append(f"{pending} afirmaciones pendientes de verificar")
-        if thesis is not None and thesis.valuation_risk_score:
+        if thesis is not None and not thesis_withheld and thesis.valuation_risk_score:
             bits.append(f"riesgo de valoración {thesis.valuation_risk_score}/100 en la tesis v{thesis.version}")
         if bits:
             return f"Sobre los riesgos de {ticker}, lo guardado señala: " + "; ".join(bits) + "."
@@ -472,6 +479,8 @@ def _answer_lead(
     ):
         if thesis is None or thesis_line is None:
             return f"No tengo ninguna tesis guardada de {ticker}."
+        if thesis_withheld:
+            return thesis_line
         summary = " ".join((thesis.executive_summary or "").split())
         draft_note = (
             " Es un borrador: cualquier rango de valor que aparezca es indicativo, no un valor intrínseco final."
@@ -2278,7 +2287,8 @@ class ChatService:
 
         if company:
             thesis = self._latest_thesis(db, company)
-            sections = self._sections(db, thesis)
+            withheld_reason = thesis_withheld_reason(db, thesis) if thesis else None
+            sections = [] if withheld_reason else self._sections(db, thesis)
             facts = self._key_facts(db, company)
             claims = self._claims(db, company)
             news = self._recent_news(db, company)
@@ -2538,13 +2548,10 @@ class ChatService:
                 if claim.status != "supported"
             ]
             unverified_text = "\n".join(claim_lines) or "- No hay afirmaciones sin resolver en el contexto recuperado."
-            from app.schemas.api import VALUATION_WITHHELD_REASON, valuation_uses_inferred_inputs
-
-            thesis_withheld = bool(thesis) and valuation_uses_inferred_inputs(thesis.valuation_basis)
             thesis_text = (
-                f"Tesis {company.ticker} v{thesis.version}: {VALUATION_WITHHELD_REASON} "
+                f"{archived_thesis_notice(thesis, withheld_reason)} "
                 f"[thesis_version:{thesis.id}]"
-                if thesis_withheld
+                if thesis and withheld_reason
                 else f"Tesis {company.ticker} v{thesis.version}: `{thesis.status}` con rating `{thesis.rating}`. "
                 f"Valor esperado={_decimal_to_float(thesis.expected_value)} frente a precio actual={_decimal_to_float(thesis.current_price)}. "
                 f"[thesis_version:{thesis.id}]"
@@ -2614,6 +2621,7 @@ class ChatService:
                 memory_notes=[item.item.content for item in retrieved_memory[:3]],
                 market_cap_fact=market_cap_fact,
                 question=question,
+                thesis_withheld=withheld_reason,
             )
 
             sections = [
