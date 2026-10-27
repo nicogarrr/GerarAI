@@ -74,6 +74,9 @@ class _FakeSECCamden:
             "OperatingLeaseLeaseIncome": two(1_543_842_000, 1_573_544_000),
             "DirectCostsOfLeasedAndRentedPropertyOrEquipment": two(365_681_000, 369_889_000),
             "RealEstateTaxExpense": two(193_124_000, 196_821_000),
+            # Sonda de divisa (#2384): sin un concepto de referencia la divisa
+            # de reporte queda indeterminada y no se guarda ningun hecho en USD.
+            "Assets": two(9_200_000_000, 9_300_000_000),
         }}}
 
 
