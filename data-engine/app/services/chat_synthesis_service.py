@@ -342,12 +342,36 @@ def _reports_named_investor_opinion(text: str) -> bool:
     return False
 
 
+def _number_key(token: str) -> str:
+    """Forma canonica de una cifra para compararla con el fragmento: sin
+    separadores de miles ni signo ("13,6" y "13.6" son la misma cifra)."""
+    digits = re.sub(r"[^\d.,]", "", token).strip(".,")
+    return digits.replace(",", ".")
+
+
+def grounded_numbers_in(texts: list[str]) -> frozenset[str]:
+    """Cifras literales de los fragmentos de doctrina (mas de un digito o con
+    decimales: un "3" suelto no legitima nada)."""
+    found = set()
+    for text in texts:
+        for match in re.finditer(r"\d[\d.,]*\d|\d", text or ""):
+            key = _number_key(match.group())
+            if len(key.replace(".", "")) >= 2:
+                found.add(key)
+    return frozenset(found)
+
+
 def _inferred_general_text_valid(
     text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
     allow_named_attribution: bool = False,
     allowed_investors: frozenset[str] = frozenset(),
+    grounded_numbers: frozenset[str] = frozenset(),
 ) -> bool:
     """Prosa natural: no atribuciones/citas falsas, cifras aproximadas locales.
+
+    ``grounded_numbers``: cifras que aparecen literalmente en los fragmentos de
+    doctrina que se le pasaron (p. ej. "+202%" de una carta de Numantia). Esas
+    no son inventadas y no necesitan aproximador.
 
     Con doctrina recuperada (cartas de la biblioteca) el modelo SI puede decir
     "en sus cartas, Buffett...": la atribucion es a fragmentos que se le
@@ -412,7 +436,10 @@ def _inferred_general_text_valid(
         if not named <= allowed_investors:
             return False
     # Aproximar no convierte una cifra contable con decimales en estimacion.
-    if re.search(r"\d[\d.,]*[.,]\d{2}(?!\d)", text):
+    if any(
+        _number_key(m.group()) not in grounded_numbers
+        for m in re.finditer(r"\d[\d.,]*[.,]\d{2}(?!\d)", text)
+    ):
         return False
     hits, total = _english_hits(text)
     if hits >= 2 and hits / max(total, 1) >= 0.15:
@@ -440,6 +467,8 @@ def _inferred_general_text_valid(
             continue
         for match in number.finditer(clause):
             token = match.group().strip().rstrip(".,")
+            if grounded_numbers and _number_key(token) in grounded_numbers:
+                continue
             # Periodos/fechas no son una cifra empresarial. No convertirlos
             # en fuente: solo se permite el formato de fecha o año aislado.
             prefix = clause[max(0, match.start() - 90):match.start()]
@@ -904,6 +933,11 @@ class ChatSynthesisService:
             reasoning_effort=get_settings().reasoning_effort_for("chat_general"),
         )
         spent = {"cost": 0.0}
+        # Cifras que la respuesta puede dar tal cual porque estan en la doctrina
+        # recuperada. Antes "+202% desde su inicio" (literal en la carta) se
+        # rechazaba por no llevar "aproximadamente" y el usuario recibia el
+        # fallback "no tengo datos" con la carta en el prompt.
+        doctrine_numbers = grounded_numbers_in([str(item.get("text") or "") for item in doctrine or []])
 
         def _record(resp: Any) -> None:
             # CADA respuesta consume presupuesto y se registra en DB como en
@@ -936,6 +970,7 @@ class ChatSynthesisService:
                     quantitative=scope != "ordinary" or _general_quantity_context(resp.text),
                     allow_named_attribution=bool(doctrine),
                     allowed_investors=allowed_investors,
+                    grounded_numbers=doctrine_numbers,
                 ):
                     raise ValueError("Ungrounded general output")
 
@@ -960,6 +995,7 @@ class ChatSynthesisService:
             quantitative=scope != "ordinary" or _general_quantity_context(text),
             allow_named_attribution=bool(doctrine),
             allowed_investors=allowed_investors,
+            grounded_numbers=doctrine_numbers,
         ):
             return self._general_fallback(baseline, reason="ungrounded")
         # Fuentes visibles: SOLO la doctrina que la respuesta usa de verdad
