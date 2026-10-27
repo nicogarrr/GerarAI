@@ -409,21 +409,53 @@ export function DecisionAndRealityPanel({
               {entry.transaction ? (
                 <div className="mt-2 rounded border border-teal-900/50 bg-teal-950/10 p-2 text-xs leading-5 text-gray-300">
                   <p><span className="text-teal-300">Operación:</span> {describeTrade(entry.transaction)}</p>
+                  {isAutoLinked(entry.metadata) ? (
+                    <div className="text-amber-200" data-testid="journal-auto-link-badge">
+                      <Badge variant="outline">Enlace detectado automáticamente</Badge>{' '}
+                      Coincide en empresa, sentido y fecha (hasta 3 días después), sin otra candidata. No confirma cantidad ni cuenta: corrígelo si no es esa operación.
+                    </div>
+                  ) : <p className="text-teal-300" data-testid="journal-confirmed-link">Enlace confirmado manualmente</p>}
                   <p className="text-gray-400" title="Margen = valor justo / precio de ejecución − 1">{describeFairValue(entry.fair_value_on_day)}</p>
                   <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Operación desenlazada">
                     <input name="transaction_id" type="hidden" value="" />
-                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">Desenlazar</button>
+                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">{isAutoLinked(entry.metadata) ? 'Corregir / desenlazar' : 'Desenlazar'}</button>
                   </MutationForm>
                 </div>
               ) : trades.length > 0 ? (
                 <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage="Decisión enlazada a la operación">
+                  {ambiguousCandidateIds(entry.metadata) && tradesForEntry(trades, entry.metadata).length === 0 ? (
+                    <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-unavailable-link" role="status">
+                      Las operaciones sugeridas ya no están disponibles; no se ha enlazado ninguna.
+                    </p>
+                  ) : isSuggested(entry.metadata) ? (
+                    <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-suggested-link" role="status">
+                      Sugerencia sin confirmar: una operación coincide en empresa, sentido y fecha (hasta 3 días después). No se conoce cantidad ni cuenta, así que no se ha enlazado. Confírmala o deja la decisión sin operación.
+                    </p>
+                  ) : ambiguousCandidateIds(entry.metadata) ? (
+                    <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-ambiguous-link" role="status">
+                      Hay varias operaciones posibles para esta decisión y no se ha enlazado ninguna sola. Elige cuál la ejecutó, o deja la decisión sin operación.
+                    </p>
+                  ) : null}
+                  {tradesForEntry(trades, entry.metadata).length > 0 ? (
+                    <>
                   <select aria-label="Enlazar a una operación" className={`${selectClass} h-8 text-xs`} defaultValue="" name="transaction_id" required>
                     <option disabled value="">Enlazar a una operación…</option>
-                    {trades.map((trade) => (
+                    {tradesForEntry(trades, entry.metadata).map((trade) => (
                       <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
                     ))}
                   </select>
-                  <Button size="sm" type="submit" variant="outline">Enlazar</Button>
+                  <Button size="sm" type="submit" variant="outline">{isSuggested(entry.metadata) ? 'Confirmar enlace' : 'Enlazar'}</Button>
+                    </>
+                  ) : null}
+                </MutationForm>
+              ) : null}
+              {!entry.transaction && (entry.metadata?.auto_link as { status?: unknown } | undefined)?.status === 'user_unlinked' ? (
+                <p className="mt-2 text-xs text-gray-400" data-testid="journal-no-operation">Sin operación por elección del usuario. No se enlazará automáticamente.</p>
+              ) : null}
+              {!entry.transaction && ambiguousCandidateIds(entry.metadata) ? (
+                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Decisión marcada sin operación">
+                  <input name="transaction_id" type="hidden" value="" />
+                  <button className="text-gray-500 underline hover:text-gray-300" type="submit">No enlazar (sin operación)</button>
                 </MutationForm>
               ) : null}
             </div>
@@ -509,4 +541,32 @@ function AssumptionSources({ fuentes }: { fuentes?: Array<{ fact_id: number; tit
       ))}
     </>
   );
+}
+
+
+/** Candidatas detectadas, sin confirmación del usuario. */
+function ambiguousCandidateIds(metadata: Record<string, unknown> | undefined): number[] | null {
+  const link = metadata?.auto_link as { status?: unknown; candidate_transaction_ids?: unknown } | undefined;
+  const sug = metadata?.auto_link as { status?: unknown; candidate_transaction_id?: unknown } | undefined;
+  if (sug?.status === 'suggested' && typeof sug.candidate_transaction_id === 'number') return [sug.candidate_transaction_id];
+  if (!link || link.status !== 'ambiguous' || !Array.isArray(link.candidate_transaction_ids)) return null;
+  const ids = link.candidate_transaction_ids.filter((id): id is number => typeof id === 'number');
+  return ids;
+}
+
+/** Con ambigüedad, el selector ofrece SOLO las candidatas que siguen existiendo (puede quedar vacío); nunca todas. */
+function tradesForEntry(trades: JournalTrade[], metadata: Record<string, unknown> | undefined): JournalTrade[] {
+  const ids = ambiguousCandidateIds(metadata);
+  if (!ids) return trades;
+  const subset = trades.filter((trade) => ids.includes(trade.id));
+  return subset;
+}
+
+function isAutoLinked(metadata: Record<string, unknown> | undefined): boolean {
+  const link = metadata?.auto_link as { status?: unknown } | undefined;
+  return link?.status === 'linked';
+}
+
+function isSuggested(metadata: Record<string, unknown> | undefined): boolean {
+  return (metadata?.auto_link as { status?: unknown } | undefined)?.status === 'suggested';
 }

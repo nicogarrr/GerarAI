@@ -502,6 +502,13 @@ def _snapshot_blockers(
     return reasons
 
 
+def _auto_link_journal_after_import(db: Session) -> None:
+    """Enlaza decisiones del diario con las operaciones recien importadas (inequivocas)."""
+    from app.services.journal_trade_link import auto_link_journal_trades_best_effort
+
+    auto_link_journal_trades_best_effort(db)
+
+
 class IBKRImportService:
     def import_flex_xml(
         self,
@@ -935,6 +942,7 @@ class IBKRImportService:
                 db.rollback()
             else:
                 db.commit()
+                _auto_link_journal_after_import(db)
             return result
 
         positions_closed: list[str] = []
@@ -990,6 +998,7 @@ class IBKRImportService:
             source="ibkr_flex",
         )
         db.commit()
+        _auto_link_journal_after_import(db)
         # market_prices solo acumula hacia adelante: las companias que la
         # importacion estrena en cartera no tienen pasado. Backfill de ~1 ano
         # en segundo plano, una compania por tarea; la cola nunca rompe una
@@ -1209,6 +1218,7 @@ class IBKRImportService:
                 "usa tradeID para importarlos sin ambigüedad."
             )
         db.commit()
+        _auto_link_journal_after_import(db)
         return {
             "status": "imported",
             "trades_imported": trades_imported,

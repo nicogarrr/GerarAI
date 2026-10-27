@@ -76,6 +76,13 @@ class DecisionJournalService:
         db.add(entry)
         db.commit()
         db.refresh(entry)
+        if trade is None:
+            # Decision de compra/venta sin operacion indicada: si ya existe UNA
+            # operacion inequivoca (p. ej. importada de IBKR), se enlaza sola.
+            from app.services.journal_trade_link import auto_link_journal_trades_best_effort
+
+            auto_link_journal_trades_best_effort(db, {company.id})
+            db.refresh(entry)
         return entry
 
     def link_transaction(
@@ -101,6 +108,16 @@ class DecisionJournalService:
         if entry is None:
             raise LookupError("Entrada del diario no encontrada")
         entry.transaction_id = resolve_trade(db, company, transaction_id).id if transaction_id else None
+        if transaction_id is None:
+            # Desenlazar a mano es una decision del usuario: no se vuelve a
+            # enlazar automaticamente.
+            meta = dict(entry.metadata_ or {})
+            meta["auto_link"] = {"status": "user_unlinked"}
+            entry.metadata_ = meta
+        else:
+            meta = dict(entry.metadata_ or {})
+            meta.pop("auto_link", None)
+            entry.metadata_ = meta
         db.commit()
         db.refresh(entry)
         return entry
