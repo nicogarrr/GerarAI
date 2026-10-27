@@ -135,7 +135,7 @@ def exposure_from_snapshot(
     """Exposicion renta-variable/caja y concentracion del ultimo snapshot.
 
     top_1_weight/top_5_weight conservan su contrato sobre NAV neto, con caja.
-    Los nuevos top_*_gross_positions_weight usan la suma de posiciones y
+    Los nuevos top_*_gross_positions_weight usan suma de valores absolutos y
     permiten comparar concentracion sin confundirla con apalancamiento.
     No se modifica PositionDailySnapshot.weight ni ningun snapshot persistido.
     """
@@ -143,17 +143,17 @@ def exposure_from_snapshot(
     positions_value = _safe_float(snapshot.positions_value_base) or 0.0
     cash_value = _safe_float(snapshot.cash_value_base) or 0.0
     weights: list[float] = []
-    gross_weights: list[float] = []
+    gross_values: list[float] = []
     for row in position_rows:
         value = _safe_float(row.market_value_base)
         if value is None:
             continue
         if total > 0:
             weights.append(value / total)
-        if positions_value > 0:
-            gross_weights.append(value / positions_value)
+        gross_values.append(abs(value))
     weights.sort(reverse=True)
-    gross_weights.sort(reverse=True)
+    gross_value = sum(gross_values) if gross_values else None
+    gross_weights = sorted((value / gross_value for value in gross_values), reverse=True) if gross_value else []
     equity_weight = positions_value / total if total > 0 else None
     return {
         "snapshot_date": snapshot.snapshot_date.isoformat(),
@@ -165,7 +165,7 @@ def exposure_from_snapshot(
         "top_1_weight": _safe_float(weights[0]) if weights else None,
         "top_5_weight": _safe_float(sum(weights[:5])) if weights else None,
         # Additive, explicit denominator. Existing NAV fields stay unchanged.
-        "gross_positions_value_base": _safe_float(snapshot.positions_value_base),
+        "gross_positions_value_base": _safe_float(gross_value),
         "top_1_gross_positions_weight": _safe_float(gross_weights[0]) if gross_weights else None,
         "top_5_gross_positions_weight": _safe_float(sum(gross_weights[:5])) if gross_weights else None,
     }

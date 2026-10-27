@@ -229,3 +229,23 @@ def test_explicit_gross_weights_preserve_nav_contract_and_snapshot(cash, nav):
         assert result["top_1_weight"] is None
         assert result["top_5_weight"] is None
     assert all(row.weight == Decimal("0.123") for row in rows)
+
+
+
+def test_explicit_gross_weights_use_absolute_values_for_long_short_positions():
+    snapshot = PortfolioDailySnapshot(
+        portfolio_id=1, snapshot_date=date(2026, 9, 18), base_currency="EUR",
+        positions_value_base=Decimal("3000"), cash_value_base=Decimal("2000"), total_value_base=Decimal("5000"),
+    )
+    rows = [PositionDailySnapshot(
+        portfolio_snapshot_id=1, portfolio_id=1, company_id=i, snapshot_date=date(2026, 9, 18),
+        quantity=Decimal("1"), market_price_native=Decimal("100"), currency="EUR",
+        market_value_native=Decimal(v), market_value_base=Decimal(v), weight=Decimal("0.123"),
+    ) for i,v in enumerate(["9000", "-6000"], start=1)]
+    result = exposure_from_snapshot(snapshot, rows)
+    assert result["gross_positions_value_base"] == 15000
+    assert result["top_1_gross_positions_weight"] == pytest.approx(0.6)
+    assert result["top_5_gross_positions_weight"] == pytest.approx(1.0)
+    assert result["top_1_weight"] == pytest.approx(1.8)  # legacy NAV, unchanged
+    assert result["top_5_weight"] == pytest.approx(0.6)
+    assert all(row.weight == Decimal("0.123") for row in rows)
