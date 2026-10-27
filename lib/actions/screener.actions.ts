@@ -105,7 +105,7 @@ export const screenStocks = cache(async (filters: ScreenerFilters): Promise<Scre
         const metricsUrl = `${FINNHUB_BASE_URL}/stock/metric?symbol=${symbol}&metric=all&token=${FINNHUB_API_KEY}`;
         const metricsRes = await fetchWithTimeout(metricsUrl);
         
-        let metrics: any = { metric: {} };
+        let metrics: { metric?: Record<string, number | null> } = { metric: {} };
         if (metricsRes.ok) {
           metrics = await metricsRes.json();
         }
@@ -121,11 +121,11 @@ export const screenStocks = cache(async (filters: ScreenerFilters): Promise<Scre
           change,
           changePercent,
           marketCap: profile.marketCapitalization ? profile.marketCapitalization * 1000000 : 0,
-          pe: (metrics.metric as any)?.peBasicExclExtraTTM || 0,
-          pb: (metrics.metric as any)?.pbAnnual || 0,
-          roe: (metrics.metric as any)?.roeTTM || 0,
+          pe: metrics.metric?.peBasicExclExtraTTM || 0,
+          pb: metrics.metric?.pbAnnual || 0,
+          roe: metrics.metric?.roeTTM || 0,
           volume: quote.v || 0,
-          beta: (metrics.metric as any)?.beta || 1.0,
+          beta: metrics.metric?.beta || 1.0,
           sector: profile.finnhubIndustry || 'Desconocido',
           exchange: profile.exchange || 'US',
           type: symbol.match(/^[A-Z]{3,4}$/) && ['SPY', 'QQQ', 'IWM', 'VOO', 'VTI', 'URTH', 'VWO', 'GLD', 'BITO'].includes(symbol) ? 'ETF' : 'Stock',
