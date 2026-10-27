@@ -22,17 +22,22 @@ export interface SectorAverages {
         debtLiquidity: number; // 0-100
     };
     sampleSize: number;
+    unitTrace: {
+        inputPercentageUnit: 'assumed_percent_not_provider_verified';
+        outputPercentageUnit: 'fraction';
+        missing: 'null';
+    };
     metrics: {
-        avgPE: number;
-        avgPB: number;
-        avgPS: number;
+        avgPE: number | null;
+        avgPB: number | null;
+        avgPS: number | null;
         // Fracciones: 15% = 0.15; nunca porcentajes crudos.
-        avgROE: number;
-        avgROA: number;
-        avgNetMargin: number;
-        avgRevenueGrowth: number;
-        avgDebtToEquity: number;
-        avgCurrentRatio: number;
+        avgROE: number | null;
+        avgROA: number | null;
+        avgNetMargin: number | null;
+        avgRevenueGrowth: number | null;
+        avgDebtToEquity: number | null;
+        avgCurrentRatio: number | null;
     };
 }
 
@@ -124,16 +129,21 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
             sector,
             averages,
             sampleSize: metrics.length,
+            unitTrace: {
+                inputPercentageUnit: 'assumed_percent_not_provider_verified',
+                outputPercentageUnit: 'fraction',
+                missing: 'null',
+            },
             metrics: {
-                avgPE: avgPE || 0,
-                avgPB: avgPB || 0,
-                avgPS: avgPS || 0,
-                avgROE: avgROE || 0,
-                avgROA: avgROA || 0,
-                avgNetMargin: avgNetMargin || 0,
-                avgRevenueGrowth: avgRevenueGrowth || 0,
-                avgDebtToEquity: avgDebtToEquity || 0,
-                avgCurrentRatio: avgCurrentRatio || 0,
+                avgPE: avgPE,
+                avgPB: avgPB,
+                avgPS: avgPS,
+                avgROE: avgROE,
+                avgROA: avgROA,
+                avgNetMargin: avgNetMargin,
+                avgRevenueGrowth: avgRevenueGrowth,
+                avgDebtToEquity: avgDebtToEquity,
+                avgCurrentRatio: avgCurrentRatio,
             },
         };
     } catch (error) {
