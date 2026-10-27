@@ -147,6 +147,7 @@ python scripts/run_coverage_gate.py --report
 | Documento | Que responde |
 |---|---|
 | [`docs/COVERAGE.md`](COVERAGE.md) | Que se mide, que se excluye y por que, los dos totales (84.27 % gateado / 81.99 % con exentos, baseline 2026-10-02), el ratchet por paquete, la exencion de `alembic` y por que `include_namespace_packages = True` no es cosmetica. |
+| [`docs/FRONTEND_TESTS.md`](FRONTEND_TESTS.md) | Qué test escribir en el frontend (comportamiento con Vitest + Testing Library vs guard de texto), cómo ejecutarlos, la cobertura de `lib/` y `components/` y su trinquete. |
 | [`data-engine/evals/rag/README.md`](../data-engine/evals/rag/README.md) | De donde sale el corpus del golden set, las 5 puertas del RAG, las 6 metricas y el por que de cada umbral, y que se mediria con un LLM real. |
 | `data-engine/evals/llm/README.md`, `data-engine/evals/valuation/README.md`, `data-engine/evals/ingest/README.md` | **PENDIENTE**: todavia no existen. Los tres runners imprimen su cobertura por puerta, por capa/motor y por familia de fuente, que es la parte que estos README documentarian. |
 | [`data-engine/scripts/run_coverage_gate.py`](../data-engine/scripts/run_coverage_gate.py) | El gate, con las 10 situaciones en las que falla cerrado. |

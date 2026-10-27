@@ -9,6 +9,9 @@ Reglas de rotulado honesto (nada inventado, cada cifra con fuente y fecha):
 - Salida = el ticker deja de estar en el snapshot del mes siguiente; precio
   de salida = ultimo cierre persistido a fecha del as_of de ese snapshot.
 - Columna fija de 90 dias desde la fecha del precio de entrada.
+- Rentabilidades del pick con adj_close (entrada y final) cuando existe,
+  como la de SPY; un split no se lee como caida. Sin adj_close: cierre vs
+  precio congelado.
 - vs SPY = serie diaria ingerida de Yahoo en benchmark_prices (job diario);
   si aun no hay filas, se usa la descarga directa con cache y se etiqueta la
   fuente; si tampoco hay, los campos vs SPY salen null.
@@ -169,6 +172,44 @@ def _pct(end: Decimal | None, start: Decimal | None) -> float | None:
     return float((end - start) / start)
 
 
+def _pick_return(
+    db: Session,
+    company_id: int,
+    end_row: MarketPrice,
+    entry_price: Decimal | None,
+    entry_price_date: date | None,
+) -> float | None:
+    """Rentabilidad del pick entre la entrada y ``end_row``.
+
+    El precio de entrada congelado y ``close`` NO estan ajustados: un split
+    entre ambas fechas (4:1 -> el cierre cae a la cuarta parte) se leia como
+    una caida del 75 %. Si hay ``adj_close`` en la fecha de entrada y en la
+    final, el precio congelado se lleva a la misma base ajustada con el factor
+    de ajuste de su fecha (adj_close/close) y se compara con el ``adj_close``
+    final: rentabilidad ajustada por splits y dividendos, la misma base que
+    SPY. Se conserva el precio congelado como referencia (puede venir de otra
+    hora o fuente que el cierre persistido). Sin adj_close en alguna de las
+    dos fechas se mantiene el calculo anterior.
+    """
+    if (
+        entry_price is not None
+        and entry_price_date is not None
+        and end_row.adj_close is not None
+        and end_row.adj_close > 0
+    ):
+        entry_row = _price_at(db, company_id, entry_price_date)
+        if (
+            entry_row is not None
+            and entry_row.adj_close is not None
+            and entry_row.adj_close > 0
+            and entry_row.close is not None
+            and entry_row.close > 0
+        ):
+            factor = Decimal(str(entry_row.adj_close)) / Decimal(str(entry_row.close))
+            return _pct(Decimal(str(end_row.adj_close)), entry_price * factor)
+    return _pct(Decimal(str(end_row.close)), entry_price)
+
+
 def build_track_record(db: Session, *, today: date | None = None) -> dict[str, Any]:
     """Track record por pick a partir de los snapshots mensuales congelados."""
     today = today or date.today()
@@ -224,7 +265,7 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
                     if row is not None:
                         exit_price = float(row.close)
                         exit_price_date = row.date.isoformat()
-                        exit_pct = _pct(Decimal(str(row.close)), entry_price)
+                        exit_pct = _pick_return(db, company.id, row, entry_price, entry_price_date)
                         spy_point = _price_at_or_before(spy, row.date)
                         spy_entry = _price_at_or_before(spy, entry_price_date) if entry_price_date else None
                         if spy_point and spy_entry:
@@ -242,7 +283,9 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
                     if not current_stale:
                         current_price = float(latest.close)
                         current_price_date = latest.date.isoformat()
-                        pct_since_entry = _pct(Decimal(str(latest.close)), entry_price)
+                        pct_since_entry = _pick_return(
+                            db, company.id, latest, entry_price, entry_price_date
+                        )
                         spy_point = _price_at_or_before(spy, latest.date)
                         spy_entry = _price_at_or_before(spy, entry_price_date) if entry_price_date else None
                         if spy_point and spy_entry:
@@ -258,7 +301,7 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
                 if horizon_target <= today and company is not None:
                     row = _price_at(db, company.id, horizon_target)
                     if row is not None:
-                        pct_90d = _pct(Decimal(str(row.close)), entry_price)
+                        pct_90d = _pick_return(db, company.id, row, entry_price, entry_price_date)
                         spy_point = _price_at_or_before(spy, row.date)
                         spy_entry = _price_at_or_before(spy, entry_price_date)
                         if spy_point and spy_entry:

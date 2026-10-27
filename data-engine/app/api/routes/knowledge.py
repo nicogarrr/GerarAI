@@ -25,6 +25,7 @@ from app.services.document_ingestion_service import MAX_DOCUMENT_BYTES
 from app.services.knowledge_library_service import (
     KNOWLEDGE_DOCUMENT_TYPES,
     KnowledgeLibraryService,
+    normalize_knowledge_ticker,
 )
 
 router = APIRouter()
@@ -242,12 +243,33 @@ def list_documents(
     offset: Annotated[int, Query(ge=0)] = 0,
     document_type: str | None = None,
     status: str | None = None,
+    ticker: Annotated[str | None, Query(max_length=32)] = None,
     db: Session = Depends(get_db),
 ) -> list[dict]:
     return KnowledgeLibraryService.list_documents(
         db, collection_id=collection_id, limit=limit, offset=offset,
-        document_type=document_type, status=status,
+        document_type=document_type, status=status, ticker=ticker,
     )
+
+
+class DocumentTickerUpdate(BaseModel):
+    """Ticker de la empresa a la que se refiere el documento; ``null`` lo quita."""
+
+    ticker: str | None = Field(default=None, max_length=32)
+
+
+@router.patch("/documents/{document_id}")
+def update_document_ticker(
+    document_id: int, payload: DocumentTickerUpdate, db: Session = Depends(get_db)
+) -> dict:
+    # db.get va con el filtro de tenant: otro tenant ve 404, como inexistente.
+    document = db.get(KnowledgeDocument, document_id)
+    if document is None:
+        raise HTTPException(status_code=404, detail="Knowledge document not found")
+    try:
+        return KnowledgeLibraryService.set_document_ticker(db, document, payload.ticker)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.get("/documents/{document_id}")
@@ -267,6 +289,7 @@ async def upload_document(
     source_url: str | None = Form(default=None),
     publication_date: date | None = Form(default=None),
     language: str = Form(default="en", max_length=20),
+    ticker: str | None = Form(default=None, max_length=32),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -274,6 +297,7 @@ async def upload_document(
         validated_type, validated_language, validated_url = validate_upload_metadata(
             document_type=document_type, language=language, source_url=source_url
         )
+        validated_ticker = normalize_knowledge_ticker(ticker)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     try:
@@ -290,6 +314,7 @@ async def upload_document(
             source_url=validated_url,
             publication_date=publication_date,
             language=validated_language,
+            ticker=validated_ticker,
             content=content,
             filename=file.filename or "knowledge-document.bin",
             content_type=file.content_type,

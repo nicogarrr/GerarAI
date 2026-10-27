@@ -19,8 +19,12 @@ import React from "react";
  * Formulario de alta. Recibe `signUpOpen` desde el servidor porque
  * `ALLOW_PUBLIC_SIGNUP` no es `NEXT_PUBLIC_*`: leerlo en el cliente daría
  * siempre `undefined` y el aviso de registro cerrado nunca aparecería.
+ * `inviteOnly`: alta solo para los emails invitados (SIGNUP_ALLOWLIST).
+ * `invitationsEnabled`: con el registro cerrado, enlaza al alta para invitados.
  */
-const SignUpForm = ({ signUpOpen }: { signUpOpen: boolean }) => {
+type SignUpFormProps = { signUpOpen: boolean; inviteOnly?: boolean; invitationsEnabled?: boolean };
+
+const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false }: SignUpFormProps) => {
     const router = useRouter()
     const {
         register,
@@ -80,6 +84,28 @@ const SignUpForm = ({ signUpOpen }: { signUpOpen: boolean }) => {
                         abajo y te avisamos en cuanto haya plaza. Si ya tienes cuenta,{' '}
                         <a href="/sign-in" className="underline underline-offset-4 hover:text-amber-100">
                             inicia sesión
+                        </a>
+                        .
+                    </p>
+                    {invitationsEnabled ? (
+                        <p className="mt-2 text-sm leading-6 text-amber-100/90">
+                            ¿Te han invitado?{' '}
+                            <a href="/sign-up?invitacion=1" className="underline underline-offset-4 hover:text-amber-100">
+                                Crea tu cuenta con el email invitado
+                            </a>
+                            .
+                        </p>
+                    ) : null}
+                </div>
+            ) : null}
+
+            {inviteOnly ? (
+                <div className="mb-6 rounded-lg border border-teal-900/60 bg-teal-950/20 p-4">
+                    <p className="text-sm font-semibold text-teal-200">Alta por invitación</p>
+                    <p className="mt-1 text-sm leading-6 text-teal-100/90">
+                        Usa el email con el que te invitaron. Si no está en la lista, puedes{' '}
+                        <a href="/sign-up" className="underline underline-offset-4 hover:text-teal-100">
+                            pedir acceso
                         </a>
                         .
                     </p>

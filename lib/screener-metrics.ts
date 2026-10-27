@@ -20,6 +20,10 @@ const GROUPS: { title: string; unit: UnitKind; keys: string[] }[] = [
   { title: 'Flujo de caja', unit: 'usd', keys: ['operating_cash_flow', 'free_cash_flow', 'capital_expenditure', 'dividends_paid'] },
   { title: 'Balance', unit: 'usd', keys: ['total_assets', 'total_liabilities', 'total_equity', 'total_debt', 'net_debt', 'cash_and_equivalents', 'goodwill'] },
   { title: 'Calidad', unit: 'number', keys: ['quality_moat_score', 'quality_moat_score_v2'] },
+  // Conexiones con el resto de la app (data-engine/app/services/screener_context_metrics.py):
+  // margen del motor de valoración, si hay tesis y el nivel del motor DCA.
+  { title: 'Valoración', unit: 'ratio', keys: ['margen_seguridad'] },
+  { title: 'Tesis y nivel DCA', unit: 'number', keys: ['tiene_tesis', 'tesis_publicada', 'nivel_dca'] },
 ];
 
 const BY_KEY = new Map<string, { group: string; unit: UnitKind }>();

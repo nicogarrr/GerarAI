@@ -51,6 +51,7 @@ from app.services.thesis_provenance import (
     classify_origin,
     inputs_provenance_from_snapshot,
 )
+from app.services.ticker_ownership_signals import ownership_fact_lines, ownership_markdown
 from app.services.valuation_service import ValuationService
 from app.valuation.engines.base import MODEL_VERSION, margin_of_safety_reference
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
@@ -842,6 +843,11 @@ class ThesisService:
         # y fuentes anclada al paquete de hechos; fail-closed a la narrativa
         # de noticias/determinista. El modelo ejecutado queda en la traza de
         # la version para verificar que la tesis usa el modelo Go real.
+        evidence_sources = evidence.get("sources") or {}
+        ownership_evidence = {
+            "insider": evidence_sources.get("insider") or {},
+            "holders": evidence_sources.get("holders") or {},
+        }
         deep_narrative = maybe_deep_narrative(
             db,
             company,
@@ -852,6 +858,9 @@ class ThesisService:
             filing_items=filing_items,
             rag_context=rag_context,
             financial_facts=list(snapshot.facts.values()),
+            ownership_facts=ownership_fact_lines(
+                {"ticker": company.ticker.upper(), **ownership_evidence}
+            ),
         )
         narrative_model_trace = None
         if deep_narrative:
@@ -898,6 +907,13 @@ class ThesisService:
             thesis_markdown += f"\n### {section['titulo']}\n"
             thesis_markdown += "\n\n".join(section["parrafos"]) + "\n"
 
+        # Conexion 10b: insiders (Form 4) y fondos (13F) persistidos, como
+        # seccion propia del memo con su fuente y sus limites.
+        thesis_markdown += "\n\n## 24. Insiders (Form 4) y fondos (13F)\n\n"
+        thesis_markdown += ownership_markdown(
+            {"ticker": company.ticker.upper(), **ownership_evidence}
+        ) + "\n"
+
         def _dec(value) -> Decimal | None:
             return None if value is None else Decimal(str(value))
 
@@ -943,6 +959,13 @@ class ThesisService:
             hypothesis=hypothesis,
             catalysts=catalysts,
             invalidation_criteria=invalidation,
+            # Los criterios medibles los pone el usuario: sobreviven a cada
+            # regeneracion de la tesis (si no, el aviso dejaria de vigilarse).
+            invalidation_rules=(
+                list(previous.invalidation_rules)
+                if previous is not None and previous.invalidation_rules
+                else None
+            ),
             scenario_probabilities=scenario_probabilities,
             narrative_sections=narrative_sections,
             valuation_basis=valuation_basis,
@@ -1760,6 +1783,8 @@ class ThesisService:
             "transcript": "Transcripción",
             "ir": "Relación con inversores",
             "external_theses": "Tesis externas",
+            "insider": "Insiders (Form 4)",
+            "holders": "Fondos (13F)",
         }
         for key, label in labels.items():
             block = sources.get(key) or {}
@@ -1820,6 +1845,19 @@ class ThesisService:
             return f"{block.get('source')}: {len(block.get('items') or [])} comunicados ({titles})"
         if key == "external_theses":
             return f"{len(block.get('items') or [])} tesis pegadas"
+        if key == "insider":
+            buys, sells = block.get("buys") or {}, block.get("sells") or {}
+            return (
+                f"{block.get('source')}: {buys.get('trades', 0)} compras y "
+                f"{sells.get('trades', 0)} ventas en {block.get('window_days')} días. "
+                f"{block.get('reading')}"
+            )
+        if key == "holders":
+            return (
+                f"{block.get('source')}: {block.get('holders_count', 0)} de "
+                f"{block.get('managers_with_data', 0)} gestores revisados lo declaran "
+                f"(periodo {block.get('report_date') or 'sin fecha'})"
+            )
         return str(block.get("source") or "ok")
 
     @staticmethod

@@ -35,3 +35,17 @@ test('cobertura vacía conserva métricas personalizadas sin cambiar su escala',
   assert.deepEqual(options.map((option: { key: string }) => option.key), ['roic_spread']);
   assert.equal(options[0].unit, 'number');
 });
+
+
+test('valoración, tesis y nivel DCA son métricas del screener con su unidad', () => {
+  type Option = { key: string; unit: string; group: string };
+  const options: Option[] = buildMetricOptions(['margen_seguridad', 'tiene_tesis', 'nivel_dca']);
+  const byKey = new Map(options.map((o) => [o.key, o]));
+  assert.equal(byKey.get('margen_seguridad')?.unit, 'ratio');
+  assert.equal(byKey.get('nivel_dca')?.unit, 'number');
+  assert.equal(byKey.get('tiene_tesis')?.group, 'Tesis y nivel DCA');
+  // Margen del 20 % que escribe la persona -> 0.2 en el backend.
+  assert.equal(toBackendValue('20', 'ratio'), '0.2');
+  // Sin datos de DCA (motor aún no desplegado) no se ofrece el filtro.
+  assert.equal(buildMetricOptions(['margen_seguridad']).some((o: { key: string }) => o.key === 'nivel_dca'), false);
+});

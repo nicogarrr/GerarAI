@@ -386,6 +386,14 @@ def answer_data_question(db: Session, question: str) -> ChatResponse | None:
     tenant = db.info.get("tenant_id")
     if type(tenant) is not int or tenant <= 0:
         return None
+    # Avisos, riesgo de cartera (panel + histórico) y diario de decisiones.
+    from app.services.brain_context_tools import answer_context_question
+
+    context_answer = answer_context_question(
+        db, question, tenant, lambda: _company_in_question(db, question)
+    )
+    if context_answer is not None:
+        return context_answer
     news = bool(re.search(r"(?i)\bnoticias?\b", question)) and bool(re.search(r"(?i)\bmis\s+(?:empresas|acciones|posiciones)\b|\bmi\s+cartera\b", question))
     theses = bool(re.search(r"(?i)\btesis\b", question)) and bool(re.search(r"(?i)\b(?:tengo|mis|activas|vigentes)\b", question))
     comparison = bool(re.search(r"(?i)\bcompara\w*\b", question))

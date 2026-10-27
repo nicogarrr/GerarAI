@@ -940,6 +940,21 @@ class ChatService:
                 await DividendIngestionService().sync_company(db, ticker=missing_dividends)
             except Exception:  # noqa: BLE001 - sin proveedor se responde con lo guardado
                 db.rollback()
+        # «¿Cuándo se invalidan mis tesis?»: la lista de tesis de
+        # answer_data_question no lleva los criterios de invalidación; el
+        # contexto personal sí.
+        if not ticker and re.search(r"(?i)\binvalid", question or ""):
+            from app.services.personal_answer import (
+                answer_personal_question,
+                detect_personal_intent,
+            )
+
+            thesis_intent = detect_personal_intent(question or "")
+            if thesis_intent is not None and thesis_intent.kind == "tesis":
+                personal = await answer_personal_question(db, question or "", thesis_intent, self.provider)
+                if personal is not None:
+                    personal.context = context_echo
+                    return personal
         data_answer = answer_data_question(db, question)
         if data_answer is not None:
             # A quote question may also request a concrete metric. Do not let
@@ -1088,6 +1103,28 @@ class ChatService:
             if followup is not None:
                 followup.context = context_echo
                 return followup
+        # Preguntas sobre los datos propios sin empresa («¿qué riesgo tengo?»,
+        # «¿qué está barato de mi watchlist?», cartera vacía): antes caían en
+        # la abstención «Selecciona la empresa» o en el LLM sin contexto
+        # («no tengo acceso a tu watchlist»). Se responden con el contexto
+        # personal y comprobación de cifras (personal_answer).
+        if company is None and not ticker:
+            from app.services.personal_answer import (
+                answer_personal_question,
+                detect_personal_intent,
+            )
+
+            intent = detect_personal_intent(question or "")
+            if intent is not None:
+                history_text = "\n".join(
+                    f"{turn.role}: {turn.content[:300]}" for turn in (history or [])[-4:] if turn.content
+                ) or None
+                personal = await answer_personal_question(
+                    db, question or "", intent, self.provider, history_text=history_text
+                )
+                if personal is not None:
+                    personal.context = context_echo
+                    return personal
         if company is not None and not ticker:
             ticker = company.ticker
         # La abstencion financiera vive en el clasificador unificado de
@@ -1304,6 +1341,15 @@ class ChatService:
         )
         if unvalued:
             lines.append(f"- Sin valor en moneda base (no entran en los porcentajes): {', '.join(sorted(unvalued))}.")
+        # Reglas del panel de riesgo y TWR/caída máxima del histórico de snapshots:
+        # el Cerebro ya no se queda solo en la concentración.
+        from app.services.brain_context_tools import portfolio_risk_lines
+
+        try:
+            risk_lines, risk_sources = portfolio_risk_lines(db, tenant_id)
+        except Exception:  # noqa: BLE001 - el panel nunca rompe la respuesta de concentración
+            risk_lines, risk_sources = [], []
+        lines.extend(f"- {line}" if not line.startswith("- ") else line for line in risk_lines)
         as_of = min(pos.as_of for pos, _ in rows)
         answer = (
             "Cifras calculadas de tus posiciones guardadas "
@@ -1315,6 +1361,7 @@ class ChatService:
             self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
             for pos, comp, _ in top
         ]
+        sources.extend(risk_sources)
         return ChatResponse(
             answer=answer,
             sources=sources,

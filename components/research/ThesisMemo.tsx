@@ -10,6 +10,8 @@ import { cleanThesisText } from '@/lib/research/thesis-text';
 import { GlossaryTerm } from '@/components/GlossaryTerm';
 import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
 import ThesisHumanInputForm from '@/components/research/ThesisHumanInputForm';
+import ThesisInvalidationRulesForm from '@/components/research/ThesisInvalidationRulesForm';
+import { coerceInvalidationRules } from '@/lib/research/thesis-invalidation-rules';
 import ThesisDebatePanel from '@/components/research/ThesisDebatePanel';
 import ThesisMarkdownPager from '@/components/research/ThesisMarkdownPager';
 import { splitMemoPages } from '@/lib/research/memo-pages';
@@ -426,6 +428,12 @@ export default function ThesisMemo({
               Pendiente: genera una nueva versión para registrar criterios de invalidación.
             </p>
           )}
+          {ticker ? (
+            <ThesisInvalidationRulesForm
+              ticker={ticker}
+              initialRules={coerceInvalidationRules(thesis.invalidation_rules)}
+            />
+          ) : null}
         </section>
       </div>
 

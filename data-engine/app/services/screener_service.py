@@ -25,6 +25,7 @@ from app.models import (
     SavedScreenMatch,
 )
 from app.services.review_alert_service import ReviewAlertService
+from app.services.screener_context_metrics import context_metrics_with_data, context_observations
 
 logger = logging.getLogger(__name__)
 
@@ -257,7 +258,7 @@ class ScreenerService:
                 .distinct()
             ).all()
         )
-        return sorted(calculated | facts)
+        return sorted(calculated | facts | set(context_metrics_with_data(db)))
 
     def run_saved(self, db: Session, screen: SavedScreen) -> dict[str, Any]:
         response = self.run(
@@ -363,11 +364,21 @@ class ScreenerService:
         facts_by_company = self._facts_by_company(
             db, self._required_fact_metrics(used_names, definitions)
         )
+        # Valoracion, tesis y nivel DCA como nombres del screener (tambien
+        # dentro de metricas personalizadas). Solo se leen si se usan.
+        context_names = set(used_names)
+        for definition in definitions:
+            try:
+                context_names |= SafeFormula(definition.formula).names
+            except ValueError:
+                continue
+        context_by_company = context_observations(db, context_names, companies)
         for company in companies:
             observations = self._observations_from_rows(
                 calculated_by_company.get(company.id, []),
                 facts_by_company.get(company.id, []),
             )
+            observations.update(context_by_company.get(company.id, {}))
             self._custom_metrics(observations, definitions)
             values = {key: item.value for key, item in observations.items()}
             names_with_data.update(name for name in used_names if name in observations)
