@@ -99,11 +99,16 @@ TREATY_DIVIDEND_RATES = {
     # aquí. El Reino Unido no retiene en origen sobre dividendos ordinarios,
     # así que lo normal es retención 0 y deducción 0.
     "GB": Decimal("0.10"),
+    # España-Canadá (BOE-A-1981-2731, texto consolidado con el Protocolo de
+    # 2014, BOE-A-2015-10793, art. X.2.b): 15% "en todos los demás casos"
+    # (el 5% del art. X.2.a exige sociedad con >=10% del capital).
+    "CA": Decimal("0.15"),
 }
 TREATY_RATE_SOURCES = {
     "US": "BOE-A-1990-30940 art. 10.2.b (convenio España-EE.UU.)",
     "CN": "BOE-A-2021-4911 art. 10.2.b (convenio España-China 2018)",
     "GB": "BOE-A-2014-5171 art. 10.2.a.i (convenio España-Reino Unido)",
+    "CA": "BOE-A-1981-2731 art. X.2.b (convenio España-Canadá)",
 }
 
 UNKNOWN_COUNTRY = "??"
