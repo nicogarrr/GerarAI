@@ -111,6 +111,10 @@ class LLMProvider(ABC):
     #: Lo que ESTE adaptador implementa. Vacio por defecto: un adaptador que no
     #: lo declare no puede afirmar ninguna capacidad (fail closed).
     supported_capabilities: frozenset[str] = frozenset()
+    #: True para destinos elegidos por un usuario (proveedor ``custom``): la
+    #: conexion solo se abre a IPs publicas validadas al conectar y se ignora
+    #: cualquier cliente HTTP inyectado (ver app/llm/egress_guard.py).
+    public_only: bool = False
 
     def __init__(
         self,
@@ -233,6 +237,11 @@ class LLMProvider(ABC):
         # Tope duro por corrida (inactivo salvo que haya un guard en el
         # contexto): reserva cupo ANTES de la red; ver app/llm/run_guard.py.
         reserve_request(url, payload, guard_required=bool(getattr(self, "guard_required", False)))
+        if self.public_only:
+            from app.llm.egress_guard import public_only_client
+
+            async with public_only_client(self._timeout) as guarded:
+                return await guarded.post(url, headers=dict(headers), json=dict(payload))
         if self._client is not None:
             return await self._client.post(
                 url,
