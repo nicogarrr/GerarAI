@@ -44,7 +44,7 @@ async function audit(page: Page): Promise<AxeViolation[]> {
 async function expectAuthenticatedRoute(page: Page, path: string) {
   await expect.poll(() => new URL(page.url()).pathname).toBe(path);
   await expect(page.locator("main#content")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Buscar acciones|Search stocks/ })).toBeVisible();
+  await expect(page.locator('header a[href="/alerts"]')).toBeVisible();
   await expect(page.locator("main#content").getByRole("heading", { level: 1 })).toBeVisible();
 }
 
