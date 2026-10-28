@@ -130,3 +130,28 @@ def test_entity_country_must_match_custody(db):
     svc.write(db, {"custody": {"US0378331005": "US"}})
     with pytest.raises(ValueError):
         svc.write(db, {"custody_entities": {"US0378331005": ENTITY}})
+
+
+def test_declarant_input_acepta_nif_extranjero_o_raro():
+    """El servidor no valida formato: un NIF extranjero pasa tal cual."""
+    from app.api.routes.taxes import DeclarantInput
+
+    assert DeclarantInput(nif="DE123456789").nif == "DE123456789"
+    assert DeclarantInput(nif="abc-123 x").nif == "abc-123 x"
+    assert DeclarantInput(nif=None).nif is None
+
+
+def test_declarant_input_rechaza_longitud_absurda_y_controles():
+    """Solo se rechaza lo imposible: >32 chars o caracteres de control."""
+    from pydantic import ValidationError
+
+    from app.api.routes.taxes import DeclarantInput
+
+    with pytest.raises(ValidationError):
+        DeclarantInput(nif="X" * 33)
+    with pytest.raises(ValidationError):
+        DeclarantInput(nif="12345678Z\x00")
+    with pytest.raises(ValidationError):
+        DeclarantInput(nif="12345678Z\n")
+    # 32 justos sí entran
+    assert len(DeclarantInput(nif="X" * 32).nif) == 32
