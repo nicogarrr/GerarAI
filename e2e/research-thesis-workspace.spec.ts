@@ -155,6 +155,13 @@ tenant = cur.execute("SELECT id FROM tenants WHERE external_id = ?", ("e2e-brows
 company = cur.execute("SELECT id FROM companies WHERE ticker = ?", ("E2ENAR",)).fetchone()
 assert company, "company E2ENAR no encontrada"
 cur.execute("DELETE FROM thesis_versions WHERE company_id = ?", (company[0],))
+cur.execute("DELETE FROM fundamental_model_versions WHERE company_id = ?", (company[0],))
+# La puerta de publicacion retiene la narrativa de una tesis 'published' sin
+# modelo publicable verificado: la semilla necesita un modelo publicable.
+cur.execute(
+    "INSERT INTO fundamental_model_versions (tenant_id, company_id, version, engine_version, algorithm_version, framework_key, horizon_years, status, publishable, input_fingerprint, forecast_fingerprint, market_snapshot_fingerprint, valuation_snapshot_fingerprint, code_commit_sha, scenario_probabilities, model_snapshot, created_at, updated_at) VALUES (?, ?, 1, 'e2e', 'e2e', 'e2e', 10, 'final', 1, 'fp-in', 'fp-forecast', 'fp-market', 'fp-valuation', 'e2e', '{}', '{}', datetime('now'), datetime('now'))",
+    (tenant[0] if tenant else None, company[0]),
+)
 cur.execute(
     "INSERT INTO thesis_versions (tenant_id, company_id, version, status, thesis_markdown, executive_summary, rating, data_confidence_score, source_coverage_score, red_team_score, valuation_risk_score, narrative_sections, created_at, updated_at) VALUES (?, ?, 1, 'published', '# T', 'resumen ejecutivo semilla', 'watch', 0, 0, 0, 0, ?, datetime('now'), datetime('now'))",
     (tenant[0] if tenant else None, company[0], SECTIONS_JSON),

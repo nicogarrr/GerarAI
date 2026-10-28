@@ -5,7 +5,13 @@ test.skip(process.env.E2E_UI_RUN !== '1', 'Local UI required');
 test('settings LLM section exposes the provider form without leaking a key', async ({ page }) => {
   await page.goto('/settings');
   await expect(page.getByRole('heading', { name: 'Ajustes', level: 1 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Modelo de IA' })).toBeVisible();
+  // Las secciones de ajustes son disclosures nativos (<details>): hay que
+  // abrir «Modelo de IA» antes de ver el formulario. Chrome no expone nombre
+  // accesible para <details> cuando el <summary> lleva contenido complejo, así
+  // que el ancla estable es el id de sección (el mismo que usa la nav interna).
+  const section = page.locator('details#llm');
+  await expect(section).toBeVisible();
+  await section.locator('summary').click();
   const form = page.getByRole('form', { name: 'Configuración del modelo de IA' });
   await expect(form.getByRole('combobox', { name: 'Proveedor' })).toBeVisible();
   await expect(form.getByRole('textbox', { name: 'Modelo', exact: true })).toBeVisible();

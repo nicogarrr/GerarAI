@@ -70,8 +70,8 @@ test("ficha: los 3 pasos conservan la posición de scroll (móvil)", async ({ pa
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   await medirSalto(
     page,
-    page.getByRole("navigation", { name: "Etapas del research", exact: true }).getByRole("link", { name: "Números", exact: true }),
-    /\/research\/MSFT\?view=numeros/,
+    page.getByRole("navigation", { name: "Secciones de la empresa", exact: true }).getByRole("link", { name: "Finanzas", exact: true }),
+    /\/research\/MSFT\?view=financials/,
     page.getByTestId("company-technical-chart"),
   );
 });

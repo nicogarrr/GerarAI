@@ -11,7 +11,7 @@ test.describe("public authentication shell", () => {
     await expect(page).toHaveTitle(/GerarAI/);
     await expect(page.getByRole("heading", { name: "Bienvenido de nuevo" })).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
-    await expect(page.getByLabel("Contraseña")).toBeVisible();
+    await expect(page.getByLabel("Contraseña", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Iniciar sesión" }).click();
     await expect(page.getByText("El email es obligatorio")).toBeVisible();
@@ -38,7 +38,7 @@ test.describe("public authentication shell", () => {
     await expect(form.getByRole("combobox").nth(1)).toHaveText(/Crecimiento a largo plazo/);
     await expect(form.getByRole("combobox").nth(2)).toHaveText(/Moderado/);
     await expect(form.getByRole("combobox").nth(3)).toHaveText(/Tecnolog/);
-    await expect(form.getByRole("button", { name: "Empieza tu viaje inversor" })).toBeEnabled();
+    await expect(form.getByRole("button", { name: "Crear cuenta", exact: true })).toBeEnabled();
   });
 });
 
@@ -55,15 +55,36 @@ test.describe("mobile authentication layout", () => {
     // y dejaba el botón fuera del viewport.
     await expect(page.getByRole("heading", { name: "Bienvenido de nuevo" })).toBeInViewport();
     await expect(page.getByLabel("Email")).toBeInViewport();
-    await expect(page.getByLabel("Contraseña")).toBeInViewport();
+    await expect(page.getByLabel("Contraseña", { exact: true })).toBeInViewport();
     await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeInViewport();
 
-    // La página completa hace scroll normal en documento (no hay trampas internas).
-    const metrics = await page.evaluate(() => ({
-      scrollHeight: document.documentElement.scrollHeight,
-      innerHeight: window.innerHeight,
-    }));
-    expect(metrics.scrollHeight).toBeGreaterThan(metrics.innerHeight);
+    // La página completa hace scroll normal en documento (no hay trampas internas):
+    // ni el documento está clavado con overflow-hidden (la regresión original) ni
+    // el botón vive dentro de un contenedor con scroll o recorte propio. Si el
+    // contenido crece, hace scroll el documento. (El contenido ya no desborda
+    // 844px, así que scrollHeight > innerHeight dejó de discriminar.)
+    const traps = await page.evaluate(() => {
+      const doc = getComputedStyle(document.documentElement).overflowY;
+      const body = getComputedStyle(document.body).overflowY;
+      const submit = [...document.querySelectorAll("button")].find(
+        (el) => el.textContent?.trim() === "Iniciar sesión",
+      );
+      let innerTrap: string | null = null;
+      for (let el = submit?.parentElement ?? null; el; el = el.parentElement) {
+        const { overflowY } = getComputedStyle(el);
+        if (
+          (overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden") &&
+          el.scrollHeight > el.clientHeight
+        ) {
+          innerTrap = el.className || el.tagName;
+          break;
+        }
+      }
+      return { doc, body, innerTrap };
+    });
+    expect(traps.doc).not.toBe("hidden");
+    expect(traps.body).not.toBe("hidden");
+    expect(traps.innerTrap).toBeNull();
     await page.screenshot({ path: "test-results/gerarai-sign-in-mobile.png", fullPage: true });
   });
 });
@@ -86,13 +107,15 @@ test.describe("company research workspace", () => {
     // modelo vive en su modulo (pestaña Números).
     await expect(page.getByRole("heading", { name: "Última tesis" })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Etapas del research" }).getByRole("link", { name: "Números", exact: true }).click();
-    await page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Modelo a largo plazo", exact: true }).click();
+    // El modelo vive en el desplegable «Análisis avanzado» (IA nueva de la
+    // ficha: Resumen / Finanzas / Fuentes + avanzado).
+    await page.locator('summary', { hasText: "Análisis avanzado" }).click();
+    await page.getByRole("navigation", { name: "Análisis avanzado" }).getByRole("link", { name: "Modelo a largo plazo", exact: true }).click();
     await expect(page).toHaveURL(/view=model/);
     await expect(page.getByRole("heading", { name: "Modelo fundamental a largo plazo" })).toBeVisible();
 
-    await page.getByRole("navigation", { name: "Etapas del research" }).getByRole("link", { name: "Más", exact: true }).click();
-    await page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Cambios y revisiones", exact: true }).click();
+    // Con el modelo activo el desplegable avanzado ya queda abierto.
+    await page.getByRole("navigation", { name: "Análisis avanzado" }).getByRole("link", { name: "Cambios y revisiones", exact: true }).click();
     await expect(page).toHaveURL(/view=changes/);
     await expect(page.getByRole("heading", { name: "Diario de decisiones" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Expectativa vs realidad" })).toBeVisible();

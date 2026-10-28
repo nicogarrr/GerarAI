@@ -34,7 +34,7 @@ test.describe("investor knowledge flow", () => {
     // decidir: un isVisible()/count() de una sola lectura corre contra la página
     // aun renderizando y ve «0 enlaces» aunque los documentos lleguen un instante
     // despues (fallo visto en CI sobre un commit que no toca esta pagina).
-    const emptyState = page.getByText("Aún no hay documentos de conocimiento.");
+    const emptyState = page.getByText("No hay documentos en esta página.");
     // Listed documents expose chunk browsing and principle extraction per row.
     const chunksLinks = page.getByRole("link", { name: "Fragmentos" });
     await expect(emptyState.or(chunksLinks.first())).toBeVisible({ timeout: 15_000 });

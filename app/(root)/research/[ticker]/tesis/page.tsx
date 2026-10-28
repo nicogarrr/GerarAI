@@ -18,7 +18,7 @@ import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/res
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
-import { publicEditorial } from '@/lib/public-fonts';
+import { publicEditorial } from '@/lib/public-fonts-editorial';
 
 export const dynamic = 'force-dynamic';
 

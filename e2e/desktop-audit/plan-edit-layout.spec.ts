@@ -5,8 +5,15 @@ test.use({ viewport: { width: 1440, height: 900 } });
 test("editar plan: select de categoría sin truncar y primera fila alineada", async ({ page }) => {
   await page.goto("/plan", { waitUntil: "domcontentloaded" });
   await page.waitForTimeout(4000);
-  await page.getByRole("button", { name: /Editar plan/ }).click();
+  // Sin plan sembrado en la BD e2e el disparador es «Configurar plan»; con
+  // plan existente, «Editar plan». El diálogo es el mismo PlanSetupDialog.
+  await page.getByRole("button", { name: /Editar plan|Configurar plan/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
+  // Un plan nuevo arranca con una fila: se añaden hasta tener la tercera que
+  // mide el texto más largo («Clase de activo»).
+  while ((await page.getByLabel(/Categoría \d+/).count()) < 3) {
+    await page.getByRole("button", { name: /Añadir ticker/ }).click();
+  }
   await page.getByLabel("Categoría 3", { exact: true }).selectOption("asset_class");
   const m = await page.evaluate(() => {
     const kind = document.querySelector("[aria-label='Categoría 3']") as HTMLSelectElement;

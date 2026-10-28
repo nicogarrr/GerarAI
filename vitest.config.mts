@@ -13,7 +13,12 @@ const root = path.dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
     resolve: {
-        alias: { '@': root },
+        alias: {
+            '@': root,
+            // 'server-only' solo se resuelve en el bundler de Next; en Vitest
+            // se sustituye por un stub vacío para poder importar los módulos.
+            'server-only': path.join(root, 'tests/unit/stubs/server-only.ts'),
+        },
     },
     test: {
         environment: 'jsdom',

@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.hoisted(() => {
+    // El job de CI fija FMP_BACKEND_URL=http://127.0.0.1:8000 para el build y los
+    // guards. Estos tests verifican el mapa de constantes por defecto
+    // (http://localhost:8000), asi que fijan el entorno antes de que se importen
+    // los modulos de acciones, que leen BACKEND_URL en ambito de modulo.
+    process.env.FMP_BACKEND_URL = 'http://localhost:8000';
+});
+
 const { researchRequest, requireAuthenticatedUser, researchIdentityHeaders, revalidatePath } = vi.hoisted(() => ({
     researchRequest: vi.fn(async () => ({})),
     requireAuthenticatedUser: vi.fn(async () => ({ id: 'user-1' })),
