@@ -366,6 +366,18 @@ function expectationRows(reviews: ResearchExpectationReview[]): ExpectationRow[]
   });
 }
 
+/**
+ * «Contra tesis v3 · modelo v2». El servicio guarda el número de versión en
+ * `metadata` al registrar la decisión; los `*_version_id` son claves internas
+ * y no se muestran.
+ */
+export function journalVersionLabel(entry: Pick<ResearchDecisionJournalEntry, 'thesis_version_id' | 'model_version_id' | 'metadata'>): string {
+  const number = (value: unknown) => (typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null);
+  const part = (label: string, linked: string, id: number | null, version: number | null) =>
+    version !== null ? `${label} v${version}` : id !== null ? `${label} ${linked}` : `sin ${label}`;
+  return `Contra ${part('tesis', 'registrada', entry.thesis_version_id, number(entry.metadata?.thesis_version))} · ${part('modelo', 'registrado', entry.model_version_id, number(entry.metadata?.model_version))}`;
+}
+
 export function DecisionAndRealityPanel({
   ticker,
   decisions,
@@ -422,7 +434,7 @@ export function DecisionAndRealityPanel({
                 <span className="text-xs text-gray-500">{entry.decision_date}</span>
               </div>
               <p className="mt-2 text-sm text-gray-300">{entry.rationale}</p>
-              <p className="mt-2 text-xs text-gray-500">Tesis {entry.thesis_version_id ?? '—'} · Modelo {entry.model_version_id ?? '—'}</p>
+              <p className="mt-2 text-xs text-gray-500">{journalVersionLabel(entry)}</p>
               {entry.transaction ? (
                 <div className="mt-2 rounded border border-teal-900/50 bg-teal-950/10 p-2 text-xs leading-5 text-gray-300">
                   <p><span className="text-teal-300">Operación:</span> {describeTrade(entry.transaction)}</p>
