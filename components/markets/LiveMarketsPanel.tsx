@@ -161,7 +161,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                     siguiente y esas tabs no respondían al toque (21-oct-2026). */}
                 <TabsList className="h-auto flex-wrap gap-y-1">
                     {TABS.map((tab) => (
-                        <TabsTrigger key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>
+                        <TabsTrigger className="min-h-11" key={tab.key} value={tab.key}>{tab.label}</TabsTrigger>
                     ))}
                 </TabsList>
                 {TABS.map((tab) => {
