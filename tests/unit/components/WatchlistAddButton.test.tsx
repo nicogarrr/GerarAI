@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const searchStocksWithStatus = vi.fn();
 
@@ -24,11 +24,21 @@ async function flush(ms = 0) {
     });
 }
 
-function openDialog(followed: string[]) {
+async function openDialog(followed: string[]) {
     render(<WatchlistAddButton followedSymbols={followed} />);
     fireEvent.click(screen.getByRole('button', { name: /Añadir empresa/ }));
+    // El contenido del diálogo llega en chunk diferido (next/dynamic): cada
+    // vuelta cede al event loop sin romper los timers fake del debounce.
+    for (let i = 0; i < 50 && !screen.queryByRole('dialog'); i++) await flush(100);
     return screen.getByRole('dialog');
 }
+
+beforeAll(async () => {
+    // Calienta el chunk diferido del diálogo (next/dynamic) en tiempo real,
+    // antes de que los tests activen los timers fake: la primera resolución
+    // del import dinámico tarda tiempo real (transform del módulo en vitest).
+    await import('@/components/watchlist/WatchlistAddDialog');
+});
 
 describe('WatchlistAddButton: ticker ya seguido', () => {
     beforeEach(() => {
@@ -41,7 +51,7 @@ describe('WatchlistAddButton: ticker ya seguido', () => {
     });
 
     it('dice «Ya sigues» en vez de dejar el diálogo en blanco (prueba real 27/10, AAPL)', async () => {
-        const dialog = openDialog(['AAPL', 'POOL']);
+        const dialog = await openDialog(['AAPL', 'POOL']);
         const input = within(dialog).getByLabelText('Buscar acciones para añadir a la watchlist');
         fireEvent.change(input, { target: { value: 'aapl' } });
         await flush(300);
@@ -50,7 +60,7 @@ describe('WatchlistAddButton: ticker ya seguido', () => {
     });
 
     it('no muestra el aviso para un ticker que no sigues', async () => {
-        const dialog = openDialog(['AAPL']);
+        const dialog = await openDialog(['AAPL']);
         const input = within(dialog).getByLabelText('Buscar acciones para añadir a la watchlist');
         fireEvent.change(input, { target: { value: 'KKR' } });
         await flush(300);
