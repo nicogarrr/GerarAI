@@ -56,7 +56,7 @@ describe('comandos de ficha tipo terminal (ASTS FA)', () => {
 });
 
 describe('integración en el buscador Ctrl+K', () => {
-    const search = readFileSync('components/SearchCommand.tsx', 'utf8');
+    const search = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
     it('parsea el input y ofrece los comandos', () => {
         assert.ok(search.includes("import { parseTickerCommand } from \"@/lib/research/ticker-commands\""));
         assert.ok(search.includes('parseTickerCommand(searchTerm)'));
