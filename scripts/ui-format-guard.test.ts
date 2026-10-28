@@ -109,9 +109,11 @@ describe('guardas de UI', () => {
     ]) {
       assert.equal(source(file).includes("'Unknown'"), false, `${file} debe mostrar Desconocido`);
     }
-    const proPicks = source('lib/actions/proPicks.actions.ts');
-    assert.ok(proPicks.includes("profile.finnhubIndustry ?? profile.industry ?? 'Desconocido'"));
-    assert.ok(proPicks.includes("profile.finnhubIndustry ?? profile.industry ?? 'Desconocido'"));
+    // El fallback 'Desconocido' vive en advancedStockScoring.ts (lo cubre el bucle);
+    // proPicks.actions.ts ya no lee perfiles: sirve el run persistido del embudo F1.
+    const scoring = source('lib/utils/advancedStockScoring.ts');
+    assert.ok(scoring.includes("profile.finnhubIndustry ?? profile.industry"));
+    assert.ok(scoring.includes("sectorRaw.length > 0 ? sectorRaw : 'Desconocido'"));
   });
 
   it('mantiene las etiquetas de estado en español sin cambiar enums de API', () => {

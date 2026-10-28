@@ -39,7 +39,12 @@ test('F358: los consumidores etiquetan el cierre fechado y no lo pintan actual',
     assert.match(watchlistActions, /priceAsOf = priceKind === 'close'/, 'watchlist fecha el cierre');
 });
 
-test('F358: ProPicks no recibe cache obsoleta (consume Light ya filtrada)', () => {
-    assert.match(proPicks, /getStockFinancialDataLight\(symbol\)/, 'ProPicks consume la variante Light');
-    assert.match(proPicks, /quote\?\.c \?\? quote\?\.price \?\? 0/, 'precio actual sale de la cotizacion filtrada');
+test('F358: ProPicks no recibe cache obsoleta (sirve el run persistido del embudo)', () => {
+    // El path viejo evaluaba tickers en vivo contra Finnhub (riesgo de cache
+    // obsoleta); se elimino como codigo muerto. La guarda ahora fija el
+    // contrato nuevo: ProPicks sirve el ultimo run persistido del embudo F1
+    // y no vuelve a llamar a Finnhub desde el action.
+    assert.match(proPicks, /getLatestFunnelPicks\(/, 'ProPicks sirve el run persistido del embudo');
+    assert.doesNotMatch(proPicks, /getStockFinancialData(?:Light)?\(/, 'ProPicks no consulta Finnhub en vivo');
+    assert.doesNotMatch(proPicks, /getCandles\(/, 'ProPicks no pide velas en vivo');
 });
