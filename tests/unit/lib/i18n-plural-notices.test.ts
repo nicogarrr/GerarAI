@@ -35,3 +35,27 @@ describe('avisos de cartera con conteo: singular/plural', () => {
     expect(msg).not.toContain('{tickers}');
   });
 });
+
+describe('knowledge graph: singular/plural con conteo', () => {
+  it('search.results: 1 resultado usa singular y conserva la query', () => {
+    const msg = t('knowledgeGraph.search.results.one', { count: 1, query: 'AAPL' });
+    expect(msg).toBe('1 nodo coincide con «AAPL».');
+  });
+
+  it('search.results: varios resultados usan plural', () => {
+    expect(t('knowledgeGraph.search.results.other', { count: 4, query: 'AAPL' })).toBe('4 nodos coinciden con «AAPL».');
+  });
+
+  it('canvas.isolatedOn: 1 vecino', () => {
+    expect(t('knowledgeGraph.canvas.isolatedOn.one', { count: 1 })).toContain('su único vecino');
+  });
+
+  it('canvas.isolatedOn: varios vecinos', () => {
+    expect(t('knowledgeGraph.canvas.isolatedOn.other', { count: 3 })).toContain('sus 3 vecinos');
+  });
+
+  it('listing.rowCount: 1 nodo vs varios', () => {
+    expect(t('knowledgeGraph.listing.rowCount.one', { count: 1 })).toBe('1 nodo en el subgrafo visible.');
+    expect(t('knowledgeGraph.listing.rowCount.other', { count: 7 })).toBe('7 nodos en el subgrafo visible.');
+  });
+});
