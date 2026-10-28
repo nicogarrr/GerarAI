@@ -201,3 +201,27 @@ def test_knowledge_chat_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert resolved.text == prompt_registry.KNOWLEDGE_CHAT
+
+
+def test_news_headline_translation_prompt_version_and_hash_are_pinned():
+    resolved = prompt_registry.get_prompt("news_headline_translation", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "news-headline-translation-v1",
+        "a8dc119256fb",
+        "news_headline_translation",
+    )
+    assert resolved.source == "code"
+    assert resolved.text == prompt_registry.NEWS_HEADLINE_TRANSLATION
+
+
+def test_propicks_review_prompt_version_and_hash_are_pinned():
+    from app.services import propicks_review_service
+
+    resolved = prompt_registry.get_prompt("propicks_review_service", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "propicks-review-v1",
+        "47668143ea7d",
+        "main_financial_analysis",
+    )
+    assert resolved.source == "code"
+    assert propicks_review_service.SYSTEM == resolved.text == prompt_registry.PROPICKS_REVIEW
