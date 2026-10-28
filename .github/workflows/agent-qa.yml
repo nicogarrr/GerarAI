@@ -1,0 +1,105 @@
+name: Agent QA exploratoria (manual)
+
+# Agentes LLM (browser-use) que usan la app como usuarios reales contra una
+# instancia LOCAL (backend APP_ENV=test + Next dev con E2E_AUTH_BYPASS). Solo
+# informa: nunca bloquea merges ni deploys. Ver qa-agents/README.md.
+on:
+  workflow_dispatch:
+    inputs:
+      personas:
+        description: "Slugs separados por comas (vacío = todas)"
+        required: false
+        default: ""
+      max_steps:
+        description: "Pasos máximos por persona (0 = los de cada persona)"
+        required: false
+        default: "0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-qa-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  agent-qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: true
+    env:
+      APP_ENV: test
+      RESEARCH_AUTH_SECRET: cavaai-e2e-research-secret-at-least-32-characters
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+
+      - name: Precheck del proveedor LLM (OpenCode Go)
+        id: llm
+        env:
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+        run: |
+          if [ -z "$OPENCODE_API_KEY" ]; then
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Agent QA no ejecutada::Falta el secret OPENCODE_API_KEY"
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
+            -X POST https://opencode.ai/zen/go/v1/chat/completions \
+            -H "Authorization: Bearer $OPENCODE_API_KEY" \
+            -H "x-opencode-session: gerarai-agent-qa-precheck" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"deepseek-v4.1-flash","messages":[{"role":"user","content":"ok"}],"max_tokens":1}')
+          if [ "$code" = "200" ]; then echo "ok=1" >> "$GITHUB_OUTPUT"; else
+            echo "ok=0" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Agent QA no ejecutada::OpenCode Go respondió HTTP $code"
+          fi
+
+      - name: Instala dependencias
+        if: steps.llm.outputs.ok == '1'
+        run: |
+          npm ci --no-audit --no-fund
+          python -m pip install --upgrade pip
+          python -m pip install -r data-engine/requirements.txt -r qa-agents/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Arranca backend (APP_ENV=test, SQLite) y frontend
+        if: steps.llm.outputs.ok == '1'
+        run: |
+          (cd data-engine && DATABASE_URL=sqlite:///./agentqa.db RESEARCH_AUTH_REQUIRED=true \
+             RESEARCH_AUTH_MAX_AGE_SECONDS=3600 CAVAAI_ENABLE_VECTOR_INGEST=0 CAVAAI_ENABLE_VECTOR_CHAT=0 \
+             SCREENER_QUOTE_VENDOR=offline LLM_ENABLED=false \
+             nohup python -m uvicorn main:app --host 127.0.0.1 --port 8720 > ../backend.log 2>&1 &)
+          BETTER_AUTH_SECRET=cavaai-e2e-secret-at-least-32-characters BETTER_AUTH_URL=http://127.0.0.1:3720 \
+            E2E_AUTH_BYPASS=1 FMP_BACKEND_URL=http://127.0.0.1:8720 NEXT_DIST_DIR=.next-agentqa \
+            nohup npx next dev --hostname 127.0.0.1 --port 3720 > ui.log 2>&1 &
+          for i in $(seq 1 90); do curl -sf http://127.0.0.1:8720/health >/dev/null && break; sleep 2; done
+          for i in $(seq 1 90); do curl -sf -o /dev/null http://127.0.0.1:3720/sign-in && break; sleep 2; done
+
+      - name: Lanza los agentes persona
+        if: steps.llm.outputs.ok == '1'
+        env:
+          QA_LLM_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          ANONYMIZED_TELEMETRY: "false"
+        run: |
+          args="--base http://127.0.0.1:3720 --out qa-agents/out --parallel 4"
+          [ -n "${{ inputs.personas }}" ] && args="$args --only ${{ inputs.personas }}"
+          [ "${{ inputs.max_steps }}" != "0" ] && args="$args --max-steps ${{ inputs.max_steps }}"
+          timeout -k 10 2700 python qa-agents/run.py $args
+          python qa-agents/report.py qa-agents/out >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Sube hallazgos y capturas
+        if: always() && steps.llm.outputs.ok == '1'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: agent-qa-${{ github.run_id }}
+          path: |
+            qa-agents/out
+            backend.log
+            ui.log
+          retention-days: 14

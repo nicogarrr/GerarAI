@@ -1,0 +1,4 @@
+Symbol,Action,Quantity,Price,Date,Fees,Currency
+SAN.MC,BUY,200,"3,95",2024-01-10,"2,00",EUR
+ITX.MC,BUY,15,"38,20",2024-02-14,"2,00",EUR
+SAN.MC,SELL,50,"4,60",2025-03-03,"2,00",EUR
