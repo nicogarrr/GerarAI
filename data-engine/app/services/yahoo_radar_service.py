@@ -27,10 +27,11 @@ Verificado contra el Yahoo real el 28-oct-2026 (sondas minimas, sandbox):
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -168,7 +169,6 @@ def _via_cotejo(candidate: RadarCandidate) -> str | None:
 
 def fetch_screener(query: dict[str, Any]) -> dict[str, Any]:
     """POST real al screener de Yahoo con sesion crumb (red, solo runtime)."""
-    import httpx  # import diferido: los tests nunca tocan red
 
     from app.services.connectors.ca_insider_yahoo import yahoo_session
 
@@ -223,5 +223,5 @@ def run_radar(
         for candidate in candidates:
             candidate.en_universo_propio = candidate.symbol in known
             candidate.via_cotejo = _via_cotejo(candidate)
-    generado_en = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    generado_en = datetime.now(UTC).isoformat(timespec="seconds")
     return candidates, generado_en, regs

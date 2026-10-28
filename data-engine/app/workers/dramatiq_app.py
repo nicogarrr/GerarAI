@@ -2034,6 +2034,7 @@ def ingest_spy_daily(
 def _official_close_session_key() -> str:
     """Last completed US session, never today's still-open session."""
     from datetime import UTC, datetime
+
     from app.services.market_close_sync import last_completed_us_session
     return last_completed_us_session(datetime.now(UTC)).isoformat()
 
@@ -2049,7 +2050,8 @@ def sync_official_closes(
     Strict distributed lock: Redis failure retries instead of local fallback.
     Success survives lock release, so queued legacy duplicates skip too.
     """
-    from app.services.market_close_sync import MIN_TARGET_COVERAGE, sync_official_closes as _sync
+    from app.services.market_close_sync import MIN_TARGET_COVERAGE
+    from app.services.market_close_sync import sync_official_closes as _sync
 
     client = _redis_client()
     if client is None:

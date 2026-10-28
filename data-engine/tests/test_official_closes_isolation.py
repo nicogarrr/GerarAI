@@ -1,8 +1,11 @@
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
+
 import pytest
+
 from app.workers import dramatiq_app as app
 from app.workers import scheduler as sched
+
 
 class Redis:
     def __init__(self): self.values={}; self.closed=0

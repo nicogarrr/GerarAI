@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import redis
 from sqlalchemy import select, update
+
 from app.core.config import get_settings
 from app.core.redis_retry import no_retry
 from app.core.tenancy import tenant_filters

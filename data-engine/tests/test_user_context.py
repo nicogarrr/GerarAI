@@ -134,6 +134,7 @@ def test_otro_tenant_no_ve_nada_de_nico(db):
 
 def test_dated_portfolio_notice_keeps_qualifiers_in_cerebro_context(db):
     from sqlalchemy import select
+
     from app.models import ResearchAlert
     alert = db.scalar(select(ResearchAlert))
     alert.alert_type = 'portfolio_data_review'
@@ -148,6 +149,7 @@ def test_dated_portfolio_notice_keeps_qualifiers_in_cerebro_context(db):
 
 def test_other_alert_bodies_are_not_added_to_context(db):
     from sqlalchemy import select
+
     from app.models import ResearchAlert
     alert = db.scalar(select(ResearchAlert))
     alert.message = 'BODY_NOT_FOR_CONTEXT'
@@ -157,6 +159,7 @@ def test_other_alert_bodies_are_not_added_to_context(db):
 
 def test_plan_notice_detail_bounded(db):
     from sqlalchemy import select
+
     from app.models import ResearchAlert
     alert = db.scalar(select(ResearchAlert))
     alert.alert_type = 'savings_plan_review'

@@ -10,6 +10,7 @@ from app.models.entities import Base
 from app.services.investment_plan_service import InvestmentPlanService
 from app.services.plan_proactivity import review_savings_plan
 
+
 @pytest.fixture
 def db():
     engine = create_engine('sqlite:///:memory:')

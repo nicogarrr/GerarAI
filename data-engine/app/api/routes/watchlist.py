@@ -686,6 +686,7 @@ class DcaManualStatusOut(BaseModel):
 @router.post("/dca-signals/evaluate-async", status_code=202, response_model=DcaAcceptedOut)
 def enqueue_manual_dca(db: Session = Depends(get_db)) -> dict:
     import redis
+
     from app.models import DcaEvaluationRun
     from app.services import dca_manual, dca_manual_job, dca_run_log
     from app.workers.dramatiq_app import evaluate_manual_dca
@@ -743,15 +744,17 @@ def manual_dca_status(run_id: int, db: Session = Depends(get_db)) -> dict:
         DcaEvaluationRun.trigger == "manual", *tenant_filters(db, DcaEvaluationRun)))
     if row is None:
         raise HTTPException(status_code=404, detail="Ejecución no encontrada en tu cuenta.")
-    return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else run_payload(row)["status"]),
+    payload = run_payload(row) or {}
+    return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else payload.get("status", "interrupted")),
         "summary": (row.detail or {}).get("summary"), "error": row.error}
 
 
 @router.post("/dca-signals/evaluate", response_model=DcaEvaluateOut)
 async def evaluate_dca_signals_now(db: Session = Depends(get_db)) -> dict:
     """Refresh at most ten missing/stale states, shared lease and 5min cooldown."""
-    from fastapi.concurrency import run_in_threadpool
     import redis
+    from fastapi.concurrency import run_in_threadpool
+
     from app.core.config import get_settings
     from app.core.redis_retry import no_retry
     from app.services import dca_manual, dca_run_log

@@ -3363,6 +3363,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan/savings-projection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Savings Projection
+         * @description Read-only preview or canonical illustration of the existing savings plan.
+         */
+        get: operations["savings_projection_api_plan_savings_projection_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/cash": {
         parameters: {
             query?: never;
@@ -5397,9 +5417,43 @@ export interface paths {
         put?: never;
         /**
          * Evaluate Dca Signals Now
-         * @description Evalua ahora watchlist + cartera (una vez por minuto como maximo).
+         * @description Refresh at most ten missing/stale states, shared lease and 5min cooldown.
          */
         post: operations["evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/evaluate-async": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enqueue Manual Dca */
+        post: operations["enqueue_manual_dca_api_watchlist_dca_signals_evaluate_async_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/watchlist/dca-signals/manual-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Manual Dca Status */
+        get: operations["manual_dca_status_api_watchlist_dca_signals_manual_runs__run_id__get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6583,6 +6637,25 @@ export interface components {
              */
             unit: string;
         };
+        /** DcaAcceptedOut */
+        DcaAcceptedOut: {
+            /**
+             * Cooldown Seconds
+             * @default 300
+             */
+            cooldown_seconds: number;
+            /** Pending Remaining */
+            pending_remaining: number;
+            /** Requested */
+            requested: number;
+            /** Run Id */
+            run_id: number;
+            /**
+             * Status
+             * @default running
+             */
+            status: string;
+        };
         /** DcaBacktestLevelOut */
         DcaBacktestLevelOut: {
             /** Color */
@@ -6686,6 +6759,11 @@ export interface components {
             }[];
             /** Alerts Enabled */
             alerts_enabled: boolean;
+            /**
+             * Cooldown Seconds
+             * @default 300
+             */
+            cooldown_seconds: number;
             /** Errors */
             errors: {
                 [key: string]: unknown;
@@ -6694,6 +6772,16 @@ export interface components {
             evaluated: number;
             /** Params Version */
             params_version: string;
+            /**
+             * Pending Remaining
+             * @default 0
+             */
+            pending_remaining: number;
+            /**
+             * Requested
+             * @default 0
+             */
+            requested: number;
             /** Skipped */
             skipped: {
                 [key: string]: unknown;
@@ -6757,6 +6845,16 @@ export interface components {
             rows?: components["schemas"]["DcaHitRateRowOut"][];
             /** Symbol */
             symbol: string;
+        };
+        /** DcaManualStatusOut */
+        DcaManualStatusOut: {
+            /** Error */
+            error?: string | null;
+            /** Run Id */
+            run_id: number;
+            /** Status */
+            status: string;
+            summary?: components["schemas"]["DcaEvaluateOut"] | null;
         };
         /** DcaMinLevelIn */
         DcaMinLevelIn: {
@@ -17829,6 +17927,53 @@ export interface operations {
             };
         };
     };
+    savings_projection_api_plan_savings_projection_get: {
+        parameters: {
+            query?: {
+                monthly?: number | null;
+                years?: number | null;
+                currency?: string | null;
+                annual_return?: number | null;
+                dividend_yield?: number;
+                inflation?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cash_api_portfolio_cash_get: {
         parameters: {
             query?: never;
@@ -22883,6 +23028,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DcaEvaluateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_manual_dca_api_watchlist_dca_signals_evaluate_async_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaAcceptedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manual_dca_status_api_watchlist_dca_signals_manual_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaManualStatusOut"];
                 };
             };
             /** @description Validation Error */

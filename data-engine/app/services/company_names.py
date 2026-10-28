@@ -128,7 +128,7 @@ def companies_named_in(question: str, companies: Iterable[Company]) -> NameMatch
                     seen.add(company.id)
                     out.companies.append(company)
                 out.spans.append((m.start(), m.end()))
-        first = words[0]
+        first = next(iter(words))
         if len(first) >= 4 and first not in _GENERIC_FIRST_WORDS and first in folded:
             by_first.setdefault(first, []).append(company)
     for first, candidates in by_first.items():

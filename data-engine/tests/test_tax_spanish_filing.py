@@ -127,7 +127,7 @@ def test_modelo_720_threshold_lives_in_modelo720_service_and_is_strict():
     from app.services.tax_modelo720_service import THRESHOLD_720, Modelo720Service
     from tests.test_tax_modelo720_service import _company, _position_row, _position_snapshot, _seed
 
-    assert THRESHOLD_720 == Decimal("50000")
+    assert Decimal("50000") == THRESHOLD_720
     results = {}
     for amount in ("50000", "50000.01"):
         engine = create_engine("sqlite:///:memory:")

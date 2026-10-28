@@ -28,7 +28,6 @@ from app.services.connectors.fmp import FMPClient
 from app.services.connectors.yahoo import YahooFinanceClient
 from app.services.provenance import Coverage, SourceKind, provenance
 
-
 _SAME_EVENT_DAYS = 3
 
 
