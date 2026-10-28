@@ -119,7 +119,7 @@ GerarAI uses OpenCode Go as its primary LLM provider (see docs/AI_PROVIDER_STRAT
 
 Company chat keeps the deterministic context contract, then performs source-aware JSON synthesis, verifies citation IDs, calculates confidence / insufficient-data state and falls back safely when validation fails.
 
-Langfuse records workflow, provider, model, prompt version, retrieval set, tools, tokens and cache tokens, estimated cost, latency, citations, JSON validity, fallback, escalation and evaluation score. Native Microsoft Agent Framework workflows are reserved for Deep Research, Earnings Review, Thesis Review and Red Team; ingestion, SQL, metrics and DCF remain deterministic services.
+Langfuse records workflow, provider, model, prompt version, retrieval set, tools, tokens and cache tokens, estimated cost, latency, citations, JSON validity, fallback, escalation and evaluation score. Native Microsoft Agent Framework runs only EarningsWorkflow and RedTeamWorkflow (`MAF_WORKFLOWS` in `app/workflows/maf_runtime.py`); Deep Research and Thesis Review are retired from the executable catalog (`RETIRED_WORKFLOWS`), and the thesis lifecycle is governed by the LangGraph control plane with `ThesisService` as the only LLM/write executor. Ingestion, SQL, metrics and DCF remain deterministic services.
 
 Vector-backed chat retrieval is opt-in through `CAVAAI_ENABLE_VECTOR_CHAT=1`. The default company chat uses the canonical SQL store first so local development and tests do not depend on Qdrant or embedding downloads.
 
