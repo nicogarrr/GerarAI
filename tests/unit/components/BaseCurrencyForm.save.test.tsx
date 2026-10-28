@@ -5,7 +5,7 @@ vi.mock('@/lib/actions/portfolio-settings.actions',()=>({savePortfolioBaseCurren
 vi.mock('sonner',()=>({toast:{success:mocks.success}}));
 vi.mock('@/lib/toast',()=>({showErrorToast:mocks.error}));
 import BaseCurrencyForm from '@/components/settings/BaseCurrencyForm';
-async function selectUsd(){fireEvent.keyDown(screen.getByRole('combobox',{name:'Divisa base'}),{key:'ArrowDown'});fireEvent.click(await screen.findByRole('option',{name:'USD · Dólar estadounidense',exact:true}));}
+async function selectUsd(){fireEvent.keyDown(screen.getByRole('combobox',{name:'Divisa base'}),{key:'ArrowDown'});fireEvent.click(await screen.findByRole('option',{name:'USD · Dólar estadounidense'}));}
 beforeEach(()=>vi.clearAllMocks());
 describe('base currency save control',()=>{
  it('blocks saving unchanged currency and shows supplied source date',()=>{
@@ -18,7 +18,7 @@ describe('base currency save control',()=>{
  });
  it('retains a saved currency outside the menu catalog',async()=>{
   render(<BaseCurrencyForm initial={{base_currency:'AUD'}}/>);expect(screen.getByRole('combobox')).toHaveTextContent('AUD');
-  fireEvent.keyDown(screen.getByRole('combobox'),{key:'ArrowDown'});expect(await screen.findByRole('option',{name:'AUD',exact:true})).toBeVisible();
+  fireEvent.keyDown(screen.getByRole('combobox'),{key:'ArrowDown'});expect(await screen.findByRole('option',{name:'AUD'})).toBeVisible();
  });
  it('sends selected currency, blocks save while pending and marks confirmed value saved',async()=>{
   let resolve!:(v:unknown)=>void;mocks.save.mockReturnValue(new Promise(r=>resolve=r));
