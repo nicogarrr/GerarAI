@@ -194,3 +194,11 @@ def test_snapshot_mixed_pound_and_pence_cash(db):
     db.commit()
     snapshot = PortfolioSnapshotService().capture(db, as_of=day, source="test")
     assert snapshot.cash_value_base == Decimal("118.17")
+
+
+def test_currency_key_rejects_missing_currency_instead_of_returning_none():
+    import pytest
+
+    from app.services.portfolio_fx_service import currency_key
+    with pytest.raises(ValueError, match="Divisa no registrada"):
+        currency_key("")

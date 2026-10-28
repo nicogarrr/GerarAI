@@ -744,7 +744,8 @@ def manual_dca_status(run_id: int, db: Session = Depends(get_db)) -> dict:
         DcaEvaluationRun.trigger == "manual", *tenant_filters(db, DcaEvaluationRun)))
     if row is None:
         raise HTTPException(status_code=404, detail="Ejecución no encontrada en tu cuenta.")
-    return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else run_payload(row)["status"]),
+    payload = run_payload(row) or {}
+    return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else payload.get("status", "interrupted")),
         "summary": (row.detail or {}).get("summary"), "error": row.error}
 
 

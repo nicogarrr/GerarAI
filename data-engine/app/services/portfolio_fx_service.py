@@ -17,6 +17,8 @@ TAX_CURRENCY = "EUR"
 def currency_key(raw: str) -> str:
     """Injective monetary-unit key: GBP and GBp must never collide."""
     major, divisor = normalize_currency(raw)
+    if major is None:
+        raise ValueError("Divisa no registrada")
     return major if divisor == 1 else f"{major}/{divisor}"
 
 
