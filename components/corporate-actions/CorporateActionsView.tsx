@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Building2, CheckCircle2, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RecordList, researchHrefFor, type DataRecord, type ReplaceRecord } from '@/components/data/RecordViews';
 import { applyCorporateAction, getCorporateActions } from '@/lib/actions/corporate-actions.actions';
@@ -87,8 +87,8 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
     return (
         <RecordList
             title="Acciones Corporativas"
-            description="Dividendos, splits, spin-offs y fusiones pendientes de aplicar a la cartera"
-            icon={<Building2 className="h-5 w-5 text-teal-400" />}
+            // La página ya muestra título, descripción y recuento: no se repiten en la tarjeta.
+            hideTitle
             records={visibleActions}
             fetchRecords={async () => (await getCorporateActions()).filter(matchesTicker)}
             // Columnas que sí sirve GET /api/corporate-actions
