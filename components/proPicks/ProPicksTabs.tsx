@@ -5,6 +5,7 @@ import { BarChart3, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import RadarGlobalView from './RadarGlobalView';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
 import GemsView from './GemsView';
 import PaperTradingView from './PaperTradingView';
@@ -144,9 +145,13 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                     Backtesting
                 </TabsTrigger>
                 <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Paper trading</TabsTrigger>
+                <TabsTrigger value="radar" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Radar global</TabsTrigger>
             </TabsList>
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
+            <TabsContent value="radar" className="mt-6">
+                {activeTab === 'radar' && <RadarGlobalView />}
+            </TabsContent>
 
             {/* forceMount: Radix desmonta el panel inactivo y EnhancedProPicksContent
                 se sembraba con initialPicks del SSR; al generar/actualizar la
