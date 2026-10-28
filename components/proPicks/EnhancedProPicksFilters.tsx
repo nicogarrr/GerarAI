@@ -195,7 +195,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           </div>
 
           {/* Botón Aplicar */}
-          <Button onClick={onApply} className="h-11 w-full">
+          <Button onClick={onApply} className="min-h-11 w-full whitespace-normal text-center leading-tight">
             <Filter className="h-4 w-4 mr-2" />
             Aplicar Filtros
           </Button>

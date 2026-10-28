@@ -179,7 +179,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         onClick={handleRefresh}
                         disabled={loading}
                         aria-busy={loading}
-                        className="h-11 w-full gap-2"
+                        className="min-h-11 w-full gap-2 whitespace-normal text-center leading-tight"
                     >
                         {loading ? (
                             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
