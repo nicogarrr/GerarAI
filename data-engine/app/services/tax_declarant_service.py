@@ -8,11 +8,12 @@ adquisición...) se conservan intactas.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import CashBalance, Company, Position, Tenant
 
@@ -212,7 +213,7 @@ def write(db: Session, payload: dict) -> dict:
                     except ValueError:
                         errors.append(f"Fecha no válida para {isin}")
                         continue
-                    if day > date.today():
+                    if day > local_today():
                         errors.append(f"Fecha futura para {isin}")
                     else:
                         merged_dates[isin] = day.strftime("%Y%m%d")
