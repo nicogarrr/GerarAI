@@ -11,9 +11,7 @@ import PortfolioDataNotice from '@/components/portfolio/PortfolioDataNotice';
 import PortfolioSummary from '@/components/portfolio/PortfolioSummary';
 import { hasCostBasis } from '@/lib/portfolio-insight';
 import { windowNav } from '@/lib/portfolio-nav';
-import PortfolioHoldings from '@/components/portfolio/PortfolioHoldings';
 import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
-import PortfolioTransactions from '@/components/portfolio/PortfolioTransactions';
 import PortfolioAllocation from '@/components/portfolio/PortfolioAllocation';
 const PortfolioNavChart = dynamic(() => import('./PortfolioNavChart'), {
     ssr: false,
@@ -21,12 +19,28 @@ const PortfolioNavChart = dynamic(() => import('./PortfolioNavChart'), {
         <div className="h-full w-full animate-pulse rounded-lg border border-gray-800 bg-gray-900/40" aria-label="Cargando gráfico" role="status" />
     ),
 });
-import PortfolioScores from '@/components/portfolio/PortfolioScores';
 import PortfolioTearsheet from '@/components/portfolio/PortfolioTearsheet';
 import RefreshPortfolioButton from '@/components/portfolio/RefreshPortfolioButton';
-import PortfolioForecast from '@/components/portfolio/PortfolioForecast';
-import SavingsProjection from '@/components/portfolio/SavingsProjection';
-import PortfolioDividends from '@/components/portfolio/PortfolioDividends';
+// Las vistas de cada pestaña secundaria solo se montan al abrirla (los
+// TabsContent de Radix no renderizan el panel inactivo), pero con imports
+// estáticos su JS viajaba igual en el bundle inicial de /portfolio
+// (~28 KB gz entre posiciones, movimientos y previsión). Con dynamic cada
+// vista se descarga la primera vez que se abre su pestaña; «Resumen» se queda
+// eager (pestaña inicial y LCP). Si la URL entra con ?tab=posiciones (u otra),
+// el SSR precarga su chunk, como debe.
+const TabFallback = () => (
+    <div role="status" aria-label="Cargando la sección" className="mt-0 flex min-h-[200px] items-center justify-center rounded-xl border border-gray-800 bg-gray-900/40">
+        <span className="block h-4 w-1/3 animate-pulse rounded bg-gray-700/60" aria-hidden="true" />
+    </div>
+);
+
+const PortfolioHoldings = dynamic(() => import('@/components/portfolio/PortfolioHoldings'), { loading: TabFallback });
+const PortfolioTransactions = dynamic(() => import('@/components/portfolio/PortfolioTransactions'), { loading: TabFallback });
+const PortfolioScores = dynamic(() => import('@/components/portfolio/PortfolioScores'), { loading: TabFallback });
+const SavingsProjection = dynamic(() => import('@/components/portfolio/SavingsProjection'), { loading: TabFallback });
+const PortfolioForecast = dynamic(() => import('@/components/portfolio/PortfolioForecast'), { loading: TabFallback });
+const PortfolioDividends = dynamic(() => import('@/components/portfolio/PortfolioDividends'), { loading: TabFallback });
+
 import { Wallet, LayoutDashboard, Briefcase, TrendingUp, TrendingDown, History, Brain, Gauge, Activity, Coins } from 'lucide-react';
 import type { PortfolioForecast as PortfolioForecastType, PortfolioPerformanceHistory, PortfolioSummary as PortfolioSummaryType, PortfolioTearsheet as PortfolioTearsheetType, PortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 
