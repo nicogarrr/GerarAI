@@ -184,7 +184,7 @@ export default function PlanSetupDialog({
                     {triggerLabel}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-lg">
+            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-xl">
                 <DialogHeader>
                     <DialogTitle>Configurar plan de inversión</DialogTitle>
                     <DialogDescription className="text-gray-400">

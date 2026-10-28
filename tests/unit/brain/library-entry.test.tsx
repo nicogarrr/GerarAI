@@ -1,3 +1,4 @@
+import {renderToString} from 'react-dom/server';
 import {render,screen,waitFor,fireEvent} from '@testing-library/react';
 import {expect,it,vi} from 'vitest';
 vi.mock('next/navigation',()=>({usePathname:()=>'/knowledge'}));
@@ -20,4 +21,8 @@ it('one embedded region, no modal, close, trigger, focus trap or body lock',asyn
  fireEvent.click(screen.getByText('Autor y análisis'));
  expect(screen.getByLabelText('Autor')).toBeInTheDocument();
  await waitFor(()=>expect(screen.getAllByLabelText('Pregunta al cerebro')).toHaveLength(1));
+});
+
+it('does not emit a portal target in SSR before the page has hydrated',()=>{
+ expect(renderToString(<LibraryChat scope="library"/>)).toBe('');
 });

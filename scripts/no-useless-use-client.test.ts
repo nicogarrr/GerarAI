@@ -85,6 +85,8 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'app/(root)/inversores/_components/LibraryChat.tsx':
+    'useSyncExternalStore retrasa el slot hasta hidratar la pagina; evita insertar el portal del layout en HTML SSR aun sin hidratar',
   'components/research/DecisionJournalEntryLink.tsx':
     'Client boundary for onClick and browser hash scrolling via scrollToHashAnchor; imported from server CompanyNavigation.',
     'components/proPicks/DeepValueView.tsx':
@@ -488,10 +490,11 @@ describe('la lista de excepciones no crece sin motivo', () => {
 });
 
 describe('el escaner y el guard cuentan lo mismo', () => {
-  it('LibraryChat justifica su directiva por estado y envío interactivo', () => {
+  it('LibraryChat justifica su directiva por montaje del slot tras hidratacion', () => {
     const row = byRel.get('app/(root)/inversores/_components/LibraryChat.tsx');
     assert.ok(row);
-    assert.equal(row.hasUseClient, false, 'el slot es servidor; solo GlobalBrain mantiene estado y eventos');
+    assert.equal(row.hasUseClient, true, 'el slot se monta tras hidratar; solo GlobalBrain mantiene estado de conversacion');
+    assert.equal(row.justified, true);
   });
 
   it('scan-use-client.mjs no reporta ninguna clase (B)', () => {
