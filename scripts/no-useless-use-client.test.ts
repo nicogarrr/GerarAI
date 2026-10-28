@@ -125,6 +125,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
 
   'components/forms/SignInForm.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
   'app/(root)/error.tsx': 'useEffect, jsx-onClick',
+  'components/watchlist/LazyDcaControls.tsx': 'dynamic (frontera perezosa de las islas del panel DCA: DcaEvaluateButton, DcaHitRatesPopover, DcaMinLevelSelect)',
   'components/watchlist/DcaEvaluateButton.tsx': 'useState, useRouter, jsx-onClick',
   'components/watchlist/DcaMinLevelSelect.tsx': 'useState, useRouter, jsx-onChange',
   'components/watchlist/DcaHitRatesPopover.tsx': 'useState, useTransition, jsx-onClick',
@@ -272,7 +273,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/tooltip.tsx': 'jsx-spread, libreria cliente: @radix-ui/react-tooltip',
   'components/common/AnalystTargetLine.tsx': 'useState, useEffect: pide el consenso de objetivos tras el primer pintado (fuera del render de servidor)',
   'components/common/ExtendedHoursLine.tsx': 'useState, useEffect: pide la cotización extendida tras el primer pintado (fuera del render de servidor)',
-  'components/watchlist/WatchlistAddButton.tsx': 'useCallback, useEffect, useRef, useState, useRouter, jsx-onClick, libreria cliente: sonner',
+  'components/watchlist/WatchlistAddButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (contenido del alta diferido en WatchlistAddDialog)',
+  'components/watchlist/WatchlistAddDialog.tsx': 'useState, useRouter, jsx-onClick, libreria cliente: sonner, importa cliente: components/search/TickerSearchInput.tsx (chunk diferido: solo se descarga al abrir el alta)',
   'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
   'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx',
   'hooks/useOnlineStatus.ts': 'useSyncExternalStore, browser:window, browser:navigator',
