@@ -248,7 +248,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         onSelect={onSelectInstrument}
                         placeholder={kind === 'accion' ? 'p. ej. ASTS' : 'p. ej. AAPL'}
                         ariaLabel={kind === 'accion' ? 'Buscar acción por nombre o ticker' : 'Buscar subyacente por nombre o ticker'}
-                        className="h-10 w-full bg-gray-800/50 uppercase placeholder:text-gray-500"
+                        className="h-11 w-full bg-gray-800/50 uppercase placeholder:text-gray-500"
                         dropdownSide="bottom"
                         required
                     />
@@ -257,6 +257,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-name`}>Nombre</Label>
                     <Input
+                        style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
                         id={`${uid}-name`}
                         value={name}
@@ -290,6 +291,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-strike`}>Strike</Label>
                         <Input
+                        style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
                             id={`${uid}-strike`}
                             value={strike}
@@ -302,6 +304,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-expiry`}>Vencimiento</Label>
                         <Input
+                        style={{ minHeight: 44 }}
                             className="w-full min-w-0 max-w-full px-3 text-sm placeholder:text-gray-500"
                             id={`${uid}-expiry`}
                             type="date"
@@ -339,6 +342,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     <Label htmlFor={`${uid}-quantity`}>Cantidad</Label>
                     <div className="relative">
                         <Input
+                        style={{ minHeight: 44 }}
                             className="pr-20 placeholder:text-gray-500"
                             id={`${uid}-quantity`}
                             aria-describedby={`${uid}-quantity-unit`}
@@ -354,6 +358,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-price`}>{kind === 'opcion' ? 'Prima por acción' : 'Precio por acción'}</Label>
                     <Input
+                        style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
                         id={`${uid}-price`}
                         value={price}
@@ -391,6 +396,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     barrera. Verificación en dispositivo real pendiente. */}
                 <div className="w-full overflow-hidden">
                     <Input
+                        style={{ minHeight: 44 }}
                         className="w-full min-w-0 max-w-full px-3 text-sm"
                         id={`${uid}-executed`}
                         type="datetime-local"
