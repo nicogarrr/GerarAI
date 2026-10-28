@@ -53,12 +53,24 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import (
-    FxConversion,
     Company,
+    FxConversion,
     Position,
     TaxReport,
     Tenant,
     Transaction,
+)
+from app.services.currency_ledger import (
+    ANALOGY_LABEL,
+    COMPUTED,
+    CRITERION,
+    INCOMPLETE,
+    SOURCES,
+    Conversion,
+    CurrencyLot,
+    Outflow,
+    compute_currency_ledger,
+    lots_from_sales,
 )
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.tax_irpf_filing import (
@@ -69,18 +81,6 @@ from app.services.tax_irpf_filing import (
     build_loss_compensation,
 )
 from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
-from app.services.currency_ledger import (
-    COMPUTED,
-    CRITERION,
-    INCOMPLETE,
-    SOURCES,
-    ANALOGY_LABEL,
-    Conversion,
-    CurrencyLot,
-    Outflow,
-    compute_currency_ledger,
-    lots_from_sales,
-)
 from app.valuation.currency import normalize_currency
 
 FIFO_METHOD = "fifo"

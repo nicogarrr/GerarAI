@@ -38,7 +38,6 @@ Nunca se devuelve 0 como si fuese un dato conocido.
 """
 from __future__ import annotations
 
-from collections import deque
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal

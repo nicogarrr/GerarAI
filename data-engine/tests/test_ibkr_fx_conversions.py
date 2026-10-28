@@ -1,16 +1,16 @@
 """Flex Trades CASH (EUR.USD) -> fx_conversions -> libro de divisas. XML sintetico."""
 from datetime import date
 from decimal import Decimal as D
+from xml.etree import ElementTree as ET
 
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
-from app.models import Portfolio, Company, FXRate, FxConversion, Tenant, Transaction
+from app.models import Company, FxConversion, FXRate, Portfolio, Tenant, Transaction
 from app.services.ibkr_import_service import IBKRImportService, parse_fx_trade
 from app.services.tax_report_service import TaxReportService
-from xml.etree import ElementTree as ET
 
 
 def _xml(*trades: str) -> str:

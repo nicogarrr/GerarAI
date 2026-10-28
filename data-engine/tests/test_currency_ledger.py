@@ -3,8 +3,14 @@ from datetime import date
 from decimal import Decimal as D
 
 from app.services.currency_ledger import (
-    COMPUTED, INCOMPLETE, NOT_COMPUTED, Conversion, CurrencyLot, Outflow,
-    compute_currency_ledger, lots_from_sales,
+    COMPUTED,
+    INCOMPLETE,
+    NOT_COMPUTED,
+    Conversion,
+    CurrencyLot,
+    Outflow,
+    compute_currency_ledger,
+    lots_from_sales,
 )
 
 Y0, Y1 = date(2025, 1, 1), date(2025, 12, 31)
@@ -76,6 +82,7 @@ def test_lots_from_sales_keeps_unknown_rate_as_none():
 
 def test_report_summary_marks_ledger_not_computed_without_conversions():
     import inspect
+
     from app.services.tax_report_service import TaxReportService
     src = inspect.getsource(TaxReportService.compute_report)
     assert "currency_ledger_status" in src and "fx_conversions" in src
