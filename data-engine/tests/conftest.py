@@ -215,3 +215,12 @@ def _reset_filing_deadline_failure_cache():
     catalyst_calendar_service._FAILED_UNTIL.clear()
     yield
     catalyst_calendar_service._FAILED_UNTIL.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_historical_stress_failure_cache():
+    from app.services import historical_stress_service
+
+    historical_stress_service._FAILED_UNTIL.clear()
+    yield
+    historical_stress_service._FAILED_UNTIL.clear()
