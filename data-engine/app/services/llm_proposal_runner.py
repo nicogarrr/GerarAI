@@ -1,6 +1,7 @@
 """Cableado del motor de propuestas LLM (item 1): contexto real, cuota y presupuesto.
 
-El modelo solo ve titulares ya guardados para la empresa y una cotizacion fresca.
+El modelo solo ve titulares ya guardados para la empresa, una cotizacion fresca y,
+si existe, la tesis vigente del tenant (solo campos publicables), que queda anclada.
 Sin empresa seguida, sin titulares recientes, sin cotizacion, sin presupuesto o
 con la cuota diaria agotada no se llama al modelo o no se guarda nada.
 """
@@ -27,6 +28,7 @@ from app.models.paper_trading import PaperTrade
 from app.schemas.paper_trading import PaperProposal
 from app.services.budget import BudgetController, BudgetExceededError
 from app.services.llm_proposal_service import ProposalRejected, build_request, propose
+from app.services.paper_thesis_anchor import current_thesis, prompt_context
 from app.services.paper_trading_service import create_proposal
 from app.services.proposal_momentum import load_momentum
 
@@ -100,7 +102,9 @@ def _quota_lock(db: Session, now: datetime) -> threading.Lock:
         return _quota_locks.setdefault(key, threading.Lock())
 
 
-def save_within_quota(db: Session, proposal: PaperProposal, now: datetime) -> PaperTrade:
+def save_within_quota(
+    db: Session, proposal: PaperProposal, now: datetime, *, thesis_version_id: int | None = None
+) -> PaperTrade:
     """Cuenta y guarda en una transaccion corta serializada por tenant y dia.
 
     Candado de proceso mas pg_advisory_xact_lock (varios workers). Se toma DESPUES
@@ -116,7 +120,7 @@ def save_within_quota(db: Session, proposal: PaperProposal, now: datetime) -> Pa
             db.rollback()
             raise QuotaExceeded(DAILY_QUOTA)
         try:
-            return create_proposal(db, proposal)
+            return create_proposal(db, proposal, thesis_version_id=thesis_version_id)
         except Exception:
             db.rollback()
             raise
@@ -193,6 +197,11 @@ async def generate_proposal(
     if not headlines:
         raise ProposalRejected("sin_titulares")
     momentum = load_momentum(db, ticker, now)
+    # La tesis que vera el modelo es la que queda anclada, aunque otra version
+    # se publique mientras dura la llamada.
+    thesis_row = current_thesis(db, ticker)
+    thesis = prompt_context(db, thesis_row) if thesis_row is not None else None
+    thesis_version_id = thesis_row.id if thesis_row is not None else None
     db.commit()  # sin conexion ni transaccion abiertas durante cotizacion y LLM
     if fetch_quote is None:
         from app.api.routes.market import market_quote as fetch_quote
@@ -217,9 +226,9 @@ async def generate_proposal(
 
     try:
         proposal = await propose(
-            provider, ticker, quote=quote, headlines=headlines, momentum=momentum, now=now,
+            provider, ticker, quote=quote, headlines=headlines, momentum=momentum, thesis=thesis, now=now,
             on_response=_record, before_retry=_can_retry,
         )
     except BudgetExceededError as exc:
         raise ProposalRejected("presupuesto_agotado") from exc
-    return save_within_quota(db, proposal, now)
+    return save_within_quota(db, proposal, now, thesis_version_id=thesis_version_id)
