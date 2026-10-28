@@ -200,6 +200,10 @@ class Settings(BaseSettings):
     retention_job_enabled: bool = False
     retention_dry_run: bool = True
     retention_batch_limit: int = Field(default=500, ge=1, le=10000)
+    # Límite técnico heredado de 3 días para cierres guardados.
+    # No autoriza mostrar una cotización de más de 24 h como actual.
+    # Pendiente reconciliar este límite con la regla del propietario;
+    # no se presupone una excepción de fin de semana aprobada.
     market_price_max_age_days: int = Field(default=3, ge=0, le=30)
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
