@@ -277,6 +277,26 @@ describe('ficha de empresa', () => {
         await expect(createDriverAssumption('aapl', form({}))).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
     });
 
+    it('createDriverAssumption acepta números es-ES y rechaza los ambiguos', async () => {
+        await createDriverAssumption('aapl', form({ driver_key: 'growth', fiscal_year: '2027', value: '1.234,56', source: 'guía', rationale: 'porque', confidence: '0,7' }));
+        expect(lastBody()).toMatchObject({ value: 1234.56, confidence: 0.7 });
+        await createDriverAssumption('aapl', form({ driver_key: 'growth', fiscal_year: '2027', value: '12,5', source: 'guía', rationale: 'porque' }));
+        expect(lastBody()).toMatchObject({ value: 12.5, confidence: 1 });
+        const calls = fetchMock.mock.calls.length;
+        await expect(createDriverAssumption('aapl', form({ driver_key: 'g', fiscal_year: '2027', value: '1,234', source: 's', rationale: 'r' })))
+            .rejects.toMatchObject({ code: 'VALIDATION_ERROR', field: 'value', message: expect.stringContaining('ambiguo') });
+        await expect(createDriverAssumption('aapl', form({ driver_key: 'g', fiscal_year: '2027', value: '0,05', confidence: '1,5', source: 's', rationale: 'r' })))
+            .rejects.toMatchObject({ code: 'VALIDATION_ERROR', field: 'confidence' });
+        expect(fetchMock.mock.calls.length).toBe(calls);
+    });
+
+    it('createManagementPromise interpreta el valor objetivo en es-ES', async () => {
+        await createManagementPromise('AAPL', form({ promise: 'p', promise_date: '2026-01-01', expected_period: 'FY27', target_value: '1250,5' }));
+        expect(lastBody()).toMatchObject({ target_value: 1250.5 });
+        await expect(createManagementPromise('AAPL', form({ promise: 'p', promise_date: '2026-01-01', expected_period: 'FY27', target_value: 'abc' })))
+            .rejects.toMatchObject({ code: 'VALIDATION_ERROR', field: 'target_value' });
+    });
+
     it('getDriverAssumptions y credibilidad con ticker codificado', async () => {
         fetchMock.mockResolvedValue(okJson([]));
         await getDriverAssumptions('BRK.B');
