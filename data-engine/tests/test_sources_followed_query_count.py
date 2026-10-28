@@ -71,3 +71,22 @@ def test_followed_scope_empty_watchlist(n):
     _, session = _db(n)
     assert documents_count(db=session) == {"total": 0}
     session.close()
+
+
+def _tracked(n: int):
+    from app.services.eight_k_digest import tracked_company_ids
+
+    engine, session = _db(n)
+    statements: list[str] = []
+    event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
+    found = tracked_company_ids(session)
+    session.close()
+    return len(statements), found
+
+
+def test_8k_tracked_companies_queries_do_not_scale_with_watchlist():
+    few, _ = _tracked(3)
+    many, found = _tracked(30)
+    assert many == few, (few, many)
+    assert len(found) == 31  # 30 + SAN via san.mc
+    assert all(tags == ["watchlist"] for tags in found.values())
