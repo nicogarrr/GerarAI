@@ -571,7 +571,7 @@ def _plan_block(db: Session, tenant: int) -> ContextBlock:
     plan = db.scalar(
         select(InvestmentPlan)
         .where(InvestmentPlan.tenant_id == tenant, InvestmentPlan.status == "active")
-        .order_by(InvestmentPlan.id.desc())
+        .order_by(InvestmentPlan.created_at.asc(), InvestmentPlan.id.asc()).limit(1)
     )
     if plan is None:
         block.lines.append("- Sin plan de aportación activo.")
@@ -593,6 +593,19 @@ def _plan_block(db: Session, tenant: int) -> ContextBlock:
             else:
                 rendered.append(str(name))
         block.lines.append("- Asignación objetivo: " + "; ".join(rendered) + ".")
+    from app.services.savings_projection import savings_contract
+    projection = savings_contract(db)
+    if projection['status'] == 'ok':
+        block.lines.append('- Ahorro futuro: simulación solo de aportaciones, capital inicial 0; '
+            'rentabilidad total incluye reinversión. No es previsión de cartera ni promesa.')
+        for scenario in projection['scenarios']:
+            block.lines.append(f"- Hipótesis {num_es(scenario['annual_total_return'] * 100)} % anual total: "
+                f"{num_es(scenario['terminal_value'])} {projection['currency']} en "
+                f"{projection['horizon_years']} años; aportado {num_es(scenario['contributed'])}. "
+                'Sin impuestos/costes; dividendo neto N/D. DCA reparte la cuota, no mejora esta hipótesis.')
+        block.sources.append(_source("savings_projection", plan.id, "Simulación de ahorro", "/portfolio?tab=prevision"))
+    else:
+        block.lines.append('- Simulación de ahorro no disponible: falta divisa registrada; no asumir EUR.')
     block.sources.append(_source("investment_plan", plan.id, "Plan de aportación", "/plan"))
     return block
 

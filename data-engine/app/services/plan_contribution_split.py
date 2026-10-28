@@ -246,7 +246,10 @@ def build_contribution_split(db: Session) -> dict[str, Any]:
         )
     if currency is None:
         notes.append("La divisa de la aportación no está registrada en el plan.")
+    from app.services.savings_projection import savings_contract
+
     return {
+        "savings_projection": savings_contract(db),
         "plan_exists": True,
         "amount": float(amount),
         "currency": currency,

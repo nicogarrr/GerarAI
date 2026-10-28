@@ -98,6 +98,9 @@ def test_tesis_avisos_diario_y_plan(db):
     assert "1 avisos abiertos; 1 reglas de aviso activas" in text
     assert "2026-10-02 BN: compra a 55,00 USD (abierta)" in text
     assert "Aportación mensual 300,00 EUR; horizonte 20 años" in text
+    assert "Ahorro futuro: simulación solo de aportaciones" in text
+    assert "121.741,35 EUR en 20 años" in text
+    assert "DCA reparte la cuota, no mejora esta hipótesis" in text
     assert "Asignación objetivo: POOL 50,0 %; UBER 50,0 %" in text
 
 

@@ -180,3 +180,18 @@ def contribution_split(db: Session = Depends(get_db)) -> dict:
 @router.get("/drift")
 def drift_analysis(db: Session = Depends(get_db)) -> dict:
     return InvestmentPlanService().drift_analysis(db)
+
+@router.get("/savings-projection")
+def savings_projection(
+    db: Session = Depends(get_db),
+    monthly: Annotated[float | None, Query(ge=0, le=1_000_000)] = None,
+    years: Annotated[int | None, Query(ge=1, le=80)] = None,
+    currency: Annotated[str | None, Query(pattern=r"^[A-Za-z]{3}$")] = None,
+    annual_return: Annotated[float | None, Query(ge=-0.99, le=1)] = None,
+    dividend_yield: Annotated[float, Query(ge=0, le=0.5)] = 0.03,
+    inflation: Annotated[float, Query(ge=-0.99, le=1)] = 0.02,
+) -> dict:
+    """Read-only preview or canonical illustration of the existing savings plan."""
+    from app.services.savings_projection import savings_contract
+    return savings_contract(db, monthly=monthly, years=years, currency=currency,
+        annual_return=annual_return, dividend_yield=dividend_yield, inflation=inflation)

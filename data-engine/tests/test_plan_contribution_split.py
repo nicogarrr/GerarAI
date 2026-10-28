@@ -230,3 +230,13 @@ def _other_tenant_dca_row(db, *, tenant, symbol, level, company_id=None, status=
         " updated_at) VALUES (:t, :s, :c, :l, :st, '2026-09', '2026-09-30', 100, '{}', '{}', '[]',"
         " 'nico-v1', '2026-09-30', 'test', '2026-09-30', '2026-09-30')"
     ), {"t": tenant, "s": symbol, "c": company_id, "l": level, "st": status})
+
+
+def test_dca_split_exposes_same_savings_contract(db):
+    _plan(db, [], amount="1000")
+    result = build_contribution_split(db)
+    projection = result['savings_projection']
+    assert projection['monthly_contribution'] == result['amount'] == 1000
+    assert projection['currency'] == result['currency'] == 'EUR'
+    assert projection['scenarios'][2]['annual_total_return'] == .05
+    assert projection['portfolio_included'] is False
