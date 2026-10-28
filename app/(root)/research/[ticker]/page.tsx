@@ -390,23 +390,13 @@ function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; ref
           Incluye cifras de una fuente no oficial (Yahoo Finance), sin auditar ni contrastar con el emisor; la fuente de cada fila aparece a la derecha.
         </p>
       ) : null}
-      {/* Móvil: cards paginadas con «ver más» en vez de corte silencioso */}
+      {/* Móvil: cards paginadas (Anterior/Siguiente), sin «ver más» ni corte silencioso */}
       <div className="space-y-3 md:hidden">
-        {facts.slice(0, FACTS_MOBILE_PAGE).map((fact) => (
-          <FactCard key={fact.id} fact={fact} staleness={stalenessOf(fact)} ticker={ticker} />
-        ))}
-        {facts.length > FACTS_MOBILE_PAGE ? (
-          <details className="rounded-lg border border-gray-800 p-3">
-            <summary className="cursor-pointer text-sm font-medium text-teal-300">
-              Ver más ({facts.length - FACTS_MOBILE_PAGE} restantes)
-            </summary>
-            <div className="mt-3 space-y-3">
-              {facts.slice(FACTS_MOBILE_PAGE).map((fact) => (
-                <FactCard key={fact.id} fact={fact} staleness={stalenessOf(fact)} ticker={ticker} />
-              ))}
-            </div>
-          </details>
-        ) : null}
+        <PagedList
+          items={facts.map((fact) => ({ key: `fact-${fact.id}`, node: <FactCard fact={fact} staleness={stalenessOf(fact)} ticker={ticker} /> }))}
+          label="Hechos financieros"
+          pageSize={FACTS_MOBILE_PAGE}
+        />
       </div>
       {/* Escritorio: tabla completa */}
       <div aria-label="Hechos financieros" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>

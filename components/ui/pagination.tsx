@@ -18,6 +18,10 @@ export type PaginationProps = {
   /** Nombre accesible del bloque (p. ej. «Historial de versiones»). */
   label: string;
   className?: string;
+  /** Hay más páginas en el servidor aún sin cargar: «Siguiente» sigue activo y el total se muestra como «N+». */
+  hasMore?: boolean;
+  /** Deshabilita los botones mientras se carga una página. */
+  busy?: boolean;
 };
 
 /**
@@ -25,9 +29,9 @@ export type PaginationProps = {
  * pantalla. Vive en cliente porque la página de research no puede convertirse
  * entera en cliente solo para paginar dos listados.
  */
-export function Pagination({ page, pages, onPageChange, label, className }: PaginationProps) {
+export function Pagination({ page, pages, onPageChange, label, className, hasMore = false, busy = false }: PaginationProps) {
   const current = clampPage(page, pages);
-  if (pages <= 1) return null;
+  if (pages <= 1 && !hasMore) return null;
 
   return (
     <nav
@@ -36,7 +40,7 @@ export function Pagination({ page, pages, onPageChange, label, className }: Pagi
     >
       <Button
         aria-label={`Página anterior: ${label}`}
-        disabled={current <= 1}
+        disabled={busy || current <= 1}
         onClick={() => onPageChange(current - 1)}
         size="sm"
         type="button"
@@ -45,11 +49,11 @@ export function Pagination({ page, pages, onPageChange, label, className }: Pagi
         Anterior
       </Button>
       <span aria-current="page" className="text-xs text-gray-500">
-        {pageLabel(current, pages)}
+        {busy ? 'Cargando…' : hasMore ? `${pageLabel(current, pages)}+` : pageLabel(current, pages)}
       </span>
       <Button
         aria-label={`Página siguiente: ${label}`}
-        disabled={current >= pages}
+        disabled={busy || (current >= pages && !hasMore)}
         onClick={() => onPageChange(current + 1)}
         size="sm"
         type="button"

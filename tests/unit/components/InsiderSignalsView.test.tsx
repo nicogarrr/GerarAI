@@ -160,41 +160,50 @@ describe('InsiderSignalsView', () => {
         expect(screen.getByText(/plan 10b5-1/)).toBeInTheDocument();
         expect(screen.getByText(/Opción/)).toBeInTheDocument();
         expect(screen.getByText('Sin operaciones extraídas.')).toBeInTheDocument();
-        expect(screen.getByText('Mostrando 3 de 3')).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Cargar más' })).not.toBeInTheDocument();
+        expect(screen.getByText('Mostrando 1-3 de 3')).toBeInTheDocument();
+        expect(screen.queryByRole('navigation', { name: /Paginación/ })).not.toBeInTheDocument();
     });
 
-    it('Cargar más añade filings sin duplicar los ya conocidos', async () => {
-        loadMore.mockResolvedValueOnce({ status: 'ok', filings: [filing(2), filing(3)] });
+    const many = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, k) => filing(from + k));
+
+    it('paginación: «Siguiente» pide por offset los filings que faltan y muestra esa página, sin duplicar', async () => {
+        loadMore.mockResolvedValueOnce({ status: 'ok', filings: [...many(20, 25)] });
         render(
-            <InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings([filing(1), filing(2)], { total: 3 })} />,
+            <InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings(many(1, 20), { total: 25 })} />,
         );
-        expect(screen.getByText('Mostrando 2 de 3')).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }));
-        await waitFor(() => expect(screen.getByText('Mostrando 3 de 3')).toBeInTheDocument());
-        expect(loadMore).toHaveBeenCalledWith('ASTS', 2);
+        expect(screen.getByText('Mostrando 1-20 de 25')).toBeInTheDocument();
+        expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cargar más' })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
+        await waitFor(() => expect(screen.getByText('Mostrando 21-25 de 25')).toBeInTheDocument());
+        expect(loadMore).toHaveBeenCalledWith('ASTS', 20);
+        expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
+        // Volver atrás no vuelve a pedir nada.
+        fireEvent.click(screen.getByRole('button', { name: /Página anterior/ }));
+        expect(screen.getByText('Mostrando 1-20 de 25')).toBeInTheDocument();
+        expect(loadMore).toHaveBeenCalledTimes(1);
     });
 
-    it('Cargar más: error ofrece reintentar', async () => {
+    it('paginación: si falla la carga se avisa, se queda en la página actual y se puede reintentar', async () => {
         loadMore.mockResolvedValueOnce({ status: 'unavailable', reason: 'x', filings: [] });
-        render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings([filing(1)], { total: 5 })} />);
-        fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }));
+        render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings(many(1, 20), { total: 40 })} />);
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
         expect(await screen.findByRole('alert')).toHaveTextContent('No se pudieron cargar más filings.');
-        expect(screen.getByRole('button', { name: 'Reintentar' })).toBeEnabled();
-        loadMore.mockRejectedValueOnce(new Error('boom'));
-        fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
-        await waitFor(() => expect(loadMore).toHaveBeenCalledTimes(2));
+        expect(screen.getByText('Mostrando 1-20 de 40')).toBeInTheDocument();
+        loadMore.mockResolvedValueOnce({ status: 'ok', filings: many(21, 40) });
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
+        await waitFor(() => expect(screen.getByText('Mostrando 21-40 de 40')).toBeInTheDocument());
+        expect(loadMore).toHaveBeenCalledTimes(2);
     });
 
-    it('Cargar más: sin ticker o ya cargando no hace llamadas dobles', async () => {
+    it('paginación: mientras carga no hay llamadas dobles', async () => {
         let resolve!: (v: unknown) => void;
         loadMore.mockReturnValueOnce(new Promise((r) => { resolve = r; }));
-        render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings([filing(1)], { total: 5 })} />);
-        const btn = screen.getByRole('button', { name: 'Cargar más' });
-        fireEvent.click(btn);
-        expect(await screen.findByRole('button', { name: 'Cargando…' })).toBeDisabled();
-        resolve({ status: 'ok', filings: [] });
-        await waitFor(() => expect(screen.getByRole('button', { name: 'Cargar más' })).toBeEnabled());
+        render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings(many(1, 20), { total: 40 })} />);
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
+        await waitFor(() => expect(screen.getByRole('button', { name: /Página siguiente/ })).toBeDisabled());
+        resolve({ status: 'ok', filings: many(21, 40) });
+        await waitFor(() => expect(screen.getByText('Mostrando 21-40 de 40')).toBeInTheDocument());
         expect(loadMore).toHaveBeenCalledTimes(1);
     });
 });
