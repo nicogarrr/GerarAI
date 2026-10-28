@@ -3678,7 +3678,7 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
             return {"status": "error", "message": "IBKR no disponible; se conservan los datos anteriores."}
 
 
-@dramatiq.actor(max_retries=0, time_limit=1_800_000)
+@dramatiq.actor(queue_name="dca-manual", max_retries=0, time_limit=1_800_000)
 def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -> dict:
     """Execute an accepted, bounded manual batch outside the HTTP request."""
     from app.services.dca_manual_job import run_manual_job
