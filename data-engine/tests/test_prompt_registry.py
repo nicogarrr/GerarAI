@@ -148,3 +148,21 @@ def test_asts_llm_service_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert resolved.text == prompt_registry.ASTS_CATALOG_ANALYSIS
+
+
+def test_bottleneck_discovery_prompt_version_hash_and_closed_lists_are_pinned():
+    from app.services import bottleneck_discovery_service as service
+
+    resolved = prompt_registry.get_prompt("bottleneck_discovery_service", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "bottleneck-discovery-v1",
+        "c5a549ec7b59",
+        "bottleneck_discovery",
+    )
+    assert resolved.source == "code"
+    assert service.SYSTEM == resolved.text == prompt_registry.BOTTLENECK_DISCOVERY
+    # El registro guarda el texto ya renderizado: las listas cerradas del
+    # servicio tienen que seguir apareciendo en el, o el prompt y el schema
+    # divergirian (cambiar EXPOSURES/CHANNELS exige subir la version).
+    assert "exposicion (una de: " + ", ".join(service.EXPOSURES) + ")" in resolved.text
+    assert "canal (uno de: " + ", ".join(service.CHANNELS) + ")" in resolved.text
