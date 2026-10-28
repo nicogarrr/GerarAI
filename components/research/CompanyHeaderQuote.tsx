@@ -5,6 +5,7 @@ import { NA, formatMarketDate, formatMoney, formatPercent, formatPrice, isValidC
 import { extendedQuoteLabel, quoteDate, quoteTime, quoteSessionDate, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { chartFallbackCurrency } from '@/lib/market/chart-fallback-currency';
+import { isClosedCandle } from '@/lib/market/candle-close';
 import { CompanyTechnicalWorkspace } from './CompanyTechnicalWorkspace';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 
@@ -128,10 +129,10 @@ export function CompanyHeaderQuote({
     // .L) la escala sería ambigua (x100): sin fallback.
     const fallbackCurrency = chartFallbackCurrency({ ticker: snapshot.ticker, symbol, exchange: snapshot.exchange, currency: snapshot.currency, candleCurrency: snapshot.historyCurrency });
     const useFallback = !showPrice && (slow || settled) && fallbackPrice != null && isValidCurrencyCode(fallbackCurrency);
-    // La vela de hoy puede ser parcial (sesión abierta): solo es «cierre» si es
-    // anterior a la fecha actual en Nueva York; si no, se rotula «Última vela».
-    const todayEt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date());
-    const lastIsClose = last != null && last.date.slice(0, 10) < todayEt;
+    // La vela de hoy puede ser parcial (sesión abierta): solo es «cierre» si su
+    // mercado ya cerró (huso y hora de cierre del propio listado); si no, se
+    // rotula «Última vela».
+    const lastIsClose = last != null && isClosedCandle(last.date, { symbol: symbol ?? snapshot.ticker, currency: snapshot.currency });
     const loading = !settled && !useFallback;
     // Con fallback, la divisa es la del listado; con cotización real, la suya.
     const currency: string = (useFallback ? fallbackCurrency : quoteCurrency) ?? '';
