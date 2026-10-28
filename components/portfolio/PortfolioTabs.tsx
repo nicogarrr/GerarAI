@@ -25,6 +25,7 @@ import PortfolioScores from '@/components/portfolio/PortfolioScores';
 import PortfolioTearsheet from '@/components/portfolio/PortfolioTearsheet';
 import RefreshPortfolioButton from '@/components/portfolio/RefreshPortfolioButton';
 import PortfolioForecast from '@/components/portfolio/PortfolioForecast';
+import SavingsProjection from '@/components/portfolio/SavingsProjection';
 import PortfolioDividends from '@/components/portfolio/PortfolioDividends';
 import { Wallet, LayoutDashboard, Briefcase, TrendingUp, TrendingDown, History, Brain, Gauge, Activity, Coins } from 'lucide-react';
 import type { PortfolioForecast as PortfolioForecastType, PortfolioPerformanceHistory, PortfolioSummary as PortfolioSummaryType, PortfolioTearsheet as PortfolioTearsheetType, PortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
@@ -297,6 +298,8 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 {/* Tab: Posiciones */}
                 {/* Tab: Prevision */}
                 <TabsContent value="prevision" className="mt-0">
+                    <SavingsProjection />
+                    <h2 className="mb-3 text-lg font-semibold text-gray-100">Valoración de la cartera actual</h2>
                     {forecast ? (
                         <PortfolioForecast forecast={forecast} />
                     ) : (

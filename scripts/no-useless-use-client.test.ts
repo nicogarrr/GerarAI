@@ -174,6 +174,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/plan/PlanView.tsx': 'importa cliente: components/data/RecordViews.tsx, importa cliente: components/plan/PlanSetupDialog.tsx',
   'components/portfolio/AddTransactionButton.tsx': 'useRouter, useState, useRef, useEffect, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, jsx-onValueChange, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
   'components/portfolio/EditTransactionDialog.tsx': 'useRouter, useState, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
+  'components/portfolio/SavingsProjection.tsx': 'useState, useEffect, jsx-onSubmit, jsx-onChange, jsx-onClick: edición de supuestos y preview asíncrono sin guardar',
   'components/portfolio/HoldingSignals.tsx': 'useState, useEffect',
   'components/portfolio/ImportIBKRButton.tsx': 'useState, useRef, useRouter, jsx-onChange, jsx-onClick, libreria cliente: sonner',
   'components/portfolio/PortfolioAllocation.tsx': 'dynamic-ssr-false, importa cliente: components/portfolio/PortfolioAllocationChart.tsx',

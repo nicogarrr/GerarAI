@@ -87,5 +87,13 @@ export async function upsertPlan(payload: PlanUpsertPayload): Promise<PlanUpsert
         throw error;
     }
     revalidatePath('/plan');
+    revalidatePath('/portfolio');
     return { ok: true };
+}
+
+/** Read-only savings preview; it never changes the plan or places an order. */
+export async function getSavingsProjection(input?: import('@/lib/plan/savings-projection').SavingsPreviewInput): Promise<import('@/lib/plan/savings-projection').SavingsProjection> {
+    await requireAuthenticatedUser();
+    const query = input ? new URLSearchParams({ monthly: String(input.monthly), years: String(input.years), currency: input.currency, dividend_yield: String(input.dividendYield), inflation: String(input.inflation) }) : null;
+    return researchRequest(`/api/plan/savings-projection${query ? `?${query}` : ''}`);
 }

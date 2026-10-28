@@ -52,10 +52,12 @@ function asText(value: unknown): string {
 export default function PlanSetupDialog({
     triggerLabel = 'Configurar plan',
     initial,
+    onSaved,
 }: {
     triggerLabel?: string;
     /** Plan existente para precargar el formulario (edición). */
     initial?: PlanInitial | null;
+    onSaved?: () => void;
 }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
@@ -160,6 +162,7 @@ export default function PlanSetupDialog({
             toast.success('Plan de inversión guardado');
             setOpen(false);
             router.refresh();
+            onSaved?.();
         } catch (exc) {
             showErrorToast(exc, { onRetry: () => handleSubmitRetry() });
         } finally {
