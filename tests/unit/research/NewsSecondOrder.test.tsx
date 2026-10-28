@@ -1,10 +1,19 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
 const fetchMock = vi.fn();
 const reply = (data: unknown, ok = true) => ({ ok, json: async () => data });
 const empty = { status: 'sin_datos', mode: 'determinista', candidates: [] };
-const toggle = (details: HTMLDetailsElement, open: boolean) => { details.open = open; fireEvent(details, new Event('toggle')); };
+// Setting open already queues the native toggle event. Await that event so an
+// error cannot receive a delayed duplicate toggle and retry before reopening.
+const toggle = async (details: HTMLDetailsElement, open: boolean) => {
+    await act(async () => {
+        await new Promise<void>(resolve => {
+            details.addEventListener('toggle', () => resolve(), { once: true });
+            details.open = open;
+        });
+    });
+};
 const mount = (subjectTicker?: string) => {
     const view = render(<NewsSecondOrder eventId={42} summary="Contexto y efectos" subjectTicker={subjectTicker}><p>Contexto original</p></NewsSecondOrder>);
     return view.container.querySelector('details')!;
@@ -19,23 +28,23 @@ describe('News second order lazy loading with mocked HTTP', () => {
         const details = mount('TEST');
         expect(fetchMock).not.toHaveBeenCalled();
         expect(screen.getByText('Contexto original')).toBeInTheDocument();
-        toggle(details, true); expect(screen.getByRole('status')).toHaveTextContent('Calculando');
-        toggle(details, false); toggle(details, true); expect(fetchMock).toHaveBeenCalledOnce();
+        await toggle(details, true); expect(screen.getByRole('status')).toHaveTextContent('Calculando');
+        await toggle(details, false); await toggle(details, true); expect(fetchMock).toHaveBeenCalledOnce();
         await act(async () => finish(reply(empty)));
         expect(screen.getByText(/excluye a propósito a la propia TEST/)).toBeVisible();
-        toggle(details, false); toggle(details, true); expect(fetchMock).toHaveBeenCalledOnce();
+        await toggle(details, false); await toggle(details, true); expect(fetchMock).toHaveBeenCalledOnce();
         expect(fetchMock.mock.calls[0][0]).toBe('/api/news/42/second-order');
     });
     it('does not imply a primary ticker when no subject was supplied', async () => {
-        fetchMock.mockResolvedValue(reply(empty)); const details = mount(); toggle(details, true);
+        fetchMock.mockResolvedValue(reply(empty)); const details = mount(); await toggle(details, true);
         expect(await screen.findByText('Sin empresas del universo expuestas a esta noticia.')).toBeVisible();
     });
     it.each(['http', 'schema', 'rejected'])('reports %s failure and retries on reopen', async mode => {
         if (mode === 'rejected') fetchMock.mockRejectedValueOnce(new Error('offline'));
         else fetchMock.mockResolvedValueOnce(mode === 'http' ? reply({}, false) : reply({ candidates: null }));
-        fetchMock.mockResolvedValueOnce(reply(empty)); const details = mount(); toggle(details, true);
+        fetchMock.mockResolvedValueOnce(reply(empty)); const details = mount(); await toggle(details, true);
         expect(await screen.findByText(/No disponible ahora/)).toBeVisible();
-        toggle(details, false); toggle(details, true);
+        await toggle(details, false); await toggle(details, true);
         expect(await screen.findByText('Sin empresas del universo expuestas a esta noticia.')).toBeVisible();
         expect(fetchMock).toHaveBeenCalledTimes(2);
     });
@@ -48,7 +57,7 @@ describe('News second order lazy loading with mocked HTTP', () => {
             ...Array.from({ length: 10 }, (_, i) => candidate(`UP${i}`, 'beneficiada', i === 0)),
             candidate('DOWN', 'perjudicada'), candidate('UNKNOWN', 'incierta'),
         ] }));
-        const details = mount(); toggle(details, true);
+        const details = mount(); await toggle(details, true);
         expect(await screen.findByText(`Hipótesis no verificadas · ${mode === 'llm' ? 'modelo' : 'reglas'}`)).toBeVisible();
         expect(screen.getByRole('heading', { name: 'Beneficiadas (10)' })).toBeVisible();
         expect(screen.getByRole('heading', { name: 'Perjudicadas (1)' })).toBeVisible();
