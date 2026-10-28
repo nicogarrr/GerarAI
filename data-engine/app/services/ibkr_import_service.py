@@ -222,6 +222,22 @@ def _csv_trade_action(value: str | None) -> str | None:
     return None
 
 
+def _csv_delimiter(csv_text: str) -> str:
+    """Separador del CSV, decidido por la CABECERA (no por las celdas).
+
+    Excel/LibreOffice en español exportan «CSV» con «;» porque la coma es el
+    decimal (12,50). Solo cuenta la primera línea con contenido, así una
+    celda entrecomillada con «;» en un CSV de comas no cambia la lectura.
+    """
+    header = next((line for line in csv_text.splitlines() if line.strip()), "")
+    return ";" if header.count(";") > header.count(",") else ","
+
+
+def _csv_rows(csv_text: str) -> list[list[str]]:
+    text = csv_text.strip()
+    return list(csv.reader(io.StringIO(text), delimiter=_csv_delimiter(text)))
+
+
 def validate_ibkr_csv(csv_text: str) -> list[str]:
     """Valida un CSV de actividad de IBKR (cabecera + filas).
 
@@ -231,7 +247,7 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
     if not csv_text or not csv_text.strip():
         return ["El fichero está vacío: exporta de nuevo la actividad desde IBKR en formato CSV."]
     try:
-        rows = list(csv.reader(io.StringIO(csv_text.strip())))
+        rows = _csv_rows(csv_text)
     except csv.Error as exc:
         return [
             f"El CSV no se puede leer ({exc}): revisa que el fichero use comas como separador "
@@ -1081,7 +1097,7 @@ class IBKRImportService:
         row_errors = [error for error in errors if error.startswith("Fila ")]
         bad_lines = {int(error.split(" ")[1]) for error in row_errors if error.split(" ")[1].isdigit()}
 
-        data_rows = [row for row in csv.reader(io.StringIO(csv_text.strip())) if any(cell.strip() for cell in row)]
+        data_rows = [row for row in _csv_rows(csv_text) if any(cell.strip() for cell in row)]
         mapping = _map_csv_columns(data_rows[0])
         assert mapping is not None  # garantizado por validate_ibkr_csv
         ledger = PortfolioLedgerService()
