@@ -29,6 +29,10 @@ async function addBySymbol(page: Page, symbol: string) {
   await expect(page.getByText(`${symbol} añadido a la watchlist`)).toBeVisible({ timeout: 20_000 });
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
+  // Success toast precedes router.refresh. The first add replaces the empty
+  // state (and its dialog owner) with the table; wait for that server result
+  // before opening a dialog that would otherwise be unmounted by the refresh.
+  await expect(rowsFor(page).filter({ has: page.locator(`a[href="/research/${symbol}"]`) })).toHaveCount(1, { timeout: 30_000 });
 }
 
 for (const vp of VIEWPORTS) {
