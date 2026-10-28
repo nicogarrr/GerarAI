@@ -133,6 +133,11 @@ export type SanitizedQuote = {
     closeDate?: string | null;
     /** 'live' = sesion en curso; 'close' = ultimo cierre fechado. 'stale' nunca se devuelve. */
     kind: 'live' | 'close';
+    /**
+     * Unidad declarada por el proveedor para c/d/h/l/o/pc (Yahoo: «GBp» en
+     * Londres = peniques). Ausente si el proveedor no la declara (Finnhub).
+     */
+    currency?: string | null;
 };
 
 /**
@@ -160,6 +165,8 @@ export interface ProviderQuotePayload {
     /** Variantes de timestamp que devuelve Finnhub en respuestas cacheadas. */
     ct?: unknown;
     cd?: unknown;
+    /** Unidad de la cotización (backend Yahoo: p. ej. «GBp» = peniques). */
+    currency?: unknown;
 }
 
 export function sanitizeFinnhubQuote(data: ProviderQuotePayload | null | undefined, nowMs: number = Date.now()): SanitizedQuote | null {
@@ -189,5 +196,7 @@ export function mapBackendYahooQuote(data: ProviderQuotePayload | null | undefin
         h: num(data.h), l: num(data.l), o: num(data.o), pc: num(data.pc),
         source: 'Yahoo Finance', t: null, kind: 'close',
         closeDate: validCalendarDate(data.cd),
+        // Solo si el backend la declara (contrato estable sin ella).
+        ...(typeof data.currency === 'string' && data.currency.trim() ? { currency: data.currency.trim() } : {}),
     };
 }
