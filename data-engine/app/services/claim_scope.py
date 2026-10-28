@@ -31,10 +31,16 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Claim, Company, ThesisVersion
 
 
-def latest_thesis_version(db: Session, company: Company) -> ThesisVersion | None:
+def latest_thesis_version(db: Session, company: Company | int) -> ThesisVersion | None:
+    """Highest version in the session tenant, including drafts as before.
+
+    Accept a global company or its ID so all existing consumers use one rule.
+    Publication eligibility remains a separate gate, not a selection filter.
+    """
+    company_id = company.id if isinstance(company, Company) else company
     return db.scalar(
         select(ThesisVersion)
-        .where(ThesisVersion.company_id == company.id)
+        .where(ThesisVersion.company_id == company_id)
         .order_by(ThesisVersion.version.desc())
         .limit(1)
     )

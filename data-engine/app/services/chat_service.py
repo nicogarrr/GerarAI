@@ -36,7 +36,7 @@ from app.services.brain_service import (
     small_talk_answer,
 )
 from app.services.chat_synthesis_service import ChatSynthesisService
-from app.services.claim_scope import live_claims
+from app.services.claim_scope import latest_thesis_version, live_claims
 from app.services.company_resolver import resolve_company
 from app.services.library_context import company_library_context, retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
@@ -811,12 +811,7 @@ class ChatService:
         return next(iter(found.values())) if len(found) == 1 else None
 
     def _latest_thesis(self, db: Session, company: Company) -> ThesisVersion | None:
-        return db.scalar(
-            select(ThesisVersion)
-            .where(ThesisVersion.company_id == company.id)
-            .order_by(desc(ThesisVersion.version))
-            .limit(1)
-        )
+        return latest_thesis_version(db, company)
 
     def _key_facts(self, db: Session, company: Company, limit: int = 8) -> list[FinancialFact]:
         # One query instead of one per metric: pick the latest fact per

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -12,7 +12,7 @@ from app.models import (
     ThesisVersion,
 )
 from app.services.claim_intelligence_service import ClaimIntelligenceService, _similarity
-from app.services.claim_scope import live_claims
+from app.services.claim_scope import latest_thesis_version, live_claims
 
 NODE_RULES: dict[str, tuple[str, ...]] = {
     "technology": ("technology", "technical", "product works", "launch", "performance"),
@@ -68,12 +68,7 @@ def impact_summary_text(affected_claim_count: int, labels: list[str]) -> str:
 
 class ThesisGraphService:
     def latest_thesis(self, db: Session, company: Company) -> ThesisVersion | None:
-        return db.scalar(
-            select(ThesisVersion)
-            .where(ThesisVersion.company_id == company.id)
-            .order_by(desc(ThesisVersion.version))
-            .limit(1)
-        )
+        return latest_thesis_version(db, company)
 
     def read(
         self, db: Session, company: Company, thesis: ThesisVersion | None = None

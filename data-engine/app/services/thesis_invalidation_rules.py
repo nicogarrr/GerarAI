@@ -40,6 +40,7 @@ from app.models import (
     MarketPrice,
     ThesisVersion,
 )
+from app.services.claim_scope import latest_thesis_version
 
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
@@ -161,12 +162,7 @@ def _rule_name(company: Company, rule: dict[str, Any]) -> str:
 
 
 def latest_thesis(db: Session, company_id: int) -> ThesisVersion | None:
-    return db.scalar(
-        select(ThesisVersion)
-        .where(ThesisVersion.company_id == company_id)
-        .order_by(desc(ThesisVersion.version))
-        .limit(1)
-    )
+    return latest_thesis_version(db, company_id)
 
 
 def sync_thesis_rules(db: Session, company: Company) -> list[AlertRule]:
