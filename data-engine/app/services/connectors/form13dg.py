@@ -31,6 +31,8 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+from app.core.errors import redact_secrets
+
 # Mismo throttle compartido de proceso que form4/form13f (ver base.py y la
 # nota de form4.py): un reloj propio permitiria disparar dos peticiones SEC a
 # la vez y la SEC devolveria 403 a todos los conectores.
@@ -538,7 +540,7 @@ def parse_schedule13dg(text: str) -> dict:
         try:
             return _parse_xml(text)
         except (ET.ParseError, ValueError) as exc:
-            return {**_empty_parse(), "format": "xml", "error": f"{type(exc).__name__}: {exc}"[:300]}
+            return {**_empty_parse(), "format": "xml", "error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300]}
 
     sgml_form = None
     match = _SGML_TYPE_RE.search(text)

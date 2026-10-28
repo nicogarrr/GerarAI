@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, inspect
 
 
 def _load():
-    path = Path(__file__).parents[1] / "alembic/versions/0094_paper_trade_corporate_actions.py"
+    path = Path(__file__).parents[1] / "alembic/versions/0094_paper_trade_actions.py"
     spec = importlib.util.spec_from_file_location("paper_ca_migration", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
