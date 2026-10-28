@@ -55,6 +55,8 @@ import { TtmPanel } from '@/components/research/TtmPanel';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
 import { CompanyPaperTrades } from '@/components/research/CompanyPaperTrades';
+import { CompanyPositionPanel } from '@/components/research/CompanyPositionPanel';
+import { getCompanyHolding } from '@/lib/actions/portfolio.actions';
 import { getCompanyPaperTrades } from '@/lib/actions/paper-trading.actions';
 import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
@@ -989,9 +991,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           .sort((a, b) => b.date.localeCompare(a.date))
       : [];
     // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
-    const [per, ownershipSignals] = await Promise.all([
+    // La posición real solo se pide si la empresa está en cartera (misma lectura que Cartera).
+    const [per, ownershipSignals, holdingContext] = await Promise.all([
       getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' })),
       getOwnershipSignals(ticker).catch(() => null),
+      snapshot.in_portfolio
+        ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: 'No se pudo cargar tu posición en esta empresa.' }))
+        : Promise.resolve(null),
     ]);
     content = (
       <div className="space-y-6">
@@ -1035,6 +1041,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               estado, ya presente en el chip «Modelo» de la cabecera (enlazado
               a la vista Modelo con el contenido completo). Redundante: se
               retira del overview; motor, datos y vista Modelo intactos. */}
+          <CompanyPositionPanel context={holdingContext} />
         </div>
         <Panel collapsible="mobile"
           actions={

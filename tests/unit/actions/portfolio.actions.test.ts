@@ -32,6 +32,7 @@ import {
     getPortfolioDividendProjection,
     getPortfolioDataQuality,
     syncPortfolioDividends,
+    getCompanyHolding,
 } from '@/lib/actions/portfolio.actions';
 
 const position = (over: object = {}) => ({
@@ -333,5 +334,34 @@ describe('lecturas simples', () => {
         await syncPortfolioDividends('tenant-one');
         expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/dividends/sync', { method: 'POST' });
         expect(invalidate).toHaveBeenCalledWith('portfolio:tenant-one:dividends');
+    });
+});
+
+describe('getCompanyHolding: posición de la ficha con las cifras de Cartera', () => {
+    it('devuelve la posición del ticker y su peso con la regla del donut (solo posiciones con valor)', async () => {
+        seedSummary([
+            position(),
+            position({ ticker: 'MSFT', market_value_base: 2050, cost_basis_base: 2000, unrealized_pnl_base: 50 }),
+            position({ ticker: 'NOFX', market_value_base: null, cost_basis_base: null }),
+        ]);
+        const context = await getCompanyHolding('aapl');
+        expect(context.status).toBe('held');
+        if (context.status !== 'held') return;
+        expect(context.holding).toMatchObject({ symbol: 'AAPL', quantity: 10, value: 1350, gain: 450, baseCurrency: 'EUR' });
+        // 1350 / (1350 + 2050): NOFX sin valor no entra en el reparto.
+        expect(context.weightPercent).toBeCloseTo(39.705882, 5);
+    });
+    it('una posición sin valor no tiene peso inventado', async () => {
+        seedSummary([position({ market_value_base: null, cost_basis_base: null }), position({ ticker: 'MSFT' })]);
+        const context = await getCompanyHolding('AAPL');
+        expect(context.status === 'held' && context.weightPercent).toBeNull();
+    });
+    it('distingue «sin posición» de un fallo de carga y no tapa la autenticación', async () => {
+        seedSummary([position({ ticker: 'MSFT' })]);
+        expect(await getCompanyHolding('AAPL')).toEqual({ status: 'not_held' });
+        researchRequest.mockRejectedValue(new AppError('caído', 'RESEARCH_API_ERROR', 502));
+        expect(await getCompanyHolding('AAPL')).toEqual({ status: 'error', message: 'No se pudo cargar tu posición en esta empresa.' });
+        researchRequest.mockRejectedValue(new AppError('sin sesión', 'RESEARCH_API_ERROR', 401));
+        await expect(getCompanyHolding('AAPL')).rejects.toThrow('sin sesión');
     });
 });
