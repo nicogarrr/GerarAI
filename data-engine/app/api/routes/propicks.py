@@ -4,6 +4,7 @@ research universe, persisted and diffable. LLM selection lands in F3."""
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -271,3 +272,75 @@ def review_brier(db: Session = Depends(get_db)) -> dict:
 
     evaluate_outcomes(db)
     return brier_report(db)
+class DeepValueRowOut(BaseModel):
+    ticker: str
+    name: str
+    exchange: str
+    currency: str
+    sector: str | None
+    score: float
+    price_to_book: float
+    pb_price_date: str | None
+    pb_fiscal_year: int | None
+    dividend_yield: float | None
+    yield_status: str | None
+    desacuerdo_fuentes: bool
+    yield_extremo_revisar: bool
+    finnhub_yield_indicated: float | None
+    fuentes: list[str]
+    metric_as_of: str | None
+
+
+class DeepValueResponse(BaseModel):
+    estrategia: str
+    rotulo: str
+    resultados: list[DeepValueRowOut]
+
+
+@router.get("/deep-value", response_model=DeepValueResponse)
+def deep_value(
+    pb_max: Decimal = Query(default=Decimal("1.0"), gt=0, le=5),
+    yield_min: Decimal = Query(default=Decimal("0"), ge=0, le=1),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> DeepValueResponse:
+    """Cribado deep value (P/B + yield) sobre las metricas valuation-v1.
+
+    Estrategia separada del embudo de calidad, con su rotulo: cada fila lleva
+    fuente y fecha por cifra y el desacuerdo Yahoo/Finnhub visible."""
+    from app.services.deep_value_service import (
+        STRATEGY_ID,
+        STRATEGY_LABEL,
+        find_deep_value,
+    )
+
+    rows = find_deep_value(db, pb_max=pb_max, yield_min=yield_min, limit=limit)
+    return DeepValueResponse(
+        estrategia=STRATEGY_ID,
+        rotulo=STRATEGY_LABEL,
+        resultados=[
+            DeepValueRowOut(
+                ticker=r.ticker,
+                name=r.name,
+                exchange=r.exchange,
+                currency=r.currency,
+                sector=r.sector,
+                score=r.score,
+                price_to_book=float(r.price_to_book),
+                pb_price_date=r.pb_price_date,
+                pb_fiscal_year=r.pb_fiscal_year,
+                dividend_yield=float(r.dividend_yield) if r.dividend_yield is not None else None,
+                yield_status=r.yield_status,
+                desacuerdo_fuentes=r.desacuerdo_fuentes,
+                yield_extremo_revisar=r.yield_extremo_revisar,
+                finnhub_yield_indicated=(
+                    float(r.finnhub_yield_indicated)
+                    if r.finnhub_yield_indicated is not None
+                    else None
+                ),
+                fuentes=r.fuentes,
+                metric_as_of=r.metric_as_of,
+            )
+            for r in rows
+        ],
+    )
