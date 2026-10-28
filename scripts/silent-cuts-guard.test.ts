@@ -25,7 +25,12 @@ describe('cortes de lista declarados', () => {
     it('«Lo que debe cumplirse» se muestra completo, sin corte', () => {
         assert.ok(!panels.includes('what_must_be_true.slice('), 'corte silencioso en lo que debe cumplirse');
     });
-    it('comparaciones expectativa/realidad: 40 de N declarado', () => {
-        assert.match(panels, /Se muestran 40 de \{formatNumber\(reviews\.length/);
+    it('comparaciones y previsiones: todas accesibles por paginación con total', () => {
+        const list = readFileSync('components/research/ExpectationsList.tsx', 'utf8');
+        const pager = readFileSync('components/research/Pager.tsx', 'utf8');
+        assert.match(list, /paginate\(main, page, PAGE\)/);
+        assert.match(list, /total=\{main\.length\}/);
+        assert.match(list, /total=\{pending\.length\}/);
+        assert.match(pager, /Página \{page\} de \{pages\} · \{total\}/);
     });
 });
