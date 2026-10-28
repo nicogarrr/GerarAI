@@ -5,8 +5,8 @@ Cubre con el comportamiento real del fuente (TaxReportService):
 - compensación de ganancias y pérdidas dentro del mismo ejercicio;
 - sin arrastre automático: pérdidas de ejercicios anteriores no reducen
   el neto del año en curso (límite documentado, no verde falso);
-- umbral Modelo 720 y scrip cash-vs-acciones: el fuente no los
-  implementa → skip explícito con motivo.
+- umbral Modelo 720: implementado en Modelo720Service (ver el test);
+- scrip cash-vs-acciones: el fuente no lo implementa → skip explícito con motivo.
 
 Hermético: SQLite en memoria, sin red.
 """
@@ -118,15 +118,49 @@ def test_no_automatic_carryforward_prior_year_loss_excluded(db):
     assert report["summary"]["net_taxable_base"] == pytest.approx(500.0)
 
 
-def test_modelo_720_threshold_not_implemented():
-    pytest.skip(
-        "El fuente (TaxReportService) no implementa el umbral del Modelo 720 "
-        "(50.000 €): no hay nada honesto que afirmar."
-    )
+def test_modelo_720_threshold_lives_in_modelo720_service_and_is_strict():
+    """El umbral SÍ está implementado, pero en Modelo720Service (no en
+    TaxReportService, que es el IRPF): 50.000 € por categoría, y la obligación
+    nace al EXCEDERLO (50.000,00 no obliga, 50.000,01 sí)."""
+    from datetime import date as _date
+
+    from app.services.tax_modelo720_service import THRESHOLD_720, Modelo720Service
+    from tests.test_tax_modelo720_service import _company, _position_row, _position_snapshot, _seed
+
+    assert THRESHOLD_720 == Decimal("50000")
+    results = {}
+    for amount in ("50000", "50000.01"):
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        with Session(engine) as session:
+            tenant, portfolio = _seed(session, custody={"US0378331005": "IE"})
+            c = _company(session, tenant, "AAPL", isin="US0378331005")
+            _position_row(session, tenant, portfolio, c)
+            _position_snapshot(session, tenant, portfolio, c, _date(2025, 12, 31), Decimal(amount))
+            results[amount] = Modelo720Service().check_thresholds(session, 2025)["categories"]["valores"]
+    assert results["50000"]["exceeds"] is False and results["50000"]["status"] == "por_debajo"
+    assert results["50000.01"]["exceeds"] is True and results["50000.01"]["status"] == "supera"
 
 
-def test_scrip_cash_vs_shares_not_distinguished():
-    pytest.skip(
-        "El fuente no distingue scrip en efectivo frente a scrip en acciones "
-        "(todo 'dividend' va al mismo bucket): testearlo sería verde falso."
-    )
+def test_scrip_rows_are_not_counted_as_cash_dividends_and_are_flagged_for_review(db):
+    """Scrip (efectivo vs acciones): el criterio fiscal NO está implementado.
+    Fail-closed: la fila no suma a dividendos ni a la casilla 0029 y se marca
+    para revisión manual, en vez de tratarse como dividendo en efectivo."""
+    _eur_portfolio(db)
+    c = _company(db, "SAN")
+    pay = date(2026, 5, 15)
+    _fx(db, "EUR", "USD", pay, "0.90")
+    _tx(db, c, pay, "dividend", 0, 100)                      # dividendo ordinario 100 USD
+    db.add(Transaction(
+        company_id=c.id, trade_date=pay, action="dividend", quantity=Decimal("0"), price=Decimal("200"),
+        fees=Decimal("0"), currency="USD", raw_payload={"type": "Scrip Dividend"},
+    ))
+    db.commit()
+
+    report = TaxReportService().compute_report(db, 2026)
+    bucket = next(b for b in report["dividends"] if b["ticker"] == "SAN")
+    # Solo el ordinario: 100 USD * 0,90 = 90 EUR (el scrip de 200 no suma).
+    assert bucket["dividends_base"] == pytest.approx(90.0)
+    assert len(bucket["special_payments"]) == 1
+    assert bucket["special_payments"][0]["raw_action"] == "Scrip Dividend"
+    assert bucket["special_payments"][0]["type"] == "special"
