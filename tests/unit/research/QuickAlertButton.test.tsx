@@ -6,7 +6,7 @@ vi.mock('sonner',()=>({toast:{success:m.success,error:m.error,info:m.info}}));
 vi.mock('@/lib/toast',()=>({showErrorToast:m.showError}));
 import QuickAlertButton from '@/components/research/QuickAlertButton';
 function open(){fireEvent.click(screen.getByRole('button',{name:'Alerta de precio'}));}
-async function type(label:string){fireEvent.keyDown(screen.getByRole('combobox',{name:'Tipo de alerta'}),{key:'ArrowDown'});fireEvent.click(await screen.findByRole('option',{name:label,exact:true}));}
+async function type(label:string){fireEvent.keyDown(screen.getByRole('combobox',{name:'Tipo de alerta'}),{key:'ArrowDown'});fireEvent.click(await screen.findByRole('option',{name:label}));}
 beforeEach(()=>vi.clearAllMocks());
 describe('quick research alert',()=>{
  it.each(['','0','-1','abc'])('rejects invalid/nonpositive input %s before any action',async value=>{
