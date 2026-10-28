@@ -62574,6 +62574,26 @@
             }
           },
           {
+            "in": "query",
+            "name": "fx_opening_complete",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Fx Opening Complete",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fx_income_by_analogy",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Fx Income By Analogy",
+              "type": "boolean"
+            }
+          },
+          {
             "in": "header",
             "name": "x-cavaai-user",
             "required": false,
