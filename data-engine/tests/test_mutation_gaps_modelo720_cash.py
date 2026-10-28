@@ -155,3 +155,87 @@ def test_custodia_declarada_solo_codigos_iso2_de_texto(db):
     tenant.metadata_ = {"tax_declarant": "IE"}
     db.flush()
     assert _declared_custody_map(db, tenant.id) == {}
+
+
+def test_saldo_medio_q4_por_cartera_no_mezcla_carteras(db):
+    from app.models import Portfolio
+
+    tenant, first = _seed(db)
+    second = Portfolio(tenant_id=tenant.id, name="B", base_currency="EUR", is_default=False)
+    db.add(second)
+    db.flush()
+    for day in [*_weekly(date(2025, 10, 1), date(2025, 12, 24)), YEAR_END]:
+        _snap(db, tenant, first, day, "USD", 10000, "0.90")
+        _snap(db, tenant, second, day, "USD", 30000, "0.90")
+    cuentas = Modelo720Service().check_thresholds(db, 2025)["categories"]["cuentas"]
+    assert [(b["value_base"], b["average_q4_base"]) for b in cuentas["balances"]] == [
+        (9000.0, 9000.0), (27000.0, 27000.0),
+    ]
+    assert cuentas["total_base"] == 36000.0
+    assert cuentas["average_q4_total_base"] == 36000.0
+    # Multicartera: el efectivo no es atribuible por cuenta real -> no concluyente.
+    assert cuentas["status"] == "desconocido"
+
+
+@pytest.mark.parametrize(("lag", "total", "stale"), [(10, 9000.0, False), (11, 0.0, True)])
+def test_snapshot_de_caja_hasta_diez_dias_antes_del_cierre_vale(db, lag, total, stale):
+    from datetime import timedelta
+
+    from app.services.tax_modelo720_service import SNAPSHOT_MAX_LAG_DAYS
+
+    assert SNAPSHOT_MAX_LAG_DAYS == 10
+    tenant, portfolio = _seed(db)
+    last = YEAR_END - timedelta(days=lag)
+    for day in [*_weekly(date(2025, 10, 1), last), last]:
+        _snap(db, tenant, portfolio, day, "USD", 10000, "0.90")
+    result = Modelo720Service().check_thresholds(db, 2025)
+    cuentas = result["categories"]["cuentas"]
+    assert cuentas["total_base"] == total
+    assert cuentas["snapshot_lag_days"] == lag
+    if stale:
+        assert result["stale_snapshots"] == [{
+            "ticker": "cash-USD", "snapshot_date": last.isoformat(), "lag_days": lag,
+            "reason": (
+                f"Snapshot de {last.isoformat()} ({lag} días antes del cierre): demasiado "
+                "antiguo para afirmar el valor a 31/12 de ESTA partida; fuera del total."
+            ),
+        }]
+    else:
+        assert result["stale_snapshots"] == []
+
+
+
+@pytest.mark.parametrize("base_currency", ["USD", "GBP"])
+def test_portfolio_sin_base_eur_no_evalua_el_umbral(db, base_currency):
+    from app.services.tax_modelo720_service import _inmuebles, _notas
+
+    tenant, portfolio = _seed(db)
+    portfolio.base_currency = base_currency
+    db.flush()
+    result = Modelo720Service().check_thresholds(db, 2025)
+    reason = (
+        f"La divisa base del portfolio es {base_currency}, no EUR: sin tipo de cambio "
+        "oficial a 31/12 no hay conversión fiable y el umbral de 50.000 € no se evalúa."
+    )
+    unknown = {"exceeds": None, "status": "desconocido", "total_base": None,
+               "snapshot_lag_days": None, "reasons": [reason], "custody": "por_partida"}
+    assert result["categories"] == {
+        "valores": {**unknown, "positions": [], "missing_isin": []},
+        "cuentas": {**unknown, "balances": [], "average_q4_missing": True},
+        "inmuebles": _inmuebles(),
+    }
+    assert result["base_currency"] == base_currency
+    assert result["incomplete"] is True
+    assert result["notas"] == _notas()
+    assert result["custody_country"] is None
+
+
+def test_base_eur_en_minusculas_pasa_el_filtro(db):
+    tenant, portfolio = _seed(db)
+    portfolio.base_currency = "eur"
+    db.flush()
+    _snap(db, tenant, portfolio, YEAR_END, "USD", 1000, "0.90")
+    result = Modelo720Service().check_thresholds(db, 2025)
+    assert result["base_currency"] == "eur"
+    assert result["custody_country"] is None
+    assert result["categories"]["cuentas"]["total_base"] == 900.0
