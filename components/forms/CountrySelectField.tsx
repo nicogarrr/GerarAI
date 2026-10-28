@@ -8,18 +8,19 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from '@/components/ui/command';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { ChevronsUpDown } from 'lucide-react';
+import type { CountryOption } from '@/components/forms/CountrySelectCommand';
+
+// El menú (cmdk) solo se descarga al abrir el desplegable: /sign-up es una
+// página pública de entrada y el selector casi nunca se abre (defecto ES).
+// Se precarga al pulsar/enfocar el gatillo para que no se note.
+const CountrySelectCommand = dynamic(() => import('@/components/forms/CountrySelectCommand'), {
+    loading: () => <div className='h-40 animate-pulse rounded bg-gray-800' aria-hidden='true' />,
+});
+const preloadCountryCommand = () => void import('@/components/forms/CountrySelectCommand');
 import countryList from 'react-select-country-list';
 
 // Los nombres visibles van en español; el value sigue siendo el código ISO.
@@ -69,7 +70,7 @@ const CountrySelect = ({
     // Get country options with Spanish labels and flags. `search` lleva el
     // nombre español, el inglés original y el ISO para que buscar «España»
     // (o «Spain», o «ES») encuentre la misma opción.
-    const countries = useMemo(
+    const countries: CountryOption[] = useMemo(
         () => countryList().getData().map((country) => {
             const label = countryLabel(country.value, country.label);
             return {
@@ -96,6 +97,8 @@ const CountrySelect = ({
                 <Button
                     variant='outline'
                     role='combobox'
+                    onPointerDown={preloadCountryCommand}
+                    onFocus={preloadCountryCommand}
                     aria-expanded={open}
                     aria-label={label}
                     aria-invalid={invalid}
@@ -117,41 +120,15 @@ const CountrySelect = ({
                 className='w-full p-0 bg-gray-800 border-gray-600'
                 align='start'
             >
-                <Command className='bg-gray-800 border-gray-600'>
-                    <CommandInput
-                        placeholder='Buscar países…'
-                        className='country-select-input'
-                    />
-                    <CommandEmpty className='country-select-empty'>
-                        No se ha encontrado ningún país.
-                    </CommandEmpty>
-                    <CommandList className='max-h-60 bg-gray-800 scrollbar-hide-default'>
-                        <CommandGroup className='bg-gray-800'>
-                            {countries.map((country) => (
-                                <CommandItem
-                                    key={country.value}
-                                    value={country.search}
-                                    onSelect={() => {
-                                        onChange(country.value);
-                                        setOpen(false);
-                                    }}
-                                    className='country-select-item'
-                                >
-                                    <Check
-                                        className={cn(
-                                            'mr-2 h-4 w-4 text-teal-500',
-                                            value === country.value ? 'opacity-100' : 'opacity-0'
-                                        )}
-                                    />
-                                    <span className='flex items-center gap-2'>
-                    <span>{getFlagEmoji(country.value)}</span>
-                    <span>{country.label}</span>
-                  </span>
-                                </CommandItem>
-                            ))}
-                        </CommandGroup>
-                    </CommandList>
-                </Command>
+                <CountrySelectCommand
+                    countries={countries}
+                    value={value}
+                    flagFor={getFlagEmoji}
+                    onSelect={(next) => {
+                        onChange(next);
+                        setOpen(false);
+                    }}
+                />
             </PopoverContent>
         </Popover>
     );

@@ -1254,6 +1254,14 @@ class IBKRImportService:
             as_of=max(observation_dates, default=date.today()),
             source="ibkr_flex",
         )
+        from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+
+        checked_positions = list(db.scalars(select(Position)).all())
+        cost_checks = reconcile_ibkr_costs(db, checked_positions)
+        cost_review_required = sorted(
+            p.company.ticker for p in checked_positions
+            if cost_checks.get(p.id, {}).get("status") == "review_required"
+        )
         db.commit()
         _auto_link_journal_after_import(db)
         # market_prices solo acumula hacia adelante: las companias que la
@@ -1283,6 +1291,7 @@ class IBKRImportService:
             "price_backfills_enqueued": price_backfills_enqueued,
             "positions_imported": positions_imported,
             "valuation_hold_kept": valuation_hold_kept,
+            "cost_review_required": cost_review_required,
             "cash_imported": cash_imported,
             "trades_imported": trades_imported,
             "raw_rows_stored": raw_rows_stored,

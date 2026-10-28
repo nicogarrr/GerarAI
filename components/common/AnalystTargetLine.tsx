@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { getListingAnalystTargets, type ListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { requestCache } from '@/lib/cache/requestCache';
 import { formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 
 /**
@@ -17,7 +18,14 @@ import { formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
  * oficial y precio de la fila en USD del OTC), se muestra con SU divisa
  * declarada y sin recorrido: nunca se mezclan divisas en una cifra o un %.
  * Si Yahoo no declara divisa, número pelado y sin recorrido.
+ *
+ * /watchlist y /portfolio montan la línea DOS veces por fila (tarjetas
+ * móviles + tabla de escritorio, ambas en el DOM): eran 2 lecturas iguales
+ * por símbolo tras el primer pintado. requestCache las deduplica y guarda
+ * el consenso ANALYST_TARGETS_TTL_S (cambia a diario como mucho): 1 lectura
+ * por símbolo y ventana aunque se pagine o se remonte la lista.
  */
+const ANALYST_TARGETS_TTL_S = 300;
 export default function AnalystTargetLine({
     symbol,
     quoteSymbol,
@@ -35,7 +43,11 @@ export default function AnalystTargetLine({
 
     useEffect(() => {
         let cancelled = false;
-        getListingAnalystTargets(symbol, quoteSymbol)
+        requestCache.get(
+            `analyst-targets:${symbol.toUpperCase()}:${(quoteSymbol ?? '').toUpperCase()}`,
+            () => getListingAnalystTargets(symbol, quoteSymbol),
+            ANALYST_TARGETS_TTL_S,
+        )
             .then((value) => {
                 if (cancelled) return;
                 setData(value);
