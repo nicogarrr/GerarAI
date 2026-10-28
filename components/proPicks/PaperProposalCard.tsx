@@ -21,7 +21,7 @@ function conviction(value: string) {
     return value.trim() && Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? `${number(parsed * 100)} %` : 'Sin datos';
 }
 
-/** Qué tesis evaluaba la simulación; avisa si la tesis ha cambiado desde entonces. */
+/** Qué tesis evaluaba la operación simulada; avisa si la tesis ha cambiado desde entonces. */
 export function PaperThesisLine({ trade }: { trade: PaperTradeView }) {
     const anchor = trade.thesis_anchor;
     const thesisHref = `/research/${encodeURIComponent(trade.ticker)}?view=thesis`;
