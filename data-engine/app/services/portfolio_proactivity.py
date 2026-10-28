@@ -5,9 +5,18 @@ import hashlib
 import json
 from datetime import date
 from decimal import Decimal, InvalidOperation
+
 from sqlalchemy import select
+
 from app.core.tenancy import tenant_filters
-from app.models import CashBalance, Company, InvestmentPlan, PortfolioDailySnapshot, PositionDailySnapshot, ResearchAlert
+from app.models import (
+    CashBalance,
+    Company,
+    InvestmentPlan,
+    PortfolioDailySnapshot,
+    PositionDailySnapshot,
+    ResearchAlert,
+)
 from app.services.review_alert_service import ReviewAlertService
 
 

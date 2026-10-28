@@ -1,11 +1,21 @@
 from datetime import date, timedelta
 from decimal import Decimal
+
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
-from app.models import CashBalance, Company, InvestmentPlan, PortfolioDailySnapshot, PositionDailySnapshot, ResearchAlert
+
+from app.models import (
+    CashBalance,
+    Company,
+    InvestmentPlan,
+    PortfolioDailySnapshot,
+    PositionDailySnapshot,
+    ResearchAlert,
+)
 from app.models.entities import Base
 from app.services.portfolio_proactivity import review_portfolio_data
+
 
 @pytest.fixture
 def db():

@@ -619,7 +619,7 @@ services:
       resources:
         limits:
           cpus: "0.40"
-          memory: 640M
+          memory: 448M
 
   worker-alerts:
     image: cavaai-backend:prod
@@ -789,7 +789,7 @@ services:
       resources:
         limits:
           cpus: "0.50"
-          memory: 1024M
+          memory: 512M
 
   scheduler:
     image: cavaai-backend:prod

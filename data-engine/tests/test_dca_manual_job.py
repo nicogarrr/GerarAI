@@ -1,10 +1,13 @@
 from datetime import UTC, datetime
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
 from app.models import DcaEvaluationRun
 from app.models.entities import Base
 from app.services import dca_manual_job
+
 
 class Gate:
     owner = b'token'
@@ -82,10 +85,11 @@ def test_oversized_receipt_fails_before_fetch(env, monkeypatch):
 
 
 def test_enqueue_is_202_and_never_fetches_then_status_is_scoped(env, monkeypatch):
-    from app.api.routes import watchlist
-    from app.workers.dramatiq_app import evaluate_manual_dca
-    from app.services import dca_manual
     from fastapi import HTTPException
+
+    from app.api.routes import watchlist
+    from app.services import dca_manual
+    from app.workers.dramatiq_app import evaluate_manual_dca
     db, row, gate = env
     db.info['user_id'] = 'u-1'
     sent = []
@@ -104,11 +108,12 @@ def test_enqueue_is_202_and_never_fetches_then_status_is_scoped(env, monkeypatch
 
 
 def test_queue_failure_terminal_no_success_receipt(env, monkeypatch):
-    from app.api.routes import watchlist
-    from app.workers.dramatiq_app import evaluate_manual_dca
-    from app.services import dca_manual
     from fastapi import HTTPException
     from sqlalchemy import select
+
+    from app.api.routes import watchlist
+    from app.services import dca_manual
+    from app.workers.dramatiq_app import evaluate_manual_dca
     db, row, gate = env
     db.info['user_id'] = 'u-1'
     monkeypatch.setattr(dca_manual, 'acquire_manual_gate', lambda *args: ('token', 0))
@@ -132,12 +137,13 @@ def test_api_route_is_202():
 def test_manual_lease_outlives_actor_limit():
     from app.services.dca_manual import LEASE_SECONDS
     from app.workers.dramatiq_app import evaluate_manual_dca
-    assert LEASE_SECONDS * 1000 > evaluate_manual_dca.options['time_limit']
+    assert evaluate_manual_dca.options['time_limit'] < LEASE_SECONDS * 1000
 
 
 def test_queued_receipt_maps_to_running_until_stale(env):
-    from app.services.dca_run_log import run_payload
     from datetime import timedelta
+
+    from app.services.dca_run_log import run_payload
     db, row, gate = env
     assert run_payload(row)['status'] == 'running'
     assert run_payload(row, now=datetime.now(UTC) + timedelta(minutes=41))['status'] == 'interrupted'

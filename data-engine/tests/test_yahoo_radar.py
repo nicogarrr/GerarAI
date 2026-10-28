@@ -1,6 +1,5 @@
 """Radar Yahoo (B1): parseo fail-closed, unidades por campo, cotejo y contrato
 de no-persistencia. Sin red: fetcher inyectado con payload grabado."""
-from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -12,7 +11,6 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.routes import propicks as propicks_route
 from app.core.database import Base, get_db
-from app.core.database import Base
 from app.models import CalculatedMetric, FinancialFact, Tenant
 from app.services import yahoo_radar_service as radar
 from tests.test_propicks_prices import _company, _db

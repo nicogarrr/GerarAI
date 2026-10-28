@@ -75,7 +75,7 @@ class InvestmentPlanService:
     ) -> InvestmentPlan:
         portfolio = self.fx.ensure_portfolio(db)
         plan = self.get_plan(db)
-        from app.services.plan_proactivity import plan_state, emit_plan_notice
+        from app.services.plan_proactivity import emit_plan_notice, plan_state
         previous_state = plan_state(plan)
         if plan is None:
             plan = InvestmentPlan(

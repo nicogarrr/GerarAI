@@ -394,7 +394,7 @@ def deep_value_radar(
         raise HTTPException(
             status_code=503,
             detail="Radar Yahoo no disponible ahora mismo; no se han generado candidatos.",
-        )
+        ) from None
     return RadarResponse(
         rotulo=RADAR_LABEL,
         generado_en=generado_en,
