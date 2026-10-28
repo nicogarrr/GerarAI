@@ -6,6 +6,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getKnowledgeDocument, getKnowledgeDocumentChunkPage } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
+import { LibraryChat } from '../../_components/LibraryChat';
 import { Pagination } from '../../_components/Pagination';
 import { investorLetters } from '../investor-letters';
 import { authorKey, titleYear } from '../letters';
@@ -56,6 +57,7 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
     const backHref = verifiedInvestor ? `/inversores/${encodeURIComponent(verifiedInvestor)}?vista=cartas` : author ? `/inversores/cartas?autor=${authorKey(author) || 'sin-autor'}` : '/inversores/cartas?autor=sin-autor';
 
     return (
+        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-8 overflow-x-clip py-6">
             <header className="flex flex-col gap-3">
                 <Link className={LINK} href={backHref}>
@@ -101,5 +103,7 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
                 el PDF original manda). Es doctrina de inversión, no datos de las empresas.
             </p>
         </main>
+        <aside aria-label="Cerebro de la carta" className="min-w-0 xl:sticky xl:top-24 xl:self-start"><LibraryChat scope="letters" authors={author ? [author] : []} documentId={letterId} documentTitle={letter.title} placement="reader" /></aside>
+        </div>
     );
 }

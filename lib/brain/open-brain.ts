@@ -14,7 +14,7 @@
  */
 export const OPEN_BRAIN_PENDING_KEY = 'gerarai:open-brain:pending';
 
-export type KnowledgeBrainContext = { scope: 'letters' | 'library'; authors?: string[] };
+export type KnowledgeBrainContext = { scope: 'letters' | 'library'; authors?: string[]; documentId?: number; documentTitle?: string };
 
 export type OpenBrainDetail = {
     knowledge?: KnowledgeBrainContext;
@@ -64,5 +64,5 @@ export function brainHandoffContext(detail?: OpenBrainDetail | null): { ticker: 
 export function knowledgeHandoff(detail?: OpenBrainDetail | null): KnowledgeBrainContext | null {
     const k = detail?.knowledge;
     if (!k || (k.scope !== 'letters' && k.scope !== 'library')) return null;
-    return { scope: k.scope, authors: Array.isArray(k.authors) ? k.authors.filter((a): a is string => typeof a === 'string' && a.length <= 200).slice(0, 200) : [] };
+    return { scope: k.scope, ...(Number.isSafeInteger(k.documentId) && k.documentId! > 0 ? { documentId: k.documentId } : {}), ...(typeof k.documentTitle === 'string' ? { documentTitle: k.documentTitle.slice(0, 240) } : {}), authors: Array.isArray(k.authors) ? k.authors.filter((a): a is string => typeof a === 'string' && a.length <= 200).slice(0, 200) : [] };
 }

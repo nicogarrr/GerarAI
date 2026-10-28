@@ -156,3 +156,11 @@ describe('macro-calendar y market-themes', () => {
         await expect(getMarketThemes()).rejects.toThrow('no válida');
     });
 });
+
+describe('knowledge document context', () => {
+    it('sends only the explicitly selected document ID', async () => {
+        await askKnowledge('Pregunta de la carta', 'letters', undefined, 'respuesta', null, 42);
+        const opts = researchRequest.mock.calls.at(-1)![1];
+        expect(JSON.parse(opts.body).document_id).toBe(42);
+    });
+});

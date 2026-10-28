@@ -123,7 +123,6 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/proPicks/DcaBacktestPanel.tsx': 'useState, useTransition, jsx-onSubmit, jsx-onChange',
   'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',
   'app/(root)/inversores/_components/IngestLettersButton.tsx': 'useState, jsx-onClick',
-  'app/(root)/inversores/_components/LibraryChat.tsx': 'jsx-onClick',
   'app/(root)/inversores/_components/SyncPortfoliosButton.tsx': 'useState, jsx-onClick',
   'app/(root)/ownership/SyncButton.tsx': 'useTransition, useState, jsx-onClick',
   'app/(root)/temas/_components/ThemeBrainButton.tsx': 'jsx-onClick, browser:window',
@@ -492,8 +491,7 @@ describe('el escaner y el guard cuentan lo mismo', () => {
   it('LibraryChat justifica su directiva por estado y envío interactivo', () => {
     const row = byRel.get('app/(root)/inversores/_components/LibraryChat.tsx');
     assert.ok(row);
-    assert.equal(row.hasUseClient, true);
-    assert.equal(row.justified, true, 'preguntas, respuesta y estado busy/error requieren hooks y eventos');
+    assert.equal(row.hasUseClient, false, 'el slot es servidor; solo GlobalBrain mantiene estado y eventos');
   });
 
   it('scan-use-client.mjs no reporta ninguna clase (B)', () => {

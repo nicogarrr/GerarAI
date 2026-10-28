@@ -427,7 +427,7 @@ describe('Cerebro único: biblioteca y cartas', () => {
     fireEvent.change(screen.getByLabelText('Autor'), { target: { value: 'Buffett' } });
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
-    await waitFor(() => expect(askKnowledge).toHaveBeenCalledWith('¿Recompras?', 'letters', 'Buffett', 'analisis', expect.objectContaining({ path: '/portfolio' })));
+    await waitFor(() => expect(askKnowledge).toHaveBeenCalledWith('¿Recompras?', 'letters', 'Buffett', 'analisis', expect.objectContaining({ path: '/portfolio' }), undefined));
     expect(chatWithPortfolio).not.toHaveBeenCalled();
     expect(askResearchAssistantAction).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Volver al chat general' }));

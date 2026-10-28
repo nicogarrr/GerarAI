@@ -2,6 +2,7 @@
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,27 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     useEffect(() => {
         if (isOpen) void import('react-markdown');
     }, [isOpen]);
+    // The page owns only a slot. This layout instance keeps the transcript
+    // when moving between embedded doctrine and the floating panel elsewhere.
+    useEffect(() => {
+        let current: HTMLElement | null | undefined = undefined;
+        const sync = () => {
+            const slot = document.getElementById('brain-library-slot');
+            if (slot === current) return;
+            current = slot;
+            setLibrarySlot(slot);
+            if (slot) {
+                let authors: string[] = [];
+                try { authors = JSON.parse(slot.dataset.authors ?? '[]'); } catch { /* empty filter */ }
+                setKnowledge(knowledgeHandoff({ knowledge: { scope: slot.dataset.scope === 'letters' ? 'letters' : 'library', authors, documentId: Number(slot.dataset.documentId), documentTitle: slot.dataset.documentTitle } }));
+                setGuideTicker(''); setReviewId(undefined); setAuthor(''); setAnalysis(false);
+            } else { setKnowledge(null); setIsOpen(false); }
+        };
+        queueMicrotask(sync);
+        const observer = new MutationObserver(sync);
+        observer.observe(document.body, { childList: true, subtree: true });
+        return () => observer.disconnect();
+    }, [pathname]);
     // Pista de apertura: la etiqueta "Pregunta al Cerebro" se ve unos
     // segundos al cargar y se pliega sola (vuelve con hover/foco). Sin ella
     // el botón flotante era un cerebro suelto que nadie tocaba (Tester Nico).
@@ -73,6 +95,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const [isMaximized, setIsMaximized] = useState(false);
     // Modo guía (asistente de research unificado): con ticker en el selector el
     // Cerebro pregunta a /api/research/assistant en vez de al chat general.
+    const [librarySlot, setLibrarySlot] = useState<HTMLElement | null>(null);
     const [knowledge, setKnowledge] = useState<KnowledgeBrainContext | null>(null);
     const [author, setAuthor] = useState('');
     const [analysis, setAnalysis] = useState(false);
@@ -189,7 +212,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     }
 
     // La pastilla "Viendo X": el eco del servidor manda sobre la etiqueta local.
-    const viewing = echo?.label ?? page?.label ?? null;
+    const viewing = knowledge?.documentTitle ?? echo?.label ?? page?.label ?? null;
     // Y la pastilla NAVEGA: si el eco resolvió un ticker va a su ficha; si no,
     // a la página que el cliente está viendo (la pastilla deja de ser texto muerto).
     const viewingHref = echo?.ticker
@@ -200,7 +223,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         if (scrollRef.current) {
             scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
         }
-    }, [messages, isOpen, isMaximized]);
+    }, [messages, isOpen, isMaximized, librarySlot]);
 
     // Al cambiar de página el eco viejo deja de ser válido: vuelve la etiqueta
     // local. Ajuste durante el render (reset al cambiar un valor), no efecto.
@@ -220,7 +243,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
      * por si solo.
      */
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen || librarySlot) return;
         const dialog = dialogRef.current;
         if (!dialog) return;
 
@@ -303,7 +326,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             if (previous && previous.isConnected && previous.getClientRects().length > 0) previous.focus();
             else (document.activeElement as HTMLElement | null)?.blur?.();
         };
-    }, [isOpen]);
+    }, [isOpen, librarySlot]);
 
     async function handleSend() {
         if (!input.trim() || loading) return;
@@ -316,7 +339,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
 
         if (knowledge) {
             try {
-                const result = await askKnowledge(userMsg, knowledge.scope, author, analysis ? 'analisis' : 'respuesta', page);
+                const result = await askKnowledge(userMsg, knowledge.scope, author, analysis ? 'analisis' : 'respuesta', page, knowledge.documentId);
                 const text = result.analysis ? analysisToText(result.analysis) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? 'Autor no registrado'} · ${a.citation.title}${a.citation.page_number !== null ? ` · Página ${a.citation.page_number}` : ''} · Fragmento ${a.citation.chunk_index + 1}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
                 setMessages(prev => [...prev, { role: 'assistant', content: text || result.message || 'Sin datos en la biblioteca.', library: result }]);
             } catch (error) {
@@ -375,7 +398,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // safe-area), nunca la tapa; en escritorio vuelve a la esquina habitual.
     // `viewportFit: "cover"` + barra de inicio de iOS: sin el inset la
     // burbuja queda bajo la barra en modo standalone.
-    if (!isOpen) {
+    if (!isOpen && !librarySlot) {
         return (
             <div className="group fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] z-50 hidden items-center gap-2 md:flex">
                 <span
@@ -401,15 +424,15 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
 
     // Panel: lateral derecho a toda altura en escritorio; hoja sobre la
     // BottomNav en móvil.
-    return (
+    const panel = (
         <Card
             ref={dialogRef}
             tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
+            role={librarySlot ? "region" : "dialog"}
+            aria-modal={librarySlot ? undefined : true}
             aria-labelledby="global-brain-title"
             aria-busy={loading}
-            className={`fixed z-50 flex flex-col border-indigo-500/30 bg-slate-950/95 backdrop-blur-md shadow-2xl transition-all duration-300 ${isMaximized
+            className={`${librarySlot ? 'relative h-[min(780px,80dvh)] min-h-[520px] w-full' : 'fixed z-50'} flex flex-col border-indigo-500/30 bg-slate-950/95 backdrop-blur-md shadow-2xl transition-all duration-300 ${librarySlot ? '' : isMaximized
             ? 'top-4 bottom-4 left-4 right-4 w-auto h-auto'
             : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
@@ -466,7 +489,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                         )
                     )}
                 </div>
-                <div className="flex items-center gap-1">
+                {!librarySlot && <div className="flex items-center gap-1">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -485,13 +508,14 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     >
                         <X aria-hidden="true" className="h-4 w-4" />
                     </Button>
-                </div>
+                </div>}
             </CardHeader>
 
             {knowledge && <div className="shrink-0 flex flex-col gap-2 border-b border-slate-700 p-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2"><span>{knowledge.scope === 'letters' ? 'Cartas' : 'Biblioteca'} · Doctrina, no datos actuales de empresas</span><button type="button" className="min-h-11 text-indigo-300" onClick={() => setKnowledge(null)}>Volver al chat general</button></div>
+                <div className="flex flex-wrap items-center justify-between gap-2"><span>{knowledge.documentTitle ? `Carta: ${knowledge.documentTitle}` : knowledge.scope === 'letters' ? 'Cartas' : 'Biblioteca'} · Doctrina, no datos actuales de empresas</span><button type="button" className="min-h-11 text-indigo-300" onClick={() => setKnowledge(null)}>Volver al chat general</button></div>
+                <details><summary className="min-h-11 cursor-pointer py-2">Autor y análisis</summary>
                 {!!knowledge.authors?.length && <label>Autor<select aria-label="Autor" value={author} onChange={e => setAuthor(e.target.value)} className="block min-h-11 w-full rounded bg-slate-900 p-2"><option value="">Todos los autores</option>{knowledge.authors.map(a => <option key={a} value={a}>{a}</option>)}</select></label>}
-                <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} />Análisis estructurado (tesis, escenarios, modelos mentales)</label>
+                <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} />Análisis estructurado (tesis, escenarios, modelos mentales)</label></details>
             </div>}
             <CardContent className="min-h-0 flex-1 p-0 overflow-hidden relative">
                 <div
@@ -622,4 +646,5 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             </CardFooter>
         </Card>
     );
+    return librarySlot ? createPortal(panel, librarySlot) : panel;
 }

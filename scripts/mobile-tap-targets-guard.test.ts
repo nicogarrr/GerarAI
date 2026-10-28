@@ -52,7 +52,7 @@ describe('móvil: 44 px en biblioteca, estados vacíos y enlaces de panel (audit
     it('biblioteca abre Cerebro y controles de doctrina tienen área táctil', () => {
         const entry = readFileSync('app/(root)/inversores/_components/LibraryChat.tsx', 'utf8');
         const chat = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
-        assert.ok(entry.includes('min-h-[44px]'), 'entrada con area tactil');
+        assert.ok(entry.includes('brain-library-slot'), 'entrada es el Cerebro integrado sin boton intermedio');
         assert.ok(chat.includes('className="flex min-h-11 items-center gap-2"'), 'casilla de análisis táctil');
         assert.ok(chat.includes('block min-h-11 w-full'), 'selector de autor táctil');
         assert.ok(chat.includes('mt-2 block min-h-11'), 'copiar táctil');
