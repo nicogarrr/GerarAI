@@ -335,8 +335,11 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
         ? []
         : Array.from({ length: 6 }, (_, index) => currentYear - index);
 
+    // [&>*]:min-w-0: a 768 px (md) la tarjeta «Posiciones Fiscales» (min-content
+    // 513 px) inflaba la vía implícita de esta grid y la página hacía scroll
+    // horizontal; con min-w-0 cada tarjeta cabe y su tabla desliza dentro.
     return (
-        <div className="grid gap-6 [&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:items-center">
+        <div className="grid gap-6 [&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:items-center [&>*]:min-w-0">
             <div className="flex flex-wrap items-center gap-3">
                 <label htmlFor="tax-year" className="text-sm text-gray-400">
                     {t('taxes.year')}
