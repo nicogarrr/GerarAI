@@ -71,14 +71,16 @@ beforeEach(() => {
 });
 
 describe('ProPicksTabs', () => {
-    it('muestra las 5 pestañas y arranca en Selección IA con los datos del servidor', () => {
+    it('muestra las 7 pestañas y arranca en Selección IA con los datos del servidor', () => {
         render(<ProPicksTabs strategies={strategies} initialPicks={[pick('A'), pick('B')]} generatedAt="2026-10-27" passedCount={7} />);
         expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
             'Selección IA',
             'Joyas',
+            'Deep value',
             'Estrategia y rebalanceo',
             'Backtesting',
             'Paper trading',
+            'Radar global',
         ]);
         expect(screen.getByRole('tab', { name: 'Selección IA' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByTestId('picks')).toHaveTextContent('picks:2 run:2026-10-27 passed:7');

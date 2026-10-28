@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BarChart3, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -37,7 +37,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
     // El motor walk-forward NO se dispara al montar: se lanza la primera vez
     // que se abre la pestaña de Backtesting (o con «Ejecutar backtest»).
     // Antes costaba una corrida completa a quien solo quería ver los Picks.
-    const [backtestStarted, setBacktestStarted] = useState(false);
+    const backtestStarted = useRef(false);
     // F383: los picks iniciales (ranking global del embudo) NO se asocian a
     // ninguna estrategia; cada estrategia, también la inicial, carga los suyos
     // por la ruta strategy-aware. Nunca se exportan picks de otra estrategia.
@@ -88,8 +88,8 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
         setActiveTab(tab);
         // El backtest arranca al entrar en su pestaña, una sola vez: es la
         // respuesta a un evento, no un efecto.
-        if (tab === 'backtest' && !backtestStarted) {
-            setBacktestStarted(true);
+        if (tab === 'backtest' && !backtestStarted.current) {
+            backtestStarted.current = true;
             void runBacktest();
         }
     };
