@@ -75,6 +75,8 @@ class InvestmentPlanService:
     ) -> InvestmentPlan:
         portfolio = self.fx.ensure_portfolio(db)
         plan = self.get_plan(db)
+        from app.services.plan_proactivity import plan_state, emit_plan_notice
+        previous_state = plan_state(plan)
         if plan is None:
             plan = InvestmentPlan(
                 portfolio_id=portfolio.id,
@@ -100,6 +102,8 @@ class InvestmentPlanService:
             if monthly_contribution_currency is not PLAN_CURRENCY_UNSET:
                 plan.monthly_contribution_currency = monthly_contribution_currency
             plan.status = "active"
+        db.flush()
+        emit_plan_notice(db, plan, changed=previous_state != plan_state(plan))
         db.commit()
         db.refresh(plan)
         return plan

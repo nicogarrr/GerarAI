@@ -2127,6 +2127,9 @@ def evaluate_dca_signals(
     run = dca_run_log.start_run(db, "scheduler")
     try:
         summary = evaluate_watchlist(db)
+        from app.services.plan_proactivity import review_savings_plan
+        summary["savings_plan_review"] = review_savings_plan(db)
+        db.commit()
         dca_run_log.finish_run(db, run, summary=summary)
         return {"actor": "evaluate_dca_signals", "status": "ok", **summary}
     except Exception as exc:
