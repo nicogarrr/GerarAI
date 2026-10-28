@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { revalidatePath } from 'next/cache';
 
 import { ManualDemoPanel } from '@/components/paper-trading/ManualDemoPanel';
@@ -18,7 +19,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-    title: 'Cuenta demo',
+    title: 'Mi cuenta demo',
     description:
         'Cuenta de práctica con saldo ficticio y operaciones manuales: registras compras y ventas con el precio que introduces tú.',
 };
@@ -227,9 +228,10 @@ export default async function PaperTradingPage() {
     return (
         <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-6">
             <PageHeader
-                title="Cuenta demo"
+                title="Mi cuenta demo"
                 description="Práctica con dinero ficticio: 100.000 € iniciales, operaciones manuales y contabilidad FIFO."
             />
+            <p className="mt-3 text-sm text-gray-400">Esta es tu cuenta de práctica manual, separada de las propuestas de la IA. <Link href="/propicks?tab=paper" className="text-teal-300 hover:underline">Ver resultados simulados de la IA</Link>.</p>
             {loadError ? (
                 <p role="alert" className="mt-4 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
                     No se pudo cargar la cuenta demo: {loadError}

@@ -14,5 +14,5 @@ test('ProPicks mobile tablist wraps instead of clipping tabs mid-word', () => {
     assert.ok(!list.includes('min-w-full'));
     assert.ok(!list.includes('overflow-x-auto'), 'sin scroll horizontal oculto');
     assert.ok(!list.includes('snap-x'), 'sin snap scroll');
-    assert.ok(list.includes('Paper trading'));
+    assert.ok(list.includes('Resultados simulados de la IA'));
 });
