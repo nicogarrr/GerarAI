@@ -45,6 +45,16 @@ describe('Company position panel with the same figures as the portfolio', () => 
         expect(screen.getByRole('status')).toHaveTextContent('Sin valor en EUR: falta el precio o el tipo de cambio.');
         expect(screen.queryByText(/0,00 €/)).not.toBeInTheDocument();
     });
+    it('distinguishes unknown acquisition cost from missing price or FX', () => {
+        render(<CompanyPositionPanel context={held({ avgPrice: 0, cost: 0, nativeCost: null,
+            costReviewMessage: null, fxMissing: true, valueMissing: false })} />);
+        expect(value('Coste medio')).toHaveTextContent('N/D');
+        expect(value('Valor')).toHaveTextContent('1.350,00 €');
+        expect(value('Plusvalía latente')).toHaveTextContent('N/D');
+        expect(screen.getByRole('status')).toHaveTextContent('Coste de adquisición desconocido');
+        expect(screen.queryByText(/falta el precio o el tipo de cambio/)).not.toBeInTheDocument();
+        expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+    });
     it('renders nothing without a position and an explicit message when loading failed', () => {
         const { container, unmount } = render(<CompanyPositionPanel context={{ status: 'not_held' }} />);
         expect(container).toBeEmptyDOMElement();
