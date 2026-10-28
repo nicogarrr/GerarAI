@@ -48,6 +48,23 @@ function toDisplayReport(raw: DataRecord | null): DataRecord | null {
     return humanized;
 }
 
+/** Aviso de informe guardado con un criterio de cálculo anterior. Sale del
+ *  bloque `versioning` que calcula el backend (tax_report_versioning.py): la UI
+ *  no decide nada, solo lo muestra. Sin `versioning` (backend antiguo) o con
+ *  `stale` distinto de true no hay aviso. */
+function staleReportNotice(raw: DataRecord | null): string | null {
+    const versioning = raw?.versioning;
+    if (!versioning || typeof versioning !== 'object' || Array.isArray(versioning)) return null;
+    if ((versioning as DataRecord).stale !== true) return null;
+    const outdated = (versioning as DataRecord).outdated;
+    const markers = Array.isArray(outdated) ? outdated : [];
+    const missing = markers.some((item) => (item as DataRecord | null)?.reason === 'criterio_no_registrado');
+    const why = missing
+        ? 'se guardó antes de registrar el criterio de cálculo'
+        : 'se guardó con un criterio de cálculo anterior al vigente';
+    return `Este informe ${why}: las cifras guardadas pueden no reflejar las reglas actuales. Regenéralo para recalcularlo; hasta entonces no lo tomes como actualizado.`;
+}
+
 /** Etiquetas en español para las claves conocidas del resumen fiscal (F20).
  *  Las claves desconocidas se humanizan (snake_case -> frase) sin ocultarse. */
 const TAX_LABELS: Record<string, string> = {
@@ -292,6 +309,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
     const holdingPages = Math.max(1, Math.ceil(initialHoldings.length / 10));
     const currentHoldingPage = Math.min(holdingPage, holdingPages - 1);
     const report = reportForYear(override, initialReport, year);
+    const staleNotice = staleReportNotice(report);
 
     const handleYearChange = (next: string) => {
         const parsed = Number.parseInt(next, 10);
@@ -357,6 +375,18 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     ))}
                 </select>
             </div>
+            {staleNotice ? (
+                <div
+                    role="status"
+                    data-testid="stale-report-notice"
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200"
+                >
+                    <span className="min-w-0 flex-1">{staleNotice}</span>
+                    <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={regenerating}>
+                        Regenerar ahora
+                    </Button>
+                </div>
+            ) : null}
             <RecordDetail
                 key={recordDetailKey(year, reportKey)}
                 title={`Reporte Fiscal ${year}`}

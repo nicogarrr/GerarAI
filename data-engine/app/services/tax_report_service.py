@@ -67,6 +67,7 @@ from app.services.tax_irpf_filing import (
     build_interest,
     build_loss_compensation,
 )
+from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
 from app.valuation.currency import normalize_currency
 
 FIFO_METHOD = "fifo"
@@ -1107,7 +1108,7 @@ class TaxReportService:
                 b["ticker"] for b in realized if b.get("cost_unknown")
             ),
             "method": FIFO_METHOD,
-            "securities_fx_criterion": "dgt_native_gain_sale_date_v1",
+            "securities_fx_criterion": SECURITIES_FX_CRITERION,
             "incomplete_fx": incomplete_fx,
             "missing_fx": sorted(
                 {b["ticker"] for b in dividends if b["missing_fx"]}
@@ -1276,10 +1277,12 @@ class TaxReportService:
             # presentacion derivada de los mismos agregados, siempre al dia
             # con el mapeo normativo vigente en el codigo.
             data["filing"] = self._build_filing(db, fiscal_year, data, tme=tme)
+            data["versioning"] = report_versioning(data["summary"], persisted=True)
             return data
         data = self.compute_report(db, fiscal_year, tme=tme)
         data["generated_at"] = None
         data["persisted"] = False
+        data["versioning"] = report_versioning(data["summary"], persisted=False)
         return data
 
     def regenerate_report(self, db: Session, fiscal_year: int) -> dict:
@@ -1306,6 +1309,7 @@ class TaxReportService:
         db.refresh(report)
         data["generated_at"] = report.generated_at.isoformat()
         data["persisted"] = True
+        data["versioning"] = report_versioning(data["summary"], persisted=True)
         return data
 
 
