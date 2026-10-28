@@ -94,3 +94,20 @@ def test_brier_needs_resolved_outcomes_and_flags_small_samples():
         assert abs(rep["brier_llm"] - 0.16) < 1e-9  # (0.6 - 1)^2
         row = db.query(PropickReview).one()
         assert abs(row.outcome_return - 0.2) < 1e-9
+
+
+def test_review_request_uses_registered_prompt_and_traces_it():
+    from app.services import prompt_registry
+
+    class Capturing(P):
+        seen = []
+
+        async def complete(self, request):
+            self.seen.append(request)
+            return await super().complete(request)
+
+    run(Capturing({"verdicts": [_v()]}), [_cand()])
+    resolved = prompt_registry.get_prompt("propicks_review_service", allow_remote=False)
+    request = Capturing.seen[0]
+    assert request.messages[0].content == resolved.text
+    assert request.metadata == resolved.trace_metadata()
