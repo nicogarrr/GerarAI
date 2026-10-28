@@ -341,6 +341,24 @@ export function boundsFor(scene: Scene, keep: Set<number> | null): Bounds | null
   );
 }
 
+/**
+ * Ancla de la etiqueta de un nodo segun el sitio que tiene alrededor. Nace a
+ * la derecha del punto ('start'), pero si no cabe por la derecha se ancla a
+ * la izquierda ('end') y si no cabe a ningun lado (escena minuscula, p. ej.
+ * el entorno de un solo nodo a zoom alto) se centra DEBAJO del punto
+ * ('middle'). Sin esto el lienzo (overflow oculto) y el viewBox del SVG
+ * exportado recortaban la etiqueta de los nodos del borde. El ancho se
+ * estima por caracteres (charWidth ~ 0.55 x fontSize), sin medir texto.
+ */
+export type LabelAnchor = 'start' | 'end' | 'middle';
+export function labelAnchor(node: { x: number; label: string }, bounds: Bounds | null, charWidth: number = 6.1): LabelAnchor {
+  if (!bounds) return 'start';
+  const width = Math.min(node.label.length, 28) * charWidth;
+  if (bounds.maxX - node.x >= width) return 'start';
+  if (node.x - bounds.minX >= width) return 'end';
+  return 'middle';
+}
+
 /** Vecinos de un nodo con la relacion que los une y su sentido, tal cual lo dio el backend. */
 export type NeighborRow = { edgeId: number; nodeId: number; label: string; type: string; direction: 'outgoing' | 'incoming'; weight: number; confidence: number | null; provenance: string };
 
@@ -456,6 +474,7 @@ export function serializeSvg(scene: Scene, options: ExportOptions = {}): string 
       { x: node.x + node.radius, y: node.y + node.radius },
     ]),
   );
+  const anchorOf = (node: { x: number; label: string }) => labelAnchor(node, bounds, 6.7);
   const minX = bounds ? bounds.minX - SCENE_MARGIN : 0;
   const minY = bounds ? bounds.minY - SCENE_MARGIN : 0;
   const width = bounds ? bounds.maxX - bounds.minX + SCENE_MARGIN * 2 : 1;
@@ -475,7 +494,7 @@ export function serializeSvg(scene: Scene, options: ExportOptions = {}): string 
   }
   parts.push(`</g>`);
   for (const node of nodes) {
-    parts.push(`<g><circle cx="${round(node.x)}" cy="${round(node.y)}" r="${round(node.radius)}" fill="${node.color}"><title>${escapeXml(node.label)}</title></circle><text x="${round(node.x + node.radius + 4)}" y="${round(node.y + 4)}" font-size="12" fill="#d4d4d8">${escapeXml(node.label)}</text></g>`);
+    parts.push(`<g><circle cx="${round(node.x)}" cy="${round(node.y)}" r="${round(node.radius)}" fill="${node.color}"><title>${escapeXml(node.label)}</title></circle><text x="${round(anchorOf(node) === 'end' ? node.x - node.radius - 4 : node.x + (anchorOf(node) === 'middle' ? 0 : node.radius + 4))}" y="${round(anchorOf(node) === 'middle' ? node.y + node.radius + 15 : node.y + 4)}" font-size="12" fill="#d4d4d8" text-anchor="${anchorOf(node)}">${escapeXml(node.label)}</text></g>`);
   }
   if (options.selectedId !== null && options.selectedId !== undefined && nodes.some((node) => node.id === options.selectedId)) {
     const selected = nodes.find((node) => node.id === options.selectedId)!;

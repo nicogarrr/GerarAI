@@ -91,6 +91,11 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                     <label className="space-y-1 text-sm text-gray-300" key={field.key}>
                         <span>{field.label}</span>
                         <Input
+                            // Sin aria-label el aviso suave (que vive dentro del
+                            // <label>) pasaba al nombre accesible del campo y el
+                            // lector de pantalla lo anunciaba como su nombre; el
+                            // aviso corresponde a la descripción, no al nombre.
+                            aria-label={field.label}
                             aria-describedby={field.key === 'nif' && nifWarning ? 'tax-declarant-nif-warning' : undefined}
                             className="h-11"
                             autoComplete={field.autoComplete}

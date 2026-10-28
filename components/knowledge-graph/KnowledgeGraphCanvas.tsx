@@ -36,6 +36,7 @@ import {
     EDGE_COLOR,
     exportFullGraph,
     focusIds,
+    labelAnchor,
     MAX_SCENE_NODES,
     neighborRows,
     searchNodes,
@@ -554,7 +555,11 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                                     r={node.radius}
                                                 />
                                                 {showLabels ? (
-                                                    <text fill="#a1a1aa" fontSize={11} pointerEvents="none" x={node.x + node.radius + 4} y={node.y + 4}>
+                                                    /* Si la etiqueta no cabe a la derecha se ancla a la
+                                                       izquierda del punto, y si no cabe a ningun lado
+                                                       (escena de un nodo a zoom alto) va centrada debajo:
+                                                       el lienzo recorta con overflow. */
+                                                    <text fill="#a1a1aa" fontSize={11} pointerEvents="none" textAnchor={labelAnchor(node, scene.bounds)} x={labelAnchor(node, scene.bounds) === 'end' ? node.x - node.radius - 4 : node.x + (labelAnchor(node, scene.bounds) === 'middle' ? 0 : node.radius + 4)} y={labelAnchor(node, scene.bounds) === 'middle' ? node.y + node.radius + 14 : node.y + 4}>
                                                         {node.label.slice(0, 28)}
                                                     </text>
                                                 ) : null}
