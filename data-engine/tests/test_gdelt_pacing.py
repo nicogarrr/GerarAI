@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -43,13 +44,25 @@ def fake_clock(monkeypatch):
     import app.services.connectors.gdelt as gdelt_mod
 
     now = [10_000.0]
-    monkeypatch.setattr(gdelt_mod.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(gdelt_mod, "time", SimpleNamespace(monotonic=lambda: now[0]))
 
     async def _fake_sleep(seconds: float) -> None:
         now[0] += max(0.0, seconds)
 
-    monkeypatch.setattr(gdelt_mod.asyncio, "sleep", _fake_sleep)
+    monkeypatch.setattr(gdelt_mod, "asyncio", SimpleNamespace(sleep=_fake_sleep))
     yield now
+
+
+def test_fake_clock_is_private_to_gdelt_not_the_event_loop(fake_clock):
+    import app.services.connectors.gdelt as gdelt_mod
+
+    assert gdelt_mod.time is not time
+    assert gdelt_mod.asyncio is not asyncio
+    started = fake_clock[0]
+    asyncio.run(asyncio.sleep(0.001))
+    assert fake_clock[0] == started
+    asyncio.run(gdelt_mod.asyncio.sleep(3))
+    assert fake_clock[0] == started + 3
 
 
 def test_throttle_enforces_min_interval():
@@ -239,12 +252,12 @@ def test_429_marks_ip_wide_blocked_until_for_the_whole_lane(fake_clock):
     client = GDELTClient(client=stub, min_interval=0, max_429_retries=0)
     with pytest.raises(GdeltRateLimited):
         asyncio.run(client.news_search("q"))
-    assert GDELTClient._blocked_until > time.monotonic() + 2  # ~3s de ventana
+    assert GDELTClient._blocked_until > fake_clock[0] + 2  # ~3s de ventana
     # otro job (otra instancia) del carril hereda la espera
     other = GDELTClient(client=_StubClient([_resp(200, {"articles": []})]), min_interval=5)
-    started = time.monotonic()
+    started = fake_clock[0]
     asyncio.run(other._throttle())
-    assert time.monotonic() - started >= 2  # esperó la ventana, no los 5s de pacing
+    assert fake_clock[0] - started >= 2  # esperó la ventana, no los 5s de pacing
 
 
 def test_block_for_only_extends_never_shortens():
@@ -306,5 +319,5 @@ def test_429_sin_cabecera_usa_suelo_60_en_excepcion_y_cooldown(fake_clock):
     assert excinfo.value.retry_after == GDELTClient.RETRY_AFTER_FLOOR
     # dos reintentos inline de 60s (el pacing de 5s queda absorbido por el suelo)
     assert fake_clock[0] - started == 2 * GDELTClient.RETRY_AFTER_FLOOR
-    remaining = GDELTClient._blocked_until - time.monotonic()
+    remaining = GDELTClient._blocked_until - fake_clock[0]
     assert remaining > 50.0
