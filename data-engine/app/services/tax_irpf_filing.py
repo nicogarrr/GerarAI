@@ -115,8 +115,11 @@ UNKNOWN_COUNTRY = "??"
 
 # Tipos de pago especiales (en la acción cruda del bróker) que NO son un
 # dividendo ordinario: su tratamiento fiscal difiere (payment in lieu,
-# retorno de capital, ingresos por préstamo de valores). Nunca entran en la
-# deducción 0588 automática: revisión manual.
+# retorno de capital, ingresos por préstamo de valores, scrip/dividendo
+# flexible). Nunca entran en la deducción 0588 automática: revisión manual.
+# Scrip: el criterio (acciones liberadas vs venta de derechos vs efectivo) NO
+# está implementado; la fila se marca "no calculado, revisar" y queda fuera de
+# la casilla 0029 en vez de contarse como dividendo en efectivo.
 SPECIAL_PAYMENT_TOKENS = (
     "lieu",               # payment in lieu of dividends
     "return of capital",
@@ -124,6 +127,9 @@ SPECIAL_PAYMENT_TOKENS = (
     "lending",            # stock lending income
     "loan",
     "substitute payment",
+    "scrip",              # scrip dividend / scrip: efectivo vs acciones sin distinguir
+    "dividendo flexible",
+    "dividendo opcional",
 )
 
 
