@@ -197,6 +197,35 @@ CASH_LEDGER_ACTIONS = frozenset(
 CASH_UNIT_QUANTITIES = (Decimal("0"), Decimal("1"))
 
 
+def _release_deferred(lot: dict, take: Decimal) -> Decimal:
+    """Saca del lote la parte del diferido que corresponde a ``take`` acciones.
+
+    El diferido (pérdida bloqueada por la regla de los dos meses) viaja con
+    las acciones del lote y sale a prorrata cuando se venden. Se lleva en dos
+    importes que se consumen en la misma proporción:
+
+    - ``deferred``: en la divisa del valor. Es el que entra en el coste de la
+      venta (y de ahí en euros al cambio de ESA venta, criterio DGT). Se
+      devuelve para sumarlo al coste nativo.
+    - ``deferred_base``: la misma pérdida en euros al cambio de la venta que
+      la originó (``_defer_base``). No entra en el coste de la venta; queda en
+      los lotes restantes para ``sale_simulation``. None = desconocido y sigue
+      desconocido.
+
+    Debe llamarse ANTES de restar ``take`` de ``lot["qty"]``.
+    """
+    qty = lot["qty"]
+    if qty <= 0:
+        return Decimal("0")
+    if lot["deferred_base"] is not None and lot["deferred_base"] > 0:
+        lot["deferred_base"] -= lot["deferred_base"] * take / qty
+    released = Decimal("0")
+    if lot["deferred"] > 0:
+        released = lot["deferred"] * take / qty
+        lot["deferred"] -= released
+    return released
+
+
 def is_cash_action(action: str | None) -> bool:
     """True si la accion es un movimiento de caja (no buy/sell)."""
     return (action or "").lower() in CASH_LEDGER_ACTIONS
@@ -403,9 +432,11 @@ def replay_tax_fifo(events, resolve_rate, start, end):
             continue
         remaining = transaction.quantity
         proceeds_native = transaction.quantity * transaction.price - transaction.fees
+        # Coste en la divisa del valor (incluye el diferido nativo de los
+        # lotes consumidos). El coste en euros sale de aquí, al cambio de la
+        # venta (criterio DGT, más abajo): NO se suma lote a lote al cambio de
+        # cada compra.
         cost_native = Decimal("0")
-        # Coste en base = suma de cada lote a SU tipo de compra.
-        cost_base: Decimal | None = Decimal("0")
         # Coste desconocido aunque la venta esté cubierta: algún lote consumido
         # arrastra una pérdida diferida de una venta descubierta.
         cost_unknown = False
@@ -415,21 +446,9 @@ def replay_tax_fifo(events, resolve_rate, start, end):
             if lot.get("deferred_unknown"):
                 cost_unknown = True
             cost_native += take * lot["unit"]
-            if cost_base is not None and lot["unit_base"] is not None:
-                cost_base += take * lot["unit_base"]
-            else:
-                cost_base = None
-            if lot["qty"] > 0 and lot["deferred_base"] is None:
-                cost_base = None
-            elif lot["deferred_base"] > 0 and lot["qty"] > 0:
-                deferred_base_take = lot["deferred_base"] * take / lot["qty"]
-                if cost_base is not None:
-                    cost_base += deferred_base_take
-                lot["deferred_base"] -= deferred_base_take
-            if lot["deferred"] > 0 and lot["qty"] > 0:
-                deferred_take = lot["deferred"] * take / lot["qty"]
-                cost_native += deferred_take
-                lot["deferred"] -= deferred_take
+            released = _release_deferred(lot, take)
+            if released:
+                cost_native += released
             lot["qty"] -= take
             if lot["qty"] == 0:
                 lots.popleft()
@@ -471,8 +490,8 @@ def replay_tax_fifo(events, resolve_rate, start, end):
                 # Pérdida por acción en divisa; 0 si en divisa hubo
                 # ganancia (la pérdida existe solo en euros).
                 "loss_per_share": max(-gain_native, Decimal("0")) / transaction.quantity,
-                # Pérdida por acción en base (tramos a su tipo); 0 si
-                # en base no hay pérdida que diferir.
+                # Pérdida por acción en base (al cambio de esta venta,
+                # criterio DGT); 0 si en base no hay pérdida que diferir.
                 "loss_per_share_base": (
                     max(-gain_base_raw, Decimal("0")) / transaction.quantity
                     if gain_base_raw is not None
