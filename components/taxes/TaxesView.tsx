@@ -89,7 +89,7 @@ const TAX_LABELS: Record<string, string> = {
     currency_ledger_status: 'Libro de divisas (USD a EUR)',
     currency_ledger_gain_base: 'G/P por conversión de divisa',
     currency_ledger_reason: 'Libro de divisas: motivo',
-    currency_ledger_blocked_loss_base: 'Pérdida de divisa diferida (1 año)',
+    currency_ledger_blocked_loss_base: 'Pérdida de divisa diferida (recompra en el año posterior)',
     currency_ledger_note: 'Libro de divisas: nota de criterio',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',

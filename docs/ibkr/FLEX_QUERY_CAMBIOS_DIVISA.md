@@ -53,7 +53,7 @@ esa divisa, que el libro todavía no modela.
 - Salidas sin resultado propio: compras de valores y comisiones en la divisa (V0282-22, V0706-22).
   El resultado aparece solo al convertir a EUR.
 - Pérdida al convertir: no se integra en la parte cubierta por adquisición de la misma divisa en el
-  año anterior o posterior (art. 33.5.e LIRPF, V1613-25), no 2 meses. Se suma al valor de los lotes
+  año POSTERIOR a la transmisión, solo posterior y solo la misma divisa (art. 33.5.e LIRPF, V1613-25; AEAT, Manual práctico IRPF 2025, https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c11-ganancias-perdidas-patrimoniales/ganancias-perdidas-patrimoniales-que-no-bi/perdidas-patrimoniales-que-no-se-tales.html), no 2 meses. Se suma al valor de los lotes
   readquiridos. Si la ventana de 1 año sigue abierta a fecha de los datos, queda "incompleto".
 - Dividendos e intereses como entradas: sin consulta, solo analogía. Solo con
   `?fx_income_by_analogy=true`, etiquetado "criterio por analogía, sin consulta".

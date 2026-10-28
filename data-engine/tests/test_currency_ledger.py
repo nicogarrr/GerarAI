@@ -127,10 +127,23 @@ def test_two_months_is_not_the_window():  # compra a los 4 meses sigue bloqueand
     assert r["rows"][0]["blocked_loss_base"] == 10.0
 
 
-def test_backward_window_blocks_loss_when_recent_lot_still_held():
+def test_prior_year_acquisition_does_not_block_only_posterior_does():  # art. 33.5.e: solo posterior
     lots = [CurrencyLot(date(2024, 12, 1), D(100), D(100)), CurrencyLot(date(2025, 2, 1), D(100), D(90))]
     r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("0.80"))])
-    assert r["rows"][0]["blocked_loss_base"] == 20.0 and r["gain_base"] == 0.0
+    assert r["rows"][0]["blocked_loss_base"] == 0.0 and r["gain_base"] == -20.0
+
+
+def test_same_day_acquisition_is_not_posterior():
+    lots = [CurrencyLot(date(2025, 1, 1), D(100), D(100)), CurrencyLot(date(2025, 3, 1), D(100), D(90))]
+    r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("0.90"))])
+    assert r["rows"][0]["blocked_loss_base"] == 0.0
+
+
+def test_acquisition_exactly_one_year_after_blocks_and_one_day_later_does_not():
+    base = [CurrencyLot(date(2025, 1, 1), D(100), D(100))]
+    conv = [Conversion(date(2025, 3, 1), D(100), D("0.90"))]
+    assert _run(base + [CurrencyLot(date(2026, 3, 1), D(100), D(90))], conv)["rows"][0]["blocked_loss_base"] == 10.0
+    assert _run(base + [CurrencyLot(date(2026, 3, 2), D(100), D(90))], conv)["rows"][0]["blocked_loss_base"] == 0.0
 
 
 def test_loss_with_window_still_open_is_incomplete():

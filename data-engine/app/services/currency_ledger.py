@@ -22,11 +22,11 @@ el texto de las consultas):
   consumen lotes FIFO; el resultado solo aparece al convertir a EUR
   (V0706-22 para comisiones).
 - Anti-recompra: la perdida por convertir divisa a EUR no se integra en la
-  parte cubierta por una adquisicion de la misma divisa en el año anterior o
-  posterior (art. 33.5.e LIRPF, V1613-25), NO 2 meses. La perdida bloqueada se
-  suma al valor de adquisicion de la divisa readquirida y se integra al
-  convertirla. Direccion (anterior y posterior) segun el articulo; el texto
-  no se ha podido contrastar aqui.
+  parte cubierta por una recompra de la MISMA divisa en el año POSTERIOR a la
+  transmision (art. 33.5.e LIRPF, V1613-25; solo posterior, no anterior; NO 2
+  meses; fuente AEAT, Manual practico IRPF 2025, "perdidas patrimoniales que
+  no se computan"). La perdida bloqueada se suma al valor de adquisicion de la
+  divisa recomprada y se integra al convertirla.
 - Dividendos e intereses como entradas: sin consulta en punto, solo analogia;
   solo con ``income_by_analogy=True`` y etiquetado.
 - Fondos/IIC comprados con divisa propia (V0775-21): fuera de alcance, el
@@ -191,9 +191,9 @@ def compute_currency_ledger(
         blocked = Decimal("0")
         window_open = False
         if gain is not None and gain < 0:
-            lo, hi = _shift_year(day, -WASH_YEARS), _shift_year(day, WASH_YEARS)
+            hi = _shift_year(day, WASH_YEARS)
             window_open = hi > data_end
-            held = [q for q in queue if q[1] > 0 and lo <= q[0] <= hi]
+            held = [q for q in queue if q[1] > 0 and day < q[0] <= hi]
             held_total = sum((q[1] for q in held), Decimal("0"))
             cover = min(conv.amount, held_total)
             if cover > 0:
