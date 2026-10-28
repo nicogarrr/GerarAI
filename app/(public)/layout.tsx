@@ -120,7 +120,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                         </p>
                         <p className="mt-1 text-xs">
                             Gráficos interactivos por{' '}
-                            <a className="public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
+                            <a className="inline-flex min-h-11 items-center public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
                                 TradingView
                             </a>
                             .
@@ -128,12 +128,12 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                     </div>
                     <nav aria-label="Enlaces del pie" className="flex flex-col items-start gap-2 sm:items-end">
                         {legalLinks.map((link) => (
-                            <Link key={link.href} href={link.href} className="public-footer-link">
+                            <Link key={link.href} href={link.href} className="inline-flex min-h-11 items-center public-footer-link">
                                 {link.label}
                             </Link>
                         ))}
                         {SUPPORT_EMAIL && (
-                            <a href={`mailto:${SUPPORT_EMAIL}`} className="public-footer-link">
+                            <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex min-h-11 items-center public-footer-link">
                                 {SUPPORT_EMAIL}
                             </a>
                         )}

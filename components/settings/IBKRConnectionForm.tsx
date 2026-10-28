@@ -98,7 +98,7 @@ export default function IBKRConnectionForm({ initial }: { initial: IBKRConnectio
           <details className="text-sm text-gray-400">
             <summary className="min-h-11 cursor-pointer py-3 text-gray-300">Opciones de sincronización</summary>
           <label className="flex min-h-11 items-start gap-3 pb-3 text-sm text-gray-300">
-            <input className="mt-1 size-4 shrink-0" type="checkbox" checked={complete} onChange={event => setComplete(event.target.checked)} disabled={busy} />
+            <input className="mt-0.5 size-5 shrink-0 accent-teal-500" type="checkbox" checked={complete} onChange={event => setComplete(event.target.checked)} disabled={busy} />
             <span>Confirmo que la consulta incluye toda esta cuenta, sin filtros. Permito cerrar posiciones y quitar saldos importados de IBKR que ya no aparezcan. Si no lo marco, solo se añaden o actualizan datos.</span>
           </label>
           </details>
