@@ -1,9 +1,22 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
-import ThesisMarkdown from '@/components/research/ThesisMarkdown';
+// react-markdown + remark-gfm (~47 KB gzip con micromark/hast) solo pintan el
+// cuerpo del memorando: cargarlos en el bundle inicial de /research/[ticker]
+// los pagaban también las vistas que nunca abren el memo. Import diferido con
+// esqueleto; la cabecera del paginador (anterior/siguiente) responde ya.
+const ThesisMarkdown = dynamic(() => import('@/components/research/ThesisMarkdown'), {
+  loading: () => (
+    <div className="space-y-2" aria-hidden="true">
+      <div className="h-4 w-3/4 animate-pulse rounded bg-slate-800/60" />
+      <div className="h-4 w-full animate-pulse rounded bg-slate-800/60" />
+      <div className="h-4 w-5/6 animate-pulse rounded bg-slate-800/60" />
+    </div>
+  ),
+});
 import { Button } from '@/components/ui/button';
 import type { MemoPage } from '@/lib/research/memo-pages';
 

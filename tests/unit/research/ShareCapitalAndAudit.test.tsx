@@ -132,15 +132,16 @@ describe('ThesisMarkdownPager', () => {
     it('sin páginas no pinta nada', () => {
         expect(render(<ThesisMarkdownPager pages={[]} />).container).toBeEmptyDOMElement();
     });
-    it('navega con anterior/siguiente y selector; límites deshabilitados', () => {
+    // El visor markdown carga diferido (chunk propio): el texto llega asíncrono.
+    it('navega con anterior/siguiente y selector; límites deshabilitados', async () => {
         render(<ThesisMarkdownPager pages={pages} />);
-        expect(screen.getByText('Texto uno')).toBeInTheDocument();
+        expect(await screen.findByText('Texto uno')).toBeInTheDocument();
         expect(screen.getByText('1/3')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Sección anterior' })).toBeDisabled();
         fireEvent.click(screen.getAllByRole('button', { name: 'Siguiente' })[0]);
-        expect(screen.getByText('Texto dos')).toBeInTheDocument();
+        expect(await screen.findByText('Texto dos')).toBeInTheDocument();
         fireEvent.change(screen.getByRole('combobox', { name: 'Sección del memorando' }), { target: { value: '2' } });
-        expect(screen.getByText('Texto tres')).toBeInTheDocument();
+        expect(await screen.findByText('Texto tres')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Sección siguiente' })).toBeDisabled();
         expect(screen.getByText('3/3')).toBeInTheDocument();
     });
