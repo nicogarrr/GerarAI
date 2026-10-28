@@ -7,7 +7,7 @@
  * o precio válidos no hay petición al backend.
  */
 
-import { parseLocalizedNumber } from '@/lib/format';
+import { parseLocalizedNumberDetailed } from '@/lib/format';
 
 export interface TransactionFormValues {
   symbol: string;
@@ -29,6 +29,14 @@ export interface TransactionFormErrors {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * El parser rechaza los formatos ambiguos («1,234.5», «1,234») en lugar de
+ * reinterpretarlos con un factor 1000 silencioso; este mensaje enseña el
+ * formato esperado en vez de acusar al usuario de escribir «mal» el número.
+ */
+const AMBIGUOUS_NUMBER_MESSAGE =
+  'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).';
+
 export function validateTransactionForm(values: TransactionFormValues, now: Date = new Date()): TransactionFormErrors {
   const errors: TransactionFormErrors = {};
 
@@ -36,19 +44,25 @@ export function validateTransactionForm(values: TransactionFormValues, now: Date
     errors.symbol = 'Busca y selecciona una acción de la lista.';
   }
 
-  const quantity = parseLocalizedNumber(values.quantity);
-  if (quantity === null || quantity <= 0) {
+  const quantity = parseLocalizedNumberDetailed(values.quantity);
+  if (!quantity.ok) {
+    errors.quantity = quantity.error === 'ambiguous' ? AMBIGUOUS_NUMBER_MESSAGE : 'Introduce una cantidad mayor que 0.';
+  } else if (quantity.value <= 0) {
     errors.quantity = 'Introduce una cantidad mayor que 0.';
   }
 
-  const price = parseLocalizedNumber(values.price);
-  if (price === null || price < 0) {
+  const price = parseLocalizedNumberDetailed(values.price);
+  if (!price.ok) {
+    errors.price = price.error === 'ambiguous' ? AMBIGUOUS_NUMBER_MESSAGE : 'Introduce un precio válido (0 o mayor).';
+  } else if (price.value < 0) {
     errors.price = 'Introduce un precio válido (0 o mayor).';
   }
 
   if (values.fees !== undefined && values.fees.trim() !== '') {
-    const fees = parseLocalizedNumber(values.fees);
-    if (fees === null || fees < 0) {
+    const fees = parseLocalizedNumberDetailed(values.fees);
+    if (!fees.ok) {
+      errors.fees = fees.error === 'ambiguous' ? AMBIGUOUS_NUMBER_MESSAGE : 'Introduce una comisión válida (0 o mayor) o déjala vacía.';
+    } else if (fees.value < 0) {
       errors.fees = 'Introduce una comisión válida (0 o mayor) o déjala vacía.';
     }
   }
