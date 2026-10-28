@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const runUiE2E = process.env.E2E_UI_RUN === "1";
+// Skip before the page fixture launches: the API-only job has no browser.
+test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 
 // La ficha tenia tres capas de navegacion encima de la cotizacion (subnav del
 // hub, flecha «Research» y pestañas de la ficha) y en movil el precio quedaba
@@ -10,7 +12,6 @@ for (const viewport of [
   { width: 1280, height: 900 },
 ]) {
   test(`ficha MSFT ${viewport.width}px: sin subnav del hub y cotizacion en el primer viewport`, async ({ page }) => {
-    test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
     await page.setViewportSize(viewport);
     await page.goto("/research/MSFT");
     await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
@@ -31,7 +32,6 @@ for (const viewport of [
 }
 
 test("una herramienta del hub conserva su subnav con la actual marcada", async ({ page }) => {
-  test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/research/news");
   const nav = page.getByRole("navigation", { name: "Herramientas de la sección" });
