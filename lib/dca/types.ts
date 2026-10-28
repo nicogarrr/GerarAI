@@ -1,9 +1,6 @@
 // Tipos de las señales DCA por niveles (GET /api/watchlist/dca-signals).
 // Espejo de los modelos Pydantic de data-engine/app/api/routes/watchlist.py.
 
-/** 4..1 = múltiplo de la aportación base; -1 recorte ligero; -2 recorte fuerte. */
-export type DcaLevel = 4 | 3 | 2 | 1 | -1 | -2;
-
 export interface DcaZone {
     level: number;
     key: string;

@@ -13,7 +13,7 @@ import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import { valuationHoldLabel } from '@/lib/portfolio/holding-display';
 import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { deleteHolding, refreshPortfolioHoldings } from '@/lib/actions/portfolio.actions';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Trash2, RefreshCw } from 'lucide-react';
@@ -96,10 +96,13 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   // Nivel DCA de tu fórmula + valor justo único (tesis o motor), una sola petición.
   const signals = useHoldingSignals(currentHoldings.map((holding) => holding.symbol));
 
-  // Sync props if they change (e.g. from server revalidation)
-  useEffect(() => {
+  // Sync props if they change (e.g. from server revalidation): ajuste
+  // durante el render (reset al cambiar la prop), no efecto con setState.
+  const [prevHoldings, setPrevHoldings] = useState(holdings);
+  if (prevHoldings !== holdings) {
+    setPrevHoldings(holdings);
     setCurrentHoldings(holdings);
-  }, [holdings]);
+  }
 
   const handleDelete = async (symbol: string) => {
     setDeleting(symbol);

@@ -10,8 +10,8 @@ interface CacheEntry<T> {
 }
 
 export class RequestCache {
-    private cache = new Map<string, CacheEntry<any>>();
-    private pendingRequests = new Map<string, Promise<any>>();
+    private cache = new Map<string, CacheEntry<unknown>>();
+    private pendingRequests = new Map<string, Promise<unknown>>();
 
     /**
      * Get cached data or execute the fetcher function
@@ -27,13 +27,13 @@ export class RequestCache {
 
         // Return cached data if still valid
         if (cached && (now - cached.timestamp) < ttlSeconds * 1000) {
-            return cached.data;
+            return cached.data as T;
         }
 
         // If there's a pending request, wait for it instead of making a new one
         const pending = this.pendingRequests.get(key);
         if (pending) {
-            return pending;
+            return pending as Promise<T>;
         }
 
         // Create new request

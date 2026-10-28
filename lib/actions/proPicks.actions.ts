@@ -12,8 +12,8 @@ import type { SignalOverlay } from '@/lib/utils/propicksSignals';
 import { getLatestFunnelPicks } from '@/lib/actions/propicks-funnel.actions';
 import { withOptionalBudget } from '@/lib/propicks/optional-budget';
 
-/** Selección con tope de rotación (núcleo puro en proPicksStrategies, reexportada aquí para el pipeline). */
-import { selectRebalancedPicks, type RankedCandidate } from '@/lib/utils/proPicksStrategies';
+/** Selección con tope de rotación (núcleo puro en proPicksStrategies, usada por el pipeline viejo). */
+import { selectRebalancedPicks } from '@/lib/utils/proPicksStrategies';
 
 export interface ConfidenceReason {
   /** Texto mostrado en UI. Siempre incluye `value` para que sea verificable. */
@@ -185,6 +185,8 @@ export async function attachSignalOverlays(picks: ProPick[], asOf?: string): Pro
     });
   }, finalists, 4_000);
 }
+
+
 
 export async function generateProPicks(limit = 5, strategyId = 'adaptive'): Promise<ProPick[]> {
   await requireAuthenticatedUser();

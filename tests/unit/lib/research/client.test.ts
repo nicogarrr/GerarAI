@@ -87,16 +87,16 @@ describe('researchRequest', () => {
     });
     it('fallo de red: ExternalAPIError que no filtra el error interno en el mensaje', async () => {
         fetchMock.mockRejectedValueOnce(new TypeError('ECONNREFUSED 10.0.0.5'));
-        const err = await researchRequest('/api/x').catch((e) => e);
+        const err: any = await researchRequest('/api/x').catch((e: unknown) => e);
         expect(err.name).toBe('ExternalAPIError');
         expect(err.message).toContain('fetch fallido');
         expect(err.message).not.toContain('10.0.0.5');
     });
     it('timeout y cancelación se distinguen en el mensaje', async () => {
         fetchMock.mockRejectedValueOnce(new DOMException('t', 'TimeoutError'));
-        expect((await researchRequest('/api/x', { timeoutMs: 777 }).catch((e) => e)).message).toContain('timeout de 777 ms');
+        expect(((await researchRequest('/api/x', { timeoutMs: 777 }).catch((e: unknown) => e)) as Error).message).toContain('timeout de 777 ms');
         fetchMock.mockRejectedValueOnce(new DOMException('a', 'AbortError'));
-        expect((await researchRequest('/api/x').catch((e) => e)).message).toContain('cancelado por el llamador');
+        expect(((await researchRequest('/api/x').catch((e: unknown) => e)) as Error).message).toContain('cancelado por el llamador');
     });
     it('429 en GET reintenta una vez tras Retry-After', async () => {
         vi.useFakeTimers();

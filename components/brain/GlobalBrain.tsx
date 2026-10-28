@@ -132,16 +132,23 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         } catch {
             pending = null;
         }
+        // Handoff desde un almacén externo (sessionStorage) tras montar o
+        // cambiar de ruta: el setState no puede ser síncrono en el efecto.
         if (pending) {
-            setIsOpen(true);
-            applyOpenBrainDetail(pending);
+            const detail = pending;
+            queueMicrotask(() => {
+                setIsOpen(true);
+                applyOpenBrainDetail(detail);
+            });
         }
     }, [pathname]);
 
     useEffect(() => {
         try {
             const stored = restoreConversation(window.sessionStorage.getItem(brainStorageKey(userId)));
-            if (stored) setMessages(stored as Message[]);
+            // Restauración desde sessionStorage tras montar: setState
+            // diferido, no síncrono dentro del efecto.
+            if (stored) queueMicrotask(() => setMessages(stored as Message[]));
         } catch {
             // sessionStorage no disponible: el panel funciona sin persistencia.
         } finally {
@@ -185,10 +192,13 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         }
     }, [messages, isOpen, isMaximized]);
 
-    // Al cambiar de página el eco viejo deja de ser válido: vuelve la etiqueta local.
-    useEffect(() => {
+    // Al cambiar de página el eco viejo deja de ser válido: vuelve la etiqueta
+    // local. Ajuste durante el render (reset al cambiar un valor), no efecto.
+    const [prevPathname, setPrevPathname] = useState(pathname);
+    if (prevPathname !== pathname) {
+        setPrevPathname(pathname);
         setEcho(null);
-    }, [pathname]);
+    }
 
     /**
      * Modal de verdad (WCAG 2.1.2): con `aria-modal` el fondo se marca inaccesible

@@ -1,6 +1,5 @@
 'use server';
 
-import { getPortfolioSummary } from './portfolio.actions';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 

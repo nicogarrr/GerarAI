@@ -181,7 +181,13 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
      * no seguro) lo dice y enseña el enlace para copiarlo a mano.
      */
     const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-    useEffect(() => setCopyState('idle'), [selectedId]);
+    // Reset al cambiar de nodo: ajuste durante el render (reset al cambiar un
+    // valor), no efecto con setState síncrono.
+    const [prevSelectedId, setPrevSelectedId] = useState(selectedId);
+    if (prevSelectedId !== selectedId) {
+        setPrevSelectedId(selectedId);
+        setCopyState('idle');
+    }
     const copyShareLink = useCallback(async () => {
         const absolute = new URL(shareHref, window.location.href).toString();
         try {

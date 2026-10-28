@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, FileText, Receipt, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -316,11 +316,12 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
     // El año civil viene del reloj del navegador: leerlo en el render rompe la
     // hidratación en la frontera de año. Se arranca con un estado fijo (0) y se
     // fija el año real en el primer efecto.
-    const [currentYear, setCurrentYear] = useState(0);
-    useEffect(() => {
+    const currentYear = useSyncExternalStore(
+        () => () => {},
         // Año civil del usuario (Europe/Madrid), igual que el servidor en taxes/page.tsx.
-        setCurrentYear(Number(new Intl.DateTimeFormat('en-CA', { timeZone: USER_TZ, year: 'numeric' }).format(new Date())));
-    }, []);
+        () => Number(new Intl.DateTimeFormat('en-CA', { timeZone: USER_TZ, year: 'numeric' }).format(new Date())),
+        () => 0,
+    );
     const yearOptions = currentYear === 0
         ? []
         : Array.from({ length: 6 }, (_, index) => currentYear - index);
