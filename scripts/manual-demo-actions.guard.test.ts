@@ -339,7 +339,7 @@ describe('opciones (buildOptionFill real, saldo y posición derivados en la tran
         if (!dec.ok) assert.equal(dec.field, 'price');
         const expired = await actions.placeManualOrder(opt({ instrument: { kind: 'opcion', contract: { ...call, expiry: '2020-01-17' } } }));
         assert.ok(expired.ok);
-        if (expired.ok) assert.match(expired.reason ?? '', /vencio/);
+        if (expired.ok) assert.match(expired.reason ?? '', /venci[óo]/);
     });
 
     it('sell-to-close por encima de lo abierto se rechaza entero; cerrar lo abierto sí funciona', async () => {
