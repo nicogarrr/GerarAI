@@ -63,6 +63,20 @@ describe('CalendarTabs', () => {
         render(<CalendarTabs />);
         expect(document.querySelector('[aria-current="page"]')).toBeNull();
     });
+    it('muestra un degradado a la derecha solo si hay pestañas fuera de pantalla', () => {
+        pathname = '/calendar';
+        const widths = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(500);
+        const client = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(390);
+        const { unmount } = render(<CalendarTabs />);
+        expect(screen.getByTestId('calendar-tabs-fade-right')).toBeInTheDocument();
+        expect(screen.queryByTestId('calendar-tabs-fade-left')).toBeNull();
+        unmount();
+        widths.mockReturnValue(390);
+        render(<CalendarTabs />);
+        expect(screen.queryByTestId('calendar-tabs-fade-right')).toBeNull();
+        widths.mockRestore();
+        client.mockRestore();
+    });
     it('desplaza la barra solo si la pestaña activa no cabe', () => {
         pathname = '/macro-calendar';
         const spy = vi.spyOn(HTMLElement.prototype, 'offsetLeft', 'get').mockReturnValue(500);

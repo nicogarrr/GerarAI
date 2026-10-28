@@ -126,6 +126,8 @@ export interface RecordListProps {
     titleAs?: 'h2' | 'h3';
     description?: string;
     icon?: ReactNode;
+    /** Oculta título, descripción e icono (la página ya los muestra): queda solo «Refrescar». El título sigue como texto accesible. */
+    hideTitle?: boolean;
     /** Datos iniciales recibidos desde el servidor */
     records: DataRecord[];
     /** Server action que devuelve el listado (para refresco client-side) */
@@ -155,6 +157,7 @@ export function RecordList({
     titleAs,
     description,
     icon,
+    hideTitle = false,
     records: initialRecords,
     fetchRecords,
     columns,
@@ -195,14 +198,18 @@ export function RecordList({
 
     return (
         <Card className="rounded-lg border border-gray-700">
-            <CardHeader className="flex flex-col gap-3 border-b border-gray-700/50 pb-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-                <div className="flex items-center gap-3">
-                    {icon}
-                    <div>
-                        <CardTitle as={titleAs} className="text-lg font-semibold text-gray-100">{title}</CardTitle>
-                        {description && <CardDescription className="mt-0.5 text-sm text-gray-500">{description}</CardDescription>}
+            <CardHeader className={`flex flex-col gap-3 border-b border-gray-700/50 pb-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0${hideTitle ? ' items-end' : ''}`}>
+                {hideTitle ? (
+                    <CardTitle as={titleAs} className="sr-only">{title}</CardTitle>
+                ) : (
+                    <div className="flex items-center gap-3">
+                        {icon}
+                        <div>
+                            <CardTitle as={titleAs} className="text-lg font-semibold text-gray-100">{title}</CardTitle>
+                            {description && <CardDescription className="mt-0.5 text-sm text-gray-500">{description}</CardDescription>}
+                        </div>
                     </div>
-                </div>
+                )}
                 <Button
                     variant="ghost"
                     size="sm"

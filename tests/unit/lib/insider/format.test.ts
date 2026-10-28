@@ -12,6 +12,10 @@ describe('insiderName', () => {
     it('respeta separadores / y guion', () => {
         expect(insiderName('GARCÍA/LÓPEZ ANA-MARÍA')).toBe('García/López Ana-María');
     });
+    it('mayúscula tras apóstrofo: O\'BRIEN -> O\'Brien', () => {
+        expect(insiderName("O'BRIEN DEIRDRE")).toBe("O'Brien Deirdre");
+        expect(insiderName('D’ANGELO MARK')).toBe('D’Angelo Mark');
+    });
     it('no toca un nombre que ya viene en minúsculas/mezcla', () => {
         expect(insiderName('John Smith')).toBe('John Smith');
         expect(insiderName('McDonald')).toBe('McDonald');
@@ -20,6 +24,17 @@ describe('insiderName', () => {
         expect(insiderName('')).toBe('—');
         expect(insiderName(null)).toBe('—');
         expect(insiderName('   ')).toBe('—');
+    });
+});
+
+describe('insiderRole: presidencia del consejo', () => {
+    it('traduce Executive Chair/Chairman y Chair', () => {
+        expect(insiderRole('Officer, Director', 'Executive Chair')).toContain('Presidente ejecutivo');
+        expect(insiderRole('Director', 'Executive Chairman')).toContain('Presidente ejecutivo');
+        expect(insiderRole('Director', 'Chairman')).toContain('Presidente del consejo');
+    });
+    it('Vice Chair se queda como el original (no se rebaja ni inventa)', () => {
+        expect(insiderRole('Officer', 'Vice Chair')).toContain('Vice Chair');
     });
 });
 
