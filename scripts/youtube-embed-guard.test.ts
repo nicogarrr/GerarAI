@@ -39,9 +39,11 @@ describe('vídeos de inversores', () => {
         assert.equal(validInvestorVideos(many).length, 6);
     });
     it('CSP permite los reproductores de YouTube explícitamente', () => {
-        const config = readFileSync('next.config.ts', 'utf8');
-        assert.match(config, /frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/www\.youtube\.com;/);
-        assert.match(config, /frame-ancestors 'self'/);
+        // La CSP vive en lib/security/csp.ts (nonce por middleware), no en
+        // next.config.ts.
+        const cspModule = readFileSync('lib/security/csp.ts', 'utf8');
+        assert.match(cspModule, /frame-src https:\/\/www\.youtube-nocookie\.com https:\/\/www\.youtube\.com/);
+        assert.match(cspModule, /frame-ancestors 'self'/);
     });
     it('iframe solo tras clic, nocookie, con título y alternativa externa', () => {
         const embed = readFileSync('components/media/YouTubeEmbed.tsx', 'utf8');

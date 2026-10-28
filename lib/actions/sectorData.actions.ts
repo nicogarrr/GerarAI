@@ -86,12 +86,12 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
 
         // Obtener métricas de hasta 10 acciones representativas del sector
         const stocksToAnalyze = representativeStocks.slice(0, 10);
-        const metrics: any[] = [];
+        const metrics: Array<Record<string, unknown>> = [];
 
         for (const symbol of stocksToAnalyze) {
             try {
                 const metricsUrl = `${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`;
-                const stockMetrics = await fetchJSON<any>(metricsUrl, 3600).catch(() => null);
+                const stockMetrics = await fetchJSON<{ metric?: Record<string, unknown> }>(metricsUrl, 3600).catch(() => null);
                 
                 if (stockMetrics?.metric) {
                     metrics.push(stockMetrics.metric);

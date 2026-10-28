@@ -26,9 +26,7 @@ import { canonicalRedirectTicker } from '@/lib/research/canonical-ticker';
 import {
   ArrowLeft,
   FileText,
-  History,
   RefreshCcw,
-  Search,
   ShieldAlert,
   ShieldCheck,
   Target,
@@ -48,7 +46,6 @@ import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 import { TtmPanel } from '@/components/research/TtmPanel';
-import { GuideBrainButton } from '@/components/research/GuideBrainButton';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
 import { ChangeImpactCard } from '@/components/research/ChangeImpactCard';

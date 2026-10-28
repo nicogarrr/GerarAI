@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { researchRequest, requireAuthenticatedUser, cachedKeys } = vi.hoisted(() => ({
-    researchRequest: vi.fn(async () => ({ status: 'ok' })),
-    requireAuthenticatedUser: vi.fn(async () => ({ id: 'user-1' })),
+    researchRequest: vi.fn<(...args: any[]) => any>(async () => ({ status: 'ok' })),
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(async () => ({ id: 'user-1' })),
     cachedKeys: [] as string[],
 }));
 vi.mock('@/lib/research/client', () => ({ researchRequest }));

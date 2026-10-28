@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { requireAuthenticatedUser, parseYahooQuote, cacheArgs } = vi.hoisted(() => ({
-    requireAuthenticatedUser: vi.fn(async () => ({ id: 'user-1' })),
-    parseYahooQuote: vi.fn(),
-    cacheArgs: [] as unknown[],
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(async () => ({ id: 'user-1' })),
+    parseYahooQuote: vi.fn<(...args: any[]) => any>(),
+    cacheArgs: [] as unknown[][],
 }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
 vi.mock('@/lib/cache/memoryTTL', () => ({
@@ -18,7 +18,7 @@ vi.mock('@/lib/market/live-quotes', () => ({
     yahooChartRequest: (symbol: string) => ({ url: `http://yahoo/${encodeURIComponent(symbol)}`, init: {} }),
 }));
 
-const fetchMock = vi.fn();
+const fetchMock = vi.fn<(...args: any[]) => any>();
 vi.stubGlobal('fetch', fetchMock);
 
 import { getLiveMarkets } from '@/lib/actions/live-quotes.actions';

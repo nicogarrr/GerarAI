@@ -22,6 +22,6 @@ test('el éxito no esconde el botón de regenerar ni falsea publicación', () =>
 });
 
 test('completar el job NO dispara router.refresh global (scroll del lector)', () => {
-    const tick = BTN.slice(BTN.indexOf('const tick = async'), BTN.indexOf('setPollExhausted(true);'));
+    const tick = BTN.slice(BTN.indexOf('const tick = async'), BTN.indexOf('setExhaustedJobId(jobId);'));
     assert.ok(!/router\.refresh\(\s*\)\s*;/.test(tick), 'el polling no refresca la ruta entera');
 });

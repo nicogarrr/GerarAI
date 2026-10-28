@@ -2,6 +2,7 @@
 import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { requiresSession } from '@/lib/auth/session-gate';
 import { REQUESTED_PATH_HEADER } from '@/lib/auth/safe-redirect';
 import { config, middleware } from '@/middleware';
 
@@ -67,14 +68,20 @@ describe('middleware de sesión', () => {
         expect(middleware(request('/portfolio')).headers.get('location')).not.toBeNull();
     });
 
-    it.each(['/', '/sign-in', '/sign-up', '/forgot-password', '/metodologia', '/help', '/privacidad', '/terminos', '/api/auth/session', '/robots.txt', '/sw.js', '/manifest.webmanifest', '/_next/static/chunk.js', '/assets/icons/icon-192.png', '/investors/buffett.jpg', '/landing/ficha-movil.png'])(
+    it.each(['/', '/sign-in', '/sign-up', '/forgot-password', '/metodologia', '/help', '/privacidad', '/terminos', '/api/auth/session'])('la decisión de sesión deja pública %s', (path) => {
+        expect(requiresSession(path)).toBe(false);
+        expect(middleware(request(path)).headers.get('location')).toBeNull();
+    });
+
+    it.each(['/robots.txt', '/sw.js', '/manifest.webmanifest', '/_next/static/chunk.js', '/assets/icons/icon-192.png', '/investors/buffett.jpg', '/landing/ficha-movil.png'])(
         'el matcher deja pública %s',
         (path) => {
             expect(matcher.test(path)).toBe(false);
         },
     );
 
-    it.each(['/inicio', '/portfolio', '/research/AAPL', '/taxes', '/insider', '/propicks', '/alerts'])('el matcher protege %s', (path) => {
+    it.each(['/inicio', '/portfolio', '/research/AAPL', '/taxes', '/insider', '/propicks', '/alerts'])('la decisión de sesión protege %s', (path) => {
+        expect(requiresSession(path)).toBe(true);
         expect(matcher.test(path)).toBe(true);
     });
 });

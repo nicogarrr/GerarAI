@@ -22,12 +22,13 @@ function cutoffsFor(months: number): Date[] {
 }
 
 /** Serie diaria artificial: path(i) da el cierre del día i entre from y to. */
-function series(fromSec: number, toSec: number, path: (dayIndex: number) => number) {
+function series(fromSec: number, toSec: number, path: (dayIndex: number, total: number) => number) {
     const t: number[] = [];
     const c: number[] = [];
+    const total = Math.floor((toSec - fromSec) / 86400) + 1;
     for (let sec = fromSec, i = 0; sec <= toSec; sec += 86400, i++) {
         t.push(sec);
-        c.push(path(i));
+        c.push(path(i, total));
     }
     return { s: 'ok', t, c };
 }

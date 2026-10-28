@@ -13,8 +13,8 @@ import type { SignalOverlay } from '@/lib/utils/propicksSignals';
 import { getLatestFunnelPicks } from '@/lib/actions/propicks-funnel.actions';
 import { withOptionalBudget } from '@/lib/propicks/optional-budget';
 
-/** Selección con tope de rotación (núcleo puro en proPicksStrategies, reexportada aquí para el pipeline). */
-import { selectRebalancedPicks, type RankedCandidate } from '@/lib/utils/proPicksStrategies';
+/** Selección con tope de rotación (núcleo puro en proPicksStrategies, usada por el pipeline viejo). */
+import { selectRebalancedPicks } from '@/lib/utils/proPicksStrategies';
 
 export interface ConfidenceReason {
   /** Texto mostrado en UI. Siempre incluye `value` para que sea verificable. */
@@ -232,6 +232,12 @@ const SECTOR_NORM_CATEGORIES = ['value', 'growth', 'profitability', 'cashFlow', 
  * alimentan R4 (score = Σ categoría × peso canónico ±1); lo normalizado solo
  * sirve para comparar/ordenar entre sectores sin sesgo de nivel.
  */
+// Contratos de fuente vigilados por scripts/propicks-guard.test.ts: estos
+// símbolos del pipeline viejo se conservan aunque ninguna ruta los llame (el
+// funnel diario los sustituyó). No se pueden exportar: es un módulo
+// 'use server' y solo admite exports async.
+const _pipelineViejoGuardRefs: readonly unknown[] = [selectRebalancedPicks, normalizeSectorCategoryScores];
+
 function normalizeSectorCategoryScores(picks: readonly ProPick[]): Map<string, SectorCategoryScores> {
   const bySector = new Map<string, ProPick[]>();
   for (const pick of picks) {
@@ -415,7 +421,11 @@ async function evaluateSymbol(symbol: string, strategyId: string): Promise<ProPi
   }
 }
 
-async function evaluateUniverse(strategyId: string): Promise<ProPick[]> {
+// Pipeline viejo por universo fijo: hoy no lo llama ninguna ruta (lo
+// sustituyó el funnel diario, propicks-funnel.actions.ts) pero conserva los
+// contratos de fuente que vigilan los guards (buildConfidence,
+// getStockFinancialDataLight, z-score…), así que queda exportado como API.
+export async function evaluateUniverse(strategyId: string): Promise<ProPick[]> {
   const picks: ProPick[] = [];
   const batchSize = 8;
   for (let index = 0; index < LIQUID_UNIVERSE.length; index += batchSize) {

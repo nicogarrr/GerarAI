@@ -436,6 +436,8 @@ async function executeLedgerChange(
     let lastConflict: VersionConflictError | null = null;
     for (let attempt = 1; attempt <= MAX_TXN_ATTEMPTS; attempt++) {
         const conn = await connectToDatabase();
+        // null solo es posible durante el build; en runtime es un invariante.
+        if (!conn) throw new Error('manual-demo: conexión a MongoDB no disponible en runtime');
         const session = await conn.startSession();
         try {
             let outcome: TxnOutcome | null = null;
