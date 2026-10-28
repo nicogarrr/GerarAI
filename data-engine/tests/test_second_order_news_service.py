@@ -557,3 +557,29 @@ def test_total_cap_remains_ten_with_many_specific_themes(monkeypatch):
         assert len(result["candidates"])==10
         # Eight different themes each get one place before the first gets a second.
         assert len({row["exposure"]["value"] for row in result["candidates"][:8]})==8
+
+
+def test_extraction_request_uses_registered_prompt_and_traces_it(monkeypatch):
+    import asyncio
+
+    import pytest
+
+    from app.services import prompt_registry
+
+    seen = []
+
+    class Router:
+        def resolve(self, request):
+            seen.append(request)
+            return "paid-model-x"  # corta antes de llamar al proveedor
+
+    class Provider:
+        name = "test"
+        model_router = Router()
+
+    monkeypatch.setattr(service, "create_llm_provider", lambda: Provider())
+    with pytest.raises(RuntimeError, match="owner-approved"):
+        asyncio.run(service._extract_with_llm("noticia"))
+    resolved = prompt_registry.get_prompt("second_order_news_service", allow_remote=False)
+    assert seen[0].messages[0].content == resolved.text
+    assert seen[0].metadata == resolved.trace_metadata()
