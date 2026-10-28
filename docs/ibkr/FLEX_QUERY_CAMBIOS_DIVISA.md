@@ -14,7 +14,7 @@ descripciones en la guía oficial de IBKR, Trades - Flex Statement):
 
 - Asset Class (`assetCategory`), Symbol (`symbol`, p. ej. `EUR.USD`), Buy/Sell
   (`buySell`), Quantity (`quantity`), Trade Price (`tradePrice`), Proceeds
-  (`proceeds`), Currency (`currency`), Trade Date (`tradeDate`), Trade ID (`tradeID`).
+  (`proceeds`), Currency (`currency`), Trade Date (`tradeDate`), Trade ID (`tradeID`), y la hora (`dateTime` o `tradeTime`) para la regla del mismo día.
 - Marca también Account ID y Report Date; el importador ya los usa para validar la cuenta.
 
 Opciones de la sección: no filtres por tipo de activo (no marques solo «Stocks»),
@@ -55,6 +55,11 @@ esa divisa, que el libro todavía no modela.
 - Pérdida al convertir: no se integra en la parte cubierta por adquisición de la misma divisa en el
   año POSTERIOR a la transmisión, solo posterior y solo la misma divisa (art. 33.5.e LIRPF, V1613-25; AEAT, Manual práctico IRPF 2025, https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c11-ganancias-perdidas-patrimoniales/ganancias-perdidas-patrimoniales-que-no-bi/perdidas-patrimoniales-que-no-se-tales.html), no 2 meses. Se suma al valor de los lotes
   readquiridos. Si la ventana de 1 año sigue abierta a fecha de los datos, queda "incompleto".
+  - Mismo día: decisión conservadora de Auditor 2, sin consulta que la dirima. Si el Flex trae hora
+    (`dateTime` o `tradeTime`, actívala en la Flex Query) en ambas operaciones, solo bloquea la
+    recompra posterior a la conversión (misma hora no bloquea). Si falta alguna de las dos horas,
+    la recompra del mismo día BLOQUEA. Excluir ese día arriesga una deducción indebida.
+  - El día +1 año exacto cuenta como dentro de la ventana (art. 30 Código Civil).
 - Dividendos e intereses como entradas: sin consulta, solo analogía. Solo con
   `?fx_income_by_analogy=true`, etiquetado "criterio por analogía, sin consulta".
 - Fondos/ETF comprados con divisa propia (V0775-21): fuera de alcance, "incompleto".

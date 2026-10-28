@@ -133,10 +133,23 @@ def test_prior_year_acquisition_does_not_block_only_posterior_does():  # art. 33
     assert r["rows"][0]["blocked_loss_base"] == 0.0 and r["gain_base"] == -20.0
 
 
-def test_same_day_acquisition_is_not_posterior():
-    lots = [CurrencyLot(date(2025, 1, 1), D(100), D(100)), CurrencyLot(date(2025, 3, 1), D(100), D(90))]
-    r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("0.90"))])
-    assert r["rows"][0]["blocked_loss_base"] == 0.0
+def _same_day(lot_time, conv_time):
+    lots = [CurrencyLot(date(2025, 1, 1), D(100), D(100)), CurrencyLot(date(2025, 3, 1), D(100), D(90), "", lot_time)]
+    return _run(lots, [Conversion(date(2025, 3, 1), D(100), D("0.90"), "", conv_time)])["rows"][0]["blocked_loss_base"]
+
+
+def test_same_day_without_times_blocks_conservatively():  # sin orden intradia, sin consulta que lo dirima
+    assert _same_day("", "") == 10.0
+
+
+def test_same_day_with_one_time_missing_blocks():
+    assert _same_day("101500", "") == 10.0 and _same_day("", "101500") == 10.0
+
+
+def test_same_day_known_times_only_later_purchase_blocks():
+    assert _same_day("110000", "101500") == 10.0   # compra despues de la conversion
+    assert _same_day("101500", "110000") == 0.0    # compra antes de la conversion
+    assert _same_day("101500", "101500") == 0.0    # misma hora: no es posterior
 
 
 def test_acquisition_exactly_one_year_after_blocks_and_one_day_later_does_not():

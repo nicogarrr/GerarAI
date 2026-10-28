@@ -118,6 +118,16 @@ def _execution_time(transaction) -> str:
     return ""
 
 
+def _fx_time(conversion) -> str:
+    """HHMMSS de un cambio de divisa: dateTime del Flex o, si no, tradeTime."""
+    found = _execution_time(conversion)
+    if found:
+        return found
+    payload = conversion.raw_payload if isinstance(conversion.raw_payload, dict) else {}
+    digits = "".join(ch for ch in str(payload.get("tradeTime") or "") if ch.isdigit())
+    return digits[:6].ljust(6, "0") if len(digits) >= 4 else ""
+
+
 def _fifo_sort_key(transaction) -> tuple:
     action = (transaction.action or "").lower()
     return (
@@ -1180,11 +1190,11 @@ class TaxReportService:
                 .order_by(FxConversion.trade_date, FxConversion.id)
             ).all()
             raw = [
-                (c.trade_date, c.disposed_currency, c.disposed_amount, c.acquired_currency, f"fx#{c.id}", c.acquired_amount)
+                (c.trade_date, c.disposed_currency, c.disposed_amount, c.acquired_currency, f"fx#{c.id}", c.acquired_amount, _fx_time(c))
                 for c in stored
             ]
         else:
-            raw = [(c.converted_on, "USD", c.amount, base_currency, c.ref, None) for c in fx_conversions]
+            raw = [(c.converted_on, "USD", c.amount, base_currency, c.ref, None, c.time) for c in fx_conversions]
             explicit_rates = {c.converted_on: c.ecb_rate for c in fx_conversions}
         if not raw:
             return compute_currency_ledger([], [], start, end)
@@ -1206,7 +1216,7 @@ class TaxReportService:
         by_currency: dict[str, list] = {}
         unsupported: list[str] = []
         bought_with_base: dict[str, list[CurrencyLot]] = {}
-        for day, disposed, amount, acquired, ref, acquired_amount in raw:
+        for day, disposed, amount, acquired, ref, acquired_amount, when in raw:
             disposed = (disposed or "").upper()
             if disposed == base_currency:
                 # Comprar divisa con EUR: entrada de lote cuyo valor de adquisicion
@@ -1214,7 +1224,7 @@ class TaxReportService:
                 # de divisa extranjera. Añadido propio, pendiente de Auditor 2.
                 if acquired_amount is not None:
                     bought_with_base.setdefault((acquired or "").upper(), []).append(
-                        CurrencyLot(day, Decimal(str(acquired_amount)), Decimal(str(amount)), f"cambio {ref}")
+                        CurrencyLot(day, Decimal(str(acquired_amount)), Decimal(str(amount)), f"cambio {ref}", when)
                     )
                 continue
             if (acquired or "").upper() != base_currency:
@@ -1226,7 +1236,7 @@ class TaxReportService:
                 if fx_conversions is not None
                 else conv_rate(disposed, day)
             )
-            by_currency.setdefault(disposed, []).append(Conversion(day, Decimal(str(amount)), rate, ref))
+            by_currency.setdefault(disposed, []).append(Conversion(day, Decimal(str(amount)), rate, ref, when))
         results = []
         all_events = {}
         for transaction, company in tx_rows:
@@ -1244,6 +1254,7 @@ class TaxReportService:
                         "proceeds_native": e["proceeds_native"],
                         "proceeds_base": e["proceeds_base"],
                         "ref": f"sale#{e['transaction'].id}",
+                        "time": _execution_time(e["transaction"]),
                     }
                     for e in hist
                     if (e["transaction"].currency or "").upper() == currency
@@ -1284,7 +1295,7 @@ class TaxReportService:
                     if amount > 0:
                         rate = resolve_rate(currency, day)
                         extra_lots.append(
-                            CurrencyLot(day, amount, None if rate is None else amount * rate, f"{action}#{transaction.id}")
+                            CurrencyLot(day, amount, None if rate is None else amount * rate, f"{action}#{transaction.id}", _execution_time(transaction))
                         )
                     elif amount < 0:
                         outflows.append(Outflow(day, -amount, action, f"{action}#{transaction.id}"))

@@ -179,3 +179,21 @@ def test_fund_purchase_in_currency_is_out_of_scope(db):
     db.commit()
     s = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]
     assert s["currency_ledger_status"] == "incomplete" and "V0775-21" in s["currency_ledger_reason"]
+
+
+def test_flex_datetime_feeds_same_day_rule(db):
+    # compra de divisa (EUR->USD) 10:00 el mismo dia que la conversion USD->EUR con perdida a las 09:00
+    _rates(db)
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date(2026, 3, 1), rate=D("0.80"), source="ECB"))
+    db.commit()
+    buy_usd = ("<Trade assetCategory='CASH' symbol='EUR.USD' buySell='SELL' quantity='-90' tradePrice='1.1' proceeds='100' "
+               "currency='USD' tradeDate='20250301' dateTime='20250301;100000' tradeID='b'/>")
+    first = ("<Trade assetCategory='CASH' symbol='EUR.USD' buySell='SELL' quantity='-100' tradePrice='1' proceeds='100' "
+             "currency='USD' tradeDate='20250101' dateTime='20250101;100000' tradeID='a'/>")
+    sell_usd = ("<Trade assetCategory='CASH' symbol='EUR.USD' buySell='BUY' quantity='90' tradePrice='1.11' proceeds='-100' "
+                "currency='USD' tradeDate='20250301' dateTime='20250301;090000' tradeID='c'/>")
+    IBKRImportService().import_flex_xml(db, _xml(first, buy_usd, sell_usd), trades_only=True)
+    _tx(db, "sell", 1, 1, date(2026, 6, 1))  # fecha de datos posterior a la ventana de 1 año
+    s = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]
+    assert s["currency_ledger_status"] == "computed", s["currency_ledger_reason"]
+    assert s["currency_ledger_blocked_loss_base"] == 5.0

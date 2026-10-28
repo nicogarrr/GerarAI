@@ -64,6 +64,7 @@ class CurrencyLot:
     amount: Decimal
     eur_value: Decimal | None  # None si falta el cambio de la venta de origen
     origin: str = ""
+    acquired_time: str = ""  # HHMMSS si el broker la trae; "" si no
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,7 @@ class Conversion:
     amount: Decimal
     ecb_rate: Decimal | None  # EUR por unidad de divisa, BCE del dia
     ref: str = ""
+    time: str = ""  # HHMMSS si el broker la trae; "" si no
 
 
 def lots_from_sales(sales) -> list[CurrencyLot]:
@@ -98,6 +100,7 @@ def lots_from_sales(sales) -> list[CurrencyLot]:
             Decimal(str(s["proceeds_native"])),
             None if s.get("proceeds_base") is None else Decimal(str(s["proceeds_base"])),
             s.get("ref", ""),
+            s.get("time", ""),
         )
         for s in sales
         if s.get("proceeds_native") is not None and Decimal(str(s["proceeds_native"])) > 0
@@ -109,6 +112,19 @@ def _shift_year(day: date, years: int) -> date:
         return day.replace(year=day.year + years)
     except ValueError:  # 29 feb
         return day.replace(year=day.year + years, day=28)
+
+
+def _is_posterior(lot_day: date, lot_time: str, conv_day: date, conv_time: str, hi: date) -> bool:
+    """Adquisicion posterior a la conversion y dentro de 1 año (art. 30 CC: +1 año exacto cuenta).
+
+    Mismo dia: si ambas horas son conocidas solo bloquea la posterior a la
+    conversion; si falta alguna, BLOQUEA (decision conservadora: sin orden
+    intradia, excluir el dia arriesga una deduccion indebida; ninguna consulta
+    lo dirime).
+    """
+    if lot_day == conv_day:
+        return not (lot_time and conv_time) or lot_time > conv_time
+    return conv_day < lot_day <= hi
 
 
 def compute_currency_ledger(
@@ -136,7 +152,7 @@ def compute_currency_ledger(
             "unconverted": None, "blocked_loss_base": None, "sources": list(SOURCES),
         }
     lot_list = sorted(lots or [], key=lambda l: l.acquired_on)
-    queue = [[l.acquired_on, l.amount, l.eur_value, l.origin] for l in lot_list]
+    queue = [[l.acquired_on, l.amount, l.eur_value, l.origin, l.acquired_time] for l in lot_list]
     data_end = data_through or max(
         [c.converted_on for c in conversions]
         + [l.acquired_on for l in lot_list]
@@ -193,7 +209,7 @@ def compute_currency_ledger(
         if gain is not None and gain < 0:
             hi = _shift_year(day, WASH_YEARS)
             window_open = hi > data_end
-            held = [q for q in queue if q[1] > 0 and day < q[0] <= hi]
+            held = [q for q in queue if q[1] > 0 and _is_posterior(q[0], q[4], day, conv.time, hi)]
             held_total = sum((q[1] for q in held), Decimal("0"))
             cover = min(conv.amount, held_total)
             if cover > 0:
