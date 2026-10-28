@@ -166,6 +166,12 @@ describe('Modelo720Section', () => {
         expect(screen.getByText(/no su contenido/)).toBeInTheDocument();
     });
 
+    it('recuento ausente no se convierte en cero fiscal', () => {
+        render(<Modelo720Section thresholds={thresholds} file720={{ available: true, detail_records: null }} />);
+        expect(screen.getByText(/null registros de detalle/)).toBeInTheDocument();
+        expect(screen.queryByText(/0 registros de detalle/)).not.toBeInTheDocument();
+    });
+
     it('fichero no disponible muestra motivo', () => {
         render(<Modelo720Section thresholds={thresholds} file720={{ available: false, reason: 'faltan ISIN' }} />);
         expect(screen.getByText(/faltan ISIN/)).toBeInTheDocument();
@@ -178,7 +184,7 @@ describe('Modelo720Section', () => {
         const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
         render(<Modelo720Section thresholds={thresholds}
             file720={{ available: true, detail_records: 1, record_length: 500, encoding: 'ISO-8859-1', content: 'Ñá\u00ff', notas: ['n1'], excluded: [{ ticker: 'EX', reason: 'r' }], manual_review: [{ ticker: 'MR', reason: 'r2' }] }} />);
-        expect(screen.getByText(/500 bytes/)).toBeInTheDocument();
+        expect(screen.getByText(/1 registro de detalle de 500 bytes/)).toBeInTheDocument();
         expect(screen.getByText('n1')).toBeInTheDocument();
         expect(screen.getByText(/EX: r/)).toBeInTheDocument();
         expect(screen.getByText(/MR: r2/)).toBeInTheDocument();

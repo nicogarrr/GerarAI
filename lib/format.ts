@@ -354,12 +354,6 @@ export function formatPercent(
 }
 
 /**
- * Fecha corta en español (23 sept 2026). Acepta Date, ISO o timestamp.
- * Sin `timeZone` por defecto: el comportamiento actual no cambia para los
- * call sites existentes; para fechas con zona definida usa `formatUserDate`
- * o `formatMarketDate`.
- */
-/**
  * Conteo con concordancia es-ES: formatCountEs(1, 'posición', 'posiciones')
  * -> «1 posición»; formatCountEs(5, 'posición', 'posiciones') ->
  * «5 posiciones». El número lleva separador de miles es-ES.
@@ -368,6 +362,12 @@ export function formatCountEs(value: number, singular: string, pluralForm: strin
   return `${formatNumber(value, { maximumFractionDigits: 0 })} ${value === 1 ? singular : pluralForm}`;
 }
 
+/**
+ * Fecha corta en español (23 sept 2026). Acepta Date, ISO o timestamp.
+ * Sin `timeZone` por defecto: el comportamiento actual no cambia para los
+ * call sites existentes; para fechas con zona definida usa `formatUserDate`
+ * o `formatMarketDate`.
+ */
 export function formatDate(
   value: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },

@@ -336,7 +336,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                     {file720.available === true ? (
                         <div className="space-y-3">
                             <p className="text-sm text-gray-400">
-                                Borrador de fichero generado ({formatCountEs(Number(file720.detail_records), 'registro de detalle', 'registros de detalle')}
+                                Borrador de fichero generado ({typeof file720.detail_records === 'number' ? formatCountEs(file720.detail_records, 'registro de detalle', 'registros de detalle') : `${String(file720.detail_records)} registros de detalle`}
                                 {typeof file720.record_length === 'number' ? ` de ${String(file720.record_length)} bytes` : ''}
                                 {typeof file720.encoding === 'string' ? `, en ${file720.encoding}` : ''}). Es el
                                 contenido real que produce el generador, no una estimación: puedes descargarlo y
