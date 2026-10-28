@@ -153,6 +153,7 @@ def reconcile_ibkr_costs(db: Session, positions: list[Position]) -> dict[int, di
         if reason:
             result[p.id] = {"status": "not_comparable", "reason": reason, "message": UNKNOWN_MESSAGE}
             continue
+        assert raw is not None
         currencies = {currency_key(raw[key]) for key in ("costBasisCurrency", "costBasisMoneyCurrency")
                       if raw.get(key)}
         if len(currencies) > 1:
