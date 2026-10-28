@@ -18,12 +18,7 @@ function YieldValue({ candidate }: { candidate: RadarCandidate }) {
     if (candidate.dividend_yield === null) {
         return <span className="text-sm text-gray-500">N/D</span>;
     }
-    return (
-        <span className="text-sm text-gray-200">
-            {formatPercent(candidate.dividend_yield)}{' '}
-            <span className="text-xs text-gray-500">Yahoo (fuente no oficial)</span>
-        </span>
-    );
+    return <span className="text-sm text-gray-200">{formatPercent(candidate.dividend_yield)}</span>;
 }
 
 export default function RadarGlobalView() {
@@ -48,13 +43,9 @@ export default function RadarGlobalView() {
 
     return (
         <div className="space-y-4">
-            <Card className="border-teal-800 bg-teal-950/40 p-4">
-                <p className="text-sm text-teal-200">
-                    Radar global Yahoo (fuente no oficial). SOLO propone candidatos: las cifras no
-                    son dato verificado hasta el cotejo con la fuente oficial de cada mercado
-                    (para HKEX, HKEXnews). Nada de aquí se guarda como hecho financiero.
-                </p>
-            </Card>
+            <p className="text-xs text-gray-500">
+                Candidatos de Yahoo Finance; conviene cotejo oficial antes de usarlos.
+            </p>
             <div className="flex flex-wrap items-center gap-2">
                 {REGION_PRESETS.map((p) => (
                     <Button
