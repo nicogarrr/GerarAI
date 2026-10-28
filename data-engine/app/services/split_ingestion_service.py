@@ -13,7 +13,7 @@ dividend ingestion shares.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -27,6 +27,9 @@ from app.services.company_resolver import resolve_company
 from app.services.connectors.fmp import FMPClient
 from app.services.connectors.yahoo import YahooFinanceClient
 from app.services.provenance import Coverage, SourceKind, provenance
+
+
+_SAME_EVENT_DAYS = 3
 
 
 class NoSafeProviderSymbol(RuntimeError):
@@ -213,7 +216,11 @@ class SplitIngestionService(ProviderIngestionService):
             return None
         if denominator <= 0 or numerator <= 0:
             return None
-        return numerator / denominator
+        # La columna es Numeric(24, 10): se guarda ya a esa precision. Con el
+        # cociente completo (28 digitos, p. ej. 5:3) la comparacion de dedupe
+        # contra lo guardado en Postgres nunca coincide y cada sync semanal
+        # reinserta el mismo split.
+        return (numerator / denominator).quantize(Decimal("1e-10"))
 
     @staticmethod
     def _description(source: str, ratio: float | Decimal, fetched_at: datetime) -> str:
@@ -269,7 +276,11 @@ class SplitIngestionService(ProviderIngestionService):
         return db.scalar(
             select(CorporateAction).where(
                 CorporateAction.company_id == company.id,
-                CorporateAction.effective_date == row["effective_date"],
+                # +-3 dias: Yahoo y FMP (el respaldo) fechan el mismo split con
+                # un dia de diferencia; con fecha exacta, un fallo puntual de
+                # Yahoo duplicaba el evento con la fecha del otro proveedor.
+                CorporateAction.effective_date >= row["effective_date"] - timedelta(days=_SAME_EVENT_DAYS),
+                CorporateAction.effective_date <= row["effective_date"] + timedelta(days=_SAME_EVENT_DAYS),
                 CorporateAction.ratio == row["ratio"],
                 CorporateAction.action_type.in_(["split", "reverse_split"]),
             )

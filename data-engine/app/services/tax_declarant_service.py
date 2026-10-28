@@ -19,7 +19,7 @@ from app.models import CashBalance, Company, Position, Tenant
 
 KEY = "tax_declarant"
 IDENTITY_FIELDS = ("nif", "apellidos_nombre", "numero_declaracion", "telefono")
-_NIF = re.compile(r"^[A-Z0-9]{5,15}$")
+_NIF = re.compile(r"^[A-Z0-9]{5,20}$")
 _NUMERO = re.compile(r"^720\d{10}$")
 _TELEFONO = re.compile(r"^\d{9,15}$")
 _COUNTRY = re.compile(r"^[A-Z]{2}$")
@@ -121,6 +121,14 @@ def write(db: Session, payload: dict) -> dict:
             continue
         value = str(payload[field] or "").strip()
         value = value.upper() if upper else value
+        if field == "nif" and value:
+            if len(value) > 32 or any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+                errors.append(message)
+                continue
+            value = re.sub(r"[^A-Z0-9]", "", value)
+            if not value:
+                errors.append(message)
+                continue
         if not value:
             declarant.pop(field, None)
         elif pattern.match(value):
