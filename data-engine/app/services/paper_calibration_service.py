@@ -79,6 +79,7 @@ def calibration(rows: list[PaperTrade], now: datetime | None = None) -> dict:
         last = index == len(edges) - 1
         sample = [
             (r, res) for r, res in closed
+            # nosemgrep: gerarai-float-equality -- limite superior inclusivo del ultimo tramo de conviccion (valores discretos); igualdad intencionada
             if low <= float(r.conviction) < high or (last and float(r.conviction) == high)
         ]
         size = len(sample)

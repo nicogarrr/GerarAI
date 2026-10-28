@@ -213,7 +213,9 @@ def portfolio_risk_lines(db: Session, tenant: int, *, today: date | None = None)
         else:
             lines.append("Panel de riesgo: ninguna regla incumplida (peso > 20 %, pre-FCF > 10 %, margen).")
         lines.append(
+            # nosemgrep: gerarai-money-none-to-zero -- contexto de texto para el LLM; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
             f"Concentración: la mayor posición pesa {_pct(float(dashboard.get('top_1_weight') or 0))} "
+            # nosemgrep: gerarai-money-none-to-zero -- contexto de texto para el LLM; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
             f"y las 5 mayores {_pct(float(dashboard.get('top_5_weight') or 0))}."
         )
         if dashboard.get("status") not in (None, "ok"):

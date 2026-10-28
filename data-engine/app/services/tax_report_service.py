@@ -673,6 +673,7 @@ class TaxReportService:
                             "ticker": ticker,
                             "date": transaction.trade_date.isoformat(),
                             "action": action,
+                            # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
                             "quantity": float(transaction.quantity or 0),
                             # Valor crudo (price x quantity no canonica): es
                             # un CANDIDATO a revisar, nunca un pago medido.
@@ -770,6 +771,7 @@ class TaxReportService:
                             "ticker": ticker,
                             "date": transaction.trade_date.isoformat(),
                             "action": action,
+                            # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
                             "quantity": float(transaction.quantity or 0),
                             "amount": _money(amount),
                             "currency": transaction.currency,
@@ -1016,15 +1018,19 @@ class TaxReportService:
         )
 
         total_dividends = sum(
+            # nosemgrep: gerarai-money-none-to-zero -- los totales se publican como None si algun componente es incompleto o hay over_sell (realized_unreliable/dividend_incomplete)
             (Decimal(str(b["dividends_base"] or 0)) for b in dividends), Decimal("0")
         )
         total_withholding = sum(
+            # nosemgrep: gerarai-money-none-to-zero -- los totales se publican como None si algun componente es incompleto o hay over_sell (realized_unreliable/dividend_incomplete)
             (Decimal(str(b["withholding_base"] or 0)) for b in dividends), Decimal("0")
         )
         total_gain = sum(
+            # nosemgrep: gerarai-money-none-to-zero -- los totales se publican como None si algun componente es incompleto o hay over_sell (realized_unreliable/dividend_incomplete)
             (Decimal(str(b["gain_base"] or 0)) for b in realized), Decimal("0")
         )
         total_blocked = sum(
+            # nosemgrep: gerarai-money-none-to-zero -- los totales se publican como None si algun componente es incompleto o hay over_sell (realized_unreliable/dividend_incomplete)
             (Decimal(str(b["blocked_loss_base"] or 0)) for b in realized), Decimal("0")
         )
 
@@ -1061,6 +1067,7 @@ class TaxReportService:
                 else _money(
                     sum(
                         (
+                            # nosemgrep: gerarai-money-none-to-zero -- los totales se publican como None si algun componente es incompleto o hay over_sell (realized_unreliable/dividend_incomplete)
                             Decimal(str(b["dividends_base"] or 0))
                             for b in dividends
                             if b.get("unattributed")
@@ -1153,6 +1160,7 @@ class TaxReportService:
             prior_rcm = None
             if prior_summary.get("total_dividends_base") is not None and not prior_interest["incomplete"]:
                 prior_rcm = Decimal(str(prior_summary["total_dividends_base"])) + Decimal(
+                    # nosemgrep: gerarai-money-none-to-zero -- solo se suma con interest["incomplete"] False; un interes sin convertir marca incomplete y rcm_net_base queda None
                     str(prior_interest["received"]["amount_base"] or 0)
                 )
             prior_year_nets.append({
@@ -1193,6 +1201,7 @@ class TaxReportService:
         rcm_net_base: Decimal | None = None
         if summary.get("total_dividends_base") is not None and not interest["incomplete"]:
             rcm_net_base = Decimal(str(summary["total_dividends_base"])) + Decimal(
+                # nosemgrep: gerarai-money-none-to-zero -- solo se suma con interest["incomplete"] False; un interes sin convertir marca incomplete y rcm_net_base queda None
                 str(interest["received"]["amount_base"] or 0)
             )
         return {

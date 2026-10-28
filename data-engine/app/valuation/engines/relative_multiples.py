@@ -688,6 +688,7 @@ class RelativeMultiplesEngine(ValuationEngine):
     def _own_reading(
         self, kind: str, context: ValuationContext, fundamentals: dict[str, float]
     ) -> MultipleReading:
+        # nosemgrep: gerarai-money-none-to-zero -- derive_multiple devuelve lectura no disponible con price <= 0; un precio desconocido no produce multiplo
         price = float(context.current_price or 0.0)
         return derive_multiple(
             kind,
@@ -725,6 +726,7 @@ class RelativeMultiplesEngine(ValuationEngine):
                     kind=kind,
                     peer_multiple=multiple,
                     fundamentals=fundamentals,
+                    # nosemgrep: gerarai-money-none-to-zero -- derive_multiple devuelve lectura no disponible con price <= 0; un precio desconocido no produce multiplo
                     price=float(context.current_price or 0.0),
                     shares=fundamentals["shares_diluted"],
                     total_debt=fundamentals.get("total_debt"),

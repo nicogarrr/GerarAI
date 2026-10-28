@@ -250,6 +250,7 @@ class CorporateActionService:
                 ).all()
                 ledger_net = sum(
                     (
+                        # nosemgrep: gerarai-money-none-to-zero -- campos NOT NULL de Transaction (quantity/price/fees default 0); el `or` es defensivo
                         (leg.quantity or Decimal("0"))
                         * (1 if leg.action == "buy" else -1)
                         for leg in legs
@@ -284,7 +285,9 @@ class CorporateActionService:
                 cost = Decimal("0")
                 realized = Decimal("0")
                 for leg in legs:
+                    # nosemgrep: gerarai-money-none-to-zero -- campos NOT NULL de Transaction (quantity/price/fees default 0); el `or` es defensivo
                     leg_qty = leg.quantity or Decimal("0")
+                    # nosemgrep: gerarai-money-none-to-zero -- campos NOT NULL de Transaction (quantity/price/fees default 0); el `or` es defensivo
                     leg_price = leg.price or Decimal("0")
                     fees = leg.fees or Decimal("0")
                     if leg.trade_date < action.effective_date:

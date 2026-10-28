@@ -1,0 +1,315 @@
+# Reglas Semgrep propias de GerarAI: clases de bug que ya nos han mordido.
+# CI: job `semgrep-custom` (bloqueante, 0 hallazgos). Las reglas del registro
+# corren aparte en `semgrep-registry` (no bloqueante, informe SARIF).
+#
+# Suprimir un hallazgo SOLO con una justificacion en la linea anterior:
+#   # nosemgrep: <rule-id> -- por que aqui es correcto
+#
+# gerarai-direct-http-client: los modulos excluidos abajo se revisaron (oct 2026)
+# y solo hablan con hosts fijos o URLs de settings del operador; las URLs que
+# elige un usuario pasan por app.services.public_fetch (documentos, RSS, IR) o
+# app.llm.egress_guard (proveedor LLM custom). Un modulo NUEVO con httpx/requests
+# directo falla el CI: usa public_fetch o, si el host es fijo, anadelo aqui con
+# su motivo.
+#   api/routes/companies.py: only catches httpx.HTTPStatusError from a service; no request here
+#   api/routes/market.py: Yahoo/Finnhub quote+candles on fixed hosts (shared client, #2541)
+#   api/routes/screeners.py: fixed market-data hosts
+#   llm/adapters.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/base.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/chat_provider.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/egress_guard.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/factory.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/free_interactive.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/jev.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/thesis_go.py: LLM provider endpoint; custom URLs via egress_guard
+#   services/class_filer_eps_service.py: SEC EDGAR fixed host
+#   services/company_enrichment_service.py: fixed provider APIs (OpenFIGI/Finnhub)
+#   services/connectors/base.py: connector to a fixed public data API
+#   services/connectors/ca_insider_yahoo.py: connector to a fixed public data API
+#   services/connectors/celestrak_ast.py: connector to a fixed public data API
+#   services/connectors/celestrak_ast_supgp.py: connector to a fixed public data API
+#   services/connectors/cnmv.py: connector to a fixed public data API
+#   services/connectors/cnmv_shorts.py: connector to a fixed public data API
+#   services/connectors/damodaran.py: connector to a fixed public data API
+#   services/connectors/earnings_calendar.py: connector to a fixed public data API
+#   services/connectors/ecb.py: connector to a fixed public data API
+#   services/connectors/ecb_history.py: connector to a fixed public data API
+#   services/connectors/esef.py: connector to a fixed public data API
+#   services/connectors/finnhub.py: connector to a fixed public data API
+#   services/connectors/fmp.py: connector to a fixed public data API
+#   services/connectors/form13dg.py: connector to a fixed public data API
+#   services/connectors/form13f.py: connector to a fixed public data API
+#   services/connectors/form4.py: connector to a fixed public data API
+#   services/connectors/fred.py: connector to a fixed public data API
+#   services/connectors/gdelt.py: connector to a fixed public data API
+#   services/connectors/ibkr.py: connector to a fixed public data API
+#   services/connectors/ir.py: connector to a fixed public data API
+#   services/connectors/macro_calendar.py: connector to a fixed public data API
+#   services/connectors/openfigi.py: connector to a fixed public data API
+#   services/connectors/rss.py: connector to a fixed public data API
+#   services/connectors/sec.py: connector to a fixed public data API
+#   services/connectors/sec_edgar.py: connector to a fixed public data API
+#   services/connectors/short_interest.py: connector to a fixed public data API
+#   services/connectors/stooq.py: connector to a fixed public data API
+#   services/connectors/uk_pdmr_tracefour.py: connector to a fixed public data API
+#   services/connectors/yahoo.py: connector to a fixed public data API
+#   services/corpus_ingestion_service.py: fund-letter sites; scraped links are regex-pinned to the same host
+#   services/earnings_dates_service.py: fixed market-data hosts
+#   services/energy_flows.py: fixed public data API
+#   services/etf_holdings.py: fixed ETF issuer pages; links regex-pinned per issuer
+#   services/finnhub_profile_backfill.py: Finnhub fixed host
+#   services/historical_stress_service.py: fixed market-data host
+#   services/insider_service.py: SEC fixed host
+#   services/investor_videos.py: YouTube feed fixed host, redirects off
+#   services/macro_calendar_service.py: fixed public data API
+#   services/manager_holding_ingestion_service.py: SEC fixed host
+#   services/market_observation_service.py: fixed market-data host
+#   services/money_flows.py: fixed public data API
+#   services/notification_service.py: Telegram API + operator-configured webhook from settings (not user input)
+#   services/public_fetch.py: the SSRF-safe fetcher itself
+#   services/sec_bottleneck_filings.py: SEC fixed host
+#   services/short_positions_service.py: regulator fixed host
+#   services/tenant_llm_settings_service.py: custom provider URLs go through egress_guard.public_only_client
+#   services/thesis_approval_service.py: Telegram API from settings
+#   services/thesis_audio_service.py: internal TTS sidecar URL from settings
+#   services/thesis_job_service.py: only references httpx exception types
+#   workers/dramatiq_app.py: internal services from settings
+
+rules:
+- id: gerarai-direct-http-client
+  languages:
+  - python
+  severity: ERROR
+  message: Cliente HTTP directo (httpx/requests/urllib). Para URLs que vienen del usuario o de datos externos usa app.services.public_fetch (bloquea IPs privadas, fija la IP validada, limita bytes). Si
+    el host es fijo, anade el modulo a la lista revisada de .semgrep/gerarai.yml con su motivo.
+  paths:
+    include:
+    - data-engine/app/
+    exclude:
+    - /data-engine/app/api/routes/companies.py
+    - /data-engine/app/api/routes/market.py
+    - /data-engine/app/api/routes/screeners.py
+    - /data-engine/app/llm/adapters.py
+    - /data-engine/app/llm/base.py
+    - /data-engine/app/llm/chat_provider.py
+    - /data-engine/app/llm/egress_guard.py
+    - /data-engine/app/llm/factory.py
+    - /data-engine/app/llm/free_interactive.py
+    - /data-engine/app/llm/jev.py
+    - /data-engine/app/llm/thesis_go.py
+    - /data-engine/app/services/class_filer_eps_service.py
+    - /data-engine/app/services/company_enrichment_service.py
+    - /data-engine/app/services/connectors/base.py
+    - /data-engine/app/services/connectors/ca_insider_yahoo.py
+    - /data-engine/app/services/connectors/celestrak_ast.py
+    - /data-engine/app/services/connectors/celestrak_ast_supgp.py
+    - /data-engine/app/services/connectors/cnmv.py
+    - /data-engine/app/services/connectors/cnmv_shorts.py
+    - /data-engine/app/services/connectors/damodaran.py
+    - /data-engine/app/services/connectors/earnings_calendar.py
+    - /data-engine/app/services/connectors/ecb.py
+    - /data-engine/app/services/connectors/ecb_history.py
+    - /data-engine/app/services/connectors/esef.py
+    - /data-engine/app/services/connectors/finnhub.py
+    - /data-engine/app/services/connectors/fmp.py
+    - /data-engine/app/services/connectors/form13dg.py
+    - /data-engine/app/services/connectors/form13f.py
+    - /data-engine/app/services/connectors/form4.py
+    - /data-engine/app/services/connectors/fred.py
+    - /data-engine/app/services/connectors/gdelt.py
+    - /data-engine/app/services/connectors/ibkr.py
+    - /data-engine/app/services/connectors/ir.py
+    - /data-engine/app/services/connectors/macro_calendar.py
+    - /data-engine/app/services/connectors/openfigi.py
+    - /data-engine/app/services/connectors/rss.py
+    - /data-engine/app/services/connectors/sec.py
+    - /data-engine/app/services/connectors/sec_edgar.py
+    - /data-engine/app/services/connectors/short_interest.py
+    - /data-engine/app/services/connectors/stooq.py
+    - /data-engine/app/services/connectors/uk_pdmr_tracefour.py
+    - /data-engine/app/services/connectors/yahoo.py
+    - /data-engine/app/services/corpus_ingestion_service.py
+    - /data-engine/app/services/earnings_dates_service.py
+    - /data-engine/app/services/energy_flows.py
+    - /data-engine/app/services/etf_holdings.py
+    - /data-engine/app/services/finnhub_profile_backfill.py
+    - /data-engine/app/services/historical_stress_service.py
+    - /data-engine/app/services/insider_service.py
+    - /data-engine/app/services/investor_videos.py
+    - /data-engine/app/services/macro_calendar_service.py
+    - /data-engine/app/services/manager_holding_ingestion_service.py
+    - /data-engine/app/services/market_observation_service.py
+    - /data-engine/app/services/money_flows.py
+    - /data-engine/app/services/notification_service.py
+    - /data-engine/app/services/public_fetch.py
+    - /data-engine/app/services/sec_bottleneck_filings.py
+    - /data-engine/app/services/short_positions_service.py
+    - /data-engine/app/services/tenant_llm_settings_service.py
+    - /data-engine/app/services/thesis_approval_service.py
+    - /data-engine/app/services/thesis_audio_service.py
+    - /data-engine/app/services/thesis_job_service.py
+    - /data-engine/app/workers/dramatiq_app.py
+  pattern-either:
+  - pattern: httpx.$M(...)
+  - pattern: requests.$M(...)
+  - pattern: urllib.request.urlopen(...)
+  - pattern: urlopen(...)
+- id: gerarai-orm-fake-mock
+  languages:
+  - python
+  severity: ERROR
+  message: 'Mock con spec de un modelo ORM ($M): oculta columnas, relaciones y tenant_id reales (asi se escondio el AttributeError de las tesis). Crea el modelo real en una sesion SQLite.'
+  paths:
+    include:
+    - data-engine/tests/
+  patterns:
+  - pattern-either:
+    - pattern: MagicMock(spec=$M, ...)
+    - pattern: Mock(spec=$M, ...)
+    - pattern: MagicMock(spec_set=$M, ...)
+    - pattern: create_autospec($M, ...)
+  - metavariable-regex:
+      metavariable: $M
+      regex: ^(AlertAnalysis|AlertDelivery|AlertRule|AlertSubscription|BudgetUsage|CalculatedMetric|CalendarFeedToken|CallClaim|CashBalance|CashDailySnapshot|Catalyst|ChatSession|ChatTelemetryEvent|Claim|ClaimEvidence|Company|CompanyKPI|ConnectorState|CorporateAction|CustomMetricDefinition|DailyBrief|DcaAlertOverride|DcaSignalState|DecisionJournalEntry|DecisionLesson|DividendRecord|Document|DocumentChunk|DriverAssumptionVersion|EarningsDate|EarningsRun|EtfHolding|EvidenceSuggestion|ExpectationReview|ExternalClaim|FXRate|FactAnchor|FactRevision|FinancialFact|FinancialStatement|FundManager|FundamentalAssumption|FundamentalDriver|FundamentalForecast|FundamentalModelVersion|FundamentalValuationSnapshot|ITUNotice|InferredInput|InsiderFiling|InsiderTransaction|InstrumentReference|InvestmentCaseStudy|InvestmentPlan|InvestmentPrinciple|InvestorMovement|InvestorPosition|KPIExtractionCandidate|KnowledgeChunk|KnowledgeCollection|KnowledgeDocument|KnowledgeGraphEdge|KnowledgeGraphNode|ManagementPromise|ManagerHolding|MarketObservation|MarketPrice|MarketRegimeSnapshot|MemoryItem|MoatAssessment|ModelAlias|ModelRun|NewsEvent|PeerRelationship|PlanContribution|Portfolio|PortfolioDailySnapshot|PortfolioMoveDigest|Position|PositionDailySnapshot|PrimarySourceRecord|PrivacyAuditEvent|ProPickCandidate|ProPickRun|ProcessingJob|RedTeamRun|ResearchAlert|ResearchReview|ResearchSession|RiskEvent|SavedScreen|SavedScreenMatch|SourceAudit|TaxReport|TelegramChatBinding|TelegramLinkChallenge|Tenant|TenantLLMSettings|ThesisChange|ThesisDiff|ThesisEdge|ThesisNode|ThesisSection|ThesisVersion|Transaction|Transcript|TypeSafeStatus|ValuationAssumption|ValuationModel|ValuationOutput|WatchItem|WorkflowRun|WorkflowStepRun)$
+- id: gerarai-orm-fake-simplenamespace
+  languages:
+  - python
+  severity: ERROR
+  message: 'SimpleNamespace con columnas ORM (tenant_id/company_id) como falso modelo: no ejecuta el gate ni el scoping reales. Usa el modelo real.'
+  paths:
+    include:
+    - data-engine/tests/
+  pattern-either:
+  - pattern: SimpleNamespace(..., tenant_id=$A, ...)
+  - pattern: SimpleNamespace(..., company_id=$A, ...)
+- id: gerarai-tenant-raw-sql
+  languages:
+  - python
+  severity: ERROR
+  message: 'SQL crudo sobre una tabla con tenant_id: text()/exec_driver_sql saltan el scoping automatico de app/core/database.py. Usa el ORM o anade el filtro de tenant explicito.'
+  paths:
+    include:
+    - data-engine/app/
+  patterns:
+  - pattern-either:
+    - pattern: text("$SQL", ...)
+    - pattern: $C.exec_driver_sql("$SQL", ...)
+    - pattern: sa.text("$SQL", ...)
+  - metavariable-regex:
+      metavariable: $SQL
+      regex: (?is).*\b(from|join|update|into)\s+"?(alert_analyses|alert_deliveries|alert_rules|alert_subscriptions|budget_usage|calculated_metrics|calendar_feed_tokens|call_claims|cash_balances|cash_daily_snapshots|catalysts|chat_sessions|chat_telemetry_events|claim_evidence|claims|company_kpis|connector_states|corporate_actions|custom_metric_definitions|daily_briefs|dca_alert_overrides|dca_signal_states|decision_journal_entries|decision_lessons|dividend_records|document_chunks|documents|driver_assumption_versions|earnings_runs|evidence_suggestions|expectation_reviews|external_claims|fact_anchors|fact_revisions|financial_facts|financial_statements|fund_managers|fundamental_assumptions|fundamental_drivers|fundamental_forecasts|fundamental_model_versions|fundamental_valuation_snapshots|fx_rates|inferred_inputs|insider_filings|insider_transactions|investment_case_studies|investment_plans|investment_principles|investor_movements|investor_positions|itu_notices|knowledge_chunks|knowledge_collections|knowledge_documents|knowledge_graph_edges|knowledge_graph_nodes|kpi_extraction_candidates|management_promises|manager_holdings|memory_items|moat_assessments|model_runs|news_events|peer_relationships|plan_contributions|portfolio_daily_snapshots|portfolio_move_digests|portfolios|position_daily_snapshots|positions|primary_source_records|processing_jobs|propick_candidates|propick_runs|red_team_runs|research_alerts|research_reviews|research_sessions|risk_events|saved_screen_matches|saved_screens|source_audits|tax_reports|telegram_chat_bindings|telegram_link_challenges|tenant_llm_settings|thesis_changes|thesis_diffs|thesis_edges|thesis_nodes|thesis_sections|thesis_versions|transactions|transcripts|valuation_assumptions|valuation_models|valuation_outputs|watch_items|workflow_runs|workflow_step_runs)"?\b.*
+- id: gerarai-tenant-include-all-in-api
+  languages:
+  - python
+  severity: ERROR
+  message: include_all_tenants=True en una ruta HTTP desactiva el aislamiento entre tenants para esa consulta.
+  paths:
+    include:
+    - data-engine/app/api/
+  pattern-either:
+  - pattern: $Q.execution_options(..., include_all_tenants=True, ...)
+  - pattern: execution_options(..., include_all_tenants=True, ...)
+- id: gerarai-float-equality
+  languages:
+  - python
+  severity: ERROR
+  message: 'Igualdad exacta entre floats: usa Decimal, math.isclose o math.isfinite.'
+  paths:
+    include:
+    - data-engine/app/
+  pattern-either:
+  - pattern: float(...) == $Y
+  - pattern: $Y == float(...)
+  - pattern: float(...) != $Y
+  - pattern: $Y != float(...)
+- id: gerarai-money-none-to-zero
+  languages:
+  - python
+  severity: ERROR
+  message: '`x or 0` convierte un importe desconocido (None) en 0: una ganancia, un coste o un peso inventados. Conserva None (y muestra N/D) o justifica por que 0 es correcto.'
+  paths:
+    include:
+    - data-engine/app/
+  patterns:
+  - pattern-either:
+    - patterns:
+      - pattern-either:
+        - pattern: $X or 0
+        - pattern: $X or 0.0
+        - pattern: $X or Decimal(0)
+        - pattern: $X or Decimal("0")
+      - metavariable-regex:
+          metavariable: $X
+          regex: (?i)^(.*\.)?(\w*_)?(price|prices|cost|costs|amount|amounts|value|values|gain|gains|loss|losses|nav|cash|qty|quantity|shares|dividend|dividends|withholding|withheld|gross|balance|proceeds|pnl|basis|close|weight)(_\w*)?$
+    - patterns:
+      - pattern-either:
+        - pattern: $D.get($K) or 0
+        - pattern: $D.get($K) or 0.0
+        - pattern: $D[$K] or 0
+        - pattern: $D[$K] or 0.0
+        - pattern: $D.get($K) or Decimal("0")
+        - pattern: $D[$K] or Decimal("0")
+      - metavariable-regex:
+          metavariable: $K
+          regex: (?i)^[\"'](\w*_)?(price|prices|cost|costs|amount|amounts|value|values|gain|gains|loss|losses|nav|cash|qty|quantity|shares|dividend|dividends|withholding|withheld|gross|balance|proceeds|pnl|basis|close|weight)(_\w*)?[\"']$
+  - pattern-not-inside: $L.sort(...)
+  - pattern-not-inside: sorted(...)
+  - pattern-not-inside: max(...)
+  - pattern-not-inside: min(...)
+  - pattern-not: ($X or 0) > 0
+  - pattern-not: ($X or 0) >= 0
+- id: gerarai-naive-datetime
+  languages:
+  - python
+  severity: ERROR
+  message: 'datetime naive (sin zona): usa datetime.now(UTC) o la zona del usuario.'
+  paths:
+    include:
+    - data-engine/app/
+  pattern-either:
+  - pattern: datetime.now()
+  - pattern: datetime.datetime.now()
+  - pattern: datetime.utcnow()
+  - pattern: datetime.datetime.utcnow()
+  - pattern: datetime.utcfromtimestamp(...)
+  - pattern: datetime.fromtimestamp($T)
+- id: gerarai-broad-except-pass
+  languages:
+  - python
+  severity: ERROR
+  message: 'except Exception: pass oculta el fallo. Estrecha la excepcion, registralo (logger.warning(..., exc_info=True)) o justifica con nosemgrep.'
+  paths:
+    include:
+    - data-engine/app/
+  patterns:
+  - pattern-either:
+    - pattern: "try:\n  ...\nexcept Exception:\n  pass"
+    - pattern: "try:\n  ...\nexcept BaseException:\n  pass"
+    - pattern: "try:\n  ...\nexcept:\n  pass"
+    - pattern: "try:\n  ...\nexcept Exception as $E:\n  pass"
+  - pattern-not: "try:\n  $X.rollback()\nexcept Exception:\n  pass"
+  - pattern-not: "try:\n  $X.close()\nexcept Exception:\n  pass"
+- id: gerarai-dangerously-set-inner-html
+  languages:
+  - typescript
+  - javascript
+  severity: ERROR
+  message: dangerouslySetInnerHTML pinta HTML sin escapar (XSS). Renderiza texto/JSX o sanea; si el contenido es constante, justifica con nosemgrep.
+  pattern: <$EL dangerouslySetInnerHTML={...} />
+- id: gerarai-hardcoded-secret
+  languages:
+  - generic
+  severity: ERROR
+  message: Parece una credencial en el codigo. Muevela a variables de entorno / secretos.
+  paths:
+    exclude:
+    - '*.lock'
+    - package-lock.json
+    - uv.lock
+    - '*.svg'
+    - '*.md'
+    - .semgrep/
+    - '*.test.ts'
+    - data-engine/tests/
+    - tests/
+  pattern-regex: (sk-(proj-|ant-)?[A-Za-z0-9_\-]{24,}|gh[pousr]_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_\-]{35}|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|\d{8,10}:AA[A-Za-z0-9_\-]{33})

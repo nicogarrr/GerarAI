@@ -113,6 +113,7 @@ def test_audio_context_default_uses_latest_published_not_newer_draft(monkeypatch
     class FakeService:
         def latest_published(self, db, ticker):
             seen["latest_published"] = ticker
+            # nosemgrep: gerarai-orm-fake-simplenamespace -- FakeService devuelve la tesis; el servicio de audio solo lee status/version/updated_at
             return SimpleNamespace(status="published", version=11, company_id=1, updated_at=0)
 
         def by_version(self, db, ticker, version):
@@ -185,6 +186,7 @@ def test_audio_context_explicit_draft_version_keeps_draft_memo(monkeypatch):
     class FakeService:
         def by_version(self, db, ticker, version):
             assert version == 13
+            # nosemgrep: gerarai-orm-fake-simplenamespace -- FakeService devuelve la tesis; el servicio de audio solo lee status/version/updated_at
             return SimpleNamespace(status="draft", version=13, company_id=1, updated_at=0)
 
         def latest_published(self, db, ticker):

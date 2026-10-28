@@ -62,6 +62,7 @@ export default function RootLayout({
         <Toaster />
         {/* Service worker (app shell + fallback offline). Solo en build de
             producción: en dev las cachés del SW estorban al hot-reload. */}
+        {/* nosemgrep: gerarai-dangerously-set-inner-html -- script constante del service worker, sin datos de usuario. */}
         {process.env.NODE_ENV === 'production' ? (
           <script
             dangerouslySetInnerHTML={{

@@ -464,6 +464,7 @@ def positions(
     payloads = []
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
+        # nosemgrep: gerarai-money-none-to-zero -- comparacion booleana: None no es coste conocido, igual que 0
         has_cost = position.average_cost > 0 and (position.cost_basis_base or 0) > 0
         held = bool(position.valuation_hold_reason)
         payloads.append(

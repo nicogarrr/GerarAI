@@ -56,6 +56,7 @@ def _service_with_stubbed_outbox():
     return svc
 
 def _alert(channels: list[str]):
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- formato del mensaje: el servicio solo lee atributos de la alerta
     return SimpleNamespace(
         id=7,
         tenant_id=3,

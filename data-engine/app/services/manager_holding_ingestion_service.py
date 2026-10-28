@@ -433,7 +433,9 @@ class ManagerHoldingIngestionService:
                 change = "closed"
             else:
                 assert now is not None and before is not None
+                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
                 now_shares = now.shares or Decimal(0)
+                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
                 before_shares = before.shares or Decimal(0)
                 if now_shares > before_shares:
                     change = "increased"

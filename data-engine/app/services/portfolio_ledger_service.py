@@ -236,6 +236,7 @@ class PortfolioLedgerService:
             *tenant_filters(db, Transaction),
         )
         ).all():
+            # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
             amount = Decimal(quantity or 0)
             total += amount if str(action).lower() in BUY_ACTIONS else -amount
         return total
@@ -380,6 +381,7 @@ class PortfolioLedgerService:
         if position is None:
             position = Position(company_id=company_id, portfolio_id=portfolio.id)
             db.add(position)
+        # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
         existing_price = position.market_price or Decimal("0")
         market_price = existing_price if existing_price > 0 else last_price
         if existing_price > 0 and as_of is None and position.as_of is not None:
@@ -512,6 +514,7 @@ class PortfolioLedgerService:
         position.market_value = position.quantity * price
         # Zero/missing cost is unknown, not a free acquisition. Never turn
         # the entire market value into a reported profit after a price refresh.
+        # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
         has_cost = position.average_cost > 0 and (position.cost_basis_base or 0) > 0
         position.unrealized_pnl = (
             position.market_value - position.quantity * position.average_cost

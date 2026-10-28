@@ -64,6 +64,7 @@ class ReviewAlertService:
             return existing
 
         # Etiqueta de la bandeja, no auto-aprueba ni oculta tickets.
+        # nosemgrep: gerarai-broad-except-pass -- marca opcional de Jev (best-effort)
         try:
             from app.services.jev_gates import TICKET_CRITERIA, mark_only
             mark = mark_only("copilot_ticket", f"{title}\n{summary}",

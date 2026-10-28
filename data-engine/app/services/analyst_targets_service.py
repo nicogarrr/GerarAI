@@ -162,6 +162,7 @@ def _fetch_consensus(symbol: str) -> dict[str, Any]:
 def _fetch_currency(symbol: str) -> str | None:
     import yfinance as yf
 
+    # nosemgrep: gerarai-broad-except-pass -- divisa declarativa de yfinance: sin ella queda None (comentario en linea)
     try:
         raw_currency = yf.Ticker(symbol).fast_info.get("currency")
         if raw_currency:

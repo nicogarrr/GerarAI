@@ -324,6 +324,7 @@ _DRIVER_LABELS_ES: dict[str, str] = {
 def _fact_source_locator(fact: FinancialFact) -> str:
     """Localizador real del hecho financiero: URL del documento fuente si el
     registro la tiene (un id de fact NO sustituye la URL), si no, etiqueta."""
+    # nosemgrep: gerarai-broad-except-pass -- localizador opcional de la sesion; nunca rompe el paquete
     try:
         from sqlalchemy.orm import object_session
 
@@ -933,7 +934,7 @@ def maybe_deep_narrative(
             # siguiente llamada LLM del mismo generate no veria este consumo.
             db.flush()
         except Exception:  # noqa: BLE001 - el registro contable no decide el contenido
-            pass
+            logger.warning("budget_record_failed: el gasto LLM de esta narrativa no quedo contabilizado", exc_info=True)
 
     response = None
     last_reason: str | None = None

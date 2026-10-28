@@ -1211,6 +1211,7 @@ class ChatSynthesisService:
         """Enganche opcional del debate bull/bear. Nunca rompe el flujo."""
         if not ticker or not self._debate_enabled(enable_debate):
             return
+        # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional (Jev/debate) de una respuesta ya construida
         try:
             from app.services.jev_gates import (
                 DEBATE_WORTHWHILE_CRITERIA,
@@ -1241,6 +1242,7 @@ class ChatSynthesisService:
                 return
         except Exception:
             pass
+        # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional (Jev/debate) de una respuesta ya construida
         try:
             from app.services.thesis_debate_service import debate_thesis
 

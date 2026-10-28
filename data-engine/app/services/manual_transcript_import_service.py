@@ -1,9 +1,12 @@
+import logging
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
 from app.models import Document, DocumentChunk, Transcript
 from app.services.company_resolver import resolve_company
+
+logger = logging.getLogger(__name__)
 
 
 class ManualTranscriptImportService:
@@ -71,7 +74,7 @@ class ManualTranscriptImportService:
 
             RAGIndex().ingest_document(db, document)
         except Exception:
-            pass
+            logger.warning("transcript_rag_ingest_failed: la transcripcion se guardo pero no quedo indexada en RAG", exc_info=True)
 
         return {
             "document_id": document.id,

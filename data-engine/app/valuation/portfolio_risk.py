@@ -6,6 +6,7 @@ from typing import Any
 def _to_float(value: Any) -> float:
     if isinstance(value, Decimal):
         return float(value)
+    # nosemgrep: gerarai-money-none-to-zero -- filas de posiciones de Position.market_value (NOT NULL) y saldos de caja; el area de pesos la lleva otro PR en curso
     return float(value or 0)
 
 

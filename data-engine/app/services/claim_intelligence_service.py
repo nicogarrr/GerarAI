@@ -477,6 +477,7 @@ class ClaimIntelligenceService:
                 # Un solo marcador por documento para no multiplicar llamadas.
                 routing = None
                 if suggestion_count == 0:
+                    # nosemgrep: gerarai-broad-except-pass -- marca opcional de Jev (best-effort)
                     try:
                         from app.services.jev_gates import CLAIM_ROUTING_CRITERIA, mark_only
                         routing = mark_only("claim_routing", extracted.text,

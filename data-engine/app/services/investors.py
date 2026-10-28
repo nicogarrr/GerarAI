@@ -278,6 +278,7 @@ def most_bought(db: Session) -> dict[str, Any]:
                 elif row["change"] == "new":
                     same["change"] = "new"
                 value = _value_usd(row["value_usd_thousands_latest"], result["latest_report"])
+                # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
                 entry["value_usd"] += value or 0.0
             elif row["change"] in ("closed", "decreased"):
                 entry["sellers"] += 1

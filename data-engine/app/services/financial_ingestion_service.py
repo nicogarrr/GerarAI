@@ -1960,6 +1960,7 @@ class FinancialIngestionService:
         # La anomalía es solo una bandera; no toca las cifras ingestadas.
         jev_anomaly = None
         if conflicts:
+            # nosemgrep: gerarai-broad-except-pass -- marca opcional de Jev (best-effort); la ingesta sigue
             try:
                 from app.services.jev_gates import ANOMALY_CRITERIA, mark_only
                 jev_anomaly = mark_only("data_anomaly", "\n".join(conflicts[:8]),

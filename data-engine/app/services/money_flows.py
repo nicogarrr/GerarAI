@@ -271,6 +271,7 @@ def aggregate_recipients(results: list[dict], top: int = 12) -> list[dict]:
         key = normalize_recipient(name)
         if not key:
             continue
+        # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
         totals[key] = totals.get(key, 0.0) + float(row.get("amount") or 0.0)
         display.setdefault(key, name)
     ordered = sorted(totals.items(), key=lambda item: item[1], reverse=True)[:top]
@@ -440,6 +441,7 @@ def build_usaspending_theme(
             label = PSC_LABELS_ES.get(code, row.get("name") or code)
             destinations.append({
                 "label": label,
+                # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
                 "amount": float(row.get("amount") or 0.0),
                 "unit": "USD",
                 "source": {
