@@ -17,7 +17,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, Document, DocumentChunk, Position, WatchItem
-from app.services.company_resolver import resolve_company
+from app.services.company_resolver import resolve_companies
 from app.services.filing_changes import excerpt_units
 from app.services.filing_intelligence import KEY, official_document
 
@@ -104,12 +104,13 @@ def tracked_company_ids(db: Session) -> dict[int, list[str]]:
             found.setdefault(cid, [])
             if "cartera" not in found[cid]:
                 found[cid].append("cartera")
-    for symbol in db.scalars(select(WatchItem.symbol).where(WatchItem.tenant_id == tenant)).all():
-        company = resolve_company(db, symbol)
-        if company is not None:
-            found.setdefault(company.id, [])
-            if "watchlist" not in found[company.id]:
-                found[company.id].append("watchlist")
+    symbols = sorted(set(db.scalars(select(WatchItem.symbol).where(WatchItem.tenant_id == tenant)).all()))
+    # Lote (1-2 IN) en vez de una resolucion por simbolo de la watchlist.
+    resolved, _missing = resolve_companies(db, [symbol for symbol in symbols if symbol])
+    for company in resolved:
+        found.setdefault(company.id, [])
+        if "watchlist" not in found[company.id]:
+            found[company.id].append("watchlist")
     return found
 
 

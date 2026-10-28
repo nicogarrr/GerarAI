@@ -27,7 +27,7 @@ from app.schemas import (
 from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetExceededError
 from app.services.claim_intelligence_service import ClaimIntelligenceService
-from app.services.company_resolver import resolve_company
+from app.services.company_resolver import resolve_companies, resolve_company
 from app.services.document_ingestion_service import MAX_DOCUMENT_BYTES, DocumentIngestionService
 from app.services.document_visibility import without_archive_duplicates
 from app.services.kpi_extraction_service import KPIExtractionService
@@ -75,11 +75,10 @@ def _followed_company_ids(db: Session):
     # BRK.B, minusculas...). Se resuelve con el mismo `resolve_company` que la
     # ficha para que un valor con sufijo de mercado cuente como seguido.
     symbols = set(db.scalars(select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))).all())
-    watched_ids = {
-        company.id
-        for symbol in symbols
-        if symbol and (company := resolve_company(db, symbol)) is not None
-    }
+    # Un solo lote (1-2 IN) en vez de una resolucion por simbolo: el coste no
+    # crece con el tamano de la watchlist.
+    resolved, _missing = resolve_companies(db, sorted(symbol for symbol in symbols if symbol))
+    watched_ids = {company.id for company in resolved}
     watched = select(Company.id).where(Company.id.in_(watched_ids))
     return union(held, watched)
 

@@ -337,6 +337,9 @@ describe('SubscriptionManager', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Regenerar enlace' }));
         await screen.findByLabelText('Enlace de suscripción');
         expect(createCalendarFeed).toHaveBeenCalledWith('followed');
+        // El enlace aparece antes de que termine useTransition; espera el
+        // botón operativo antes de simular el siguiente gesto del usuario.
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Desactivar' })).toBeEnabled());
         fireEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
         await screen.findByRole('button', { name: 'Crear suscripción' });
         expect(revokeCalendarFeed).toHaveBeenCalledTimes(1);
