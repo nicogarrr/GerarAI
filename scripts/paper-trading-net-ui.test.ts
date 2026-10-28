@@ -72,3 +72,16 @@ test('split adjustment on an open trade is visible with its source', async () =>
     assert.ok(html.includes('Ajustada por split'), 'ajuste');
     assert.ok(html.includes('yahoo_finance'), 'fuente');
 });
+
+
+test('missing dividend count stays unavailable, while a real zero stays zero', async () => {
+    for (const dividends_count of [null, undefined]) {
+        const html = await render({ dividends_count, dividends_uncertain: 1, dividends_total: '0' });
+        assert.ok(html.includes('Eventos no disponibles'));
+        assert.ok(!html.includes('0 eventos'));
+        assert.ok(html.includes('incierto'));
+    }
+    const zero = await render({ dividends_count: 0, dividends_uncertain: 1, dividends_total: '0' });
+    assert.ok(zero.includes('0 eventos'));
+    assert.ok(!zero.includes('Eventos no disponibles'));
+});
