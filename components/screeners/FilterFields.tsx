@@ -10,7 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { METRIC_LABELS, metricLabel } from '@/lib/research/metric-labels';
-import { UNITS, buildMetricOptions, fromBackendValue, toBackendValue, type MetricOption, type UnitKind } from '@/lib/screener-metrics';
+import { UNITS, buildMetricOptions, fromBackendValue, shownValueError, toBackendValue, type MetricOption, type UnitKind } from '@/lib/screener-metrics';
 import type { CustomMetric, ScreenCriterion } from '@/lib/actions/research-tools.actions';
 
 type CustomMetricInfo = Pick<CustomMetric, 'metric_key' | 'name' | 'unit'>;
@@ -133,6 +133,7 @@ export function CriterionFields({ suffix = '', initialLeft = '', initialRight = 
   const unit = UNITS[unitOf(left, options)];
   const unitKind = unitOf(left, options);
   const rightValue = rightMode === 'valor' ? toBackendValue(shown, unitKind) : rightMetric;
+  const valueError = rightMode === 'valor' ? shownValueError(shown) : null;
   const complete = left.trim() !== '' && rightValue !== '';
   const symbol = OPERATORS.find((op) => op.value === operator)?.symbol ?? operator;
   const preview = rightMode === 'valor' ? `${shown}${unit.suffix ? ` ${unit.suffix}` : ''}` : describe(rightMetric);
@@ -154,10 +155,14 @@ export function CriterionFields({ suffix = '', initialLeft = '', initialRight = 
           </div>
         </div>
         {rightMode === 'valor' ? <div className="flex items-center gap-2">
-          <Input autoComplete="off" className="min-h-11" id={`${id}-right`} inputMode="decimal" onChange={(event) => setShown(event.target.value)} placeholder="0" required={required} step={unit.step} type="number" value={shown} />
+          <Input autoComplete="off" className="min-h-11" id={`${id}-right`} inputMode="decimal" onChange={(event) => setShown(event.target.value)} placeholder="0" required={required} type="text" value={shown} />
+          {/* type="text" (no "number"): el input numérico rechaza la coma decimal es-ES. */}
           {unit.suffix ? <span className="w-9 shrink-0 text-sm text-gray-400">{unit.suffix}</span> : null}
           <input name={`right${suffix}`} readOnly type="hidden" value={rightValue} />
         </div> : <MetricPicker id={`${id}-right`} name={`right${suffix}`} onChange={setRightMetric} options={options} placeholder="Elegir métrica" required={required} value={rightMetric} />}
+        {valueError ? <p className="mt-1.5 text-xs text-amber-300" role="alert">{valueError === 'ambiguous'
+          ? 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).'
+          : 'Introduce un número válido (ej. 12,5).'}</p> : null}
       </div>
     </div>
     {complete ? <p aria-live="polite" className="mt-3 rounded-md border border-gray-800 bg-surface-2 px-3 py-2 text-sm text-gray-300">{describe(left)} {symbol} {preview}</p> : null}

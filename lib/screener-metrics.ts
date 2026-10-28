@@ -67,11 +67,23 @@ export function buildMetricOptions(
   return out;
 }
 
+import { parseLocalizedNumberDetailed } from '@/lib/format';
+
 /** Valor que se manda al backend a partir de lo que ve la persona (15 % -> 0.15). */
 export function toBackendValue(shown: string, unit: UnitKind): string {
-  const n = Number(shown.replace(',', '.'));
-  if (!shown.trim() || !Number.isFinite(n)) return '';
-  return String(Number((n * UNITS[unit].factor).toPrecision(12)));
+  // Gramática es-ES compartida (lib/format): «12,5» y «1.234,56» valen;
+  // los ambiguos («1,234») se rechazan en lugar de reinterpretarse x1000.
+  const parsed = parseLocalizedNumberDetailed(shown);
+  if (!parsed.ok) return '';
+  return String(Number((parsed.value * UNITS[unit].factor).toPrecision(12)));
+}
+
+/** ¿El texto del valor es rechazado por la gramática es-ES? (para el aviso en el campo) */
+export function shownValueError(shown: string): 'ambiguous' | 'invalid' | null {
+  if (!shown.trim()) return null;
+  const parsed = parseLocalizedNumberDetailed(shown);
+  if (parsed.ok) return null;
+  return parsed.error === 'ambiguous' ? 'ambiguous' : 'invalid';
 }
 
 /** Inverso: valor del backend al que se muestra (0.15 -> 15). */
