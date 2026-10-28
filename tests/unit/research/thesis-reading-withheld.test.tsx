@@ -7,7 +7,7 @@ import { researchRequest } from '@/lib/research/client';
 import ThesisReadingPage from '@/app/(root)/research/[ticker]/tesis/page';
 vi.mock('@/lib/actions/research.actions', () => ({ getResearchCompanySnapshot: vi.fn(), getResearchThesisWorkspace: vi.fn() }));
 vi.mock('@/lib/research/client', () => ({ researchRequest: vi.fn() }));
-vi.mock('@/lib/public-fonts', () => ({ publicEditorial: { variable: '' } }));
+vi.mock('@/lib/public-fonts-editorial', () => ({ publicEditorial: { variable: '' } }));
 vi.mock('@/components/research/PrintButton', () => ({ default: () => null }));
 const leaked = 'Margen -65,1% valor esperado 119,92';
 const thesis = { id: 1, version: 11, status: 'published', rating: 'buy', created_at: '2026-10-19T06:54:00Z', executive_summary: leaked, hypothesis: leaked, narrative_sections: [{ titulo: leaked, parrafos: [leaked] }], catalysts: [{ label: leaked }], invalidation_criteria: [leaked], current_price: '343', bear_value: '50', base_value: '100', bull_value: '200', expected_value: '119.92', margin_of_safety: '-0.651' };

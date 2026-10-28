@@ -58,12 +58,33 @@ test.describe("mobile authentication layout", () => {
     await expect(page.getByLabel("Contraseña", { exact: true })).toBeInViewport();
     await expect(page.getByRole("button", { name: "Iniciar sesión" })).toBeInViewport();
 
-    // La página completa hace scroll normal en documento (no hay trampas internas).
-    const metrics = await page.evaluate(() => ({
-      scrollHeight: document.documentElement.scrollHeight,
-      innerHeight: window.innerHeight,
-    }));
-    expect(metrics.scrollHeight).toBeGreaterThan(metrics.innerHeight);
+    // La página completa hace scroll normal en documento (no hay trampas internas):
+    // ni el documento está clavado con overflow-hidden (la regresión original) ni
+    // el botón vive dentro de un contenedor con scroll o recorte propio. Si el
+    // contenido crece, hace scroll el documento. (El contenido ya no desborda
+    // 844px, así que scrollHeight > innerHeight dejó de discriminar.)
+    const traps = await page.evaluate(() => {
+      const doc = getComputedStyle(document.documentElement).overflowY;
+      const body = getComputedStyle(document.body).overflowY;
+      const submit = [...document.querySelectorAll("button")].find(
+        (el) => el.textContent?.trim() === "Iniciar sesión",
+      );
+      let innerTrap: string | null = null;
+      for (let el = submit?.parentElement ?? null; el; el = el.parentElement) {
+        const { overflowY } = getComputedStyle(el);
+        if (
+          (overflowY === "auto" || overflowY === "scroll" || overflowY === "hidden") &&
+          el.scrollHeight > el.clientHeight
+        ) {
+          innerTrap = el.className || el.tagName;
+          break;
+        }
+      }
+      return { doc, body, innerTrap };
+    });
+    expect(traps.doc).not.toBe("hidden");
+    expect(traps.body).not.toBe("hidden");
+    expect(traps.innerTrap).toBeNull();
     await page.screenshot({ path: "test-results/gerarai-sign-in-mobile.png", fullPage: true });
   });
 });
