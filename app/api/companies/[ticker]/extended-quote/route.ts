@@ -28,7 +28,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ tick
                 `/api/companies/${encodeURIComponent(ticker)}`, { timeoutMs: 6000, signal },
             );
             const resolved = typeof company.ticker === 'string' ? quoteSymbolFor(company, company.ticker) : null;
-            if (!resolved) return Response.json({ status: 'unavailable' }, { status: 404, headers: { 'Cache-Control': 'no-store' } });
+            // Sin correspondencia de bolsa validada: «no disponible» es la
+            // respuesta (200), no un error. Con 404 cada visita a la ficha de
+            // un listado así (MC.PA en París) dejaba un error en la consola.
+            if (!resolved) return Response.json({ status: 'unavailable' }, { headers: { 'Cache-Control': 'no-store' } });
             symbol = resolved;
         }
         const quote = await researchRequest<ExtendedQuote>(`/api/companies/${encodeURIComponent(symbol)}/extended-quote`, { signal });
