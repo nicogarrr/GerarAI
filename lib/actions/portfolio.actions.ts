@@ -234,7 +234,10 @@ export async function getPortfolioTransactions(userId: string) {
 }
 
 export async function getPortfolioTransactionPage(userId: string, offset = 0) {
-    const canonicalUserId = await resolveUserId(userId);
+    // Sin binding: la llamada es el control de autorización (lanza si la
+    // cartera pedida no es la del usuario autenticado); la página la sirve el
+    // backend con la sesión.
+    await resolveUserId(userId);
     const safeOffset = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
     const page = await researchRequest<{ items: ResearchPortfolioTransaction[]; total: number }>(
         `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}`, { fast: true },

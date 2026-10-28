@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { researchRequest, requireAuthenticatedUser, researchIdentityHeaders, requestCacheInvalidate, revalidatePath, getWatchlist } = vi.hoisted(() => ({
-    researchRequest: vi.fn(async () => ({})),
-    requireAuthenticatedUser: vi.fn(async () => ({ id: 'user-1' })),
-    researchIdentityHeaders: vi.fn(async () => ({ 'X-Tenant': 'user-1' })),
-    requestCacheInvalidate: vi.fn(),
-    revalidatePath: vi.fn(),
-    getWatchlist: vi.fn(async () => []),
+    researchRequest: vi.fn<(...args: any[]) => any>(async () => ({})),
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(async () => ({ id: 'user-1' })),
+    researchIdentityHeaders: vi.fn<(...args: any[]) => any>(async () => ({ 'X-Tenant': 'user-1' })),
+    requestCacheInvalidate: vi.fn<(...args: any[]) => any>(),
+    revalidatePath: vi.fn<(...args: any[]) => any>(),
+    getWatchlist: vi.fn<(...args: any[]) => any>(async () => []),
 }));
 vi.mock('@/lib/research/client', () => ({ researchRequest, jsonBody: JSON.stringify }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
@@ -27,7 +27,7 @@ import { previewPortfolioImage, searchImageInstrument, reviewPortfolioImage, con
 import { getPortfolioCurrencySettings, savePortfolioBaseCurrency } from '@/lib/actions/portfolio-settings.actions';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 
-const fetchMock = vi.fn();
+const fetchMock = vi.fn<(...args: any[]) => any>();
 vi.stubGlobal('fetch', fetchMock);
 
 beforeEach(() => {

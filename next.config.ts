@@ -58,14 +58,13 @@ const nextConfig: NextConfig = {
     // Docker needs standalone output; Vercel packages Next.js itself.
     ...(process.env.VERCEL ? {} : { output: 'standalone' as const }),
     
-    // CSP: en producción sin 'unsafe-eval' (ningún código de la app usa
-    // eval/new Function - verificado con grep en app/, components/, lib/,
-    // hooks/). En desarrollo se mantiene porque webpack/turbopack usan
-    // sourcemaps basados en eval para HMR. 'unsafe-inline' en script-src NO
-    // se puede quitar con headers estáticos: Next inyecta scripts inline de
-    // bootstrap/RSC; quitarlo exige CSP con nonce vía middleware (trabajo
-    // aparte) o la app no hidrata. 'unsafe-inline' en style-src lo necesitan
-    // los estilos inline de React/Tailwind.
+    // CSP: la fija el middleware (`middleware.ts` + `lib/security/csp.ts`)
+    // con un nonce por petición, así `script-src` ya no lleva 'unsafe-inline'
+    // en producción. No puede vivir aquí: una cabecera estática no puede
+    // noncear los scripts inline de bootstrap/RSC que inyecta Next (sin nonce
+    // la app no hidrata), y una CSP aquí SUMARÍA una segunda política a la
+    // del middleware (el navegador exige cumplir ambas). 'unsafe-inline' en
+    // style-src lo necesitan los estilos inline de React/Tailwind.
 
     // Headers for better caching and security
     async redirects() {
@@ -115,12 +114,6 @@ const nextConfig: NextConfig = {
                     {
                         key: 'Strict-Transport-Security',
                         value: 'max-age=63072000; includeSubDomains; preload'
-                    },
-                    {
-                        key: 'Content-Security-Policy',
-                        value: process.env.NODE_ENV === 'production'
-                            ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
-                            : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-src https://www.youtube-nocookie.com https://www.youtube.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
                     },
                 ],
             },

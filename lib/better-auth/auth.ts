@@ -187,7 +187,13 @@ export const getAuth = async (): Promise<AuthInstance> => {
             throw new DatabaseError('MongoDB connection is required at runtime');
         }
 
-        const db = mongoose.connection;
+        // mongodbAdapter espera el Db NATIVO del driver, no la Connection de
+        // mongoose (antes pasaba la Connection porque connectToDatabase
+        // devolvía any; funcionaba por duck-typing de .collection()).
+        const db = mongoose.connection.db;
+        if (!db) {
+            throw new DatabaseError('MongoDB native database handle is not available');
+        }
 
         authInstance = createAuthInstance(mongodbAdapter(db));
 

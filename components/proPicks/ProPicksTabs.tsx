@@ -82,14 +82,15 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
         }
     };
 
-    useEffect(() => {
-        if (activeTab === 'backtest' && !backtestStarted) {
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        // El backtest arranca al entrar en su pestaña, una sola vez: es la
+        // respuesta a un evento, no un efecto.
+        if (tab === 'backtest' && !backtestStarted) {
             setBacktestStarted(true);
             void runBacktest();
         }
-    }, [activeTab, backtestStarted]);
-
-    const handleTabChange = (tab: string) => setActiveTab(tab);
+    };
 
     const handleStrategyChange = (strategyId: string) => {
         setCurrentStrategy(strategyId);

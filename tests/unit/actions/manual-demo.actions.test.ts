@@ -6,17 +6,17 @@ const {
     tradeFind, tradeFindOne, tradeCreate,
     computeManualDemoAccount, docsToLedger, cacheGetQuote,
 } = vi.hoisted(() => ({
-    requireAuthenticatedUser: vi.fn(),
-    connectToDatabase: vi.fn(),
-    accountFindOne: vi.fn(),
-    accountCreate: vi.fn(async () => [{}]),
-    accountFindOneAndUpdate: vi.fn(),
-    tradeFind: vi.fn(),
-    tradeFindOne: vi.fn(),
-    tradeCreate: vi.fn(async () => [{}]),
-    computeManualDemoAccount: vi.fn(),
-    docsToLedger: vi.fn(() => ({ entries: [], violations: [] })),
-    cacheGetQuote: vi.fn(),
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(),
+    connectToDatabase: vi.fn<(...args: any[]) => any>(),
+    accountFindOne: vi.fn<(...args: any[]) => any>(),
+    accountCreate: vi.fn<(...args: any[]) => any>(async () => [{}]),
+    accountFindOneAndUpdate: vi.fn<(...args: any[]) => any>(),
+    tradeFind: vi.fn<(...args: any[]) => any>(),
+    tradeFindOne: vi.fn<(...args: any[]) => any>(),
+    tradeCreate: vi.fn<(...args: any[]) => any>(async () => [{}]),
+    computeManualDemoAccount: vi.fn<(...args: any[]) => any>(),
+    docsToLedger: vi.fn<(...args: any[]) => any>(() => ({ entries: [], violations: [] })),
+    cacheGetQuote: vi.fn<(...args: any[]) => any>(),
 }));
 
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
@@ -404,7 +404,7 @@ describe('getManualDemoAccount', () => {
     });
 
     it('posición de opción lleva vencimiento y badge calculados en servidor', async () => {
-        const key = instrumentKey({ kind: 'opcion', contract: { underlying: 'AAPL', expiry: '2027-01-15', strike: 100, callPut: 'call', multiplier: 100, deliverable: 'acciones' }, name: '' });
+        const key = instrumentKey({ kind: 'opcion', contract: { underlying: 'AAPL', expiry: '2027-01-15', strike: 100, callPut: 'call', multiplier: 100, deliverable: 'acciones', adjusted: false }, name: '' });
         state = stateWith(100000, 0, [
             { instrumentKey: key, name: 'AAPL call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2, realizedPnl: 0 },
         ]);
@@ -470,7 +470,7 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
     it('con listado y cotización fresca -> valorada; asOf es la cotización más vieja servida', async () => {
         state = stateWith(100000, 0, [applePosition]);
         process.env.FINNHUB_API_KEY = 'key';
-        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
+        vi.stubGlobal('fetch', vi.fn<(...args: any[]) => any>(async () => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
         cacheGetQuote.mockResolvedValue({ quote: { c: 150, t: 1700000000, kind: 'live', source: 'Finnhub' }, fetchFailed: false, retryAfterSeconds: null, fetchedAt: 111, saturated: false });
         const m = await load();
         const result = await m.getManualDemoValuation();
@@ -484,7 +484,7 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
     it('todas las cotizaciones fallan -> quoteFetchFailed con el Retry-After del proveedor', async () => {
         state = stateWith(100000, 0, [applePosition]);
         process.env.FINNHUB_API_KEY = 'key';
-        vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
+        vi.stubGlobal('fetch', vi.fn<(...args: any[]) => any>(async () => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
         cacheGetQuote.mockResolvedValue({ quote: null, fetchFailed: true, retryAfterSeconds: 30, fetchedAt: null, saturated: false });
         const m = await load();
         const result = await m.getManualDemoValuation();

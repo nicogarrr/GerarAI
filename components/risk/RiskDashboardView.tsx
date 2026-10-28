@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Briefcase, Gauge } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -264,9 +264,13 @@ function alertKey(alert: DataRecord): string {
 
 export default function RiskDashboardView({ initialDashboard }: RiskDashboardViewProps) {
     const [dashboard, setDashboard] = useState(initialDashboard);
-    useEffect(() => {
+    // Sincroniza el snapshot si el servidor revalida: ajuste durante el
+    // render, no efecto con setState síncrono.
+    const [prevInitial, setPrevInitial] = useState(initialDashboard);
+    if (prevInitial !== initialDashboard) {
+        setPrevInitial(initialDashboard);
         setDashboard(initialDashboard);
-    }, [initialDashboard]);
+    }
 
     const refreshDashboard = async () => {
         // Una única respuesta actualiza resumen, alertas, posiciones y divisa.
