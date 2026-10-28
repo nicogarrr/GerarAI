@@ -67,6 +67,22 @@ async def test_translates_caches_and_preserves_source(db):
 
 
 @sync_test
+async def test_request_uses_registered_prompt_and_keeps_tenant_metadata(db):
+    from app.services import prompt_registry
+
+    seen=[]
+    class Capturing(Provider):
+        async def complete(self,request):
+            seen.append(request)
+            return await super().complete(request)
+    row=event(db)
+    await translate_headline(db,row.id,provider=Capturing())
+    resolved=prompt_registry.get_prompt("news_headline_translation",allow_remote=False)
+    assert seen[0].messages[0].content==resolved.text
+    assert seen[0].metadata=={**resolved.trace_metadata(),"tenant_id":"1"}
+
+
+@sync_test
 @pytest.mark.parametrize("title",["La empresa anuncia resultados","8-K presentado ante la SEC"])
 async def test_latin_titles_skip_without_call(db,title):
     row=event(db,title);p=Provider()
