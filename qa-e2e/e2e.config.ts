@@ -16,7 +16,17 @@ const zen = createOpenAICompatible({
 });
 
 export default {
-  agents: { default: { model: zen.chatModel(process.env.ZEN_MODEL ?? 'deepseek-v4.1-flash') } },
+  agents: {
+    default: {
+      model: zen.chatModel(process.env.ZEN_MODEL ?? 'deepseek-v4.1-flash'),
+      // Topes duros por test (Nico 2026-10-28: LLM quirurgico, pocos tokens).
+      // El plan Go es de precio plano; estos limites protegen la CUOTA, no la
+      // factura. Un override por llamada solo puede apretar, nunca escapar.
+      maxSteps: Number(process.env.E2E_MAX_STEPS ?? 10),
+      maxModelCalls: Number(process.env.E2E_MAX_MODEL_CALLS ?? 15),
+      maxInputTokens: Number(process.env.E2E_MAX_INPUT_TOKENS ?? 10000),
+    },
+  },
   targets: [{ engine: web(), app: { url: process.env.E2E_BASE_URL ?? 'https://gerarai.vercel.app' } }],
   workers: 1,
   // Sin trazas ni video: la pasada autenticada usa una sesion real y no debe dejar
