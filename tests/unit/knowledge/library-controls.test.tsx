@@ -20,16 +20,16 @@ for(const kind of ['document','collection'] as const)describe(`library ${kind} d
  it('waits for confirmation and disables the trigger during deletion',async()=>{
   let resolve!:(v:unknown)=>void;action().mockReturnValue(new Promise(r=>resolve=r));
   render(view());expect(action()).not.toHaveBeenCalled();open();
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar',exact:true}));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar'}));
   expect(action()).toHaveBeenCalledWith(kind==='document'?987:765);
   expect(screen.getByRole('button',{name:/^Eliminar (documento|colección):/})).toBeDisabled();expect(screen.getByText('Eliminando...')).toBeVisible();
   await act(async()=>resolve({success:true}));expect(screen.getByRole('button')).toBeEnabled();expect(screen.queryByRole('alert')).not.toBeInTheDocument();
  });
  it('shows a failed delete and allows a later successful retry',async()=>{
   action().mockResolvedValueOnce({success:false}).mockResolvedValueOnce({success:true});render(view());open();
-  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar',exact:true}));
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar'}));
   expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo eliminar. Inténtalo de nuevo.');
-  open();fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar',exact:true}));
+  open();fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Eliminar'}));
   await waitFor(()=>expect(screen.queryByRole('alert')).not.toBeInTheDocument());expect(action()).toHaveBeenCalledTimes(2);
  });
 });
