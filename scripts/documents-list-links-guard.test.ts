@@ -13,10 +13,7 @@ import { readFileSync } from 'node:fs';
 
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
-// Aisla el bloque de la lista de documentos
-const listMatch = page.match(/title="Documentos"[\s\S]{0,2200}/);
-assert.ok(listMatch, 'no se encontró el panel Documentos');
-const block = listMatch[0];
+const list = readFileSync('components/research/DocumentsList.tsx', 'utf8');
 
 describe('documents list links guard (F249)', () => {
   it('solo se enlaza una URL absoluta http(s)', () => {
@@ -28,17 +25,17 @@ describe('documents list links guard (F249)', () => {
 
 
   it('la ficha enlaza cuando hay source_url', () => {
-    assert.match(block, /safeHttpUrl\(document\.source_url\) \? <a/, 'condicional sobre URL validada');
-    assert.match(block, /href=\{safeHttpUrl\(document\.source_url\)/, 'href solo desde URL validada');
-    assert.equal(block.includes('href={document.source_url}'), false, 'source_url en crudo no puede ser href');
+    assert.match(page, /url: safeHttpUrl\(document\.source_url\)/, 'URL validada al construir las filas');
+    assert.match(list, /d\.url \? <a[^>]*href=\{d\.url\}/, 'href solo desde fila validada');
+    assert.equal(list.includes('href={document.source_url}'), false, 'source_url en crudo no puede ser href');
   });
 
   it('sin URL queda texto, no enlace roto', () => {
-    assert.match(block, /: <span className="font-medium text-gray-200">\{document\.title\}<\/span>/, 'fallback a texto');
+    assert.match(list, /: <span className="font-medium text-gray-200">\{d\.title\}<\/span>/, 'fallback a texto');
   });
 
   it('enlace externo seguro', () => {
-    assert.match(block, /target="_blank"/);
-    assert.match(block, /rel="noopener noreferrer"/);
+    assert.match(list, /target="_blank"/);
+    assert.match(list, /rel="noopener noreferrer"/);
   });
 });

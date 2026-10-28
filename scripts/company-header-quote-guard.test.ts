@@ -17,7 +17,7 @@ const component = readFileSync('components/research/CompanyHeaderQuote.tsx', 'ut
 const actions = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
 
 test('la cabecera compone la cotización en todas las vistas', () => {
-    assert.match(page, /CompanyHeaderQuote snapshot=\{headerMarket\}/);
+    assert.match(page, /<CompanyHeaderQuote[^>]*snapshot=\{headerMarket\}/);
     // market ya no se lanza solo en overview: la cabecera lo usa siempre.
     assert.ok(
         !/activeView === 'overview' \? getCompanyMarketSnapshot/.test(page),
