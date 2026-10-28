@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
-from app.models import Company, FXRate, FxConversion, Portfolio, Tenant, Transaction
+from app.models import Company, FxConversion, FXRate, Portfolio, Tenant, Transaction
 from app.services.tax_report_service import TaxReportService
 
 
