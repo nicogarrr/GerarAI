@@ -49,11 +49,13 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
 });
 
 describe('móvil: 44 px en biblioteca, estados vacíos y enlaces de panel (auditoría 375 px, 2026-10-27)', () => {
-    it('chat de la biblioteca: Preguntar, sugerencias y casilla de análisis', () => {
-        const chat = readFileSync('app/(root)/inversores/_components/LibraryChat.tsx', 'utf8');
-        assert.ok(chat.includes(`className="${AREA} sm:min-h-0 rounded-lg bg-teal-300`), 'Preguntar con area tactil');
-        assert.ok(chat.includes(`className="inline-flex ${AREA} sm:min-h-0 items-center rounded-full`), 'sugerencias con area tactil');
-        assert.ok(chat.includes(`<label className="flex ${AREA} sm:min-h-0 items-center gap-2 text-sm"><input type="checkbox"`), 'casilla de analisis con etiqueta tactil');
+    it('biblioteca abre Cerebro y controles de doctrina tienen área táctil', () => {
+        const entry = readFileSync('app/(root)/inversores/_components/LibraryChat.tsx', 'utf8');
+        const chat = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+        assert.ok(entry.includes('min-h-[44px]'), 'entrada con area tactil');
+        assert.ok(chat.includes('className="flex min-h-11 items-center gap-2"'), 'casilla de análisis táctil');
+        assert.ok(chat.includes('block min-h-11 w-full'), 'selector de autor táctil');
+        assert.ok(chat.includes('mt-2 block min-h-11'), 'copiar táctil');
     });
     it('EmptyLink (CTA de los estados vacíos)', () => {
         const empty = readFileSync('components/ui/empty-state.tsx', 'utf8');

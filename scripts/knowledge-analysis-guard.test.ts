@@ -60,17 +60,17 @@ describe('atajos y sugeridas', () => {
 });
 
 describe('componente y acción', () => {
-  const chat = source('app/(root)/inversores/_components/LibraryChat.tsx');
+  const chat = source('components/brain/GlobalBrain.tsx');
   const action = source('lib/actions/knowledge-chat.actions.ts');
   it('el modo normal sigue siendo el predeterminado', () => {
     assert.ok(action.includes("mode: 'respuesta' | 'analisis' = 'respuesta'"));
     assert.ok(chat.includes('useState(false)'));
   });
   it('el historial no se borra al preguntar de nuevo', () => {
-    assert.ok(chat.includes('setTurns(prev => [') && !chat.includes('setTurns([])'));
+    assert.ok(chat.includes('setMessages(prev => [...prev,') && !chat.includes('setMessages([])'));
   });
   it('un error se muestra en su turno y no tumba el historial', () => {
-    assert.ok(chat.includes("role=\"alert\"") && chat.includes('No se pudo consultar la biblioteca'));
+    assert.ok(chat.includes('No se pudo consultar la biblioteca'));
   });
   it('la acción no traga errores (la UI los muestra)', () => {
     assert.ok(!/catch\s*[({]/.test(action));

@@ -13,7 +13,7 @@ import { brainStorageKey, restoreConversation, serializeConversation, BRAIN_SUGG
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
 import type { AssistantResponse } from '@/lib/research/assistant-contract';
-import { markBrainReady, brainHandoffContext, OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail } from '@/lib/brain/open-brain';
+import { markBrainReady, brainHandoffContext, OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail, knowledgeHandoff, type KnowledgeBrainContext } from '@/lib/brain/open-brain';
 import { brainPageContext } from '@/lib/brain/page-context';
 import { BrainGuideAnswer } from './BrainGuideAnswer';
 import dynamic from 'next/dynamic';
@@ -27,12 +27,16 @@ const ReactMarkdown = dynamic(() => import('react-markdown'), {
 });
 import type { PortfolioChatCitation } from '@/lib/chat/citations';
 import { BrainSources } from './BrainSources';
+import { askKnowledge, type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
+import { analysisToText, isSubmitShortcut, SUGGESTED_QUESTIONS } from '@/lib/knowledge/analysis';
+const BrainLibraryAnswer = dynamic(() => import('./BrainLibraryAnswer').then(m => m.BrainLibraryAnswer));
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     citations?: PortfolioChatCitation[];
     guide?: AssistantResponse;
+    library?: LibraryAnswer;
 }
 
 interface GlobalBrainProps {
@@ -69,6 +73,9 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const [isMaximized, setIsMaximized] = useState(false);
     // Modo guía (asistente de research unificado): con ticker en el selector el
     // Cerebro pregunta a /api/research/assistant en vez de al chat general.
+    const [knowledge, setKnowledge] = useState<KnowledgeBrainContext | null>(null);
+    const [author, setAuthor] = useState('');
+    const [analysis, setAnalysis] = useState(false);
     const [guideTicker, setGuideTicker] = useState('');
     // El selector de ticker de la guía queda plegado tras un botón: un input
     // suelto en la cabecera parecía herramienta de desarrollo. Con ticker
@@ -84,7 +91,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
     // La conversación se conserva al navegar: se restaura al montar (solo
@@ -100,6 +107,9 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     function applyOpenBrainDetail(detail?: OpenBrainDetail | null) {
         // Cada apertura sustituye el anclaje anterior, incluso sin review_id.
         const context = brainHandoffContext(detail);
+        setKnowledge(knowledgeHandoff(detail));
+        setAuthor('');
+        setAnalysis(false);
         setGuideTicker(context.ticker);
         setReviewId(context.reviewId);
         if (detail?.question) setInput(detail.question.slice(0, 2000));
@@ -304,6 +314,18 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         setInput('');
         setLoading(true);
 
+        if (knowledge) {
+            try {
+                const result = await askKnowledge(userMsg, knowledge.scope, author, analysis ? 'analisis' : 'respuesta', page);
+                const text = result.analysis ? analysisToText(result.analysis) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? 'Autor no registrado'} · ${a.citation.title}${a.citation.page_number !== null ? ` · Página ${a.citation.page_number}` : ''} · Fragmento ${a.citation.chunk_index + 1}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
+                setMessages(prev => [...prev, { role: 'assistant', content: text || result.message || 'Sin datos en la biblioteca.', library: result }]);
+            } catch (error) {
+                const expired = typeof error === 'object' && error !== null && 'statusCode' in error && error.statusCode === 401;
+                const message = expired ? 'Sesión caducada. Vuelve a iniciar sesión.' : error instanceof Error && /sesión|sesi[oó]n|401/i.test(error.message) ? error.message : 'No se pudo consultar la biblioteca. Inténtalo de nuevo.';
+                setMessages(prev => [...prev, { role: 'assistant', content: message }]);
+            } finally { setLoading(false); }
+            return;
+        }
         const cleanTicker = guideTicker.trim().toUpperCase();
         if (cleanTicker) {
             // Modo guía: asistente de research (solo lectura), secciones y citas tipadas.
@@ -392,15 +414,15 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
         >
-            <CardHeader className="p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
+            <CardHeader className="shrink-0 p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
                     <CardTitle id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
                     {showGuideInput || guideTicker ? (
                         <TickerSearchInput
                             value={guideTicker}
-                            onValueChange={(value) => { setGuideTicker(value); setReviewId(undefined); }}
-                            onSelect={(stock) => { setGuideTicker(stock.symbol); setReviewId(undefined); }}
+                            onValueChange={(value) => { setKnowledge(null); setGuideTicker(value); setReviewId(undefined); }}
+                            onSelect={(stock) => { setKnowledge(null); setGuideTicker(stock.symbol); setReviewId(undefined); }}
                             onBlur={() => { if (!guideTicker.trim()) setShowGuideInput(false); }}
                             placeholder="Ticker guía"
                             ariaLabel="Ticker de la guía de investigación"
@@ -409,7 +431,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     ) : (
                         <button
                             type="button"
-                            onClick={() => setShowGuideInput(true)}
+                            onClick={() => { setKnowledge(null); setShowGuideInput(true); }}
                             title="Guía de investigación por empresa"
                             aria-label="Abrir la guía de investigación por empresa"
                             className="inline-flex min-h-11 items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
@@ -466,7 +488,12 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                 </div>
             </CardHeader>
 
-            <CardContent className="flex-1 p-0 overflow-hidden relative">
+            {knowledge && <div className="shrink-0 flex flex-col gap-2 border-b border-slate-700 p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2"><span>{knowledge.scope === 'letters' ? 'Cartas' : 'Biblioteca'} · Doctrina, no datos actuales de empresas</span><button type="button" className="min-h-11 text-indigo-300" onClick={() => setKnowledge(null)}>Volver al chat general</button></div>
+                {!!knowledge.authors?.length && <label>Autor<select aria-label="Autor" value={author} onChange={e => setAuthor(e.target.value)} className="block min-h-11 w-full rounded bg-slate-900 p-2"><option value="">Todos los autores</option>{knowledge.authors.map(a => <option key={a} value={a}>{a}</option>)}</select></label>}
+                <label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={analysis} onChange={e => setAnalysis(e.target.checked)} />Análisis estructurado (tesis, escenarios, modelos mentales)</label>
+            </div>}
+            <CardContent className="min-h-0 flex-1 p-0 overflow-hidden relative">
                 <div
                     ref={scrollRef}
                     role="log"
@@ -485,7 +512,9 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                     ? 'bg-blue-600 text-white rounded-tr-none'
                                     : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-none'
                                     }`}>
-                                    {m.role === 'assistant' && m.guide ? (
+                                    {m.role === 'assistant' && m.library ? (
+                                        <BrainLibraryAnswer result={m.library} />
+                                    ) : m.role === 'assistant' && m.guide ? (
                                         <BrainGuideAnswer result={m.guide} />
                                     ) : m.role === 'assistant' ? (
                                         <div className="prose prose-invert prose-sm max-w-none [&>h3]:text-indigo-400 [&>h3]:font-bold [&>h3]:mt-2 [&>h3]:mb-1 [&>ul]:list-disc [&>ul]:pl-4 [&>strong]:text-white">
@@ -521,7 +550,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                         <button
                                             type="button"
                                             onClick={() => void copyMessage(i, m.content)}
-                                            className="mt-2 block text-xs text-indigo-300 hover:text-indigo-200"
+                                            className="mt-2 block min-h-11 text-xs text-indigo-300 hover:text-indigo-200"
                                         >
                                             {copied === i ? 'Copiado' : 'Copiar'}
                                         </button>
@@ -532,7 +561,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     ))}
                     {messages.length === 1 && !loading && (
                         <div className="flex flex-wrap gap-2" aria-label="Preguntas sugeridas">
-                            {BRAIN_SUGGESTED_QUESTIONS.map((text) => (
+                            {(knowledge ? SUGGESTED_QUESTIONS : BRAIN_SUGGESTED_QUESTIONS).map((text) => (
                                 <button
                                     key={text}
                                     type="button"
@@ -552,7 +581,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                 </div>
                                 <div role="status" aria-live="polite" className="p-3 rounded-lg bg-slate-800 border border-slate-700 rounded-tl-none">
                                     <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-indigo-400" />
-                                    <span className="sr-only">GerarAI está escribiendo la respuesta.</span>
+                                    <span className="sr-only">{knowledge && analysis ? 'Preparando el análisis (puede tardar hasta 90 segundos).' : 'GerarAI está escribiendo la respuesta.'}</span>
                                 </div>
                             </div>
                         </div>
@@ -560,7 +589,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                 </div>
             </CardContent>
 
-            <CardFooter className="p-3 border-t border-slate-800 bg-slate-900/50">
+            <CardFooter className="shrink-0 p-3 border-t border-slate-800 bg-slate-900/50">
                 <form
                     className="flex w-full gap-2"
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -568,15 +597,25 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     <label htmlFor="global-brain-input" className="sr-only">
                         Pregunta al cerebro
                     </label>
-                    <Input
-                        ref={inputRef}
+                    {knowledge ? <textarea
+                        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+                        id="global-brain-input"
+                        value={input}
+                        onChange={e => setInput(e.target.value)}
+                        onKeyDown={e => { if (isSubmitShortcut(e)) { e.preventDefault(); void handleSend(); } }}
+                        minLength={3} maxLength={1200} rows={2}
+                        placeholder="Pregunta a la biblioteca (Ctrl + Enter para enviar)"
+                        className="min-h-11 min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 p-2"
+                    /> : <Input
+                        ref={inputRef as React.RefObject<HTMLInputElement>}
                         id="global-brain-input"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        maxLength={2000}
                         placeholder={guideTicker.trim() ? `Pregunta sobre ${guideTicker.trim().toUpperCase()}...` : 'Pregunta al cerebro...'}
                         className="min-h-11 bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
-                    />
-                    <Button type="submit" size="icon" aria-label="Enviar pregunta" disabled={loading || !input.trim()} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
+                    />}
+                    <Button type="submit" size="icon" aria-label="Enviar pregunta" disabled={loading || !input.trim() || (!!knowledge && (input.trim().length < 3 || input.trim().length > 1200))} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
                         <Send aria-hidden="true" className="h-4 w-4" />
                     </Button>
                 </form>
