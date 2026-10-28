@@ -32,9 +32,19 @@ describe('pestañas con estado en la URL conservan el scroll', () => {
         const page = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
         navBlock(page, 'aria-label={`Módulos de ');
         // Los enlaces de módulo salen del helper link(), fuera del bloque <nav>.
+        // scroll={'path' in item}: los módulos con subruta propia (`path`)
+        // navegan a OTRA página y arrancan arriba; los ?view= son la MISMA
+        // página con otro query param y conservan la posición. La expresión
+        // negada (!('path' in item)) hacía justo lo contrario (auditoría
+        // v1.0, 2026-10-27): la pestaña subía al inicio y la subruta se
+        // quedaba a media página.
         assert.ok(
-            page.includes("scroll={!('path' in item)}"),
+            page.includes("scroll={'path' in item}"),
             'los módulos ?view= conservan el scroll y las subrutas navegan arriba',
+        );
+        assert.ok(
+            !page.includes("scroll={!('path' in item)}"),
+            'la negación invierte el comportamiento: prohibida',
         );
     });
     it('biblioteca: las pestañas y los filtros de principios no resetean el scroll', () => {
