@@ -125,6 +125,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
 
   'components/forms/SignInForm.tsx': 'useRouter, useState, jsx-onSubmit, jsx-onClick, libreria cliente: react-hook-form, libreria cliente: sonner',
   'app/(root)/error.tsx': 'useEffect, jsx-onClick',
+  'components/settings/DcaAlertsForm.tsx': 'useState, jsx-onSubmit, jsx-onChange (ajustes globales DCA por tenant)',
+  'components/watchlist/DcaAlertSettingsList.tsx': 'useState, jsx-onClick (paginación acotada de ajustes de aviso DCA)',
   'components/watchlist/LazyDcaControls.tsx': 'dynamic (frontera perezosa de las islas del panel DCA: DcaEvaluateButton, DcaHitRatesPopover, DcaMinLevelSelect)',
   'components/watchlist/DcaEvaluateButton.tsx': 'useState, useRouter, jsx-onClick',
   'components/watchlist/DcaMinLevelSelect.tsx': 'useState, useRouter, jsx-onChange',

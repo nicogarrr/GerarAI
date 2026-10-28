@@ -12,6 +12,7 @@ import { readFileSync } from 'node:fs';
 const button = readFileSync('components/watchlist/WatchlistAddButton.tsx', 'utf8');
 const dialog = readFileSync('components/watchlist/WatchlistAddDialog.tsx', 'utf8');
 const panel = readFileSync('components/watchlist/DcaSignalsPanel.tsx', 'utf8');
+const settings = readFileSync('components/watchlist/DcaAlertSettingsList.tsx', 'utf8');
 const lazy = readFileSync('components/watchlist/LazyDcaControls.tsx', 'utf8');
 
 describe('watchlist: diálogo de alta diferido', () => {
@@ -35,9 +36,9 @@ describe('watchlist: diálogo de alta diferido', () => {
 
 describe('watchlist: islas del panel DCA diferidas', () => {
     it('el panel consume las versiones perezosas, sin imports estáticos de las islas', () => {
-        assert.ok(panel.includes("from '@/components/watchlist/LazyDcaControls'"), 'el panel debe usar la frontera perezosa');
+        assert.ok((panel + settings).includes("from '@/components/watchlist/LazyDcaControls'"), 'el panel debe usar la frontera perezosa');
         for (const isla of ['DcaEvaluateButton', 'DcaHitRatesPopover', 'DcaMinLevelSelect']) {
-            assert.ok(!panel.includes(`import ${isla} from`), `${isla} no debe tener import estático en el panel`);
+            assert.ok(!(panel + settings).includes(`import ${isla} from`), `${isla} no debe tener import estático en el panel`);
             assert.ok(lazy.includes(`dynamic(() => import('@/components/watchlist/${isla}')`), `${isla} debe cargar con dynamic()`);
         }
     });

@@ -21,7 +21,7 @@ export default function DcaHitRatesPopover({ symbol }: { symbol: string }) {
             <PopoverTrigger asChild>
                 <button
                     type="button"
-                    className="rounded border border-gray-700 px-2 py-1 text-[11px] text-gray-300 hover:border-gray-500"
+                    className="min-h-11 rounded border border-gray-700 px-2 py-1 text-[11px] text-gray-300 hover:border-gray-500"
                     aria-label={`Histórico de señales DCA de ${symbol}`}
                 >
                     Histórico
