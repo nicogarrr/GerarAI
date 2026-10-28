@@ -68,9 +68,12 @@ describe('guardas de UI', () => {
     const triggers = tabs.slice(tabs.indexOf('<TabsList'), tabs.indexOf('</TabsList>'));
     // «Estrategias» y «Rebalanceo» son la misma estrategia con dos lecturas
     // (el mismo currentStrategy): viven en una sola pestaña. La pestaña
-    // «Joyas» (#1544) convive con las cuatro originales: cinco triggers.
+    // «Joyas», «Deep value» y «Radar global» conviven con las cuatro originales.
     const triggerBlocks = [...triggers.matchAll(/<TabsTrigger[\s\S]*?>/g)].map((match) => match[0]);
-    assert.equal(triggerBlocks.length, 5, 'ProPicks tiene picks, joyas, estrategia, backtest y paper trading');
+    assert.equal(triggerBlocks.length, 7, 'ProPicks tiene picks, joyas, deepvalue, estrategia, backtest, paper trading y radar');
+    for (const value of ['picks', 'joyas', 'deepvalue', 'estrategia', 'backtest', 'paper', 'radar']) {
+      assert.ok(triggerBlocks.some((block) => block.includes(`value="${value}"`)), `falta trigger ${value}`);
+    }
     // El contrato original, por trigger y no con un número suelto: cada uno
     // conserva su ANCHO NATURAL y nunca parte su etiqueta, para que a 390px
     // sea el contenedor, no cada tab, quien desborda horizontalmente. Una
