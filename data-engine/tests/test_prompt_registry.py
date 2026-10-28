@@ -201,3 +201,14 @@ def test_knowledge_chat_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert resolved.text == prompt_registry.KNOWLEDGE_CHAT
+
+
+def test_news_headline_translation_prompt_version_and_hash_are_pinned():
+    resolved = prompt_registry.get_prompt("news_headline_translation", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "news-headline-translation-v1",
+        "a8dc119256fb",
+        "news_headline_translation",
+    )
+    assert resolved.source == "code"
+    assert resolved.text == prompt_registry.NEWS_HEADLINE_TRANSLATION
