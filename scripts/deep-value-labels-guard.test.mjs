@@ -3,7 +3,7 @@
  *
  * La estrategia acepta perfiles que el embudo de calidad rechaza; sin el
  * aviso, una lista de "gangas" se lee como seleccion de calidad. El guard
- * bloquea que el aviso o la etiqueta de fuente no oficial desaparezcan.
+ * protege el aviso y la nota de fuente no oficial, sin etiqueta repetida.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -17,10 +17,8 @@ test('el aviso de que NO es el filtro de calidad es visible en la vista', () => 
     assert.match(view, /role="note"/);
 });
 
-test('criterio extendido de la decision del radar (28-oct); pendiente OK explicito de Nico', () => {
-    // El mensaje de Nico del 28-oct cubria el radar global; en Deep value se
-    // aplica el mismo criterio por instruccion de coordinacion, pendiente de
-    // su OK explicito. La fuente sigue declarada en la nota de cabecera
+test('criterio aprobado por Nico: sin etiqueta repetida por cifra', () => {
+    // Nico aprobó aplicar este criterio a #2639 el 28-oct a las 08:46 CET. La fuente sigue declarada en la nota de cabecera
     // (rotulo del servidor, test 1 y 5) y la API mantiene el campo fuente;
     // solo se retira la marca repetida junto a cada cifra.
     assert.doesNotMatch(view, /Yahoo \(fuente no oficial\)/);
