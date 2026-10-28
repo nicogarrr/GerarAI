@@ -34,5 +34,5 @@ const RATINGS_ES: Record<string, string> = {
 export function analystRatingEs(rating: string | null | undefined): string | null {
   if (!rating) return null;
   const key = rating.trim().toLowerCase().replace(/\s+/g, ' ');
-  return RATINGS_ES[key] ?? rating.trim();
+  return Object.hasOwn(RATINGS_ES, key) ? RATINGS_ES[key] : rating.trim();
 }
