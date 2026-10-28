@@ -1,0 +1,87 @@
+{
+  "id": "adr_baba_cny_to_usd",
+  "kind": "valuation",
+  "facets": [
+    "publicable_contract",
+    "adr",
+    "fx"
+  ],
+  "company": {
+    "ticker": "BABA",
+    "name": "Alibaba",
+    "exchange": "NYSE",
+    "currency": "USD",
+    "factor_tags": [
+      "adr:8"
+    ]
+  },
+  "facts": [
+    {
+      "metric": "revenue",
+      "value": "996000000000",
+      "unit": "CNY",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "free_cash_flow",
+      "value": "152000000000",
+      "unit": "CNY",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "shares_diluted",
+      "value": "19000000000",
+      "unit": "shares",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "net_debt",
+      "value": "0",
+      "unit": "CNY",
+      "period": "2025-12-31:FY"
+    }
+  ],
+  "price": {
+    "date": "2026-10-23",
+    "close": "120",
+    "quote_currency": "USD"
+  },
+  "fx_rates": [
+    {
+      "base_currency": "EUR",
+      "quote_currency": "USD",
+      "rate": "0.9090909090909091",
+      "rate_date": "2026-10-23",
+      "source": "ECB"
+    },
+    {
+      "base_currency": "EUR",
+      "quote_currency": "CNY",
+      "rate": "0.1298701298701299",
+      "rate_date": "2026-10-23",
+      "source": "ECB"
+    }
+  ],
+  "expected": {
+    "status": "ok",
+    "publishable": true,
+    "missing_inputs": [],
+    "value_currency": "USD",
+    "currency_status": "converted",
+    "adr_ratio": 8.0,
+    "current_price": 120.0,
+    "base_value": 17.142857142857,
+    "expected_value": 17.142857142857,
+    "margin_of_safety": 0.125,
+    "listed_base_value": 137.142857142857,
+    "price_status": "ok",
+    "memo_contains": [
+      "| Base | $17.14 | 60 % |",
+      "Margen de seguridad: 12,5 %"
+    ],
+    "memo_forbidden": [
+      "120,00 CNY",
+      "estado datos insuficientes"
+    ]
+  }
+}

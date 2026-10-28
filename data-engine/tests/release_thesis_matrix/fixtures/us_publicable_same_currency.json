@@ -1,0 +1,69 @@
+{
+  "id": "us_publicable_same_currency",
+  "kind": "valuation",
+  "facets": [
+    "publicable_contract",
+    "unit"
+  ],
+  "company": {
+    "ticker": "USM",
+    "name": "US Matrix",
+    "exchange": "NYSE",
+    "currency": "USD"
+  },
+  "facts": [
+    {
+      "metric": "revenue",
+      "value": "100000000000",
+      "unit": "USD",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "free_cash_flow",
+      "value": "10000000000",
+      "unit": "USD",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "shares_diluted",
+      "value": "1000000000",
+      "unit": "shares",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "net_debt",
+      "value": "0",
+      "unit": "USD",
+      "period": "2025-12-31:FY"
+    }
+  ],
+  "price": {
+    "date": "2026-10-23",
+    "close": "120",
+    "quote_currency": "USD"
+  },
+  "fx_rates": [],
+  "expected": {
+    "status": "ok",
+    "publishable": true,
+    "missing_inputs": [],
+    "value_currency": "USD",
+    "currency_status": "same",
+    "adr_ratio": null,
+    "current_price": 120.0,
+    "base_value": 150.0,
+    "expected_value": 150.0,
+    "margin_of_safety": 0.2,
+    "listed_base_value": null,
+    "price_status": "ok",
+    "memo_contains": [
+      "Versión 1 · estado publicada",
+      "| Base | $150.00 | 60 % |",
+      "Precio del modelo al 2026-10-23: $120.00"
+    ],
+    "memo_forbidden": [
+      "| Base | pendiente |",
+      "estado datos insuficientes"
+    ]
+  }
+}
