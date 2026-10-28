@@ -124,3 +124,61 @@ describe('docsToLedger', () => {
         expect(violations[0]).toContain('desconocido');
     });
 });
+
+describe('huecos restantes (ramas y línea 53)', () => {
+    it('persistedOrder desempata por _id cuando executedAt y createdAt coinciden', () => {
+        const primero = doc({ executedAt: new Date(1000), createdAt: new Date(1000), _id: 'a' });
+        const segundo = doc({ executedAt: new Date(1000), createdAt: new Date(1000), _id: 'b' });
+        expect([segundo, primero].sort(persistedOrder)).toEqual([primero, segundo]);
+        const sinId = doc({ executedAt: new Date(1000), createdAt: new Date(1000), _id: undefined });
+        expect([primero, sinId].sort(persistedOrder)).toEqual([sinId, primero]);
+    });
+
+    it('un createdAt que no es Date no rompe el orden y deja la entrada sin tiebreak', () => {
+        const d = doc({ createdAt: undefined });
+        const { entries, violations } = docsToLedger([d]);
+        expect(violations).toEqual([]);
+        expect(entries[0].tiebreak).toBeUndefined();
+    });
+
+    it('una venta para cerrar conserva side sell y openClose close', () => {
+        const d = doc({ side: 'sell', openClose: 'close' });
+        const { entries, violations } = docsToLedger([d]);
+        expect(violations).toEqual([]);
+        expect(entries[0]).toMatchObject({ side: 'sell', openClose: 'close' });
+    });
+
+    it('sin divisa ni comisión en el doc, el fill sale en EUR con fee 0', () => {
+        const d = doc({ currency: undefined, fee: undefined });
+        const { entries, violations } = docsToLedger([d]);
+        expect(violations).toEqual([]);
+        expect(entries[0]).toMatchObject({ currency: 'EUR', fee: 0 });
+    });
+
+    it('sin nombre usa el símbolo; sin símbolo ni nombre, "?"', () => {
+        const { entries: conSimbolo } = docsToLedger([doc({ name: undefined })]);
+        expect(conSimbolo[0]).toMatchObject({ instrument: { kind: 'accion', symbol: 'SAN', name: 'SAN' } });
+        const { entries: sinNada } = docsToLedger([doc({ name: undefined, symbol: undefined })]);
+        expect(sinNada[0]).toMatchObject({ instrument: { kind: 'accion', symbol: '?', name: '?' } });
+    });
+
+    it('una opción sin nombre se etiqueta con su subyacente', () => {
+        const contract = { underlying: 'AAPL', callPut: 'put' as const, strike: 150, expiry: '2027-01-15', multiplier: 100, deliverable: 'acciones' as const, adjusted: false };
+        const { entries, violations } = docsToLedger([doc({ kind: 'opcion', contract, name: undefined })]);
+        expect(violations).toEqual([]);
+        expect(entries[0]).toMatchObject({ instrument: { kind: 'opcion', name: 'AAPL opción' } });
+    });
+
+    it('una fx con fillPrice null es inválida aunque tenga importe', () => {
+        const { entries, violations } = docsToLedger([doc({ kind: 'fx', fxFrom: 'EUR', fxTo: 'USD', quantity: 100, fillPrice: null })]);
+        expect(entries).toEqual([]);
+        expect(violations[0]).toContain('fx inválida');
+    });
+
+    it('una fx sin createdAt entra en el libro sin tiebreak', () => {
+        const { entries, violations } = docsToLedger([doc({ kind: 'fx', fxFrom: 'USD', fxTo: 'EUR', quantity: 50, fillPrice: 0.9, createdAt: undefined })]);
+        expect(violations).toEqual([]);
+        expect(entries[0]).toMatchObject({ kind: 'fx', from: 'USD', to: 'EUR', amountFrom: 50, rate: 0.9 });
+        expect(entries[0].tiebreak).toBeUndefined();
+    });
+});
