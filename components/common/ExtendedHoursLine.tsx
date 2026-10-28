@@ -14,7 +14,17 @@ import { formatNumber, formatPercent, formatPrice } from '@/lib/format';
  * primer pintado; hasta que responde no se pinta nada — igual que cuando la
  * lectura falla — nunca un dato inventado.
  */
-export default function ExtendedHoursLine({ symbol, currency }: { symbol: string; currency: string | null }) {
+export default function ExtendedHoursLine({
+    symbol,
+    currency,
+    as: Tag = 'div',
+}: {
+    symbol: string;
+    currency: string | null;
+    // Dentro de una ficha <dl> la linea es un <dd>: un <div> suelto en el grupo
+    // dt/dd rompe la lista de definiciones para el lector de pantalla.
+    as?: 'div' | 'dd';
+}) {
     const [quote, setQuote] = useState<ExtendedQuote | null>(null);
 
     useEffect(() => {
@@ -41,9 +51,9 @@ export default function ExtendedHoursLine({ symbol, currency }: { symbol: string
             ? ` (${formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' })})`
             : '';
     return (
-        <div className="text-[10px] font-normal text-gray-500">
+        <Tag className="text-[10px] font-normal text-gray-500">
             {extendedQuoteLabel(quote)}: {priceText}
             {changeText}
-        </div>
+        </Tag>
     );
 }

@@ -439,7 +439,7 @@ export default async function WatchlistPage({
                                         {stock.priceKind === 'close' ? (
                                             <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
-                                        <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
+                                        <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} as="dd" />
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
