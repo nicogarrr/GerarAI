@@ -259,3 +259,30 @@ def test_download_failure_has_durable_receipt(monkeypatch):
         assert receipt['error_code'] == 'sync_failed'
         assert receipt['finished_at'] is not None
         assert receipt['period_end'] is None
+
+
+def test_connection_routes_return_conflict_while_sync_owns_lease(monkeypatch):
+    import asyncio
+
+    from fastapi import HTTPException
+
+    from app.api.routes import settings as routes
+    init_db()
+    monkeypatch.setattr(routes, 'get_settings', settings)
+    async def downloaded(*args):
+        return report()
+    monkeypatch.setattr(service, 'download', downloaded)
+    with SessionLocal() as db:
+        tenant(db)
+        save(db)
+        revision = service.connection(db).revision
+        with service.sync_lease(db):
+            with pytest.raises(HTTPException) as disconnected:
+                routes.disconnect_ibkr(db)
+            assert disconnected.value.status_code == 409
+            payload = routes.IBKRConnectRequest(token='1234567890123456', query_id='12345', account_id='U123456')
+            with pytest.raises(HTTPException) as renewed:
+                asyncio.run(routes.connect_ibkr(payload, db))
+            assert renewed.value.status_code == 409
+        assert service.connection(db).revision == revision
+        assert service.view(db)['connected']
