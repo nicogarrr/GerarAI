@@ -56,6 +56,21 @@ export async function feedPaperProposalsNow(): Promise<PaperFeedResult> {
     }
 }
 
+/**
+ * Operaciones simuladas de UNA empresa para su ficha. El backend filtra por ticker; la
+ * ficha vuelve a filtrar por si responde un backend anterior al filtro. Un fallo
+ * se devuelve como error visible, nunca como lista vacía.
+ */
+export async function getCompanyPaperTrades(ticker: string): Promise<{ trades: PaperTradeView[]; error?: string }> {
+    try {
+        const params = new URLSearchParams({ ticker, limit: '20' });
+        return { trades: await researchRequest<PaperTradeView[]>(`/api/paper-trading/proposals?${params}`) };
+    } catch (error) {
+        if (error instanceof AppError && [401, 403].includes(error.statusCode ?? 0)) throw error;
+        return { trades: [], error: 'No se pudieron cargar las operaciones simuladas.' };
+    }
+}
+
 export async function getPaperTrading(): Promise<PaperState> {
     try {
         const [trades, score] = await Promise.all([

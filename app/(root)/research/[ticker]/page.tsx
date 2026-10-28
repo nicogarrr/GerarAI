@@ -54,6 +54,8 @@ import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 import { TtmPanel } from '@/components/research/TtmPanel';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
+import { CompanyPaperTrades } from '@/components/research/CompanyPaperTrades';
+import { getCompanyPaperTrades } from '@/lib/actions/paper-trading.actions';
 import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
 import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-layer-guidance';
@@ -1343,7 +1345,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const data = await viewData('changes');
     // Contexto de guía (revisiones anclables + noticias atribuidas): opcional,
     // su fallo no puede romper la pestaña Seguir.
-    const guideContext = await getGuideContext(ticker).catch(() => null);
+    // Operaciones simuladas de la empresa: mismo carácter opcional que la guía.
+    const [guideContext, paperTrades] = await Promise.all([
+      getGuideContext(ticker).catch(() => null),
+      getCompanyPaperTrades(ticker).catch(() => null),
+    ]);
     content = (
       <div className="space-y-6">
         {data.changes.length || data.reviews.length || data.alerts.length ? (
@@ -1358,6 +1364,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         )}
         <GuideContextPanel ticker={ticker} context={guideContext} hideReviews />
         <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} />
+        <CompanyPaperTrades state={paperTrades} ticker={ticker} />
       </div>
     );
   } else if (activeView === 'holders') {
