@@ -293,7 +293,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     className="search-text"
-                    aria-label="Abrir buscador"
+                    data-testid="search-command-trigger"
                 >
                     {label}
                 </button>
@@ -303,6 +303,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     aria-label="Abrir buscador"
+                    data-testid="search-command-trigger"
                     className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                 >
                     <Search aria-hidden="true" className="h-5 w-5" />
@@ -313,7 +314,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-400 backdrop-blur-sm transition-all duration-200 hover:bg-gray-700/60"
-                    aria-label="Abrir buscador"
+                    data-testid="search-command-trigger"
                 >
                     <Search aria-hidden="true" className="h-4 w-4 text-gray-500" />
                     <span className="flex-1 text-left">Buscar acciones...</span>
