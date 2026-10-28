@@ -10,6 +10,14 @@ export interface PaperTradeView {
     entry_price: string | null; exit_price: string | null; mark_price: string | null;
     mark_at: string | null; entry_at: string | null; exit_at: string | null;
     realized_pnl: string | null; unrealized_pnl: string | null; close_reason: string | null;
+    realized_pnl_net?: string | null; unrealized_pnl_net?: string | null;
+    entry_fee?: string | null; exit_fee?: string | null;
+    cost_label?: string | null; cost_assumption_version?: string | null;
+    dividends_total?: string | null; dividends_count?: number | null;
+    dividends_uncertain?: number | null; dividends_wrong_currency?: number | null;
+    dividends_source?: string | null;
+    split_adjustments?: number | null; last_corporate_action?: string | null;
+    corporate_action_warning?: string | null;
 }
 export interface PaperCalibration {
     base: string; calculado_en: string; propuestas_llm: number; cerradas_con_resultado: number;
@@ -22,7 +30,9 @@ export interface PaperScore {
     calibracion?: PaperCalibration;
     groups: Array<{ horizon: string; currency: string; proposals: number; closed: number;
         open: number; wins: number; losses: number; flat: number; hit_rate: number | null;
-        realized_pnl: string | null; unrealized_pnl: string | null; missing_marks: number }>;
+        realized_pnl: string | null; unrealized_pnl: string | null; missing_marks: number;
+        closed_net?: number; hit_rate_net?: number | null; realized_pnl_net?: string | null;
+        closed_distorted?: number }>;
 }
 export type PaperState = { trades: PaperTradeView[]; score: PaperScore; error?: string };
 

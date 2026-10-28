@@ -57,6 +57,9 @@ export function PaperTradingContent({ data }: { data: PaperState }) {
                     <dt>Resultado bruto cerrado</dt><dd>{number(group.realized_pnl)}</dd>
                     <dt>Resultado bruto abierto</dt><dd>{number(group.unrealized_pnl)}</dd>
                     <dt>Abiertas sin precio</dt><dd>{group.missing_marks}</dd>
+                    <dt>Resultado neto cerrado</dt><dd>{group.realized_pnl_net === null || group.realized_pnl_net === undefined ? 'Sin datos' : number(group.realized_pnl_net)}</dd>
+                    <dt>Cerradas con neto</dt><dd>{group.closed_net ?? 0} de {group.closed}</dd>
+                    <dt>Excluidas por acción corporativa</dt><dd>{group.closed_distorted ?? 0}</dd>
                 </dl>
             </article>)}
         </div>
@@ -68,7 +71,7 @@ export function PaperTradingContent({ data }: { data: PaperState }) {
             </div>
         )}
         {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} />)}
-        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. Sin comisiones, dividendos, financiación ni ajustes por splits. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
+        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. El neto descuenta costes modelados (supuesto: comisión fija + spread, persistido por operación) y suma dividendos declarados (fuente Yahoo/FMP; eventos inciertos excluidos; otra divisa nunca convertida). Splits: posiciones abiertas ajustadas con fuente; una cerrada con split no se reescribe y queda excluida del acierto. Sin financiación de cortos, FX, cash ledger ni capital. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
     </section>;
 }
 
