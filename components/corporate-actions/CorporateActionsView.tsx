@@ -85,6 +85,7 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
     };
 
     return (
+        <div className="[&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:min-w-11 [&_a.font-mono]:items-center">
         <RecordList
             title="Acciones Corporativas"
             description="Dividendos, splits, spin-offs y fusiones pendientes de aplicar a la cartera"
@@ -157,5 +158,6 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                 );
             }}
         />
+        </div>
     );
 }

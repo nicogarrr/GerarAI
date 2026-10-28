@@ -160,7 +160,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-scope">
             Alcance
             <select
-              className="h-10 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
               defaultValue={scope}
               id="sources-scope"
               name="scope"
@@ -172,7 +172,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-source-type">
             Tipo de fuente
             <select
-              className="h-10 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
               defaultValue={sourceType}
               id="sources-source-type"
               name="source_type"
@@ -237,7 +237,7 @@ export default async function ResearchSourcesPage({
                   </td>
                   <td className="py-3 text-gray-500">
                     {document.source_url ? (
-                      <a className="text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
+                      <a className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
                         abrir
                       </a>
                     ) : (
@@ -364,7 +364,7 @@ export default async function ResearchSourcesPage({
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
-              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
+              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
                 <option value="manual_upload">Texto aportado por el usuario</option>
                 <option value="manual_transcript">Transcripción</option>
                 <option value="company_ir">Relaciones con inversores</option>
@@ -416,7 +416,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">Tipo de fuente</label>
-                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">URL de la fuente</label>
@@ -449,7 +449,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">Tipo de fuente</label>
-                <select id="url-source-type" name="source_type" defaultValue="url" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+                <select id="url-source-type" name="source_type" defaultValue="url" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url">URL</label>

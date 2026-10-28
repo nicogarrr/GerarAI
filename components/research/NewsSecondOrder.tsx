@@ -45,7 +45,7 @@ export function NewsSecondOrder({ eventId, summary, subjectTicker, children }: {
 
   return (
     <details className="mt-2 text-xs text-gray-400" onToggle={(event) => { if ((event.currentTarget as HTMLDetailsElement).open) void fetchOnce(); }}>
-      <summary className="min-h-10 cursor-pointer py-2 text-teal-300">{summary}</summary>
+      <summary className="min-h-11 cursor-pointer py-2 text-teal-300">{summary}</summary>
       {children}
       {load.state === 'loading' ? <p className="mt-1" role="status">Calculando…</p> : null}
       {load.state === 'error' ? <p className="mt-1">No disponible ahora. Vuelve a abrir para reintentar.</p> : null}
@@ -68,7 +68,7 @@ export function NewsSecondOrder({ eventId, summary, subjectTicker, children }: {
                 <ul className="mt-1 space-y-1">
                   {items.slice(0, PER_GROUP).map((item) => (
                     <li className="break-words" key={`${group.key}-${item.ticker}`}>
-                      <Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/research/${item.ticker}`}>{item.ticker}</Link>
+                      <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${item.ticker}`}>{item.ticker}</Link>
                       {item.company_name ? ` · ${item.company_name}` : ''}
                       <span className="text-gray-500"> · {item.exposure.value}</span>
                       {item.causal_chain[0] ? <span className="block text-gray-500">{item.causal_chain[0].cause} → {item.causal_chain[0].effect}</span> : null}
