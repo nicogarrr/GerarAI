@@ -85,6 +85,8 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/research/DecisionJournalEntryLink.tsx':
+    'Client boundary for onClick and browser hash scrolling via scrollToHashAnchor; imported from server CompanyNavigation.',
     'components/proPicks/DeepValueView.tsx':
         'filtros controlados con useState/useEffect/useCallback y server actions al cambiar criterios',
     'components/proPicks/RadarGlobalView.tsx':
