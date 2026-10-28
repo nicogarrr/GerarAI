@@ -54,7 +54,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, DividendRecord, Position
-from app.services.dividend_records import resolve_yahoo_events
+from app.services.dividend_records import resolve_cross_provider_events, resolve_yahoo_events
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_irpf_filing import calculate_savings_tax
 
@@ -198,12 +198,14 @@ class DividendProjectionService:
             ).all()
         )
         company_ids = [company.id for _, company in rows]
-        all_records, uncertain_events = resolve_yahoo_events(
-            db.scalars(
-                select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
-            ).all()
-            if company_ids
-            else [],
+        all_records, uncertain_events = resolve_cross_provider_events(
+            *resolve_yahoo_events(
+                db.scalars(
+                    select(DividendRecord).where(DividendRecord.company_id.in_(company_ids))
+                ).all()
+                if company_ids
+                else [],
+            )
         )
         uncertain_by_company = {event.company_id for event in uncertain_events}
         records_by_company: dict[int, list[DividendRecord]] = defaultdict(list)

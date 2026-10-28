@@ -564,3 +564,112 @@ def test_partial_total_when_one_position_uncertain_and_another_has_data(db):
     assert out["gross_summary"]["excluded_uncertain_dividends"] == ["UNC"]
     assert out["coverage"]["uncertain_dividends"] == ["UNC"] and out["coverage"]["sin_datos"] == []
     assert [p["ticker"] for p in out["positions"]] == ["GOOD"]
+
+
+# --- P1-6: dedupe cross-provider conservador (Yahoo vs FMP) ---------------
+
+
+def _src_dividend(db, company, ex_date, amount, source, currency="USD"):
+    db.add(DividendRecord(
+        company_id=company.id, ex_date=ex_date, amount=Decimal(str(amount)),
+        currency=currency, source=source,
+    ))
+    db.commit()
+
+
+def test_yahoo_and_fmp_same_ex_date_different_amount_are_not_summed(db):
+    # Yahoo da el importe ajustado por split y FMP el declarado: sumarlos
+    # duplicaria el cobro. Sin poder identificar el evento, se excluye.
+    company = _company(db, ticker="XPRV")
+    _position(db, company)
+    _fx(db)
+    ex = date.today() - timedelta(days=30)
+    _src_dividend(db, company, ex, "0.1925", "yahoo_finance")
+    _src_dividend(db, company, ex, "0.77", "fmp")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == ["XPRV"]
+    assert out["coverage"]["sin_datos"] == []
+    assert out["positions"] == []
+    assert out["gross_summary"]["complete"] is False
+    assert out["gross_summary"]["excluded_uncertain_dividends"] == ["XPRV"]
+
+
+def test_cross_provider_conflict_on_one_date_does_not_hide_other_clean_dates(db):
+    # El conflicto es de UNA fecha, pero la posicion entera queda marcada
+    # incierta (regla vigente): nunca un total parcial presentado como completo.
+    company = _company(db, ticker="XMIX")
+    _position(db, company)
+    _fx(db)
+    today = date.today()
+    _src_dividend(db, company, today - timedelta(days=30), "0.20", "yahoo_finance")
+    _src_dividend(db, company, today - timedelta(days=30), "0.80", "fmp")
+    _src_dividend(db, company, today - timedelta(days=120), "0.50", "fmp")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == ["XMIX"]
+    assert out["gross_summary"]["complete"] is False
+
+
+def test_same_provider_regular_plus_special_does_not_trigger_cross_provider_rule(db):
+    # Dos filas FMP el mismo dia (ordinario + especial) siguen sumandose: la
+    # regla cross-provider exige al menos dos proveedores distintos.
+    company = _company(db, ticker="XSPC")
+    _position(db, company, quantity="10")
+    _fx(db, rate="1")
+    ex = date.today() - timedelta(days=30)
+    _src_dividend(db, company, ex, "0.50", "fmp")
+    _src_dividend(db, company, ex, "2.00", "fmp")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == []
+    assert [p["ticker"] for p in out["positions"]] == ["XSPC"]
+    assert out["positions"][0]["gross_native"] == pytest.approx(25.0)
+
+
+def test_yahoo_and_fmp_on_different_dates_are_both_counted(db):
+    company = _company(db, ticker="XDIF")
+    _position(db, company, quantity="10")
+    _fx(db, rate="1")
+    today = date.today()
+    _src_dividend(db, company, today - timedelta(days=30), "0.50", "yahoo_finance")
+    _src_dividend(db, company, today - timedelta(days=120), "0.50", "fmp")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == []
+    assert out["positions"][0]["gross_native"] == pytest.approx(10.0)
+
+
+def test_cross_provider_in_other_currency_does_not_conflict(db):
+    # GBX (peniques) y GBP son divisas distintas: no se agrupan ni se convierten
+    # aqui. Solo cuentan las filas de la divisa de la posicion.
+    company = _company(db, ticker="XGBP", currency="GBP", country="GB")
+    _position(db, company, quantity="100", currency="GBP")
+    _fx(db, quote="GBP", rate="1.15")
+    ex = date.today() - timedelta(days=40)
+    _src_dividend(db, company, ex, "0.20", "fmp", currency="GBP")
+    _src_dividend(db, company, ex, "20", "yahoo_finance", currency="GBX")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == []
+    assert out["positions"][0]["gross_native"] == pytest.approx(20.0)  # 0.20 * 100, GBX ignorado
+
+
+def test_cross_provider_future_ex_date_conflict_is_not_reported_as_trailing_uncertain(db):
+    company = _company(db, ticker="XFUT")
+    _position(db, company)
+    _fx(db)
+    today = date.today()
+    _src_dividend(db, company, today - timedelta(days=60), "0.50", "fmp")
+    _src_dividend(db, company, today + timedelta(days=10), "0.20", "yahoo_finance")
+    _src_dividend(db, company, today + timedelta(days=10), "0.80", "fmp")
+
+    out = DividendProjectionService().project(db, months=12)
+
+    assert out["coverage"]["uncertain_dividends"] == []
+    assert out["positions"][0]["frequency_last_year"] == 1
