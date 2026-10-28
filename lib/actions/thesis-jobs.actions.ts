@@ -66,19 +66,6 @@ export async function getLatestThesisJob(ticker: string): Promise<ThesisJobStatu
 
 export type ThesisDebateResult = SanitizedDebate;
 
-export interface RawThesisDebateResult {
-    ticker: string;
-    thesis_version_id?: number;
-    persisted?: boolean;
-    bull_case: string;
-    bear_case: string;
-    verdict: 'bullish' | 'bearish' | 'neutral' | string;
-    verdict_rationale: string;
-    llm_calls: number;
-    degraded: boolean;
-    model: string | null;
-}
-
 export type ThesisDebateOutcome =
     | { ok: true; debate: ThesisDebateResult }
     | { ok: false; error: string };

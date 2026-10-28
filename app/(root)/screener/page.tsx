@@ -224,7 +224,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.4fr)]">
         <Card className="min-w-0 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-base break-words">Oportunidades — {sectorEs(sector)}</CardTitle>
+            <CardTitle as="h2" className="text-base break-words">Oportunidades — {sectorEs(sector)}</CardTitle>
           </CardHeader>
           <CardContent className="min-w-0 px-3 sm:px-6">
             {rows.length === 0 ? (
@@ -415,7 +415,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
           ) : engineScreens.screens.length === 0 ? (
             <p className="text-sm text-gray-500">
               El motor de análisis responde, pero no hay filtros guardados.{' '}
-              <Link href="/screeners" className="text-teal-300 hover:text-teal-200 hover:underline">
+              <Link href="/screeners" className="text-teal-300 underline underline-offset-2 hover:text-teal-200">
                 Crea el primero en Screeners
               </Link>.
             </p>

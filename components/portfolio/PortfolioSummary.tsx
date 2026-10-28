@@ -15,6 +15,9 @@ export default function PortfolioSummary({ summary }: Props) {
   const isEmpty = summary.holdings.length === 0;
   // Sin base de coste: coste, ganancia y rendimiento son N/D, no 0 (F2).
   const noData = isEmpty || !hasCostBasis(summary);
+  // Sin posiciones NI caja: el valor total no es 0,00 EUR real, es ausencia de datos.
+  // Con caja y sin posiciones el total (la caja) sí es un dato.
+  const nothingYet = isEmpty && summary.totalValue === 0 && summary.cash === 0 && summary.equityValue === 0;
   const isPositive = summary.totalGain >= 0;
   const format = (value: number) => formatMoney(value, summary.baseCurrency, {
     minimumFractionDigits: 2,
@@ -25,12 +28,12 @@ export default function PortfolioSummary({ summary }: Props) {
     <div className="space-y-3">
       {summary.valuationHold.length > 0 ? (
         <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-sm text-amber-200">
-          {t('portfolio.valuationHoldNotice', { n: summary.valuationHold.length, tickers: summary.valuationHold.map((h) => h.ticker).join(', ') })}
+          {t(summary.valuationHold.length === 1 ? 'portfolio.valuationHoldNotice.one' : 'portfolio.valuationHoldNotice.other', { n: summary.valuationHold.length, tickers: summary.valuationHold.map((h) => h.ticker).join(', ') })}
         </div>
       ) : null}
       {summary.status === 'incomplete_fx' ? (
         <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-sm text-amber-200">
-          {t('portfolio.fxMissingNotice', { n: summary.missingFx.length })}
+          {t(summary.missingFx.length === 1 ? 'portfolio.fxMissingNotice.one' : 'portfolio.fxMissingNotice.other', { n: summary.missingFx.length })}
         </div>
       ) : null}
       {/* F290: columnas por ANCHO DE CONTENIDO, no de viewport. Con sidebar
@@ -47,11 +50,13 @@ export default function PortfolioSummary({ summary }: Props) {
         </div>
         <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Valor Total (neto)</p>
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
-          {format(summary.totalValue)}
+          {nothingYet ? NA : format(summary.totalValue)}
         </p>
-        <p className="text-xs text-gray-500 mt-1">
-          Patrimonio neto: RV {format(summary.equityValue)} + caja {format(summary.cash)}
-        </p>
+        {nothingYet ? null : (
+          <p className="text-xs text-gray-500 mt-1">
+            Patrimonio neto: RV {format(summary.equityValue)} + caja {format(summary.cash)}
+          </p>
+        )}
       </div>
 
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-blue-500/30 transition-colors">

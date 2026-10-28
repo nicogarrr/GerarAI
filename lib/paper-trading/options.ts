@@ -27,6 +27,12 @@ export type Result<T> = { ok: true; value: T } | { ok: false; reason: string };
 
 const fail = (reason: string): { ok: false; reason: string } => ({ ok: false, reason });
 
+/** Importes en los motivos de rechazo: es-ES con 2 decimales («2.000,00»).
+ *  Local a propósito: este módulo no importa nada fuera de ./types (los
+ *  golden lo cargan con node --experimental-strip-types, sin alias @/). */
+const importeEs = (n: number): string =>
+    new Intl.NumberFormat('es-ES', { useGrouping: 'always', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
 /** Fecha civil (yyyy-mm-dd) de un instante en Nueva York (zona de los vencimientos OCC). */
 export function newYorkDate(epochMs: number): string {
     const parts = new Intl.DateTimeFormat('en-CA', {
@@ -62,13 +68,13 @@ function decimals(n: number): number {
 
 /** Valida la identidad del contrato (sin mirar fechas relativas a hoy). */
 export function validateOptionContract(contract: OptionContract): Result<OptionContract> {
-    if (!contract || typeof contract !== 'object') return fail('Contrato de opcion ausente.');
+    if (!contract || typeof contract !== 'object') return fail('Contrato de opción ausente.');
     if (!/^[A-Za-z][A-Za-z0-9.\-]{0,9}$/.test(String(contract.underlying ?? '').trim())) {
-        return fail('Subyacente invalido.');
+        return fail('Subyacente inválido.');
     }
     if (contract.callPut !== 'call' && contract.callPut !== 'put') return fail('Tipo debe ser call o put.');
-    if (!Number.isFinite(contract.strike) || contract.strike <= 0) return fail('Strike debe ser un numero mayor que 0.');
-    if (!isRealDate(String(contract.expiry))) return fail('Vencimiento invalido (se espera yyyy-mm-dd real).');
+    if (!Number.isFinite(contract.strike) || contract.strike <= 0) return fail('Strike debe ser un número mayor que 0.');
+    if (!isRealDate(String(contract.expiry))) return fail('Vencimiento inválido (se espera yyyy-mm-dd real).');
     if (contract.deliverable !== 'acciones') return fail('Solo se admite entrega de acciones en fase 1.');
     if (contract.adjusted) {
         return fail(
@@ -76,7 +82,7 @@ export function validateOptionContract(contract: OptionContract): Result<OptionC
         );
     }
     if (contract.multiplier !== STANDARD_MULTIPLIER) {
-        return fail('Solo se admiten contratos estandar con multiplicador 100.');
+        return fail('Solo se admiten contratos estándar con multiplicador 100.');
     }
     return { ok: true, value: contract };
 }
@@ -155,13 +161,13 @@ export function buildOptionFill(input: OptionOrderInput): Result<Fill> {
     }
     if (!Number.isInteger(input.contracts) || input.contracts <= 0) return fail('Los contratos deben ser un entero mayor que 0.');
     if (!Number.isFinite(input.premium) || input.premium <= 0) return fail('La prima debe ser mayor que 0.');
-    if (decimals(input.premium) > MAX_PREMIUM_DECIMALS) return fail(`La prima admite como maximo ${MAX_PREMIUM_DECIMALS} decimales.`);
+    if (decimals(input.premium) > MAX_PREMIUM_DECIMALS) return fail(`La prima admite como máximo ${MAX_PREMIUM_DECIMALS} decimales.`);
     if (input.currency !== 'EUR' && input.currency !== 'USD') return fail('Divisa no soportada.');
-    if (!Number.isFinite(input.fee) || input.fee < 0) return fail('La comision no puede ser negativa.');
-    if (!Number.isFinite(input.executedAt) || input.executedAt <= 0) return fail('Fecha de ejecucion invalida.');
+    if (!Number.isFinite(input.fee) || input.fee < 0) return fail('La comisión no puede ser negativa.');
+    if (!Number.isFinite(input.executedAt) || input.executedAt <= 0) return fail('Fecha de ejecución inválida.');
     if (!input.clientOrderId) return fail('Falta clientOrderId.');
     if (expirationState(input.contract, input.executedAt).status === 'vencido') {
-        return fail('El contrato ya vencio en la fecha de ejecucion indicada.');
+        return fail('El contrato ya venció en la fecha de ejecución indicada.');
     }
 
     if (sellClose && input.contracts > input.heldContracts) {
@@ -172,8 +178,8 @@ export function buildOptionFill(input: OptionOrderInput): Result<Fill> {
         // que queda tras abonar la prima (la apertura ya lo chequea).
         const proceeds = premiumTotal(input.premium, input.contracts, input.contract.multiplier);
         if (!Number.isFinite(input.availableCash) || input.fee > input.availableCash + proceeds + 1e-9) {
-            const disponible = Number.isFinite(input.availableCash) ? (input.availableCash + proceeds).toFixed(2) : 'N/D';
-            return fail(`La comision (${input.fee.toFixed(2)}) supera el efectivo disponible tras el cierre (${disponible}): la demo no admite sobregiro.`);
+            const disponible = Number.isFinite(input.availableCash) ? importeEs(input.availableCash + proceeds) : 'N/D';
+            return fail(`La comisión (${importeEs(input.fee)}) supera el efectivo disponible tras el cierre (${disponible}): la demo no admite sobregiro.`);
         }
     }
     if (buyOpen) {
@@ -185,7 +191,7 @@ export function buildOptionFill(input: OptionOrderInput): Result<Fill> {
             instrument: { kind: 'opcion', contract: input.contract, name: '' },
         });
         if (!Number.isFinite(input.availableCash) || cost > input.availableCash + 1e-9) {
-            return fail(`Saldo ${input.currency} insuficiente: la compra cuesta ${cost.toFixed(2)} y hay ${Number.isFinite(input.availableCash) ? input.availableCash.toFixed(2) : 'N/D'}.`);
+            return fail(`Saldo ${input.currency} insuficiente: la compra cuesta ${importeEs(cost)} y hay ${Number.isFinite(input.availableCash) ? importeEs(input.availableCash) : 'N/D'}.`);
         }
     }
 
@@ -231,7 +237,7 @@ export function expiryOutcome(contract: OptionContract, nowMs: number, underlyin
         return {
             status: 'pendiente-liquidacion',
             intrinsicPerShare: null,
-            reason: 'Sin cierre fechado del subyacente: no se asume si vencio dentro o fuera del dinero.',
+            reason: 'Sin cierre fechado del subyacente: no se asume si venció dentro o fuera del dinero.',
         };
     }
     const intrinsic = intrinsicValue(contract, underlyingClose);
@@ -239,6 +245,6 @@ export function expiryOutcome(contract: OptionContract, nowMs: number, underlyin
     return {
         status: 'pendiente-liquidacion',
         intrinsicPerShare: intrinsic,
-        reason: 'Dentro del dinero al vencer: ejercicio/asignacion no modelados en fase 1; registrar el cierre manualmente.',
+        reason: 'Dentro del dinero al vencer: ejercicio/asignación no modelados en fase 1; registra el cierre manualmente.',
     };
 }

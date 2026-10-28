@@ -42,7 +42,7 @@ test.describe('header app antes y después de hidratar', () => {
       } finally {
         release();
       }
-      const search = page.locator('.header').getByRole('button', { name: 'Abrir buscador', exact: true });
+      const search = page.locator('.header [data-testid=\'search-command-trigger\']:visible').first();
       await expect(search).toBeVisible();
       await fits(page);
       await search.click();

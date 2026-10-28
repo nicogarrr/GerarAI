@@ -2,8 +2,7 @@
 
 from datetime import date, timedelta
 
-import pytest
-
+from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
 from tests.test_ledger_contribution import (  # noqa: F401  (fixture db)
     CUTOFF,
     _company,
@@ -13,7 +12,6 @@ from tests.test_ledger_contribution import (  # noqa: F401  (fixture db)
     _usd_base,
     db,
 )
-from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
 
 
 def _entry(db, *, with_ledger_gap: bool):

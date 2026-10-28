@@ -10,6 +10,38 @@ import { isFinanciallyRelevant } from '@/lib/newsRelevance';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { NewsSource } from '@/lib/types/vendorSources';
 
+/* Ítems de cada proveedor de noticias: frontera externa sin esquema; todo
+ * opcional y con fallback en el mapa. */
+interface AlphaVantageFeedItem {
+    time_published?: string;
+    url?: string;
+    title?: string;
+    summary?: string;
+    source?: string;
+    banner_image?: string;
+}
+
+interface NewsApiArticle {
+    publishedAt?: string;
+    url?: string;
+    title?: string;
+    description?: string;
+    content?: string;
+    source?: { name?: string };
+    urlToImage?: string;
+}
+
+interface MarketauxArticle {
+    published_at?: string;
+    uuid?: string;
+    title?: string;
+    description?: string;
+    snippet?: string;
+    source?: string;
+    url?: string;
+    image_url?: string;
+}
+
 export type { NewsSource };
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -148,8 +180,8 @@ async function getNewsAlphaVantage(symbols?: string[], maxArticles = 6): Promise
 
         const articles: MarketNewsArticle[] = data.feed
             .slice(0, maxArticles)
-            .map((item: any, idx: number) => {
-                const timestamp = new Date(item.time_published).getTime() / 1000;
+            .map((item: AlphaVantageFeedItem, idx: number) => {
+                const timestamp = new Date(item.time_published ?? '').getTime() / 1000;
                 // Use hash of URL for shorter, safer IDs
                 const urlHash = item.url ? item.url.split('/').pop()?.slice(0, 20) || idx : idx;
                 return {
@@ -206,8 +238,8 @@ async function getNewsFromNewsAPI(symbols?: string[], maxArticles = 6): Promise<
 
         const articles: MarketNewsArticle[] = data.articles
             .slice(0, maxArticles)
-            .map((item: any, idx: number) => {
-                const timestamp = new Date(item.publishedAt).getTime() / 1000;
+            .map((item: NewsApiArticle, idx: number) => {
+                const timestamp = new Date(item.publishedAt ?? '').getTime() / 1000;
                 // Use hash of URL for shorter, safer IDs
                 const urlHash = item.url ? item.url.split('/').pop()?.slice(0, 20) || idx : idx;
                 return {
@@ -263,8 +295,8 @@ async function getNewsMarketaux(symbols?: string[], maxArticles = 6): Promise<Ma
 
         const articles: MarketNewsArticle[] = data.data
             .slice(0, maxArticles)
-            .map((item: any, idx: number) => {
-                const timestamp = new Date(item.published_at).getTime() / 1000;
+            .map((item: MarketauxArticle, idx: number) => {
+                const timestamp = new Date(item.published_at ?? '').getTime() / 1000;
                 // Use UUID from API as it's already a unique identifier
                 return {
                     id: `marketaux-${item.uuid || idx}`,

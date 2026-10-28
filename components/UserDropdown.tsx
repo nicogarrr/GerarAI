@@ -30,13 +30,19 @@ const UserDropdown = ({ user }: { user: User }) => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700" aria-label="Menú de usuario">
-                    <Avatar className="h-8 w-8">
+                {/* Sin aria-label: el nombre accesible sale del texto (WCAG 2.5.3,
+                    label-in-name). Con aria-label="Menú de usuario de X" el texto
+                    visible (inicial + nombre) no estaba dentro del nombre y quien
+                    navega por voz diciendo lo que ve no daba con el botón. En
+                    móvil el nombre se oculta a la vista pero no al lector. */}
+                <Button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700">
+                    <Avatar aria-hidden="true" className="h-8 w-8">
                         <AvatarFallback className="bg-teal-500 text-teal-900 text-sm font-bold">
                             {user.name[0]}
                         </AvatarFallback>
                     </Avatar>
-                    <span className="hidden text-sm font-medium text-gray-400 md:inline">{user.name}</span>
+                    <span className="sr-only text-sm font-medium text-gray-400 md:not-sr-only md:inline">{user.name}</span>
+                    <span className="sr-only">, menú de usuario</span>
                     <ChevronDown aria-hidden="true" className="hidden h-4 w-4 text-gray-500 md:inline" />
                 </Button>
             </DropdownMenuTrigger>

@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
-import { parseLocalizedNumber } from '@/lib/format';
+import { formatNumberForInput, parseLocalizedNumber } from '@/lib/format';
 
 type Transaction = {
     _id: string;
@@ -48,10 +48,10 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
     const [formData, setFormData] = useState({
         symbol: transaction.symbol,
         type: transaction.type,
-        quantity: transaction.quantity.toString(),
-        price: transaction.price.toString(),
+        quantity: formatNumberForInput(transaction.quantity),
+        price: formatNumberForInput(transaction.price),
         // Sin dato de comisión en la fila el campo queda vacío: guardar sin tocarlo OMITE fees y el backend conserva la registrada (nunca se resetea a 0).
-        fees: transaction.fees === undefined ? '' : transaction.fees.toString(),
+        fees: transaction.fees === undefined ? '' : formatNumberForInput(transaction.fees),
         date: transaction.date.slice(0, 10),
         notes: transaction.notes || '',
         currency: transaction.currency || 'USD',
@@ -113,14 +113,22 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     <Pencil aria-hidden="true" className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+            {/* Sin autofoco al abrir: Radix enfoca el primer campo (Símbolo) y
+                TickerSearchInput lanza una búsqueda con el ticker precargado,
+                abriendo el desplegable encima de Moneda/Tipo/Cantidad/Precio,
+                que son los campos que sí se editan. El foco queda en el diálogo
+                y el primer Tab entra al formulario. */}
+            <DialogContent
+                className="bg-gray-900 border-gray-700 max-w-md"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle className="text-gray-100">Editar Transacción</DialogTitle>
                     <DialogDescription className="text-gray-400">
                         Modifica los detalles de la transacción
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} noValidate className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="symbol" className="text-gray-300">Símbolo</Label>
                         <TickerSearchInput
@@ -167,9 +175,8 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                             <Label htmlFor="quantity" className="text-gray-300">Cantidad</Label>
                             <Input
                                 id="quantity"
-                                type="number"
-                                step="any"
-                                min="0"
+                                type="text"
+                                inputMode="decimal"
                                 value={formData.quantity}
                                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
                                 required
@@ -184,9 +191,8 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                             <Label htmlFor="price" className="text-gray-300">Precio ({formData.currency})</Label>
                             <Input
                                 id="price"
-                                type="number"
-                                step="any"
-                                min="0"
+                                type="text"
+                                inputMode="decimal"
                                 value={formData.price}
                                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                                 required
@@ -202,9 +208,8 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                       <Label htmlFor="edit-fees" className="text-gray-300">Comisiones ({formData.currency}) (opcional)</Label>
                       <Input
                         id="edit-fees"
-                        type="number"
-                        step="any"
-                        min="0"
+                        type="text"
+                                inputMode="decimal"
                         placeholder="0,00"
                         value={formData.fees}
                         onChange={(e) => setFormData({ ...formData, fees: e.target.value })}

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BarChart3, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import RadarGlobalView from './RadarGlobalView';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
 import GemsView from './GemsView';
 import DeepValueView from './DeepValueView';
@@ -36,7 +37,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
     // El motor walk-forward NO se dispara al montar: se lanza la primera vez
     // que se abre la pestaña de Backtesting (o con «Ejecutar backtest»).
     // Antes costaba una corrida completa a quien solo quería ver los Picks.
-    const [backtestStarted, setBacktestStarted] = useState(false);
+    const backtestStarted = useRef(false);
     // F383: los picks iniciales (ranking global del embudo) NO se asocian a
     // ninguna estrategia; cada estrategia, también la inicial, carga los suyos
     // por la ruta strategy-aware. Nunca se exportan picks de otra estrategia.
@@ -83,14 +84,15 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
         }
     };
 
-    useEffect(() => {
-        if (activeTab === 'backtest' && !backtestStarted) {
-            setBacktestStarted(true);
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab);
+        // El backtest arranca al entrar en su pestaña, una sola vez: es la
+        // respuesta a un evento, no un efecto.
+        if (tab === 'backtest' && !backtestStarted.current) {
+            backtestStarted.current = true;
             void runBacktest();
         }
-    }, [activeTab, backtestStarted]);
-
-    const handleTabChange = (tab: string) => setActiveTab(tab);
+    };
 
     const handleStrategyChange = (strategyId: string) => {
         setCurrentStrategy(strategyId);
@@ -148,9 +150,13 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                     Backtesting
                 </TabsTrigger>
                 <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Paper trading</TabsTrigger>
+                <TabsTrigger value="radar" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Radar global</TabsTrigger>
             </TabsList>
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
+            <TabsContent value="radar" className="mt-6">
+                {activeTab === 'radar' && <RadarGlobalView />}
+            </TabsContent>
 
             {/* forceMount: Radix desmonta el panel inactivo y EnhancedProPicksContent
                 se sembraba con initialPicks del SSR; al generar/actualizar la

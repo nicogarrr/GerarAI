@@ -12,8 +12,10 @@ from app.schemas.paper_trading import PaperProposal
 from app.services.llm_proposal_runner import QuotaExceeded, generate_proposal
 from app.services.llm_proposal_service import ProposalRejected
 from app.services.paper_calibration_service import calibration
+from app.services.paper_cost_service import current_assumptions
 from app.services.paper_trading_service import (
     UnknownProposalCurrency,
+    close_position,
     create_proposal,
     refresh_trades,
     scoreboard,
@@ -104,11 +106,10 @@ def close(proposal_id: int, db: Session = Depends(get_db)) -> dict:
     if row.status == "closed":
         return trade_out(row)
     out = trade_out(row)
-    if row.status != "open" or out["quote_status"] != "available" or row.mark_at is None:
+    if row.status != "open" or out["quote_status"] != "available" or row.mark_at is None or row.mark_price is None:
         raise HTTPException(status_code=409, detail="Sin precio real reciente para cerrar")
     if row.entry_at == row.mark_at:
         raise HTTPException(status_code=409, detail="Falta una cotización posterior a la entrada")
-    row.exit_price, row.exit_at = row.mark_price, row.mark_at
-    row.close_reason, row.status = "manual", "closed"
+    close_position(row, row.mark_price, row.mark_at, "manual", current_assumptions())
     db.commit()
     return trade_out(row, datetime.now(UTC))

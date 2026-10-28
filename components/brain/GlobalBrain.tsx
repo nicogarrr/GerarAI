@@ -132,16 +132,23 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         } catch {
             pending = null;
         }
+        // Handoff desde un almacén externo (sessionStorage) tras montar o
+        // cambiar de ruta: el setState no puede ser síncrono en el efecto.
         if (pending) {
-            setIsOpen(true);
-            applyOpenBrainDetail(pending);
+            const detail = pending;
+            queueMicrotask(() => {
+                setIsOpen(true);
+                applyOpenBrainDetail(detail);
+            });
         }
     }, [pathname]);
 
     useEffect(() => {
         try {
             const stored = restoreConversation(window.sessionStorage.getItem(brainStorageKey(userId)));
-            if (stored) setMessages(stored as Message[]);
+            // Restauración desde sessionStorage tras montar: setState
+            // diferido, no síncrono dentro del efecto.
+            if (stored) queueMicrotask(() => setMessages(stored as Message[]));
         } catch {
             // sessionStorage no disponible: el panel funciona sin persistencia.
         } finally {
@@ -185,10 +192,13 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         }
     }, [messages, isOpen, isMaximized]);
 
-    // Al cambiar de página el eco viejo deja de ser válido: vuelve la etiqueta local.
-    useEffect(() => {
+    // Al cambiar de página el eco viejo deja de ser válido: vuelve la etiqueta
+    // local. Ajuste durante el render (reset al cambiar un valor), no efecto.
+    const [prevPathname, setPrevPathname] = useState(pathname);
+    if (prevPathname !== pathname) {
+        setPrevPathname(pathname);
         setEcho(null);
-    }, [pathname]);
+    }
 
     /**
      * Modal de verdad (WCAG 2.1.2): con `aria-modal` el fondo se marca inaccesible
@@ -402,7 +412,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                             onClick={() => setShowGuideInput(true)}
                             title="Guía de investigación por empresa"
                             aria-label="Abrir la guía de investigación por empresa"
-                            className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
+                            className="inline-flex min-h-11 items-center rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-xs text-slate-400 hover:border-indigo-400 hover:text-slate-200"
                         >
                             Guía
                         </button>
@@ -419,7 +429,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                                 href={viewingHref}
                                 data-testid="brain-page-context"
                                 title={echo?.company_name ?? undefined}
-                                className="max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200"
+                                className="inline-flex min-h-11 items-center max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200"
                             >
                                 Viendo {viewing}
                             </Link>
@@ -564,7 +574,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         placeholder={guideTicker.trim() ? `Pregunta sobre ${guideTicker.trim().toUpperCase()}...` : 'Pregunta al cerebro...'}
-                        className="bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
+                        className="min-h-11 bg-slate-950 border-slate-700 focus-visible:ring-indigo-500"
                     />
                     <Button type="submit" size="icon" aria-label="Enviar pregunta" disabled={loading || !input.trim()} aria-busy={loading} className="bg-indigo-600 hover:bg-indigo-500">
                         <Send aria-hidden="true" className="h-4 w-4" />

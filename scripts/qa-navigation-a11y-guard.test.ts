@@ -20,5 +20,5 @@ test('ticker targets and removal names are usable without icons',()=>{
  assert.match(read('components/watchlist/WatchlistRemoveButton.tsx'),/aria-label=\{`Quitar \$\{symbol\} de la watchlist`\}/);
  assert.match(read('app/(root)/watchlist/page.tsx'),/min-h-11 items-center truncate text-base/);
  const news=read('components/research/NewsEventsFlow.tsx');
- assert.ok((news.match(/inline-flex min-h-11 items-center.*text-teal-300/g)??[]).length>=2);
+ assert.ok((news.match(/inline-flex min-h-11[^"]*items-center[^"]*text-teal-300/g)??[]).length>=2);
 });

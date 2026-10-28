@@ -1,8 +1,7 @@
 'use server';
 
-import { getCandles, getStockFinancialDataLight } from './finnhub.actions';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
-import { calculateAdvancedStockScore, type AdvancedScoreData } from '@/lib/utils/advancedStockScoring';
+import type { AdvancedScoreData } from '@/lib/utils/advancedStockScoring';
 import {
   PROPICKS_STRATEGIES,
   calculateStrategyScore,
@@ -13,8 +12,8 @@ import type { SignalOverlay } from '@/lib/utils/propicksSignals';
 import { getLatestFunnelPicks } from '@/lib/actions/propicks-funnel.actions';
 import { withOptionalBudget } from '@/lib/propicks/optional-budget';
 
-/** Selección con tope de rotación (núcleo puro en proPicksStrategies, reexportada aquí para el pipeline). */
-import { selectRebalancedPicks, type RankedCandidate } from '@/lib/utils/proPicksStrategies';
+/** Selección con tope de rotación (núcleo puro en proPicksStrategies, usada por el pipeline viejo). */
+import { selectRebalancedPicks } from '@/lib/utils/proPicksStrategies';
 
 export interface ConfidenceReason {
   /** Texto mostrado en UI. Siempre incluye `value` para que sea verificable. */
@@ -46,7 +45,7 @@ export interface ProPick {
    * y aparece en `text` (validado por lib/utils/propicksValidation.ts).
    */
   confidenceReasons: ConfidenceReason[];
-  /** 0-100. Fórmula: base por banda de score + bonus reales (ver buildConfidence). */
+  /** 0-100. Fórmula: base por banda de score + bonus reales (bandas originales del path viejo; hoy la confianza la persiste el embudo F1). */
   confidence: number;
   /** Alta (>=80) · Media (>=65) · Baja (<65). */
   confidenceLevel: 'Alta' | 'Media' | 'Baja';
@@ -75,28 +74,6 @@ export interface ProPick {
   overlays?: SignalOverlay[];
 }
 
-const LIQUID_UNIVERSE = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'AVGO', 'ORCL', 'CRM', 'AMD',
-  'JPM', 'BAC', 'GS', 'MS', 'V', 'MA', 'AXP', 'BLK', 'SCHW', 'C',
-  'LLY', 'UNH', 'JNJ', 'MRK', 'ABBV', 'TMO', 'ABT', 'ISRG', 'GILD', 'AMGN',
-  'WMT', 'COST', 'HD', 'MCD', 'BKNG', 'TJX', 'LOW', 'SBUX', 'NKE', 'DIS',
-  'XOM', 'CVX', 'COP', 'SLB', 'EOG', 'CAT', 'GE', 'RTX', 'HON', 'ETN',
-  'NEE', 'DUK', 'SO', 'CEG', 'VST', 'LIN', 'FCX', 'NEM', 'SHW', 'APD',
-  'PLD', 'AMT', 'EQIX', 'WELL', 'VICI', 'TSM', 'ASML', 'NVO', 'MELI', 'SE',
-] as const;
-
-type FinancialData = Awaited<ReturnType<typeof getStockFinancialDataLight>>;
-
-const CATEGORY_LABELS: Record<keyof AdvancedScoreData['categoryScores'], string> = {
-  value: 'Valor',
-  growth: 'Crecimiento',
-  profitability: 'Rentabilidad',
-  cashFlow: 'Flujo de caja',
-  momentum: 'Momentum',
-  debtLiquidity: 'Salud financiera',
-};
-
-const round1 = (n: number) => Math.round(n * 10) / 10;
 
 type OverlayRecord = Record<string, number | string | boolean | null | undefined>;
 
@@ -209,222 +186,7 @@ export async function attachSignalOverlays(picks: ProPick[], asOf?: string): Pro
   }, finalists, 4_000);
 }
 
-export type SectorCategoryScores = {
-  value: number;
-  growth: number;
-  profitability: number;
-  cashFlow: number;
-  momentum: number;
-  debtLiquidity: number;
-};
 
-const SECTOR_NORM_CATEGORIES = ['value', 'growth', 'profitability', 'cashFlow', 'momentum', 'debtLiquidity'] as const;
-
-/**
- * Normalización sectorial de las 6 categorías (z-score winsorizado ±3 por sector).
- *
- * Para cada sector y cada categoría: z = (x - media) / sd; se winsoriza a
- * ±3 (recorta colas extremas) y se reescala a 0-100 como 50 + z·(50/3)
- * (z=0 → 50, z=±3 → 0/100). Sectores de un solo miembro o sin dispersión
- * dan z=0 (50, neutral).
- *
- * Los `categoryScores` finales del pick SIGUEN siendo los crudos y son los que
- * alimentan R4 (score = Σ categoría × peso canónico ±1); lo normalizado solo
- * sirve para comparar/ordenar entre sectores sin sesgo de nivel.
- */
-function normalizeSectorCategoryScores(picks: readonly ProPick[]): Map<string, SectorCategoryScores> {
-  const bySector = new Map<string, ProPick[]>();
-  for (const pick of picks) {
-    const sector = pick.sector ?? 'Unknown';
-    const group = bySector.get(sector);
-    if (group) group.push(pick);
-    else bySector.set(sector, [pick]);
-  }
-  const normalized = new Map<string, SectorCategoryScores>();
-  for (const group of bySector.values()) {
-    const stats = new Map<(typeof SECTOR_NORM_CATEGORIES)[number], { mean: number; sd: number }>();
-    for (const key of SECTOR_NORM_CATEGORIES) {
-      const values = group.map((p) => p.categoryScores[key]);
-      const mean = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
-      const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, values.length);
-      stats.set(key, { mean, sd: Math.sqrt(variance) });
-    }
-    for (const pick of group) {
-      const entry = {} as SectorCategoryScores;
-      for (const key of SECTOR_NORM_CATEGORIES) {
-        const { mean, sd } = stats.get(key) ?? { mean: 50, sd: 0 };
-        const z = sd < 1e-9 ? 0 : (pick.categoryScores[key] - mean) / sd;
-        const winsorized = Math.max(-3, Math.min(3, z));
-        entry[key] = Math.round((50 + winsorized * (50 / 3)) * 10) / 10;
-      }
-      normalized.set(pick.symbol, entry);
-    }
-  }
-  return normalized;
-}
-
-/**
- * Confianza explicada del pick (0-100).
- * Fórmula calibrada y sin magia:
- *   base por banda de score: >=80 → 82 · 70-79 → 72 · 60-69 → 60 · <60 → 45
- *   +6 si upside real > 15% (precio objetivo de analista vs precio actual)
- *   +4 si ≥2 categorías superan a su sector en >5 puntos
- *   +4 si la mejor categoría ≥ 80
- *   ±bonus por overlays externos: +2 por overlay positivo, -3 por negativo,
- *   con tope total de ±6 (ver overlayConfidenceDelta). Sin overlays el bonus es 0.
- *   techo 97 (suelo 5). Nivel: Alta (>=80) · Media (>=65) · Baja (<65).
- * Los motivos se eligen solo entre métricas presentes en `facts`.
- */
-function buildConfidence(
-  score: number,
-  advanced: AdvancedScoreData,
-  upsidePotential: number,
-  targetPrice: number,
-  currentPrice: number,
-  overlays: SignalOverlay[] = []
-): { confidence: number; confidenceLevel: ProPick['confidenceLevel']; confidenceReasons: ConfidenceReason[]; facts: Record<string, number | string> } {
-  const facts: Record<string, number | string> = { ...advanced.facts };
-  if (targetPrice > 0) facts['targetMean'] = round1(targetPrice);
-  if (upsidePotential !== 0) facts['upside'] = round1(upsidePotential);
-  (Object.keys(advanced.categoryScores) as Array<keyof AdvancedScoreData['categoryScores']>).forEach((key) => {
-    facts[`cat_${key}`] = advanced.categoryScores[key];
-  });
-
-  let confidence = score >= 80 ? 82 : score >= 70 ? 72 : score >= 60 ? 60 : 45;
-  if (upsidePotential > 15) confidence += 6;
-  const strongVsSector = Object.values(advanced.sectorComparison?.vsSector ?? {}).filter((d) => d !== null && d > 5).length;
-  if (strongVsSector >= 2) confidence += 4;
-  const bestCategory = (Object.entries(advanced.categoryScores) as Array<[keyof AdvancedScoreData['categoryScores'], number]>)
-    .sort((a, b) => b[1] - a[1])[0];
-  if (bestCategory && bestCategory[1] >= 80) confidence += 4;
-  confidence += overlayConfidenceDelta(overlays);
-  confidence = Math.max(5, Math.min(97, Math.round(confidence)));
-  const confidenceLevel: ProPick['confidenceLevel'] = confidence >= 80 ? 'Alta' : confidence >= 65 ? 'Media' : 'Baja';
-
-  // Motivos: solo métricas reales presentes en facts, valor incluido en el texto.
-  const candidates: ConfidenceReason[] = [];
-  if (targetPrice > 0 && upsidePotential > 5) {
-    const v = round1(upsidePotential);
-    candidates.push({
-      metric: 'upside',
-      value: v,
-      text: `Potencial alcista del ${v}% (objetivo $${round1(targetPrice)} vs $${round1(currentPrice)})`,
-    });
-  }
-  const deltas = advanced.sectorComparison?.vsSector;
-  const bestDelta = bestCategory ? deltas?.[bestCategory[0]] : null;
-  if (bestCategory && bestDelta != null && bestDelta > 5) {
-    const [key, catScore] = bestCategory;
-    const delta = Math.round(bestDelta);
-    candidates.push({
-      metric: `cat_${key}`,
-      value: catScore,
-      text: `${CATEGORY_LABELS[key]} ${catScore}/100 (+${delta} vs sector)`,
-    });
-  }
-  const f = facts;
-  if (typeof f['return12M'] === 'number' && f['return12M'] > 10) {
-    candidates.push({ metric: 'return12M', value: f['return12M'], text: `Sube un ${f['return12M']}% en 12 meses` });
-  }
-  if (typeof f['vsSP500'] === 'number' && f['vsSP500'] > 5) {
-    candidates.push({ metric: 'vsSP500', value: f['vsSP500'], text: `Supera al S&P 500 en ${f['vsSP500']} puntos` });
-  }
-  if (typeof f['proximity52W'] === 'number' && f['proximity52W'] > 95) {
-    candidates.push({ metric: 'proximity52W', value: f['proximity52W'], text: `Cotiza al ${f['proximity52W']}% de su máximo de 52 semanas` });
-  }
-  if (typeof f['currentRatio'] === 'number' && f['currentRatio'] > 2) {
-    candidates.push({ metric: 'currentRatio', value: f['currentRatio'], text: `Liquidez sólida (ratio ${f['currentRatio']})` });
-  }
-  // Respaldo trazable: mejores categorías aunque no batan al sector
-  // (los números siguen siendo reales). Garantiza ≥2 motivos.
-  if (candidates.length < 2) {
-    const used = new Set(candidates.map((c) => c.metric));
-    const ranked = (Object.entries(advanced.categoryScores) as Array<[keyof AdvancedScoreData['categoryScores'], number]>)
-      .sort((a, b) => b[1] - a[1]);
-    for (const [key, catScore] of ranked) {
-      if (candidates.length >= 2) break;
-      if (used.has(`cat_${key}`)) continue;
-      candidates.push({
-        metric: `cat_${key}`,
-        value: catScore,
-        text: `Su punto fuerte es ${CATEGORY_LABELS[key]} (${catScore}/100)`,
-      });
-    }
-  }
-
-  return { confidence, confidenceLevel, confidenceReasons: candidates.slice(0, 3), facts };
-}
-
-async function evaluateSymbol(symbol: string, strategyId: string): Promise<ProPick | null> {
-  try {
-    // financialData y candles son independientes: en paralelo en vez de en
-    // serie (ahorra ~1 RTT Finnhub por símbolo × 70 del universo).
-    const to = Math.floor(Date.now() / 1000);
-    const [financialData, candles] = await Promise.all([
-      getStockFinancialDataLight(symbol),
-      getCandles(symbol, to - 365 * 24 * 60 * 60, to, 'D', 3600).catch(() => null),
-    ]);
-    const typedFinancialData: FinancialData = financialData;
-    if (!typedFinancialData?.profile) return null;
-
-    const profile = typedFinancialData.profile as Record<string, unknown>;
-    const quote = typedFinancialData.quote as Record<string, unknown> | undefined;
-    const currentPrice = Number(quote?.c ?? quote?.price ?? 0);
-    const sector = String(profile.finnhubIndustry ?? profile.industry ?? 'Desconocido');
-    const strategy = getStrategyById(strategyId) ?? PROPICKS_STRATEGIES[0];
-
-    let historicalData: { prices: number[]; dates: number[] } | undefined;
-    if (candles?.s === 'ok' && candles.c.length > 0) {
-      historicalData = { prices: candles.c, dates: candles.t };
-    }
-
-    const advanced = await calculateAdvancedStockScore(typedFinancialData, historicalData);
-    const targetPrice = Number(typedFinancialData.priceTarget?.targetMean ?? 0);
-    const upsidePotential = currentPrice > 0 && targetPrice > 0
-      ? ((targetPrice - currentPrice) / currentPrice) * 100
-      : 0;
-
-    const strategyScore = calculateStrategyScore(advanced, strategy);
-    const explained = buildConfidence(advanced.overallScore, advanced, upsidePotential, targetPrice, currentPrice);
-
-    return {
-      symbol,
-      company: String(profile.name ?? symbol),
-      score: advanced.overallScore,
-      grade: advanced.grade,
-      strategyScore,
-      strategy: strategy.id,
-      categoryScores: advanced.categoryScores,
-      reasons: [...advanced.reasons.strengths, ...advanced.reasons.opportunities].slice(0, 5),
-      confidenceReasons: explained.confidenceReasons,
-      confidence: explained.confidence,
-      confidenceLevel: explained.confidenceLevel,
-      asOf: advanced.asOf,
-      facts: explained.facts,
-      currentPrice,
-      sector,
-      exchange: profile.exchange ? String(profile.exchange) : undefined,
-      vsSector: advanced.sectorComparison?.vsSector,
-      targetPrice: targetPrice || undefined,
-      upsidePotential: targetPrice ? upsidePotential : undefined,
-      isStrongBuy: advanced.overallScore >= 80 && upsidePotential > 15,
-    };
-  } catch (error) {
-    console.error(`No se pudo evaluar ${symbol}`, error);
-    return null;
-  }
-}
-
-async function evaluateUniverse(strategyId: string): Promise<ProPick[]> {
-  const picks: ProPick[] = [];
-  const batchSize = 8;
-  for (let index = 0; index < LIQUID_UNIVERSE.length; index += batchSize) {
-    const batch = LIQUID_UNIVERSE.slice(index, index + batchSize);
-    const evaluated = await Promise.all(batch.map((symbol) => evaluateSymbol(symbol, strategyId)));
-    picks.push(...evaluated.filter((pick): pick is ProPick => pick !== null));
-  }
-  return picks;
-}
 
 export async function generateProPicks(limit = 5, strategyId = 'adaptive'): Promise<ProPick[]> {
   await requireAuthenticatedUser();

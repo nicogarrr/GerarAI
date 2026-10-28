@@ -68,12 +68,24 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         expect(addTransaction).not.toHaveBeenCalled();
     });
 
-    it('cantidad y precio aceptan decimales (no se limita a 2 decimales con step)', () => {
+    it('cantidad, precio y comisión aceptan coma decimal (teclado decimal, sin type=number)', () => {
+        // Un input type=number rechaza la coma al teclear en es-ES: el campo
+        // queda vacío y el placeholder («150,00») invitaba a usarla. Texto con
+        // inputMode=decimal deja escribir «32,5» y parseLocalizedNumber lo lee.
         const dialog = openDialog();
-        for (const label of ['Cantidad', /^Precio/]) {
+        for (const label of ['Cantidad', /^Precio/, /^Comisiones/]) {
             const input = within(dialog).getByLabelText(label);
-            expect(input).toHaveAttribute('step', 'any');
+            expect(input).toHaveAttribute('type', 'text');
+            expect(input).toHaveAttribute('inputmode', 'decimal');
         }
+    });
+
+    it('el formulario no usa validación nativa (los errores salen en español bajo cada campo)', () => {
+        // Sin noValidate, un required vacío abre la burbuja nativa del navegador
+        // («Please fill out this field.») y los mensajes en español de
+        // validateTransactionForm nunca llegan a pintarse.
+        const dialog = openDialog();
+        expect(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')).toHaveAttribute('novalidate');
     });
 
     it('un ticker de Madrid (SAN.MC) fija la divisa en EUR y la operación se envía con los valores tecleados', async () => {
@@ -180,7 +192,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         expect(addTransaction).toHaveBeenCalledTimes(1);
         expect(toastSuccess).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog')).toBeInTheDocument();
-        expect(within(dialog).getByLabelText('Cantidad')).toHaveValue(3);
+        expect(within(dialog).getByLabelText('Cantidad')).toHaveValue('3');
         expect(within(dialog).getByRole('button', { name: 'Guardar Inversión' })).toBeEnabled();
     });
 });

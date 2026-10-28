@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Self
@@ -173,6 +174,12 @@ class Settings(BaseSettings):
     # in tests via WORKERS_ENABLED=false so TestClient lifespans stay quiet.
     workers_enabled: bool = True
     rate_limit_requests_per_minute: int = Field(default=300, ge=10, le=10000)
+    # Supuesto de coste del paper trading (paper_cost_service): comision fija
+    # por ejecucion EN LA DIVISA DEL TRADE y spread en bps del nocional. Son
+    # supuestos rotulados, no la tarifa de ningun broker; cambiarlos solo
+    # afecta a ejecuciones futuras (el set queda persistido por trade).
+    paper_trade_commission_flat: Decimal = Field(default=Decimal("1.00"), ge=0)
+    paper_trade_spread_bps: Decimal = Field(default=Decimal("5"), ge=0)
     # Lecturas de mercado (quote/candles/movers/indices): el frontend abanica
     # una llamada por ticker y pagina (ProPicks ~20, backtest ~60) y Vercel
     # serverless no comparte la cache entre instancias -> rafagas grandes en

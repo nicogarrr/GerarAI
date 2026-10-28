@@ -110,3 +110,9 @@ data-engine/htmlcov/
 
 # venv aislado del crossover RAGAS (data-engine/scripts/ragas_crossover.sh)
 .venv-ragas/
+
+# Mutation testing (docs/testing/mutation.md)
+.stryker-tmp/
+reports/mutation/
+reports/mutation-baseline/
+data-engine/mutants/

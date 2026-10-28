@@ -162,7 +162,13 @@ def test_cambiar_divisa_base_eur_a_usd_y_volver(db: Session) -> None:
 
 
 def test_fiscalidad_en_eur_aunque_la_base_sea_usd(db: Session) -> None:
-    # Venta: 10 x 120 USD el 2-feb. En EUR: 960 - 900 = 60 EUR de ganancia.
+    # Venta: 10 x 120 USD el 2-feb. Criterio DGT (consultas vinculantes V1740-17,
+    # V0706-22 y V0152-26, 27/01/2026): «debiendo efectuarse dicho cálculo en la
+    # moneda en que se encuentren denominadas las acciones y efectuar la conversión
+    # de la diferencia resultante a euros al tipo de cambio vigente en la fecha en
+    # la que haya tenido lugar la alteración patrimonial».
+    # Ganancia en USD: 1.200 - 1.000 = 200 USD; x 0,80 (BCE del 2-feb) = 160 EUR.
+    # (La diferencia de cambio de las divisas es otra ganancia, aparte, al convertirlas.)
     company = _company(db)
     fx = PortfolioFXService()
     fx.set_base_currency(db, "USD")
@@ -192,5 +198,6 @@ def test_fiscalidad_en_eur_aunque_la_base_sea_usd(db: Session) -> None:
 
     assert TAX_CURRENCY == "EUR"
     assert report["summary"]["base_currency"] == "EUR"
-    # En USD habrian sido 200; en EUR, cada pata a su tipo BCE: 60.
-    assert Decimal(str(report["summary"]["total_realized_gain_base"])) == Decimal("60")
+    # 200 USD de ganancia convertidos al tipo BCE de la fecha de venta: 160 EUR
+    # (no 960 - 900 = 60 convirtiendo cada pata a su fecha).
+    assert Decimal(str(report["summary"]["total_realized_gain_base"])) == Decimal("160")

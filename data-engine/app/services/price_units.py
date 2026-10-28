@@ -64,16 +64,23 @@ def close_in_company_currency(
 ) -> Decimal | None:
     """Cierre expresado en ``Company.currency`` para ratios contra hechos.
 
-    Sin ``quote_currency`` o con la misma divisa principal que la empresa se
-    devuelve el cierre tal cual (comportamiento previo, sin tocar). Si la
+    Sin ``quote_currency`` (o sin divisa de la empresa) se devuelve el cierre
+    tal cual (comportamiento previo, sin tocar). Con la misma divisa principal
+    solo cambia la unidad, de forma exacta y sin FX: TSCO.L cotiza en GBp y
+    reporta en GBP, asi que 250,5 peniques son 2,505 GBP (devolver los
+    peniques tal cual inflaba x100 el market cap derivado y el PER). Si la
     cotizacion esta en otra divisa (SHEL.L en GBp con cuentas en USD) se pasa
     a la divisa principal de la cotizacion y se convierte con el tipo FX
     point-in-time; sin tipo valido, None (N/D, nunca un precio en otra divisa).
     """
     quote_major, quote_divisor = normalize_currency(quote_currency)
     company_major, company_divisor = normalize_currency(getattr(company, "currency", None))
-    if not quote_major or not company_major or quote_major == company_major:
+    if not quote_major or not company_major:
         return value
+    if quote_major == company_major:
+        if quote_divisor == company_divisor:
+            return value
+        return value * Decimal(company_divisor) / Decimal(quote_divisor)
     fx = resolve_fx(db, quote_major, company_major, on)
     if fx is None:
         return None

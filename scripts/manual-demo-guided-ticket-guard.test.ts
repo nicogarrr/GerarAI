@@ -54,7 +54,7 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
 
     it('la fecha lleva contención reforzada: fila propia + overflow-hidden (fallo real iPhone 21-oct-2026; verificación en dispositivo pendiente)', () => {
         const fechaEjecucion = ticket.match(/id=\{`\$\{uid\}-executed`\}[\s\S]{0,400}/)?.[0] ?? '';
-        const bloqueInput = ticket.match(/<Input\s+className="[^"]*min-w-0[^"]*"\s+id=\{`\$\{uid\}-executed`\}/);
+        const bloqueInput = ticket.match(/<Input\s+style=\{\{ minHeight: 44 \}\}\s+className="[^"]*min-w-0[^"]*"\s+id=\{`\$\{uid\}-executed`\}/);
         assert.ok(bloqueInput, 'el datetime-local lleva min-w-0/max-w-full y texto reducido');
         assert.match(fechaEjecucion, /datetime-local/);
         // min-w-0/max-w-full no bastaron en iOS Safari: barrera dura de

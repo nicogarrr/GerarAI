@@ -1,6 +1,3 @@
-// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
-import { METRIC_LABELS } from './metric-labels.ts';
-
 export const SOURCE_LABELS: Record<string, string> = {
   primary_official: 'Fuente oficial primaria',
   yahoo_finance_intraday: 'Yahoo Finance · intradía',
@@ -20,5 +17,5 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 /** Solo cambia la presentación; nunca modifica claves ni cifras de la fuente. */
 export function sourceDisplay(value: string): string {
-  return SOURCE_LABELS[value] ?? value.replaceAll('_', ' ');
+  return Object.hasOwn(SOURCE_LABELS, value) ? SOURCE_LABELS[value] : value.replaceAll('_', ' ');
 }

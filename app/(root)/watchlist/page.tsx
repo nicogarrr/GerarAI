@@ -390,7 +390,7 @@ export default async function WatchlistPage({
                                         key={key}
                                         href={sortHref(key)}
                                         aria-current={sort === key ? 'true' : undefined}
-                                        className={`block min-h-10 px-3 py-2 text-xs ${sort === key ? 'text-teal-300' : 'text-gray-300 hover:text-gray-100'}`}
+                                        className={`flex min-h-11 items-center px-3 py-2 text-xs ${sort === key ? 'text-teal-300' : 'text-gray-300 hover:text-gray-100'}`}
                                     >
                                         {SORT_LABELS[key]}{sort === key && key !== 'added' ? <span aria-hidden="true"> {dir === 'asc' ? '▲' : '▼'}</span> : null}
                                     </Link>
@@ -439,7 +439,7 @@ export default async function WatchlistPage({
                                         {stock.priceKind === 'close' ? (
                                             <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</dd>
                                         ) : null}
-                                        <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
+                                        <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} as="dd" />
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500">Próx. resultados</dt>
@@ -533,7 +533,7 @@ export default async function WatchlistPage({
                                                 <details className="relative inline-block align-middle">
                                                     <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
                                                     <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
-                                                        <Link href={`/research/${stock.symbol}`} className="block min-h-10 px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
+                                                        <Link href={`/research/${stock.symbol}`} className="flex min-h-11 items-center px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
                                                     </div>
                                                 </details>
                                                 {/* Quitar siempre visible (QA 2026-10-19): antes iba dentro de «Opciones» y en escritorio no se descubría; en móvil ya era visible. */}

@@ -35,6 +35,7 @@ import {
     type ManualDemoTradeDoc,
 } from '@/database/models/manual-demo.model';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { formatNumber } from '@/lib/format';
 import { sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
 import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
 import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
@@ -133,7 +134,9 @@ export type ManualDemoOrdersResult = { ok: true; orders: ManualDemoOrderRow[] } 
 const failure = (message: string, field?: string): ManualDemoFailure =>
     field ? { ok: false, message, field } : { ok: false, message };
 
-const money = (n: number): string => (Math.round(n * 100) / 100).toFixed(2);
+// Importes en motivos visibles: es-ES con 2 decimales y miles («2.000,00»),
+// nunca Number.toFixed («2000.00») dentro de frases en español.
+const money = (n: number): string => formatNumber(n, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 /** Mismo redondeo a céntimos que el libro (P3, accounting r2): el fast path
  * decide con la cifra EXACTA que aplicaría el replay, sin deriva de floats. */
 const r2 = (n: number): number => Math.round(n * 100) / 100;
@@ -436,6 +439,8 @@ async function executeLedgerChange(
     let lastConflict: VersionConflictError | null = null;
     for (let attempt = 1; attempt <= MAX_TXN_ATTEMPTS; attempt++) {
         const conn = await connectToDatabase();
+        // null solo es posible durante el build; en runtime es un invariante.
+        if (!conn) throw new Error('manual-demo: conexión a MongoDB no disponible en runtime');
         const session = await conn.startSession();
         try {
             let outcome: TxnOutcome | null = null;
@@ -1045,7 +1050,7 @@ export async function convertManualDemoCurrency(raw: unknown): Promise<ManualDem
         const decide = (state: AccountState): TxnDecision => {
             const cash = state.cashByCurrency[parsed.from];
             if (parsed.amount > cash + 1e-9) {
-                return { kind: 'reject', reason: `Saldo ${parsed.from} insuficiente para convertir ${parsed.amount}: hay ${money(cash)}.` };
+                return { kind: 'reject', reason: `Saldo ${parsed.from} insuficiente para convertir ${money(parsed.amount)}: hay ${money(cash)}.` };
             }
             const entry: FxConversion = {
                 kind: 'fx',

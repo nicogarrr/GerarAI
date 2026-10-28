@@ -2031,37 +2031,65 @@ def ingest_spy_daily(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000)
+def _official_close_session_key() -> str:
+    """Last completed US session, never today's still-open session."""
+    from datetime import UTC, datetime
+    from app.services.market_close_sync import last_completed_us_session
+    return last_completed_us_session(datetime.now(UTC)).isoformat()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
+                queue_name="official-closes")
 def sync_official_closes(
     tenant_id: int | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """Cierres diarios oficiales (yfinance) de todo el universo en market_prices."""
-    from app.services.market_close_sync import sync_official_closes as _sync
+    """One global download; legacy per-tenant default messages stay harmless.
 
-    db = _session(tenant_id, user_id)
+    Strict distributed lock: Redis failure retries instead of local fallback.
+    Success survives lock release, so queued legacy duplicates skip too.
+    """
+    from app.services.market_close_sync import MIN_TARGET_COVERAGE, sync_official_closes as _sync
+
+    client = _redis_client()
+    if client is None:
+        raise RuntimeError("Redis required for global official closes")
+    lock = "cavaai:job-lease:sync_official_closes:global"
+    session_key = _official_close_session_key()
+    # Preserve existing markers; an operator backs up and clears any known
+    # false positive explicitly after this fix is deployed.
+    done = "cavaai:official-closes:done:" + session_key
+    attempts = "cavaai:official-closes:attempts:" + session_key
+    token = uuid.uuid4().hex
+    acquired = False
+    db = None
     try:
-        lease = acquire_job_lease(
-            f"sync_official_closes:{tenant_id}",
-            ttl_seconds=3600,
-            redis_url=_lease_redis_url(),
-        )
+        acquired = bool(client.set(lock, token, nx=True, ex=3900))
+        if not acquired:
+            return {"status": "skipped", "reason": "lease_held"}
+        if client.get(done):
+            return {"status": "skipped", "reason": "session_already_synced"}
+        # Global lease serializes counters too. Cap full downloads at three
+        # per session, including holidays and swallowed per-symbol failures.
+        tried = int(client.get(attempts) or 0)
+        if tried >= 3:
+            return {"status": "skipped", "reason": "session_attempt_cap", "attempts": tried}
+        client.set(attempts, str(tried + 1), ex=7 * 86400)
+        db = _session(tenant_id, user_id)
+        result = _sync(db)
+        if result.get("status") == "ok" and result.get("target_coverage", 0) >= MIN_TARGET_COVERAGE and result.get("target_date") == session_key:
+            client.set(done, "1", ex=7 * 86400)
+        return {"actor": "sync_official_closes", **result}
     except Exception:
-        db.close()
+        if db is not None:
+            _rollback(db)
         raise
-    if lease is None:
-        db.close()
-        return {"status": "skipped", "actor": "sync_official_closes", "reason": "lease_held"}
-    try:
-        return {"actor": "sync_official_closes", **_sync(db)}
-    except Exception as exc:
-        _rollback(db)
-        return _handle_actor_error("sync_official_closes", exc, tenant_id=tenant_id)
     finally:
-        release_job_lease(
-            f"sync_official_closes:{tenant_id}", lease, redis_url=_lease_redis_url()
-        )
-        db.close()
+        if db is not None:
+            db.close()
+        if acquired:
+            client.eval(_RELEASE_LEASE_LUA, 1, lock, token)
+        client.close()
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=1_800_000)
@@ -3555,8 +3583,9 @@ def refresh_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
 def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Lote de propuestas LLM para el paper book (INFERIDO, solo proveedor gratuito).
 
-    SIN schedule: se lanza a mano (POST /paper-trading/feed). Comparte la cuota
-    diaria con el endpoint manual de propuestas; no define tope propio.
+    Manual (POST /paper-trading/feed) y programado (cron diario
+    paper_proposals_daily): ambos comparten la cuota diaria con el endpoint de
+    propuestas; este actor no define tope propio.
     """
     from app.services.paper_feed_service import run_feed
 
@@ -3566,6 +3595,41 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("propose_paper_trades", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Ingesta diaria de dividendos declarados de los tickers con paper trades vivos.
+
+    Misma fuente gratuita y servicio que la cartera real (Yahoo, FMP de
+    respaldo): sin ellos el devengo del paper book no tiene con que computar.
+    """
+    from sqlalchemy import select
+
+    from app.models.paper_trading import PaperTrade as _PT
+    from app.services.async_bridge import run_from_any_context
+    from app.services.dividend_ingestion_service import DividendIngestionService
+
+    db = _session(tenant_id, user_id)
+    try:
+        tickers = [
+            t for (t,) in db.execute(
+                select(_PT.ticker).where(_PT.status.in_(("pending", "open"))).distinct()
+            ).all()
+        ]
+        service = DividendIngestionService()
+        synced, unavailable = [], []
+        for ticker in tickers:
+            db.commit()  # sesion libre antes de la red
+            result = run_from_any_context(service.sync_company(db, ticker=ticker))
+            (synced if result.get("status") == "ok" else unavailable).append(ticker)
+        return {"actor": "sync_paper_dividends", "status": "ok",
+                "tickers": len(tickers), "synced": synced, "unavailable": unavailable}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("sync_paper_dividends", exc, tenant_id=tenant_id)
     finally:
         db.close()
 

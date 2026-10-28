@@ -8,17 +8,18 @@ adquisición...) se conservan intactas.
 from __future__ import annotations
 
 import re
-from datetime import date, datetime
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import CashBalance, Company, Position, Tenant
 
 KEY = "tax_declarant"
 IDENTITY_FIELDS = ("nif", "apellidos_nombre", "numero_declaracion", "telefono")
-_NIF = re.compile(r"^[A-Z0-9]{5,15}$")
+_NIF = re.compile(r"^[A-Z0-9]{5,20}$")
 _NUMERO = re.compile(r"^720\d{10}$")
 _TELEFONO = re.compile(r"^\d{9,15}$")
 _COUNTRY = re.compile(r"^[A-Z]{2}$")
@@ -120,6 +121,14 @@ def write(db: Session, payload: dict) -> dict:
             continue
         value = str(payload[field] or "").strip()
         value = value.upper() if upper else value
+        if field == "nif" and value:
+            if len(value) > 32 or any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+                errors.append(message)
+                continue
+            value = re.sub(r"[^A-Z0-9]", "", value)
+            if not value:
+                errors.append(message)
+                continue
         if not value:
             declarant.pop(field, None)
         elif pattern.match(value):
@@ -212,7 +221,7 @@ def write(db: Session, payload: dict) -> dict:
                     except ValueError:
                         errors.append(f"Fecha no válida para {isin}")
                         continue
-                    if day > date.today():
+                    if day > local_today():
                         errors.append(f"Fecha futura para {isin}")
                     else:
                         merged_dates[isin] = day.strftime("%Y%m%d")

@@ -73,8 +73,14 @@
       "maxDrawdown": "Caída máxima",
       "winRate": "Ratio de acierto"
     },
-    "fxMissingNotice": "Los totales de la cartera excluyen {n} saldo o posición sin tipo de cambio válido.",
-    "valuationHoldNotice": "Los totales de la cartera excluyen {n} posición con valoración pendiente tras un split sin precio post-split verificado ({tickers}). Cantidad y coste sí están ajustados."
+    "fxMissingNotice": {
+      "one": "Los totales de la cartera excluyen 1 saldo o posición sin tipo de cambio válido.",
+      "other": "Los totales de la cartera excluyen {n} saldos o posiciones sin tipo de cambio válido."
+    },
+    "valuationHoldNotice": {
+      "one": "Los totales de la cartera excluyen 1 posición con valoración pendiente tras un split sin precio post-split verificado ({tickers}). Cantidad y coste sí están ajustados.",
+      "other": "Los totales de la cartera excluyen {n} posiciones con valoración pendiente tras un split sin precio post-split verificado ({tickers}). Cantidad y coste sí están ajustados."
+    }
   },
   "screener": {
     "match": "coincidencia",
@@ -133,7 +139,10 @@
       "nodesDrawn": "Nodos dibujados: {drawn} de {total}",
       "edgesDrawn": "Relaciones dibujadas: {drawn} de {total}",
       "truncatedHint": "El dibujo se limita a {max} nodos. Acota con los filtros de arriba o exporta el JSON para ver el subgrafo cargado completo: el volcado no pasa por el recorte del dibujo.",
-      "isolatedOn": "Mostrando el nodo seleccionado y sus {count} vecinos; el resto queda atenuado.",
+      "isolatedOn": {
+        "one": "Mostrando el nodo seleccionado y su único vecino; el resto queda atenuado.",
+        "other": "Mostrando el nodo seleccionado y sus {count} vecinos; el resto queda atenuado."
+      },
       "isolatedOff": "Vista completa: sin nodos atenuados.",
       "isolate": "Aislar nodo",
       "controls": "Controles de la vista del grafo",
@@ -149,7 +158,10 @@
     "search": {
       "label": "Buscar un nodo por nombre",
       "placeholder": "Buscar nodo por nombre",
-      "results": "{count} nodos coinciden con «{query}».",
+      "results": {
+        "one": "1 nodo coincide con «{query}».",
+        "other": "{count} nodos coinciden con «{query}»."
+      },
       "noResults": "Ningún nodo dibujado contiene «{query}».",
       "hint": "Al elegir un nodo se centra y queda en la URL, para poder compartir el enlace.",
       "open": "Centrar y seleccionar «{label}»",
@@ -190,7 +202,10 @@
       "columnType": "Tipo",
       "columnDegree": "Relaciones",
       "select": "Seleccionar y centrar el nodo {label}",
-      "rowCount": "{count} nodos en el subgrafo visible.",
+      "rowCount": {
+        "one": "1 nodo en el subgrafo visible.",
+        "other": "{count} nodos en el subgrafo visible."
+      },
       "empty": "No hay nodos que listar.",
       "caption": "Tabla de nodos del grafo: etiqueta, tipo y número de relaciones de cada nodo."
     }

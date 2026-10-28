@@ -15,6 +15,9 @@ test('risk refresh replaces the whole snapshot, not only the headline card', () 
 });
 
 test('server refresh syncs the snapshot without discarding it on a failed read', () => {
-    assert.match(source, /setDashboard\(initialDashboard\);\s+\}, \[initialDashboard\]\)/);
+    // La sincronización es un ajuste durante el render (reset al cambiar la
+    // prop), equivalente al antiguo efecto [initialDashboard].
+    assert.match(source, /prevInitial !== initialDashboard/);
+    assert.match(source, /setDashboard\(initialDashboard\);/);
     assert.doesNotMatch(source, /setDashboard\(null\)|catch\s*\([^)]*\)\s*\{\s*setDashboard/);
 });

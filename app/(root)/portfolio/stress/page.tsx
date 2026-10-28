@@ -25,12 +25,12 @@ export default async function HistoricalStressPage({ searchParams }: { searchPar
     }
         return <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-6">
             <header className="border-b border-gray-800 pb-5">
-                <Link className="text-sm text-teal-300" href="/portfolio/intelligence">Inteligencia de cartera</Link>
+                <Link className="inline-flex min-h-11 items-center text-sm text-teal-300" href="/portfolio/intelligence">Inteligencia de cartera</Link>
                 <h1 className="mt-3 text-3xl font-bold text-gray-100">Estrés histórico</h1>
                 <form method="get" className="mt-4 flex flex-wrap items-end gap-3">
-                    <label className="text-sm text-gray-400">Compañía<TickerSearchInput className="mt-1 block w-40 rounded border border-gray-700 bg-surface-1 px-3 py-2 text-gray-100" name="ticker" maxLength={20} defaultValue={ticker} placeholder="AAPL" /></label>
-                    <button className="rounded bg-teal-800 px-4 py-2 text-sm text-white" type="submit">Analizar</button>
-                    <Link className="px-2 py-2 text-sm text-teal-300" href="/portfolio/stress">Mi cartera</Link>
+                    <label className="text-sm text-gray-400">Compañía<TickerSearchInput className="mt-1 block min-h-11 w-40 rounded border border-gray-700 bg-surface-1 px-3 py-2 text-gray-100" name="ticker" maxLength={20} defaultValue={ticker} placeholder="AAPL" /></label>
+                    <button className="min-h-11 min-w-11 rounded bg-teal-800 px-4 py-2 text-sm text-white" type="submit">Analizar</button>
+                    <Link className="inline-flex min-h-11 items-center px-2 py-2 text-sm text-teal-300" href="/portfolio/stress">Mi cartera</Link>
                 </form>
             </header>
             <HistoricalStressView report={report} />

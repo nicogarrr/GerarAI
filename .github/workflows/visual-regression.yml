@@ -1,0 +1,83 @@
+name: Visual regression (public pages)
+
+# Sin PNGs versionados: la baseline es un artefacto del run de main y el PR
+# la descarga y la compara con reg-cli. NO se anade al gate de ci.yml:
+# informativo de momento (diff reportado, no bloquea merge).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: visual-${{ github.ref }}
+  # Nunca cancelar un run de main a medias (test_ci_concurrency_main): solo PRs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  shots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      E2E_UI_RUN: "1"
+      RESEARCH_AUTH_SECRET: cavaai-browser-e2e-research-secret-at-least-32-characters
+      MONGODB_URI: mongodb://127.0.0.1:27017/cavaai_e2e
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data-engine/requirements.txt
+      - run: npm ci
+      - run: python -m pip install -r data-engine/requirements.txt
+      - name: Version de Playwright
+        id: pw
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      - name: Descarga de Chromium
+        timeout-minutes: 8
+        run: npx playwright install --with-deps chromium
+      - name: Capturas de las paginas publicas
+        run: npx playwright test visual-public --reporter=line
+      - name: Sube capturas
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: visual-${{ github.event_name == 'push' && 'baseline' || 'pr' }}
+          path: test-results/visual/
+          retention-days: 7
+      - name: Compara con la baseline de main (solo PR)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow visual-regression.yml --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$run_id" ]; then
+            echo "::warning::Sin baseline de main todavia; este PR solo sube capturas."
+            exit 0
+          fi
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name visual-baseline --dir baseline
+          npx --yes reg-cli test-results/visual baseline reg-out --matching-threshold 0.02 --threshold-rate 0.001 --json reg-out/report.json || true
+          cat reg-out/report.json | node -e "const r=JSON.parse(require('fs').readFileSync(0));console.log('diff:',r.failedItems.length,'nuevas:',r.newItems.length,'borradas:',r.deletedItems.length,'ok:',r.passedItems.length)"

@@ -98,6 +98,18 @@ describe('PortfolioSummary', () => {
         expect(screen.getByText('Rendimiento').nextElementSibling).not.toHaveClass('text-good');
     });
 
+    it('cartera vacía sin caja: Valor total es N/D, no 0,00 EUR, y sin línea de patrimonio', () => {
+        render(<PortfolioSummary summary={summary({ holdings: [], totalValue: 0, totalCost: 0, totalGain: 0, totalGainPercent: 0, equityValue: 0, cash: 0 })} />);
+        expect(cardValue('Valor Total (neto)')).toHaveTextContent(/^N\/D$/);
+        expect(screen.queryByText(/Patrimonio neto: RV/)).not.toBeInTheDocument();
+    });
+
+    it('sin posiciones pero con caja: el valor total (la caja) sigue siendo un dato', () => {
+        render(<PortfolioSummary summary={summary({ holdings: [], totalValue: 500, totalCost: 0, totalGain: 0, totalGainPercent: 0, equityValue: 0, cash: 500 })} />);
+        expect(cardValue('Valor Total (neto)').textContent).toMatch(/500,00\s€/);
+        expect(screen.getByText(/Patrimonio neto: RV/)).toBeInTheDocument();
+    });
+
     it('avisa de lo que los totales excluyen (FX ausente y valoración en suspensión)', () => {
         render(
             <PortfolioSummary

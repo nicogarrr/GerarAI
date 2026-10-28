@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { saveTaxDeclarant, type TaxCustodyEntity, type TaxDeclarant } from '@/lib/actions/taxes.actions';
+import { spanishTaxIdWarning } from '@/lib/nif';
 import { showErrorToast } from '@/lib/toast';
 
 const FIELDS = [
@@ -50,6 +51,8 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
     const [entities, setEntities] = useState<Record<string, TaxCustodyEntity>>(initial.custody_entities);
     const [dates, setDates] = useState<Record<string, string>>(initial.first_acquisition_dates);
     const [busy, setBusy] = useState(false);
+    // Aviso suave (no bloquea el guardado: puede ser un NIF extranjero).
+    const nifWarning = spanishTaxIdWarning(values.nif);
 
     async function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -88,12 +91,18 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                     <label className="space-y-1 text-sm text-gray-300" key={field.key}>
                         <span>{field.label}</span>
                         <Input
+                            aria-describedby={field.key === 'nif' && nifWarning ? 'tax-declarant-nif-warning' : undefined}
                             className="h-11"
                             autoComplete={field.autoComplete}
                             disabled={busy}
                             onChange={(event) => setValues((current) => ({ ...current, [field.key]: event.target.value }))}
                             value={values[field.key]}
                         />
+                        {field.key === 'nif' && nifWarning ? (
+                            <p className="text-xs text-amber-400/90" id="tax-declarant-nif-warning" role="status">
+                                {nifWarning}
+                            </p>
+                        ) : null}
                     </label>
                 ))}
                 <label className="space-y-1 text-sm text-gray-300">

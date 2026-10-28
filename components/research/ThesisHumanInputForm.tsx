@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { parseLocalizedNumberDetailed } from '@/lib/format';
 import { submitThesisHumanInput } from '@/lib/actions/research.actions';
 import { Button } from '@/components/ui/button';
 
@@ -16,7 +17,20 @@ export default function ThesisHumanInputForm({ ticker }: { ticker: string }) {
     setError(null);
     setMessage(null);
     try {
-      await submitThesisHumanInput(ticker, new FormData(event.currentTarget));
+      const formData = new FormData(event.currentTarget);
+      // El valor llega en formato es-ES («1250,5», «1.234,56»): se valida en
+      // cliente con el parser compartido y se envía canónico (punto). Los
+      // ambiguos («1,234») se rechazan enseñando el formato, nunca se reinterpretan.
+      const parsedValue = parseLocalizedNumberDetailed(String(formData.get('value') ?? ''));
+      if (!parsedValue.ok) {
+        setError(parsedValue.error === 'ambiguous'
+          ? 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).'
+          : 'Introduce un valor numérico válido en la unidad del driver.');
+        setPending(false);
+        return;
+      }
+      formData.set('value', String(parsedValue.value));
+      await submitThesisHumanInput(ticker, formData);
       setMessage('Supuesto guardado. Regenera la tesis para incorporarlo; no se ha convertido en un dato verificado.');
     } catch (exc) {
       setError(exc instanceof Error ? exc.message : 'No se pudo guardar el supuesto.');
@@ -48,7 +62,9 @@ export default function ThesisHumanInputForm({ ticker }: { ticker: string }) {
             </select>
           </label>
           <label className="text-xs text-gray-300">Valor (unidad del driver)
-            <input name="value" type="number" required step="any" className={inputClass} />
+            {/* type="text" (no "number"): el input numérico rechaza la coma
+                decimal es-ES; inputMode conserva el teclado numérico. */}
+            <input name="value" type="text" inputMode="decimal" required className={inputClass} />
           </label>
         </div>
         <label className="block text-xs text-gray-300">Fuente o referencia

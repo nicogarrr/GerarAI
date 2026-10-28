@@ -243,6 +243,9 @@ export type ResearchThesis = {
   /** Base por acción de los escenarios al generar la tesis; null/ausente = tesis anterior sin evidencia. */
   valuation_basis?: {
     margin_of_safety_convention?: string | null;
+    /** Fecha (ISO) de la cotización que usó el modelo al generar la versión;
+     *  null/ausente = sin fecha conocida: el precio se rotula sin fecha. */
+    price_as_of?: string | null;
     value_per_share_basis?: string | null;
     adr_ratio?: number | null;
     listed_share_values?: Partial<Record<'bear' | 'base' | 'bull' | 'expected', number>> | null;

@@ -9,6 +9,14 @@ from sqlalchemy.orm import Session
 
 from app.models.paper_trading import PaperTrade
 from app.schemas.paper_trading import PaperProposal
+from app.services.paper_cost_service import (
+    LABEL as COST_LABEL,
+)
+from app.services.paper_cost_service import (
+    PaperCostAssumptions,
+    current_assumptions,
+    execution_fee,
+)
 
 
 def utc(value: datetime) -> datetime:
@@ -71,7 +79,25 @@ def deadline(row: PaperTrade) -> datetime | None:
         return start.replace(year=start.year + 5, day=28)
 
 
-def apply_quote(row: PaperTrade, quote: dict, now: datetime) -> bool:
+def close_position(
+    row: PaperTrade,
+    price: Decimal,
+    at: datetime,
+    reason: str,
+    costs: PaperCostAssumptions | None,
+) -> None:
+    """Cierra al precio OBSERVADO y persiste la comision de salida del supuesto.
+
+    El supuesto de coste se aplica solo si el trade ya nacio con el (entry_fee
+    no NULL) o si se pasa `costs` explicitamente: un trade legado nunca gana
+    costes a medias. Cierres inmutables: no se reabre ni se recalcula.
+    """
+    row.exit_price, row.exit_at, row.close_reason, row.status = price, at, reason, "closed"
+    if row.entry_fee is not None and costs is not None:
+        row.exit_fee = execution_fee(price, row.quantity, costs)
+
+
+def apply_quote(row: PaperTrade, quote: dict, now: datetime, *, costs: PaperCostAssumptions | None = None) -> bool:
     """Skip missing/stale/backdated quotes. Stops fill at observed spot, not ideal levels."""
     if row.status not in {"pending", "open"}:
         return False
@@ -92,6 +118,8 @@ def apply_quote(row: PaperTrade, quote: dict, now: datetime) -> bool:
         return False
     if row.currency is not None and currency != row.currency:
         return False
+    if costs is None and row.entry_fee is not None:
+        costs = current_assumptions()
     if row.status == "pending":
         # Proposed entry is a limit. No instant backfill from before the proposal.
         reached = price <= row.proposed_entry if row.direction == "long" else price >= row.proposed_entry
@@ -102,6 +130,9 @@ def apply_quote(row: PaperTrade, quote: dict, now: datetime) -> bool:
         if not valid:
             return False
         row.entry_price, row.entry_at, row.status = price, at, "open"
+        if costs is not None:
+            row.entry_fee = execution_fee(price, row.quantity, costs)
+            row.cost_assumption_version = costs.version
     row.mark_price, row.mark_at = price, at
     row.currency, row.price_source = currency, "yahoo_finance_spot"
     stop = price <= row.stop if row.direction == "long" else price >= row.stop
@@ -109,7 +140,7 @@ def apply_quote(row: PaperTrade, quote: dict, now: datetime) -> bool:
     due = deadline(row)
     reason = "stop" if stop else "target" if target else "horizon" if due and at >= due else None
     if reason:
-        row.exit_price, row.exit_at, row.close_reason, row.status = price, at, reason, "closed"
+        close_position(row, price, at, reason, costs)
     return True
 
 
@@ -117,12 +148,17 @@ def trade_out(row: PaperTrade, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     fresh = row.mark_at is not None and timedelta(0) <= utc(now) - utc(row.mark_at) <= timedelta(hours=24)
     data = {column.name: getattr(row, column.name) for column in row.__table__.columns if column.name != "tenant_id"}
+    from app.services.paper_cost_service import pnl_net
+
     data.update({
         "market_label": "dato",
         "quantity_label": "supuesto",
+        "cost_label": COST_LABEL if row.cost_assumption_version else None,
         "mark_price": row.mark_price if fresh or row.status == "closed" else None,
         "unrealized_pnl": pnl(row, row.mark_price) if fresh and row.status == "open" else None,
+        "unrealized_pnl_net": pnl_net(row, row.mark_price) if fresh and row.status == "open" else None,
         "realized_pnl": pnl(row, row.exit_price) if row.status == "closed" else None,
+        "realized_pnl_net": pnl_net(row, row.exit_price) if row.status == "closed" else None,
         "quote_status": "available" if fresh else "sin_datos",
     })
     return data
@@ -134,11 +170,16 @@ def scoreboard(rows: list[PaperTrade], now: datetime | None = None) -> dict:
         groups[(row.horizon, row.currency or "sin_datos")].append(row)
     cells = []
     for (horizon, currency), trades in sorted(groups.items()):
-        closed = [r for r in trades if r.status == "closed"]
+        distorted = [r for r in trades if r.status == "closed" and r.corporate_action_warning]
+        closed = [r for r in trades if r.status == "closed" and not r.corporate_action_warning]
         results = [pnl(r, r.exit_price) for r in closed]
         realized = [r for r in results if r is not None]
         wins = sum(r > 0 for r in realized)
         losses = sum(r < 0 for r in realized)
+        from app.services.paper_cost_service import pnl_net
+        nets = [pnl_net(r, r.exit_price) for r in closed]
+        realized_net = [n for n in nets if n is not None]
+        wins_net = sum(n > 0 for n in realized_net)
         open_results = [trade_out(r, now)["unrealized_pnl"] for r in trades if r.status == "open"]
         marks = [r for r in open_results if r is not None]
         cells.append({
@@ -147,6 +188,11 @@ def scoreboard(rows: list[PaperTrade], now: datetime | None = None) -> dict:
             "wins": wins, "losses": losses, "flat": len(realized) - wins - losses,
             "hit_rate": wins / len(realized) if realized else None,
             "realized_pnl": sum(realized, Decimal(0)) if realized else None,
+            # Neto del supuesto persistido por trade; los legados no tienen neto.
+            "closed_distorted": len(distorted),
+            "closed_net": len(realized_net),
+            "hit_rate_net": wins_net / len(realized_net) if realized_net else None,
+            "realized_pnl_net": sum(realized_net, Decimal(0)) if realized_net else None,
             "unrealized_pnl": sum(marks, Decimal(0)) if marks else None,
             "missing_marks": len(open_results) - len(marks),
         })
@@ -164,6 +210,7 @@ def refresh_trades(db: Session, fetch_quote=None, *, only_id: int | None = None)
     from app.api.routes.market import market_quote
 
     fetch_quote = fetch_quote or market_quote
+    costs = current_assumptions()
     statement = select(PaperTrade).where(PaperTrade.status.in_(["pending", "open"]))
     if only_id is not None:
         statement = statement.where(PaperTrade.id == only_id)
@@ -198,12 +245,20 @@ def refresh_trades(db: Session, fetch_quote=None, *, only_id: int | None = None)
             if row is None or row.status not in {"pending", "open"}:
                 unavailable += 1
             else:
+                from app.services.paper_corporate_actions_service import (
+                    PENDING_SPLIT_WARNING,
+                    sync_corporate_actions,
+                    sync_dividends,
+                )
                 now = datetime.now(UTC)
                 row.updated_at = now
-                if apply_quote(row, quotes[ticker], now):
+                sync_corporate_actions(db, row)  # niveles ajustados ANTES del fill
+                blocked = row.status == "pending" and row.corporate_action_warning == PENDING_SPLIT_WARNING
+                if not blocked and apply_quote(row, quotes[ticker], now, costs=costs):
                     changed += 1
                 else:
                     unavailable += 1
+                sync_dividends(db, row)
             db.commit()
         except Exception:
             db.rollback()

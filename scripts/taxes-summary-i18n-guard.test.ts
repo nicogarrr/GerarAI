@@ -26,3 +26,12 @@ test('F330: nada de spanglish en las descripciones de la vista fiscal', () => {
     assert.doesNotMatch(view, /Holdings con base de coste/);
     assert.match(view, /Posiciones con base de coste/);
 });
+
+test('F-bug6: el criterio FX de valores tiene etiqueta y traduccion en espanol', () => {
+    // El resumen incluye securities_fx_criterion='dgt_native_gain_sale_date_v1'
+    // y la vista lo mostraba en crudo: «Securities fx criterion» (spanglish al
+    // humanizar la clave) y el identificador interno como valor.
+    assert.match(view, /securities_fx_criterion: 'Criterio FX en valores'/);
+    assert.match(view, /dgt_native_gain_sale_date_v1: 'Ganancia en divisa del valor/);
+    assert.match(view, /key === 'securities_fx_criterion'/);
+});

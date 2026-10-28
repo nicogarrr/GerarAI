@@ -67,7 +67,7 @@ function Filter<T extends string | number>({
 function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?: React.ReactNode }) {
     return (
         <li className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
-            <Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/insider?ticker=${signal.ticker}`}>
+            <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/insider?ticker=${signal.ticker}`}>
                 {signal.ticker}
             </Link>
             {signal.insider ? <span className="text-gray-100">{insiderName(signal.insider)}</span> : null}
@@ -93,7 +93,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
     return (
         <article className="min-w-0 rounded-lg border border-gray-800 bg-gray-900/50 p-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
+                <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
                     {tx.ticker}
                 </Link>
                 <span className={`font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>{sideLabel(tx.side)}</span>
@@ -118,7 +118,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                     <dd className="tabular-nums font-semibold text-gray-100">
                         {tx.source_url ? (
                             <a
-                                className="inline-flex items-center gap-1 hover:text-teal-300"
+                                className="inline-flex min-h-11 min-w-11 items-center gap-1 hover:text-teal-300"
                                 href={tx.source_url}
                                 rel="noopener noreferrer"
                                 target="_blank"
@@ -251,7 +251,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                             <tr className="border-t border-gray-900" key={`${tx.accession_number}-${index}`}>
                                                 <td className="whitespace-nowrap py-2 pr-3 tabular-nums text-gray-400">{tx.date ? formatDate(tx.date) : '—'}</td>
                                                 <td className="px-3 py-2 font-semibold">
-                                                    <Link className="text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
+                                                    <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
                                                         {tx.ticker}
                                                     </Link>
                                                     {tx.form === 'PDMR' ? <span className="block text-xs font-normal text-gray-500">PDMR (Reino Unido)</span> : null}
@@ -271,7 +271,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                 <td className="py-2 pl-3 text-right tabular-nums">
                                                     {tx.source_url ? (
                                                         <a
-                                                            className="inline-flex items-center gap-1 text-gray-100 hover:text-teal-300"
+                                                            className="inline-flex min-h-11 min-w-11 items-center gap-1 text-gray-100 hover:text-teal-300"
                                                             href={tx.source_url}
                                                             rel="noopener noreferrer"
                                                             target="_blank"

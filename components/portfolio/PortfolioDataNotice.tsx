@@ -1,5 +1,5 @@
 import type { PortfolioDataQuality } from '@/lib/actions/portfolio.actions';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatDate, formatMoney, formatCountEs } from '@/lib/format';
 
 export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDataQuality | null }) {
     if (!quality || quality.status === 'no_portfolio') return null;
@@ -8,7 +8,7 @@ export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDa
             <p>Datos de cartera: posiciones a {quality.position_dates.map((d) => formatDate(d)).join(', ') || 'fecha no disponible'};
                 {' '}caja a {quality.cash_dates.map((d) => formatDate(d)).join(', ') || 'fecha no disponible'}.</p>
             {quality.missing_cost_positions > 0 && <p className="mt-2 text-amber-300">
-                Falta una base de coste válida en {quality.missing_cost_positions} posiciones.
+                Falta una base de coste válida en {formatCountEs(quality.missing_cost_positions, 'posición', 'posiciones')}.
                 {quality.position_sources.includes('ibkr_flex') ? ' La sincronización no puede recuperar un coste que IBKR no entrega. Se necesita un extracto Flex completo con la PyG preparada.' : ' Revisa el coste original de los movimientos registrados.'}
                 {' '}No se sustituyen por ceros ni estimaciones.
             </p>}

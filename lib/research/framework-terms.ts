@@ -98,7 +98,7 @@ function normalise(term: string): string {
 
 /** Traduce un término simple o una fórmula con × / ÷; null si algún término no tiene etiqueta. */
 export function frameworkTerm(raw: string): string | null {
-    const direct = FRAMEWORK_TERMS[normalise(raw)];
+    const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(raw)) ? FRAMEWORK_TERMS[normalise(raw)] : null);
     if (direct) return direct;
     if (!/[×÷]/.test(raw)) return null;
     const parts = raw.split(/\s*([×÷])\s*/);
@@ -108,7 +108,7 @@ export function frameworkTerm(raw: string): string | null {
             out.push(part);
             continue;
         }
-        const t = FRAMEWORK_TERMS[normalise(part)] ?? translateWords(part);
+        const t = (Object.hasOwn(FRAMEWORK_TERMS, normalise(part)) ? FRAMEWORK_TERMS[normalise(part)] : null) ?? translateWords(part);
         if (!t) return null;
         out.push(t);
     }
@@ -117,16 +117,16 @@ export function frameworkTerm(raw: string): string | null {
 
 /** «price per launch» -> «precio por lanzamiento»: palabra a palabra con «per» -> «por». */
 function translateWords(part: string): string | null {
-    const direct = FRAMEWORK_TERMS[normalise(part)];
+    const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(part)) ? FRAMEWORK_TERMS[normalise(part)] : null);
     if (direct) return direct;
     const chunks = part.trim().split(/\s+per\s+/i);
     if (chunks.length > 1) {
-        const tr = chunks.map((c) => FRAMEWORK_TERMS[normalise(c)] ?? null);
+        const tr = chunks.map((c) => (Object.hasOwn(FRAMEWORK_TERMS, normalise(c)) ? FRAMEWORK_TERMS[normalise(c)] : null) ?? null);
         return tr.every(Boolean) ? tr.join(' por ') : null;
     }
     return null;
 }
 
 export function frameworkLabel(label: string): string {
-    return FRAMEWORK_LABELS[label] ?? label;
+    return Object.hasOwn(FRAMEWORK_LABELS, label) ? FRAMEWORK_LABELS[label] : label;
 }

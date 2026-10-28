@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
 import { getDcaBacktest } from '@/lib/actions/dca-signals.actions';
+import { parseLocalizedNumberDetailed } from '@/lib/format';
 import type { DcaBacktest, DcaBacktestPlan } from '@/lib/dca/types';
 
 const NUM = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
@@ -53,16 +54,34 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
     const [base, setBase] = useState('100');
     const [result, setResult] = useState<DcaBacktest | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [baseError, setBaseError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     const run = (event: React.FormEvent) => {
         event.preventDefault();
+        // La aportación es dinero: nunca se reinterpreta en silencio
+        // (Number(base) || 100 convertía «abc», «0» o «-50» en 100 sin avisar).
+        const parsed = parseLocalizedNumberDetailed(base);
+        if (!parsed.ok) {
+            setBaseError(
+                parsed.error === 'ambiguous'
+                    ? 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).'
+                    : 'Introduce una aportación base mayor que 0.',
+            );
+            return;
+        }
+        if (parsed.value <= 0) {
+            setBaseError('Introduce una aportación base mayor que 0.');
+            return;
+        }
+        setBaseError(null);
+        const baseAmount = parsed.value;
         startTransition(async () => {
             const { data, error: err } = await getDcaBacktest({
                 symbol,
                 start: start || undefined,
                 end: end || undefined,
-                base: Number(base) || 100,
+                base: baseAmount,
             });
             setResult(data);
             setError(err);
@@ -110,7 +129,12 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                 </label>
                 <label className="text-xs text-gray-400">
                     Aportación base
-                    <input type="number" min={1} step="any" value={base} onChange={(e) => setBase(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    <input type="text" inputMode="decimal" value={base} onChange={(e) => setBase(e.target.value)} aria-invalid={baseError !== null} aria-describedby={baseError ? 'dca-base-error' : undefined} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    {baseError && (
+                        <span id="dca-base-error" role="alert" className="mt-1 block text-xs text-red-400">
+                            {baseError}
+                        </span>
+                    )}
                 </label>
                 <div className="flex items-end">
                     <Button type="submit" disabled={pending || !symbol.trim()} className="w-full min-h-[38px] bg-teal-600 hover:bg-teal-500">

@@ -14,6 +14,7 @@
  *   ficheros REALES del repo (el codigo bajo test es el fuente real).
  */
 const REAL = {
+    '@/lib/format': '../lib/format.ts',
     '@/lib/paper-trading/types': '../lib/paper-trading/types.ts',
     '@/lib/paper-trading/accounting': '../lib/paper-trading/accounting.ts',
     '@/lib/paper-trading/options': '../lib/paper-trading/options.ts',

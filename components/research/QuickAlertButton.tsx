@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { BellPlus, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { createAlert, type AlertType } from '@/lib/actions/alerts.actions';
+import { createAlertResult, type AlertType } from '@/lib/actions/alerts.actions';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { formatMoney, parseLocalizedNumber } from '@/lib/format';
@@ -78,7 +78,7 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
     }
     setBusy(true);
     try {
-      await createAlert({
+      const result = await createAlertResult({
         symbol: ticker,
         type,
         condition: {
@@ -86,6 +86,13 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
           value,
         },
       });
+      if (!result.ok) {
+        // Rechazo de negocio (símbolo no reconocido, duplicada): su mensaje,
+        // nunca «motor caído, reintenta» (ver createAlertResult).
+        if (result.cause === 'duplicate') toast.info(result.message);
+        else toast.error(result.message);
+        return;
+      }
       toast.success(
         meta.needsValue
           ? `Alerta creada: ${ticker} ${meta.label.toLowerCase()} ${type === 'price_change' ? `${value}%` : formatMoney(value, currency)}`

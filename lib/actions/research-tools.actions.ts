@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 
 import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/research-identity';
+import { parseLocalizedNumberDetailed } from '@/lib/format';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { researchErrorDetail } from '@/lib/research/error-detail';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
@@ -386,6 +387,38 @@ function required(formData: FormData, key: string, label: string): string {
   return value;
 }
 
+/**
+ * Numéricos de formularios de research: el usuario escribe en es-ES
+ * («1.234,56», «0,7»). Los formatos ambiguos se rechazan enseñando el
+ * formato esperado, nunca se reinterpretan con un factor 1000 silencioso.
+ */
+function localizedFormNumber(
+  formData: FormData,
+  key: string,
+  label: string,
+  options: { required?: boolean; min?: number; max?: number } = {},
+): number | null {
+  const raw = String(formData.get(key) ?? '').trim();
+  if (!raw) {
+    if (options.required) throw new ValidationError(`${label} es obligatorio.`, key);
+    return null;
+  }
+  const parsed = parseLocalizedNumberDetailed(raw);
+  if (!parsed.ok) {
+    throw new ValidationError(
+      parsed.error === 'ambiguous'
+        ? 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).'
+        : `Introduce un valor numérico válido para ${label}.`,
+      key,
+    );
+  }
+  const value = parsed.value;
+  if ((options.min !== undefined && value < options.min) || (options.max !== undefined && value > options.max)) {
+    throw new ValidationError(`${label} debe estar entre ${options.min} y ${options.max}.`, key);
+  }
+  return value;
+}
+
 export async function getKnowledgeLibrary(options: { documentOffset?: number; principleOffset?: number; status?: string } = {}) {
   const documentOffset = Number.isSafeInteger(options.documentOffset) && options.documentOffset! >= 0 ? options.documentOffset! : 0;
   const principleOffset = Number.isSafeInteger(options.principleOffset) && options.principleOffset! >= 0 ? options.principleOffset! : 0;
@@ -732,9 +765,9 @@ export async function createDriverAssumption(ticker: string, formData: FormData)
       driver_key: required(formData, 'driver_key', 'Driver'),
       fiscal_year: Number(required(formData, 'fiscal_year', 'Fiscal year')),
       scenario: String(formData.get('scenario') ?? 'base'),
-      value: Number(required(formData, 'value', 'Value')),
+      value: localizedFormNumber(formData, 'value', 'El valor', { required: true }),
       source: required(formData, 'source', 'Source'),
-      confidence: Number(formData.get('confidence') ?? 1),
+      confidence: localizedFormNumber(formData, 'confidence', 'La confianza', { min: 0, max: 1 }) ?? 1,
       rationale: required(formData, 'rationale', 'Rationale'),
       user_override: true,
     }),
@@ -784,7 +817,7 @@ export async function getManagementCredibility(ticker: string): Promise<Manageme
 }
 
 export async function createManagementPromise(ticker: string, formData: FormData) {
-  const target = String(formData.get('target_value') ?? '').trim();
+  const target = localizedFormNumber(formData, 'target_value', 'El valor objetivo');
   const sourceDocument = String(formData.get('source_document_id') ?? '').trim();
   await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises`, {
     method: 'POST',
@@ -794,7 +827,7 @@ export async function createManagementPromise(ticker: string, formData: FormData
       expected_period: required(formData, 'expected_period', 'Expected period'),
       metric: String(formData.get('metric') ?? '').trim() || null,
       operator: String(formData.get('operator') ?? '').trim() || null,
-      target_value: target ? Number(target) : null,
+      target_value: target,
       unit: String(formData.get('unit') ?? '').trim() || null,
       source_document_id: sourceDocument ? Number(sourceDocument) : null,
     }),

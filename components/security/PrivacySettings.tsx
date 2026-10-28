@@ -105,12 +105,12 @@ export default function PrivacySettings({ email }: { email: string }) {
 
                 <form className="mt-5 space-y-4" onSubmit={handleDelete}>
                     <div>
-                        <Label className="break-words" htmlFor="delete-confirmation">
-                            Escribe <span className="font-mono text-gray-200 [overflow-wrap:anywhere]">{email}</span> para confirmar
+                        <Label className="block break-words leading-6" htmlFor="delete-confirmation">
+                            Escribe <span className="block font-mono text-gray-200 [overflow-wrap:anywhere]">{email}</span> para confirmar
                         </Label>
                         <Input
                             autoComplete="off"
-                            className="mt-2"
+                            className="mt-2 min-h-11"
                             id="delete-confirmation"
                             name="confirmation"
                             onChange={(event) => setConfirmation(event.target.value)}
@@ -123,7 +123,7 @@ export default function PrivacySettings({ email }: { email: string }) {
                         <Label htmlFor="delete-password">Contraseña actual (reautenticación)</Label>
                         <Input
                             autoComplete="current-password"
-                            className="mt-2"
+                            className="mt-2 min-h-11"
                             id="delete-password"
                             name="password"
                             onChange={(event) => setPassword(event.target.value)}
@@ -132,10 +132,10 @@ export default function PrivacySettings({ email }: { email: string }) {
                             value={password}
                         />
                     </div>
-                    <label className="flex items-start gap-2 text-sm text-gray-300" htmlFor="delete-understood">
+                    <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6 text-gray-300" htmlFor="delete-understood">
                         <input
                             checked={understood}
-                            className="mt-1 h-4 w-4 accent-red-500"
+                            className="mt-0.5 size-5 shrink-0 accent-red-500"
                             id="delete-understood"
                             onChange={(event) => setUnderstood(event.target.checked)}
                             type="checkbox"

@@ -15,6 +15,15 @@ type Props = {
 type LogoArt = { src: string; background: string | null; forKey: string };
 
 /**
+ * Lado mayor, en píxeles, del recorte que se guarda como data URL. El logo más
+ * grande que se pinta es size-14 (56 px CSS); 128 px cubre ese tamaño a 2x.
+ * Antes el recorte salía al tamaño del lienzo de análisis (hasta 256 px): PNG
+ * base64 de hasta ~50 KB por logo que Lighthouse marcaba como imágenes
+ * sobredimensionadas en /research (Cerebro) y la watchlist.
+ */
+export const LOGO_CROP_MAX_PX = 128;
+
+/**
  * Logo real de empresa con cadena de fuentes (lib/logos/logo-sources.ts):
  * FMP image-stock por ticker -> icono oficial de la web de la empresa vía
  * nuestra ruta cacheada /api/logo -> iniciales. Verdad medida (2026-10-27):
@@ -79,10 +88,13 @@ export function CompanyLogo({ ticker, name, className }: Props) {
                 cw >= w && ch >= h
                     ? el.src
                     : (() => {
+                          const fit = Math.min(1, LOGO_CROP_MAX_PX / Math.max(cw, ch));
+                          const ow = Math.max(1, Math.round(cw * fit));
+                          const oh = Math.max(1, Math.round(ch * fit));
                           const crop = document.createElement('canvas');
-                          crop.width = cw;
-                          crop.height = ch;
-                          crop.getContext('2d')?.drawImage(canvas, x, y, cw, ch, 0, 0, cw, ch);
+                          crop.width = ow;
+                          crop.height = oh;
+                          crop.getContext('2d')?.drawImage(canvas, x, y, cw, ch, 0, 0, ow, oh);
                           return crop.toDataURL('image/png');
                       })();
             const background = analysis.background ?? (analysis.onDark ? DARK_LOGO_BACKGROUND : null);

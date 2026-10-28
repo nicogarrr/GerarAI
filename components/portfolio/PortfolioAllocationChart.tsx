@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
 import { AllocationTooltip } from './AllocationTooltip';

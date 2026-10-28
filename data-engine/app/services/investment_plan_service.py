@@ -122,6 +122,10 @@ class InvestmentPlanService:
         plan = self.get_plan(db)
         if plan is None:
             raise ValueError("Investment plan does not exist yet; create it first")
+        # Una referencia vacía o en blanco no identifica nada: se guarda NULL
+        # (el UNIQUE tenant/plan/external_id no choca con NULL). Antes se
+        # guardaba "" y la segunda aportación manual sin referencia daba 500.
+        external_id = (external_id or "").strip() or None
         if external_id:
             existing = db.scalar(
                 select(PlanContribution).where(

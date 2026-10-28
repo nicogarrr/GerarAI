@@ -36,7 +36,13 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     // siguiente apertura (la lista vacia tras fallo nunca es permanente).
     const [popular, setPopular] = useState<StockWithWatchlistStatus[]>(initialStocks ?? []);
     const [stocks, setStocks] = useState<StockWithWatchlistStatus[]>(initialStocks ?? []);
-    const [mounted, setMounted] = useState(false);
+    // Guard de hidratación sin efecto: false en SSR y en el primer render
+    // del cliente, true tras hidratar (useSyncExternalStore).
+    const mounted = useSyncExternalStore(
+        () => () => {},
+        () => true,
+        () => false,
+    );
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -86,10 +92,6 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
     const exactCommand = commandQuery?.exact
         ? { ticker: commandQuery.ticker, command: commandQuery.exact }
         : null;
-
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     // Reintento: handleSearch no puede referirse a si misma dentro de su propio
     // useCallback (react-hooks/immutability); se pasa por ref.
@@ -163,10 +165,9 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
 
         const trimmedQuery = searchTerm.trim();
 
+        // La búsqueda vacía la resuelve el onValueChange del input (evento);
+        // aquí solo hay debounce de búsquedas reales.
         if (!trimmedQuery) {
-            setStocks(popular);
-            setSearchError(false);
-            setLoading(false);
             return;
         }
 
@@ -186,12 +187,20 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
         };
     }, [searchTerm, handleSearch, popular]);
 
-    // Limpiar cuando se cierra el diálogo
-    useEffect(() => {
+    // Limpiar cuando se cierra el diálogo: ajuste durante el render (el
+    // patrón documentado de "reset de estado al cambiar un valor"), no un
+    // efecto con setState síncrono.
+    const [wasOpen, setWasOpen] = useState(isDialogOpen);
+    if (wasOpen !== isDialogOpen) {
+        setWasOpen(isDialogOpen);
         if (!isDialogOpen) {
             setSearchTerm("");
             setStocks(popular);
             setSearchError(false);
+        }
+    }
+    useEffect(() => {
+        if (!isDialogOpen) {
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
             }
@@ -206,7 +215,10 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
         // y cualquier fallo se reintenta en la proxima apertura.
         if (popular.length > 0) return;
         let active = true;
-        setLoading(true);
+        // El estado de carga arranca fuera del cuerpo síncrono del efecto.
+        queueMicrotask(() => {
+            if (active) setLoading(true);
+        });
         loadPopularStocks(getPopularStocks)
             .then((list) => {
                 if (!active) return;
@@ -293,7 +305,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     className="search-text"
-                    aria-label="Abrir buscador"
+                    data-testid="search-command-trigger"
                 >
                     {label}
                 </button>
@@ -303,6 +315,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     aria-label="Abrir buscador"
+                    data-testid="search-command-trigger"
                     className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                 >
                     <Search aria-hidden="true" className="h-5 w-5" />
@@ -313,7 +326,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-400 backdrop-blur-sm transition-all duration-200 hover:bg-gray-700/60"
-                    aria-label="Abrir buscador"
+                    data-testid="search-command-trigger"
                 >
                     <Search aria-hidden="true" className="h-4 w-4 text-gray-500" />
                     <span className="flex-1 text-left">Buscar acciones...</span>
@@ -340,7 +353,16 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                 <div className="search-field">
                     <CommandInput
                         value={searchTerm}
-                        onValueChange={setSearchTerm}
+                        onValueChange={(value) => {
+                            setSearchTerm(value);
+                            // Con la búsqueda vacía el resultado vuelve a las
+                            // populares al momento (evento, no efecto).
+                            if (!value.trim()) {
+                                setStocks(popular);
+                                setSearchError(false);
+                                setLoading(false);
+                            }
+                        }}
                         placeholder="Buscar acciones o comando «ASTS FA»..."
                         aria-label="Buscar acciones o secciones"
                         className="search-input"

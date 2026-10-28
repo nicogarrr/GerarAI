@@ -49,11 +49,11 @@ export const EXPECTATION_METRIC_LABELS: Record<string, string> = {
 /** Estado de una revisión en español; desconocido se muestra tal cual. */
 export function reviewStatusLabel(status: string | null | undefined): string {
     if (status == null || status === '') return 's/d';
-    return REVIEW_STATUS_LABELS[status] ?? status;
+    return Object.hasOwn(REVIEW_STATUS_LABELS, status) ? REVIEW_STATUS_LABELS[status] : status;
 }
 
 /** Métrica en español; desconocida se humaniza sin inventar traducción. */
 export function expectationMetricLabel(metric: string | null | undefined): string {
     if (metric == null || metric === '') return 's/d';
-    return EXPECTATION_METRIC_LABELS[metric] ?? metric.replaceAll('_', ' ');
+    return Object.hasOwn(EXPECTATION_METRIC_LABELS, metric) ? EXPECTATION_METRIC_LABELS[metric] : metric.replaceAll('_', ' ');
 }

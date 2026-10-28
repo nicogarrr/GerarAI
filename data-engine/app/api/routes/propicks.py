@@ -344,3 +344,74 @@ def deep_value(
             for r in rows
         ],
     )
+
+
+class RadarCandidateOut(BaseModel):
+    symbol: str
+    name: str | None
+    exchange: str | None
+    currency: str | None
+    price_to_book: float | None
+    dividend_yield: float | None
+    yield_extremo_revisar: bool
+    fuente: str
+    en_universo_propio: bool
+    via_cotejo: str | None
+
+
+class RadarResponse(BaseModel):
+    rotulo: str
+    generado_en: str
+    regiones: list[str]
+    candidatos: list[RadarCandidateOut]
+
+
+@router.get("/deep-value/radar", response_model=RadarResponse)
+def deep_value_radar(
+    pb_max: Decimal | None = Query(default=Decimal("1.0"), gt=0, le=5),
+    yield_min: Decimal = Query(default=Decimal("0"), ge=0, le=1),
+    regions: str = Query(default="", description="CSV de regiones Yahoo (us,es,hk,jp,...)"),
+    limit: int = Query(default=50, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> RadarResponse:
+    """Radar global Yahoo (fuente no oficial): SOLO propone candidatos.
+
+    No persiste nada y no presenta cifras como dato verificado; cada
+    candidato lleva su fuente y la via de cotejo oficial cuando aplica
+    (HKEXnews para HKEX). 503 honesto si Yahoo no responde."""
+    from app.services.yahoo_radar_service import (
+        RADAR_LABEL,
+        YAHOO_LABEL,
+        run_radar,
+    )
+
+    regs = [r.strip().lower() for r in regions.split(",") if r.strip()] or None
+    try:
+        candidates, generado_en, regs_used = run_radar(
+            db, pb_max=pb_max, yield_min=yield_min, regions=regs, size=limit
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=503,
+            detail="Radar Yahoo no disponible ahora mismo; no se han generado candidatos.",
+        )
+    return RadarResponse(
+        rotulo=RADAR_LABEL,
+        generado_en=generado_en,
+        regiones=regs_used,
+        candidatos=[
+            RadarCandidateOut(
+                symbol=c.symbol,
+                name=c.name,
+                exchange=c.exchange,
+                currency=c.currency,
+                price_to_book=float(c.price_to_book) if c.price_to_book is not None else None,
+                dividend_yield=float(c.dividend_yield) if c.dividend_yield is not None else None,
+                yield_extremo_revisar=c.yield_extremo_revisar,
+                fuente=YAHOO_LABEL,
+                en_universo_propio=c.en_universo_propio,
+                via_cotejo=c.via_cotejo,
+            )
+            for c in candidates
+        ],
+    )

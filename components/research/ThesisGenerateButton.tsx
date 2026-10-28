@@ -40,7 +40,9 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
     const [recoveryCycle, setRecoveryCycle] = useState(0);
     const [starting, setStarting] = useState(false);
     const startingRef = useRef(false);
-    const [pollExhausted, setPollExhausted] = useState(false);
+    // Polling agotado por job: derivado del id del job (no un booleano que
+    // hay que resetear en un efecto al cambiar de job).
+    const [exhaustedJobId, setExhaustedJobId] = useState<number | null>(null);
     const pollCountRef = useRef(0);
     // Reloj local: se fija en cada sondeo y avanza cada 1 s mientras el job
     // corre, para que los segundos no salten de 3 en 3 con el polling.
@@ -87,14 +89,14 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
     }, [ticker, recoveryCycle]);
 
     const jobId = job?.id;
-    // Job nuevo (o cambio de job): ventana de polling nueva.
-    useEffect(() => {
-        pollCountRef.current = 0;
-        setPollExhausted(false);
-    }, [jobId]);
+    // Job nuevo (o cambio de job): ventana de polling nueva. El agotamiento
+    // se deriva comparando el id del job agotado con el actual.
+    const pollExhausted = jobId != null && exhaustedJobId === jobId;
 
     useEffect(() => {
         if (!active || !jobId || pollExhausted) return;
+        // Ventana de polling nueva: el contador arranca con el efecto.
+        pollCountRef.current = 0;
         let disposed = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const tick = async () => {
@@ -117,7 +119,7 @@ export default function ThesisGenerateButton({ ticker, label = 'Generar tesis', 
             if (pollCountRef.current >= MAX_POLLS) {
                 // El trabajo del servidor sigue (o no): aqui ya no lo sabemos
                 // y no se re-agenda. El copy pasa a "estado desconocido".
-                setPollExhausted(true);
+                setExhaustedJobId(jobId);
                 return;
             }
             timer = setTimeout(tick, POLL_MS);

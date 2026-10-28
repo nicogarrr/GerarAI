@@ -38,21 +38,111 @@ function toFinite(value: NumericInput): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+export type LocalizedNumberError = 'empty' | 'invalid' | 'ambiguous';
+
+const INT_PLAIN = /^\d+$/;
+// Miles es-ES estrictos: grupos de 3 tras el primero («1.234», «12.345.678»).
+const INT_GROUPS_ES = /^\d{1,3}(?:\.\d{3})+$/;
+
+/**
+ * Parsea números escritos por el usuario en formato es-ES sin adivinar.
+ *
+ * Gramática admitida:
+ * - «32,5» / «1.234,56» / «12.345.678,9»: coma decimal, punto solo como
+ *   separador de miles en grupos exactos de 3 antes de la coma.
+ * - «1.234» -> 1234 (miles es-ES) y «1234.56» / «32.5» -> decimal con punto
+ *   cuando el punto NO forma grupos de 3.
+ * - Signo «-» inicial opcional.
+ *
+ * Se RECHAZA (error, nunca un valor reinterpretado) todo formato ambiguo:
+ * - «1,234.5» (orden US mezclado) y «1,234» (¿1.234 es ó 1234 US?): antes
+ *   «1,234.5» se leía como 1,2345, un factor 1000 silencioso en dinero.
+ *   Excepción: «0,001» es decimal (nadie agrupa miles con un 0 delante).
+ * - «1e3», «0x10», «1 000», «Infinity»: Number() los aceptaba en silencio.
+ *
+ * El error «ambiguous» permite al formulario explicar el formato esperado
+ * en lugar del genérico «introduce un número válido».
+ */
+export function parseLocalizedNumberDetailed(
+  value: string,
+): { ok: true; value: number } | { ok: false; error: LocalizedNumberError } {
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: false, error: 'empty' };
+  const negative = trimmed.startsWith('-');
+  const body = negative ? trimmed.slice(1) : trimmed;
+  const finish = (magnitude: number) => {
+    const signed = negative ? -magnitude : magnitude;
+    return Number.isFinite(signed)
+      ? { ok: true as const, value: signed }
+      : { ok: false as const, error: 'invalid' as const };
+  };
+
+  const commaParts = body.split(',');
+  if (commaParts.length > 2) return { ok: false, error: 'ambiguous' };
+  if (commaParts.length === 2) {
+    const [intPart, decPart] = commaParts;
+    if (!INT_PLAIN.test(decPart)) return { ok: false, error: 'ambiguous' }; // «1,234.5», «32,», «1,2e3»
+    if (intPart === '') return finish(Number(`0.${decPart}`)); // «,5»
+    if (INT_GROUPS_ES.test(intPart)) {
+      return finish(Number(`${intPart.replace(/\./g, '')}.${decPart}`)); // «1.234,56»
+    }
+    if (INT_PLAIN.test(intPart)) {
+      // Coma seguida de exactamente 3 dígitos («1,234»): ¿decimal es-ES 1,234
+      // o miles US 1234? Ambiguo y en dinero no se adivina; «0,001» sí es
+      // decimal porque los miles nunca empiezan por 0.
+      if (decPart.length === 3 && intPart !== '0') return { ok: false, error: 'ambiguous' };
+      return finish(Number(`${intPart}.${decPart}`));
+    }
+    return { ok: false, error: 'ambiguous' }; // «12.34,5»: grupo de miles roto
+  }
+
+  const dotParts = body.split('.');
+  if (dotParts.length === 1) {
+    if (!INT_PLAIN.test(body)) return { ok: false, error: 'invalid' }; // «1e3», «abc», «0x10», «1 000», «+3», «-»
+    return finish(Number(body));
+  }
+  if (dotParts.some((part) => part === '')) {
+    // «.5» y «5.» se admiten; «1..2» no.
+    if (dotParts.length === 2 && INT_PLAIN.test(dotParts[0] + dotParts[1])) {
+      return finish(Number(`${dotParts[0] || '0'}.${dotParts[1] || '0'}`));
+    }
+    return { ok: false, error: 'ambiguous' };
+  }
+  if (dotParts.length > 2) {
+    if (INT_GROUPS_ES.test(body)) return finish(Number(body.replace(/\./g, ''))); // «1.234.567»
+    return { ok: false, error: 'ambiguous' };
+  }
+  // Un solo punto: grupos de 3 = miles es-ES («1.234» -> 1234); si no,
+  // decimal con punto («32.5», «1.23», «1.2345»).
+  if (INT_GROUPS_ES.test(body)) return finish(Number(body.replace(/\./g, '')));
+  return finish(Number(body));
+}
+
 /**
  * Parsea números escritos por el usuario tolerando el formato es-ES.
- * "12,53" -> 12.53, "1.234,56" -> 1234.56, "1234.56" -> 1234.56.
- * Regla: si hay coma se asume decimal español (los puntos son miles);
- * sin coma, se parsea tal cual. Entrada inválida -> null (nunca trunca
- * en silencio como parseFloat("12,53") -> 12).
+ * Devuelve null ante entrada vacía, inválida o AMBIGUA (nunca reinterpreta:
+ * mejor un error visible que un factor 1000 silencioso en dinero). Para
+ * distinguir el motivo y mensajear al usuario, usa parseLocalizedNumberDetailed.
  */
 export function parseLocalizedNumber(value: string): number | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const normalized = trimmed.includes(',')
-    ? trimmed.replace(/\./g, '').replace(',', '.')
-    : trimmed;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
+  const result = parseLocalizedNumberDetailed(value);
+  return result.ok ? result.value : null;
+}
+
+/**
+ * Precarga de inputs numéricos: el number del backend (p.ej. 6.0572 o 1e-7)
+ * se escribe con la gramática es-ES del formulario («6,0572», «0,0000001»),
+ * nunca con Number.toString() («6.0572», «1e-7»), que el propio parser del
+ * formulario rechazaría o mostraría con punto decimal en una UI en español.
+ * Sin separador de miles para no estorbar al editar; hasta 12 decimales para
+ * que el valor sobreviva al round-trip guardar-sin-tocar. No finito -> ''.
+ */
+export function formatNumberForInput(value: number): string {
+  if (!Number.isFinite(value)) return '';
+  return new Intl.NumberFormat(FORMAT_LOCALE, {
+    useGrouping: false,
+    maximumFractionDigits: 12,
+  }).format(value);
 }
 
 function toDate(value: string | number | Date | null | undefined): Date | null {
@@ -264,6 +354,15 @@ export function formatPercent(
 }
 
 /**
+ * Conteo con concordancia es-ES: formatCountEs(1, 'posición', 'posiciones')
+ * -> «1 posición»; formatCountEs(5, 'posición', 'posiciones') ->
+ * «5 posiciones». El número lleva separador de miles es-ES.
+ */
+export function formatCountEs(value: number, singular: string, pluralForm: string): string {
+  return `${formatNumber(value, { maximumFractionDigits: 0 })} ${value === 1 ? singular : pluralForm}`;
+}
+
+/**
  * Fecha corta en español (23 sept 2026). Acepta Date, ISO o timestamp.
  * Sin `timeZone` por defecto: el comportamiento actual no cambia para los
  * call sites existentes; para fechas con zona definida usa `formatUserDate`
@@ -457,21 +556,6 @@ export function formatTimeAgo(
   return 'ahora mismo';
 }
 
-
-/**
- * El backend serializa los Numeric monetarios como string|null (nunca
- * asumir string): convierte a number con fallback cuando falta el dato
- * o llega malformado. Vive aquí (módulo puro) porque las server actions
- * no pueden exportar funciones síncronas.
- */
-export function researchMoneyToNumber(
-  value: string | null | undefined,
-  fallback = 0,
-): number {
-  if (value === null || value === undefined || value === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
 
 /** Margen de seguridad para mostrar. MoS = (valor esperado - precio)/valor esperado, el estándar de Graham
  *  (no el potencial valor/precio - 1; base explícita en la UI): con un escenario base

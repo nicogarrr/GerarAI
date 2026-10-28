@@ -26,9 +26,7 @@ import { canonicalRedirectTicker } from '@/lib/research/canonical-ticker';
 import {
   ArrowLeft,
   FileText,
-  History,
   RefreshCcw,
-  Search,
   ShieldAlert,
   ShieldCheck,
   Target,
@@ -48,7 +46,6 @@ import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 import { TtmPanel } from '@/components/research/TtmPanel';
-import { GuideBrainButton } from '@/components/research/GuideBrainButton';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
 import { ChangeImpactCard } from '@/components/research/ChangeImpactCard';
@@ -1037,7 +1034,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
             <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=model`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=model`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
@@ -1160,7 +1157,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <Panel collapsible="mobile"
           actions={moatScore ? (
             <Link
-              className="text-sm text-teal-300 hover:text-teal-200"
+              className="inline-flex min-h-11 min-w-11 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=moat`}
             >
               Ver la evaluación del foso
@@ -1658,8 +1655,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3"><h1 className="text-2xl font-bold sm:text-3xl">{ticker}</h1>{exchangeDisplayName(company.exchange) ? <Badge variant="outline">{exchangeDisplayName(company.exchange)}</Badge> : null}<Badge variant="outline">{company.currency}</Badge></div>
-              <p className="mt-2 text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>
-              <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
             </div>
             <div className="-mr-2 flex shrink-0 items-center">
               <FollowButton compact symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />
@@ -1667,6 +1662,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               <div id="alerta" className="scroll-mt-6"><QuickAlertButton compact ticker={ticker} currency={company.currency} /></div>
               <CompanyActionsMenu ticker={ticker} changeCount={recentChangeCount} />
             </div>
+          </div>
+          {/* Nombre y sector a todo el ancho en móvil: dentro de la columna del ticker
+              (entre logo y 3 botones) quedaban en ~110px y partían en 3-4 líneas. En
+              ≥sm se alinean con la columna del ticker (logo 56px + gap 16px). */}
+          <div className="-mt-1 sm:pl-[72px]">
+            <p className="text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
           </div>
           <CompanyNavigation ticker={ticker} activeView={activeView} />
           {(() => {

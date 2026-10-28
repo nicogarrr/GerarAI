@@ -28,11 +28,15 @@ export default function InstallApp() {
     const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
 
     useEffect(() => {
-        if (isStandalone()) {
-            setMode('installed');
-            return;
-        }
-        setMode(isIos() ? 'ios' : 'manual');
+        // Detección de plataforma (APIs solo de navegador) tras montar: el
+        // setState no es síncrono dentro del efecto.
+        queueMicrotask(() => {
+            if (isStandalone()) {
+                setMode('installed');
+                return;
+            }
+            setMode(isIos() ? 'ios' : 'manual');
+        });
         const onPrompt = (event: Event) => {
             event.preventDefault();
             setDeferred(event as BeforeInstallPromptEvent);

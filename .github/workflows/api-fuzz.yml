@@ -1,0 +1,44 @@
+name: api-fuzz
+
+# Fuzzing Schemathesis del data-engine (ver docs/testing/api-fuzzing.md).
+# No bloquea: corre a mano y cada noche, y sus fallos se revisan a mano.
+on:
+  workflow_dispatch:
+    inputs:
+      max_examples:
+        description: "Ejemplos por operación"
+        default: "5"
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: data-engine
+    env:
+      APP_ENV: test
+      RUN_FUZZ: "1"
+      FUZZ_MAX_EXAMPLES: ${{ github.event.inputs.max_examples || '5' }}
+      FUZZ_REPORT: ${{ github.workspace }}/fuzz-report.jsonl
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - run: uv sync --frozen --extra test --no-install-project
+      - name: Schemathesis (sin 500 en ninguna operación + stateful)
+        run: uv run --frozen --with "schemathesis>=4.3,<5" python -m pytest tests/fuzz -n 2 -p no:randomly -q
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-report
+          path: fuzz-report.jsonl
+          if-no-files-found: ignore

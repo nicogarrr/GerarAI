@@ -61,7 +61,7 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
       </p>
       {signal.evidence?.length ? (
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer text-teal-300">Ver evidencias guardadas ({signal.evidence.length})</summary>
+          <summary className="min-h-11 cursor-pointer py-3 text-teal-300">Ver evidencias guardadas ({signal.evidence.length})</summary>
           <ul className="mt-2 space-y-2">
             {signal.evidence.map((item) => (
               <li key={item.id}>
@@ -78,7 +78,7 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
       {BOTTLENECK_TO_THEMES[signal.theme]?.length ? (
         <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
           Temas relacionados:{' '}
-          <Link className="text-teal-300 underline hover:text-teal-200" href="/temas">
+          <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 underline hover:text-teal-200" href="/temas">
             {BOTTLENECK_TO_THEMES[signal.theme].map((theme) => theme.name).join(' · ')}
           </Link>
         </p>
@@ -94,7 +94,7 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
       <div className="flex flex-wrap items-center gap-2">
         {known ? (
           <Link
-            className="text-base font-semibold text-teal-300 hover:text-teal-200"
+            className="inline-flex min-h-11 min-w-11 items-center text-base font-semibold text-teal-300 hover:text-teal-200"
             href={`/research/${item.ticker}`}
           >
             {item.ticker}

@@ -10,6 +10,7 @@ from uuid import uuid4
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import Company, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService, currency_key
@@ -175,7 +176,7 @@ class PortfolioLedgerService:
             raise ValueError("Transaction price cannot be negative")
         if fees is None or Decimal(fees) < 0:
             raise ValueError("Transaction fees cannot be negative")
-        if trade_date is None or trade_date > date.today():
+        if trade_date is None or trade_date > local_today():
             raise ValueError("Transaction trade_date cannot be in the future")
         company = self.ensure_company(db, ticker)
         portfolio = self.fx.ensure_portfolio(db)

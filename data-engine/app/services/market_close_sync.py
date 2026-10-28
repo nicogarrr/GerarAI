@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.models.entities import Company, MarketPrice
 from app.services.propicks_price_service import (
     PriceBar,
+    _bar_is_final,
+    bar_unit_is_known,
     fetch_history_yfinance,
     upsert_prices,
     yahoo_symbol,
@@ -32,6 +34,17 @@ _NY = ZoneInfo("America/New_York")
 # Una barra del dia en curso solo es cierre cuando la sesion US ya termino.
 _SESSION_CLOSED_AFTER = (16, 30)
 CHUNK = 100
+MIN_TARGET_COVERAGE = 0.90
+
+
+def last_completed_us_session(now: datetime) -> date:
+    local = now.astimezone(_NY)
+    day = local.date()
+    if (local.hour, local.minute) < _SESSION_CLOSED_AFTER:
+        day -= timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    return day
 
 
 def _session_open(now: datetime) -> bool:
@@ -51,10 +64,13 @@ def sync_official_closes(
 ) -> dict[str, Any]:
     now = now or datetime.now(UTC)
     skipped = 0
+    target_date = last_completed_us_session(now)
+    target_covered = 0
     companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
     by_symbol = {s: c for c in companies if (s := yahoo_symbol(c)) is not None}
     symbols = list(by_symbol)
     written = 0
+    latest_date: date | None = None
     covered = 0
     failed_chunks = 0
     failed_symbols: list[str] = []
@@ -75,8 +91,15 @@ def sync_official_closes(
             bars = history.get(symbol) or []
             if not bars:
                 continue
+            target_covered += int(any(bar.day == target_date and _bar_is_final(by_symbol[symbol], bar, now)
+                                      and bar_unit_is_known(by_symbol[symbol], bar) for bar in bars))
             count = upsert_prices(db, by_symbol[symbol], bars, now=now)
             written += count
+            if count:
+                latest = max(bar.day for bar in bars
+                             if _bar_is_final(by_symbol[symbol], bar, now)
+                             and bar_unit_is_known(by_symbol[symbol], bar))
+                latest_date = max(latest_date, latest) if latest_date else latest
             skipped += len(bars) - count
             covered += int(count > 0)
         db.commit()
@@ -84,15 +107,22 @@ def sync_official_closes(
         # Todo caido: se propaga para que el actor registre el error y
         # reintente como antes (no un «ok» vacio).
         raise last_error
-    status = "partial" if failed_chunks else "ok"
+    target_coverage = target_covered / len(symbols) if symbols else 0.0
+    complete = target_coverage >= MIN_TARGET_COVERAGE
+    status = "partial" if failed_chunks or not complete else "ok"
     return {
         "status": status,
+        "target_date": target_date.isoformat(),
+        "target_covered": target_covered,
+        "target_coverage": target_coverage,
+        "minimum_target_coverage": MIN_TARGET_COVERAGE,
         "failed_chunks": failed_chunks,
         "failed_symbols": failed_symbols,
         "companies": len(companies),
         "with_symbol": len(symbols),
         "covered": covered,
         "bars_written": written,
+        "latest_date": latest_date.isoformat() if latest_date else None,
         "partial_session_skipped": skipped > 0,
     }
 

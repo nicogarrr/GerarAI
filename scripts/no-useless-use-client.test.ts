@@ -85,6 +85,14 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/research/DecisionJournalEntryLink.tsx':
+    'Client boundary for onClick and browser hash scrolling via scrollToHashAnchor; imported from server CompanyNavigation.',
+    'components/proPicks/DeepValueView.tsx':
+        'filtros controlados con useState/useEffect/useCallback y server actions al cambiar criterios',
+    'components/proPicks/RadarGlobalView.tsx':
+        'radar interactivo con useState y onClick que consulta candidatos mediante server action', 
+    'components/pwa/ServiceWorkerRegister.tsx':
+        'registro del service worker: useEffect + navigator.serviceWorker (API del navegador); sustituye al script inline del layout para la CSP con nonce',
     // Directivas reales que faltaban en la lista (QA 27-oct, fallo #20):
     'components/forms/InputField.tsx':
         'campo de formulario con useState (mostrar/ocultar contraseña), onClick y spread de props de react-hook-form',

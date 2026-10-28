@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
@@ -125,20 +126,27 @@ def _fiscal_info_batch(
     return result
 
 
+MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
+MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+
+
 class PortfolioTransactionInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
     action: Literal["buy", "sell", "dividend", "interest", "fee", "cash_misc"]
-    quantity: Decimal = Field(ge=0)
-    price: Decimal = Field(ge=0)
+    # Topes = lo que cabe en Transaction (Numeric(20, 6) / Numeric(20, 2)).
+    # Sin ellos, "1e400" pasaba la validación, se guardaba como precio nulo y
+    # cada transacción posterior del ticker daba 500 al recalcular la posición.
+    quantity: Decimal = Field(ge=0, le=MAX_NUMERIC_20_6)
+    price: Decimal = Field(ge=0, le=MAX_NUMERIC_20_6)
     trade_date: date
-    fees: Decimal = Field(default=Decimal("0"), ge=0)
+    fees: Decimal = Field(default=Decimal("0"), ge=0, le=MAX_NUMERIC_20_2)
     currency: str = Field(default="USD", min_length=3, max_length=10)
     notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("trade_date")
     @classmethod
     def _no_future_trade_date(cls, value: date) -> date:
-        if value > date.today():
+        if value > local_today():
             raise ValueError("trade_date cannot be in the future")
         return value
 

@@ -26,6 +26,7 @@ import {
   type MarketTheme,
   type ThemeOrder,
 } from '@/lib/market/themes';
+import { paginateThemes, parseThemePage, themePageHref } from '@/lib/market/theme-pagination';
 import { THEME_TO_BOTTLENECK } from '@/lib/market/theme-bottleneck-map';
 
 export const metadata: Metadata = {
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-type PageProps = { searchParams: Promise<{ orden?: string | string[] }> };
+type PageProps = { searchParams: Promise<{ orden?: string | string[]; pagina?: string | string[] }> };
 
 const pct = (value: number | null) =>
   value === null ? NA : formatPercent(value, { fromRatio: false, digits: 1, signDisplay: 'always' });
@@ -94,7 +95,7 @@ function ThemeCard({
                     ? 'bg-teal-400/15 text-teal-300'
                     : badge.kind === 'turn-down'
                       ? 'bg-red-400/15 text-red-300'
-                      : 'bg-red-500 text-white'
+                      : 'bg-red-600 text-white'
                 }`}
               >
                 {badge.label}
@@ -138,7 +139,7 @@ function ThemeCard({
                 return (
                   <tr className="border-t border-gray-900" key={row.ticker}>
                     <th className="py-1.5 pr-2 font-semibold" scope="row">
-                      <Link className="text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
+                      <Link className="-my-1 inline-flex min-h-11 min-w-11 items-center justify-center text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
                         {row.ticker}
                       </Link>
                       {row.reason ? (
@@ -203,7 +204,7 @@ function HoldingsLines({
       {symbols.map((symbol, index) => (
         <span key={symbol}>
           {index > 0 ? ' · ' : ''}
-          <Link className="text-teal-300 hover:text-teal-200" href={`/research/${symbol}`}>
+          <Link className="inline-flex min-h-11 min-w-11 items-center justify-center text-teal-300 hover:text-teal-200" href={`/research/${symbol}`}>
             {symbol}
           </Link>
         </span>
@@ -219,7 +220,9 @@ function HoldingsLines({
 }
 
 export default async function TemasPage({ searchParams }: PageProps) {
-  const order = parseThemeOrder((await searchParams).orden);
+  const query = await searchParams;
+  const order = parseThemeOrder(query.orden);
+  const requestedPage = parseThemePage(query.pagina);
   let data;
   try {
     data = await getMarketThemes();
@@ -236,7 +239,8 @@ export default async function TemasPage({ searchParams }: PageProps) {
       .map((signal) => signal.theme),
   );
 
-  const themes = sortThemes(data.themes, order);
+  const sortedThemes = sortThemes(data.themes, order);
+  const { items: themes, page, pages } = paginateThemes(sortedThemes, requestedPage);
   // Flujos de dinero por tema: degradan en silencio (la página se pinta igual
   // si el endpoint no existe o el backend no responde); jamás un importe
   // inventado en su lugar.
@@ -287,6 +291,26 @@ export default async function TemasPage({ searchParams }: PageProps) {
           })}
         </ul>
       )}
+
+      {pages > 1 ? (
+        <nav aria-label="Paginación de temas" className="flex items-center justify-between gap-2">
+          {page > 1 ? (
+            <Link className="inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium text-teal-300 hover:bg-gray-800" href={themePageHref(order, page - 1)} rel="prev">
+              Anterior
+            </Link>
+          ) : (
+            <span aria-disabled="true" className="inline-flex min-h-11 items-center px-4 text-sm text-gray-600">Anterior</span>
+          )}
+          <p aria-current="page" className="text-sm tabular-nums text-gray-400">Página {page} de {pages}</p>
+          {page < pages ? (
+            <Link className="inline-flex min-h-11 items-center rounded-lg px-4 text-sm font-medium text-teal-300 hover:bg-gray-800" href={themePageHref(order, page + 1)} rel="next">
+              Siguiente
+            </Link>
+          ) : (
+            <span aria-disabled="true" className="inline-flex min-h-11 items-center px-4 text-sm text-gray-600">Siguiente</span>
+          )}
+        </nav>
+      ) : null}
 
       <footer className="border-t border-gray-800 pt-3 text-xs text-gray-500">
         <p>

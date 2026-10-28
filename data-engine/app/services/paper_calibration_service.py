@@ -16,8 +16,12 @@ MIN_CLOSED = 30  # por debajo, la calibracion es orientativa y se avisa
 MIN_BIN = 5  # por debajo, la tasa del bin es N/D
 LABEL = "INFERIDO"
 BASIS = (
-    "acierto = retorno bruto > 0 al cierre; sin comisiones, FX, dividendos ni "
-    "acciones corporativas; conviction declarada por el LLM"
+    "acierto = retorno bruto > 0 al cierre; comisiones y spread modelados aparte "
+    "(supuesto persistido por trade, ver scoreboard neto); dividendos declarados "
+    "aplicados con fuente (Yahoo/FMP; eventos inciertos excluidos; otra divisa "
+    "nunca convertida); splits en abierto ajustados con fuente (una cerrada con "
+    "split no se reescribe y queda excluida del acierto); sin FX, cash ledger ni "
+    "financiación de cortos; conviction declarada por el LLM"
 )
 
 
@@ -38,6 +42,8 @@ def calibration(rows: list[PaperTrade], now: datetime | None = None) -> dict:
     for row in llm:
         if row.status != "closed":
             continue
+        if row.corporate_action_warning:
+            continue  # misma regla que scoreboard(): una cerrada con split no es comparable
         result = pnl(row, row.exit_price)
         if result is not None:
             closed.append((row, result))

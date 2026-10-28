@@ -33,7 +33,7 @@ export function ChangeImpactCard({ change, ticker, directionLabel, typeLabel }: 
           {[
             ...change.affected_metrics.map((metric) => metricLabel(metric)),
             ...(change.affected_claim_ids.length
-              ? [`${change.affected_claim_ids.length} afirmación${change.affected_claim_ids.length === 1 ? '' : 'es'} de la tesis`]
+              ? [`${change.affected_claim_ids.length} ${change.affected_claim_ids.length === 1 ? 'afirmación' : 'afirmaciones'} de la tesis`]
               : []),
           ].join(' · ')}
           {' · '}

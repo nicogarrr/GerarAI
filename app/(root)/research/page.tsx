@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FileSearch } from 'lucide-react';
 
 import { getResearchCompanySnapshots, getResearchDashboard, getResearchPortfolioPositions } from '@/lib/actions/research.actions';
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { portfolioMembership } from '@/lib/research/portfolio-membership';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -98,15 +99,22 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                 className="block rounded-xl border border-gray-700/50 bg-surface-1 p-4 transition hover:border-teal-700"
                 href={`/research/${encodeURIComponent(company.ticker)}`}
             >
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className="text-base font-semibold text-gray-100">{company.ticker}</span>
-                    {/* line-clamp trunca visualmente: el title devuelve el texto
-                        completo al usuario visual (hover), no solo al lector de pantalla. */}
-                    <span className="min-w-0 line-clamp-1 text-sm text-gray-400" title={company.name}>{company.name}</span>
+                <div className="flex items-center gap-3">
+                    {/* Mismo logo con cadena de fuentes y fallback a iniciales
+                        que cartera, watchlist y cabecera de ficha. */}
+                    <CompanyLogo ticker={company.ticker} name={company.name || company.ticker} className="size-10 shrink-0 rounded-lg" />
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                            <span className="text-base font-semibold text-gray-100">{company.ticker}</span>
+                            {/* line-clamp trunca visualmente: el title devuelve el texto
+                                completo al usuario visual (hover), no solo al lector de pantalla. */}
+                            <span className="min-w-0 line-clamp-1 text-sm text-gray-400" title={company.name}>{company.name}</span>
+                        </div>
+                        <p className="mt-1 line-clamp-1 text-xs text-gray-500" title={sectorLine}>
+                            {sectorLine}
+                        </p>
+                    </div>
                 </div>
-                <p className="mt-1 line-clamp-1 text-xs text-gray-500" title={sectorLine}>
-                    {sectorLine}
-                </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     {unreadable ? (
                         <span className="text-xs text-warn">No se pudo leer su research</span>

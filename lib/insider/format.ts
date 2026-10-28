@@ -7,7 +7,7 @@ export function insiderName(value: string | null | undefined): string {
     if (raw !== raw.toUpperCase()) return raw;
     return raw
         .toLowerCase()
-        .split(/(\s+|\/|-)/)
+        .split(/(\s+|\/|-|'|’)/)
         .map((part) => (/^[a-zñáéíóúü]/.test(part) ? part[0].toUpperCase() + part.slice(1) : part))
         .join('');
 }
@@ -57,7 +57,12 @@ const TITLE_ABBREVIATIONS: Array<[RegExp, string]> = [
     // aquí como «Presidente»; un «President» suelto sí. Los calificadores
     // (Assistant, Co-, «of ...», divisiones) hacen saltar el consumo total
     // y devuelven el título original, así que no rebajan el cargo.
+    // «Vice Chair» / «Co-Chair» dejan resto sin mapear y se muestran tal cual.
+    [/executive\s+chair(man|woman|person)?/i, 'Presidente ejecutivo'],
+    [/\bchair(man|woman|person)?\b/i, 'Presidente del consejo'],
     [/president/i, 'Presidente'],
+    [/government\s+affairs/i, 'Relaciones gubernamentales'],
+    [/^officer$/i, 'Directivo'],
     [/treasurer/i, 'Tesorero'],
     [/secretary/i, 'Secretario'],
 ];

@@ -181,7 +181,13 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
      * no seguro) lo dice y enseña el enlace para copiarlo a mano.
      */
     const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-    useEffect(() => setCopyState('idle'), [selectedId]);
+    // Reset al cambiar de nodo: ajuste durante el render (reset al cambiar un
+    // valor), no efecto con setState síncrono.
+    const [prevSelectedId, setPrevSelectedId] = useState(selectedId);
+    if (prevSelectedId !== selectedId) {
+        setPrevSelectedId(selectedId);
+        setCopyState('idle');
+    }
     const copyShareLink = useCallback(async () => {
         const absolute = new URL(shareHref, window.location.href).toString();
         try {
@@ -602,7 +608,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                 ) : null}
                 <p aria-live="polite" className="text-xs text-gray-500" data-testid="kg-isolation-note">
                     {isolated && selectedId !== null
-                        ? t('knowledgeGraph.canvas.isolatedOn', { count: keep ? keep.size - 1 : scene.nodes.length - 1 })
+                        ? t((keep ? keep.size - 1 : scene.nodes.length - 1) === 1 ? 'knowledgeGraph.canvas.isolatedOn.one' : 'knowledgeGraph.canvas.isolatedOn.other', { count: keep ? keep.size - 1 : scene.nodes.length - 1 })
                         : t('knowledgeGraph.canvas.isolatedOff')}
                 </p>
                 <p className="text-xs text-gray-500" id={descriptionId}>
@@ -631,7 +637,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                     <p aria-live="polite" className="mt-2 text-xs text-gray-500" role="status">
                         {query.trim()
                             ? suggestions.length
-                                ? t('knowledgeGraph.search.results', { count: suggestions.length, query: query.trim() })
+                                ? t(suggestions.length === 1 ? 'knowledgeGraph.search.results.one' : 'knowledgeGraph.search.results.other', { count: suggestions.length, query: query.trim() })
                                 : t('knowledgeGraph.search.noResults', { query: query.trim() })
                             : t('knowledgeGraph.search.hint')}
                     </p>
@@ -711,7 +717,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                     ) : (
                         <p className="mt-3 text-sm text-gray-500">{t('knowledgeGraph.listing.empty')}</p>
                     )}
-                    <p className="mt-2 text-xs text-gray-500">{t('knowledgeGraph.listing.rowCount', { count: scene.nodes.length })}</p>
+                    <p className="mt-2 text-xs text-gray-500">{t(scene.nodes.length === 1 ? 'knowledgeGraph.listing.rowCount.one' : 'knowledgeGraph.listing.rowCount.other', { count: scene.nodes.length })}</p>
                 </section>
             </div>
 

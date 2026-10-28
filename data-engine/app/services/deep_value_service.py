@@ -111,6 +111,13 @@ def find_deep_value(
         if pb <= 0 or pb > pb_max:
             continue
         yield_row = metrics.get(METRIC_YIELD)
+        if yield_row is not None:
+            yield_as_of = date.fromisoformat(yield_row.period)
+            if (today - yield_as_of).days > MAX_METRIC_AGE_DAYS:
+                # Yield de otra semana con P/B fresco: se sirve como "sin
+                # datos" (N/D), nunca como cifra. Misma regla fail-closed
+                # que la frescura del P/B.
+                yield_row = None
         yield_val = (
             Decimal(str(yield_row.value))
             if yield_row is not None and yield_row.value is not None

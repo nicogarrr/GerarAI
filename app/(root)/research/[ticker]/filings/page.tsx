@@ -54,10 +54,10 @@ export default async function FilingsYoyPage({ params, searchParams }: {
   const href = (f: string, p: number) => `/research/${encodeURIComponent(ticker)}/filings?form=${f}&page=${p}`;
   return <main id="content" tabIndex={-1} className="mx-auto flex max-w-4xl flex-col gap-6">
     <PageHeader title={`Informe frente al año anterior · ${ticker}`}
-      back={<Link className="text-teal-300" href={`/research/${encodeURIComponent(ticker)}`}>Volver a la empresa</Link>} />
+      back={<Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300" href={`/research/${encodeURIComponent(ticker)}`}>Volver a la empresa</Link>} />
     <nav aria-label="Tipo de informe" className="flex gap-3 text-sm">
       {(['10-K', '10-Q'] as const).map((f) => <Link key={f} aria-current={f === form ? 'page' : undefined}
-        className={f === form ? 'font-semibold text-teal-200' : 'text-gray-400 hover:text-teal-300'} href={href(f, 1)}>{f}</Link>)}
+        className={`inline-flex min-h-11 min-w-11 items-center justify-center ${f === form ? 'font-semibold text-teal-200' : 'text-gray-400 hover:text-teal-300'}`} href={href(f, 1)}>{f}</Link>)}
     </nav>
     {!data ? <p role="status" className="text-amber-300">No se pudo leer la comparación. No equivale a «sin cambios».</p>
       : data.status !== 'ready' || !data.current || !data.previous ? <p role="status" className="text-gray-400">{data.reason ?? 'Sin datos.'}</p>
@@ -95,9 +95,9 @@ export default async function FilingsYoyPage({ params, searchParams }: {
             : <p className="text-gray-400">{data.text_reason ?? 'Sin análisis de texto.'}</p>}
         </Panel>
         <nav aria-label="Páginas de informes" className="flex items-center gap-4 text-sm">
-          {page > 1 && <Link className="text-teal-300" href={href(form, page - 1)}>Más reciente</Link>}
+          {page > 1 && <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300" href={href(form, page - 1)}>Más reciente</Link>}
           <span>{page} / {data.total}</span>
-          {page < data.total && <Link className="text-teal-300" href={href(form, page + 1)}>Anterior</Link>}
+          {page < data.total && <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300" href={href(form, page + 1)}>Anterior</Link>}
           <span className="sr-only">{PER_PAGE_NOTE}</span>
         </nav>
       </>}

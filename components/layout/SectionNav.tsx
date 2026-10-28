@@ -28,7 +28,11 @@ export default function SectionNav(){
  const pathname=usePathname();
  const [open,setOpen]=useState(false);
  useEffect(()=>{
-  try { setOpen(window.localStorage.getItem('subnav-seccion')==='abierto'); } catch { /* Storage may be disabled. */ }
+  // Preferencia persistida (almacén externo del navegador): se lee tras
+  // montar y el setState no es síncrono dentro del efecto.
+  queueMicrotask(() => {
+   try { setOpen(window.localStorage.getItem('subnav-seccion')==='abierto'); } catch { /* Storage may be disabled. */ }
+  });
  },[]);
  const toggle=()=>{
   const next=!open;

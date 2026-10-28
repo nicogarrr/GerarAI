@@ -118,7 +118,11 @@ class CorporateActionService:
             db.scalars(
                 select(CorporateAction)
                 .join(Company, CorporateAction.company_id == Company.id)
-                .order_by(CorporateAction.effective_date)
+                # Lo mas reciente primero: el tope recorta la historia antigua, no
+                # los eventos accionables. Con orden ascendente, los cientos de
+                # splits de los anos 70 de la ingesta del universo llenaban el
+                # limite y dejaban fuera los de ahora.
+                .order_by(CorporateAction.effective_date.desc(), CorporateAction.id.desc())
                 .limit(limit)
             )
         )

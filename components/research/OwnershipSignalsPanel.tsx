@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { formatCountEs } from '@/lib/format';
 
 import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
@@ -53,7 +54,7 @@ export function OwnershipSignalsPanel({ ticker, signals }: { ticker: string; sig
         <section aria-label="Fondos (13F)">
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <h3 className="text-sm font-semibold text-gray-200">Grandes fondos (informe 13F)</h3>
-            {holders.status === 'ok' ? <Badge className={TONE_CLASS[holdersTone(holders)]} variant="outline">{holders.holders_count} gestores</Badge> : null}
+            {holders.status === 'ok' ? <Badge className={TONE_CLASS[holdersTone(holders)]} variant="outline">{formatCountEs(holders.holders_count, 'gestor', 'gestores')}</Badge> : null}
           </div>
           <ul className="space-y-1 text-sm text-gray-400">
             {holdersLines(holders).map((line) => <li key={line}>{line}</li>)}

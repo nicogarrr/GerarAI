@@ -96,7 +96,8 @@ export default function TrackRecordView() {
     };
 
     useEffect(() => {
-        void load();
+        // Carga inicial tras montar: el setState de load no es síncrono en el efecto.
+        queueMicrotask(() => void load());
     }, []);
 
     return (

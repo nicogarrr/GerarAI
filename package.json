@@ -9,6 +9,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test:e2e": "playwright test",
+    "test:e2e:flows": "E2E_UI_RUN=1 E2E_USER_FLOWS=1 playwright test e2e/user-flows --workers=1",
     "test:db": "node scripts/test-db.mjs",
     "diagnose:db": "node scripts/diagnose-db.mjs",
     "generate:openapi": "python data-engine/scripts/export_openapi.py && openapi-typescript data-engine/openapi.json -o lib/research/openapi.generated.ts",
@@ -56,7 +57,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.64.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
@@ -69,6 +70,7 @@
     "@types/react-dom": "^19",
     "@types/react-select-country-list": "^2.2.3",
     "@vitest/coverage-v8": "^5.0.5",
+    "axe-core": "^4.14.0",
     "dotenv": "^18.0.7",
     "eslint": "^9",
     "eslint-config-next": "^16.4.0",

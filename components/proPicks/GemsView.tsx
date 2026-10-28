@@ -45,7 +45,8 @@ export default function GemsView() {
     };
 
     useEffect(() => {
-        void load();
+        // Carga inicial tras montar: el setState de load no es síncrono en el efecto.
+        queueMicrotask(() => void load());
     }, []);
 
     const busy = loading || reviewing;

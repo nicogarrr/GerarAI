@@ -123,7 +123,7 @@ export default async function ResearchSourcesPage({
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
       <header className="flex items-center justify-between gap-3 border-b border-gray-800 pb-4">
         <div className="flex items-center gap-3">
-          <Button asChild size="sm" variant="ghost">
+          <Button asChild className="min-w-11" size="sm" variant="ghost">
             <Link href="/research" aria-label="Volver a Research">
               <ArrowLeft aria-hidden="true" className="h-4 w-4" />
             </Link>
@@ -150,7 +150,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-ticker">
             Filtrar por ticker
             <TickerSearchInput
-              className="min-w-0 border-gray-800 bg-black/30 text-gray-200"
+              className="min-h-11 min-w-0 border-gray-800 bg-black/30 text-gray-200"
               defaultValue={ticker}
               id="sources-ticker"
               name="ticker"
@@ -160,7 +160,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-scope">
             Alcance
             <select
-              className="h-10 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
               defaultValue={scope}
               id="sources-scope"
               name="scope"
@@ -172,7 +172,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-source-type">
             Tipo de fuente
             <select
-              className="h-10 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
+              className="h-11 rounded-lg border border-gray-800 bg-black px-3 text-sm text-gray-200"
               defaultValue={sourceType}
               id="sources-source-type"
               name="source_type"
@@ -186,7 +186,7 @@ export default async function ResearchSourcesPage({
           <label className="grid gap-1 text-xs font-medium text-gray-400" htmlFor="sources-q">
             Buscar
             <Input
-              className="h-10 border-gray-800 bg-black/30 text-gray-200"
+              className="min-h-11 h-10 border-gray-800 bg-black/30 text-gray-200"
               defaultValue={query}
               id="sources-q"
               name="q"
@@ -237,7 +237,7 @@ export default async function ResearchSourcesPage({
                   </td>
                   <td className="py-3 text-gray-500">
                     {document.source_url ? (
-                      <a className="text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
+                      <a className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
                         abrir
                       </a>
                     ) : (
@@ -296,7 +296,7 @@ export default async function ResearchSourcesPage({
           <nav aria-label="Paginación de documentos" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             {pageInfo.page > 1 ? (
               <Link
-                className="rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
+                className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
                 href={sourcesHref(ticker, pageInfo.page - 1, filters)}
               >
                 Anterior
@@ -308,7 +308,7 @@ export default async function ResearchSourcesPage({
             </span>
             {pageInfo.page < pageInfo.pages ? (
               <Link
-                className="rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
+                className="inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
                 href={sourcesHref(ticker, pageInfo.page + 1, filters)}
               >
                 Siguiente
@@ -364,7 +364,7 @@ export default async function ResearchSourcesPage({
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="manual-source-type">Tipo de fuente</label>
-              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
+              <select id="manual-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">
                 <option value="manual_upload">Texto aportado por el usuario</option>
                 <option value="manual_transcript">Transcripción</option>
                 <option value="company_ir">Relaciones con inversores</option>
@@ -372,15 +372,15 @@ export default async function ResearchSourcesPage({
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="period">Periodo</label>
-              <Input id="period" name="period" placeholder="p. ej. Q2 2026" />
+              <Input className="min-h-11" id="period" name="period" placeholder="p. ej. Q2 2026" />
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="title">Título</label>
-              <Input id="title" name="title" placeholder="Transcript de la llamada de resultados del Q2" required />
+              <Input className="min-h-11" id="title" name="title" placeholder="Transcript de la llamada de resultados del Q2" required />
             </div>
             <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
               <label className="text-sm font-semibold text-gray-400" htmlFor="source_url">URL</label>
-              <Input id="source_url" name="source_url" placeholder="https://..." />
+              <Input className="min-h-11" id="source_url" name="source_url" placeholder="https://..." />
             </div>
             <div className="grid gap-2">
               <label className="text-sm font-semibold text-gray-400" htmlFor="text">Texto</label>
@@ -412,19 +412,19 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-title">Título</label>
-                <Input id="file-title" name="title" placeholder="Informe anual, presentación, transcript..." required />
+                <Input className="min-h-11" id="file-title" name="title" placeholder="Informe anual, presentación, transcript..." required />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-type">Tipo de fuente</label>
-                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+                <select id="file-source-type" name="source_type" defaultValue="manual_upload" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file-source-url">URL de la fuente</label>
-                <Input id="file-source-url" name="source_url" placeholder="https://..." />
+                <Input className="min-h-11" id="file-source-url" name="source_url" placeholder="https://..." />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file">Archivo</label>
-                <Input accept=".txt,.md,.html,.htm,.pdf,.docx,.xlsx,.csv,.tsv" id="file" name="file" required type="file" />
+                <Input className="min-h-11" accept=".txt,.md,.html,.htm,.pdf,.docx,.xlsx,.csv,.tsv" id="file" name="file" required type="file" />
               </div>
               <Button className="w-full sm:w-fit" type="submit">
               <UploadCloud aria-hidden="true" className="h-4 w-4" />
@@ -445,15 +445,15 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-title">Título</label>
-                <Input id="url-title" name="title" placeholder="Nota de prensa de RI o página del filing" required />
+                <Input className="min-h-11" id="url-title" name="title" placeholder="Nota de prensa de RI o página del filing" required />
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url-source-type">Tipo de fuente</label>
-                <select id="url-source-type" name="source_type" defaultValue="url" className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
+                <select id="url-source-type" name="source_type" defaultValue="url" className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200">{Object.entries(SOURCE_TYPE_LABELS).map(([value, text]) => <option key={value} value={value}>{text}</option>)}</select>
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="url">URL</label>
-                <Input id="url" name="url" placeholder="https://..." required type="url" />
+                <Input className="min-h-11" id="url" name="url" placeholder="https://..." required type="url" />
               </div>
               <Button className="w-full sm:w-fit" type="submit" variant="outline">
               <UploadCloud aria-hidden="true" className="h-4 w-4" />

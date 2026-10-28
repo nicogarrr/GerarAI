@@ -7,7 +7,10 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
-import { createAlert, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
+// Espejo de la validación de createAlert (lib/actions/alerts.actions.ts).
+const ALERT_SYMBOL_PATTERN = /^[A-Z0-9.\-]{1,20}$/;
+
+import { createAlertResult, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
 import { parseLocalizedNumber } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -55,7 +58,9 @@ function AlertsManager() {
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<{ message: string; cause: AlertsLoadCause } | null>(null);
-    const [open, setOpen] = useState(false);
+    // Deep-link desde QuickAlertButton (/alerts?symbol=MSFT&type=price_below&value=300):
+    // el diálogo arranca abierto y pre-rellenado desde la URL, sin efecto.
+    const [open, setOpen] = useState(() => searchParams.get('symbol') !== null);
     const [reviewing, setReviewing] = useState<string | null>(null);
     /** Borrado en curso: sin esto el boton se puede pulsar dos veces. */
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -71,13 +76,20 @@ function AlertsManager() {
     /** Estado de entrega del motor (evaluacion cada 5 min + Telegram). */
     const [telegram, setTelegram] = useState<TelegramStatus | null>(null);
     const [triggered, setTriggered] = useState<TriggeredAlertDelivery[]>([]);
-    const [formData, setFormData] = useState<CreateAlertInput>({
-        symbol: '',
-        type: 'price_above',
-        condition: {
-            operator: '>',
-            value: '',
-        },
+    const [formData, setFormData] = useState<CreateAlertInput>(() => {
+        const symbol = searchParams.get('symbol');
+        if (!symbol) {
+            return { symbol: '', type: 'price_above', condition: { operator: '>', value: '' } };
+        }
+        const type = searchParams.get('type');
+        return {
+            symbol: symbol.toUpperCase(),
+            type: isAlertType(type) ? type : 'price_above',
+            condition: {
+                operator: type === 'price_below' || type === 'price_change' ? '<' : '>',
+                value: searchParams.get('value') ?? '',
+            },
+        };
     });
 
     const loadAlerts = async () => {
@@ -120,24 +132,9 @@ function AlertsManager() {
     };
 
     useEffect(() => {
-        loadAlerts();
-        // Deep-link desde QuickAlertButton: /alerts?symbol=MSFT&type=price_below&value=300
-        // pre-rellena el diálogo de creación y lo abre directamente.
-        const symbol = searchParams.get('symbol');
-        if (symbol) {
-            const type = searchParams.get('type');
-            const value = searchParams.get('value') ?? '';
-            setFormData({
-                symbol: symbol.toUpperCase(),
-                type: isAlertType(type) ? type : 'price_above',
-                condition: {
-                    operator: type === 'price_below' || type === 'price_change' ? '<' : '>',
-                    value,
-                },
-            });
-            setOpen(true);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // Carga inicial tras montar: el setState de loadAlerts no es síncrono
+        // dentro del efecto.
+        queueMicrotask(() => void loadAlerts());
     }, []);
 
     useEffect(() => {
@@ -148,8 +145,12 @@ function AlertsManager() {
         if (creating) return;
         setCreateError(null);
         try {
-            if (!formData.symbol.trim()) {
-                toast.error('Introduce un símbolo válido');
+            // Mismo patrón que valida createAlert en servidor. Sin este filtro,
+            // un símbolo largo o con caracteres raros llegaba a la server action,
+            // que lanza ValidationError: POST /alerts 500 y, en producción, un
+            // error genérico en inglés en vez de este aviso (agent-qa 28/10).
+            if (!ALERT_SYMBOL_PATTERN.test(formData.symbol.trim().toUpperCase())) {
+                toast.error('Introduce un símbolo válido (letras, números, punto o guion; máximo 20)');
                 return;
             }
             const isValueless = formData.type === 'news' || formData.type === 'earnings';
@@ -167,7 +168,7 @@ function AlertsManager() {
                 : (parsedValue as number);
 
             setCreating(true);
-            await createAlert({
+            const result = await createAlertResult({
                 ...formData,
                 condition: {
                     ...formData.condition,
@@ -184,6 +185,13 @@ function AlertsManager() {
                     value: numericValue,
                 },
             });
+            if (!result.ok) {
+                // Rechazo de negocio (símbolo inexistente, duplicada): su
+                // mensaje, sin «reintenta» ni cerrar el diálogo.
+                if (result.cause === 'duplicate') toast.info(result.message);
+                else toast.error(result.message);
+                return;
+            }
             toast.success('Alerta creada');
 
             setOpen(false);
@@ -269,7 +277,7 @@ function AlertsManager() {
             return `${symbol}: ${ALERT_TYPE_LABELS.price_below} ${threshold}`;
         }
         if (type === 'price_change') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.price_change} ${operator === '>' ? 'mayor' : 'menor'} a ${value}%`;
+            return `${symbol}: ${ALERT_TYPE_LABELS.price_change} ${operator === '>' ? 'mayor' : 'menor'} a ${threshold}%`;
         }
         if (type === 'news') {
             return `${symbol}: ${ALERT_TYPE_LABELS.news}`;

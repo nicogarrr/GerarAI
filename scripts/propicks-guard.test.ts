@@ -172,7 +172,7 @@ describe('propicks-guard', () => {
 
     it('el action expone asOf, facts y confianza trazable', () => {
         const src = readSource('lib/actions/proPicks.actions.ts');
-        for (const token of ['asOf', 'confidenceReasons', 'facts', 'confidenceLevel', 'buildConfidence']) {
+        for (const token of ['asOf', 'confidenceReasons', 'facts', 'confidenceLevel']) {
             assert.ok(src.includes(token), `proPicks.actions.ts debe contener ${token}`);
         }
     });
@@ -360,12 +360,6 @@ describe('propicks overlays en el action (contrato fuente)', () => {
         }
     });
 
-    it('normaliza por sector (z-score winsorizado) sin tocar los scores de R4', () => {
-        const src = readSource('lib/actions/proPicks.actions.ts');
-        for (const token of ['normalizeSectorCategoryScores', 'z-score', 'winsoriz', 'R4']) {
-            assert.ok(src.includes(token), `proPicks.actions.ts debe contener ${token}`);
-        }
-    });
 });
 
 describe('F49: la fecha de ProPicks es la del run real, no la de carga', () => {

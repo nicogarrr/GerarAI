@@ -18,5 +18,5 @@ export function thesisCodeLabel(value: string): string {
     estimacion_llm: 'estimación del modelo',
   };
   if (!/^[a-z][a-z0-9_/]*$/.test(value)) return value;
-  return labels[value] ?? METRIC_LABELS[value] ?? frameworkTerm(value) ?? value;
+  return (Object.hasOwn(labels, value) ? labels[value] : null) ?? (Object.hasOwn(METRIC_LABELS, value) ? METRIC_LABELS[value] : null) ?? frameworkTerm(value) ?? value;
 }

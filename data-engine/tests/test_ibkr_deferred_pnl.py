@@ -110,6 +110,16 @@ def test_worker_deferred_pnl_retries_hourly_with_bounded_actor_budget(monkeypatc
         return DEFERRED
     monkeypatch.setattr(IBKRFlexClient, 'fetch_latest_xml', fetch)
     monkeypatch.setattr(worker, 'tenant_contexts', lambda: [(1, 'synthetic')])
+    # El worker consulta ibkr_connections con una sesion admin REAL (SessionLocal):
+    # el test crea su propio esquema en memoria en vez de depender de que otro
+    # test haya dejado el SQLite compartido migrado (dependencia de orden).
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.core import database as database_module
+    admin_engine = create_engine('sqlite:///:memory:', poolclass=StaticPool, connect_args={'check_same_thread': False})
+    Base.metadata.create_all(admin_engine)
+    monkeypatch.setattr(database_module, 'SessionLocal', sessionmaker(bind=admin_engine))
     db = MagicMock()
     monkeypatch.setattr(worker, '_session', lambda *args: db)
     with pytest.raises(dramatiq.Retry) as exc:

@@ -90,6 +90,14 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const encoded = encodeURIComponent(ticker);
   const name = company?.name ?? ticker;
   const generated = published ? formatGeneratedDate(published.created_at) : null;
+  // El precio persistido con la versión es el que usó el MODELO al generarla
+  // (snapshot de posición o último cierre), no la cotización de hoy: nunca
+  // se rotula "Precio actual". La fecha de la cotización solo se muestra si
+  // el motor la persistió en valuation_basis; si no, sin fecha (no se inventa).
+  const priceAsOf = published?.valuation_basis?.price_as_of ?? null;
+  const modelPriceLabel = priceAsOf
+    ? `Precio del modelo al ${formatUserDate(priceAsOf)}`
+    : 'Precio del modelo';
   // La columna Probabilidad solo se muestra cuando el motor persistio
   // probabilidades: sin ellas seria un «N/D» triple que aparenta un dato
   // que no existe (regla de veracidad: no inventar ni insinuar datos).
@@ -331,7 +339,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 <p className="mt-4 text-sm text-gray-400">Sin cifras de valoración.</p>
               )}
               <p className="mt-3 text-sm text-gray-400">
-                Precio actual: {money(published.current_price, currency)} · Valor esperado: {money(published.expected_value, currency)}
+                {modelPriceLabel}: {money(published.current_price, currency)} · Valor esperado: {money(published.expected_value, currency)}
                 {published.margin_of_safety !== null
                   ? ` · Margen de seguridad: ${formatPercent(Number(published.margin_of_safety))}`
                   : ''}

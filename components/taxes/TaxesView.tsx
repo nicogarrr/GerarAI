@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { Download, FileText, Receipt, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { getTaxHoldings, getTaxReport, regenerateTaxReport } from '@/lib/actions
 import { FilingSection, Modelo720Section } from '@/components/taxes/FilingSections';
 import { recordDetailKey } from '@/components/taxes/record-detail-key';
 import { reportForYear, type ReportOverride } from '@/lib/taxes/report-state';
-import { formatUserDateTime, formatMoney, formatNumber, isValidCurrencyCode, NA, USER_TZ } from '@/lib/format';
+import { formatUserDateTime, formatMoney, formatNumber, isValidCurrencyCode, NA, USER_TZ, formatCountEs } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { showErrorToast } from '@/lib/toast';
 import { toast } from 'sonner';
@@ -67,6 +67,7 @@ const TAX_LABELS: Record<string, string> = {
     over_sell: 'Ventas sin compras que las cubran',
     cost_unknown: 'Ventas con coste heredado desconocido',
     method: 'Método de valoración',
+    securities_fx_criterion: 'Criterio FX en valores',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',
     generated_at: 'Generado',
@@ -81,6 +82,12 @@ const TAX_LABELS: Record<string, string> = {
  *  minúsculas, p.ej. `fifo`, que en UI se veía en crudo). */
 const METHOD_LABELS: Record<string, string> = {
     fifo: 'FIFO',
+};
+
+const SECURITIES_FX_LABELS: Record<string, string> = {
+    // Criterio DGT: ganancia en la divisa del valor, convertida una sola vez
+    // al cambio de la fecha de venta (tax_report_service.py).
+    dgt_native_gain_sale_date_v1: 'Ganancia en divisa del valor, convertida a EUR al cambio de la fecha de venta (DGT)',
 };
 
 const WASH_RULE_LABELS: Record<string, string> = {
@@ -179,6 +186,8 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = WASH_RULE_LABELS[String(value)] ?? String(value);
         } else if (key === 'wash_sale_basis') {
             display[label] = WASH_BASIS_LABELS[String(value)] ?? String(value);
+        } else if (key === 'securities_fx_criterion') {
+            display[label] = SECURITIES_FX_LABELS[String(value)] ?? String(value);
         } else if (key === 'method') {
             display[label] = METHOD_LABELS[String(value).toLowerCase()] ?? String(value);
         } else if (key === 'generated_at') {
@@ -316,17 +325,21 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
     // El año civil viene del reloj del navegador: leerlo en el render rompe la
     // hidratación en la frontera de año. Se arranca con un estado fijo (0) y se
     // fija el año real en el primer efecto.
-    const [currentYear, setCurrentYear] = useState(0);
-    useEffect(() => {
+    const currentYear = useSyncExternalStore(
+        () => () => {},
         // Año civil del usuario (Europe/Madrid), igual que el servidor en taxes/page.tsx.
-        setCurrentYear(Number(new Intl.DateTimeFormat('en-CA', { timeZone: USER_TZ, year: 'numeric' }).format(new Date())));
-    }, []);
+        () => Number(new Intl.DateTimeFormat('en-CA', { timeZone: USER_TZ, year: 'numeric' }).format(new Date())),
+        () => 0,
+    );
     const yearOptions = currentYear === 0
         ? []
         : Array.from({ length: 6 }, (_, index) => currentYear - index);
 
+    // [&>*]:min-w-0: a 768 px (md) la tarjeta «Posiciones Fiscales» (min-content
+    // 513 px) inflaba la vía implícita de esta grid y la página hacía scroll
+    // horizontal; con min-w-0 cada tarjeta cabe y su tabla desliza dentro.
     return (
-        <div className="grid gap-6">
+        <div className="grid gap-6 [&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:items-center [&>*]:min-w-0">
             <div className="flex flex-wrap items-center gap-3">
                 <label htmlFor="tax-year" className="text-sm text-gray-400">
                     {t('taxes.year')}
@@ -335,7 +348,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     id="tax-year"
                     value={year}
                     onChange={(event) => handleYearChange(event.target.value)}
-                    className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200"
+                    className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200"
                 >
                     {yearOptions.map((option) => (
                         <option key={option} value={option}>
@@ -347,6 +360,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             <RecordDetail
                 key={recordDetailKey(year, reportKey)}
                 title={`Reporte Fiscal ${year}`}
+                titleAs="h2"
                 description="Resumen orientativo del ejercicio"
                 icon={<FileText className="h-5 w-5 text-teal-400" />}
                 hiddenKeys={['trace']}
@@ -376,6 +390,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             <RecordList
                 key={`holdings-${year}-${currentHoldingPage}`}
                 title="Posiciones Fiscales"
+                titleAs="h2"
                 description="Posiciones con base de coste y plusvalías latentes. La divisa base del informe es EUR; cada importe usa la divisa de su fila si consta."
                 icon={<Receipt className="h-5 w-5 text-teal-400" />}
                 records={initialHoldings.slice(currentHoldingPage * 10, (currentHoldingPage + 1) * 10)}
@@ -418,7 +433,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             />
             {holdingPages > 1 && <nav aria-label="Páginas de posiciones fiscales" className="flex items-center justify-between gap-2">
                 <Button size="sm" variant="outline" disabled={currentHoldingPage === 0} onClick={() => setHoldingPage(currentHoldingPage - 1)}>Anterior</Button>
-                <span className="text-xs text-gray-400">{currentHoldingPage + 1} / {holdingPages} · {initialHoldings.length} posiciones</span>
+                <span className="text-xs text-gray-400">{currentHoldingPage + 1} / {holdingPages} · {formatCountEs(initialHoldings.length, 'posición', 'posiciones')}</span>
                 <Button size="sm" variant="outline" disabled={currentHoldingPage + 1 >= holdingPages} onClick={() => setHoldingPage(currentHoldingPage + 1)}>Siguiente</Button>
             </nav>}
         </div>

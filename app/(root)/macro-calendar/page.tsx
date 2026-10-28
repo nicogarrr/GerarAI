@@ -99,7 +99,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                                 </span>
                                 {event.time_et && <span className="text-xs text-gray-500">{event.time_et} ET</span>}
                                 <SourceBadge>Oficial</SourceBadge>
-                                <a className="text-xs text-teal-300 hover:underline" href={event.source_url} target="_blank" rel="noopener noreferrer">{event.source}</a>
+                                <a className="inline-flex min-h-11 min-w-11 items-center text-xs text-teal-300 hover:underline" href={event.source_url} target="_blank" rel="noopener noreferrer">{event.source}</a>
                             </li>
                         ))}
                     </ul>
@@ -117,14 +117,14 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                         {digest.items.map((entry) => (
                             <li key={entry.document_id} className="rounded-xl border border-gray-800 p-4">
                                 <div className="flex flex-wrap items-center gap-3">
-                                    <Link href={`/research/${encodeURIComponent(entry.ticker)}`} className="text-base font-semibold text-gray-100 hover:text-teal-300">{entry.ticker}</Link>
+                                    <Link href={`/research/${encodeURIComponent(entry.ticker)}`} className="inline-flex min-h-11 min-w-11 items-center text-base font-semibold text-gray-100 hover:text-teal-300">{entry.ticker}</Link>
                                     <span className="text-sm text-gray-400">{entry.company}</span>
                                     <span className="text-sm text-gray-500">{entry.filed_at ? formatMarketDate(entry.filed_at) : 'Fecha no disponible'}</span>
                                     {entry.matching.map((m) => (
                                         <span key={m} className="rounded bg-gray-800 px-1.5 py-0.5 text-[11px] uppercase text-gray-300">{m}</span>
                                     ))}
                                     <SourceBadge>Oficial</SourceBadge>
-                                    <a className="ml-auto text-xs text-teal-300 hover:underline" href={entry.source_url} target="_blank" rel="noopener noreferrer">Documento en SEC</a>
+                                    <a className="ml-auto inline-flex min-h-11 min-w-11 items-center text-xs text-teal-300 hover:underline" href={entry.source_url} target="_blank" rel="noopener noreferrer">Documento en SEC</a>
                                 </div>
                                 {entry.status === 'insufficient_data' ? (
                                     <p className="mt-3 text-sm text-gray-400">{entry.reason}</p>

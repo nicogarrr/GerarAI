@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Briefcase, Gauge } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -84,12 +84,14 @@ const RISK_LABELS: Record<string, string> = {
     cash_as_of: 'Caja a fecha de',
     fx_rates: 'Tipos de cambio usados',
     valuation_dates_differ: 'Fechas de valoración',
+    valuation_hold: 'Valoración en suspenso',
 };
 
 const RISK_STATUS_LABELS: Record<string, string> = {
     ok: 'Correcto',
     incomplete_fx: 'Incompleto: faltan tipos de cambio',
     insufficient_data: 'Datos insuficientes',
+    incomplete_valuation: 'Incompleto: valoración en suspenso',
 };
 
 function humanizeRiskKey(key: string): string {
@@ -164,6 +166,18 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
             display[label] = value
                 .map((item) => (isRecord(item) ? String(item.ticker ?? item.quote_currency ?? item.currency ?? '?') : String(item)))
                 .join(', ');
+        } else if (key === 'valuation_hold') {
+            // Como missing_fx: sin posiciones en suspenso no se pinta la fila.
+            // Cada entrada declara ticker, motivo y fecha efectiva (risk_service).
+            if (!Array.isArray(value) || value.length === 0) continue;
+            display[label] = value
+                .map((item) => {
+                    if (!isRecord(item)) return String(item);
+                    const reason = typeof item.reason === 'string' && item.reason ? `: ${item.reason}` : '';
+                    const since = typeof item.effective_date === 'string' && item.effective_date ? ` · ${formatDate(item.effective_date)}` : '';
+                    return `${String(item.ticker ?? '?')}${reason}${since}`;
+                })
+                .join(' · ');
         } else if (key === 'cash_as_of') {
             display[label] = typeof value === 'string' && value ? formatDate(value) : NA;
         } else if (key === 'fx_rates') {
@@ -264,9 +278,13 @@ function alertKey(alert: DataRecord): string {
 
 export default function RiskDashboardView({ initialDashboard }: RiskDashboardViewProps) {
     const [dashboard, setDashboard] = useState(initialDashboard);
-    useEffect(() => {
+    // Sincroniza el snapshot si el servidor revalida: ajuste durante el
+    // render, no efecto con setState síncrono.
+    const [prevInitial, setPrevInitial] = useState(initialDashboard);
+    if (prevInitial !== initialDashboard) {
+        setPrevInitial(initialDashboard);
         setDashboard(initialDashboard);
-    }, [initialDashboard]);
+    }
 
     const refreshDashboard = async () => {
         // Una única respuesta actualiza resumen, alertas, posiciones y divisa.

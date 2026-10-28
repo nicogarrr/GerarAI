@@ -3120,6 +3120,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ownership/schedule-13dg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Schedule 13Dg
+         * @description Filings SC 13D/13G persistidos del ticker; campos no parseados = N/D.
+         */
+        get: operations["schedule_13dg_api_ownership_schedule_13dg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ownership/schedule-13dg/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule 13Dg Sync
+         * @description Ingesta acotada de SC 13D/13G para UN ticker SEGUIDO.
+         *
+         *     "Seguido" = watchlist o cartera del tenant (misma definicion que el
+         *     monitor diario); cualquier otro ticker se rechaza con 404 en lugar de
+         *     gastar peticiones a la SEC en un emisor que el usuario no sigue.
+         */
+        post: operations["schedule_13dg_sync_api_ownership_schedule_13dg_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/paper-trading/feed": {
         parameters: {
             query?: never;
@@ -3880,6 +3924,53 @@ export interface paths {
          *     ni identificadores de otros tenants.
          */
         get: operations["export_account_api_privacy_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/deep-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deep Value
+         * @description Cribado deep value (P/B + yield) sobre las metricas valuation-v1.
+         *
+         *     Estrategia separada del embudo de calidad, con su rotulo: cada fila lleva
+         *     fuente y fecha por cifra y el desacuerdo Yahoo/Finnhub visible.
+         */
+        get: operations["deep_value_api_propicks_deep_value_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/deep-value/radar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Deep Value Radar
+         * @description Radar global Yahoo (fuente no oficial): SOLO propone candidatos.
+         *
+         *     No persiste nada y no presenta cifras como dato verificado; cada
+         *     candidato lleva su fuente y la via de cotejo oficial cuando aplica
+         *     (HKEXnews para HKEX). 503 honesto si Yahoo no responde.
+         */
+        get: operations["deep_value_radar_api_propicks_deep_value_radar_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6915,6 +7006,50 @@ export interface components {
             /** Telefono */
             telefono?: string | null;
         };
+        /** DeepValueResponse */
+        DeepValueResponse: {
+            /** Estrategia */
+            estrategia: string;
+            /** Resultados */
+            resultados: components["schemas"]["DeepValueRowOut"][];
+            /** Rotulo */
+            rotulo: string;
+        };
+        /** DeepValueRowOut */
+        DeepValueRowOut: {
+            /** Currency */
+            currency: string;
+            /** Desacuerdo Fuentes */
+            desacuerdo_fuentes: boolean;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Exchange */
+            exchange: string;
+            /** Finnhub Yield Indicated */
+            finnhub_yield_indicated: number | null;
+            /** Fuentes */
+            fuentes: string[];
+            /** Metric As Of */
+            metric_as_of: string | null;
+            /** Name */
+            name: string;
+            /** Pb Fiscal Year */
+            pb_fiscal_year: number | null;
+            /** Pb Price Date */
+            pb_price_date: string | null;
+            /** Price To Book */
+            price_to_book: number;
+            /** Score */
+            score: number;
+            /** Sector */
+            sector: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Yield Extremo Revisar */
+            yield_extremo_revisar: boolean;
+            /** Yield Status */
+            yield_status: string | null;
+        };
         /** DeleteAccountRequest */
         DeleteAccountRequest: {
             /** Confirmation */
@@ -8397,6 +8532,40 @@ export interface components {
              * @default 6
              */
             top_k: number;
+        };
+        /** RadarCandidateOut */
+        RadarCandidateOut: {
+            /** Currency */
+            currency: string | null;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** En Universo Propio */
+            en_universo_propio: boolean;
+            /** Exchange */
+            exchange: string | null;
+            /** Fuente */
+            fuente: string;
+            /** Name */
+            name: string | null;
+            /** Price To Book */
+            price_to_book: number | null;
+            /** Symbol */
+            symbol: string;
+            /** Via Cotejo */
+            via_cotejo: string | null;
+            /** Yield Extremo Revisar */
+            yield_extremo_revisar: boolean;
+        };
+        /** RadarResponse */
+        RadarResponse: {
+            /** Candidatos */
+            candidatos: components["schemas"]["RadarCandidateOut"][];
+            /** Generado En */
+            generado_en: string;
+            /** Regiones */
+            regiones: string[];
+            /** Rotulo */
+            rotulo: string;
         };
         /** ResearchAlertAction */
         ResearchAlertAction: {
@@ -16996,6 +17165,90 @@ export interface operations {
             };
         };
     };
+    schedule_13dg_api_ownership_schedule_13dg_get: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_13dg_sync_api_ownership_schedule_13dg_sync_post: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     feed_api_paper_trading_feed_post: {
         parameters: {
             query?: never;
@@ -19022,6 +19275,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PrivacyErrorResponse"];
+                };
+            };
+        };
+    };
+    deep_value_api_propicks_deep_value_get: {
+        parameters: {
+            query?: {
+                pb_max?: number | string;
+                yield_min?: number | string;
+                limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeepValueResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    deep_value_radar_api_propicks_deep_value_radar_get: {
+        parameters: {
+            query?: {
+                pb_max?: number | string | null;
+                yield_min?: number | string;
+                /** @description CSV de regiones Yahoo (us,es,hk,jp,...) */
+                regions?: string;
+                limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RadarResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

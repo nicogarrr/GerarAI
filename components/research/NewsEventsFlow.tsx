@@ -4,7 +4,7 @@ import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import type { NewsLane } from '@/lib/news-paging';
-import { formatPercent, formatTimeAgo, formatUserDateTime, NA } from '@/lib/format';
+import { formatPercent, formatTimeAgo, formatUserDate, formatUserDateTime, NA } from '@/lib/format';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { NewsSummary } from './NewsSummary';
 import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
@@ -25,8 +25,8 @@ function carrilHref(lane: NewsLane, ticker?: string | null): string {
   return text ? `/research/news?${text}` : '/research/news';
 }
 
-const PAGER_LINK = 'rounded-lg border border-gray-700 bg-black/30 px-4 py-2 text-sm font-medium text-gray-200 hover:border-teal-600 hover:text-teal-200';
-const PAGER_OFF = 'rounded-lg border border-gray-900 px-4 py-2 text-sm text-gray-700';
+const PAGER_LINK = 'inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-700 bg-black/30 px-4 py-2 text-sm font-medium text-gray-200 hover:border-teal-600 hover:text-teal-200';
+const PAGER_OFF = 'inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-900 px-4 py-2 text-sm text-gray-700';
 
 function newsPageHref(lane: NewsLane, page: number, ticker?: string | null): string {
   const query = new URLSearchParams();
@@ -61,13 +61,15 @@ function NewsPager({label,lane,page,hasMore,ticker}:{label:string;lane:NewsLane;
  * enlaces Anterior/Siguiente la cambian. El carril se filtra en la API (no
  * sobre una ventana fija), así que "Macro" y "Empresas" recorren todo el histórico.
  */
-/** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto). */
-function eventDateText(value: string): string {
+/** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto).
+ *  El día sin hora se pinta en es-ES con formatUserDate (día de calendario literal, sin
+ *  desplazamiento por zona); antes se devolvía el ISO crudo («2026-10-27»). */
+export function eventDateText(value: string): string {
   const day = value.split('T')[0];
   const match = /T(\d{2}:\d{2})/.exec(value);
-  if (!match || match[1] === '00:00') return day;
+  if (!match || match[1] === '00:00') return formatUserDate(day);
   const formatted = formatUserDateTime(value);
-  return formatted === NA ? day : formatted;
+  return formatted === NA ? formatUserDate(day) : formatted;
 }
 
 /** Materialidad como indicador visual: barra proporcional + número, color por impacto. */
@@ -209,7 +211,7 @@ export function NewsEventsFlow({
             return (
               <Link
                 aria-current={active ? 'page' : undefined}
-                className={`rounded-full border px-4 py-1.5 text-sm ${
+                className={`inline-flex min-h-11 min-w-11 items-center rounded-full border px-4 py-1.5 text-sm ${
                   active
                     ? 'border-teal-500 bg-teal-950/60 font-semibold text-teal-300'
                     : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-gray-100'
@@ -236,7 +238,7 @@ export function NewsEventsFlow({
             <li className="rounded-lg border border-gray-800 bg-black/20 p-3" key={`card-${event.id}`}>
               <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
                 {event.ticker ? (
-                  <Link className="inline-flex min-h-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${event.ticker}`}>
+                  <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${event.ticker}`}>
                     {event.ticker}
                   </Link>
                 ) : null}
@@ -286,7 +288,7 @@ export function NewsEventsFlow({
                   <th className="py-2.5 text-left text-sm font-semibold" scope="row">
                     {event.ticker ? (
                       <Link
-                        className="inline-flex min-h-11 items-center text-teal-300 hover:text-teal-200"
+                        className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200"
                         href={`/research/${event.ticker}`}
                       >
                         {event.ticker}

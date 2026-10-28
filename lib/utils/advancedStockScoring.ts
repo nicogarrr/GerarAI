@@ -104,17 +104,41 @@ export interface AdvancedScoreData {
  * @param historicalData velas hasta `asOf`; la última vela fija el corte si no se pasa `asOf`.
  * @param asOf corte explícito (ISO). Por defecto: última vela o `now`. Nunca usa datos futuros.
  */
+/**
+ * Entrada del scoring: métricas del proveedor, perfil, quote y comparación
+ * con índice. Frontera externa sin esquema: todo `unknown` y se estrecha
+ * campo a campo con `asRecord`/`getNumeric`.
+ */
+export interface ScoringFinancialData {
+    metrics?: unknown;
+    profile?: unknown;
+    quote?: unknown;
+    indexComparison?: unknown;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : {};
+
 export async function calculateAdvancedStockScore(
-    financialData: any,
+    financialData: ScoringFinancialData,
     historicalData?: { prices: number[]; dates: number[] },
     asOf?: string
 ): Promise<AdvancedScoreData> {
-    const metrics = financialData.metrics?.metric || financialData.metrics || {};
-    const profile = financialData.profile || {};
-    const quote = financialData.quote || {};
-    const indexComparison = financialData.indexComparison || {};
+    const metricsContainer = asRecord(financialData.metrics);
+    const nestedMetrics = metricsContainer.metric;
+    const metrics = (
+        nestedMetrics !== null && typeof nestedMetrics === 'object'
+            ? nestedMetrics
+            : metricsContainer
+    ) as Record<string, unknown>;
+    const profile = asRecord(financialData.profile);
+    const quote = asRecord(financialData.quote);
+    const indexComparison = asRecord(financialData.indexComparison);
 
-    const sector = profile.finnhubIndustry || profile.industry || 'Desconocido';
+    const sectorRaw = profile.finnhubIndustry ?? profile.industry;
+    const sector = typeof sectorRaw === 'string' && sectorRaw.length > 0 ? sectorRaw : 'Desconocido';
 
     // Obtener promedios reales del sector desde la API
     // IMPORTANTE: Si no hay datos disponibles, no inventamos valores
@@ -170,7 +194,7 @@ export async function calculateAdvancedStockScore(
     const facts: Record<string, number | string> = { sector };
 
     // Helper para obtener valores numéricos
-    const getNumeric = (value: any): number | null => {
+    const getNumeric = (value: unknown): number | null => {
         if (value === null || value === undefined || value === '') return null;
         const num = typeof value === 'string' ? parseFloat(value.replace(/,/g, '')) : Number(value);
         return isNaN(num) ? null : num;
@@ -381,8 +405,9 @@ export async function calculateAdvancedStockScore(
 
     // Comparación con S&P 500: snapshot externo sin fecha; con corte
     // explícito no se puede demostrar point-in-time y se excluye.
+    const vsSP500Data = asRecord(indexComparison.vsSP500);
     if (indexComparison.vsSP500 && !explicitCutoff) {
-        const vsSP500 = indexComparison.vsSP500.change || 0;
+        const vsSP500 = getNumeric(vsSP500Data.change) ?? 0;
         categoryScores.momentum += vsSP500 > 5 ? 20 : vsSP500 > 0 ? 15 : vsSP500 > -5 ? 10 : 5;
 
         if (vsSP500 > 5) {
@@ -478,7 +503,7 @@ export async function calculateAdvancedStockScore(
     snapshot('price', explicitCutoff
         ? (candles && candles.prices.length > 0 ? candles.prices[candles.prices.length - 1] : null)
         : getNumeric((quote as Record<string, unknown>)?.c ?? (quote as Record<string, unknown>)?.price));
-    snapshot('vsSP500', indexComparison.vsSP500?.change);
+    snapshot('vsSP500', getNumeric(vsSP500Data.change));
     if (candles && candles.prices.length > 0) {
         const priceList = candles.prices;
         const lastPrice = priceList[priceList.length - 1];

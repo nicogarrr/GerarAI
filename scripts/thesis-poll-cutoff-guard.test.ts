@@ -20,7 +20,8 @@ describe('polling de tesis: corte y estado desconocido', () => {
         assert.match(button, /pollCountRef\.current \+= 1;/);
     });
     it('al agotarse NO se re-agenda y se marca pollExhausted', () => {
-        assert.match(button, /if \(pollCountRef\.current >= MAX_POLLS\) \{[\s\S]{0,200}setPollExhausted\(true\);\s*return;/);
+        // El agotamiento se marca por id de job (estado derivado, sin reset en efecto).
+        assert.match(button, /if \(pollCountRef\.current >= MAX_POLLS\) \{[\s\S]{0,200}setExhaustedJobId\(jobId\);\s*return;/);
         // El efecto no arranca si está agotado.
         assert.match(button, /if \(!active \|\| !jobId \|\| pollExhausted\) return;/);
     });
@@ -29,6 +30,10 @@ describe('polling de tesis: corte y estado desconocido', () => {
         assert.match(button, /El trabajo del servidor no se cancela/);
     });
     it('un job nuevo reinicia la ventana de polling', () => {
-        assert.match(button, /useEffect\(\(\) => \{\s*pollCountRef\.current = 0;\s*setPollExhausted\(false\);\s*\}, \[jobId\]\);/);
+        // El contador arranca con el efecto de polling y el agotamiento se
+        // deriva comparando ids: un job nuevo tiene id distinto, así que su
+        // ventana es nueva sin necesidad de un efecto de reset.
+        assert.match(button, /pollCountRef\.current = 0;/);
+        assert.match(button, /const pollExhausted = jobId != null && exhaustedJobId === jobId;/);
     });
 });

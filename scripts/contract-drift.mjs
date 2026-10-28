@@ -36,6 +36,9 @@ function loadArgs(argv) {
   return args;
 }
 
+/**
+ * @param {{ root?: string, openapiPath?: string }} [options]
+ */
 export function scanContract({ root = ROOT, openapiPath } = {}) {
   const spec = JSON.parse(fs.readFileSync(openapiPath ?? path.join(root, 'data-engine', 'openapi.json'), 'utf8'));
 
@@ -283,7 +286,6 @@ export function scanContract({ root = ROOT, openapiPath } = {}) {
       if (obj) schema = obj; else return;
     }
     const sProps = schema.properties ?? {};
-    const sRequired = new Set(schema.required ?? []);
     const allowsExtra = schema.additionalProperties === true || (schema.additionalProperties && typeof schema.additionalProperties === 'object');
     for (const sym of tsType.getProperties()) {
       const name = sym.getName();

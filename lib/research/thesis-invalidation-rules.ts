@@ -91,7 +91,7 @@ export function coerceInvalidationRules(raw: unknown): ThesisInvalidationRule[] 
     const record = item as Record<string, unknown>;
     const operator = String(record.operator ?? '');
     const threshold = typeof record.threshold === 'number' ? record.threshold : parseThreshold(String(record.threshold ?? ''));
-    if (typeof record.metric !== 'string' || !(operator in OPERATOR_TEXT) || threshold === null) continue;
+    if (typeof record.metric !== 'string' || !Object.hasOwn(OPERATOR_TEXT, operator) || threshold === null) continue;
     rules.push({
       metric: record.metric,
       operator: operator as InvalidationOperator,

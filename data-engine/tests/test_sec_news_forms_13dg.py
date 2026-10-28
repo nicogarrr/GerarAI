@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import asyncio
 
-from app.services.feed_ingestion_service import DEFAULT_SEC_NEWS_FORMS, FeedIngestionService
 from app.services.connectors.base import ConnectorResult
+from app.services.feed_ingestion_service import DEFAULT_SEC_NEWS_FORMS, FeedIngestionService
 
 
 def test_default_sec_news_forms_cover_13d_13g_both_families():

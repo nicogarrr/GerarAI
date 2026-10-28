@@ -92,6 +92,15 @@ jobs:
           else
             echo "Sin informe de Vitest: el paso anterior no llego a generarlo." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Frontend coverage by feature (informativo, no bloquea)
+        # Agrupa coverage-summary.json por funcionalidad (impuestos, DCA,
+        # cartera, auth...). Sin umbrales: solo resumen y artefacto.
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          if [ -f coverage/frontend/coverage-summary.json ]; then
+            node scripts/frontend-coverage-by-feature.mjs --markdown --json coverage/frontend/coverage-by-feature.json | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Publish frontend coverage report artifact
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -100,6 +109,7 @@ jobs:
           path: |
             coverage/frontend/lcov.info
             coverage/frontend/coverage-summary.json
+            coverage/frontend/coverage-by-feature.json
             coverage/frontend/guards.lcov
           if-no-files-found: warn
           retention-days: 14

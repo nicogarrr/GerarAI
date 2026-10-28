@@ -18,6 +18,7 @@ const UNIT_NAMES: Record<string, string> = { shares: "acciones", share: "acción
 
 function toNumber(value: number | string | null | undefined): number | null {
     if (value === null || value === undefined || value === "") return null;
+    if (typeof value === "string" && value.trim() === "") return null;
     const parsed = typeof value === "number" ? value : Number(String(value).replace(/,/g, ""));
     return Number.isFinite(parsed) ? parsed : null;
 }

@@ -20,8 +20,11 @@ describe('alta de alerta: sin doble click', () => {
         assert.match(alerts, /const handleCreateAlert = async \(\) => \{\s*if \(creating\) return;/);
     });
     it('creating se activa antes del await y se libera en finally', () => {
-        const setAt = alerts.indexOf('setCreating(true);\n            await createAlert({');
-        assert.ok(setAt !== -1, 'setCreating(true) debe ir justo antes de await createAlert');
+        const handler = alerts.slice(alerts.indexOf('const handleCreateAlert = async'), alerts.indexOf('const handleDeleteAlert = async'));
+        const setAt = handler.indexOf('setCreating(true);');
+        const firstAwait = handler.indexOf('await ');
+        assert.ok(setAt >= 0 && firstAwait > setAt, 'setCreating(true) debe preceder a todo await del alta');
+        assert.match(handler.slice(firstAwait), /^await createAlertResult\(\{/);
         assert.match(alerts, /\} finally \{\s*setCreating\(false\);\s*\}/);
     });
     it('el botón se deshabilita mientras crea', () => {
@@ -32,7 +35,7 @@ describe('alta de alerta: sin doble click', () => {
 describe('alta de alerta: umbral de precio positivo', () => {
     it('el formulario rechaza precios <= 0 antes de llamar a createAlert', () => {
         const at = alerts.indexOf('El precio debe ser mayor que 0');
-        assert.ok(at !== -1 && at < alerts.indexOf('setCreating(true);\n            await createAlert({'));
+        assert.ok(at !== -1 && at < alerts.indexOf('setCreating(true);'));
     });
     it('la server action también lo rechaza', () => {
         const action = readFileSync('lib/actions/alerts.actions.ts', 'utf8');

@@ -517,15 +517,49 @@ class Modelo720Service:
                 # Saldo 0 a 31/12, pero el saldo medio del 4T puede no serlo
                 # (p. ej. dólares convertidos a euros en diciembre).
                 custody_zero = custody_map.get(f"CASH:{cash.currency}".upper())
-                if cash.fx_rate is not None and custody_zero not in (None, "ES"):
-                    detail_zero = _q4_native(cash)
-                    if detail_zero is None:
+                if custody_zero == "ES":
+                    continue
+                detail_zero = _q4_native(cash)
+                if detail_zero is None:
+                    if cash.fx_rate is not None and custody_zero is not None:
                         q4_unknown.append(ticker)
-                    elif detail_zero["average"] != 0:
-                        q4_total += detail_zero["average"] * Decimal(str(cash.fx_rate))
-                        q4_rows += 1
-                        if detail_zero["estimate"]:
-                            q4_estimated.append(ticker)
+                    continue
+                if detail_zero["average"] == 0:
+                    continue
+                # Saldo medio del 4T distinto de 0: nunca se omite en silencio.
+                # Mismo trato que un saldo ≠ 0 sin tipo de cambio o sin
+                # ubicación declarada: fuera del total y listado para revisar.
+                if cash.fx_rate is None:
+                    unvalued.append({
+                        "ticker": ticker,
+                        "snapshot_date": cash.snapshot_date.isoformat(),
+                        "reason": (
+                            "Saldo 0 a 31/12 pero saldo medio del 4.º trimestre "
+                            "distinto de 0, sin tipo de cambio: fuera del total "
+                            "EUR, valorar a mano."
+                        ),
+                    })
+                    continue
+                avg_zero_base = detail_zero["average"] * Decimal(str(cash.fx_rate))
+                if custody_zero is None:
+                    foreign_unverified.append({
+                        "ticker": ticker,
+                        "snapshot_date": cash.snapshot_date.isoformat(),
+                        "average_q4_base": _money(avg_zero_base),
+                        "reason": (
+                            "Saldo 0 a 31/12 pero saldo medio del 4.º trimestre "
+                            "distinto de 0 (también cuenta para el umbral). "
+                            "Ubicación de la cuenta no declarada (la divisa no es "
+                            "el país): declara tax_declarant.custody con la clave "
+                            f"'cash:{cash.currency}' en la metadata del tenant; "
+                            "mientras tanto, fuera del total."
+                        ),
+                    })
+                    continue
+                q4_total += avg_zero_base
+                q4_rows += 1
+                if detail_zero["estimate"]:
+                    q4_estimated.append(ticker)
                 continue
             if cuentas_max_date is None or cash.snapshot_date > cuentas_max_date:
                 cuentas_max_date = cash.snapshot_date

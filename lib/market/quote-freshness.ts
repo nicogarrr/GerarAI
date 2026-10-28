@@ -125,13 +125,19 @@ export function sessionDateEt(tSeconds: number): string {
 /** Cotizacion saneada: shape Finnhub {c,d,dp,h,l,o,pc} + frescura validada. */
 export type SanitizedQuote = {
     source?: 'Finnhub' | 'Yahoo Finance';
-    c: number; d: number; dp: number; h: number; l: number; o: number; pc: number;
+    /** d/dp son null cuando el proveedor no tiene cierre previo real (nunca un 0 inventado). */
+    c: number; d: number | null; dp: number | null; h: number; l: number; o: number; pc: number;
     /** Timestamp (epoch s) del proveedor; null en el fallback Yahoo (sin fecha). */
     t: number | null;
     /** Market-local date of the exact daily candle c, supplied by Yahoo backend. */
     closeDate?: string | null;
     /** 'live' = sesion en curso; 'close' = ultimo cierre fechado. 'stale' nunca se devuelve. */
     kind: 'live' | 'close';
+    /**
+     * Unidad declarada por el proveedor para c/d/h/l/o/pc (Yahoo: «GBp» en
+     * Londres = peniques). Ausente si el proveedor no la declara (Finnhub).
+     */
+    currency?: string | null;
 };
 
 /**
@@ -141,12 +147,34 @@ export type SanitizedQuote = {
  * (stale-while-error): el fetch resuelve 200 con el dato viejo y el error
  * nunca llega al catch. La unica senal de frescura es `t`. null = miss honesto.
  */
-export function sanitizeFinnhubQuote(data: any, nowMs: number = Date.now()): SanitizedQuote | null {
-    if (!data || !(data.c > 0 || data.pc > 0)) return null;
+/**
+ * Forma mínima de una cotización de proveedor: Finnhub quote o vela diaria
+ * del backend Yahoo (`cd` = fecha de la vela). Todo opcional: se valida por
+ * campo. Los huecos numéricos se sirven como 0 (antes se colaba `undefined`
+ * en campos tipados como number).
+ */
+export interface ProviderQuotePayload {
+    c?: number | null;
+    d?: number | null;
+    dp?: number | null;
+    h?: number | null;
+    l?: number | null;
+    o?: number | null;
+    pc?: number | null;
+    t?: number | null;
+    /** Variantes de timestamp que devuelve Finnhub en respuestas cacheadas. */
+    ct?: unknown;
+    cd?: unknown;
+    /** Unidad de la cotización (backend Yahoo: p. ej. «GBp» = peniques). */
+    currency?: unknown;
+}
+
+export function sanitizeFinnhubQuote(data: ProviderQuotePayload | null | undefined, nowMs: number = Date.now()): SanitizedQuote | null {
+    if (!data || !((data.c ?? 0) > 0 || (data.pc ?? 0) > 0)) return null;
     const t = typeof data.t === 'number' && Number.isFinite(data.t) ? data.t : 0;
     const kind = classifyQuoteKind(t, nowMs);
     if (kind === 'stale') return null;
-    return { source: 'Finnhub', c: data.c, d: data.d, dp: data.dp, h: data.h, l: data.l, o: data.o, pc: data.pc, t, kind };
+    return { source: 'Finnhub', c: data.c ?? 0, d: data.d ?? 0, dp: data.dp ?? 0, h: data.h ?? 0, l: data.l ?? 0, o: data.o ?? 0, pc: data.pc ?? 0, t, kind };
 }
 
 /** Validate a date without timezone shifts or accepting JS calendar overflow. */
@@ -157,13 +185,18 @@ function validCalendarDate(value: unknown): string | null {
 }
 
 /** Yahoo daily close: use only the exact candle's date cd, never retrieval time. */
-export function mapBackendYahooQuote(data: any): SanitizedQuote | null {
-    if (!data || !(data.c > 0 || data.pc > 0)) return null;
-    const num = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+export function mapBackendYahooQuote(data: ProviderQuotePayload | null | undefined): SanitizedQuote | null {
+    if (!data || !((data.c ?? 0) > 0 || (data.pc ?? 0) > 0)) return null;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
     return {
-        c: num(data.c), d: num(data.d), dp: num(data.dp),
+        c: num(data.c),
+        // Sin cierre previo real el backend manda null: no se convierte en 0,00 %.
+        d: typeof data.d === 'number' && Number.isFinite(data.d) ? data.d : null,
+        dp: typeof data.dp === 'number' && Number.isFinite(data.dp) ? data.dp : null,
         h: num(data.h), l: num(data.l), o: num(data.o), pc: num(data.pc),
         source: 'Yahoo Finance', t: null, kind: 'close',
         closeDate: validCalendarDate(data.cd),
+        // Solo si el backend la declara (contrato estable sin ella).
+        ...(typeof data.currency === 'string' && data.currency.trim() ? { currency: data.currency.trim() } : {}),
     };
 }

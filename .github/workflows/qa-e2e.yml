@@ -127,6 +127,11 @@ jobs:
             echo '```'
             sed 's/\x1b\[[0-9;]*m//g' run.log | grep -i -E 'pass|fail|✓|×|error' | head -40 || true
             echo '```'
+            echo
+            echo "#### Uso de tokens (pasada de agente)"
+            echo '```'
+            sed 's/\x1b\[[0-9;]*m//g' run.log | grep -E '\([0-9][0-9.,kM ]*(in|out|tokens)' || echo "El proveedor no reporto usage por llamada o no hubo pasada de agente."
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

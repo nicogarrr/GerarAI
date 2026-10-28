@@ -15,7 +15,7 @@ async function fichaLista(page: import("@playwright/test").Page, width: number, 
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   // Dato determinista del fixture: si no llega, la captura no es valida.
   await expect(header(page).getByText("$336.56")).toBeVisible();
-  await expect(header(page).getByRole("img", { name: /Evolución del precio/ })).toBeVisible();
+  await expect(page.getByTestId("company-technical-chart").getByRole("figure", { name: /Evolución del precio/ })).toBeVisible();
   // Sin desbordamiento horizontal: el layout debe caber en su viewport.
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

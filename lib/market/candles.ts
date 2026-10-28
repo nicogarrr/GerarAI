@@ -34,13 +34,6 @@ export type CandleRow = {
 /** Enlace exigido por la cláusula de atribución de la licencia. */
 export const TRADINGVIEW_URL = 'https://www.tradingview.com/';
 
-/**
- * Intervalo de la serie del workspace: el snapshot pide resolución `D` al
- * endpoint de velas (`data-engine/app/api/routes/market.py` solo soporta
- * `D | W | M | 60`). Etiqueta fija, no un selector que invente rangos.
- */
-export const CANDLES_INTERVAL_LABEL = 'diario';
-
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 function isFiniteNumber(value: unknown): value is number {

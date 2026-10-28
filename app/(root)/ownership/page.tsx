@@ -206,7 +206,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                             <td className="py-3 text-gray-400">{row.put_call ?? row.share_type}</td>
                                             <td className="py-3">
                                                 <a
-                                                    className="inline-flex items-center gap-1 text-teal-300 hover:text-teal-200"
+                                                    className="inline-flex min-h-11 items-center gap-1 text-teal-300 hover:text-teal-200"
                                                     href={row.filing_url}
                                                     rel="noreferrer"
                                                     target="_blank"
@@ -297,7 +297,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
             ) : null}
             {limitations.length ? (
                 <details className="rounded-lg border border-gray-800 bg-surface-1 px-4 py-3 text-sm text-gray-500">
-                    <summary className="cursor-pointer select-none text-xs font-medium text-gray-400 hover:text-gray-300">
+                    <summary className="min-h-11 cursor-pointer select-none py-3 text-xs font-medium text-gray-400 hover:text-gray-300">
                         Límites de este dato
                     </summary>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-xs leading-5">

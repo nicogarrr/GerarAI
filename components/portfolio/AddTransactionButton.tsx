@@ -131,7 +131,7 @@ export default function AddTransactionButton({ userId }: Props) {
             Registra una compra o venta de acciones
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           {/* Buscador con autocompletado: el componente compartido de la app
               (misma búsqueda del buscador global, gate F215 y debounce). */}
           <div className="space-y-2">
@@ -207,9 +207,8 @@ export default function AddTransactionButton({ userId }: Props) {
               <Label htmlFor="quantity" className="text-gray-300">Cantidad</Label>
               <Input
                 id="quantity"
-                type="number"
-                step="any"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 placeholder="10"
                 value={formData.quantity}
                 onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
@@ -225,9 +224,8 @@ export default function AddTransactionButton({ userId }: Props) {
               <Label htmlFor="price" className="text-gray-300">Precio ({formData.currency})</Label>
               <Input
                 id="price"
-                type="number"
-                step="any"
-                min="0"
+                type="text"
+                inputMode="decimal"
                 placeholder="150,00"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
@@ -244,9 +242,8 @@ export default function AddTransactionButton({ userId }: Props) {
             <Label htmlFor="fees" className="text-gray-300">Comisiones ({formData.currency}) (opcional)</Label>
             <Input
               id="fees"
-              type="number"
-              step="any"
-              min="0"
+              type="text"
+                inputMode="decimal"
               placeholder="0,00"
               value={formData.fees}
               onChange={(e) => setFormData({ ...formData, fees: e.target.value })}

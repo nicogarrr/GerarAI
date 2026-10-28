@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
+import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -62,14 +63,7 @@ export default function RootLayout({
         <Toaster />
         {/* Service worker (app shell + fallback offline). Solo en build de
             producción: en dev las cachés del SW estorban al hot-reload. */}
-        {/* nosemgrep: gerarai-dangerously-set-inner-html -- script constante del service worker, sin datos de usuario. */}
-        {process.env.NODE_ENV === 'production' ? (
-          <script
-            dangerouslySetInnerHTML={{
-              __html: "if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js'); }); }",
-            }}
-          />
-        ) : null}
+{process.env.NODE_ENV === 'production' ? <ServiceWorkerRegister /> : null}
       </body>
     </html>
   );

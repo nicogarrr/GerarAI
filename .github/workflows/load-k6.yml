@@ -1,0 +1,45 @@
+name: Load smoke (k6)
+
+# No gatea merges: de noche y a mano. Backend APP_ENV=test con sqlite, sin
+# datos reales; los numeros en runner compartido son indicativos, lo que
+# importa es la tendencia entre noches (resumen en artifacts).
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  k6:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: data-engine/requirements.txt
+      - run: python -m pip install -r data-engine/requirements.txt
+      - name: Arranca el backend de test
+        run: |
+          cd data-engine
+          APP_ENV=test DATABASE_URL="sqlite:///./cavaai_load.db" RESEARCH_AUTH_REQUIRED=true \
+            RESEARCH_AUTH_SECRET="cavaai-e2e-research-secret-at-least-32-characters" \
+            CAVAAI_ENABLE_VECTOR_INGEST=0 CAVAAI_ENABLE_VECTOR_CHAT=0 \
+            SCREENER_QUOTE_VENDOR=offline \
+            python -m uvicorn main:app --host 127.0.0.1 --port 8100 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:8100/health && break; sleep 2; done
+      - name: k6
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz | tar xz
+          ./k6-v0.55.0-linux-amd64/k6 run --summary-export k6-summary.json scripts/load/api-smoke.k6.js
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: k6-summary
+          path: k6-summary.json
+          if-no-files-found: ignore
+          retention-days: 30

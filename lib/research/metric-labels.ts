@@ -143,7 +143,7 @@ export const METRIC_LABELS: Record<string, string> = {
 
 /** Etiqueta en español de una métrica; humaniza la clave si es desconocida. */
 export function metricLabel(metric: string): string {
-    const known = METRIC_LABELS[metric] ?? METRIC_LABELS[metric.toLowerCase()];
+    const known = (Object.hasOwn(METRIC_LABELS, metric) ? METRIC_LABELS[metric] : null) ?? (Object.hasOwn(METRIC_LABELS, metric.toLowerCase()) ? METRIC_LABELS[metric.toLowerCase()] : null);
     if (known) return known;
     return metric.replaceAll('_', ' ');
 }

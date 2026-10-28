@@ -46,7 +46,7 @@ export default function ChangePassword() {
                 <Label htmlFor="current-password">Contraseña actual</Label>
                 <Input
                     autoComplete="current-password"
-                    className="mt-2"
+                    className="mt-2 min-h-11"
                     id="current-password"
                     onChange={(event) => setCurrentPassword(event.target.value)}
                     required
@@ -58,7 +58,7 @@ export default function ChangePassword() {
                 <Label htmlFor="new-password">Contraseña nueva</Label>
                 <Input
                     autoComplete="new-password"
-                    className="mt-2"
+                    className="mt-2 min-h-11"
                     id="new-password"
                     minLength={8}
                     onChange={(event) => setNewPassword(event.target.value)}
@@ -72,7 +72,7 @@ export default function ChangePassword() {
                 <Label htmlFor="confirm-password">Repite la contraseña nueva</Label>
                 <Input
                     autoComplete="new-password"
-                    className="mt-2"
+                    className="mt-2 min-h-11"
                     id="confirm-password"
                     minLength={8}
                     onChange={(event) => setConfirmPassword(event.target.value)}

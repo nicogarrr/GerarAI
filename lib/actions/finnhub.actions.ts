@@ -12,7 +12,7 @@ import type { PopularStocksResult } from '@/lib/popular-stocks-loader';
 import { foldSearchQuery } from '@/lib/search-query';
 import { cache } from 'react';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
-import { mapBackendYahooQuote, sanitizeFinnhubQuote, type SanitizedQuote } from '@/lib/market/quote-freshness';
+import { mapBackendYahooQuote, sanitizeFinnhubQuote, type ProviderQuotePayload, type SanitizedQuote } from '@/lib/market/quote-freshness';
 
 import { env } from '@/lib/env';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -65,6 +65,20 @@ export async function getCandles(symbol: string, from: number, to: number, resol
     }
     return noData;
 }
+
+/** Respuesta de Finnhub `/stock/metric?metric=all`: las claves y su presencia varían por plan y mercado. */
+export type FinnhubMetricsAll = { metric?: Record<string, number | string | null> };
+
+/** Respuesta de Finnhub `/stock/price-target`. */
+export type FinnhubPriceTarget = {
+    symbol?: string;
+    lastUpdated?: string;
+    targetHigh?: number;
+    targetLow?: number;
+    targetMean?: number;
+    targetMedian?: number;
+    targetMode?: number;
+};
 
 export type FinnhubProfile2 = { ticker?: string; name?: string; exchange?: string; currency?: string; country?: string; ipo?: string; logo?: string; weburl?: string };
 export const getProfile = cache(async (symbol: string): Promise<FinnhubProfile2 | null> => {
@@ -201,7 +215,7 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
  */
 export async function getStockValuationBasics(symbol: string): Promise<{
     profile: FinnhubProfile2 | null;
-    metrics: any;
+    metrics: FinnhubMetricsAll;
 } | null> {
     await requireAuthenticatedUser();
     try {
@@ -211,7 +225,7 @@ export async function getStockValuationBasics(symbol: string): Promise<{
         }
         const [profile, metrics] = await Promise.all([
             fetchJSON<FinnhubProfile2>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${token}`, 86400).catch(() => null),
-            fetchJSON<any>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`, 86400).catch(() => ({ metric: {} })),
+            fetchJSON<FinnhubMetricsAll>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`, 86400).catch(() => ({ metric: {} })),
         ]);
         return { profile, metrics };
     } catch {
@@ -220,10 +234,10 @@ export async function getStockValuationBasics(symbol: string): Promise<{
 }
 
 export async function getStockFinancialDataLight(symbol: string): Promise<{
-    quote: any;
+    quote: SanitizedQuote | null;
     profile: FinnhubProfile2 | null;
-    metrics: any;
-    priceTarget: any;
+    metrics: FinnhubMetricsAll;
+    priceTarget: FinnhubPriceTarget | null;
 } | null> {
     await requireAuthenticatedUser();
     try {
@@ -234,10 +248,10 @@ export async function getStockFinancialDataLight(symbol: string): Promise<{
 
         // Only fetch essential data - no news, events, peers etc.
         const [quote, profile, metrics, priceTarget] = await Promise.all([
-            fetchJSON<any>(`${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`, 60).then(sanitizeFinnhubQuote).catch(() => null), // F358: validada por timestamp
+            fetchJSON<ProviderQuotePayload>(`${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`, 60).then(sanitizeFinnhubQuote).catch(() => null), // F358: validada por timestamp
             fetchJSON<FinnhubProfile2>(`${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${token}`, 86400).catch(() => null),
-            fetchJSON<any>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`, 86400).catch(() => ({ metric: {} })),
-            fetchJSON<any>(`${FINNHUB_BASE_URL}/stock/price-target?symbol=${encodeURIComponent(symbol)}&token=${token}`, 86400).catch(() => null),
+            fetchJSON<FinnhubMetricsAll>(`${FINNHUB_BASE_URL}/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${token}`, 86400).catch(() => ({ metric: {} })),
+            fetchJSON<FinnhubPriceTarget>(`${FINNHUB_BASE_URL}/stock/price-target?symbol=${encodeURIComponent(symbol)}&token=${token}`, 86400).catch(() => null),
         ]);
 
         return { quote, profile, metrics, priceTarget };
@@ -363,10 +377,10 @@ const searchStocksOrThrow = async (query?: string): Promise<StockWithWatchlistSt
             .map((r) => {
                 const upper = (r.symbol || '').toUpperCase();
                 const name = r.description || upper;
-                const exchangeFromProfile = (r as any).__exchange as string | undefined;
                 // displaySymbol es el ticker visible (SAN.MC), NO la bolsa:
-                // solo se usa para derivar el mercado por sufijo.
-                const exchange = exchangeFromProfile || exchangeFromDisplaySymbol(r.displaySymbol as string | undefined) || 'US';
+                // solo se usa para derivar el mercado por sufijo. (El campo
+                // `__exchange` que se leía aquí no lo escribía nadie.)
+                const exchange = exchangeFromDisplaySymbol(r.displaySymbol as string | undefined) || 'US';
                 const type = r.type || 'Stock';
                 const item: StockWithWatchlistStatus = {
                     symbol: upper,
@@ -434,14 +448,16 @@ export const getPopularStocks = cache(async (): Promise<PopularStocksResult> => 
         top.map(async (sym) => {
             try {
                 const url = `${FINNHUB_BASE_URL}/stock/profile2?symbol=${encodeURIComponent(sym)}&token=${token}`;
-                const profile = await fetchJSON<any>(url, 3600);
-                return { sym, profile } as { sym: string; profile: any };
+                const profile = await fetchJSON<FinnhubProfile2>(url, 3600);
+                return { sym, profile } as { sym: string; profile: FinnhubProfile2 | null };
             } catch {
-                return { sym, profile: null } as { sym: string; profile: any };
+                return { sym, profile: null } as { sym: string; profile: FinnhubProfile2 | null };
             }
         })
     );
-    const successful = profiles.filter(({ profile }) => profile?.name || profile?.ticker);
+    const successful = profiles.filter(
+        (r): r is { sym: string; profile: FinnhubProfile2 } => Boolean(r.profile?.name || r.profile?.ticker),
+    );
     if (successful.length === 0) {
         // 0/10 con clave configurada: proveedor o red caidos. NO se cachea
         // como exito: el buscador reintentara y mostrara indicador.
@@ -452,8 +468,8 @@ export const getPopularStocks = cache(async (): Promise<PopularStocksResult> => 
             const symbol = sym.toUpperCase();
             return {
                 symbol,
-                name: (profile.name || profile.ticker) as string,
-                exchange: normalizeExchangeLabel(profile.exchange as string | undefined) || 'US',
+                name: profile.name || profile.ticker || symbol,
+                exchange: normalizeExchangeLabel(profile.exchange) || 'US',
                 type: 'Common Stock',
                 isInWatchlist: false,
             };
@@ -485,7 +501,7 @@ async function fetchStockQuote(symbol: string): Promise<StockQuote | null> {
         const token = env.FINNHUB_API_KEY;
         if (token) {
             const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`;
-            const data = await fetchJSON<any>(url, 60);
+            const data = await fetchJSON<ProviderQuotePayload>(url, 60);
             // Verify we got valid data (Finnhub returns all zeros for invalid
             // symbols) y fresca (F358: la Data Cache sirve el ultimo valor
             // bueno indefinidamente bajo 429 sostenidos - stale-while-error).

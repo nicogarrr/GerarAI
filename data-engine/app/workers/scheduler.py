@@ -27,6 +27,7 @@ from app.workers.dramatiq_app import (
     ingest_sec_bottleneck_filings,
     ingest_spy_daily,
     ingest_uk_pdmr_filings,
+    propose_paper_trades,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
@@ -56,6 +57,7 @@ from app.workers.dramatiq_app import (
     sync_ibkr_flex,
     sync_investor_holdings,
     sync_official_closes,
+    sync_paper_dividends,
     sync_portfolio_dividends,
     sync_tenant_ibkr_connections,
     tenant_contexts,
@@ -151,6 +153,16 @@ def enqueue_for_all_tenants(actor, **kwargs) -> dict:
             }
         )
     return {"actor": actor.actor_name, "queued": queued}
+
+
+def enqueue_official_closes_once() -> dict:
+    """Prices are global, unlike tenant portfolios: enqueue only one context."""
+    contexts = list(tenant_contexts())
+    if not contexts:
+        return {"actor": "sync_official_closes", "queued": []}
+    tenant_id, user_id = contexts[0]
+    message = sync_official_closes.send(tenant_id, user_id)
+    return {"actor": "sync_official_closes", "queued": [str(message.message_id)]}
 
 
 def build_scheduler(*, background: bool = False) -> BlockingScheduler | BackgroundScheduler:
@@ -434,6 +446,16 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # alimentan /corporate-actions y las respuestas de Cerebro. Una vez al dia.
     _register(scheduler, partial(enqueue_for_all_tenants, sync_portfolio_dividends),
               "cron", job_id="portfolio_dividends_daily", hour=6, minute=20, jitter=300)
+    # Dividendos de los tickers con paper trades vivos: el devengo del track
+    # record neto se computa sobre DividendRecord. Misma fuente gratuita.
+    _register(scheduler, partial(enqueue_for_all_tenants, sync_paper_dividends),
+              "cron", job_id="paper_dividends_daily", hour=6, minute=50, jitter=300)
+    # Propuestas LLM automaticas del paper book: UNA pasada diaria con la misma
+    # cuota compartida (5/dia) y el mismo guard de modelos EUR0 del endpoint
+    # manual: coste LLM nuevo = 0. Tras el refresco de noticias de la manana EU
+    # y con el pre-market US ya publicado.
+    _register(scheduler, partial(enqueue_for_all_tenants, propose_paper_trades),
+              "cron", job_id="paper_proposals_daily", hour=15, minute=30, jitter=600)
     # Splits declarados (Yahoo, FMP de respaldo): sin ellos el modelo no puede
     # ajustar los recuentos historicos de acciones y degrada el CAGR a N/D.
     # Semanal: cartera+watchlist completo; universo en chunks auto-encolados.
@@ -522,13 +544,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # 22:30 UTC: tras el cierre US tanto en EDT como en EST.
     _register(
         scheduler,
-        partial(enqueue_for_all_tenants, sync_official_closes),
+        enqueue_official_closes_once,
         "cron",
         job_id="official_closes_daily",
         day_of_week="mon-fri",
         hour=22,
         minute=30,
     )
+    # Automatic recovery after backlog/deploy, not a manual bulk download.
+    # Actor's completed-session marker makes successful sessions a cheap skip.
+    _register(scheduler, enqueue_official_closes_once, "interval",
+              job_id="official_closes_recovery", hours=1)
     # Senales DCA por niveles (watchlist + cartera): tras los cierres oficiales
     # de las 22:30 UTC, para evaluar con el cierre del dia ya asentado.
     _register(

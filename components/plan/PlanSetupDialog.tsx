@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { upsertPlan, type PlanTargetInput } from '@/lib/actions/plan.actions';
-import { formatNumber, parseLocalizedNumber, todayLocal } from '@/lib/format';
+import { formatNumber, formatNumberForInput, parseLocalizedNumber, todayLocal } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { overallocatedDimension } from '@/lib/plan/target-totals';
 import { showErrorToast } from '@/lib/toast';
@@ -42,7 +42,11 @@ const CURRENCY_REQUIRED_ERROR = 'Elige la divisa de la aportación mensual.';
 const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'JPY'];
 
 function asText(value: unknown): string {
-    return typeof value === 'number' || typeof value === 'string' ? String(value) : '';
+    // Números del backend en gramática es-ES (el parser del formulario la
+    // espera): String(300.5) daría «300.5» con punto; las fechas y demás
+    // cadenas pasan intactas.
+    if (typeof value === 'number') return formatNumberForInput(value);
+    return typeof value === 'string' ? value : '';
 }
 
 export default function PlanSetupDialog({
@@ -186,7 +190,9 @@ export default function PlanSetupDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <form id="plan-setup-form" onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-3">
+                    {/* items-end: la etiqueta «Aportación mensual (€)» ocupa dos líneas a ancho
+                    de diálogo y el campo quedaba 14 px más bajo que Inicio/Horizonte. */}
+                    <div className="grid items-end gap-4 sm:grid-cols-3">
                         <div className="space-y-1.5">
                             <Label htmlFor="plan-monthly" className="text-gray-300">{currencyEnabled ? 'Aportación mensual' : 'Aportación mensual (€)'}</Label>
                             <Input
@@ -248,7 +254,8 @@ export default function PlanSetupDialog({
                     <div className="space-y-2">
                         <p className="text-sm font-medium text-gray-300">Asignación objetivo</p>
                         {rows.map((row, index) => (
-                            <div key={index} className="grid grid-cols-2 items-center gap-2 rounded-md border border-gray-800 p-2 sm:grid-cols-[1fr_1fr_5rem_5rem_auto]">
+                            <div key={index} className="grid grid-cols-2 items-center gap-2 rounded-md border border-gray-800 p-2 sm:grid-cols-[9.5rem_1fr_5rem_5rem_auto]">
+                                {/* 9.5rem fijos: con 1fr «Clase de activo» quedaba truncado («Clase de a»). */}
                                 <select
                                     aria-label={`Categoría ${index + 1}`}
                                     value={row.kind}

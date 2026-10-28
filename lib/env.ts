@@ -132,11 +132,4 @@ if (env.NODE_ENV === 'production' && !isNextBuildTime()) {
   }
 }
 
-// Helper para verificar si una variable está configurada
-export function isEnvVarSet(key: keyof typeof env): boolean {
-  return env[key] !== undefined && env[key] !== '';
-}
-
-// Tipos inferidos del schema
-export type Env = z.infer<typeof envSchema>;
 
