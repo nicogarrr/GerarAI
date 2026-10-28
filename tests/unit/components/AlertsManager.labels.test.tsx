@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('symbol=MSFT&type=price_change&value=5') }));
 vi.mock('@/lib/actions/alerts.actions', () => ({
-    createAlert: vi.fn(), deleteAlert: vi.fn(),
+    createAlert: vi.fn(), createAlertResult: vi.fn(async () => ({ ok: true, alert: {} })), deleteAlert: vi.fn(),
     getUserAlertsResult: vi.fn(async () => ({ ok: true, alerts: [] })),
     getTelegramStatus: vi.fn(async () => null), getRecentTriggeredAlerts: vi.fn(async () => []),
 }));

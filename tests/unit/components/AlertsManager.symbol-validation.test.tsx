@@ -8,7 +8,8 @@ const LONG = 'A'.repeat(500);
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(`symbol=${LONG}&type=price_above&value=999999999`) }));
 const createAlert = vi.fn();
 vi.mock('@/lib/actions/alerts.actions', () => ({
-    createAlert: (...args: unknown[]) => createAlert(...args), deleteAlert: vi.fn(),
+    createAlert: (...args: unknown[]) => createAlert(...args),
+    createAlertResult: (...args: unknown[]) => createAlert(...args), deleteAlert: vi.fn(),
     getUserAlertsResult: vi.fn(async () => ({ ok: true, alerts: [] })),
     getTelegramStatus: vi.fn(async () => null), getRecentTriggeredAlerts: vi.fn(async () => []),
 }));
