@@ -79,5 +79,5 @@ jobs:
             exit 0
           fi
           gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name visual-baseline --dir baseline
-          npx --yes reg-cli test-results/visual baseline reg-out --matching-threshold 0.02 --threshold-rate 0.001 --json reg-out/report.json || true
+          npx --yes reg-cli test-results/visual baseline reg-out --matchingThreshold 0.02 --thresholdRate 0.001 --json reg-out/report.json || true
           cat reg-out/report.json | node -e "const r=JSON.parse(require('fs').readFileSync(0));console.log('diff:',r.failedItems.length,'nuevas:',r.newItems.length,'borradas:',r.deletedItems.length,'ok:',r.passedItems.length)"
