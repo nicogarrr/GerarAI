@@ -241,6 +241,7 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
         if mode == "analisis":
             response = await provider.complete(LLMRequest(
                 model=model, task="chat", temperature=0, max_tokens=2600,
+                metadata=knowledge_analysis.PROMPT.trace_metadata(),
                 messages=[Message(role, content) for role, content in knowledge_analysis.build_messages(question, sources)],
                 response_format=ResponseFormat.json_object()))
             if response.degraded:
