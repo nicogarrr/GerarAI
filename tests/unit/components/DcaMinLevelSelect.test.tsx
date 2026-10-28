@@ -9,7 +9,7 @@ import DcaMinLevelSelect from '@/components/watchlist/DcaMinLevelSelect';
 async function choose(name:string){
  const trigger=screen.getByRole('combobox');
  fireEvent.keyDown(trigger,{key:'ArrowDown'});
- fireEvent.click(await screen.findByRole('option',{name,exact:true}));
+ fireEvent.click(await screen.findByRole('option',{name}));
 }
 beforeEach(()=>vi.clearAllMocks());
 describe('DCA alert minimum level control',()=>{
