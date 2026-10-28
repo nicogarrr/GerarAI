@@ -16,7 +16,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const pager = readFileSync('components/research/ThesisMarkdownPager.tsx', 'utf8');
-const workProduct = readFileSync('components/work-products/WorkProductButton.tsx', 'utf8');
+const workProduct = readFileSync('components/work-products/WorkProductDialog.tsx', 'utf8');
 
 const STATIC_THESIS_MARKDOWN = /^import\s+ThesisMarkdown\s+from\s+['"]@\/components\/research\/ThesisMarkdown['"]/m;
 

@@ -272,7 +272,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/watchlist/WatchlistAddButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (contenido del alta diferido en WatchlistAddDialog)',
   'components/watchlist/WatchlistAddDialog.tsx': 'useState, useRouter, jsx-onClick, libreria cliente: sonner, importa cliente: components/search/TickerSearchInput.tsx (chunk diferido: solo se descarga al abrir el alta)',
   'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
-  'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/select.tsx',
+  'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (diálogo de generación diferido en WorkProductDialog)',
+  'components/work-products/WorkProductDialog.tsx': 'useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx, importa cliente: components/search/TickerSearchInput.tsx (chunk diferido: solo se descarga al abrir el diálogo)',
   'hooks/useOnlineStatus.ts': 'useSyncExternalStore, browser:window, browser:navigator',
   'lib/utils/scroll-anchor.ts': 'browser:window, browser:cancelAnimationFrame, browser:requestAnimationFrame, browser:document',
 };
