@@ -668,6 +668,85 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     }
 
 
+class DcaAcceptedOut(BaseModel):
+    run_id: int
+    status: str = "running"
+    requested: int
+    pending_remaining: int
+    cooldown_seconds: int = 300
+
+
+class DcaManualStatusOut(BaseModel):
+    run_id: int
+    status: str
+    summary: DcaEvaluateOut | None = None
+    error: str | None = None
+
+
+@router.post("/dca-signals/evaluate-async", status_code=202, response_model=DcaAcceptedOut)
+def enqueue_manual_dca(db: Session = Depends(get_db)) -> dict:
+    import redis
+    from app.models import DcaEvaluationRun
+    from app.services import dca_manual, dca_manual_job, dca_run_log
+    from app.workers.dramatiq_app import evaluate_manual_dca
+    tenant_id, user_id = db.info.get("tenant_id"), db.info.get("user_id")
+    if tenant_id is None or not user_id:
+        raise HTTPException(status_code=401, detail="Se requiere identidad de cuenta para ejecutar en segundo plano.")
+    client = dca_manual_job.redis_client()
+    token = None
+    row = None
+    sent = False
+    enqueue_attempted = False
+    try:
+        try:
+            token, wait = dca_manual.acquire_manual_gate(client, str(tenant_id))
+        except redis.RedisError as exc:
+            raise HTTPException(status_code=503, detail="No se puede asegurar una ejecución única ahora.") from exc
+        if token is None:
+            if wait == -1:
+                raise HTTPException(status_code=409, detail="Ya hay una evaluación DCA en curso en tu cuenta.")
+            raise HTTPException(status_code=429, detail=f"Espera {wait} s antes de otra tanda.", headers={"Retry-After": str(wait)})
+        pending = dca_manual.pending_symbols(db)
+        requested = pending[:dca_manual.MAX_SYMBOLS]
+        remaining = max(0, len(pending) - len(requested))
+        # Unlike best-effort historical logs, this receipt is REQUIRED before enqueue.
+        row = DcaEvaluationRun(tenant_id=tenant_id, trigger="manual", status="queued",
+            started_at=datetime.now(UTC), detail={"requested_symbols": requested, "pending_remaining": remaining})
+        db.add(row)
+        db.commit()
+        # A transport error can occur after broker acceptance. Keep the lease
+        # on ambiguous delivery so a possibly running worker never overlaps.
+        enqueue_attempted = True
+        evaluate_manual_dca.send(row.id, token, tenant_id, user_id)
+        sent = True
+        return {"run_id": row.id, "requested": len(requested), "pending_remaining": remaining}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        if row is not None:
+            dca_run_log.finish_run(db, row, error="No se pudo confirmar el envío al worker.")
+        raise HTTPException(status_code=503, detail="No se pudo confirmar la ejecución; revisa su estado antes de repetir.") from exc
+    finally:
+        try:
+            if token is not None and not sent and not enqueue_attempted:
+                dca_manual.release_manual_gate(client, str(tenant_id), token)
+        finally:
+            client.close()
+
+
+@router.get("/dca-signals/manual-runs/{run_id}", response_model=DcaManualStatusOut)
+def manual_dca_status(run_id: int, db: Session = Depends(get_db)) -> dict:
+    from app.models import DcaEvaluationRun
+    from app.services.dca_run_log import run_payload
+    row = db.scalar(select(DcaEvaluationRun).where(DcaEvaluationRun.id == run_id,
+        DcaEvaluationRun.trigger == "manual", *tenant_filters(db, DcaEvaluationRun)))
+    if row is None:
+        raise HTTPException(status_code=404, detail="Ejecución no encontrada en tu cuenta.")
+    return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else run_payload(row)["status"]),
+        "summary": (row.detail or {}).get("summary"), "error": row.error}
+
+
 @router.post("/dca-signals/evaluate", response_model=DcaEvaluateOut)
 async def evaluate_dca_signals_now(db: Session = Depends(get_db)) -> dict:
     """Refresh at most ten missing/stale states, shared lease and 5min cooldown."""

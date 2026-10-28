@@ -121,7 +121,7 @@ def run_payload(row: DcaEvaluationRun | None, now: datetime | None = None) -> di
     if row is None:
         return None
     now = now or datetime.now(UTC)
-    status = row.status
+    status = "running" if row.status == "queued" else row.status
     started = row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)
     if status == "running" and now - started > STALE_RUNNING_AFTER:
         status = "interrupted"
