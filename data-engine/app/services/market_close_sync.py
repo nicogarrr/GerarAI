@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from app.models.entities import Company, MarketPrice
 from app.services.propicks_price_service import (
     PriceBar,
+    _bar_is_final,
+    bar_unit_is_known,
     fetch_history_yfinance,
     upsert_prices,
     yahoo_symbol,
@@ -55,6 +57,7 @@ def sync_official_closes(
     by_symbol = {s: c for c in companies if (s := yahoo_symbol(c)) is not None}
     symbols = list(by_symbol)
     written = 0
+    latest_date: date | None = None
     covered = 0
     failed_chunks = 0
     failed_symbols: list[str] = []
@@ -77,6 +80,11 @@ def sync_official_closes(
                 continue
             count = upsert_prices(db, by_symbol[symbol], bars, now=now)
             written += count
+            if count:
+                latest = max(bar.day for bar in bars
+                             if _bar_is_final(by_symbol[symbol], bar, now)
+                             and bar_unit_is_known(by_symbol[symbol], bar))
+                latest_date = max(latest_date, latest) if latest_date else latest
             skipped += len(bars) - count
             covered += int(count > 0)
         db.commit()
@@ -93,6 +101,7 @@ def sync_official_closes(
         "with_symbol": len(symbols),
         "covered": covered,
         "bars_written": written,
+        "latest_date": latest_date.isoformat() if latest_date else None,
         "partial_session_skipped": skipped > 0,
     }
 
