@@ -29,7 +29,7 @@ const REASONING_OPTIONS = [
     { value: 'max', label: 'Máximo' },
 ] as const;
 
-function statusLabel(settings: LlmSettings): string {
+export function statusLabel(settings: LlmSettings): string {
     if (!settings.encryption_available) {
         return 'Cifrado no disponible';
     }
@@ -42,7 +42,7 @@ function statusLabel(settings: LlmSettings): string {
     if (settings.status === 'missing_key') {
         return 'Falta tu clave API';
     }
-    return 'Configuracion desactivada';
+    return 'Configuración desactivada';
 }
 
 export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
@@ -196,7 +196,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
 
                 {isCustom ? (
                     <label className="space-y-1 text-sm text-gray-300 md:col-span-2" htmlFor="llm-base-url">
-                        <span>URL base (HTTPS publico compatible con OpenAI)</span>
+                        <span>URL base (HTTPS público compatible con OpenAI)</span>
                         <Input
                             className="h-11"
                             autoComplete="off"
@@ -208,7 +208,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                             value={baseUrl}
                         />
                         <span className="block text-xs text-gray-500">
-                            Solo HTTPS publico. No se permiten IP privadas, loopback ni credenciales en la URL.
+                            Solo HTTPS público. No se permiten IP privadas, loopback ni credenciales en la URL.
                         </span>
                     </label>
                 ) : (
