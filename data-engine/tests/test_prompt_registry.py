@@ -96,3 +96,42 @@ def test_migrated_services_use_registry_text():
         prompt_registry.get_prompt("investment_principles", allow_remote=False).text
         == prompt_registry.INVESTMENT_PRINCIPLES
     )
+
+
+# Hash del texto ANTES de moverlo al registro: si alguien edita el prompt, o su
+# version no se mueve con el, este test falla. Cambiar el texto exige subir la
+# version y actualizar el hash aqui a proposito.
+_THESIS_NARRATIVE_PROMPTS = {
+    "thesis_deep_narrative": ("thesis-deep-narrative-v1", "c4dbfb842434", "deep_thesis"),
+    "thesis_news_narrative": ("thesis-news-narrative-v1", "6d66c3af37d3", "main_financial_analysis"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_THESIS_NARRATIVE_PROMPTS))
+def test_thesis_narrative_prompt_version_and_hash_are_pinned(name):
+    version, content_hash, task = _THESIS_NARRATIVE_PROMPTS[name]
+    resolved = prompt_registry.get_prompt(name, allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (version, content_hash, task)
+    assert resolved.source == "code"
+    assert resolved.trace_metadata() == {
+        "prompt_name": name,
+        "prompt_version": version,
+        "prompt_hash": content_hash,
+        "prompt_source": "code",
+    }
+
+
+def test_thesis_narrative_services_use_registry_text_and_trace_it():
+    from app.services import thesis_deep_narrative, thesis_news_narrative
+
+    deep = prompt_registry.get_prompt("thesis_deep_narrative", allow_remote=False)
+    news = prompt_registry.get_prompt("thesis_news_narrative", allow_remote=False)
+    assert thesis_deep_narrative._SYSTEM == deep.text == prompt_registry.THESIS_DEEP_NARRATIVE
+    assert thesis_news_narrative._SYSTEM == news.text == prompt_registry.THESIS_NEWS_NARRATIVE
+
+    news_request = thesis_news_narrative.build_request("META", [])
+    assert news_request.messages[0].content == news.text
+    assert news_request.metadata == news.trace_metadata()
+    deep_request = thesis_deep_narrative._build_request([{"id": "f1", "texto": "t", "fuente": "x"}])
+    assert deep_request.messages[0].content == deep.text
+    assert deep_request.metadata == deep.trace_metadata()
