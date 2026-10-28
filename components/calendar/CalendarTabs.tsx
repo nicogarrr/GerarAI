@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const TABS = [
+  ["/portfolio", "Cartera"],
   ["/calendar/resultados", "Resultados"],
   ["/calendar/suscripcion", "Suscribir"],
   ["/calendar", "Catalizadores"],
@@ -53,19 +54,19 @@ export function CalendarTabs() {
     .filter((href) => pathname === href || pathname.startsWith(`${href}/`))
     .sort((a, b) => b.length - a.length)[0];
   return (
-    <div className="relative mx-auto mb-4 w-full min-w-0 max-w-7xl">
+    <div className="relative mx-auto mb-4 w-full min-w-0 max-w-7xl max-sm:-mx-4 max-sm:w-auto">
     <nav
       ref={navRef}
       onScroll={updateMore}
       aria-label="Calendarios"
-      className="flex w-full min-w-0 flex-nowrap gap-1 overflow-x-auto border-b border-gray-800 px-4 py-2 sm:px-6"
+      className="flex w-full min-w-0 flex-nowrap gap-0.5 overflow-x-auto border-b border-gray-800 px-2 py-2 sm:gap-1 sm:px-6"
     >
       {TABS.map(([href, label]) => {
         const active = href === activeHref;
         return (
           <Link
             aria-current={active ? "page" : undefined}
-            className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${active ? "bg-teal-300/10 text-teal-300" : "text-gray-400 hover:bg-gray-900 hover:text-gray-100"}`}
+            className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-2.5 py-2 text-sm sm:px-3 transition-colors ${active ? "bg-teal-300/10 text-teal-300" : "text-gray-400 hover:bg-gray-900 hover:text-gray-100"}`}
             href={href}
             scroll={false}
             key={href}

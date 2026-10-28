@@ -18,7 +18,7 @@ test('el calendario cruza resultados de watchlist US etiquetados por origen', ()
 test('resultados y alertas en un solo sitio (/calendar?view=alertas)', () => {
     assert.match(page, /view === 'alertas'/);
     assert.match(page, /AlertsManager/);
-    assert.match(page, /Calendario de resultados y alertas/);
+    assert.match(page, /Catalizadores de tu cartera/);
 });
 
 test('dividendos y plazos siguen siendo solo de cartera', () => {
@@ -27,4 +27,11 @@ test('dividendos y plazos siguen siendo solo de cartera', () => {
 
 test('/alerts enlaza al calendario unificado', () => {
     assert.match(alertsPage, /href="\/calendar"/);
+});
+
+test('Calendarios: SectionNav se oculta (CalendarTabs es la única barra) y Cartera es la primera pestaña', () => {
+    const sectionNav = readFileSync('components/layout/SectionNav.tsx', 'utf8');
+    const tabs = readFileSync('components/calendar/CalendarTabs.tsx', 'utf8');
+    assert.match(sectionNav, /CALENDAR_ROUTES=\['\/calendar','\/macro-calendar','\/corporate-actions'\]/);
+    assert.match(tabs, /const TABS = \[\s*\["\/portfolio", "Cartera"\]/);
 });
