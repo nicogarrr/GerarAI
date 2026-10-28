@@ -139,7 +139,7 @@ function ThemeCard({
                 return (
                   <tr className="border-t border-gray-900" key={row.ticker}>
                     <th className="py-1.5 pr-2 font-semibold" scope="row">
-                      <Link className="-my-1 inline-flex min-h-11 items-center text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
+                      <Link className="-my-1 inline-flex min-h-11 min-w-11 items-center justify-center text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
                         {row.ticker}
                       </Link>
                       {row.reason ? (
@@ -204,7 +204,7 @@ function HoldingsLines({
       {symbols.map((symbol, index) => (
         <span key={symbol}>
           {index > 0 ? ' · ' : ''}
-          <Link className="text-teal-300 hover:text-teal-200" href={`/research/${symbol}`}>
+          <Link className="inline-flex min-h-11 min-w-11 items-center justify-center text-teal-300 hover:text-teal-200" href={`/research/${symbol}`}>
             {symbol}
           </Link>
         </span>

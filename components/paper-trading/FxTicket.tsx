@@ -143,6 +143,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-amount`}>Importe ({from})</Label>
                     <Input
+                        style={{ minHeight: 44 }}
                         className="placeholder:text-gray-600"
                         id={`${uid}-amount`}
                         value={amount}
@@ -157,6 +158,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                         Tipo: 1 {from} = … {to}
                     </Label>
                     <Input
+                        style={{ minHeight: 44 }}
                         className="placeholder:text-gray-600"
                         id={`${uid}-rate`}
                         value={rate}
@@ -169,6 +171,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-executed`}>Fecha</Label>
                     <Input
+                        style={{ minHeight: 44 }}
                         id={`${uid}-executed`}
                         type="datetime-local"
                         value={executedAtLocal}

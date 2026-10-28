@@ -241,11 +241,11 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
             {account ? <AccountSummary account={account} /> : null}
 
             <Tabs defaultValue="operar">
-                <TabsList>
-                    <TabsTrigger value="operar">Operar</TabsTrigger>
-                    <TabsTrigger value="divisas">Divisas</TabsTrigger>
-                    <TabsTrigger value="posiciones">Posiciones</TabsTrigger>
-                    <TabsTrigger value="historial">Historial</TabsTrigger>
+                <TabsList className="h-auto min-h-[50px] w-full flex-wrap">
+                    <TabsTrigger className="min-h-11" value="operar">Operar</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="divisas">Divisas</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="posiciones">Posiciones</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="historial">Historial</TabsTrigger>
                 </TabsList>
                 <TabsContent value="operar" className="mt-4">
                     <Panel title="Registrar operación">
