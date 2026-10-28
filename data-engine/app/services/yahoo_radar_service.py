@@ -12,6 +12,17 @@ oficial: el radar lo deja explicito en cada candidato.
 
 El fetcher es inyectable para tests sin red (fixtures grabados). El parseo es
 fail-closed: falta un campo -> None (N/D), nunca 0 ni inventado.
+
+Verificado contra el Yahoo real el 28-oct-2026 (sondas minimas, sandbox):
+- El operador ``in`` no existe: 400 "Unsupported operator: in". Regiones se
+  filtran con ``or`` de ``eq`` (lista de soportados: or, eq, gt, lt, ...).
+- NO existe filtro P/B: ``pricebookratio`` (y variantes) se IGNORA EN
+  SILENCIO (mismo total). Por eso el P/B se filtra en cliente tras el parseo:
+  un operando ignorado serviria resultados sin filtrar como si lo estuvieran.
+- ``dividendyield`` SI filtra, en PORCENTAJE (5 = 5%).
+- Claves reales del quote: ``priceToBook`` (ratio), ``dividendYield`` (%,
+  a veces 0 en HK pese a pasar el filtro) y ``trailingAnnualDividendYield``
+  (fraccion). Yield ambiguo o 0 -> N/D, nunca 0,0%.
 """
 
 from __future__ import annotations
@@ -58,19 +69,23 @@ class RadarCandidate:
 
 def build_screener_query(
     *,
-    pb_max: Decimal | None,
     yield_min: Decimal,
     regions: list[str],
     size: int,
 ) -> dict[str, Any]:
-    """Cuerpo del POST al screener no oficial de Yahoo. Funcion pura."""
-    operands: list[dict[str, Any]] = [
-        {"operator": "in", "operands": ["region", [r.lower() for r in regions]]}
+    """Cuerpo del POST al screener no oficial de Yahoo. Funcion pura.
+
+    Solo operadores y campos verificados (ver docstring del modulo): el P/B
+    NO se pone en la query porque Yahoo lo ignora en silencio; se filtra en
+    cliente. ``dividendyield`` va en porcentaje (0.05 -> 5%)."""
+    region_ops = [
+        {"operator": "eq", "operands": ["region", r.lower()]} for r in regions
     ]
-    if pb_max is not None:
-        operands.append({"operator": "lt", "operands": ["pricebookratio", float(pb_max)]})
+    operands: list[dict[str, Any]] = [
+        region_ops[0] if len(region_ops) == 1 else {"operator": "or", "operands": region_ops}
+    ]
     if yield_min > 0:
-        operands.append({"operator": "gt", "operands": ["dividendyield", float(yield_min)]})
+        operands.append({"operator": "gt", "operands": ["dividendyield", float(yield_min * 100)]})
     return {
         "offset": 0,
         "size": max(1, min(size, MAX_SIZE)),
@@ -120,15 +135,14 @@ def parse_screener_quotes(payload: dict[str, Any]) -> list[RadarCandidate]:
         symbol = str(quote.get("symbol") or "").strip().upper()
         if not symbol:
             continue  # sin identidad no hay candidato
-        # Unidades por campo (no se mezclan): "dividendYield" del screener
-        # viene en porcentaje (8.1 = 8,1%); "trailingAnnualDividendYield" viene
-        # en fraccion (0.081 = 8,1%). Convertir con la regla del campo, nunca
-        # por heuristica de magnitud.
-        yld = _raw_number(quote.get("dividendYield"))
-        if yld is not None:
-            yld = yld / Decimal(100)
-        else:
-            yld = _raw_number(quote.get("trailingAnnualDividendYield"))
+        # Unidades por campo (verificado 28-oct): "trailingAnnualDividendYield"
+        # es fraccion (0.081 = 8,1%) y "dividendYield" es porcentaje (8.1). El
+        # 0 es ambiguo en Yahoo (valor real o ausencia: en HK devuelve 0 aun
+        # pasando el filtro de yield), asi que 0/ausente -> N/D, nunca 0,0%.
+        yld = _raw_number(quote.get("trailingAnnualDividendYield"))
+        if yld is None or yld == 0:
+            pct = _raw_number(quote.get("dividendYield"))
+            yld = (pct / Decimal(100)) if pct is not None and pct > 0 else None
         exchange = quote.get("fullExchangeName") or quote.get("exchange")
         currency = quote.get("currency")
         out.append(
@@ -137,7 +151,7 @@ def parse_screener_quotes(payload: dict[str, Any]) -> list[RadarCandidate]:
                 name=quote.get("longName") or quote.get("shortName"),
                 exchange=str(exchange) if exchange else None,
                 currency=str(currency) if currency else None,
-                price_to_book=_first_number(quote, ("priceToBookRatio", "priceBookRatio")),
+                price_to_book=_first_number(quote, ("priceToBook",)),
                 dividend_yield=yld,
                 yield_extremo_revisar=bool(yld is not None and yld > EXTREME_YIELD),
             )
@@ -190,8 +204,16 @@ def run_radar(
     # puedan sustituir fetch_screener sin red.
     fetcher = fetcher or fetch_screener
     regs = regions or list(DEFAULT_REGIONS)
-    payload = fetcher(build_screener_query(pb_max=pb_max, yield_min=yield_min, regions=regs, size=size))
+    payload = fetcher(build_screener_query(yield_min=yield_min, regions=regs, size=size))
     candidates = parse_screener_quotes(payload)
+    if pb_max is not None:
+        # El P/B se filtra aqui: Yahoo ignora el campo en la query (verificado
+        # 28-oct). Sin cifra de P/B no se puede afirmar que pasa el filtro:
+        # fail-closed, fuera.
+        candidates = [
+            c for c in candidates
+            if c.price_to_book is not None and Decimal("0") < c.price_to_book <= pb_max
+        ]
     if candidates:
         tickers = {c.symbol for c in candidates}
         # Company no es tenant-scoped (mismo precedente que deep_value_service).
