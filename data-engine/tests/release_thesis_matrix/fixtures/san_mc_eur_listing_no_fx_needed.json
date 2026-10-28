@@ -1,0 +1,68 @@
+{
+  "id": "san_mc_eur_listing_no_fx_needed",
+  "kind": "valuation",
+  "facets": [
+    "publicable_contract",
+    "unit"
+  ],
+  "company": {
+    "ticker": "SAN.MC",
+    "name": "Banco Santander",
+    "exchange": "BME",
+    "currency": "EUR"
+  },
+  "facts": [
+    {
+      "metric": "revenue",
+      "value": "60000000000",
+      "unit": "EUR",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "free_cash_flow",
+      "value": "12600000000",
+      "unit": "EUR",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "shares_diluted",
+      "value": "15000000000",
+      "unit": "shares",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "net_debt",
+      "value": "0",
+      "unit": "EUR",
+      "period": "2025-12-31:FY"
+    }
+  ],
+  "price": {
+    "date": "2026-10-23",
+    "close": "8.40",
+    "quote_currency": "EUR"
+  },
+  "fx_rates": [],
+  "expected": {
+    "status": "ok",
+    "publishable": true,
+    "missing_inputs": [],
+    "value_currency": "EUR",
+    "currency_status": "same",
+    "adr_ratio": null,
+    "current_price": 8.4,
+    "base_value": 12.6,
+    "expected_value": 12.6,
+    "margin_of_safety": 0.3333333333333333,
+    "listed_base_value": null,
+    "price_status": "ok",
+    "memo_contains": [
+      "| Base | 12,60 EUR | 60 % |",
+      "Precio del modelo al 2026-10-23: 8,40 EUR"
+    ],
+    "memo_forbidden": [
+      "$",
+      "USD"
+    ]
+  }
+}
