@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { CalendarDays } from 'lucide-react';
-import AlertsManager from '@/components/alerts/AlertsManager';
+import { redirect } from 'next/navigation';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
@@ -15,7 +15,7 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
     title: 'Catalizadores | Calendarios',
-    description: 'Resultados de tus posiciones y de tu watchlist en EE. UU. (USD), ex-dividendos, plazos 10-Q/10-K y acciones corporativas, y tus alertas, en un solo sitio.',
+    description: 'Resultados de tus posiciones y de tu watchlist en EE. UU. (USD), ex-dividendos, plazos 10-Q/10-K y acciones corporativas, con acceso al gestor de alertas.',
 };
 
 const TYPE_LABEL: Record<CatalystEvent['type'], string> = {
@@ -36,40 +36,29 @@ function groupByDate(events: CatalystEvent[]): [string, CatalystEvent[]][] {
 export default async function CalendarPage({
     searchParams,
 }: {
-    searchParams: Promise<{ view?: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-    const { view } = await searchParams;
-    const showAlerts = view === 'alertas';
+    const params = await searchParams;
+    if (params.view === 'alertas') {
+        // Los enlaces antiguos conservan sus filtros y parámetros repetidos.
+        const target = new URLSearchParams();
+        for (const [key, value] of Object.entries(params)) {
+            if (key === 'view' || value === undefined) continue;
+            for (const item of Array.isArray(value) ? value : [value]) target.append(key, item);
+        }
+        redirect(`/alerts${target.size ? `?${target.toString()}` : ''}`);
+    }
 
     const tabs = (
         <nav aria-label="Calendario y alertas" className="flex gap-2 text-sm">
-            <Link
-                href="/calendar"
-                aria-current={showAlerts ? undefined : 'page'}
-                className={`inline-flex min-h-11 items-center rounded-lg px-3 font-medium ${showAlerts ? 'text-gray-400 hover:bg-gray-800 hover:text-gray-100' : 'bg-teal-400/10 text-teal-300'}`}
-            >
+            <Link href="/calendar" aria-current="page" className="inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300">
                 Calendario
             </Link>
-            <Link
-                href="/calendar?view=alertas"
-                aria-current={showAlerts ? 'page' : undefined}
-                className={`inline-flex min-h-11 items-center rounded-lg px-3 font-medium ${showAlerts ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100'}`}
-            >
+            <Link href="/alerts" className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-100">
                 Alertas
             </Link>
         </nav>
     );
-
-    if (showAlerts) {
-        // Pieza 5: resultados y alertas en un solo sitio (/calendar). La ruta
-        // /alerts sigue viva para enlaces existentes y apunta aquí.
-        return (
-            <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-5xl flex-col gap-6">
-                <PageHeader title="Calendario y alertas">{tabs}</PageHeader>
-                <AlertsManager />
-            </main>
-        );
-    }
 
     let calendar: CatalystCalendar;
     try {
