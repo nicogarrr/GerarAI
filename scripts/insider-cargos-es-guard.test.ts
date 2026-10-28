@@ -61,8 +61,13 @@ describe('Insider: cargos comunes en español', () => {
     assert.equal(insiderRole('Officer', 'SVP, Global Sales'), 'SVP, Global Sales');
     assert.equal(insiderRole('Officer', 'Chief Strategy and Chief Security Officer'), 'Chief Strategy and Chief Security Officer');
     assert.equal(insiderRole('Officer', 'Vice President of Sales'), 'Vice President of Sales');
-    // El caso original del Tester 6, parcial: mejor crudo que mutilado.
-    assert.equal(insiderRole('Officer', 'SVP, GC and Government Affairs'), 'SVP, GC and Government Affairs');
+    // Government Affairs ya tiene mapa completo; un área adicional sin mapa sigue cruda.
+    assert.equal(insiderRole('Officer', 'SVP, GC and Government Affairs, Asia Pacific'), 'SVP, GC and Government Affairs, Asia Pacific');
+  });
+
+  it('Government Affairs conserva todas las funciones en orden y Officer es Directivo', () => {
+    assert.equal(insiderRole('Officer', 'SVP, GC and Government Affairs'), 'Vicepresidente senior y Asesor jurídico general y Relaciones gubernamentales');
+    assert.equal(insiderRole('Officer', 'Officer'), 'Directivo');
   });
 
   it('la vista de señales pasa por insiderRole (antes mostraba el cargo SEC en crudo)', () => {
