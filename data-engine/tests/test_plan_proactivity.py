@@ -39,6 +39,9 @@ def test_actual_plan_changes_emit_in_app_only_with_sources(db):
     rows = db.scalars(select(ResearchAlert).order_by(ResearchAlert.id)).all()
     assert len(rows) == 2
     assert rows[0].status == 'resolved' and rows[0].resolved_at is not None
+    assert rows[0].metadata_['resolved_by'] == 'savings-plan'
+    assert rows[0].metadata_['resolution_reason'] == 'superseded_plan_state'
+    assert rows[0].metadata_['superseded_by_fingerprint'] == rows[1].fingerprint
     assert rows[1].status == 'open'
     assert sum(a.status == 'open' for a in rows) == 1
 
@@ -60,3 +63,30 @@ def test_other_tenant_does_not_read_plan_or_alerts(db):
     save(db)
     db.info['tenant_id'] = 'other'
     assert review_savings_plan(db) == {'plan_exists': False, 'new_in_app_alerts': 0}
+
+
+def test_resolution_preserves_prior_metadata_and_other_tenant(db):
+    save(db, currency=None)
+    owner_alert = db.scalar(select(ResearchAlert))
+    owner_alert.metadata_ = {**owner_alert.metadata_, 'custom': 'keep'}
+    db.commit()
+    db.info['tenant_id'] = 'other'
+    save(db, amount='200')
+    other_alert = db.scalar(select(ResearchAlert).where(ResearchAlert.tenant_id == 'other'))
+    db.info['tenant_id'] = 'owner'
+    save(db, currency='EUR')
+    assert owner_alert.metadata_['custom'] == 'keep'
+    assert owner_alert.metadata_['resolved_by'] == 'savings-plan'
+    assert other_alert.status == 'open'
+    assert 'resolved_by' not in other_alert.metadata_
+
+
+def test_dismissed_notice_keeps_its_resolution_provenance(db):
+    save(db)
+    dismissed = db.scalar(select(ResearchAlert))
+    dismissed.status = 'resolved'
+    dismissed.metadata_ = {**dismissed.metadata_, 'resolved_by': 'user'}
+    db.commit()
+    save(db, amount='200')
+    assert dismissed.metadata_['resolved_by'] == 'user'
+    assert 'superseded_by_fingerprint' not in dismissed.metadata_
