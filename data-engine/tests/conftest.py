@@ -205,3 +205,13 @@ def isolate_llm_free_tier_breaker():
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
     base._interactive_quota_breaker.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_filing_deadline_failure_cache():
+    """La memoria corta de fallos de plazos 10-Q/10-K es estado global de proceso."""
+    from app.services import catalyst_calendar_service
+
+    catalyst_calendar_service._FAILED_UNTIL.clear()
+    yield
+    catalyst_calendar_service._FAILED_UNTIL.clear()
