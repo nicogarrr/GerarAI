@@ -1,5 +1,6 @@
 import Link from 'next/link';
 
+import { DecisionJournalEntryLink } from '@/components/research/DecisionJournalEntryLink';
 import { MODULES, moduleHref, type View } from '@/lib/research/research-views';
 
 const PRIMARY = [
@@ -47,11 +48,11 @@ export function CompanyNavigation({ ticker, activeView }: { ticker: string; acti
           const keys = group.keys.filter((key) => key !== 'satellites' || ticker === 'ASTS');
           return keys.length ? <div key={group.label}>
             <p className="mb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
-            {/* El enlace al diario apunta a un ancla: sin scroll={false}, para que
-                Next baje hasta #diario-decisiones (agent-qa 28/10: con scroll={false}
-                la URL cambiaba pero la vista se quedaba arriba, a 4.000 px del diario). */}
+            {/* El enlace al diario apunta a un ancla y hace su propio scroll
+                (DecisionJournalEntryLink): el App Router no baja al ancla si la
+                página ya estaba desplazada (suite E2E 28/10). */}
             {keys.map((key) => key === 'changes'
-              ? <div key={key}>{link(key, true)}<Link data-testid="decision-journal-entry" className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200" href={`/research/${encodeURIComponent(ticker)}?view=changes#diario-decisiones`}>Diario de decisiones <span aria-hidden="true">→</span></Link></div>
+              ? <div key={key}>{link(key, true)}<DecisionJournalEntryLink className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200" ticker={ticker} /></div>
               : link(key, true))}
           </div> : null;
         })}
