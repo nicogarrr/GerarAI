@@ -348,6 +348,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             <RecordDetail
                 key={recordDetailKey(year, reportKey)}
                 title={`Reporte Fiscal ${year}`}
+                titleAs="h2"
                 description="Resumen orientativo del ejercicio"
                 icon={<FileText className="h-5 w-5 text-teal-400" />}
                 hiddenKeys={['trace']}
@@ -377,6 +378,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             <RecordList
                 key={`holdings-${year}-${currentHoldingPage}`}
                 title="Posiciones Fiscales"
+                titleAs="h2"
                 description="Posiciones con base de coste y plusvalías latentes. La divisa base del informe es EUR; cada importe usa la divisa de su fila si consta."
                 icon={<Receipt className="h-5 w-5 text-teal-400" />}
                 records={initialHoldings.slice(currentHoldingPage * 10, (currentHoldingPage + 1) * 10)}
