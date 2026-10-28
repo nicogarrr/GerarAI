@@ -13,7 +13,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const component = readFileSync('components/SearchCommand.tsx', 'utf8');
+// Gatillo (eager) + paleta (chunk diferido): las aserciones valen para ambos.
+const component = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
 const store = readFileSync('lib/search/search-command-store.ts', 'utf8');
 
 void test('las instancias ya no guardan su propio estado open ni listener de teclado', () => {

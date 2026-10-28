@@ -27,7 +27,13 @@ import {
     type WorkProductType,
 } from '@/lib/actions/work-products.actions';
 import { showErrorToast } from '@/lib/toast';
-import ThesisMarkdown from '@/components/research/ThesisMarkdown';
+import dynamic from 'next/dynamic';
+
+// El visor markdown (~47 KB gzip) solo hace falta con un documento ya
+// generado en pantalla: no viaja en el bundle inicial de /research.
+const ThesisMarkdown = dynamic(() => import('@/components/research/ThesisMarkdown'), {
+    loading: () => <p className="text-sm text-gray-500">Cargando visor...</p>,
+});
 import { toast } from 'sonner';
 
 const PRODUCT_TYPES: Array<{ value: WorkProductType; label: string }> = [
