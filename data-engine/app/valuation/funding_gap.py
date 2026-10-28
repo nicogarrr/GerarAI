@@ -100,6 +100,7 @@ def estimate_funding_gap(
     else:
         buffer = min_cash_buffer
         buffer_basis = "explicito"
+    # nosemgrep: gerarai-money-none-to-zero -- cash None ya devolvio status="incomplete" mas arriba (missing_inputs)
     available = cash or 0.0
     funding_gap = max(capex_need + burn_proxy + buffer - available, 0.0)
 

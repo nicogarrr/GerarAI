@@ -347,7 +347,7 @@ def maybe_narrative(
         # llamadas de una misma transaccion.
         db.flush()
     except Exception:  # noqa: BLE001 - el registro contable no decide el contenido
-        pass
+        logger.warning("budget_record_failed: el gasto LLM de esta narrativa no quedo contabilizado", exc_info=True)
     try:
         parsed = parse_json_response(response.text)
         fragment_ids = parsed.get("fragment_ids") if isinstance(parsed, dict) else None
@@ -660,7 +660,7 @@ def maybe_narrative_sections(
         # llamadas de una misma transaccion.
         db.flush()
     except Exception:  # noqa: BLE001 - el registro contable no decide el contenido
-        pass
+        logger.warning("budget_record_failed: el gasto LLM de esta narrativa no quedo contabilizado", exc_info=True)
     try:
         parsed = parse_json_response(response.text)
         section_ids = parsed.get("section_ids") if isinstance(parsed, dict) else None

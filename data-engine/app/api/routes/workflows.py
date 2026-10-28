@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, ValidationError
@@ -45,7 +45,7 @@ class EarningsRunParams(BaseModel):
     antes de abrir el run y el envelope graba exactamente lo que corre.
     """
 
-    fiscal_year: int = Field(default_factory=lambda: datetime.now().year)
+    fiscal_year: int = Field(default_factory=lambda: datetime.now(UTC).year)
     fiscal_quarter: str = "FY"
     document_ids: list[int] = Field(default_factory=list)
     force_new_thesis: bool = False

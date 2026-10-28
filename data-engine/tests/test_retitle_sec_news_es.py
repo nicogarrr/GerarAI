@@ -53,6 +53,7 @@ def test_form_allowlist():
 
 
 def test_plan_row_solo_texto_compuesto():
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- _plan_row es una funcion pura que solo lee atributos; no hay consulta ORM ni gate
     row = SimpleNamespace(
         id=1, tenant_id=None, company_id=7, title="COST COST 8-K (2026-09-24)",
         summary="COST COST 8-K (2026-09-24)", url=SEC_URL,
@@ -73,6 +74,7 @@ def test_plan_row_solo_texto_compuesto():
     assert plan["new"]["headline_from_source"] is False
     # Fila con texto ya saneado pero titular sintético aún atribuido a la
     # SEC: el plan sanea SOLO la procedencia (title/summary quedan igual).
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- _plan_row es una funcion pura que solo lee atributos; no hay consulta ORM ni gate
     row_es = SimpleNamespace(
         id=2, tenant_id=None, company_id=7, title="COST 8-K presentado ante la SEC",
         summary="COST 8-K presentado ante la SEC", url=SEC_URL,
@@ -84,12 +86,14 @@ def test_plan_row_solo_texto_compuesto():
     assert plan_es["new"]["source_headline"] is None
     assert plan_es["new"]["headline_from_source"] is False
     # Y la fila ya saneada por completo (texto y procedencia) no se toca.
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- _plan_row es una funcion pura que solo lee atributos; no hay consulta ORM ni gate
     row_ok = SimpleNamespace(
         id=3, tenant_id=None, company_id=7, title="COST 8-K presentado ante la SEC",
         summary="COST 8-K presentado ante la SEC", url=SEC_URL,
         metadata_={"headline_from_source": False},
     )
     assert _plan_row(row_ok, "COST") is None
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- _plan_row es una funcion pura que solo lee atributos; no hay consulta ORM ni gate
     row_otro = SimpleNamespace(
         id=3, tenant_id=None, company_id=7, title="Apple anuncia resultados",
         summary="Apple anuncia resultados", metadata_={},

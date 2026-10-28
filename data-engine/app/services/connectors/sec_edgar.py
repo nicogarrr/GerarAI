@@ -299,7 +299,7 @@ async def mirror_get_json(url: str, *, direct_error: Exception | None = None) ->
             f"({mirror_response.status_code} {mirror_url})"
         ) from exc
     raw = mirror_response.content
-    actual_hash = hashlib.sha1(raw).hexdigest()
+    actual_hash = hashlib.sha1(raw, usedforsecurity=False).hexdigest()
     if actual_hash != declared_hash:
         raise RuntimeError(
             f"Mirror HF: sha1 de {path} no casa con el manifest "

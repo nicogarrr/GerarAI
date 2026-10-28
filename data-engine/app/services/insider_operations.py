@@ -183,11 +183,14 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
                 bucket["officer_title"] = tx.officer_title
             for target in (bucket[side_key], totals[side_key]):
                 target["trades"] += 1
+                # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
                 target["shares"] += tx.shares or 0.0
                 if tx.value is not None:
                     target["value"] += tx.value
+                    # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
                     target["_shares_priced"] += tx.shares or 0.0
                 else:
+                    # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
                     target["_shares_unpriced"] += tx.shares or 0.0
                     target["_rows_without_value"] += 1
 

@@ -233,6 +233,7 @@ class MaterialityService:
             reasons.append("negative event on meaningful position +1")
 
         if use_jev:
+            # nosemgrep: gerarai-broad-except-pass -- triage opcional de Jev; nunca rompe la ingesta
             try:
                 from app.services.jev_triage_service import (
                     apply_to_materiality,

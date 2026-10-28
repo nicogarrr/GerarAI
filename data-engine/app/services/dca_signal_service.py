@@ -295,6 +295,7 @@ def build_bars(rows: Sequence[PriceRow]) -> tuple[list[DailyBar], float]:
     if not adjusted:
         return [DailyBar(day=row.day, close=float(row.close)) for row in ordered], 1.0
     last_adj = adjusted[-1]
+    # nosemgrep: gerarai-money-none-to-zero -- last_adj es por construccion el indice de la ultima fila con adj_close no nulo
     ratio = float(ordered[last_adj].adj_close or 0.0) / float(ordered[last_adj].close)
     bars: list[DailyBar] = []
     for i, row in enumerate(ordered):

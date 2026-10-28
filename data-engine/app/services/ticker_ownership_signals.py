@@ -101,6 +101,7 @@ def insider_signal(
         side = sides[str(tx.code)]
         side["trades"] += 1
         side["insiders"].add((tx.insider or tx.insider_cik or "?").strip().upper())
+        # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
         side["shares"] += float(tx.shares or 0.0)
         if tx.value is not None:
             side["value"] += float(tx.value)
@@ -212,6 +213,7 @@ def holders_signal(db: Session, ticker: str) -> dict[str, Any]:
         if change == "closed" and inv.slug not in held_slugs:
             exited.append(inv.name)
     report_dates = sorted({h["report_date"] for h in holders if h.get("report_date")})
+    # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
     total = sum(float(h.get("value_usd") or 0.0) for h in holders)
     top = [
         {

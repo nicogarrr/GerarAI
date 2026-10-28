@@ -71,6 +71,7 @@ class SecretRedactingFilter(logging.Filter):
         # formateador de uvicorn.access desempaqueta 5 args
         # (cliente, metodo, ruta, version, estado); vaciarlos romperia la linea.
         if isinstance(record.args, tuple) and record.args:
+            # nosemgrep: gerarai-broad-except-pass -- el redactor de logs nunca puede romper el propio logging
             try:
                 masked = tuple(redact(a) if isinstance(a, str) else a for a in record.args)
                 if masked != record.args:

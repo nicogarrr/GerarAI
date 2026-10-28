@@ -582,6 +582,7 @@ class Modelo720FileService:
         r += self._detail_tail(
             first_date, origin, "",
             value, Decimal("0"), "A",
+            # nosemgrep: gerarai-money-none-to-zero -- quantity de una posicion persistida (NOT NULL); el fichero 720 exige un numero
             Decimal(str(pos.get("quantity") or 0)),
         )
         assert len(r) == RECORD_LEN, f"detalle V: {len(r)} bytes"

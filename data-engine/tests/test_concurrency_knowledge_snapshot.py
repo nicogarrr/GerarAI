@@ -86,6 +86,7 @@ def test_concurrent_monthly_snapshot_freeze_first_wins(factory, monkeypatch):
 
     def fake_funnel(db, top_n):
         barrier.wait(timeout=10)
+        # nosemgrep: gerarai-orm-fake-simplenamespace -- resultado del embudo (no es un modelo ORM); solo se parchea run_funnel para la carrera
         result = SimpleNamespace(company_id=1, passed=True, score=0.9, metrics={"rank": 1, "roic": 0.2})
         return [result], {"universe_size": 1, "passed_count": 1, "params": {}}
 

@@ -245,6 +245,7 @@ class DividendIngestionService(ProviderIngestionService):
         missing_base_value: list[str] = []
         for position, company in rows:
             records, uncertain = resolve_yahoo_events(records_by_company.get(company.id, []))
+            # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
             price = float(position.market_price or 0)
             # Peso solo en divisa base: `market_value` esta en la divisa nativa
             # y sumarlo mezclaria monedas distintas en el mismo total.

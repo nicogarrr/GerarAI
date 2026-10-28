@@ -268,6 +268,7 @@ def _risk_answer(ctx: UserContext, db: Session) -> list[str]:
         lines.append("Avisos: " + alerts[0].removeprefix("- "))
         lines += alerts[1:4]
     # Panel de riesgo y histórico (#2317), si esa pieza está disponible.
+    # nosemgrep: gerarai-broad-except-pass -- pieza opcional; sin ella la respuesta sigue (comentario en linea)
     try:
         from importlib import import_module
 

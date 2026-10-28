@@ -254,6 +254,7 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
                     losses += abs(Decimal(str(gain_base)))
 
     dividends_total = sum(
+        # nosemgrep: gerarai-money-none-to-zero -- el total se publica como None si algun bloque es incompleto (dividend_incomplete, abajo)
         (Decimal(str(b["dividends_base"] or 0)) for b in dividends), Decimal("0")
     )
     dividend_incomplete = any(
@@ -486,7 +487,9 @@ def build_double_taxation(
         entry = by_country.setdefault(
             country, {"gross": Decimal("0"), "withheld": Decimal("0"), "creditable": Decimal("0")}
         )
+        # nosemgrep: gerarai-money-none-to-zero -- None solo con missing_fx/ambiguous_cash, que ya salieron del bucle con revision manual (lineas 384-401)
         gross_d = Decimal(str(gross or 0))
+        # nosemgrep: gerarai-money-none-to-zero -- None solo con missing_fx/ambiguous_cash, que ya salieron del bucle con revision manual (lineas 384-401)
         withheld_d = Decimal(str(withheld or 0))
         entry["gross"] += gross_d
         entry["withheld"] += withheld_d

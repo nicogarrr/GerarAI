@@ -389,6 +389,7 @@ class NewsService:
             news_metadata["news_lane"] = news_lane
         if macro_theme:
             news_metadata["macro_theme"] = macro_theme
+        # nosemgrep: gerarai-broad-except-pass -- paso opcional (Jev / relevancia); nunca bloquea la ingesta
         try:
             from app.services.jev_triage_service import (
                 classify_doc_type_sync,
@@ -402,6 +403,7 @@ class NewsService:
             pass
         # Clasificación para priorizar la vista, no modifica el análisis ni
         # descarta noticias: el universo completo sigue disponible.
+        # nosemgrep: gerarai-broad-except-pass -- paso opcional (Jev / relevancia); nunca bloquea la ingesta
         try:
             from app.models import Position, WatchItem
             from app.services.jev_gates import (

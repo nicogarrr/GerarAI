@@ -1069,7 +1069,7 @@ class ThesisService:
             if not stored_evidence_only:
                 maybe_request_thesis_approval(db, thesis, company.ticker)
         except Exception:
-            pass
+            logger.warning("thesis_approval_request_failed", exc_info=True)
         return thesis
 
     def _persist_claims(

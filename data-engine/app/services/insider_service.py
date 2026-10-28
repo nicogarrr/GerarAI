@@ -51,6 +51,7 @@ def _cached_filing_xml(filing: dict, client=None) -> tuple[str, str | None]:
     """
     accession = str(filing.get("accession_number") or filing.get("document_url") or "")
     now = time.time()
+    # nosemgrep: gerarai-broad-except-pass -- cache en memoria best-effort; el fetch real continua
     try:
         expires, xml_text = _xml_cache.get(accession, (0.0, ""))
         if xml_text and expires > now:
@@ -76,6 +77,7 @@ def _cached_filing_xml(filing: dict, client=None) -> tuple[str, str | None]:
     finally:
         if owned_client is not None:
             owned_client.close()
+    # nosemgrep: gerarai-broad-except-pass -- cache en memoria best-effort; el fetch real continua
     try:
         _xml_cache[accession] = (now + FILING_XML_CACHE_TTL_SECONDS, xml_text)
         _xml_cache_fetched_at[accession] = datetime.now(UTC).isoformat()
