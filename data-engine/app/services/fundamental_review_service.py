@@ -17,8 +17,8 @@ from app.models import (
     FundamentalForecast,
     FundamentalModelVersion,
     MarketPrice,
-    ThesisVersion,
 )
+from app.services.claim_scope import latest_thesis_version
 from app.services.metric_semantics import MetricSemanticsRegistry
 
 
@@ -37,12 +37,7 @@ class DecisionJournalService:
 
         # La operacion se valida ANTES de escribir nada (ValueError -> 422).
         trade = resolve_decision_trade(db, company, transaction_id, decision) if transaction_id else None
-        thesis = db.scalar(
-            select(ThesisVersion)
-            .where(ThesisVersion.company_id == company.id)
-            .order_by(desc(ThesisVersion.version))
-            .limit(1)
-        )
+        thesis = latest_thesis_version(db, company)
         model = db.scalar(
             select(FundamentalModelVersion)
             .where(FundamentalModelVersion.company_id == company.id)
