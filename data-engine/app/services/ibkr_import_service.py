@@ -1513,12 +1513,16 @@ class IBKRImportService:
         # must not be collapsed by ISIN alone.
         currency = ((_attr(element, "currency") if element is not None else None) or "").strip().upper()
         exchange = ((_attr(element, "listingExchange") if element is not None else None) or "UNKNOWN").strip()
+        if listing and exchange.upper() not in {"AEB", "XAMS", "EURONEXT AMSTERDAM"}:
+            raise IBKRImportError("La plaza Flex es distinta o ambigua para el ISIN verificado.")
         if listing and currency and currency != listing.currency:
             raise IBKRImportError("La divisa Flex contradice el listado verificado por ISIN.")
         if ticker in cache:
             cached = cache[ticker]
             if isin and cached.isin and cached.isin != isin:
                 raise IBKRImportError("El símbolo Flex coincide con otro ISIN; requiere revisión manual.")
+            if listing and (cached.currency != listing.currency or cached.exchange != listing.exchange):
+                raise IBKRImportError("El listado en caché contradice la identidad verificada; revisión manual.")
             return cached
         company = db.scalar(select(Company).where(Company.ticker == ticker))
         if company is not None and isin and company.isin and company.isin != isin:

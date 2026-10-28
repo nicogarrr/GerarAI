@@ -9,6 +9,8 @@ The pages returned historical April/May timestamps. They verify identity, NOT a 
 
 Code cause reproduced: Flex created/enriched a bare ticker with USD before recording its ISIN. This permits a US homonym lookup. No production record or original Flex payload was inspected, so the specific existing holding's history is unproven.
 
+IBKR AEB alias: https://www.interactivebrokers.com/cgi-pub/exchange_display.pl?file=AEB.html . AEB/XAMS/EURONEXT AMSTERDAM are the only accepted Flex listingExchange values for this mapping; missing/SMART/other venues are rejected as ambiguous.
+
 The fix resolves a reviewed ISIN before enrichment, creates BFIT.AS separately from an existing BFIT, and preserves both identities. Conflicting ISIN/currency is an explicit error. No fuzzy name fallback: a delisted US symbol alone does not prove an Amsterdam listing. Unknown issuers still need reviewed mappings. Other listings of the same ISIN must not be silently collapsed.
 
 ## Proposed correction, NOT authorized or executed

@@ -38,7 +38,7 @@ def test_import_uses_isin_before_us_homonym_and_preserves_existing_holding(monke
         assert yahoo_symbol(company) == "BFIT.AS"
         assert service._company(db, {}, "BFIT", element).id == company.id
         with pytest.raises(IBKRImportError, match="divisa Flex"):
-            service._company(db, {}, "BFIT", fromstring('<Trade isin="NL0011872650" currency="USD"/>'))
+            service._company(db, {}, "BFIT", fromstring('<Trade isin="NL0011872650" currency="USD" listingExchange="AEB"/>'))
 
 
 def test_unknown_listing_uses_flex_currency_not_usd_default(monkeypatch):
@@ -72,9 +72,24 @@ def test_full_flex_import_resolves_basic_fit(monkeypatch):
         db.add(tenant)
         db.flush()
         db.info["tenant_id"] = tenant.id
-        xml = '<FlexQueryResponse><FlexStatement><OpenPosition symbol="BFIT" isin="NL0011872650" currency="EUR" position="2" markPrice="30" positionValue="60" costBasisPrice="25" reportDate="20261028"/><Trade symbol="BFIT" isin="NL0011872650" currency="EUR" buySell="BUY" quantity="2" tradePrice="25" tradeDate="20261020" tradeID="BFIT-1"/></FlexStatement></FlexQueryResponse>'
+        xml = '<FlexQueryResponse><FlexStatement><OpenPosition symbol="BFIT" isin="NL0011872650" listingExchange="AEB" currency="EUR" position="2" markPrice="30" positionValue="60" costBasisPrice="25" reportDate="20261028"/><Trade symbol="BFIT" isin="NL0011872650" listingExchange="XAMS" currency="EUR" buySell="BUY" quantity="2" tradePrice="25" tradeDate="20261020" tradeID="BFIT-1"/></FlexStatement></FlexQueryResponse>'
         IBKRImportService().import_flex_xml(db, xml)
         company = db.query(Company).filter_by(ticker="BFIT.AS").one()
         assert db.query(Position).one().company_id == company.id
         assert db.query(Transaction).one().company_id == company.id
         assert db.query(Position).one().currency == "EUR"
+
+
+@pytest.mark.parametrize("exchange", ["XETRA", "SMART", "", "UNKNOWN"])
+def test_reviewed_isin_rejects_different_or_ambiguous_venue(exchange):
+    element = fromstring(f'<Trade isin="NL0011872650" currency="EUR" listingExchange="{exchange}"/>')
+    with pytest.raises(IBKRImportError, match="plaza Flex"):
+        IBKRImportService()._company(None, {}, "BFIT", element)
+
+
+@pytest.mark.parametrize("currency,exchange", [("USD", "NASDAQ"), ("EUR", "XETRA"), ("USD", "EURONEXT AMSTERDAM")])
+def test_reviewed_listing_cache_cannot_bypass_identity_validation(currency, exchange):
+    cached = Company(ticker="BFIT.AS", isin=BASIC_FIT.isin, currency=currency, exchange=exchange)
+    element = fromstring('<Trade isin="NL0011872650" currency="EUR" listingExchange="AEB"/>')
+    with pytest.raises(IBKRImportError, match="caché"):
+        IBKRImportService()._company(None, {"BFIT.AS": cached}, "BFIT", element)
