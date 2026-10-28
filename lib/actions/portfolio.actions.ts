@@ -8,8 +8,9 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
 import { requestCache } from '@/lib/cache/requestCache';
-import { AuthorizationError, ValidationError } from '@/lib/types/errors';
+import { AppError, AuthorizationError, ValidationError } from '@/lib/types/errors';
 import { sumCashByCurrency } from '@/lib/portfolio-cash';
+import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 import { importRejection } from '@/lib/portfolio/import-rejection';
 
@@ -332,6 +333,36 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         valuationDatesDiffer: backendSummary.valuation_dates_differ,
         quality,
     };
+}
+
+export type CompanyHoldingContext =
+    | { status: 'held'; holding: PortfolioHolding; weightPercent: number | null; positionsAsOf: string | null }
+    | { status: 'not_held' }
+    | { status: 'error'; message: string };
+
+/**
+ * La posición real de UNA empresa para su ficha, sacada de la MISMA lectura
+ * que la página de cartera (getPortfolioSummary, caché compartida): las cifras
+ * no pueden divergir entre pantallas. El peso usa la regla del donut
+ * «Distribución»: solo posiciones con valor conocido. Un fallo se devuelve
+ * como error visible, nunca como «sin posición».
+ */
+export async function getCompanyHolding(ticker: string): Promise<CompanyHoldingContext> {
+    const user = await requireAuthenticatedUser();
+    try {
+        const summary = await getPortfolioSummary(user.id);
+        const symbol = ticker.trim().toUpperCase();
+        const holding = summary.holdings.find((item) => item.symbol.toUpperCase() === symbol);
+        if (!holding) return { status: 'not_held' };
+        const known = summary.holdings.filter((item) => !item.valueMissing && !item.fxMissing);
+        const slice = known.includes(holding)
+            ? buildAllocationSlices(known).find((item) => item.symbol === holding.symbol)
+            : undefined;
+        return { status: 'held', holding, weightPercent: slice?.percentage ?? null, positionsAsOf: summary.positionsAsOf ?? null };
+    } catch (error) {
+        if (error instanceof AppError && [401, 403].includes(error.statusCode)) throw error;
+        return { status: 'error', message: 'No se pudo cargar tu posición en esta empresa.' };
+    }
 }
 
 // Actualizar transacción existente
