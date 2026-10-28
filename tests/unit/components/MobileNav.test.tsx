@@ -19,30 +19,36 @@ beforeEach(() => {
     })));
 });
 
+async function openDrawer() {
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+    // El drawer llega en chunk diferido (next/dynamic): se espera a que monte.
+    await screen.findByRole('dialog', { name: 'Menú de navegación' });
+}
+
 describe('MobileNav', () => {
-    it('el hamburger abre el drawer con el MISMO árbol que el sidebar', () => {
+    it('el hamburger abre el drawer con el MISMO árbol que el sidebar', async () => {
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         expect(screen.getByRole('dialog', { name: 'Menú de navegación' })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Cartera' })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Biblioteca' })).toBeInTheDocument();
     });
-    it('Escape cierra y el scroll del body se restaura', () => {
+    it('Escape cierra y el scroll del body se restaura', async () => {
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         expect(document.body.style.overflow).toBe('hidden');
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(document.body.style.overflow).toBe('');
     });
-    it('el botón de cerrar recibe el foco al abrir', () => {
+    it('el botón de cerrar recibe el foco al abrir', async () => {
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cerrar menú de navegación' }));
     });
-    it('cerrar por el fondo no deja el diálogo montado', () => {
+    it('cerrar por el fondo no deja el diálogo montado', async () => {
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         fireEvent.click(screen.getByRole('button', { name: 'Cerrar menú por fondo' }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -59,31 +65,31 @@ describe('MobileNav (trampas de foco y breakpoints)', () => {
         return listeners;
     }
 
-    it('el botón Cerebro cierra el drawer y emite gerarai:open-brain', () => {
+    it('el botón Cerebro cierra el drawer y emite gerarai:open-brain', async () => {
         const onBrain = vi.fn();
         window.addEventListener('gerarai:open-brain', onBrain);
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         fireEvent.click(screen.getByRole('button', { name: /Cerebro/ }));
         expect(onBrain).toHaveBeenCalledTimes(1);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         window.removeEventListener('gerarai:open-brain', onBrain);
     });
 
-    it('pulsar un enlace del árbol cierra el drawer', () => {
+    it('pulsar un enlace del árbol cierra el drawer', async () => {
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         fireEvent.click(screen.getByRole('link', { name: 'Cartera' }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(document.body.style.overflow).toBe('');
     });
 
-    it('el ciclo Tab vuelve del último focuseable al primero y Shift+Tab al revés', () => {
+    it('el ciclo Tab vuelve del último focuseable al primero y Shift+Tab al revés', async () => {
         stubMatchMedia();
         // jsdom no layouta: sin rectángulos el filtro deja la lista vacía.
         vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         const dialog = screen.getByRole('dialog', { name: 'Menú de navegación' });
         const focusables = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]'))
             .filter((el) => el.tabIndex >= 0);
@@ -98,18 +104,18 @@ describe('MobileNav (trampas de foco y breakpoints)', () => {
         vi.restoreAllMocks();
     });
 
-    it('Tab sin focuseables visibles deja el foco en el diálogo', () => {
+    it('Tab sin focuseables visibles deja el foco en el diálogo', async () => {
         stubMatchMedia();
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         fireEvent.keyDown(document, { key: 'Tab' });
         expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'Menú de navegación' }));
     });
 
-    it('cruzar a md+ con el drawer abierto lo cierra', () => {
+    it('cruzar a md+ con el drawer abierto lo cierra', async () => {
         const listeners = stubMatchMedia(true);
         render(<MobileNav />);
-        fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de navegación' }));
+        await openDrawer();
         expect(screen.getByRole('dialog')).toBeInTheDocument();
         act(() => { for (const cb of listeners['change'] ?? []) cb(new Event('change')); });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
