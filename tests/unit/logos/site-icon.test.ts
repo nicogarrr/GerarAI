@@ -89,7 +89,7 @@ describe('iconCandidatesFromHtml', () => {
 
 describe('fetchSiteIcon', () => {
     it('devuelve el primer icono válido de la portada con tipo detectado por contenido', async () => {
-        const fetchMock = vi.fn(async (url: string) => {
+        const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => {
             if (url === 'https://acme.com/') return res('<link rel="apple-touch-icon" href="/t.png" sizes="180x180">', { url: 'https://acme.com/' });
             if (url === 'https://acme.com/t.png') return res(png(180), { url, type: 'application/octet-stream' });
             return res('', { ok: false });
