@@ -277,9 +277,9 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 {ticker} · {name}
               </h1>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">PROVISIONAL — no publicada</Badge>
-                <Badge variant="outline">{statusLabel(latest.status)}</Badge>
-                <Badge variant="outline">v{latest.version}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">PROVISIONAL — no publicada</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">{statusLabel(latest.status)}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">v{latest.version}</Badge>
                 {latest.created_at ? <span className="text-xs text-gray-500">generada el {formatGeneratedDate(latest.created_at)}</span> : null}
               </div>
               <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
@@ -392,8 +392,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 {ticker} · {name}
               </h1>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="outline">Rating: {RATING_LABELS[published.rating] ?? published.rating}</Badge>
-                <Badge variant="outline">v{published.version}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">Rating: {RATING_LABELS[published.rating] ?? published.rating}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">v{published.version}</Badge>
                 {generated ? <span className="text-xs text-gray-500">generada el {generated}</span> : null}
               </div>
               {latest && latest.version !== published.version ? (
