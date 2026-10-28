@@ -32,6 +32,26 @@ const base = {
     ],
 };
 
+describe('RiskDashboardView: valoración en suspenso', () => {
+    it('etiqueta y estado en es-ES, con ticker, motivo y fecha', () => {
+        render(<RiskDashboardView initialDashboard={{
+            ...base,
+            status: 'incomplete_valuation',
+            valuation_hold: [{ ticker: 'KRKNF', reason: 'precio dudoso', effective_date: '2026-09-01' }],
+        }} />);
+        expect(screen.getByText('Valoración en suspenso')).toBeInTheDocument();
+        expect(screen.getByText(/KRKNF: precio dudoso/)).toBeInTheDocument();
+        expect(screen.getByText(/1 sept 2026/)).toBeInTheDocument();
+        expect(screen.getByText('Incompleto: valoración en suspenso')).toBeInTheDocument();
+        expect(screen.queryByText(/Valuation hold/i)).not.toBeInTheDocument();
+        expect(screen.queryByText('incomplete_valuation')).not.toBeInTheDocument();
+    });
+    it('sin filas en suspenso no pinta la fila (como missing_fx)', () => {
+        render(<RiskDashboardView initialDashboard={{ ...base, valuation_hold: [] }} />);
+        expect(screen.queryByText('Valoración en suspenso')).not.toBeInTheDocument();
+    });
+});
+
 describe('RiskDashboardView', () => {
     it('muestra resumen formateado en español y posiciones enlazadas', () => {
         render(<RiskDashboardView initialDashboard={base} />);
