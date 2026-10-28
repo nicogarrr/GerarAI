@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
 import { requestCache } from '@/lib/cache/requestCache';
-import { classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
+import { AppError, classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import { getStockQuote, getStockValuationBasics } from '@/lib/actions/finnhub.actions';
 import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
@@ -113,9 +113,17 @@ export async function addToWatchlistCanonical(symbol: string, company?: string):
 export async function removeFromWatchlist(symbol: string): Promise<WatchlistMutationResult> {
     try {
         const userId = await getUserId();
-        await researchRequest(`/api/watchlist/${encodeURIComponent(symbol)}`, {
-            method: 'DELETE'
-        });
+        try {
+            await researchRequest(`/api/watchlist/${encodeURIComponent(symbol)}`, {
+                method: 'DELETE'
+            });
+        } catch (error) {
+            // Idempotente: 404 = ya no estaba (quitado en otra pestaña o
+            // dispositivo). El objetivo del usuario ya se cumple; mostrar
+            // «error + Reintentar» dejaba la fila vieja y un reintento que
+            // siempre vuelve a fallar.
+            if (!(error instanceof AppError && error.statusCode === 404)) throw error;
+        }
         requestCache.invalidate(`watchlist:${userId}`);
         revalidatePath('/watchlist');
         revalidatePath(`/research/${encodeURIComponent(symbol.toUpperCase())}`);
