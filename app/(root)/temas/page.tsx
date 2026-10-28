@@ -95,7 +95,7 @@ function ThemeCard({
                     ? 'bg-teal-400/15 text-teal-300'
                     : badge.kind === 'turn-down'
                       ? 'bg-red-400/15 text-red-300'
-                      : 'bg-red-500 text-white'
+                      : 'bg-red-600 text-white'
                 }`}
               >
                 {badge.label}

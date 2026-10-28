@@ -415,7 +415,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
           ) : engineScreens.screens.length === 0 ? (
             <p className="text-sm text-gray-500">
               El motor de análisis responde, pero no hay filtros guardados.{' '}
-              <Link href="/screeners" className="text-teal-300 hover:text-teal-200 hover:underline">
+              <Link href="/screeners" className="text-teal-300 underline underline-offset-2 hover:text-teal-200">
                 Crea el primero en Screeners
               </Link>.
             </p>
