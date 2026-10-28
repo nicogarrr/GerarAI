@@ -187,3 +187,21 @@ def test_each_call_gets_the_current_clock_not_a_frozen_one(db):
 
     asyncio.run(run_feed(db, clock=lambda: next(ticks), generate=generate, pause=0))
     assert len(seen) == 2 and seen[0] < seen[1]  # el reloj avanza entre llamadas
+
+
+def test_scheduler_registers_daily_proposals(monkeypatch):
+    from app.workers import scheduler as sched
+
+    seen = {}
+    orig = sched._register
+
+    def spy(scheduler, func, trigger, *, job_id, **kw):
+        seen[job_id] = (trigger, dict(kw))
+
+    monkeypatch.setattr(sched, "_register", spy)
+    sched.build_scheduler(background=True)
+    assert "paper_proposals_daily" in seen
+    trigger, kwargs = seen["paper_proposals_daily"]
+    assert trigger == "cron"
+    assert kwargs.get("hour") == 15 and kwargs.get("minute") == 30
+    assert "paper_dividends_daily" in seen
