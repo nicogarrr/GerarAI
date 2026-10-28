@@ -1,0 +1,75 @@
+name: Orden aleatorio (pytest-randomly)
+
+# Suite backend en ORDEN ALEATORIO, cada noche y a mano. NO bloquea PRs.
+#
+# Por que: un test que solo pasa porque otro corrio antes (tablas creadas por
+# otro test, un monkeypatch que se filtra, filas de otro tenant en la BD de la
+# sesion) es verde en `ci.yml` y rojo el dia que alguien reordena o lo corre
+# solo. La ronda del 28-oct-2026 encontro asi 3 tests que fallaban al correr
+# solos (router_contracts /api/news sin tablas, ticker_news_lane con un fake
+# que no devolvia bytes, tenant_llm_settings contando filas de otros tests).
+#
+# Si falla: el log imprime `Using --randomly-seed=N`. Reproduce en local con
+#   python -m pytest -p randomly --randomly-seed=N <tests que fallan>
+# o lanza este workflow a mano con ese seed.
+
+on:
+  schedule:
+    - cron: "15 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Seed de pytest-randomly (vacio = aleatorio)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: random-order
+  cancel-in-progress: true
+
+jobs:
+  random-order:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: data-engine
+    env:
+      APP_ENV: test
+      DATABASE_URL: sqlite:///./cavaai_random.db
+      CAVAAI_ENABLE_VECTOR_INGEST: "0"
+      CAVAAI_ENABLE_VECTOR_CHAT: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: "data-engine/uv.lock"
+      - run: uv sync --frozen --extra test --no-install-project
+      # pytest-randomly NO entra en el lock ni en requirements: instalado en
+      # ci.yml baraja el orden de TODOS los jobs. Solo aqui.
+      - run: uv pip install "pytest-randomly==5.0.0"
+      - name: Redis local para tests de admision atomica
+        run: sudo apt-get update && sudo apt-get install -y redis-server
+      - name: Suite en orden aleatorio
+        env:
+          SEED: ${{ github.event.inputs.seed }}
+        run: |
+          set -o pipefail
+          SEED_ARG=""
+          if [ -n "$SEED" ]; then SEED_ARG="--randomly-seed=$SEED"; fi
+          # test_divisa_base::test_fiscalidad_en_eur...: rojo conocido en main
+          # (criterio DGT de #2581 vs ese test de #2376), pendiente de Nico.
+          # Quitar el --deselect cuando se decida.
+          uv run --no-sync python -m pytest -n 2 -m "not services" -p randomly $SEED_ARG \
+            --deselect tests/test_divisa_base.py::test_fiscalidad_en_eur_aunque_la_base_sea_usd \
+            -q -W ignore 2>&1 | tee /tmp/random_order.log
