@@ -155,3 +155,13 @@ def test_declarant_input_rechaza_longitud_absurda_y_controles():
         DeclarantInput(nif="12345678Z\n")
     # 32 justos sí entran
     assert len(DeclarantInput(nif="X" * 32).nif) == 32
+
+
+@pytest.mark.parametrize("raw,clean", [
+    ("DE-123456789", "DE123456789"),
+    ("DE 123 456 789", "DE123456789"),
+    ("IT 01234567890", "IT01234567890"),
+    ("AB123456789012345678", "AB123456789012345678"),
+])
+def test_foreign_declarant_nif_separators_normalized(db, raw, clean):
+    assert svc.write(db, {"nif": raw})["nif"] == clean

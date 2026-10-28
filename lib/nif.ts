@@ -71,3 +71,5 @@ export function spanishTaxIdWarning(raw: string): string | null {
   }
   return null;
 }
+
+// K/L/M/T uncommon or legacy tax identifiers are treated as unknown format, not blocked.

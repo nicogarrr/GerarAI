@@ -10,7 +10,7 @@ describe('checkSpanishTaxId', () => {
   });
 
   it('DNI válido con su letra de control', () => {
-    expect(checkSpanishTaxId('12345678Z')).toBe('valid'); // 12345678 % 23 = 9 -> Z
+    expect(checkSpanishTaxId('12345678Z')).toBe('valid'); // 12345678 % 23 = 14 -> Z
     expect(checkSpanishTaxId('00000000T')).toBe('valid'); // 0 % 23 = 0 -> T
   });
 
@@ -26,8 +26,8 @@ describe('checkSpanishTaxId', () => {
 
   it('NIE válido (X/Y/Z con prefijo numérico)', () => {
     expect(checkSpanishTaxId('X1234567L')).toBe('valid'); // 01234567 % 23 = 19 -> L
-    expect(checkSpanishTaxId('Y1234567X')).toBe('valid'); // 11234567 % 23 = 24 -> X
-    expect(checkSpanishTaxId('Z1234567R')).toBe('valid'); // 21234567 % 23 = 19 -> R
+    expect(checkSpanishTaxId('Y1234567X')).toBe('valid'); // 11234567 % 23 = 10 -> X
+    expect(checkSpanishTaxId('Z1234567R')).toBe('valid'); // 21234567 % 23 = 1 -> R
   });
 
   it('NIE con letra errónea: bad_control', () => {
