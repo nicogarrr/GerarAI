@@ -143,4 +143,9 @@ def test_flex_doc_lists_sections_and_has_no_token_placeholder():
     for section in ("Trades", "CashTransactions", "ConversionRates", "CashReport", "OpenPositions",
                     "Transfers", "CorporateActions", "Trade Time", "Level of Detail"):
         assert section in doc
-    assert "ibkrguides.com" in doc and "nunca" in doc.lower()
+    import re
+    from urllib.parse import urlparse
+
+    urls = re.findall(r"https?://[^\s)]+", doc)
+    assert any(urlparse(url).hostname == "ibkrguides.com" for url in urls)
+    assert "nunca" in doc.lower()
