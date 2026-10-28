@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 vi.mock('@/lib/actions/dca-signals.actions', () => ({
     evaluateDcaSignalsNow: vi.fn(),
-    setDcaAlertMinLevel: vi.fn(),
     getDcaHitRates: vi.fn(),
 }));
 

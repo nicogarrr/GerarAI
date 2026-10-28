@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
-import { researchRequest, jsonBody } from '@/lib/research/client';
+import { researchRequest } from '@/lib/research/client';
 import { AppError, classifyError, getFriendlyErrorMessage, type ErrorCause } from '@/lib/types/errors';
 import type { DcaBacktest, DcaEvaluateSummary, DcaHitRates, DcaSignalsResponse } from '@/lib/dca/types';
 
@@ -24,22 +24,6 @@ export interface DcaMutationResult {
     success: boolean;
     code?: ErrorCause;
     message?: string;
-}
-
-/** Nivel mínimo de aviso por ticker: null = global, 0 = sin avisos, 1-4. */
-export async function setDcaAlertMinLevel(symbol: string, minLevel: number | null): Promise<DcaMutationResult> {
-    try {
-        await requireAuthenticatedUser();
-        await researchRequest(`/api/watchlist/${encodeURIComponent(symbol)}/dca-alert-min-level`, {
-            method: 'PUT',
-            body: jsonBody({ min_level: minLevel }),
-        });
-        revalidatePath('/watchlist');
-        return { success: true };
-    } catch (error) {
-        console.error('setDcaAlertMinLevel error:', error);
-        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
-    }
 }
 
 /** Evaluación manual (compatibilidad con clientes anteriores; tandas de diez cada cinco minutos). */
