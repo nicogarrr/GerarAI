@@ -16,7 +16,8 @@ MIN_CLOSED = 30  # por debajo, la calibracion es orientativa y se avisa
 MIN_BIN = 5  # por debajo, la tasa del bin es N/D
 LABEL = "INFERIDO"
 BASIS = (
-    "acierto = retorno bruto > 0 al cierre; sin comisiones, FX, dividendos ni "
+    "acierto = retorno bruto > 0 al cierre; comisiones y spread modelados aparte "
+    "(supuesto persistido por trade, ver scoreboard neto); sin FX, dividendos ni "
     "acciones corporativas; conviction declarada por el LLM"
 )
 

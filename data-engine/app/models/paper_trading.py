@@ -41,3 +41,8 @@ class PaperTrade(TenantOwnedMixin, Base, TimestampMixin):
     exit_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     close_reason: Mapped[str | None] = mapped_column(String(20))
     price_source: Mapped[str | None] = mapped_column(String(80))
+    # Supuesto de coste persistido al ejecutar (ver paper_cost_service).
+    # NULL = trade anterior al modelo de costes: su neto es N/D, nunca se rellena.
+    entry_fee: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    exit_fee: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    cost_assumption_version: Mapped[str | None] = mapped_column(String(80))

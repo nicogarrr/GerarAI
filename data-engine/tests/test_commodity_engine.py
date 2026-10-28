@@ -6,7 +6,6 @@ Run from data-engine/:
 """
 
 from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import create_engine
