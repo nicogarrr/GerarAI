@@ -209,12 +209,12 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                         <div className="bg-[#111111] border border-gray-800 rounded-2xl p-4 sm:p-6">
                             <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
                                 <h3 className="text-gray-400 text-sm font-medium">Valor de la cartera</h3>
-                                <div className="flex flex-wrap gap-1">
+                                <div className="flex w-full gap-1 sm:w-auto">
                                     {['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'].map((period) => (
                                         <button
                                             key={period}
                                             onClick={() => setChartPeriod(period)}
-                                            className={`min-h-[44px] px-3 py-2 text-xs rounded transition-colors sm:min-h-0 sm:px-2 sm:py-1 ${chartPeriod === period
+                                            className={`min-h-[44px] flex-1 px-1 py-2 text-xs rounded transition-colors sm:min-h-0 sm:flex-none sm:px-2 sm:py-1 ${chartPeriod === period
                                                     ? 'bg-gray-700 text-white'
                                                     : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
                                                 }`}
