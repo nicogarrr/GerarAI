@@ -24,7 +24,7 @@ def setup(monkeypatch):
     monkeypatch.setattr(app,'_redis_client',lambda:r)
     monkeypatch.setattr(app,'_session',lambda *a:Db())
     monkeypatch.setattr(app,'_official_close_session_key',lambda:'2026-10-27')
-    def sync(db):calls.append(1);return {'status':'ok','covered':2,'latest_date':'2026-10-27'}
+    def sync(db):calls.append(1);return {'status':'ok','covered':2,'latest_date':'2026-10-27','target_date':'2026-10-27','target_coverage':1.0}
     monkeypatch.setattr('app.services.market_close_sync.sync_official_closes',sync)
     return r,calls
 
@@ -59,3 +59,33 @@ def test_partial_failure_does_not_mark_success(setup,monkeypatch):
 def test_redis_failure_never_falls_back_to_process_lock(monkeypatch):
     monkeypatch.setattr(app,'_redis_client',lambda:None)
     with pytest.raises(RuntimeError,match='Redis required'):app.sync_official_closes.fn(1,'a')
+
+
+def test_only_three_target_bars_cannot_mark_done(setup, monkeypatch):
+    r,calls=setup
+    monkeypatch.setattr('app.services.market_close_sync.sync_official_closes',lambda db:{'status':'ok','target_date':'2026-10-27','target_coverage':3/1952})
+    app.sync_official_closes.fn(1,'a')
+    assert not any(':done:' in k for k in r.values)
+
+@pytest.mark.parametrize('result',[{'status':'partial','target_date':'2026-10-27','target_coverage':.95}, {'status':'ok','target_date':'2026-10-26','target_coverage':1.0}])
+def test_partial_or_wrong_date_never_done(setup, monkeypatch,result):
+    r,_=setup
+    monkeypatch.setattr('app.services.market_close_sync.sync_official_closes',lambda db:result)
+    app.sync_official_closes.fn(1,'a')
+    assert not any(':done:' in k for k in r.values)
+
+def test_holiday_full_download_attempts_capped_across_tenants(setup,monkeypatch):
+    r,calls=setup
+    def sync(db):
+        calls.append(1)
+        return {'status':'partial','target_date':'2026-10-27','target_coverage':0.0}
+    monkeypatch.setattr('app.services.market_close_sync.sync_official_closes',sync)
+    for i in range(3):app.sync_official_closes.fn(i,'a')
+    assert app.sync_official_closes.fn(4,'b')['reason']=='session_attempt_cap'
+    assert len(calls)==3
+
+def test_existing_marker_requires_explicit_operator_cleanup(setup):
+    r,calls=setup
+    r.values['cavaai:official-closes:done:2026-10-27']='1'
+    app.sync_official_closes.fn(1,'a')
+    assert calls==[]
