@@ -414,8 +414,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
      *  del waterfall de oportunidades (F38). */
     const insight = useMemo(() => buildPortfolioInsight(portfolioSummary), [portfolioSummary]);
 
-    /** Posición que más se mueve desde la compra: el destino del enlace
-     *  "¿qué ha cambiado?" de la tarjeta. Sin base de coste no hay dato. */
+    /** Mayor variación absoluta desde la compra, no cambio de hoy ni su causa.
+     *  Sin base de coste no hay dato para elegir esta posición. */
     const topMover = useMemo<PortfolioHolding | null>(() => {
         const conCoste = (portfolioSummary?.holdings ?? []).filter((h) => h.cost > 0 && !h.fxMissing);
         if (!conCoste.length) return null;
@@ -512,8 +512,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 href={topMover ? `/research/${topMover.symbol}?view=changes` : '/portfolio'}
                                 className="inline-flex min-h-[44px] items-center gap-1 text-sm text-teal-300 hover:text-teal-200"
                             >
-                                <span className="whitespace-nowrap">
-                                    {topMover ? `Ver qué ha cambiado en ${topMover.symbol}` : 'Revisar tu cartera'}
+                                <span className="min-w-0">
+                                    {topMover ? `Revisar ${topMover.symbol} (mayor variación desde la compra)` : 'Revisar tu cartera'}
                                 </span>
                                 <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                             </Link>
