@@ -258,3 +258,30 @@ def test_closed_session_bar_is_kept(monkeypatch):
 def test_bar_in_open_session_needs_all_fields():
     assert market._bar_in_open_session({}, 100) is False
     assert market._bar_in_open_session({"currentTradingPeriod": {"regular": {"start": 1, "end": 10}}}, None, now_ts=5) is False
+
+
+def _single_candle_payload(previous_close=None):
+    meta = {} if previous_close is None else {"chartPreviousClose": previous_close}
+    return {"chart": {"result": [{"meta": meta, "timestamp": [1699900000],
+            "indicators": {"quote": [{"close": [10.0], "open": [9.8], "high": [10.5], "low": [9.5]}]}}]}}
+
+
+def test_quote_without_real_previous_close_has_no_invented_change():
+    out = market._fetch_yahoo_quote(_Client(resp=_Resp(200, _single_candle_payload())), "NEW")
+    assert out["c"] == 10.0
+    assert out["pc"] is None and out["d"] is None and out["dp"] is None
+
+
+def test_quote_uses_chart_previous_close_when_single_candle():
+    out = market._fetch_yahoo_quote(_Client(resp=_Resp(200, _single_candle_payload(8.0))), "NEW")
+    assert out["pc"] == 8.0 and out["d"] == pytest.approx(2.0) and out["dp"] == pytest.approx(25.0)
+
+
+def test_quote_missing_ohlc_is_none_not_filled_with_close():
+    payload = {"chart": {"result": [{"meta": {}, "timestamp": [1699800000, 1699900000],
+               "indicators": {"quote": [{"close": [9.0, 10.0], "open": [8.8, None],
+                                         "high": [9.5, None], "low": [8.5, None]}]}}]}}
+    out = market._fetch_yahoo_quote(_Client(resp=_Resp(200, payload)), "X")
+    assert out["c"] == 10.0 and out["pc"] == 9.0 and out["dp"] == pytest.approx(11.111, rel=1e-3)
+    assert out["h"] is None and out["l"] is None and out["o"] is None
+

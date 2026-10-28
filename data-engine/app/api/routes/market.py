@@ -188,19 +188,25 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
         if last_idx is None or not closes or closes[-1] <= 0:
             return None
         last = float(closes[-1])
-        previous = (
-            float(closes[-2])
-            if len(closes) >= 2
-            else float(meta.get("chartPreviousClose") or last)
-        )
+        # Cierre previo REAL o None: antes caia a `last` y la variacion salia
+        # como 0,00 % inventado (sin cierre previo no hay variacion que dar).
+        if len(closes) >= 2:
+            previous = float(closes[-2])
+        else:
+            cpc = meta.get("chartPreviousClose")
+            previous = float(cpc) if isinstance(cpc, (int, float)) and cpc > 0 else None
+        if previous is not None and previous <= 0:
+            previous = None
         # Todas las magnitudes deben pertenecer a la misma vela seleccionada;
         # no tomar el último OHLC provisional tras descartar su cierre.
         def selected_value(key):
             values = quote.get(key) or []
             value = values[last_idx] if last_idx < len(values) else None
-            return float(value) if value is not None else last
+            # Dato ausente -> None; antes se rellenaba con el cierre y el
+            # rango del dia salia 0 (maxima = minima = apertura = cierre).
+            return float(value) if value is not None else None
 
-        change = last - previous
+        change = (last - previous) if previous is not None else None
         timestamps = result.get("timestamp") or []
         candle_ts = timestamps[last_idx] if last_idx < len(timestamps) else None
         candle_date = None
@@ -228,7 +234,7 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             "live_t": meta.get("regularMarketTime"),
             "currency": meta.get("currency"),
             "d": change,
-            "dp": (change / previous * 100) if previous else 0.0,
+            "dp": (change / previous * 100) if change is not None else None,
             "h": selected_value("high"),
             "l": selected_value("low"),
             "o": selected_value("open"),
