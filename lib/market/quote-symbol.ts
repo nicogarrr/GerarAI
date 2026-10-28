@@ -24,8 +24,12 @@ const EXCHANGE_YAHOO_SUFFIX: Record<string, string> = {
     XETRA: '.DE',
 };
 
-export function quoteSymbolFor(company: ListingBasics, ticker: string): string | null {
+export function quoteSymbolFor(company: ListingBasics, rawTicker: string): string | null {
     if (!company) return null;
+    // Los simbolos de cotizacion van siempre en mayusculas y sin espacios: un
+    // ticker en minusculas ('aapl') no puede producir un simbolo distinto ni
+    // hacer que isUsQuoteLine lo trate como linea no-US.
+    const ticker = rawTicker.trim().toUpperCase();
     const exchange = (company.exchange || '').toUpperCase();
     const currency = (company.currency || '').toUpperCase();
     // El mapa exacto de plazas no-US manda sobre la inferencia por subcadena:
