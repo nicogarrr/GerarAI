@@ -113,7 +113,15 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     <Pencil aria-hidden="true" className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+            {/* Sin autofoco al abrir: Radix enfoca el primer campo (Símbolo) y
+                TickerSearchInput lanza una búsqueda con el ticker precargado,
+                abriendo el desplegable encima de Moneda/Tipo/Cantidad/Precio,
+                que son los campos que sí se editan. El foco queda en el diálogo
+                y el primer Tab entra al formulario. */}
+            <DialogContent
+                className="bg-gray-900 border-gray-700 max-w-md"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+            >
                 <DialogHeader>
                     <DialogTitle className="text-gray-100">Editar Transacción</DialogTitle>
                     <DialogDescription className="text-gray-400">

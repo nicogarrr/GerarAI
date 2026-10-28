@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const updateTransaction = vi.fn();
@@ -31,6 +31,15 @@ async function open(transaction: typeof base & { fees?: number }) {
     fireEvent.click(screen.getByRole('button', { name: /Editar transacción/ }));
     return screen.getByRole('dialog');
 }
+
+describe('EditTransactionDialog foco al abrir', () => {
+    it('no autoenfoca Símbolo al abrir: el desplegable de sugerencias tapaba Moneda/Tipo/Cantidad/Precio', async () => {
+        await open({ ...base });
+        await waitFor(() => {
+            expect(document.activeElement?.id).not.toBe('symbol');
+        });
+    });
+});
 
 describe('EditTransactionDialog comisiones', () => {
     beforeEach(() => updateTransaction.mockReset().mockResolvedValue(undefined));
