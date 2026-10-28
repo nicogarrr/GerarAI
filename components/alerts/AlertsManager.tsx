@@ -7,6 +7,9 @@ import Link from 'next/link';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
+// Espejo de la validación de createAlert (lib/actions/alerts.actions.ts).
+const ALERT_SYMBOL_PATTERN = /^[A-Z0-9.\-]{1,20}$/;
+
 import { createAlert, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
 import { parseLocalizedNumber } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -142,8 +145,12 @@ function AlertsManager() {
         if (creating) return;
         setCreateError(null);
         try {
-            if (!formData.symbol.trim()) {
-                toast.error('Introduce un símbolo válido');
+            // Mismo patrón que valida createAlert en servidor. Sin este filtro,
+            // un símbolo largo o con caracteres raros llegaba a la server action,
+            // que lanza ValidationError: POST /alerts 500 y, en producción, un
+            // error genérico en inglés en vez de este aviso (agent-qa 28/10).
+            if (!ALERT_SYMBOL_PATTERN.test(formData.symbol.trim().toUpperCase())) {
+                toast.error('Introduce un símbolo válido (letras, números, punto o guion; máximo 20)');
                 return;
             }
             const isValueless = formData.type === 'news' || formData.type === 'earnings';
