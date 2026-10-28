@@ -185,7 +185,7 @@ it('separa integridad del cálculo y alertas, prioriza alertas y usa la base rea
     expect(screen.queryByText('Correcto')).not.toBeInTheDocument();
     expect(screen.getAllByText('Peso (valor bruto)')).toHaveLength(3);
     expect(screen.queryByText('Peso (con caja)')).not.toBeInTheDocument();
-    rerender(<RiskDashboardView initialDashboard={{ ...base, weight_basis: 'with_cash' }} />);
+    rerender(<RiskDashboardView initialDashboard={{ ...base, weight_basis: 'total_with_cash' }} />);
     expect(screen.getAllByText('Peso (con caja)')).toHaveLength(3);
     rerender(<RiskDashboardView initialDashboard={{ ...base, weight_basis: null }} />);
     expect(screen.getAllByText('Peso (base no disponible)')).toHaveLength(3);
