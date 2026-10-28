@@ -1075,6 +1075,21 @@ class ChatService:
                 if personal is not None:
                     personal.context = context_echo
                     return personal
+        data_answer = answer_data_question(db, question)
+        if data_answer is not None:
+            # A quote question may also request a concrete metric. Do not let
+            # the first deterministic tool swallow the rest of the question.
+            from app.services.chat_metric_answer import metric_question_answer
+
+            metric_company = self._resolve_company(db, question, scope, ticker)
+            if metric_company is None and page_context is not None:
+                metric_company = page_context.company
+            extra_metric = metric_question_answer(db, question, metric_company)
+            if extra_metric is not None:
+                data_answer.answer += "\n\n" + extra_metric.answer
+                data_answer.sources.extend(extra_metric.sources)
+            data_answer.context = context_echo
+            return data_answer
         # A purchase QUESTION is not an execution order. Use the same personal
         # snapshot even when a company is named or the guide supplies a ticker.
         # Otherwise "qué debo comprar hoy" lost DCA/plan/alerts on company routes.
@@ -1091,21 +1106,6 @@ class ChatService:
             if personal is not None:
                 personal.context = context_echo
                 return personal
-        data_answer = answer_data_question(db, question)
-        if data_answer is not None:
-            # A quote question may also request a concrete metric. Do not let
-            # the first deterministic tool swallow the rest of the question.
-            from app.services.chat_metric_answer import metric_question_answer
-
-            metric_company = self._resolve_company(db, question, scope, ticker)
-            if metric_company is None and page_context is not None:
-                metric_company = page_context.company
-            extra_metric = metric_question_answer(db, question, metric_company)
-            if extra_metric is not None:
-                data_answer.answer += "\n\n" + extra_metric.answer
-                data_answer.sources.extend(extra_metric.sources)
-            data_answer.context = context_echo
-            return data_answer
         # Routing por compania RESUELTA del texto, no solo por el parametro
         # ticker: "precio de ASTS" sin campo ticker va igualmente por la
         # ruta estructurada con validacion financiera.
