@@ -11,5 +11,5 @@ test('la tarjeta de acciones corporativas no repite el encabezado de la página'
 });
 
 test('RecordList con hideTitle conserva el título como texto accesible', () => {
-    assert.match(list, /hideTitle \? \(\s*<CardTitle className="sr-only">\{title\}<\/CardTitle>/);
+    assert.match(list, /hideTitle \? \(\s*<CardTitle[^>]*className="sr-only">\{title\}<\/CardTitle>/);
 });
