@@ -133,11 +133,12 @@ describe('removeFromWatchlist', () => {
         expect(m.invalidate).toHaveBeenCalledWith('watchlist:tenant-w');
     });
 
-    it('quitar uno que ya no está devuelve not_found sin revalidar', async () => {
+    it('quitar uno que ya no está (404) es éxito idempotente y revalida (#2677)', async () => {
+        // Quitado antes en otra pestaña: el objetivo ya se cumple; un error con
+        // «Reintentar» dejaba la fila vieja y un reintento que siempre falla.
         m.researchRequest.mockRejectedValueOnce(new AppError('Ese ticker no está en tu watchlist', 'NOT_FOUND', 404));
         const result = await removeFromWatchlist('GONE');
-        expect(result.success).toBe(false);
-        expect(result.code).toBe('not_found');
-        expect(m.revalidatePath).not.toHaveBeenCalled();
+        expect(result).toEqual({ success: true });
+        expect(m.revalidatePath).toHaveBeenCalledWith('/watchlist');
     });
 });
