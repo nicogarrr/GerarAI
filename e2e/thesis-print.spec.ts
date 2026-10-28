@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
 const runUiE2E = process.env.E2E_UI_RUN === "1";
+// Skip before the page fixture launches: the API-only job has no browser.
+test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 
 // Impresion de la vista de lectura (Imprimir / guardar como PDF del navegador).
 // La regla de impresion ocultaba todo <header>, tambien el del propio
@@ -8,7 +10,6 @@ const runUiE2E = process.env.E2E_UI_RUN === "1";
 // tesis publicada en la base se comprueba la cabecera del articulo; sin ella
 // (base vacia de CI) se comprueba el titulo del estado vacio.
 test("la tesis impresa conserva su cabecera y no lleva chrome de la app", async ({ page }) => {
-  test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/research/MSFT/tesis");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
