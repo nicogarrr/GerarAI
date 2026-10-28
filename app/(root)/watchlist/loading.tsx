@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
  */
 export default function Loading() {
   return (
-    <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">
+    <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip">
       <span className="sr-only" role="status">Cargando…</span>
       <div aria-hidden="true" className="space-y-6">
         <div className="flex items-center gap-2 sm:gap-3">

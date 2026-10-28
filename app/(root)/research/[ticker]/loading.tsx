@@ -2,7 +2,7 @@ import { StockCardSkeleton } from '@/components/LoadingState';
 
 export default function ResearchTickerLoading() {
   return (
-    <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 sm:px-6 lg:px-8">
+    <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0">
       {/* `aria-live` en el contenedor del esqueleto no anuncia nada: la region
           live nace con el primer render y desaparece con el propio esqueleto. */}
       <span className="sr-only">Cargando…</span>

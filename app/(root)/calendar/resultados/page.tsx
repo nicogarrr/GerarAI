@@ -68,7 +68,7 @@ export default async function FollowedEarningsPage() {
     );
 
     return (
-        <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
+        <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col gap-6">
             <header>
                 <h1 className="text-2xl font-bold text-gray-100">Calendario</h1>
                 <p className="text-sm text-gray-400">Empresas seguidas</p>

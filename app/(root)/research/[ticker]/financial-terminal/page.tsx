@@ -50,7 +50,7 @@ export default async function FinancialTerminalPage({ params, searchParams }: { 
   const years = Math.max(1, Math.min(20, Number(query.years) || 10));
   const periodicity = ['all', 'annual', 'quarterly'].includes(query.periodicity ?? '') ? query.periodicity! : 'annual';
   const terminal = await getFinancialTerminal(ticker, { metrics: query.metrics, years, periodicity });
-  return <main id="content" tabIndex={-1} className="mx-auto flex min-w-0 w-full max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+  return <main id="content" tabIndex={-1} className="mx-auto flex min-w-0 w-full max-w-[1600px] flex-col gap-6">
         <PageHeader back={<Button asChild className="min-h-[44px] sm:min-h-0" size="sm" variant="ghost"><Link href={`/research/${ticker}`}><ArrowLeft aria-hidden="true" className="h-4 w-4" />Ficha de {ticker}</Link></Button>} description="Métricas reportadas, normalizadas y calculadas con definiciones, fórmulas, confianza y trazabilidad de la fuente." kicker="Financieros con fuentes" title="Terminal financiero" />
     <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">{[['Cobertura', `${terminal.coverage.percent.toFixed(0)}%`], ['Disponibles', `${terminal.coverage.available}/${terminal.coverage.requested}`], ['Ejercicios cargados', loadedFinancialRange(terminal.metrics) ?? NA], ['Periodicidad', label(terminal.periodicity)]].map(([label, data]) => <Stat key={label} label={label} size="sm" value={data} />)}</section>
     <form className="rounded-xl border border-gray-800 bg-surface-1 p-4" method="get">

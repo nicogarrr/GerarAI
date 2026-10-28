@@ -329,7 +329,7 @@ export default async function WatchlistPage({
 
     return (
         <WatchlistMembership key={watchlistItems.map((item) => item.symbol).sort().join('|')}>
-        <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip p-4 sm:p-6">
+        <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
                     <h1 className="flex items-center gap-2 text-xl font-bold break-words text-gray-100 sm:text-2xl">

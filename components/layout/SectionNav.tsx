@@ -59,15 +59,23 @@ export default function SectionNav(){
  if(items.length<2)return null;
  // Activo = la ruta mas especifica que contiene la pagina actual (una ficha /research/AAPL cuelga de Empresas).
  const current=items.filter((item)=>pathname===item.href||pathname.startsWith(`${item.href}/`)).sort((a,b)=>b.href.length-a.href.length)[0]?.href;
+ // Pantalla de detalle (una ficha /research/AAPL, un screen guardado): cuelga
+ // de una herramienta del hub pero NO es esa herramienta. Ahi el subnav del hub
+ // era la tercera capa de navegacion sobre la propia de la pagina (migas y
+ // pestañas de la ficha) y empujaba la cotizacion bajo el pliegue en movil.
+ // Las migas ya llevan de vuelta a la herramienta.
+ if(current&&current!==pathname)return null;
  const currentItem=items.find((item)=>item.href===current);
- return <div className="-mx-4 mb-6 border-b border-gray-800 px-4 pb-3 sm:mx-0 sm:border-b-0 sm:px-0 sm:pb-0">
-  <button aria-controls="subnav-seccion-lista" aria-expanded={open} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-3 py-2 text-sm text-teal-300 sm:hidden" onClick={toggle} type="button">
+ // Activo neutro (gris claro sobre surface-2), igual que el item activo del
+ // sidebar: el teal queda para acciones y datos, no para "estoy aqui".
+ return <div className="-mx-4 mb-4 border-b border-gray-800 px-4 pb-1 sm:mx-0 sm:mb-6 sm:border-b-0 sm:px-0 sm:pb-0">
+  <button aria-controls="subnav-seccion-lista" aria-expanded={open} className="-ml-3 inline-flex min-h-11 items-center gap-1 rounded-lg px-3 py-2 text-sm font-medium text-gray-200 sm:hidden" onClick={toggle} type="button">
    {currentItem?(currentItem.subnavLabel??currentItem.label):'Secciones'}
-   {open?<ChevronUp aria-hidden size={16}/>:<ChevronDown aria-hidden size={16}/>}
+   {open?<ChevronUp aria-hidden className="text-gray-500" size={16}/>:<ChevronDown aria-hidden className="text-gray-500" size={16}/>}
   </button>
   <nav aria-label="Herramientas de la sección" className={`${open?'block':'hidden'} sm:block sm:border-b sm:border-gray-800 sm:pb-3`} id="subnav-seccion-lista"><OverflowScrollRegion hint="Desliza para ver más secciones" label="Herramientas de la sección" regionClassName="[-ms-overflow-style:none] [scrollbar-width:none] sm:overflow-visible [&::-webkit-scrollbar]:hidden"><div className="flex flex-nowrap gap-1.5 sm:flex-wrap">{items.map((item)=>{
    const active=item.href===current;
-   return <Link key={item.href} href={item.href} scroll={false} aria-current={active?'page':undefined} className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${active?'bg-teal-400/10 text-teal-300':'text-gray-400 hover:bg-gray-800 hover:text-gray-100'}`}>{item.subnavLabel??item.label}</Link>;
+   return <Link key={item.href} href={item.href} scroll={false} aria-current={active?'page':undefined} className={`inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm transition-colors ${active?'bg-gray-800 font-medium text-gray-100':'text-gray-400 hover:bg-gray-800/60 hover:text-gray-100'}`}>{item.subnavLabel??item.label}</Link>;
   })}</div></OverflowScrollRegion></nav>
  </div>;
 }
