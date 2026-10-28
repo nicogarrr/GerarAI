@@ -47,17 +47,17 @@ describe('validateOptionContract', () => {
     });
     it('rechaza contrato ausente', () => {
         const r = validateOptionContract(null as unknown as OptionContract);
-        expect(r).toMatchObject({ ok: false, reason: 'Contrato de opcion ausente.' });
+        expect(r).toMatchObject({ ok: false, reason: 'Contrato de opción ausente.' });
     });
     it.each([
-        ['subyacente vacío', { underlying: '' }, 'Subyacente invalido.'],
-        ['subyacente que empieza por dígito', { underlying: '1AAPL' }, 'Subyacente invalido.'],
+        ['subyacente vacío', { underlying: '' }, 'Subyacente inválido.'],
+        ['subyacente que empieza por dígito', { underlying: '1AAPL' }, 'Subyacente inválido.'],
         ['tipo straddle', { callPut: 'straddle' as never }, 'Tipo debe ser call o put.'],
-        ['strike 0', { strike: 0 }, 'Strike debe ser un numero mayor que 0.'],
-        ['strike NaN', { strike: NaN }, 'Strike debe ser un numero mayor que 0.'],
-        ['vencimiento irreal', { expiry: '2026-13-40' }, 'Vencimiento invalido (se espera yyyy-mm-dd real).'],
+        ['strike 0', { strike: 0 }, 'Strike debe ser un número mayor que 0.'],
+        ['strike NaN', { strike: NaN }, 'Strike debe ser un número mayor que 0.'],
+        ['vencimiento irreal', { expiry: '2026-13-40' }, 'Vencimiento inválido (se espera yyyy-mm-dd real).'],
         ['entrega en cash', { deliverable: 'cash' as never }, 'Solo se admite entrega de acciones en fase 1.'],
-        ['multiplicador mini', { multiplier: 10 }, 'Solo se admiten contratos estandar con multiplicador 100.'],
+        ['multiplicador mini', { multiplier: 10 }, 'Solo se admiten contratos estándar con multiplicador 100.'],
     ])('rechaza %s', (_e, patch, reason) => {
         expect(validateOptionContract({ ...contract, ...patch })).toEqual({ ok: false, reason });
     });
@@ -131,10 +131,10 @@ describe('buildOptionFill', () => {
         ['contratos no enteros', { contracts: 1.5 }, 'Los contratos deben ser un entero mayor que 0.'],
         ['contratos 0', { contracts: 0 }, 'Los contratos deben ser un entero mayor que 0.'],
         ['prima 0', { premium: 0 }, 'La prima debe ser mayor que 0.'],
-        ['prima con 5 decimales', { premium: 1.23456 }, 'maximo 4 decimales'],
+        ['prima con 5 decimales', { premium: 1.23456 }, 'máximo 4 decimales'],
         ['divisa no soportada', { currency: 'GBP' as never }, 'Divisa no soportada.'],
-        ['comisión negativa', { fee: -1 }, 'La comision no puede ser negativa.'],
-        ['executedAt inválido', { executedAt: 0 }, 'Fecha de ejecucion invalida.'],
+        ['comisión negativa', { fee: -1 }, 'La comisión no puede ser negativa.'],
+        ['executedAt inválido', { executedAt: 0 }, 'Fecha de ejecución inválida.'],
         ['sin clientOrderId', { clientOrderId: '' }, 'Falta clientOrderId.'],
     ])('rechaza %s', (_e, patch, fragmento) => {
         const r = buildOptionFill({ ...input, ...patch });
@@ -145,7 +145,7 @@ describe('buildOptionFill', () => {
     it('rechaza operar un contrato ya vencido en la fecha de ejecución', () => {
         const r = buildOptionFill({ ...input, executedAt: Date.UTC(2027, 0, 10, 12) });
         expect(r.ok).toBe(false);
-        if (!r.ok) expect(r.reason).toContain('ya vencio');
+        if (!r.ok) expect(r.reason).toContain('ya venció');
     });
 
     it('rechaza cerrar más contratos de los abiertos', () => {
@@ -157,7 +157,7 @@ describe('buildOptionFill', () => {
     it('rechaza una compra sin saldo suficiente (sin sobregiro)', () => {
         const r = buildOptionFill({ ...input, contracts: 10, premium: 2, availableCash: 1500 });
         expect(r.ok).toBe(false);
-        if (!r.ok) expect(r.reason).toContain('Saldo USD insuficiente: la compra cuesta 2000.00 y hay 1500.00');
+        if (!r.ok) expect(r.reason).toContain('Saldo USD insuficiente: la compra cuesta 2.000,00 y hay 1.500,00');
     });
 
     it('rechaza un cierre cuya comisión no cabe en el cash tras abonar la prima', () => {

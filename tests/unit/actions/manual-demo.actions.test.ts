@@ -188,6 +188,8 @@ describe('placeManualOrder: fills y rechazos con el libro', () => {
         const result = await m.placeManualOrder(order());
         expect(result).toMatchObject({ ok: true, outcome: 'rejected' });
         expect((result as { reason: string }).reason).toContain('Saldo EUR insuficiente');
+        // Importes del motivo en es-ES («1.000,00»), nunca toFixed en-US («1000.00»).
+        expect((result as { reason: string }).reason).toContain('la compra cuesta 1.000,00 y hay 500,00');
         const doc = tradeCreate.mock.calls[0][0][0];
         expect(doc.status).toBe('rejected');
         expect(doc.fillPrice).toBeNull();
