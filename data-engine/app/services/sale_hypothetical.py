@@ -45,7 +45,10 @@ _LOT_RE = re.compile(
 )
 _SALE_PRICE_RE = re.compile(
     rf"(?i)\bvend\w*\s+(?:(?:las|los|todas|todo|todos|hoy|ahora|mis)\s+)*"
-    rf"(?:(?:{_NUM})\s*(?:acciones|t[ií]tulos|participaciones)?\s*(?:de\s+)?(?:[A-Za-z][\w.]*\s+)?)?(?:a|por)\s+"
+    # «vendo la mitad (de mis AAPL) a 150 €»: la mitad es una cantidad como «vendo 5»;
+    # antes el precio no se reconocía y se usaba la cotización en su lugar.
+    rf"(?:(?:{_NUM}|(?:la\s+)?mitad)\s*(?:acciones|t[ií]tulos|participaciones)?\s*(?:de\s+)?"
+    rf"(?:[A-Za-z][\w.]*\s+){{0,2}})?(?:a|por)\s+"
     rf"(?:(?P<pre>{_CUR})\s*)?(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
     rf"|\bprecio\s+de\s+venta\s+(?:de\s+|es\s+|ser[ií]a\s+)?(?:(?P<pre2>{_CUR})\s*)?"
     rf"(?P<price2>{_NUM})\s*(?P<cur2>{_CUR})?"
