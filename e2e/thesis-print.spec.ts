@@ -20,6 +20,13 @@ test("la tesis impresa conserva su cabecera y no lleva chrome de la app", async 
   if (hasArticle) {
     await expect(page.getByText("Tesis de inversión", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "PDF" })).toBeHidden();
+    const badges = page.locator('.thesis-meta-badge');
+    expect(await badges.count()).toBeGreaterThan(0);
+    for (const badge of await badges.all()) {
+      await expect(badge).toHaveCSS('color', 'rgb(17, 17, 17)');
+      await expect(badge).toHaveCSS('-webkit-text-fill-color', 'rgb(17, 17, 17)');
+      await expect(badge).toHaveCSS('opacity', '1');
+    }
     // display:none saca los dos indices del arbol accesible: se localizan por atributo.
     const tocs = page.locator('nav[aria-label="Índice de la tesis"]');
     await expect(tocs).toHaveCount(2);

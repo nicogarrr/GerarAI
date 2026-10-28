@@ -89,6 +89,12 @@ describe('vista de lectura de la tesis: documento', () => {
         expect(source).toHaveAttribute('href', 'https://www.sec.gov/doc');
     });
 
+    it('rating and version use the print metadata contrast hook', async () => {
+        render(await page());
+        expect(screen.getByText('Rating: mantener')).toHaveClass('thesis-meta-badge');
+        expect(screen.getByText('v4')).toHaveClass('thesis-meta-badge');
+    });
+
     it('cifras de la valoración como lista de definiciones con su etiqueta', async () => {
         render(await page());
         expect(screen.getByText('Valor esperado').nextElementSibling).toHaveTextContent(/110/);

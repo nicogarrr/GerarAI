@@ -468,6 +468,16 @@
     box-shadow: none !important;
     text-shadow: none !important;
   }
+  /* Preserve dark, legible metadata ink even when the browser suppresses
+     background graphics or a foreground token targets dark-mode screens. */
+  .print-document header .thesis-meta-badge {
+    color: #111111 !important;
+    -webkit-text-fill-color: #111111 !important;
+    opacity: 1 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
 }
 
 /* Micro-animación de la burbuja del Cerebro: respiración suave solo unos
