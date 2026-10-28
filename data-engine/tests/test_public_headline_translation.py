@@ -320,3 +320,22 @@ def test_equivalencia_genericos_ambos_lados_se_mantiene():
 ])
 def test_equivalencia_falla_cerrado_con_negacion(o, t):
     assert not _hnm(o, t)
+
+
+def test_request_uses_registered_prompt_and_keeps_tenant_metadata():
+    from app.services import prompt_registry
+
+    seen = []
+
+    class Capturing(Provider):
+        async def complete(self, request):
+            seen.append(request)
+            return await super().complete(request)
+
+    async def run():
+        db = SimpleNamespace(info={'tenant_id': 1})
+        await service.translate_external_headline(db, 'Apple reports earnings 2026', provider=Capturing())
+    asyncio.run(run())
+    resolved = prompt_registry.get_prompt('public_headline_translation', allow_remote=False)
+    assert seen[0].messages[0].content == resolved.text
+    assert seen[0].metadata == {**resolved.trace_metadata(), 'tenant_id': '1'}
