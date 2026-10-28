@@ -196,4 +196,21 @@ describe('Table', () => {
         expect(screen.getAllByRole('cell', { name: '-100 €' })).toHaveLength(2);
         expect(screen.getAllByRole('row')).toHaveLength(3);
     });
+
+    it('la región con scroll horizontal anuncia que hay más columnas', () => {
+        // F176: las tablas anchas comparten la affordance (scrollbar fina
+        // visible + sombras de borde); sin ella el borde de scroll corta el
+        // contenido a media palabra sin pista de que hay más a la derecha.
+        render(
+            <Table regionLabel="Posiciones de la cartera">
+                <TableBody>
+                    <TableRow><TableCell>AAPL</TableCell></TableRow>
+                </TableBody>
+            </Table>,
+        );
+        const region = screen.getByRole('region', { name: 'Posiciones de la cartera' });
+        expect(region.className).toContain('scroll-affordance-x');
+        expect(region.className).toContain('overflow-x-auto');
+        expect(region).toHaveAttribute('tabIndex', '0');
+    });
 });
