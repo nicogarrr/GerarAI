@@ -125,7 +125,8 @@ export function sessionDateEt(tSeconds: number): string {
 /** Cotizacion saneada: shape Finnhub {c,d,dp,h,l,o,pc} + frescura validada. */
 export type SanitizedQuote = {
     source?: 'Finnhub' | 'Yahoo Finance';
-    c: number; d: number; dp: number; h: number; l: number; o: number; pc: number;
+    /** d/dp son null cuando el proveedor no tiene cierre previo real (nunca un 0 inventado). */
+    c: number; d: number | null; dp: number | null; h: number; l: number; o: number; pc: number;
     /** Timestamp (epoch s) del proveedor; null en el fallback Yahoo (sin fecha). */
     t: number | null;
     /** Market-local date of the exact daily candle c, supplied by Yahoo backend. */
@@ -181,7 +182,10 @@ export function mapBackendYahooQuote(data: ProviderQuotePayload | null | undefin
     if (!data || !((data.c ?? 0) > 0 || (data.pc ?? 0) > 0)) return null;
     const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
     return {
-        c: num(data.c), d: num(data.d), dp: num(data.dp),
+        c: num(data.c),
+        // Sin cierre previo real el backend manda null: no se convierte en 0,00 %.
+        d: typeof data.d === 'number' && Number.isFinite(data.d) ? data.d : null,
+        dp: typeof data.dp === 'number' && Number.isFinite(data.dp) ? data.dp : null,
         h: num(data.h), l: num(data.l), o: num(data.o), pc: num(data.pc),
         source: 'Yahoo Finance', t: null, kind: 'close',
         closeDate: validCalendarDate(data.cd),

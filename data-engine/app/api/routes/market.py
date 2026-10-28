@@ -162,6 +162,27 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
         result = resp.json()["chart"]["result"][0]
         quote = result["indicators"]["quote"][0]
         closes_raw = quote["close"]
+        # Tras el cierre Yahoo tarda horas en rellenar `close` de la vela del
+        # dia (llega None) aunque meta.regularMarketPrice ya es el cierre
+        # (medido 27-oct-2026 20:14 ET: AAPL servia el cierre del 26 con
+        # cd=26 teniendo regularMarketPrice=347.1 de las 20:00 ET). Solo si
+        # el sello del propio proveedor (regularMarketTime) es posterior al fin
+        # de la sesion regular de esa vela, esa vela se da por cerrada.
+        _meta0 = result.get("meta") or {}
+        _stamps0 = result.get("timestamp") or []
+        _reg = ((_meta0.get("currentTradingPeriod") or {}).get("regular")) or {}
+        _rmt, _rmp = _meta0.get("regularMarketTime"), _meta0.get("regularMarketPrice")
+        if (
+            closes_raw
+            and closes_raw[-1] is None
+            and len(_stamps0) == len(closes_raw)
+            and all(isinstance(v, (int, float)) for v in (_reg.get("start"), _reg.get("end"), _rmt))
+            and isinstance(_rmp, (int, float)) and _rmp > 0
+            and _reg["start"] <= _stamps0[-1] < _reg["end"]
+            and _rmt >= _reg["end"]
+        ):
+            closes_raw = list(closes_raw)
+            closes_raw[-1] = float(_rmp)
         # Indice de la ultima vela con cierre no nulo: al filtrar el array se
         # pierde la alineacion con result["timestamp"], y la fecha honesta de
         # "c" es la de SU vela (desbloquea el etiquetado de ultimo cierre,
@@ -188,19 +209,25 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
         if last_idx is None or not closes or closes[-1] <= 0:
             return None
         last = float(closes[-1])
-        previous = (
-            float(closes[-2])
-            if len(closes) >= 2
-            else float(meta.get("chartPreviousClose") or last)
-        )
+        # Cierre previo REAL o None: antes caia a `last` y la variacion salia
+        # como 0,00 % inventado (sin cierre previo no hay variacion que dar).
+        if len(closes) >= 2:
+            previous = float(closes[-2])
+        else:
+            cpc = meta.get("chartPreviousClose")
+            previous = float(cpc) if isinstance(cpc, (int, float)) and cpc > 0 else None
+        if previous is not None and previous <= 0:
+            previous = None
         # Todas las magnitudes deben pertenecer a la misma vela seleccionada;
         # no tomar el último OHLC provisional tras descartar su cierre.
         def selected_value(key):
             values = quote.get(key) or []
             value = values[last_idx] if last_idx < len(values) else None
-            return float(value) if value is not None else last
+            # Dato ausente -> None; antes se rellenaba con el cierre y el
+            # rango del dia salia 0 (maxima = minima = apertura = cierre).
+            return float(value) if value is not None else None
 
-        change = last - previous
+        change = (last - previous) if previous is not None else None
         timestamps = result.get("timestamp") or []
         candle_ts = timestamps[last_idx] if last_idx < len(timestamps) else None
         candle_date = None
@@ -228,7 +255,7 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             "live_t": meta.get("regularMarketTime"),
             "currency": meta.get("currency"),
             "d": change,
-            "dp": (change / previous * 100) if previous else 0.0,
+            "dp": (change / previous * 100) if change is not None else None,
             "h": selected_value("high"),
             "l": selected_value("low"),
             "o": selected_value("open"),
