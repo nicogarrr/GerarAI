@@ -148,7 +148,7 @@ def test_flex_doc_lists_sections_and_has_no_token_placeholder():
     from urllib.parse import urlparse
 
     urls = re.findall(r"https?://[^\s)]+", doc)
-    assert any(urlparse(url).hostname == "ibkrguides.com" for url in urls)
+    assert any(urlparse(url).hostname in {"ibkrguides.com", "www.ibkrguides.com"} for url in urls)
     assert "nunca" in doc.lower()
 
 
