@@ -76,7 +76,7 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
             <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-3">
                 <Metric label="Retorno neto" value={fmtPct(result.retornoNeto)} footnote="Compuesto, descontados costes (15 pb/pata)" />
                 <Metric label="Retorno bruto" value={fmtPct(result.retornoBruto)} footnote="Antes de costes" />
-                <Metric label="SPY (mismo periodo)" value={fmtPct(result.spy)} footnote="Buy & hold" />
+                <Metric label="SPY (mismo período)" value={fmtPct(result.spy)} footnote="Buy & hold" />
                 <Metric
                     label="Sharpe"
                     value={formatNumber(result.sharpe, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -137,7 +137,7 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
                     <li>Walk-forward mensual: cada corte usa únicamente precios de cierre anteriores a ese corte (sin datos futuros).</li>
                     <li>Señal: momentum 12-1M (se excluye el último mes) sobre un universo líquido de 30 valores; {formatNumber(result.picksPorMes, { maximumFractionDigits: 0 })} picks equiponderados.</li>
                     <li>Costes aplicados: 15 pb por pata de rotación. Rotación media mensual: {formatPercent(result.turnover, { fromRatio: false, digits: 0 })}.</li>
-                    <li>Benchmark: SPY buy & hold en el mismo periodo.</li>
+                    <li>Benchmark: SPY buy & hold en el mismo período.</li>
                     <li>Sesgo de supervivencia: las 30 empresas son megacaps de hoy, elegidas con conocimiento actual; las que cayeron o salieron del índice no están.</li>
                     <li>Muestra corta: {formatNumber(result.months, { maximumFractionDigits: 0 })} meses. Sharpe, Sortino y la diferencia con SPY no son distinguibles del azar con tan pocos datos.</li>
                     <li>Precios de cierre del proveedor sin dividendos explícitos; sin impuestos ni deslizamiento más allá de los costes indicados.</li>

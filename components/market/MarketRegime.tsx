@@ -14,6 +14,11 @@ import { ExternalLink } from 'lucide-react';
  * nunca rellenado.
  */
 
+/** «1 sesión» / «N sesiones»: concordancia es-ES del conteo de entrenamiento. */
+export function trainingSessionsText(count: number): string {
+  return `${formatNumber(count, { maximumFractionDigits: 0 })} ${count === 1 ? 'sesión' : 'sesiones'}`;
+}
+
 const METRICAS: { key: keyof MarketRegime['metrics']; label: string }[] = [
   { key: 'treasury_10y_us', label: 'Bono EE. UU. 10 años' },
   { key: 'treasury_2y_us', label: 'Bono EE. UU. 2 años' },
@@ -97,7 +102,7 @@ function TarjetaHmm({ regimen }: { regimen: MarketRegime }) {
             {hmm.trained_through ? (
               <p className="text-xs text-gray-500">
                 Entrenado hasta el {formatMarketDate(hmm.trained_through)}
-                {typeof hmm.training_sessions === 'number' ? ` · ${formatNumber(hmm.training_sessions, { maximumFractionDigits: 0 })} sesiones` : ''}
+                {typeof hmm.training_sessions === 'number' ? ` · ${trainingSessionsText(hmm.training_sessions)}` : ''}
               </p>
             ) : null}
             {hmm.method ? <p className="text-xs text-gray-500">{hmm.method}</p> : null}
