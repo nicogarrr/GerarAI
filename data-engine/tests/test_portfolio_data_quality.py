@@ -42,7 +42,7 @@ def test_real_failure_shape_is_diagnosed_without_writing_or_inventing_cost():
         assert result['cash_native'] == {'USD': -20584.72}
         assert result['snapshots'] == 3 and result['complete_snapshots'] == 1
         assert result['return_observations'] == 0
-        assert set(result['reasons']) == {'missing_cost_basis', 'mixed_valuation_dates', 'latest_snapshot_incomplete', 'insufficient_verified_returns'}
+        assert set(result['reasons']) == {'missing_cost_basis', 'mixed_valuation_dates', 'latest_snapshot_incomplete', 'insufficient_verified_returns', 'ibkr_cost_currency_unverified'}
         assert not db.new and not db.dirty and not db.deleted
         assert position.average_cost == 0 and cash.balance == Decimal('-20584.72')
 
