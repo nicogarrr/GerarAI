@@ -175,7 +175,18 @@ def fetch_history_yfinance(
     for symbol in symbols:
         try:
             instrument = yf.Ticker(symbol)
-            hist = instrument.history(period=period, auto_adjust=False)
+            if period == "7d":
+                # Yahoo range=7d can return NULL closes for completed sessions
+                # while the same daily history with explicit bounds has values.
+                # Preserve daily bars, source units and the final-session gate.
+                today = datetime.now(UTC).date()
+                hist = instrument.history(
+                    start=(today - timedelta(days=7)).isoformat(),
+                    end=(today + timedelta(days=1)).isoformat(),
+                    auto_adjust=False,
+                )
+            else:
+                hist = instrument.history(period=period, auto_adjust=False)
         except Exception:
             out[symbol] = []
             continue
