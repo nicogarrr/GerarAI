@@ -331,11 +331,22 @@ async def sync_ibkr_connection(db: Session = Depends(get_db)) -> dict:
     from app.services import ibkr_connection_service as ibkr
     _require_tenant(db)
     revision: int | None = None
+    receipt_id: int | None = None
+    lease = ibkr.sync_lease(db)
+    entered = False
     try:
+        await run_in_threadpool(lease.__enter__)
+        entered = True
         token, query_id, account_id, revision = await run_in_threadpool(ibkr.credentials, db, get_settings())
+        receipt_id = await run_in_threadpool(ibkr.start_receipt, db, revision=revision)
         xml = await ibkr.download(token, query_id)
-        return await run_in_threadpool(ibkr.import_report, db, xml, account_id, revision)
-    except (ibkr.ConnectionError, LLMSettingsCryptoError) as exc:
-        await run_in_threadpool(ibkr.record_failure, db, revision=revision)
-        detail = str(exc) if isinstance(exc, ibkr.ConnectionError) else "No se pudo leer el token cifrado. Vuelve a conectar IBKR."
+        return await run_in_threadpool(ibkr.import_report, db, xml, account_id, revision, receipt_id=receipt_id)
+    except ibkr.SyncBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from None
+    except Exception as exc:
+        await run_in_threadpool(ibkr.record_failure, db, revision=revision, receipt_id=receipt_id)
+        detail = str(exc) if isinstance(exc, ibkr.ConnectionError) else "No se pudo sincronizar IBKR. Conservamos los datos anteriores."
         raise HTTPException(status_code=422, detail=detail) from None
+    finally:
+        if entered:
+            await run_in_threadpool(lease.__exit__, None, None, None)
