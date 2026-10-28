@@ -59,7 +59,7 @@ def test_manual_run_is_recorded_and_symbol_is_evaluated(client):
 def test_failed_run_marks_symbols_without_state_as_job_failed(client, monkeypatch):
     client.post("/api/watchlist", json={"symbol": "DCATST"})
 
-    def boom(db):
+    def boom(db, **kwargs):
         raise RuntimeError("yahoo down")
 
     monkeypatch.setattr(dca_signal_service, "evaluate_watchlist", boom)
@@ -76,7 +76,7 @@ def test_per_symbol_errors_and_skips_are_visible(client, monkeypatch):
     client.post("/api/watchlist", json={"symbol": "DCATST"})
     client.post("/api/watchlist", json={"symbol": "DCAOFF"})
 
-    def fake(db):
+    def fake(db, **kwargs):
         return {
             "tracked": 2, "evaluated": 0, "alerted": [],
             "skipped": [{"symbol": "DCAOFF", "reason": "datos_desactualizados", "last_price_date": "2026-01-02"}],
@@ -122,9 +122,12 @@ def test_recording_failure_never_breaks_the_evaluation():
 
 
 def test_actor_records_scheduler_run_and_error(monkeypatch):
+    monkeypatch.setattr("app.services.plan_proactivity.review_savings_plan", lambda db: {})
     events: list[tuple] = []
 
     class FakeDb:
+        info = {}
+        def commit(self): pass
         def close(self):
             pass
 
@@ -145,7 +148,7 @@ def test_actor_records_scheduler_run_and_error(monkeypatch):
 
     events.clear()
 
-    def boom(db):
+    def boom(db, **kwargs):
         raise ValueError("permanent")
 
     monkeypatch.setattr("app.services.dca_signal_service.evaluate_watchlist", boom)

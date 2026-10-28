@@ -42,7 +42,7 @@ export async function setDcaAlertMinLevel(symbol: string, minLevel: number | nul
     }
 }
 
-/** Evaluación manual (el backend la limita a una por minuto). */
+/** Evaluación manual (compatibilidad con clientes anteriores; tandas de diez cada cinco minutos). */
 export async function evaluateDcaSignalsNow(): Promise<DcaMutationResult & { summary?: DcaEvaluateSummary }> {
     try {
         await requireAuthenticatedUser();
@@ -53,6 +53,29 @@ export async function evaluateDcaSignalsNow(): Promise<DcaMutationResult & { sum
         return { success: true, summary };
     } catch (error) {
         console.error('evaluateDcaSignalsNow error:', error);
+        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
+    }
+}
+
+export async function startDcaManualJob(): Promise<DcaMutationResult & { runId?: number }> {
+    try {
+        await requireAuthenticatedUser();
+        const receipt = await researchRequest<{ run_id: number }>('/api/watchlist/dca-signals/evaluate-async', { method: 'POST' });
+        return { success: true, runId: receipt.run_id };
+    } catch (error) {
+        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
+    }
+}
+
+export async function getDcaManualJob(runId: number): Promise<DcaMutationResult & { status?: string; summary?: DcaEvaluateSummary }> {
+    try {
+        await requireAuthenticatedUser();
+        if (!Number.isSafeInteger(runId) || runId < 1) throw new Error('Ejecución no válida');
+        const result = await researchRequest<{ status: string; summary: DcaEvaluateSummary | null; error: string | null }>(`/api/watchlist/dca-signals/manual-runs/${runId}`);
+        if (result.status === 'ok') revalidatePath('/watchlist');
+        return { success: true, status: result.status, summary: result.summary ?? undefined,
+            message: result.status === 'error' ? 'La evaluación falló. Revisa el estado en la watchlist.' : undefined };
+    } catch (error) {
         return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
     }
 }
