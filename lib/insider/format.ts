@@ -61,6 +61,8 @@ const TITLE_ABBREVIATIONS: Array<[RegExp, string]> = [
     [/executive\s+chair(man|woman|person)?/i, 'Presidente ejecutivo'],
     [/\bchair(man|woman|person)?\b/i, 'Presidente del consejo'],
     [/president/i, 'Presidente'],
+    [/government\s+affairs/i, 'Relaciones gubernamentales'],
+    [/^officer$/i, 'Directivo'],
     [/treasurer/i, 'Tesorero'],
     [/secretary/i, 'Secretario'],
 ];

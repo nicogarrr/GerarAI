@@ -1034,7 +1034,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
             <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=model`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=model`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
@@ -1157,7 +1157,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <Panel collapsible="mobile"
           actions={moatScore ? (
             <Link
-              className="text-sm text-teal-300 hover:text-teal-200"
+              className="inline-flex min-h-11 min-w-11 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=moat`}
             >
               Ver la evaluación del foso

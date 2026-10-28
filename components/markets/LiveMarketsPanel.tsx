@@ -151,7 +151,7 @@ export function LiveMarketsPanel({ initial }: { initial: LiveMarketsResult | nul
                         : 'Sin datos todavía'}
                     {failed ? ' · la última actualización falló; se reintenta cada minuto' : ''}
                 </span>
-                <Button variant="ghost" size="sm" onClick={refresh} disabled={refreshing} aria-label="Actualizar ahora">
+                <Button className="min-w-11" variant="ghost" size="sm" onClick={refresh} disabled={refreshing} aria-label="Actualizar ahora">
                     <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
                 </Button>
             </div>

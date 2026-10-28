@@ -48,16 +48,16 @@ export default function HistoricalStressView({ report }: { report: HistoricalStr
             <h2 className="mb-3 font-semibold text-teal-300">{company.ticker}{company.weight !== null ? ` · ${formatPercent(company.weight)} de renta variable` : ''}</h2>
             <div className="grid gap-3 md:grid-cols-3">{company.windows.map(window => <WindowCard key={window.year} window={window} />)}</div>
             <p className="mt-2 text-xs text-gray-500">
-                {company.source_url ? <a className="text-teal-300 underline" href={company.source_url} target="_blank" rel="noopener noreferrer">{company.source}</a> : company.source} · Cierre ajustado · {company.currency ?? 'Divisa sin datos'} · Consultado {day(company.fetched_at)}
+                {company.source_url ? <a className="inline-flex min-h-11 min-w-11 items-center text-teal-300 underline" href={company.source_url} target="_blank" rel="noopener noreferrer">{company.source}</a> : company.source} · Cierre ajustado · {company.currency ?? 'Divisa sin datos'} · Consultado {day(company.fetched_at)}
                 {company.weight_as_of ? ` · Peso al ${day(company.weight_as_of)}` : ''}
             </p>
         </section>)}
         {pages > 1 && <nav aria-label="Paginación de compañías" className="flex items-center justify-between gap-3 text-sm">
-            <button className="rounded border border-gray-700 px-3 py-2 disabled:opacity-40" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
+            <button className="min-h-11 min-w-11 rounded border border-gray-700 px-3 py-2 disabled:opacity-40" disabled={page === 0} onClick={() => setPage(page - 1)}>Anterior</button>
             <span>{page + 1} / {pages}</span>
-            <button className="rounded border border-gray-700 px-3 py-2 disabled:opacity-40" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>Siguiente</button>
+            <button className="min-h-11 min-w-11 rounded border border-gray-700 px-3 py-2 disabled:opacity-40" disabled={page + 1 >= pages} onClick={() => setPage(page + 1)}>Siguiente</button>
         </nav>}
-        <details className="rounded-xl border border-gray-800 p-4 text-sm text-gray-400"><summary className="cursor-pointer">Método y límites</summary>
+        <details className="rounded-xl border border-gray-800 p-4 text-sm text-gray-400"><summary className="min-h-11 cursor-pointer py-3">Método y límites</summary>
             <p className="mt-3">Ventanas: años naturales 2008, 2020 y 2022, desde el último cierre del año anterior. Caída máxima desde un pico previo de la ventana. Recuperación: primer cierre que alcanza ese pico; días naturales desde el pico. Precios ajustados por dividendos y splits.</p>
             <p className="mt-2">Yahoo Finance es un proveedor secundario, no una fuente oficial. Sin sustitutos para compañías que aún no cotizaban. No se excluyen posiciones sin histórico para fabricar un resultado de cartera. Los pesos actuales introducen sesgo de supervivencia; el escenario no predice la próxima crisis.</p>
         </details>
