@@ -270,7 +270,7 @@ def test_failure_without_obtained_credentials_does_not_change_connection():
         assert service.view(db) == before
 
 
-def test_failed_old_download_route_cannot_mark_reconnected_revision(monkeypatch):
+def test_failed_download_route_rejects_concurrent_renewal(monkeypatch):
     import asyncio
 
     from fastapi import HTTPException
@@ -285,19 +285,20 @@ def test_failed_old_download_route_cannot_mark_reconnected_revision(monkeypatch)
         old_revision = service.connection(db).revision
 
         async def failed_old_download(*args):
-            save(db)
-            assert service.connection(db).revision > old_revision
+            with pytest.raises(service.SyncBusy):
+                save(db)
+            assert service.connection(db).revision == old_revision
             raise service.ConnectionError("Fallo sintético de la descarga anterior")
 
         monkeypatch.setattr(service, "download", failed_old_download)
         with pytest.raises(HTTPException) as caught:
             asyncio.run(routes.sync_ibkr_connection(db))
         assert caught.value.status_code == 422
-        assert service.view(db)["status"] == "connected"
-        assert service.view(db)["last_attempt_at"] is None
+        assert service.view(db)["status"] == "error"
+        assert service.view(db)["last_attempt_at"] is not None
 
 
-def test_failed_old_download_worker_cannot_mark_reconnected_revision(monkeypatch):
+def test_failed_download_worker_rejects_concurrent_renewal(monkeypatch):
     from contextlib import contextmanager
 
     from app.workers import dramatiq_app as workers
@@ -314,12 +315,13 @@ def test_failed_old_download_worker_cannot_mark_reconnected_revision(monkeypatch
             yield db
 
         async def failed_old_download(*args):
-            save(db)
-            assert service.connection(db).revision > old_revision
+            with pytest.raises(service.SyncBusy):
+                save(db)
+            assert service.connection(db).revision == old_revision
             raise service.ConnectionError("Fallo sintético de la descarga anterior")
 
         monkeypatch.setattr(workers, "_session", scoped_session)
         monkeypatch.setattr(service, "download", failed_old_download)
         assert workers.sync_one_tenant_ibkr.fn(owner, "synthetic-owner")["status"] == "error"
-        assert service.view(db)["status"] == "connected"
-        assert service.view(db)["last_attempt_at"] is None
+        assert service.view(db)["status"] == "error"
+        assert service.view(db)["last_attempt_at"] is not None
