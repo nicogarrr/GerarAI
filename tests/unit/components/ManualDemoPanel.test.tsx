@@ -154,7 +154,7 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         expect(screen.getByText(formatMoney(40, 'USD'))).toBeInTheDocument();
     });
 
-    it('cargar más pide la página siguiente con el cursor y acumula sin duplicar filas', async () => {
+    it('«Siguiente» pide el bloque siguiente con el cursor y acumula sin duplicar filas', async () => {
         const first = historyRow({ clientOrderId: 'a' });
         const loadMoreHistory = vi.fn<(before: string) => Promise<HistoryPageResult>>().mockResolvedValue({
             ok: true,
@@ -164,25 +164,46 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         });
         const { container } = setup({ ledger: [first], historyHasMore: true, historyNextBefore: 'cur-1', loadMoreHistory });
         openTab('Historial');
-        fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }));
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
         await flush();
         expect(loadMoreHistory).toHaveBeenCalledWith('cur-1');
         expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
         expect(screen.getByText('BMW')).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Cargar más' })).toBeNull();
+        expect(screen.queryByRole('navigation', { name: /Paginación/ })).toBeNull();
     });
 
-    it('si cargar más falla se avisa y se conserva lo cargado', async () => {
+    it('el historial se muestra de 10 en 10 con «Página N de M+» mientras el servidor tenga más', async () => {
+        const rows = Array.from({ length: 12 }, (_, k) => historyRow({ clientOrderId: `r${k}` }));
+        const loadMoreHistory = vi.fn<(before: string) => Promise<HistoryPageResult>>().mockResolvedValue({
+            ok: true, orders: [historyRow({ clientOrderId: 'z', symbol: 'BMW', name: 'BMW' })], hasMore: false, nextBefore: null,
+        });
+        const { container } = setup({ ledger: rows, historyHasMore: true, historyNextBefore: 'cur-1', loadMoreHistory });
+        openTab('Historial');
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(10);
+        expect(screen.getByText('Página 1 de 2+')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
+        expect(loadMoreHistory).not.toHaveBeenCalled();
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
+        await flush();
+        expect(loadMoreHistory).toHaveBeenCalledWith('cur-1');
+        expect(screen.getByText('Página 2 de 2')).toBeInTheDocument();
+        expect(container.querySelectorAll('tbody tr')).toHaveLength(3);
+        expect(screen.getByText('BMW')).toBeInTheDocument();
+    });
+
+    it('si la siguiente página falla se avisa y se conserva lo cargado', async () => {
         const loadMoreHistory = vi.fn<(before: string) => Promise<HistoryPageResult>>().mockResolvedValue({
             ok: false, message: 'sin conexión',
         });
         setup({ ledger: [historyRow({ clientOrderId: 'a' })], historyHasMore: true, historyNextBefore: 'cur-1', loadMoreHistory });
         openTab('Historial');
-        fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }));
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
         await flush();
         expect(screen.getByRole('alert')).toHaveTextContent('No se pudo cargar más historial: sin conexión');
         expect(screen.getByText('ASTS')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Cargar más' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Página siguiente/ })).toBeEnabled();
     });
 
     it('una primera página nueva del servidor descarta las páginas extra cargadas', async () => {
@@ -194,7 +215,7 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         });
         const { rerender, container } = setup({ ledger: [historyRow({ clientOrderId: 'a' })], historyHasMore: true, historyNextBefore: 'cur-1', loadMoreHistory });
         openTab('Historial');
-        fireEvent.click(screen.getByRole('button', { name: 'Cargar más' }));
+        fireEvent.click(screen.getByRole('button', { name: /Página siguiente/ }));
         await flush();
         expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
         const submitFill = vi.fn<SubmitFill>();

@@ -8,6 +8,8 @@ import { useRouter } from 'next/navigation';
 import { ExternalLink, Search, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/pagination';
+import { clampPage, pageCount } from '@/lib/ux/pagination';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -89,6 +91,9 @@ function signalKey(signal: DataRecord): string {
     return `${type}|${subject}|${date}|${form}|${execution}|${formatRecordValue(signal.detail)}`;
 }
 
+/** Filings por página (mismo tamaño que la lectura inicial y que `loadMoreInsiderFilings`). */
+const FILINGS_PAGE_SIZE = 20;
+
 export default function InsiderSignalsView({ initialTicker, initialResult, initialFilings }: InsiderSignalsViewProps) {
     const router = useRouter();
     const [ticker, setTicker] = useState(initialTicker);
@@ -114,15 +119,36 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
     const filings = [...baseFilings, ...extraFilings.filter((filing) => !knownAccessions.has(filing.accession_number))];
     const filingsTotal = initialFilings?.total ?? initialFilings?.count ?? filings.length;
 
-    async function loadMoreFilings() {
+    // Paginación numerada (sin scroll infinito): el servidor
+    // sirve por offset, así que se piden solo los filings que faltan hasta el
+    // final de la página pedida y se muestran los de esa página.
+    const [filingsPage, setFilingsPage] = useState(1);
+    const filingsPages = pageCount(filingsTotal, FILINGS_PAGE_SIZE);
+    const filingsPageNow = clampPage(filingsPage, filingsPages);
+    const visibleFilings = filings.slice((filingsPageNow - 1) * FILINGS_PAGE_SIZE, filingsPageNow * FILINGS_PAGE_SIZE);
+
+    async function goToFilingsPage(target: number) {
         if (filingsLoading || !initialTicker) return;
-        setFilingsLoading(true);
+        const page = clampPage(target, filingsPages);
+        const needed = Math.min(page * FILINGS_PAGE_SIZE, filingsTotal);
         setFilingsError(false);
+        if (filings.length >= needed) {
+            setFilingsPage(page);
+            return;
+        }
+        setFilingsLoading(true);
         try {
-            const next = await loadMoreInsiderFilings(initialTicker, filings.length);
-            if (next.status !== 'ok') throw new Error(next.reason ?? next.status);
-            setExtraFilings((current) => [...current, ...next.filings]);
+            const fetched: InsiderFilingEntry[] = [];
+            while (filings.length + fetched.length < needed) {
+                const next = await loadMoreInsiderFilings(initialTicker, filings.length + fetched.length);
+                if (next.status !== 'ok') throw new Error(next.reason ?? next.status);
+                if (next.filings.length === 0) break;
+                fetched.push(...next.filings);
+            }
+            setExtraFilings((current) => [...current, ...fetched]);
+            setFilingsPage(page);
         } catch {
+            // La página no cambia: se queda la actual y se avisa.
             setFilingsError(true);
         } finally {
             setFilingsLoading(false);
@@ -388,7 +414,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     </CardHeader>
                     <CardContent className="pt-4">
                         <ul className="space-y-2">
-                            {filings.map((filing) => (
+                            {visibleFilings.map((filing) => (
                                 <li key={filing.accession_number} className="rounded-lg border border-gray-800 p-3 text-sm">
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                         <Badge variant="outline">{filing.form}</Badge>
@@ -435,26 +461,22 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                 </li>
                             ))}
                         </ul>
-                        <div className="mt-4 flex flex-col items-center gap-2 text-xs text-gray-500">
-                            <span>
-                                Mostrando {filings.length} de {filingsTotal}
+                        <div className="mt-4 flex flex-col gap-2 text-xs text-gray-500">
+                            <span className="text-center">
+                                Mostrando {(filingsPageNow - 1) * FILINGS_PAGE_SIZE + 1}-{(filingsPageNow - 1) * FILINGS_PAGE_SIZE + visibleFilings.length} de {filingsTotal}
                             </span>
                             {filingsError ? (
-                                <span className="text-red-400" role="alert">
+                                <span className="text-center text-red-400" role="alert">
                                     No se pudieron cargar más filings.
                                 </span>
                             ) : null}
-                            {filings.length < filingsTotal ? (
-                                <Button
-                                    disabled={filingsLoading}
-                                    onClick={() => void loadMoreFilings()}
-                                    size="sm"
-                                    type="button"
-                                    variant="outline"
-                                >
-                                    {filingsLoading ? 'Cargando…' : filingsError ? 'Reintentar' : 'Cargar más'}
-                                </Button>
-                            ) : null}
+                            <Pagination
+                                busy={filingsLoading}
+                                label="Filings persistidos"
+                                onPageChange={(target) => void goToFilingsPage(target)}
+                                page={filingsPageNow}
+                                pages={filingsPages}
+                            />
                         </div>
                     </CardContent>
                 </Card>

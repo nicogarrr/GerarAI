@@ -183,7 +183,7 @@ test('un rechazo confirmado revalida /paper-trading: el Historial no puede queda
     assert.equal(sites.length, 2, 'submitFill y submitFx deben revalidar tras un rechazo confirmado');
 });
 
-test('el historial es paginado: cursor estable cableado página -> panel -> botón «Cargar más»', () => {
+test('el historial es paginado: cursor estable cableado página -> panel -> paginación', () => {
     // Read-model paginado (22-oct-2026): la primera página la sirve el
     // server component y las siguientes las pide el panel con el cursor
     // (createdAt, _id); la contabilidad (readLedger) no pasa por aquí.
@@ -192,7 +192,8 @@ test('el historial es paginado: cursor estable cableado página -> panel -> bot�
     assert.match(page, /loadMoreHistory=\{loadMoreHistory\}/, 'la página pasa la acción de cargar más');
     assert.match(page, /historyHasMore=\{historyHasMore\}/, 'la página pasa hasMore');
     const panel = readFileSync(`${COMPONENTS_DIR}/ManualDemoPanel.tsx`, 'utf8');
-    assert.match(panel, /Cargar más/, 'el panel ofrece cargar más historial');
-    assert.match(panel, /onLoadMoreHistory/, 'el botón llama a la acción con el cursor');
+    assert.doesNotMatch(panel, /Cargar más/, 'Nico 2026-10-28: paginación, no «Cargar más»');
+    assert.match(panel, /<Pagination[\s\S]*?hasMore=/, 'el panel pagina el historial');
+    assert.match(panel, /onLoadMoreHistory/, 'la última página pide el siguiente bloque con el cursor');
     assert.match(panel, /role="alert"[\s\S]{0,200}No se pudo cargar más historial/, 'un fallo al cargar más es visible');
 });

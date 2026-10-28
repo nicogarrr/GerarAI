@@ -6,10 +6,11 @@ const view = readFileSync('components/insider/InsiderSignalsView.tsx', 'utf8');
 const actions = readFileSync('lib/actions/insider.actions.ts', 'utf8');
 const route = readFileSync('data-engine/app/api/routes/insider.py', 'utf8');
 
-test('filings persistidos: cargar más, total honesto y sin recorte silencioso a 10', () => {
+test('filings persistidos: paginación numerada, total honesto y sin recorte silencioso a 10', () => {
   assert.doesNotMatch(view, /filings\.slice\(0, 10\)/);
-  assert.match(view, /Cargar más/);
-  assert.match(view, /Mostrando \{filings\.length\} de \{filingsTotal\}/);
+  assert.doesNotMatch(view, /Cargar más/, 'Nico 2026-10-28: paginación, no «Cargar más»');
+  assert.match(view, /<Pagination[\s\S]*?label="Filings persistidos"/);
+  assert.match(view, /de \{filingsTotal\}/);
   assert.match(view, /initialFilings\.total \?\? initialFilings\.count/);
 });
 

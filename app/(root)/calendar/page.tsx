@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-    title: 'Calendario de resultados y alertas',
+    title: 'Catalizadores | Calendarios',
     description: 'Resultados de tus posiciones y de tu watchlist en EE. UU. (USD), ex-dividendos, plazos 10-Q/10-K y acciones corporativas, y tus alertas, en un solo sitio.',
 };
 

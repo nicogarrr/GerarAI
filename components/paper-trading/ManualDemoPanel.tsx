@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/pagination';
+import { paginateItems } from '@/lib/ux/pagination';
 import { Panel } from '@/components/ui/panel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AccountSummary } from './AccountSummary';
@@ -114,6 +116,8 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     const [moreHistory, setMoreHistory] = useState(historyHasMore);
     const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
     const [loadingMore, startLoadMore] = useTransition();
+    // Página visible del historial (paginación, sin scroll infinito).
+    const [historyPage, setHistoryPage] = useState(1);
     // Un refresh del servidor (fill, rechazo, F5) trae una PRIMERA página
     // nueva en `ledger`: se descartan las extra acumuladas (siguen pudiendo
     // cargarse con el botón) para no mezclar filas de la foto anterior.
@@ -126,8 +130,20 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
         setHistoryCursor(historyNextBefore);
         setMoreHistory(historyHasMore);
         setLoadMoreError(null);
+        setHistoryPage(1);
     }
-    const onLoadMoreHistory = () => {
+    const loadedHistory = [...ledger, ...extraRows];
+    const historyView = paginateItems(loadedHistory, historyPage);
+    // Paginación por cursor: «Siguiente» en la última página cargada pide el
+    // siguiente bloque al servidor y, si llega, avanza a esa página.
+    const onHistoryPageChange = (target: number) => {
+        if (target <= historyView.pages) {
+            setHistoryPage(target);
+            return;
+        }
+        onLoadMoreHistory(() => setHistoryPage(target));
+    };
+    const onLoadMoreHistory = (onLoaded?: () => void) => {
         if (!loadMoreHistory || !historyCursor) return;
         const before = historyCursor;
         startLoadMore(async () => {
@@ -145,6 +161,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
             });
             setMoreHistory(result.hasMore);
             setHistoryCursor(result.nextBefore);
+            if (result.orders.length > 0) onLoaded?.();
         });
     };
     // Si cambian posiciones, cantidades o costes tras valorar, la valoracion
@@ -291,14 +308,16 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 </TabsContent>
                 <TabsContent value="historial" className="mt-4">
                     <Panel title="Historial de operaciones">
-                        <LedgerTable entries={[...ledger, ...extraRows]} />
-                        {loadMoreHistory && moreHistory ? (
-                            <div className="mt-3">
-                                <Button type="button" variant="outline" size="sm" onClick={onLoadMoreHistory} disabled={loadingMore}>
-                                    {loadingMore ? 'Cargando…' : 'Cargar más'}
-                                </Button>
-                            </div>
-                        ) : null}
+                        <LedgerTable entries={historyView.items} />
+                        <Pagination
+                            busy={loadingMore}
+                            className="mt-3"
+                            hasMore={Boolean(loadMoreHistory && moreHistory)}
+                            label="Historial de operaciones"
+                            onPageChange={onHistoryPageChange}
+                            page={historyView.page}
+                            pages={historyView.pages}
+                        />
                         {loadMoreError ? (
                             <p role="alert" className="mt-2 text-xs text-amber-300">
                                 No se pudo cargar más historial: {loadMoreError}

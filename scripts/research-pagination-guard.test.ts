@@ -44,12 +44,15 @@ test('10 por página, acotado y sin páginas vacías', () => {
   assert.equal(pageLabel(2, 3), 'Página 2 de 3');
 });
 
-test('la ficha pagina historial y afirmaciones con el componente reutilizable', () => {
+test('la ficha pagina historial, afirmaciones y hechos financieros móviles con el componente reutilizable', () => {
   const page = readFileSync(RESEARCH_PAGE, 'utf8');
-  assert.equal((page.match(/<PagedList/g) ?? []).length, 2, 'historial y afirmaciones usan PagedList');
+  assert.equal((page.match(/<PagedList/g) ?? []).length, 3, 'historial, afirmaciones y hechos financieros móviles usan PagedList');
   assert.match(page, /collapseVersionHistory\(data\.historyDetail\.history\)\.map/);
   assert.match(page, /groupClaimsByVersion\(data\.claims, data\.history\)\.map/);
   assert.match(page, /label="Historial de versiones y aprobaciones"/);
+  assert.match(page, /label="Hechos financieros"/);
+  assert.match(page, /pageSize=\{FACTS_MOBILE_PAGE\}/);
+  assert.match(page, /FACTS_MOBILE_PAGE = 10/);
   assert.match(page, /label=\{`Afirmaciones de \$\{group\.label\}`\}/);
   assert.equal((page.match(/pageSize=\{10\}/g) ?? []).length, 2);
 });
