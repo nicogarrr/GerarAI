@@ -1,4 +1,7 @@
 // @vitest-environment node
+import path from 'node:path';
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { buildMemoPdf } from '@/lib/thesis/memo-pdf';
@@ -50,6 +53,20 @@ describe('buildMemoPdf', () => {
 
     it('un memo vacío sigue siendo un PDF válido de una página', async () => {
         const pdf = await buildMemoPdf('');
+        expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+        expect(pageCount(pdf)).toBe(1);
+    });
+
+    it('maqueta el caso release de borrador sparse sin añadir valoración', async () => {
+        const markdown = readFileSync(
+            path.join(process.cwd(), 'data-engine/tests/release_thesis_matrix/fixtures/pdf_sparse_draft.md'),
+            'utf8',
+        );
+        expect(markdown).toContain('BORRADOR sin publicar');
+        for (const forbidden of ['999', '888', '40 %', '$', 'Valoración y escenarios', 'Margen de seguridad']) {
+            expect(markdown).not.toContain(forbidden);
+        }
+        const pdf = await buildMemoPdf(markdown);
         expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
         expect(pageCount(pdf)).toBe(1);
     });

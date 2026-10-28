@@ -20,7 +20,7 @@ test('index and overview use coverage and a separate evidence state', () => {
   for (const file of ['app/(root)/research/page.tsx', 'app/(root)/research/[ticker]/page.tsx']) {
     const source = readFileSync(file, 'utf8');
     // La ficha ya no pinta tarjetas de cobertura (Nico 2026-10-19); el indice si.
-    if (file === 'app/(root)/research/page.tsx') assert.match(source, /Cobertura/);
+    if (file === 'app/(root)/research/page.tsx') assert.match(source, /Capas disponibles/);
     assert.match(source, /researchValuability\(snapshot\)/);
     assert.doesNotMatch(source, /Salud del research|Salud \{/);
   }

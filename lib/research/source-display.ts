@@ -1,4 +1,5 @@
 export const SOURCE_LABELS: Record<string, string> = {
+  financial_facts: 'hechos financieros registrados',
   primary_official: 'Fuente oficial primaria',
   yahoo_finance_intraday: 'Yahoo Finance · intradía',
   yahoo_finance: 'Yahoo Finance',

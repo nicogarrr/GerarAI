@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 const read=(p:string)=>readFileSync(p,'utf8');
 test('search restores focus via dialog close-autofocus to connected opener',()=>{
- const search=read('components/SearchCommand.tsx');
+ const search=read('components/SearchCommand.tsx')+read('components/SearchCommandDialog.tsx');
  assert.match(search,/returnFocusRef\.current\?\.isConnected/);
  assert.match(search,/onCloseAutoFocus=/);
- assert.match(search,/target\?\.focus\(\)/);
+ assert.match(search,/getFocusTarget\(\)\?\.focus\(\)/);
  assert.match(read('components/ui/command.tsx'),/onCloseAutoFocus=\{onCloseAutoFocus\}/);
 });
 test('page titles and 404 navigation are explicit and human readable',()=>{

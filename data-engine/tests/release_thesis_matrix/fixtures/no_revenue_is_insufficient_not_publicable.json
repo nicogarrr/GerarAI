@@ -1,0 +1,65 @@
+{
+  "id": "no_revenue_is_insufficient_not_publicable",
+  "kind": "valuation",
+  "facets": [
+    "insufficient_data_contract"
+  ],
+  "company": {
+    "ticker": "NOREV",
+    "name": "No Revenue Matrix",
+    "exchange": "NYSE",
+    "currency": "USD"
+  },
+  "facts": [
+    {
+      "metric": "free_cash_flow",
+      "value": "10000000000",
+      "unit": "USD",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "shares_diluted",
+      "value": "1000000000",
+      "unit": "shares",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "net_debt",
+      "value": "0",
+      "unit": "USD",
+      "period": "2025-12-31:FY"
+    }
+  ],
+  "price": {
+    "date": "2026-10-23",
+    "close": "120",
+    "quote_currency": "USD"
+  },
+  "fx_rates": [],
+  "expected": {
+    "status": "insufficient_data",
+    "publishable": false,
+    "missing_inputs": [
+      "revenue",
+      "free_cash_flow",
+      "shares_diluted"
+    ],
+    "value_currency": "USD",
+    "currency_status": "unknown",
+    "adr_ratio": null,
+    "current_price": 120.0,
+    "base_value": null,
+    "expected_value": null,
+    "margin_of_safety": null,
+    "listed_base_value": null,
+    "price_status": "ok",
+    "memo_contains": [
+      "estado datos insuficientes",
+      "| Base | pendiente | pendiente |"
+    ],
+    "memo_forbidden": [
+      "$150.00",
+      "20,0 %"
+    ]
+  }
+}

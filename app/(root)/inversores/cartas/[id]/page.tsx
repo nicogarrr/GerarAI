@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
 import BackendOffline from '@/components/system/BackendOffline';
+import { ScreenBreadcrumbName } from '@/components/screeners/ScreenBreadcrumbName';
 import { getKnowledgeDocument, getKnowledgeDocumentChunkPage } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
@@ -58,6 +59,8 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
 
     return (
         <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
+        {/* Miga con el titulo real: sin el override la ruta muestra el id crudo. */}
+        <ScreenBreadcrumbName name={letter.title} />
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-8 overflow-x-clip py-6">
             <header className="flex flex-col gap-3">
                 <Link className={LINK} href={backHref}>

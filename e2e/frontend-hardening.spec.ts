@@ -56,7 +56,7 @@ test.describe("hardening frontend estático", () => {
 
   test("los controles iconográficos y el fallo de búsqueda tienen semántica", () => {
     const mobileNav = source("components", "MobileNav.tsx");
-    const searchCommand = source("components", "SearchCommand.tsx");
+    const searchCommand = source("components", "SearchCommandDialog.tsx");
     const portfolioChat = source("components", "brain", "GlobalBrain.tsx");
 
     expect(mobileNav).toContain("closeButtonRef");

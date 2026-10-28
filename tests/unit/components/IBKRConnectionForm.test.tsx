@@ -37,3 +37,17 @@ it('disconnect requires confirmation and retains account binding afterwards',asy
  await waitFor(()=>expect(screen.getByLabelText('Cuenta IBKR')).toBeDisabled());
  expect(screen.getByLabelText('Cuenta IBKR')).toHaveValue('U1234567');
 });
+
+it('explains browser-only setup, report freshness and delayed data without inventing Spanish menu labels', () => {
+ render(<IBKRConnectionForm initial={empty}/>);
+ expect(screen.getByText('Debe hacerse desde la web de IBKR (Portal del Cliente), no desde la app móvil.')).toBeInTheDocument();
+ const guide = screen.getByText('Cómo conseguir token y Query ID').parentElement!;
+ expect(guide.textContent).toContain('máximo 5 días');
+ expect(guide.textContent).toContain('no datos en tiempo real');
+ expect(guide.textContent).toContain('No hemos comprobado los nombres exactos');
+ expect(guide.textContent).toContain('Cash Transactions');
+ expect(guide.textContent).toContain('Corporate Actions');
+ expect(guide.textContent).toContain('Generar uno nuevo invalida el anterior');
+ expect(guide.textContent).toContain('no el número de cuenta');
+ expect(screen.getByRole('link', { name: 'Guía oficial: consulta y Query ID' })).toHaveAttribute('href','https://www.interactivebrokers.com/docs/web-api/flex-web-service/client-portal-configuration/create-a-flex-query.md');
+});

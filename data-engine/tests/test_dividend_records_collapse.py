@@ -99,3 +99,36 @@ def test_brain_year_total_excludes_uncertain_instead_of_picking_one(db):
     _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1))
     answer = _dividend_answer(db, "cuanto voy a cobrar de mi cartera", tenant=1)
     assert "incierto" in answer.answer and company.ticker in answer.answer
+
+
+def test_cross_provider_unit_rule_groups_by_company_date_and_currency(db):
+    from app.services.dividend_records import resolve_cross_provider_events
+
+    company = _company(db)
+    ex = date.today() - timedelta(days=30)
+    y = _row(db, company, ex, "0.1925", "yahoo_finance", datetime(2026, 9, 1))
+    f = _row(db, company, ex, "0.77", "fmp", datetime(2026, 9, 1))
+    other_day = _row(db, company, ex - timedelta(days=90), "0.5", "fmp", datetime(2026, 9, 1))
+    other_ccy = _row(db, company, ex, "5", "fmp", datetime(2026, 9, 1), "GBX")
+    same_src_a = _row(db, company, ex - timedelta(days=200), "0.5", "fmp", datetime(2026, 9, 1))
+    same_src_b = _row(db, company, ex - timedelta(days=200), "2", "fmp", datetime(2026, 9, 1))
+
+    kept, uncertain = resolve_cross_provider_events([y, f, other_day, other_ccy, same_src_a, same_src_b])
+
+    assert {r.id for r in kept} == {other_day.id, other_ccy.id, same_src_a.id, same_src_b.id}
+    assert [(u.ex_date, u.currency, u.amounts) for u in uncertain] == [
+        (ex, "USD", (Decimal("0.1925"), Decimal("0.77")))
+    ]
+
+
+def test_cross_provider_unit_rule_keeps_prior_uncertain_events(db):
+    from app.services.dividend_records import resolve_cross_provider_events, resolve_yahoo_events
+
+    company = _company(db)
+    ex = date.today() - timedelta(days=30)
+    rows = [
+        _row(db, company, ex, "0.5", "yahoo_finance", datetime(2026, 1, 1)),
+        _row(db, company, ex, "2.0", "yahoo_finance", datetime(2026, 9, 1)),
+    ]
+    kept, uncertain = resolve_cross_provider_events(*resolve_yahoo_events(rows))
+    assert kept == [] and len(uncertain) == 1

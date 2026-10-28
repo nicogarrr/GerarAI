@@ -59,6 +59,13 @@ function cardValue(label: string): HTMLElement {
 }
 
 describe('PortfolioSummary', () => {
+    it('coste IBKR en revisión oculta los totales de coste y ganancia, no el valor', () => {
+        render(<PortfolioSummary summary={summary({ holdings: [holding({ costReviewMessage: 'Revisión IBKR', fxMissing: true })] })} />);
+        expect(screen.getByRole('status')).toHaveTextContent('diferencias entre el extracto');
+        expect(cardValue('Coste de las posiciones')).toHaveTextContent('N/D');
+        expect(cardValue('Ganancia/Pérdida')).toHaveTextContent('N/D');
+        expect(cardValue('Valor Total (neto)')).toHaveTextContent(money(1700));
+    });
     it('pinta valor neto, coste, G/P y rendimiento en la divisa base con formato es-ES', () => {
         render(<PortfolioSummary summary={summary()} />);
         expect(cardValue('Valor Total (neto)')).toHaveTextContent(money(1700));

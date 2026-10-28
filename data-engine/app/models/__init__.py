@@ -43,7 +43,9 @@ from app.models.entities import (
     FundamentalModelVersion,
     FundamentalValuationSnapshot,
     FundManager,
+    FxConversion,
     FXRate,
+    IbkrRawRow,
     InferredInput,
     InsiderFiling,
     InsiderTransaction,
@@ -113,6 +115,8 @@ from app.models.entities import (
 __all__ = [
     "WorkflowStepRun",
     "WorkflowRun",
+    "FxConversion",
+    "IbkrRawRow",
     "InsiderTransaction",
     "ITUNotice",
     "InsiderFiling",

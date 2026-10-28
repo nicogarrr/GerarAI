@@ -14,7 +14,8 @@ export default function PortfolioSummary({ summary }: Props) {
   // Cartera vacia: un "+0,00%" en verde sugiere ganancia donde no hay datos (F31)
   const isEmpty = summary.holdings.length === 0;
   // Sin base de coste: coste, ganancia y rendimiento son N/D, no 0 (F2).
-  const noData = isEmpty || !hasCostBasis(summary);
+  const costReview = summary.holdings.some((holding) => Boolean(holding.costReviewMessage));
+  const noData = isEmpty || costReview || !hasCostBasis(summary);
   // Sin posiciones NI caja: el valor total no es 0,00 EUR real, es ausencia de datos.
   // Con caja y sin posiciones el total (la caja) sí es un dato.
   const nothingYet = isEmpty && summary.totalValue === 0 && summary.cash === 0 && summary.equityValue === 0;
@@ -26,6 +27,7 @@ export default function PortfolioSummary({ summary }: Props) {
 
   return (
     <div className="space-y-3">
+      {costReview ? <p role="status" className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-sm text-amber-200">Coste y rentabilidad pendientes de revisión por diferencias entre el extracto y las compras de IBKR.</p> : null}
       {summary.valuationHold.length > 0 ? (
         <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-sm text-amber-200">
           {t(summary.valuationHold.length === 1 ? 'portfolio.valuationHoldNotice.one' : 'portfolio.valuationHoldNotice.other', { n: summary.valuationHold.length, tickers: summary.valuationHold.map((h) => h.ticker).join(', ') })}

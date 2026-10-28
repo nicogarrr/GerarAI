@@ -200,3 +200,56 @@ def test_portfolio_weight_convierte_a_divisa_base_con_divisas_mezcladas():
     finally:
         db.close()
         cleanup_materiality_artifacts()
+
+
+def test_trade_resumption_does_not_inherit_halt_criticality():
+    """Repro prod 28-oct-2026: «Canadian Investment Regulatory Organization
+    Trade Resumption - BN.PF.N» salía 10/10 negativo con aviso de tesis por
+    heredar «halt» del cuerpo del aviso. La reanudación no es un halt."""
+    from app.core.database import SessionLocal, init_db
+    from app.services.materiality_service import MaterialityService
+
+    init_db()
+    db = SessionLocal()
+    try:
+        service = MaterialityService()
+        resumption = service.assess_news(
+            db,
+            None,
+            "Canadian Investment Regulatory Organization Trade Resumption - "
+            "BN.PF.N. Trading resumes in the shares after the trading halt.",
+            "company_ir",
+            "https://example.com/resumption",
+            use_jev=False,
+        )
+        assert resumption.materiality_score < 10
+        assert resumption.impact_direction == "neutral"
+
+        halt = service.assess_news(
+            db,
+            None,
+            "Canadian Investment Regulatory Organization Trading Halt - "
+            "BN.PF.N pending material news.",
+            "company_ir",
+            "https://example.com/halt",
+            use_jev=False,
+        )
+        assert halt.materiality_score == 10
+        assert halt.impact_direction == "negative"
+    finally:
+        db.close()
+
+
+def test_mainstream_news_sources_are_not_tier_unknown():
+    """Repro prod 28-oct-2026: Stock Titan, MarketBeat o el Financial Times
+    salían como fuente desconocida (confianza 0,25) cuando son medios
+    habituales de la ingesta."""
+    for source in ("Stock Titan", "MarketBeat", "Seeking Alpha", "GlobeNewswire"):
+        tier = classify_source(source, "https://news.google.com/rss/articles/xyz")
+        assert tier.key == "tier_5_data_provider", source
+        assert tier.trust_score == 0.68
+    ft = classify_source("Financial Times", "https://news.google.com/rss/articles/xyz")
+    assert ft.key == "tier_4_reputable_media"
+    # Lo genuinamente desconocido sigue en tier_unknown.
+    assert classify_source("KuCoin", "https://kucoin.com/news/x").key == "tier_unknown"
+    assert classify_source("Random Blog", "https://blog.example.com/x").key == "tier_unknown"

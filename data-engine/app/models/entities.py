@@ -378,6 +378,49 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
+    """Fila cruda de un Flex de IBKR, con TODOS sus atributos, se use o no todavia.
+
+    Un valor corregido es una fila nueva (hash distinto); nada se sobrescribe.
+    """
+
+    __tablename__ = "ibkr_raw_rows"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "row_hash", name="uq_ibkr_raw_row_tenant_hash"),
+        Index("ix_ibkr_raw_rows_section", "section"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    section: Mapped[str] = mapped_column(String(80))
+    path: Mapped[str] = mapped_column(String(200))
+    row_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class FxConversion(TenantOwnedMixin, Base, TimestampMixin):
+    """Cambio de divisa real (Flex Trades con assetCategory CASH, p. ej. EUR.USD).
+
+    No es una compra de valores: no entra en el FIFO de acciones. Alimenta el
+    libro de divisas (``currency_ledger``). Importes siempre positivos.
+    """
+
+    __tablename__ = "fx_conversions"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "external_id", name="uq_fx_conversion_tenant_external"),
+        Index("ix_fx_conversions_trade_date", "trade_date"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trade_date: Mapped[date] = mapped_column(Date)
+    disposed_currency: Mapped[str] = mapped_column(String(10))
+    disposed_amount: Mapped[Decimal] = mapped_column(Numeric(24, 6))
+    acquired_currency: Mapped[str] = mapped_column(String(10))
+    acquired_amount: Mapped[Decimal] = mapped_column(Numeric(24, 6))
+    external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class PortfolioDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "portfolio_daily_snapshots"
     __table_args__ = (

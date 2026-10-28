@@ -101,19 +101,17 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
     };
     const [chartPeriod, setChartPeriod] = useState('1M');
 
-    const chartData = useMemo(() => {
-        if (scores.history?.dates?.length && scores.history.nav?.length) {
-            // "YYYY-MM-DD" es un día de calendario: formatDate lo parsea en
-            // hora local y lo formatea en la zona del proceso, así que el
-            // eje sale igual en el servidor (UTC) y en el navegador.
-            return windowNav(scores.history.dates, scores.history.nav, chartPeriod).map((point) => ({
-                date: formatDate(point.date, { day: '2-digit', month: 'short' }),
-                value: point.value,
-            }));
-        }
-
-        return [];
-    }, [chartPeriod, scores.history]);
+    const periodData = useMemo(() => Object.fromEntries(
+        ['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'].map(period => [
+            period,
+            windowNav(scores.history?.dates ?? [], scores.history?.nav ?? [], period)
+                .filter(point => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.date)))
+                .map(point => ({ date: formatDate(point.date, { day: '2-digit', month: 'short' }), value: point.value })),
+        ]),
+    ), [scores.history]);
+    const effectivePeriod = periodData[chartPeriod].length >= 2 ? chartPeriod : 'Todo';
+    const chartData = periodData[effectivePeriod];
+    const hasDrawableHistory = periodData.Todo.length >= 2;
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip p-4 pb-24 sm:p-4 sm:pb-24 lg:p-6 lg:pb-24">
                 {/* Header */}
@@ -159,20 +157,6 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                         Resumen
                     </TabsTrigger>
                     <TabsTrigger
-                        value="prevision"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
-                    >
-                        <TrendingUp aria-hidden="true" className="h-4 w-4" />
-                        Previsión
-                    </TabsTrigger>
-                    <TabsTrigger
-                        value="dividendos"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
-                    >
-                        <Coins aria-hidden="true" className="h-4 w-4" />
-                        Dividendos
-                    </TabsTrigger>
-                    <TabsTrigger
                         value="posiciones"
                         className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
                     >
@@ -185,6 +169,20 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                     >
                         <History aria-hidden="true" className="h-4 w-4" />
                         Movimientos
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="dividendos"
+                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                    >
+                        <Coins aria-hidden="true" className="h-4 w-4" />
+                        Dividendos
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="prevision"
+                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                    >
+                        <TrendingUp aria-hidden="true" className="h-4 w-4" />
+                        Previsión
                     </TabsTrigger>
                     <TabsTrigger
                         value="estrategia"
@@ -210,12 +208,14 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                         <div className="bg-[#111111] border border-gray-800 rounded-2xl p-4 sm:p-6">
                             <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
                                 <h2 className="text-gray-400 text-sm font-medium">Valor de la cartera</h2>
-                                <div className="flex w-full flex-wrap gap-1 sm:w-auto">
+                                {hasDrawableHistory ? <div className="flex w-full flex-wrap gap-1 sm:w-auto" role="group" aria-label="Periodo del gráfico de valor">
                                     {['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'].map((period) => (
                                         <button
                                             key={period}
                                             onClick={() => setChartPeriod(period)}
-                                            className={`min-h-[44px] min-w-11 flex-1 px-1 py-2 text-xs rounded transition-colors sm:flex-none sm:px-2 sm:py-1 ${chartPeriod === period
+                                            disabled={periodData[period].length < 2}
+                                            aria-pressed={effectivePeriod === period}
+                                            className={`min-h-[44px] min-w-11 flex-1 px-1 py-2 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed sm:flex-none sm:px-2 sm:py-1 ${effectivePeriod === period
                                                     ? 'bg-gray-700 text-white'
                                                     : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
                                                 }`}
@@ -223,7 +223,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                                             {period}
                                         </button>
                                     ))}
-                                </div>
+                                </div> : null}
                             </div>
 
                             <div className="mb-4">
@@ -242,8 +242,9 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                                         Rentabilidad no disponible: falta una base de coste válida. La cifra superior es el valor neto, no el beneficio del periodo.
                                     </p>
                                 ) : (
-                                <p className={`text-sm flex items-center gap-1 ${summary.totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                <p className={`text-sm flex flex-wrap items-center gap-1 ${summary.totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                                     {summary.totalGain >= 0 ? <TrendingUp aria-hidden="true" className="h-4 w-4" /> : <TrendingDown aria-hidden="true" className="h-4 w-4" />}
+                                    <span className="whitespace-nowrap">G/P desde compra:</span>
                                     {formatPercent(summary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                     <span className="text-gray-500">
                                         ({formatMoney(summary.totalGain, summary.baseCurrency, { signDisplay: 'auto' })})
@@ -254,7 +255,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
 
                             {/* Gráfico de área */}
                             <div className="h-[200px]">
-                                {chartData.length === 0 ? (
+                                {chartData.length < 2 ? (
                                     <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-800 text-sm text-gray-500">
                                         Aún no hay una serie continua de valoraciones verificables: las fotos incompletas no se dibujan.
                                     </div>

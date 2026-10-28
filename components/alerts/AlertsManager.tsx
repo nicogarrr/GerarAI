@@ -454,11 +454,11 @@ function AlertsManager() {
                 </Dialog>
             </div>
 
-            {telegram && !telegram.configured ? (
+            {telegram ? (
                 <div className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3" role="note">
                     <p className="flex items-center gap-2 text-sm text-amber-200">
                         <Send aria-hidden="true" className="h-4 w-4" />
-                        Telegram sin configurar: las alertas solo llegan en la app
+                        {telegram.configured ? 'Canal Telegram configurado en el servidor' : 'Telegram sin configurar: las alertas solo llegan en la app'}
                     </p>
                 </div>
             ) : null}
