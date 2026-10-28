@@ -67,6 +67,7 @@ const TAX_LABELS: Record<string, string> = {
     over_sell: 'Ventas sin compras que las cubran',
     cost_unknown: 'Ventas con coste heredado desconocido',
     method: 'Método de valoración',
+    securities_fx_criterion: 'Criterio FX en valores',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',
     generated_at: 'Generado',
@@ -81,6 +82,12 @@ const TAX_LABELS: Record<string, string> = {
  *  minúsculas, p.ej. `fifo`, que en UI se veía en crudo). */
 const METHOD_LABELS: Record<string, string> = {
     fifo: 'FIFO',
+};
+
+const SECURITIES_FX_LABELS: Record<string, string> = {
+    // Criterio DGT: ganancia en la divisa del valor, convertida una sola vez
+    // al cambio de la fecha de venta (tax_report_service.py).
+    dgt_native_gain_sale_date_v1: 'Ganancia en divisa del valor, convertida a EUR al cambio de la fecha de venta (DGT)',
 };
 
 const WASH_RULE_LABELS: Record<string, string> = {
@@ -179,6 +186,8 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = WASH_RULE_LABELS[String(value)] ?? String(value);
         } else if (key === 'wash_sale_basis') {
             display[label] = WASH_BASIS_LABELS[String(value)] ?? String(value);
+        } else if (key === 'securities_fx_criterion') {
+            display[label] = SECURITIES_FX_LABELS[String(value)] ?? String(value);
         } else if (key === 'method') {
             display[label] = METHOD_LABELS[String(value).toLowerCase()] ?? String(value);
         } else if (key === 'generated_at') {
