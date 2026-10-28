@@ -7,7 +7,7 @@ describe('secondary mobile controls',()=>{
   expect(src('app/(root)/research/sources/page.tsx')).toContain('min-h-11 min-w-11 items-center text-teal-300');
  });
  it('enlarges only interactive source, disclosure, portfolio and brain controls',()=>{
-  for(const path of ['app/(root)/macro-calendar/page.tsx','app/(root)/ownership/page.tsx','app/(root)/cuellos/page.tsx','app/(root)/portfolio/stress/page.tsx','app/(root)/portfolio/intelligence/page.tsx','components/brain/GlobalBrain.tsx'])expect(src(path)).toContain('min-h-11');
-  expect(src('components/brain/GlobalBrain.tsx')).toContain('min-h-11 bg-slate-950 border-slate-700');
+  for(const path of ['app/(root)/macro-calendar/page.tsx','app/(root)/ownership/page.tsx','app/(root)/cuellos/page.tsx','app/(root)/portfolio/stress/page.tsx','app/(root)/portfolio/intelligence/page.tsx','components/brain/GlobalBrainPanel.tsx'])expect(src(path)).toContain('min-h-11');
+  expect(src('components/brain/GlobalBrainPanel.tsx')).toContain('min-h-11 bg-slate-950 border-slate-700');
  });
 });
