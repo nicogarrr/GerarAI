@@ -4,7 +4,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -36,11 +36,18 @@ def pending_symbols(db: Session, *, now: datetime | None = None) -> list[str]:
     now = now or datetime.now(UTC)
     tracked = tracked_symbols(db)
     states = {s.symbol: s for s in db.scalars(select(DcaSignalState).where(*tenant_filters(db, DcaSignalState)))}
+    # One aggregate for every tracked company (market_prices is shared market
+    # data, not tenant-owned): a per-symbol query here was N+1 on the HTTP path.
+    company_ids = {item.company.id for item in tracked.values() if item.company}
+    newest_close = dict(db.execute(
+        select(MarketPrice.company_id, func.max(MarketPrice.date))
+        .where(MarketPrice.company_id.in_(company_ids))
+        .group_by(MarketPrice.company_id)
+    ).all()) if company_ids else {}
     candidates = []
     for symbol, item in tracked.items():
         state = states.get(symbol)
-        newest = db.scalar(select(MarketPrice.date).where(MarketPrice.company_id == item.company.id)
-            .order_by(MarketPrice.date.desc()).limit(1)) if item.company else None
+        newest = newest_close.get(item.company.id) if item.company else None
         evaluated = state.evaluated_at if state else None
         if evaluated and evaluated.tzinfo is None:
             evaluated = evaluated.replace(tzinfo=UTC)
