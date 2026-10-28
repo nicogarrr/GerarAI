@@ -236,3 +236,14 @@ def test_public_headline_translation_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert resolved.text == prompt_registry.PUBLIC_HEADLINE_TRANSLATION
+
+
+def test_second_order_news_prompt_version_and_hash_are_pinned():
+    resolved = prompt_registry.get_prompt("second_order_news_service", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "second-order-news-v1",
+        "30a2c6b663cd",
+        "news_second_order",
+    )
+    assert resolved.source == "code"
+    assert resolved.text == prompt_registry.SECOND_ORDER_NEWS
