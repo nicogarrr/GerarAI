@@ -70,7 +70,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // The page owns only a slot. This layout instance keeps the transcript
     // when moving between embedded doctrine and the floating panel elsewhere.
     useEffect(() => {
-        let current: HTMLElement | null | undefined = undefined;
+        let current: HTMLElement | null = null;
         const sync = () => {
             const slot = document.getElementById('brain-library-slot');
             if (slot === current) return;
