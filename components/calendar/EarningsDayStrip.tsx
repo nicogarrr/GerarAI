@@ -94,7 +94,10 @@ export default async function EarningsDayStrip() {
                     Ver todo
                 </Link>
             </div>
-            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 2xl:grid 2xl:grid-cols-[repeat(7,minmax(0,1fr))] 2xl:overflow-visible">
+            {/* relative: bloque contenedor de las etiquetas sr-only (absolute)
+                de cada tarjeta; sin él se escapaban del overflow-x-auto y la
+                página entera se desplazaba en horizontal en móvil. */}
+            <div className="relative -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 2xl:grid 2xl:grid-cols-[repeat(7,minmax(0,1fr))] 2xl:overflow-visible">
                 {days.map((isoDate) => (
                     <DayCard key={isoDate} isoDate={isoDate} todayIso={today} events={byDate.get(isoDate) ?? []} />
                 ))}

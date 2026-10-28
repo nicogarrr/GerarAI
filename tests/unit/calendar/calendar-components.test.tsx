@@ -146,6 +146,20 @@ describe('EarningsDayStrip', () => {
         expect(screen.getAllByText('Sin eventos')).toHaveLength(5);
         expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/calendar/resultados');
     });
+    it('la tira horizontal contiene sus etiquetas sr-only (sin desborde de la página en móvil)', async () => {
+        // Suite E2E de flujos (28-oct-2026), /inicio a 375 px: las etiquetas
+        // sr-only (position:absolute) de las tarjetas no tenían un ancestro
+        // posicionado dentro del carrusel, se escapaban de su overflow-x-auto
+        // y ensanchaban el viewport de layout a 819 px (página desplazable en
+        // horizontal). El carrusel tiene que ser su bloque contenedor.
+        getFollowedEarnings.mockResolvedValue({ followed_count: 1, days: [{ date: today, events: [ev()] }] });
+        render(await EarningsDayStrip());
+        const card = screen.getAllByRole('link', { name: /^Resultados del/ })[0];
+        const scroller = card.parentElement as HTMLElement;
+        expect(scroller.className).toMatch(/\boverflow-x-auto\b/);
+        expect(scroller.className).toMatch(/(^|\s)relative(\s|$)/);
+        expect(card.querySelectorAll('.sr-only').length).toBeGreaterThan(0);
+    });
 });
 
 describe('FollowedEarningsList helpers', () => {
