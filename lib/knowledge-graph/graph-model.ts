@@ -136,7 +136,7 @@ function toNumber(value: string | number | null | undefined): number | null {
 }
 
 export function nodeColor(type: string): string {
-  return NODE_TYPE_COLORS[type] ?? FALLBACK_NODE_COLOR;
+  return Object.hasOwn(NODE_TYPE_COLORS, type) ? NODE_TYPE_COLORS[type] : FALLBACK_NODE_COLOR;
 }
 
 /** Radio por grado: un nodo con mas enlaces se ve mas grande. El tope evita que un hub se coma el lienzo. */

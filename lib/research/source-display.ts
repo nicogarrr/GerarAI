@@ -17,5 +17,5 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 /** Solo cambia la presentación; nunca modifica claves ni cifras de la fuente. */
 export function sourceDisplay(value: string): string {
-  return SOURCE_LABELS[value] ?? value.replaceAll('_', ' ');
+  return Object.hasOwn(SOURCE_LABELS, value) ? SOURCE_LABELS[value] : value.replaceAll('_', ' ');
 }
