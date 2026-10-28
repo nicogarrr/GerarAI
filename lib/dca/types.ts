@@ -78,6 +78,9 @@ export interface DcaSignalsResponse {
 }
 
 export interface DcaEvaluateSummary {
+    requested?: number;
+    pending_remaining?: number;
+    cooldown_seconds?: number;
     tracked: number;
     evaluated: number;
     alerted: Array<Record<string, unknown>>;

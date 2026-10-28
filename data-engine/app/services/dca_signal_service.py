@@ -423,6 +423,7 @@ def evaluate_watchlist(
     now: datetime | None = None,
     params: DcaParams = DEFAULT_PARAMS,
     use_db_fallback: bool = True,
+    symbols: set[str] | None = None,
 ) -> dict[str, Any]:
     """Evalua watchlist + cartera del tenant de la sesion. Devuelve un resumen."""
     settings = get_settings()
@@ -445,6 +446,8 @@ def evaluate_watchlist(
         "params_version": params.version,
     }
     for symbol, item in tracked.items():
+        if symbols is not None and symbol not in symbols:
+            continue
         history = FetchedHistory(rows=[])
         source = None
         yahoo = _yahoo_symbol_for(item)
