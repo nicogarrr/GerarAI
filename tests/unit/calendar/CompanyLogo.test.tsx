@@ -86,6 +86,29 @@ describe('CompanyLogo', () => {
         loaded(getImg(container), 20, 20);
         expect(getImg(container).getAttribute('src')).toBe('data:image/png;base64,CROP');
     });
+    it('el recorte guardado como data URL no supera 128 px de lado (Lighthouse: imágenes sobredimensionadas)', () => {
+        // Logo de 1000x500 con margen blanco horneado: el lienzo de análisis es
+        // de 256x128 y el contenido ocupa casi todo. El data URL debe salir a
+        // tamaño de pantalla (<= 128 px), no al del lienzo de análisis.
+        pixels = solid(256, 128, [255, 255, 255, 255], (d, w) => {
+            for (let y = 4; y < 124; y++) for (let x = 4; x < 252; x++) d.set([0, 90, 200, 255], (y * w + x) * 4);
+        });
+        let dataUrlCanvas: { width: number; height: number } | null = null;
+        vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockImplementation(function (this: HTMLCanvasElement) {
+            dataUrlCanvas = { width: this.width, height: this.height };
+            return 'data:image/png;base64,CROP';
+        });
+        const { container } = render(<CompanyLogo ticker="WIDE" name="Wide" />);
+        loaded(getImg(container), 1000, 500);
+        expect(getImg(container).getAttribute('src')).toBe('data:image/png;base64,CROP');
+        expect(dataUrlCanvas).not.toBeNull();
+        const out = dataUrlCanvas as unknown as { width: number; height: number };
+        expect(Math.max(out.width, out.height)).toBeLessThanOrEqual(128);
+        // conserva la proporción del recorte (248x120 -> 128x62)
+        expect(out.width / out.height).toBeCloseTo(248 / 120, 1);
+        const last = drawCalls[drawCalls.length - 1];
+        expect(last.slice(5)).toEqual([0, 0, out.width, out.height]);
+    });
     it('glifo blanco sobre transparente: se pinta sobre fondo oscuro', () => {
         pixels = solid(10, 10, [0, 0, 0, 0], (d, w) => {
             for (let y = 3; y < 8; y++) for (let x = 3; x < 8; x++) d.set([255, 255, 255, 255], (y * w + x) * 4);
