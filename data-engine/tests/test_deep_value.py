@@ -171,3 +171,26 @@ def test_endpoint_sin_metricas_da_lista_vacia_honesta():
     resp = client.get("/api/propicks/deep-value")
     assert resp.status_code == 200
     assert resp.json()["resultados"] == []
+
+
+def test_yield_antiguo_con_pb_fresco_se_sirve_como_nd():
+    """Caveat del auditor: la frescura se aplicaba solo al P/B y un yield de
+    hace un mes se servia junto a un P/B de hoy sin aviso. Fail-closed: el
+    yield viejo se trata como ausencia de dato (N/D), no como cifra."""
+    db = _db()
+    company = _company("VIEJO")
+    db.add(company)
+    db.flush()
+    _metric(db, company, METRIC_PB, "0.8", TODAY.isoformat(), trace={
+        "price_date": TODAY.isoformat(), "fiscal_year": 2025, "equity_source": "SEC",
+    })
+    stale = (TODAY - timedelta(days=30)).isoformat()
+    _metric(db, company, METRIC_YIELD, "0.08", stale)
+    rows = find_deep_value(db, pb_max=Decimal("1.0"), today=TODAY)
+    assert [r.ticker for r in rows] == ["VIEJO"]  # el P/B fresco sigue sirviendose
+    assert rows[0].dividend_yield is None
+    assert rows[0].yield_status is None
+    assert rows[0].desacuerdo_fuentes is False
+    assert rows[0].finnhub_yield_indicated is None
+    # y con yield_min>0 la empresa queda excluida: sin dato no cumple el umbral
+    assert find_deep_value(db, pb_max=Decimal("1.0"), yield_min=Decimal("0.03"), today=TODAY) == []
