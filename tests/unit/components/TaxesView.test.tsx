@@ -43,6 +43,29 @@ describe('TaxesView informe', () => {
         expect(screen.getByText('IRPF español: no recomprar en 2 meses')).toBeInTheDocument();
     });
 
+    it('el criterio FX de valores se etiqueta y traduce (no id en crudo)', () => {
+        view({
+            initialReport: {
+                summary: { fiscal_year: 2025, base_currency: 'EUR', securities_fx_criterion: 'dgt_native_gain_sale_date_v1' },
+                generated_at: '2026-01-02T10:00:00Z',
+            },
+        });
+        expect(screen.getByText('Criterio FX en valores')).toBeInTheDocument();
+        expect(screen.getByText(/Ganancia en divisa del valor, convertida a EUR al cambio de la fecha de venta/)).toBeInTheDocument();
+        expect(document.body.textContent).not.toContain('dgt_native_gain_sale_date_v1');
+    });
+
+    it('un criterio FX desconocido cae al valor crudo sin romper la vista', () => {
+        view({
+            initialReport: {
+                summary: { fiscal_year: 2025, base_currency: 'EUR', securities_fx_criterion: 'criterio_futuro_v2' },
+                generated_at: '2026-01-02T10:00:00Z',
+            },
+        });
+        expect(screen.getByText('Criterio FX en valores')).toBeInTheDocument();
+        expect(screen.getByText('criterio_futuro_v2')).toBeInTheDocument();
+    });
+
     it('sin informe muestra el mensaje vacio', () => {
         view({ initialReport: null });
         expect(screen.queryByText('FIFO')).not.toBeInTheDocument();
