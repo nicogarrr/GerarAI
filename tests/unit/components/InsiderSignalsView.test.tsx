@@ -56,6 +56,21 @@ beforeEach(() => {
 });
 
 describe('InsiderSignalsView', () => {
+    it('respuesta vacía antes de completar la página conserva la actual y permite reintentar', async () => {
+        loadMore.mockResolvedValueOnce(filings([filing(21), filing(22)], {total: 25}))
+            .mockResolvedValueOnce(filings([], {total: 25}))
+            .mockResolvedValueOnce(filings([filing(23), filing(24), filing(25)], {total: 25}));
+        render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings(Array.from({length: 20}, (_, i) => filing(i + 1)), {total: 25})} />);
+        fireEvent.click(screen.getByRole('button', {name: /Página siguiente/}));
+        await waitFor(() => expect(loadMore).toHaveBeenCalledTimes(2));
+        expect(screen.getByText('Página 1 de 2')).toBeInTheDocument();
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', {name: /Página siguiente/}));
+        await waitFor(() => expect(screen.getByText('Página 2 de 2')).toBeInTheDocument());
+        expect(loadMore).toHaveBeenLastCalledWith('ASTS', 22);
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
     it('buscar navega con el ticker en mayúsculas y vacío no navega', () => {
         render(<InsiderSignalsView initialTicker="" initialResult={null} />);
         const input = screen.getByRole('textbox');
