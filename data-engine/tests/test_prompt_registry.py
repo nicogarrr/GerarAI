@@ -190,3 +190,14 @@ def test_knowledge_analysis_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert knowledge_analysis.SYSTEM_PROMPT == resolved.text == prompt_registry.KNOWLEDGE_ANALYSIS
+
+
+def test_knowledge_chat_prompt_version_and_hash_are_pinned():
+    resolved = prompt_registry.get_prompt("knowledge_chat", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "knowledge-chat-v1",
+        "1950e02e5e39",
+        "chat",
+    )
+    assert resolved.source == "code"
+    assert resolved.text == prompt_registry.KNOWLEDGE_CHAT
