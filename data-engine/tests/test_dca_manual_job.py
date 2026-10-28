@@ -127,3 +127,17 @@ def test_api_route_is_202():
     from app.api.routes.watchlist import router
     route = next(r for r in router.routes if r.path.endswith('/dca-signals/evaluate-async'))
     assert route.status_code == 202
+
+
+def test_manual_lease_outlives_actor_limit():
+    from app.services.dca_manual import LEASE_SECONDS
+    from app.workers.dramatiq_app import evaluate_manual_dca
+    assert LEASE_SECONDS * 1000 > evaluate_manual_dca.options['time_limit']
+
+
+def test_queued_receipt_maps_to_running_until_stale(env):
+    from app.services.dca_run_log import run_payload
+    from datetime import timedelta
+    db, row, gate = env
+    assert run_payload(row)['status'] == 'running'
+    assert run_payload(row, now=datetime.now(UTC) + timedelta(minutes=41))['status'] == 'interrupted'

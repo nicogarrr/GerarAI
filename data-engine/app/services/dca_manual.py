@@ -14,7 +14,7 @@ from app.services.dca_signal_service import tracked_symbols
 
 COOLDOWN_SECONDS = 300
 MAX_SYMBOLS = 10
-LEASE_SECONDS = 1800
+LEASE_SECONDS = 2100  # 30min actor limit + 5min shutdown/cleanup buffer
 _RELEASE = "if redis.call('GET',KEYS[1]) == ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0"
 _ACQUIRE = """
 if redis.call('EXISTS',KEYS[1]) == 1 then return -1 end
