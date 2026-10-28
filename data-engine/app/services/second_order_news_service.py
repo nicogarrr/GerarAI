@@ -26,7 +26,10 @@ from app.llm.model_aliases import is_owner_approved_model
 from app.models import Company, NewsEvent, PeerRelationship
 from app.services.async_bridge import run_from_any_context
 from app.services.llm_output_guard import complete_guarded
+from app.services.prompt_registry import get_prompt
 from app.services.second_order_quota import reserve_llm_call
+
+_PROMPT = get_prompt("second_order_news_service", allow_remote=False)
 
 
 class CausalStep(BaseModel):
@@ -104,21 +107,7 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
     )
     request = LLMRequest(
         messages=[
-            Message("system", (
-                "Extrae hasta 8 hipótesis causales indirectas de la noticia. "
-                "No verifiques hechos, no afirmes que la noticia es cierta. "
-                "Cada exposure debe ser un nombre de industria o factor concreto "
-                "que pueda coincidir literalmente con los metadatos de empresas; "
-                "un sector amplio solo no genera candidatos. "
-                "No uses etiquetas de riesgo o madurez como speculative, pre_fcf, "
-                "pre_revenue, growth o high_beta como exposición causal. "
-                "Si hay contexto verificado de la empresa, úsalo para afinar las "
-                "hipótesis; las relaciones entre empresas solo existen cuando el "
-                "contexto las lista ('sin relaciones conocidas' = no hay datos). "
-                "Devuelve una cadena explícita de 1 a 4 pasos por hipótesis. "
-                "No propongas tickers; no hagas recomendaciones de inversión. "
-                "Si no hay señal, devuelve themes vacío. Responde solo JSON."
-            )),
+            Message("system", _PROMPT.text),
             Message("user", (context + "\n\nNoticia:\n" if context else "") + text[:3500]),
         ],
         task="news_second_order",
@@ -128,6 +117,7 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
         max_tokens=3000,
         reasoning_effort=settings.reasoning_effort_for("segundo_orden"),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="second_order_themes"),
+        metadata=_PROMPT.trace_metadata(),
     )
     # Pin an approved model: task overrides may route to paid models.
     if not is_owner_approved_model(provider.model_router.resolve(request), settings):
