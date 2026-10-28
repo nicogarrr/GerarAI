@@ -67,6 +67,7 @@ from app.services.tax_irpf_filing import (
     build_interest,
     build_loss_compensation,
 )
+from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
 from app.valuation.currency import normalize_currency
 
 FIFO_METHOD = "fifo"
@@ -551,6 +552,34 @@ def replay_tax_fifo(events, resolve_rate, start, end):
     return lots, year_sales
 
 
+def cancelled_buy_dates(events) -> list[date]:
+    """Fechas de compras anuladas por el broker (accion ``cancelled``) de un valor.
+
+    La original anulada ya no entra en el FIFO. Si solo se conoce el sentido por
+    ``raw_payload.buySell`` y no es una venta, se trata como compra. No se
+    adivina el caso dudoso: sentido desconocido cuenta como compra anulada.
+    """
+    dates: list[date] = []
+    for transaction in events:
+        if (transaction.action or "").lower() != "cancelled":
+            continue
+        payload = transaction.raw_payload if isinstance(transaction.raw_payload, dict) else {}
+        side = str(payload.get("buySell") or "").split("(", 1)[0].strip().lower()
+        if side in {"sell", "sold", "s"}:
+            continue
+        dates.append(transaction.trade_date)
+    return dates
+
+
+def flag_cancelled_lot_sales(events, year_sales: list[dict]) -> None:
+    """Marca ``cancelled_lot`` en las ventas del ejercicio que no se pueden fiar."""
+    cancelled_dates = cancelled_buy_dates(events)
+    for entry in year_sales:
+        entry["cancelled_lot"] = any(
+            day <= entry["transaction"].trade_date for day in cancelled_dates
+        )
+
+
 def sanitize_realized_over_sells(realized: list[dict]) -> list[dict]:
     """Read-time copy for legacy reports, never rewrite persisted JSON."""
     from copy import deepcopy
@@ -862,6 +891,10 @@ class TaxReportService:
         realized_by_company = {}
         for ticker, events in events_by_ticker.items():
             lots, year_sales = replay_tax_fifo(events, resolve_rate, start, end)
+            # Venta posterior (o del mismo dia) a una compra anulada: el lote que
+            # la cubria pudo ser el anulado, asi que el coste no es fiable. No se
+            # recalcula: se marca para revision manual.
+            flag_cancelled_lot_sales(events, year_sales)
 
             # Aggregate the bucket only after the full event loop so that
             # forward-window repurchases (which can postdate the sale) are
@@ -885,6 +918,7 @@ class TaxReportService:
                     "over_sell_count": 0,
                     "over_sell": False,
                     "cost_unknown": False,
+                    "cancelled_lot": False,
                     "sales": [],
                 },
             )
@@ -930,6 +964,8 @@ class TaxReportService:
                     bucket["missing_fx"] = True
                 if sale_cost_unknown:
                     bucket["cost_unknown"] = True
+                if entry.get("cancelled_lot"):
+                    bucket["cancelled_lot"] = True
                 bucket["wash_sale_window_open"] = bucket["wash_sale_window_open"] or window_open
                 bucket["sale_count"] += 1
                 if entry["over_sell"]:
@@ -944,7 +980,8 @@ class TaxReportService:
                 sale_over_sell = bool(entry["over_sell"])
                 # Mismo N/D si el lote vendido arrastra la pérdida diferida
                 # de una venta descubierta (coste inventado heredado).
-                nd = sale_over_sell or sale_cost_unknown
+                sale_cancelled_lot = bool(entry.get("cancelled_lot"))
+                nd = sale_over_sell or sale_cost_unknown or sale_cancelled_lot
                 bucket["sales"].append(
                     {
                         "date": transaction.trade_date.isoformat(),
@@ -967,15 +1004,23 @@ class TaxReportService:
                         "over_sell": sale_over_sell,
                         "over_sell_quantity": float(entry["over_sell_quantity"]),
                         "cost_unknown": sale_cost_unknown,
+                        "cancelled_lot": sale_cancelled_lot,
+                        "manual_review": sale_cancelled_lot,
                         "warning": (
                             "over_sell: sold more shares than the recorded lots; "
                             "excess valued at zero cost, verify the ledger"
                             if sale_over_sell
                             else (
-                                "cost_unknown: the lot sold carries a loss deferred "
-                                "from an over_sell sale; acquisition cost unknown"
-                                if sale_cost_unknown
-                                else None
+                                "cancelled_lot: the broker cancelled a purchase dated on or "
+                                "before this sale, so the lot it consumed may be void; "
+                                "cost not recomputed, review manually"
+                                if sale_cancelled_lot
+                                else (
+                                    "cost_unknown: the lot sold carries a loss deferred "
+                                    "from an over_sell sale; acquisition cost unknown"
+                                    if sale_cost_unknown
+                                    else None
+                                )
                             )
                         ),
                     }
@@ -1025,6 +1070,7 @@ class TaxReportService:
                     "over_sell": bucket["over_sell"],
                     "over_sell_count": bucket["over_sell_count"],
                     "cost_unknown": bucket["cost_unknown"],
+                    "cancelled_lot": bucket["cancelled_lot"],
                     "sales": bucket["sales"],
                 }
             )
@@ -1037,7 +1083,7 @@ class TaxReportService:
         # cero, así que la plusvalía total no es fiable. None, nunca una
         # cifra parcial con pinta de exacta (misma regla que los demás totales).
         realized_unreliable = realized_incomplete or any(
-            b.get("over_sell") or b.get("cost_unknown") for b in realized
+            b.get("over_sell") or b.get("cost_unknown") or b.get("cancelled_lot") for b in realized
         )
 
         total_dividends = sum(
@@ -1106,8 +1152,11 @@ class TaxReportService:
             "cost_unknown": sorted(
                 b["ticker"] for b in realized if b.get("cost_unknown")
             ),
+            "cancelled_lot": sorted(
+                b["ticker"] for b in realized if b.get("cancelled_lot")
+            ),
             "method": FIFO_METHOD,
-            "securities_fx_criterion": "dgt_native_gain_sale_date_v1",
+            "securities_fx_criterion": SECURITIES_FX_CRITERION,
             "incomplete_fx": incomplete_fx,
             "missing_fx": sorted(
                 {b["ticker"] for b in dividends if b["missing_fx"]}
@@ -1123,7 +1172,7 @@ class TaxReportService:
             "ambiguous_cash": sorted(
                 b["ticker"] for b in dividends if b["ambiguous_cash"]
             ),
-            "manual_review": dividend_ambiguous,
+            "manual_review": dividend_ambiguous or any(b.get("cancelled_lot") for b in realized),
         }
 
         data = {
@@ -1276,10 +1325,12 @@ class TaxReportService:
             # presentacion derivada de los mismos agregados, siempre al dia
             # con el mapeo normativo vigente en el codigo.
             data["filing"] = self._build_filing(db, fiscal_year, data, tme=tme)
+            data["versioning"] = report_versioning(data["summary"], persisted=True)
             return data
         data = self.compute_report(db, fiscal_year, tme=tme)
         data["generated_at"] = None
         data["persisted"] = False
+        data["versioning"] = report_versioning(data["summary"], persisted=False)
         return data
 
     def regenerate_report(self, db: Session, fiscal_year: int) -> dict:
@@ -1306,6 +1357,7 @@ class TaxReportService:
         db.refresh(report)
         data["generated_at"] = report.generated_at.isoformat()
         data["persisted"] = True
+        data["versioning"] = report_versioning(data["summary"], persisted=True)
         return data
 
 

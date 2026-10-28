@@ -3658,7 +3658,8 @@ def sync_tenant_ibkr_connections() -> dict[str, Any]:
     scheduled = 0
     for tenant_id, user_id in tenant_contexts():
         if tenant_id in ids:
-            sync_one_tenant_ibkr.send(tenant_id, user_id)
+            actor = sync_one_tenant_ibkr_dedicated if get_settings().ibkr_dedicated_sync_enabled else sync_one_tenant_ibkr
+            actor.send(tenant_id, user_id)
             scheduled += 1
     return {"scheduled": scheduled}
 
@@ -3687,3 +3688,15 @@ def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -
         return run_manual_job(db, run_id, token)
     finally:
         db.close()
+
+
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=0, time_limit=600_000)
+def sync_tenant_ibkr_connections_dedicated() -> dict[str, Any]:
+    """Dedicated dispatcher so default backlog cannot delay tenant Flex imports."""
+    return sync_tenant_ibkr_connections.fn()
+
+
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=0, time_limit=300_000)
+def sync_one_tenant_ibkr_dedicated(tenant_id: int, user_id: str) -> dict[str, Any]:
+    """Same revision/date validation, separate bounded read-only consumer."""
+    return sync_one_tenant_ibkr.fn(tenant_id, user_id)

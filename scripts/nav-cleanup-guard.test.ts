@@ -43,7 +43,7 @@ test('/research/workflows eliminado (pagina sin uso)', () => {
 
 test('«Vista de mercado» pasa a «Mercado»', () => {
     assert.ok(!constants.includes('Vista de mercado'), 'queda el nombre antiguo');
-    assert.match(constants, /\{ href: '\/screener', label: 'Mercado', icon: LineChart, hub: '\/discover'/);
+    assert.match(constants, /\{ href: '\/screener', label: 'Explorar acciones', icon: LineChart, hub: '\/discover'/);
 });
 
 test('el árbol del sidebar encoge con min-h-0: el pie queda alcanzable', () => {

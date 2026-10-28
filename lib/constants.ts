@@ -131,7 +131,7 @@ export const ROUTE_CATALOG: NavSection[] = [
       { href: '/corporate-actions', label: 'Acciones corp.', icon: Building2, hub: '/portfolio' },
       { href: '/calendar', label: 'Calendario', icon: CalendarDays, hub: '/portfolio' },
       { href: '/portfolio/stress', label: 'Estrés histórico', icon: LineChart, hub: '/portfolio' },
-      { href: '/paper-trading', label: 'Cuenta demo', icon: FlaskConical, hub: '/portfolio' },
+      { href: '/paper-trading', label: 'Mi cuenta demo', icon: FlaskConical, hub: '/portfolio' },
     ],
   },
   {
@@ -154,11 +154,11 @@ export const ROUTE_CATALOG: NavSection[] = [
         icon: Filter,
         hub: '/discover',
         description: 'Busca con métricas y filtros guardados.',
-        children: [{ href: '/screener', label: 'Mercado', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
+        children: [{ href: '/screener', label: 'Explorar acciones', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
       },
       {
         href: '/mercados',
-        label: 'Mercados',
+        label: 'Panorama de mercado',
         icon: LineChart,
         hub: '/discover',
         description: 'Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.',

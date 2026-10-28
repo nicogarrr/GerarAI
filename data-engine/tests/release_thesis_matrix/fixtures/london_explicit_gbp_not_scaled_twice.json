@@ -1,0 +1,67 @@
+{
+  "id": "london_explicit_gbp_not_scaled_twice",
+  "kind": "valuation",
+  "facets": [
+    "publicable_contract",
+    "unit"
+  ],
+  "company": {
+    "ticker": "GBP.L",
+    "name": "Explicit GBP Matrix",
+    "exchange": "LSE",
+    "currency": "GBP"
+  },
+  "facts": [
+    {
+      "metric": "revenue",
+      "value": "300000000",
+      "unit": "GBP",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "free_cash_flow",
+      "value": "45000000",
+      "unit": "GBP",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "shares_diluted",
+      "value": "30000000",
+      "unit": "shares",
+      "period": "2025-12-31:FY"
+    },
+    {
+      "metric": "net_debt",
+      "value": "0",
+      "unit": "GBP",
+      "period": "2025-12-31:FY"
+    }
+  ],
+  "price": {
+    "date": "2026-10-23",
+    "close": "42.55",
+    "quote_currency": "GBP"
+  },
+  "fx_rates": [],
+  "expected": {
+    "status": "ok",
+    "publishable": true,
+    "missing_inputs": [],
+    "value_currency": "GBP",
+    "currency_status": "same",
+    "adr_ratio": null,
+    "current_price": 42.55,
+    "base_value": 22.5,
+    "expected_value": 22.5,
+    "margin_of_safety": -0.8911111111111111,
+    "listed_base_value": null,
+    "price_status": "ok",
+    "memo_contains": [
+      "Precio del modelo al 2026-10-23: 42,55 GBP"
+    ],
+    "memo_forbidden": [
+      "0,43 GBP",
+      "4.255"
+    ]
+  }
+}
