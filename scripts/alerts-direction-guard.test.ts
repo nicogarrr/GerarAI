@@ -33,7 +33,7 @@ describe('alta de alerta: dirección coherente con el tipo', () => {
     });
 
     it('el alta deriva el operador del tipo (red de seguridad)', () => {
-        const submit = alerts.indexOf('await createAlert({');
+        const submit = alerts.indexOf('await createAlertResult({');
         assert.ok(submit !== -1);
         const block = alerts.slice(submit, submit + 1500);
         assert.match(block, /operator:/);
