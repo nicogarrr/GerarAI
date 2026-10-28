@@ -542,3 +542,19 @@ def test_tracked_symbols_dedups(db):
     assert list(tracked) == ["ASTS"]
     assert tracked["ASTS"].sources == ["watchlist", "portfolio"]
     assert tracked["ASTS"].company is not None
+
+
+def test_selected_symbols_only_fetch_selected_without_deleting_others(db):
+    _company(db, 'MANUALA'); _watch(db, 'MANUALA')
+    _company(db, 'MANUALB'); _watch(db, 'MANUALB')
+    fetcher = FakeFetcher()
+    fetcher.set('MANUALA', series(55)); fetcher.set('MANUALB', series(55))
+    evaluate_watchlist(db, fetcher=fetcher, now=NOW, today=NOW.date(), params=PARAMS, symbols={'MANUALA'})
+    assert fetcher.calls == ['MANUALA']
+    assert db.scalar(select(DcaSignalState).where(DcaSignalState.symbol == 'MANUALB')) is None
+    from app.services.dca_manual import pending_symbols
+    from app.services.dca_signal_engine import DEFAULT_PARAMS
+    state = _state(db, 'MANUALA'); state.params_version = DEFAULT_PARAMS.version
+    db.commit()
+    assert pending_symbols(db, now=NOW) == ['MANUALB']
+    assert set(pending_symbols(db, now=NOW + timedelta(hours=25))) == {'MANUALA', 'MANUALB'}

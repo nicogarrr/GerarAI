@@ -57,7 +57,12 @@ def test_actor_evaluates_even_with_alerts_disabled(monkeypatch):
 
     calls: list[str] = []
 
+    monkeypatch.setattr("app.services.plan_proactivity.review_savings_plan", lambda db: {"plan_exists": False, "new_in_app_alerts": 0})
+
     class FakeDb:
+        info = {}
+        def commit(self):
+            pass
         def close(self):
             calls.append("close")
 
@@ -82,7 +87,12 @@ def test_actor_evaluates_even_with_alerts_disabled(monkeypatch):
 def test_actor_takes_lease_and_runs_service(monkeypatch):
     calls: list[str] = []
 
+    monkeypatch.setattr("app.services.plan_proactivity.review_savings_plan", lambda db: {"plan_exists": False, "new_in_app_alerts": 0})
+
     class FakeDb:
+        info = {}
+        def commit(self):
+            pass
         def close(self):
             calls.append("close")
 
@@ -99,7 +109,12 @@ def test_actor_takes_lease_and_runs_service(monkeypatch):
 
 
 def test_actor_lease_held(monkeypatch):
+    monkeypatch.setattr("app.services.plan_proactivity.review_savings_plan", lambda db: {"plan_exists": False, "new_in_app_alerts": 0})
+
     class FakeDb:
+        info = {}
+        def commit(self):
+            pass
         def close(self):
             pass
 

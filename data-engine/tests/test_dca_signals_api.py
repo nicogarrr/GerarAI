@@ -27,11 +27,37 @@ def _cleanup() -> None:
         db.commit()
 
 
+class _RedisGate:
+    """Contract double for endpoint tests; real Redis Lua is checked separately."""
+    def __init__(self):
+        self.data = {}
+    def set(self, key, value, **kw):
+        self.data[key] = value.encode() if isinstance(value, str) else value
+    def get(self, key):
+        return self.data.get(key)
+    def delete(self, key):
+        self.data.pop(key, None)
+    def close(self):
+        pass
+    def eval(self, script, count, *args):
+        if count == 2:
+            lock, cooldown, token, *_ = args
+            if lock in self.data: return -1
+            if cooldown in self.data: return 300
+            self.set(lock, token); self.set(cooldown, token)
+            return 0
+        lock, token = args
+        if self.get(lock) == token.encode(): self.delete(lock)
+        return 1
+
+
 @pytest.fixture
 def client(monkeypatch):
     init_db()
     _cleanup()
-    watchlist_routes._dca_last_manual_run.clear()
+    import redis
+    store = _RedisGate()
+    monkeypatch.setattr(redis.Redis, 'from_url', lambda *a, **kw: store)
     today = date.today()
     rows: list[PriceRow] = []
     y, m = today.year, today.month
@@ -175,3 +201,31 @@ def test_staleness_helper_uses_configured_limit():
     assert watchlist_routes._dca_staleness(None, today) == (None, False)
     assert watchlist_routes._dca_staleness(date(2026, 10, 13), today) == (14, False)
     assert watchlist_routes._dca_staleness(date(2026, 10, 12), today) == (15, True)
+
+
+def test_manual_uses_shared_lease_and_fails_closed_on_redis_outage(client, monkeypatch):
+    import redis
+    store = redis.Redis.from_url('redis://127.0.0.1:6397/15')
+    store.set('cavaai:job-lease:evaluate_dca_signals:legacy', 'scheduler', ex=60)
+    response = client.post('/api/watchlist/dca-signals/evaluate')
+    assert response.status_code == 409
+    assert store.get('cavaai:job-lease:evaluate_dca_signals:legacy') == b'scheduler'
+    store.delete('cavaai:job-lease:evaluate_dca_signals:legacy')
+    store.close()
+    monkeypatch.setattr('app.services.dca_manual.acquire_manual_gate',
+        lambda *a: (_ for _ in ()).throw(redis.ConnectionError('test')))
+    assert client.post('/api/watchlist/dca-signals/evaluate').status_code == 503
+
+
+def test_manual_limits_batch_and_reports_remaining(client, monkeypatch):
+    monkeypatch.setattr('app.services.dca_manual.pending_symbols', lambda db: [f'T{i}' for i in range(23)])
+    seen = []
+    def evaluate(db, *, symbols=None):
+        seen.append(symbols)
+        return {'tracked': 23, 'evaluated': len(symbols), 'alerted': [], 'skipped': [],
+            'errors': [], 'alerts_enabled': False, 'params_version': 'test'}
+    monkeypatch.setattr('app.services.dca_signal_service.evaluate_watchlist', evaluate)
+    result = client.post('/api/watchlist/dca-signals/evaluate').json()
+    assert len(seen[0]) == result['requested'] == 10
+    assert result['pending_remaining'] == 13
+    assert result['cooldown_seconds'] == 300

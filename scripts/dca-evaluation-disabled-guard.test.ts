@@ -20,6 +20,6 @@ describe('panel DCA con la evaluación diaria apagada', () => {
     });
     it('explica el motivo y el siguiente paso en español', () => {
         assert.match(panel, /evaluación diaria automática está desactivada en el servidor/);
-        assert.match(panel, /Pulsa «Evaluar ahora»/);
+        assert.match(panel, /Pulsa «Ejecutar pendientes ahora»/);
     });
 });

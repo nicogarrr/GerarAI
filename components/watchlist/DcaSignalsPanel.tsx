@@ -45,8 +45,8 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
             {data.evaluation_enabled === false && data.items.length > 0 ? (
                 <p className="rounded-md border border-amber-800/60 bg-amber-950/30 px-3 py-2 text-sm text-amber-200" data-testid="dca-evaluation-disabled" role="status">
                     {data.items.some((item) => item.state)
-                        ? 'La evaluación diaria automática está desactivada en el servidor: los niveles no se actualizan solos. Pulsa «Evaluar ahora» para recalcularlos.'
-                        : 'Todavía no hay niveles porque la evaluación diaria automática está desactivada en el servidor. Pulsa «Evaluar ahora» para calcularlos con los cierres de hoy.'}
+                        ? 'La evaluación diaria automática está desactivada en el servidor: los niveles no se actualizan solos. Pulsa «Ejecutar pendientes ahora» para recalcularlos.'
+                        : 'Todavía no hay niveles porque la evaluación diaria automática está desactivada en el servidor. Pulsa «Ejecutar pendientes ahora» para calcularlos con los cierres de hoy.'}
                 </p>
             ) : null}
             <ul aria-label="Leyenda de zonas DCA" className="flex flex-wrap gap-2 text-[11px]">

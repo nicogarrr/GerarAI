@@ -360,8 +360,6 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
 
 # --- Senales DCA por niveles (watchlist + cartera) -------------------------
 
-_DCA_EVALUATE_COOLDOWN_SECONDS = 60
-_dca_last_manual_run: dict[object, float] = {}
 
 
 class DcaZoneOut(BaseModel):
@@ -543,6 +541,9 @@ class DcaEvaluateOut(BaseModel):
     errors: list[dict]
     alerts_enabled: bool
     params_version: str
+    requested: int = 0
+    pending_remaining: int = 0
+    cooldown_seconds: int = 300
 
 
 def _dca_staleness(signal_date: date | None, today: date | None = None) -> tuple[int | None, bool]:
@@ -669,37 +670,53 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
 
 @router.post("/dca-signals/evaluate", response_model=DcaEvaluateOut)
 async def evaluate_dca_signals_now(db: Session = Depends(get_db)) -> dict:
-    """Evalua ahora watchlist + cartera (una vez por minuto como maximo)."""
-    import time
-
+    """Refresh at most ten missing/stale states, shared lease and 5min cooldown."""
     from fastapi.concurrency import run_in_threadpool
-
+    import redis
+    from app.core.config import get_settings
+    from app.core.redis_retry import no_retry
+    from app.services import dca_manual, dca_run_log
     from app.services.dca_signal_service import evaluate_watchlist
 
-    tenant = db.info.get("tenant_id") or "legacy"
-    now = time.monotonic()
-    last = _dca_last_manual_run.get(tenant)
-    if last is not None and now - last < _DCA_EVALUATE_COOLDOWN_SECONDS:
-        wait = int(_DCA_EVALUATE_COOLDOWN_SECONDS - (now - last)) + 1
-        raise HTTPException(
-            status_code=429,
-            detail=f"Ya se evaluó hace un momento; vuelve a intentarlo en {wait} s",
-            headers={"Retry-After": str(wait)},
-        )
-    _dca_last_manual_run[tenant] = now
+    tenant = str(db.info.get("tenant_id") or "legacy")
 
     def _evaluate() -> dict:
-        from app.services import dca_run_log
-
-        run = dca_run_log.start_run(db, "manual")
+        client = redis.Redis.from_url(get_settings().redis_url,
+            socket_connect_timeout=1, socket_timeout=2, retry=no_retry())
+        token = None
         try:
-            summary = evaluate_watchlist(db)
-        except Exception as exc:
-            db.rollback()
-            dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
-            raise
-        dca_run_log.finish_run(db, run, summary=summary)
-        return summary
+            try:
+                token, wait = dca_manual.acquire_manual_gate(client, tenant)
+            except redis.RedisError as exc:
+                raise HTTPException(status_code=503, detail="No se puede asegurar una ejecución única ahora; reintenta más tarde.") from exc
+            if token is None:
+                if wait == -1:
+                    raise HTTPException(status_code=409, detail="Ya hay una evaluación DCA en curso en tu cuenta.")
+                raise HTTPException(status_code=429,
+                    detail=f"Espera {wait} s antes de ejecutar otra tanda.",
+                    headers={"Retry-After": str(wait)})
+            pending = dca_manual.pending_symbols(db)
+            requested = pending[:dca_manual.MAX_SYMBOLS]
+            run = dca_run_log.start_run(db, "manual")
+            try:
+                summary = evaluate_watchlist(db, symbols=set(requested))
+                summary.update(requested=len(requested), pending_remaining=max(0, len(pending) - len(requested)),
+                    cooldown_seconds=dca_manual.COOLDOWN_SECONDS)
+                dca_run_log.finish_run(db, run, summary=summary)
+                if run is not None:
+                    run.detail = {**(run.detail or {}), "requested_symbols": requested}
+                    db.commit()
+                return summary
+            except Exception as exc:
+                db.rollback()
+                dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
+                raise
+        finally:
+            try:
+                if token is not None:
+                    dca_manual.release_manual_gate(client, tenant, token)
+            finally:
+                client.close()
 
     return await run_in_threadpool(_evaluate)
 
