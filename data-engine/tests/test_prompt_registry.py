@@ -166,3 +166,14 @@ def test_bottleneck_discovery_prompt_version_hash_and_closed_lists_are_pinned():
     # divergirian (cambiar EXPOSURES/CHANNELS exige subir la version).
     assert "exposicion (una de: " + ", ".join(service.EXPOSURES) + ")" in resolved.text
     assert "canal (uno de: " + ", ".join(service.CHANNELS) + ")" in resolved.text
+
+
+def test_jev_fallback_prompt_version_and_hash_are_pinned():
+    resolved = prompt_registry.get_prompt("jev_fallback", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "jev-fallback-v1",
+        "88d9371956c6",
+        "jev_fallback",
+    )
+    assert resolved.source == "code"
+    assert resolved.text == prompt_registry.JEV_FALLBACK

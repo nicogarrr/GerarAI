@@ -221,6 +221,11 @@ BOTTLENECK_DISCOVERY = (
 )
 
 
+JEV_FALLBACK = (
+    "Clasifica, no verifiques hechos. Devuelve solo JSON según el esquema."
+)
+
+
 @dataclass(frozen=True)
 class PromptDef:
     """Definicion de codigo: nombre, version humana, tarea y texto."""
@@ -347,6 +352,13 @@ PROMPTS: dict[str, PromptDef] = {
             task="bottleneck_discovery",
             text=BOTTLENECK_DISCOVERY,
             schema_name="bottleneck_discovery",
+        ),
+        PromptDef(
+            name="jev_fallback",
+            version="jev-fallback-v1",
+            task="jev_fallback",
+            text=JEV_FALLBACK,
+            schema_name="jev_fallback",
         ),
     ]
 }
