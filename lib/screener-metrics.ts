@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097: extensión explícita requerida por los guards node strip-types.
+import { parseLocalizedNumberDetailed } from './format.ts';
+
 /** Unidad en la que el backend guarda la métrica y cómo la escribe una persona. */
 export type MetricUnit = { suffix: string; factor: number; step: string };
 
@@ -66,8 +69,6 @@ export function buildMetricOptions(
   }
   return out;
 }
-
-import { parseLocalizedNumberDetailed } from '@/lib/format';
 
 /** Valor que se manda al backend a partir de lo que ve la persona (15 % -> 0.15). */
 export function toBackendValue(shown: string, unit: UnitKind): string {
