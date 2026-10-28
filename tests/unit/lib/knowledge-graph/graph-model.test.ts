@@ -255,3 +255,15 @@ describe('searchNodes', () => {
         expect(searchNodes(scene, 'zzz')).toEqual([]);
     });
 });
+
+describe('SVG con etiquetas completas', () => {
+    it('incluye etiquetas largas en su viewBox sin truncarlas', () => {
+        const label = 'W'.repeat(120);
+        const svg = serializeSvg(buildScene(graph([node(1, {label})], [])));
+        const [, , , width, height] = svg.match(/viewBox="([^ ]+) ([^ ]+) ([^ ]+) ([^"]+)"/)!.map(Number);
+        expect(width).toBeGreaterThanOrEqual(label.length * 12);
+        expect(height).toBeGreaterThan(24);
+        expect(svg).toContain(label);
+        expect(svg).toContain('font-family="sans-serif"');
+    });
+});
