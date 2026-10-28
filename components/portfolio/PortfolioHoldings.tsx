@@ -232,12 +232,13 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       </Button>
                     </div>
                     <TrackedAnalysisStatus analysis={holding.analysis} />
+                    {holding.costReviewMessage ? <p role="status" className="mt-2 text-sm text-amber-300">{holding.costReviewMessage}</p> : null}
                     <dl className="mt-3 space-y-1.5 text-sm">
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Promedio</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Actual</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? 'N/D' : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
                       <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold) : holding.fxMissing ? 'Conversión o coste no disponible' : format(holding.value, holding.baseCurrency)}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold) : holding.costReviewMessage ? (holding.valueMissing ? NA : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? 'Conversión o coste no disponible' : format(holding.value, holding.baseCurrency)}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Peso</dt><dd className="font-semibold text-gray-100">{weight(holding.symbol)}</dd></div>
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">G/P</dt>
@@ -350,13 +351,14 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       </TableCell>
                       <TableCell className="text-right text-gray-300">
                         {holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}
+                        {holding.costReviewMessage ? <p role="status" className="mt-1 max-w-64 text-xs text-amber-300">{holding.costReviewMessage}</p> : null}
                       </TableCell>
                       <TableCell className="text-right text-gray-300 font-medium">
                         {holding.currentPrice === null ? 'N/D' : format(holding.currentPrice, holding.nativeCurrency)}
                         <ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} />
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-100">
-                        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold)}</Badge> : holding.fxMissing ? <Badge variant="outline">Conversión o coste no disponible</Badge> : format(holding.value, holding.baseCurrency)}
+                        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold)}</Badge> : holding.costReviewMessage ? (holding.valueMissing ? NA : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? <Badge variant="outline">Conversión o coste no disponible</Badge> : format(holding.value, holding.baseCurrency)}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-100">{weight(holding.symbol)}</TableCell>
                       <TableCell className="text-right">

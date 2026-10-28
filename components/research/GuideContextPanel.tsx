@@ -12,7 +12,7 @@ import { formatUserDateTime } from '@/lib/format';
  * noticias atribuidas se listan con su fecha y su provenance. Antes vivía en
  * el lateral de /research/assistant; la página se unificó en el Cerebro.
  */
-export function GuideContextPanel({ ticker, context }: { ticker: string; context: GuideContext | null }) {
+export function GuideContextPanel({ ticker, context, hideReviews = false }: { ticker: string; context: GuideContext | null; hideReviews?: boolean }) {
     function askWithReview(reviewId: number) {
         window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker, review_id: reviewId } }));
     }
@@ -26,7 +26,7 @@ export function GuideContextPanel({ ticker, context }: { ticker: string; context
     return (
         <Panel title="Guía de investigación">
             <div className="space-y-5 text-sm">
-                <div>
+                {hideReviews ? null : <div>
                     <h3 className="font-semibold text-gray-200">Revisiones abiertas</h3>
                     {context.open_reviews.length ? (
                         <ul className="mt-2 space-y-2">
@@ -46,7 +46,7 @@ export function GuideContextPanel({ ticker, context }: { ticker: string; context
                     ) : (
                         <p className="mt-2 text-gray-500">Sin revisiones abiertas.</p>
                     )}
-                </div>
+                </div>}
                 <div>
                     <h3 className="font-semibold text-gray-200">Últimas noticias atribuidas</h3>
                     {context.latest_news.length ? (

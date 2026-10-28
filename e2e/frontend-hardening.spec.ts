@@ -23,7 +23,7 @@ test.describe("hardening frontend estático", () => {
 
   test("el sidebar y el drawer comparten breakpoint de navegación", () => {
     const sidebar = source("components", "layout", "Sidebar.tsx");
-    const mobileNav = source("components", "MobileNav.tsx");
+    const mobileNav = source("components", "MobileNav.tsx") + source("components", "MobileNavDrawer.tsx");
 
     // Entre 640px y 767px no puede existir una ventana sin navegación.
     expect(sidebar).toContain("md:flex");
@@ -55,9 +55,9 @@ test.describe("hardening frontend estático", () => {
   });
 
   test("los controles iconográficos y el fallo de búsqueda tienen semántica", () => {
-    const mobileNav = source("components", "MobileNav.tsx");
-    const searchCommand = source("components", "SearchCommand.tsx");
-    const portfolioChat = source("components", "brain", "GlobalBrain.tsx");
+    const mobileNav = source("components", "MobileNav.tsx") + source("components", "MobileNavDrawer.tsx");
+    const searchCommand = source("components", "SearchCommandDialog.tsx");
+    const portfolioChat = source("components", "brain", "GlobalBrain.tsx") + source("components", "brain", "GlobalBrainPanel.tsx");
 
     expect(mobileNav).toContain("closeButtonRef");
     expect(mobileNav).toContain("aria-labelledby=\"mobile-nav-title\"");

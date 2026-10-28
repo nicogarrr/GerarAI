@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sintetico y anonimo: cuenta U0000001 y emisores ficticios (ACME, BETA). Modelado sobre atributos Flex documentados, NO capturado de una cuenta real. -->
+<FlexQueryResponse queryName="synthetic" type="AF">
+<FlexStatements count="1">
+<FlexStatement accountId="U0000001" fromDate="20261027" toDate="20261027" period="LastBusinessDay" whenGenerated="20261027;190000">
+<Trades>
+<Trade accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" tradeID="T-1006" ibOrderID="O-5" tradeDate="20261027" buySell="BUY" quantity="10" tradePrice="11.20" ibCommission="-0.10" notes="O"/>
+<Trade accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" tradeID="T-1006C" ibOrderID="O-5" tradeDate="20261027" buySell="BUY (Ca.)" quantity="-10" tradePrice="11.20" ibCommission="0.10" notes="Ca"/>
+</Trades>
+<OpenPositions>
+<OpenPosition accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" position="40" markPrice="11.20" positionValue="448" costBasisPrice="10.01" fifoPnlUnrealized="47.60" reportDate="20261027"/>
+</OpenPositions>
+<CashReport>
+<CashReportCurrency accountId="U0000001" currency="USD" endingCash="9606.90" endingSettledCash="9606.90" reportDate="20261027"/>
+<CashReportCurrency accountId="U0000001" currency="EUR" endingCash="2017.00" endingSettledCash="2017.00" reportDate="20261027"/>
+</CashReport>
+</FlexStatement>
+</FlexStatements>
+</FlexQueryResponse>

@@ -1,8 +1,13 @@
 import { Card, CardContent } from '@/components/ui/card';
-import DcaEvaluateButton from '@/components/watchlist/DcaEvaluateButton';
-import DcaHitRatesPopover from '@/components/watchlist/DcaHitRatesPopover';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
-import DcaMinLevelSelect from '@/components/watchlist/DcaMinLevelSelect';
+// Las islas interactivas del panel (evaluar a mano, detalle de aciertos y
+// aviso mínimo por símbolo) cargan diferidas (ver LazyDcaControls) para que
+// no viajen en el JS inicial de /watchlist; el contenido del panel sigue SSR.
+import {
+    LazyDcaEvaluateButton as DcaEvaluateButton,
+    LazyDcaHitRatesPopover as DcaHitRatesPopover,
+    LazyDcaMinLevelSelect as DcaMinLevelSelect,
+} from '@/components/watchlist/LazyDcaControls';
 import { dcaRunSummary } from '@/lib/dca/format';
 import type { DcaSignalsResponse } from '@/lib/dca/types';
 

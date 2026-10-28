@@ -32,6 +32,14 @@ function holding(over: Record<string, unknown> = {}) {
 const desktop = () => within(screen.getByRole('table'));
 
 describe('PortfolioHoldings estados y numeros', () => {
+    it('IBKR en revisión muestra aviso, promedio N/D y conserva el valor', () => {
+        render(<PortfolioHoldings holdings={[holding({ avgPrice: 0, cost: 0, gain: 0, fxMissing: true, costReviewMessage: 'Coste pendiente de revisión: IBKR' })]} userId="u" />);
+        const row = desktop().getByText('AAPL').closest('tr')!;
+        expect(row.textContent).toContain('Coste pendiente de revisión');
+        expect(row.querySelectorAll('td')[2].textContent).toContain('N/D');
+        expect(row.querySelectorAll('td')[4].textContent).toMatch(/1\.?200/);
+        expect(screen.getAllByRole('status').length).toBe(2);
+    });
     beforeEach(() => vi.clearAllMocks());
 
     it('sin posiciones ni caja: mensaje vacio y boton de actualizar desactivado', () => {

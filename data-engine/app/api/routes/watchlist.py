@@ -896,3 +896,13 @@ def dca_backtest(
             "rows": [{**row, "color": colors.get(row.get("key"), "#94A3B8")} for row in hits.get("rows", [])],
         }
     return out
+
+
+@router.get("/attention-thesis")
+def home_attention_thesis(db: Session = Depends(get_db)) -> dict:
+    """Unresolved thesis changes for this tenant's watchlist and open holdings."""
+    from app.services.home_attention_service import pending_thesis_changes
+
+    # One extra row lets the UI state that this bounded inbox is truncated.
+    items = pending_thesis_changes(db, limit=100)
+    return {"items": items[:99], "truncated": len(items) > 99}

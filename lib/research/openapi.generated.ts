@@ -5386,6 +5386,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/watchlist/attention-thesis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Home Attention Thesis
+         * @description Unresolved thesis changes for this tenant's watchlist and open holdings.
+         */
+        get: operations["home_attention_thesis_api_watchlist_attention_thesis_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist/dca-signals": {
         parameters: {
             query?: never;
@@ -21828,7 +21848,10 @@ export interface operations {
     };
     regenerate_tax_report_api_taxes_report__fiscal_year__regenerate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                fx_opening_complete?: boolean;
+                fx_income_by_analogy?: boolean;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;
@@ -22945,6 +22968,46 @@ export interface operations {
         responses: {
             /** @description Successful Response */
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    home_attention_thesis_api_watchlist_attention_thesis_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

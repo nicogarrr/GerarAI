@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const addTransaction = vi.fn();
 const refresh = vi.fn();
@@ -27,9 +27,14 @@ async function flush(ms = 0) {
     });
 }
 
-function openDialog() {
+async function openDialog() {
     render(<AddTransactionButton userId="user-1" />);
     fireEvent.click(screen.getByRole('button', { name: /Añadir inversión/ }));
+    // El contenido del diálogo llega en chunk diferido (next/dynamic): se
+    // resuelve en microtareas, sin tocar los timers fake del debounce.
+    // La primera carga real del chunk puede tardar algo de tiempo real
+    // (transform del módulo en vitest); cada vuelta cede al event loop.
+    for (let i = 0; i < 50 && !screen.queryByRole('dialog'); i++) await flush(100);
     return screen.getByRole('dialog');
 }
 
@@ -43,6 +48,13 @@ async function pickTicker(dialog: HTMLElement, query: string, symbol: string) {
 }
 
 describe('AddTransactionButton (Nueva Inversión)', () => {
+    beforeAll(async () => {
+        // Calienta el chunk diferido del diálogo (next/dynamic) en tiempo real,
+        // antes de que los tests activen los timers fake: la primera resolución
+        // del import dinámico tarda tiempo real (transform del módulo en vitest).
+        await import('@/components/portfolio/AddTransactionDialog');
+    });
+
     beforeEach(() => {
         vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
         addTransaction.mockReset().mockResolvedValue(undefined);
@@ -55,7 +67,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
     });
 
     it('ningún submit falla en silencio: sin símbolo y con cantidad 0 se explica cada campo y no se llama al backend', async () => {
-        const dialog = openDialog();
+        const dialog = await openDialog();
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '0' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '10' } });
         // submit directo: simula un navegador que no aplica `required`/`min`.
@@ -68,11 +80,11 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         expect(addTransaction).not.toHaveBeenCalled();
     });
 
-    it('cantidad, precio y comisión aceptan coma decimal (teclado decimal, sin type=number)', () => {
+    it('cantidad, precio y comisión aceptan coma decimal (teclado decimal, sin type=number)', async () => {
         // Un input type=number rechaza la coma al teclear en es-ES: el campo
         // queda vacío y el placeholder («150,00») invitaba a usarla. Texto con
         // inputMode=decimal deja escribir «32,5» y parseLocalizedNumber lo lee.
-        const dialog = openDialog();
+        const dialog = await openDialog();
         for (const label of ['Cantidad', /^Precio/, /^Comisiones/]) {
             const input = within(dialog).getByLabelText(label);
             expect(input).toHaveAttribute('type', 'text');
@@ -80,11 +92,11 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         }
     });
 
-    it('el formulario no usa validación nativa (los errores salen en español bajo cada campo)', () => {
+    it('el formulario no usa validación nativa (los errores salen en español bajo cada campo)', async () => {
         // Sin noValidate, un required vacío abre la burbuja nativa del navegador
         // («Please fill out this field.») y los mensajes en español de
         // validateTransactionForm nunca llegan a pintarse.
-        const dialog = openDialog();
+        const dialog = await openDialog();
         expect(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')).toHaveAttribute('novalidate');
     });
 
@@ -93,7 +105,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
             status: 'ok',
             stocks: [{ symbol: 'SAN.MC', name: 'Banco Santander SA', exchange: 'BME', type: 'Common Stock', isInWatchlist: false }],
         });
-        const dialog = openDialog();
+        const dialog = await openDialog();
         await pickTicker(dialog, 'santander', 'SAN.MC');
         expect(within(dialog).getByText('Precio (EUR)')).toBeInTheDocument();
 
@@ -125,7 +137,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
             status: 'ok',
             stocks: [{ symbol: 'SAN.MC', name: 'Banco Santander SA', exchange: 'BME', type: 'Common Stock', isInWatchlist: false }],
         });
-        const dialog = openDialog();
+        const dialog = await openDialog();
         await pickTicker(dialog, 'santander', 'SAN.MC');
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
@@ -150,7 +162,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
             status: 'ok',
             stocks: [{ symbol: 'SAN.MC', name: 'Banco Santander SA', exchange: 'BME', type: 'Common Stock', isInWatchlist: false }],
         });
-        const dialog = openDialog();
+        const dialog = await openDialog();
         await pickTicker(dialog, 'santander', 'SAN.MC');
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
@@ -165,7 +177,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
             status: 'ok',
             stocks: [{ symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ', type: 'Common Stock', isInWatchlist: false }],
         });
-        const dialog = openDialog();
+        const dialog = await openDialog();
         await pickTicker(dialog, 'AAPL', 'AAPL');
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '1' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '200' } });
@@ -182,7 +194,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
             status: 'ok',
             stocks: [{ symbol: 'AAPL', name: 'Apple Inc', exchange: 'NASDAQ', type: 'Common Stock', isInWatchlist: false }],
         });
-        const dialog = openDialog();
+        const dialog = await openDialog();
         await pickTicker(dialog, 'AAPL', 'AAPL');
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '3' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '150' } });

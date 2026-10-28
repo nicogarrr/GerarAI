@@ -1,13 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 
 const nav = vi.hoisted(() => ({ params: new URLSearchParams(), path: '/portfolio' }));
 vi.mock('next/navigation', () => ({
     useSearchParams: () => nav.params, usePathname: () => nav.path, useRouter: () => ({ refresh: vi.fn() }),
 }));
 vi.mock('next/dynamic', () => ({
-    default: () => (props: { data: unknown[]; positive: boolean; currency: string }) =>
-        <div data-testid="nav-chart" data-points={props.data.length} data-positive={String(props.positive)} data-currency={props.currency} />,
+    // Respeta el loader: cada vista diferida renderiza su módulo (mockeado
+    // abajo) una vez resuelta la promesa. El gráfico NAV (ssr: false) sigue
+    // sustituido por un stub ligero con los props que asertan los tests.
+    default: (loader: () => Promise<{ default: any }>, opts?: { ssr?: boolean }) => {
+        if (opts?.ssr === false) {
+            const NavChartStub = (props: { data: unknown[]; positive: boolean; currency: string }) =>
+                <div data-testid="nav-chart" data-points={props.data.length} data-positive={String(props.positive)} data-currency={props.currency} />;
+            NavChartStub.displayName = "NavChartStub";
+            return NavChartStub;
+        }
+        let Comp: any = null;
+        void loader().then((mod) => { Comp = mod.default; });
+        return function LazyStub(props: Record<string, unknown>) {
+            return Comp ? <Comp {...props} /> : null;
+        };
+    },
 }));
 vi.mock('@/components/portfolio/PortfolioDataNotice', () => ({ default: () => null }));
 vi.mock('@/components/portfolio/PortfolioSummary', () => ({ default: () => <div>summary</div> }));
@@ -31,6 +45,9 @@ function renderTabs(over: Record<string, unknown> = {}) {
         forecast={null} dividends={null} userId="u" {...over as any} />);
 }
 const selected = () => screen.getAllByRole('tab').find((t) => t.getAttribute('aria-selected') === 'true')!.textContent;
+// Las vistas de pestaña no inicial cargan diferidas (next/dynamic): su mock se
+// resuelve en microtareas. Hay que ceder al event loop antes de asertarlas.
+const flushDynamic = () => act(async () => {});
 
 beforeEach(() => { nav.params = new URLSearchParams(); nav.path = '/portfolio'; vi.restoreAllMocks(); });
 
@@ -38,26 +55,28 @@ describe('PortfolioTabs pestana desde la URL', () => {
     it.each([
         ['', 'Resumen'], ['posiciones', 'Posiciones'], ['movimientos', 'Movimientos'], ['dividendos', 'Dividendos'],
         ['prevision', 'Previsión'], ['estrategia', 'Factores'], ['factores', 'Factores'], ['inventada', 'Resumen'],
-    ])('?tab=%s abre %s', (tab, label) => {
+    ])('?tab=%s abre %s', async (tab, label) => {
         if (tab) nav.params = new URLSearchParams({ tab });
         renderTabs();
+        await flushDynamic();
         expect(selected()).toBe(label);
     });
 
-    it('cambiar de pestana conserva los demas parametros en la URL', () => {
+    it('cambiar de pestana conserva los demas parametros en la URL', async () => {
         nav.params = new URLSearchParams('foo=bar&page=2');
         const spy = vi.spyOn(window.history, 'replaceState');
         renderTabs();
         fireEvent.mouseDown(screen.getByRole('tab', { name: 'Movimientos' }));
         expect(spy).toHaveBeenCalledWith(null, '', '/portfolio?foo=bar&page=2&tab=movimientos');
-        expect(screen.getByText('transactions-tab')).toBeInTheDocument();
+        expect(await screen.findByText('transactions-tab')).toBeInTheDocument();
     });
 
-    it('un cambio posterior del parametro de URL sincroniza la pestana', () => {
+    it('un cambio posterior del parametro de URL sincroniza la pestana', async () => {
         const { rerender } = renderTabs();
         expect(selected()).toBe('Resumen');
         nav.params = new URLSearchParams({ tab: 'posiciones' });
         rerender(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as any} tearsheet={null} forecast={null} dividends={null} userId="u" />);
+        await flushDynamic();
         expect(selected()).toBe('Posiciones');
     });
 });
@@ -73,14 +92,14 @@ describe('PortfolioTabs contenido', () => {
         expect(screen.getByRole('status')).toHaveTextContent('No se pudo cargar la proyección de dividendos');
     });
 
-    it('con datos pinta los paneles', () => {
+    it('con datos pinta los paneles', async () => {
         nav.params = new URLSearchParams({ tab: 'prevision' });
         const { unmount } = renderTabs({ forecast: {} });
-        expect(screen.getByText('forecast-tab')).toBeInTheDocument();
+        expect(await screen.findByText('forecast-tab')).toBeInTheDocument();
         unmount();
         nav.params = new URLSearchParams({ tab: 'dividendos' });
         renderTabs({ dividends: {} });
-        expect(screen.getByText('dividends-tab')).toBeInTheDocument();
+        expect(await screen.findByText('dividends-tab')).toBeInTheDocument();
     });
 
     it('mensaje de cartera parcial solo si lo hay', () => {
@@ -137,5 +156,27 @@ describe('PortfolioTabs contenido', () => {
     it('serie con fechas pero sin nav no dibuja', () => {
         renderTabs({ scores: { history: { dates: ['2026-01-01'], nav: [] } } });
         expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
+    });
+});
+
+
+describe('Cartera: jerarquía y periodos honestos', () => {
+    it('ordena las pestañas por uso, sin perder ninguna', () => {
+        renderTabs();
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Resumen', 'Posiciones', 'Movimientos', 'Dividendos', 'Previsión', 'Factores']);
+    });
+    it.each([undefined, { dates: ['2026-01-01'], nav: [100] }, { dates: ['2026-01-01', '2026-01-02'], nav: [null, null] }])('sin dos valoraciones no ofrece rangos ni gráfico', history => {
+        renderTabs({ scores: { history } });
+        expect(screen.queryByRole('group', { name: 'Periodo del gráfico de valor' })).not.toBeInTheDocument();
+        expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
+        expect(screen.getByText('G/P desde compra:')).toBeInTheDocument();
+    });
+    it('una ventana sin dos puntos se desactiva, Todo sigue accesible y G/P no cambia de significado', () => {
+        renderTabs({ scores: { history: { dates: ['2025-01-01', '2026-01-02'], nav: [100, 120] } } });
+        expect(screen.getByRole('button', { name: '1M' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Todo' })).toBeEnabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Todo' }));
+        expect(screen.getByTestId('nav-chart')).toHaveAttribute('data-points', '2');
+        expect(screen.getByText('G/P desde compra:').closest('p')).toHaveTextContent(/25,00/);
     });
 });

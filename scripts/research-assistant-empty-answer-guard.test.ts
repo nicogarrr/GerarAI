@@ -36,8 +36,8 @@ describe('asistente: respuesta vacía explicada, no tapada con «Sin datos»', (
   });
 
   it('insufficient_data explica la ausencia y remite a los datos que faltan', () => {
-    assert.match(src, /la evidencia disponible no permite una confirmada/);
-    assert.match(src, /Lo que falta está enumerado en «Datos que faltan»/);
+    assert.match(src, /la evidencia disponible no permite confirmar una conclusión/);
+    assert.match(src, /Revisa «Datos que faltan»/);
   });
 
   it('answered con texto vacío lo dice como lo que es: una respuesta en blanco', () => {

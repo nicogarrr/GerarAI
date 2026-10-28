@@ -27,7 +27,7 @@ test('la búsqueda anota cobertura en ambos caminos (remoto y fallback local)', 
 });
 
 test('la paleta comunica «no comprobada» sin atribuir plan/bolsa y sin filtrar', () => {
-    const src = readFileSync('components/SearchCommand.tsx', 'utf8');
+    const src = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
     assert.ok(src.includes("fichaCoverage === 'unknown'"), 'la paleta muestra el aviso');
     assert.ok(src.includes('Cobertura de ficha no comprobada'), 'copy sin atribución de causa');
     // gray-600 está prohibido como texto en globals.css (1.7:1, regla #2078).

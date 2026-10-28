@@ -39,7 +39,7 @@ test('reviewed snapshot only contains explicit CNMV .MC aliases', () => {
 });
 
 test('modal handles rejection, deadline, stale query and close', () => {
-    const modal = readFileSync('components/watchlist/WatchlistAddButton.tsx', 'utf8');
+    const modal = readFileSync('components/watchlist/WatchlistAddDialog.tsx', 'utf8');
     assert.ok(modal.includes('TickerSearchInput'));
     const shared = readFileSync('components/search/TickerSearchInput.tsx', 'utf8');
     assert.match(shared, /withFetchDeadline\(\(\) => searchStocksWithStatus\(query\), 6000\)/);

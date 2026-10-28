@@ -28,8 +28,11 @@ function headerChangeMoney(value: number, currency: string): string {
 export function CompanyHeaderQuote({
     snapshot,
     initialQuote,
+    compact = false,
 }: {
     snapshot: CompanyMarketSnapshot;
+    /** Vistas secundarias: solo precio y variación; la franja OHLC y el gráfico viven en Resumen. */
+    compact?: boolean;
     /** Lectura de cotizacion lanzada en servidor al conocer el listado (nunca rechaza: null = fallo). */
     initialQuote?: Promise<ExtendedQuote | null>;
 }) {
@@ -141,7 +144,7 @@ export function CompanyHeaderQuote({
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
             <div>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? 'Último cierre del gráfico' : 'Última vela del gráfico (puede ser parcial)'} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
-                <div className="text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl" aria-busy={loading || undefined}>
+                <div className={compact ? 'text-3xl font-semibold tracking-tight text-gray-100' : 'text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl'} aria-busy={loading || undefined}>
                     {showPrice ? headerMoney(quote!.price, currency) : useFallback ? headerMoney(fallbackPrice, fallbackCurrency!) : loading ? (
                         <>
                             <span className="sr-only">Cargando precio…</span>
@@ -182,7 +185,7 @@ export function CompanyHeaderQuote({
                     </div>
                 </details>
             </div>
-            <div className="min-w-0 max-w-full">
+            {compact ? null : <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
                     {(useFallback ? [
                         ['Apertura', last?.open ?? null],
@@ -203,8 +206,8 @@ export function CompanyHeaderQuote({
                         </div>
                     ))}
                 </dl>
-            </div>
-            <CompanyTechnicalWorkspace snapshot={snapshot} />
+            </div>}
+            {compact ? null : <CompanyTechnicalWorkspace snapshot={snapshot} />}
         </div>
     );
 }
