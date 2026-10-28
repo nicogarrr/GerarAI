@@ -1,6 +1,6 @@
 # Memo de tesis — PDFT (PDF Matrix)
 
-Versión 1 · estado borrador · generada 2026-10-23 12:00 UTC · actualizada 2026-10-23 12:00 UTC
+Versión 1 · estado borrador · generada 23 oct 2026, 12:00 UTC · actualizada 23 oct 2026, 12:00 UTC
 
 > BORRADOR sin publicar. No incluye veredicto, hipótesis, resumen, valoración ni secciones de la tesis.
 
