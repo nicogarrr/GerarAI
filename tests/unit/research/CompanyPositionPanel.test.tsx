@@ -55,6 +55,18 @@ describe('Company position panel with the same figures as the portfolio', () => 
         expect(screen.queryByText(/falta el precio o el tipo de cambio/)).not.toBeInTheDocument();
         expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
     });
+    it('keeps a known native average cost when only the historical FX of the base cost is missing', () => {
+        // Ledger con una compra sin cambio BCE de su fecha: cost_basis_base null
+        // (cost 0 en la acción) pero precio medio nativo y valor actual conocidos.
+        render(<CompanyPositionPanel context={held({ avgPrice: 100, cost: 0, gain: 0, nativeCost: 1000,
+            nativeGain: 500, costReviewMessage: null, fxMissing: true, valueMissing: false })} />);
+        expect(value('Coste medio')).toHaveTextContent('$100.00');
+        expect(value('Valor')).toHaveTextContent('1.350,00 €');
+        expect(value('Plusvalía latente')).toHaveTextContent('N/D');
+        expect(value('Plusvalía latente')).toHaveTextContent('$500.00 en USD');
+        expect(screen.getByRole('status')).toHaveTextContent('Sin coste en EUR: falta el tipo de cambio de alguna compra.');
+        expect(screen.queryByText(/Coste de adquisición desconocido/)).not.toBeInTheDocument();
+    });
     it('renders nothing without a position and an explicit message when loading failed', () => {
         const { container, unmount } = render(<CompanyPositionPanel context={{ status: 'not_held' }} />);
         expect(container).toBeEmptyDOMElement();
