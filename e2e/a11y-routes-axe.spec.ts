@@ -20,6 +20,8 @@ import { seedMarketPrices } from "./fixtures/market-prices";
 // - /watchlist movil: <div> suelto dentro del grupo dt/dd de la ficha (definition-list);
 // - /screener: enlace «Crea el primero» solo distinguible por color (link-in-text-block);
 // - /temas: etiqueta «Caliente» blanco sobre red-500, 3,76:1 (color-contrast).
+// - /portfolio y /taxes: h1 -> h3 sin h2 (heading-order, moderada; visto con
+//   Lighthouse). En esas dos pantallas el presupuesto incluye esa regla.
 test.skip(!process.env.E2E_UI_RUN || !process.env.E2E_A11Y_RUN, "Set E2E_UI_RUN=1 E2E_A11Y_RUN=1 to run the a11y sweep.");
 test.describe.configure({ mode: "serial" });
 
@@ -111,15 +113,24 @@ const VIEWPORTS = [
   { name: "escritorio", width: 1366, height: 768 },
   { name: "movil-375", width: 375, height: 812 },
 ];
+// Reglas de impacto moderado ya arregladas por pantalla: presupuesto 0 también.
+const EXTRA_RULES: Record<string, string[]> = {
+  "/portfolio": ["heading-order"],
+  "/taxes": ["heading-order"],
+};
 const HYDRATION = /hydrat|did not match|server rendered (html|text)|text content does not match/i;
 
-async function serious(page: Page) {
+async function serious(page: Page, extraRules: string[] = []) {
   // El overlay de dev de Next no es parte de la app.
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
   const result = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
-  return result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  const found = result.violations.filter((v) => v.impact === "serious" || v.impact === "critical");
+  if (extraRules.length === 0) return found;
+  // heading-order es «best-practice» en axe: se pide por regla, solo aquí.
+  const extra = await new AxeBuilder({ page }).withRules(extraRules).analyze();
+  return [...found, ...extra.violations];
 }
 
 for (const vp of VIEWPORTS) {
@@ -138,7 +149,7 @@ for (const vp of VIEWPORTS) {
       expect(response?.status(), `${path} respondio ${response?.status()}`).toBeLessThan(400);
       await page.waitForLoadState("networkidle").catch(() => undefined);
       await expect(page.locator("main#content")).toBeVisible();
-      const violations = await serious(page);
+      const violations = await serious(page, EXTRA_RULES[path]);
       const report = violations
         .map((v) => `${v.id} (${v.impact}): ${v.help}\n  ${v.nodes.slice(0, 5).map((n) => `${n.target.join(" ")} ${n.html.slice(0, 160)}`).join("\n  ")}`)
         .join("\n");
