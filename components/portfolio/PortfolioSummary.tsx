@@ -28,12 +28,12 @@ export default function PortfolioSummary({ summary }: Props) {
     <div className="space-y-3">
       {summary.valuationHold.length > 0 ? (
         <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-sm text-amber-200">
-          {t('portfolio.valuationHoldNotice', { n: summary.valuationHold.length, tickers: summary.valuationHold.map((h) => h.ticker).join(', ') })}
+          {t(summary.valuationHold.length === 1 ? 'portfolio.valuationHoldNotice.one' : 'portfolio.valuationHoldNotice.other', { n: summary.valuationHold.length, tickers: summary.valuationHold.map((h) => h.ticker).join(', ') })}
         </div>
       ) : null}
       {summary.status === 'incomplete_fx' ? (
         <div className="rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-sm text-amber-200">
-          {t('portfolio.fxMissingNotice', { n: summary.missingFx.length })}
+          {t(summary.missingFx.length === 1 ? 'portfolio.fxMissingNotice.one' : 'portfolio.fxMissingNotice.other', { n: summary.missingFx.length })}
         </div>
       ) : null}
       {/* F290: columnas por ANCHO DE CONTENIDO, no de viewport. Con sidebar
