@@ -59,6 +59,7 @@ class DeepValueRow:
     yield_status: str | None
     desacuerdo_fuentes: bool
     yield_extremo_revisar: bool
+    finnhub_yield_indicated: Decimal | None = None
     fuentes: list[str] = field(default_factory=list)
     metric_as_of: str | None = None
 
@@ -143,6 +144,11 @@ def find_deep_value(
                 yield_status=yield_row.status if yield_row is not None else None,
                 desacuerdo_fuentes=bool(y_trace.get("desacuerdo_fuentes", False)),
                 yield_extremo_revisar=bool(y_trace.get("yield_extremo_revisar", False)),
+                finnhub_yield_indicated=(
+                    Decimal(y_trace["finnhub_yield_indicated"])
+                    if y_trace.get("finnhub_yield_indicated") is not None
+                    else None
+                ),
                 fuentes=[YAHOO_LABEL, FINNHUB_LABEL]
                 + ([pb_trace["equity_source"]] if pb_trace.get("equity_source") else []),
                 metric_as_of=pb_row.period,

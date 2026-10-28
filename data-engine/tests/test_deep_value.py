@@ -96,6 +96,7 @@ def test_desacuerdo_y_extremo_se_propagan():
     assert row.desacuerdo_fuentes is True
     assert row.yield_extremo_revisar is True
     assert row.yield_status == STATUS_DISAGREE
+    assert row.finnhub_yield_indicated == Decimal("0.20")  # la otra cifra, visible
     assert any("no oficial" in f for f in row.fuentes)
     assert "SEC" in row.fuentes
 
@@ -136,7 +137,7 @@ def _db_mt():
 def test_endpoint_contrato_y_rotulo():
     db = _db_mt()
     _seed(db, "EP", pb="0.7", yld="0.08", yield_status=STATUS_DISAGREE,
-          y_trace={"desacuerdo_fuentes": True})
+          y_trace={"desacuerdo_fuentes": True, "finnhub_yield_indicated": "0.20"})
 
     app = FastAPI()
     app.include_router(propicks_route.router, prefix="/api/propicks")
@@ -154,6 +155,7 @@ def test_endpoint_contrato_y_rotulo():
     assert row["dividend_yield"] == 0.08
     assert row["desacuerdo_fuentes"] is True
     assert row["yield_status"] == STATUS_DISAGREE
+    assert row["finnhub_yield_indicated"] == 0.2
 
     # Validacion de parametros
     assert client.get("/api/propicks/deep-value", params={"pb_max": "0"}).status_code == 422

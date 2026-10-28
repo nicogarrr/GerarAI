@@ -286,6 +286,7 @@ class DeepValueRowOut(BaseModel):
     yield_status: str | None
     desacuerdo_fuentes: bool
     yield_extremo_revisar: bool
+    finnhub_yield_indicated: float | None
     fuentes: list[str]
     metric_as_of: str | None
 
@@ -332,6 +333,11 @@ def deep_value(
                 yield_status=r.yield_status,
                 desacuerdo_fuentes=r.desacuerdo_fuentes,
                 yield_extremo_revisar=r.yield_extremo_revisar,
+                finnhub_yield_indicated=(
+                    float(r.finnhub_yield_indicated)
+                    if r.finnhub_yield_indicated is not None
+                    else None
+                ),
                 fuentes=r.fuentes,
                 metric_as_of=r.metric_as_of,
             )
