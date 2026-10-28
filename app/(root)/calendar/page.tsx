@@ -88,7 +88,7 @@ export default async function CalendarPage({
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-4xl flex-col gap-6">
             <PageHeader
                 kicker="Cartera"
-                title="Calendario de resultados y alertas"
+                title="Catalizadores de tu cartera"
                 description={`Del ${formatMarketDate(calendar.desde)} al ${formatMarketDate(calendar.hasta)}. Los resultados cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); ex-dividendos y plazos 10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus posiciones abiertas.`}
                 actions={<div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <CalendarDays aria-hidden="true" className="h-4 w-4 text-teal-300" />

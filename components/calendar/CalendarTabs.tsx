@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const TABS = [
+  ["/portfolio", "Cartera"],
   ["/calendar/resultados", "Resultados"],
   ["/calendar/suscripcion", "Suscribir"],
   ["/calendar", "Catalizadores"],

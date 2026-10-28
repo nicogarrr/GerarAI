@@ -167,13 +167,19 @@ test('SectionNav se deriva del catálogo y cede en el hub fusionado Inversores/S
     // barra): una sola barra, la del hub. /inversores/canales sigue fuera
     // porque pertenece al hub Biblioteca.
     const literals = [...nav.matchAll(/'(\/[^']*)'/g)].map((m) => m[1]).filter((l) => l.startsWith('/'));
+    // Calendarios (/calendar, /macro-calendar, /corporate-actions) tambien se
+    // excluyen: CalendarTabs es su unica barra, con «Cartera» de primera pestaña
+    // (opcion B, WhatsApp 2026-10-28 08:46).
     assert.deepEqual([...new Set(literals)].sort(), [
+        '/calendar',
+        '/corporate-actions',
         '/discover',
         '/insider',
         '/insider/',
         '/inversores',
         '/inversores/',
         '/inversores/canales',
+        '/macro-calendar',
         '/ownership',
         '/ownership/',
     ]);

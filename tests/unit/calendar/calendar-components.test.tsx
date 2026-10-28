@@ -58,6 +58,14 @@ describe('CalendarTabs', () => {
         render(<CalendarTabs />);
         expect(screen.getByRole('link', { name: 'Catalizadores' })).toHaveAttribute('aria-current', 'page');
     });
+    it('«Cartera» es la primera pestaña y enlaza a /portfolio', () => {
+        pathname = '/calendar';
+        render(<CalendarTabs />);
+        const links = screen.getAllByRole('link');
+        expect(links[0]).toHaveTextContent('Cartera');
+        expect(links[0]).toHaveAttribute('href', '/portfolio');
+        expect(links[0]).not.toHaveAttribute('aria-current');
+    });
     it('fuera de las pestañas no hay ninguna activa', () => {
         pathname = '/otra';
         render(<CalendarTabs />);

@@ -6,6 +6,8 @@ import {useEffect, useState} from 'react';
 import {flattenNavItems, sectionForRoute} from '@/lib/constants';
 import {OverflowScrollRegion} from '@/components/ui/overflow-scroll-region';
 
+const CALENDAR_ROUTES=['/calendar','/macro-calendar','/corporate-actions'];
+
 /**
  * Subnav contextual del hub actual. En móvil va PLEGADO en una línea: la
  * pestaña actual con chevron que despliega el resto (decisión de Nico,
@@ -41,6 +43,10 @@ export default function SectionNav(){
  };
 
  if(pathname==='/discover')return null;
+ // Calendarios (/calendar, /macro-calendar, /corporate-actions) ya llevan su propia
+ // barra de pestañas (CalendarTabs, con «Cartera» como primera): dos capas de
+ // navegación seguidas empujaban el contenido bajo el pliegue en móvil.
+ if(CALENDAR_ROUTES.some((route)=>pathname===route||pathname.startsWith(`${route}/`)))return null;
  // Hub Inversores/Senales fusionado (decision de Nico, WhatsApp 2026-10-20
  // 00:59): /inversores, /insider y /ownership comparten el HubNav de 4
  // pestañas; pintar aqui el subnav de Descubrir era la doble barra.
