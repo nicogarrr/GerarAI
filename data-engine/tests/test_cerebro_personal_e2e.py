@@ -78,6 +78,8 @@ def _ask(db, question, provider=None, history=None):
     "question,kind",
     [
         ("¿qué está barato de mi watchlist?", "barato"),
+        ("¿Qué debo comprar hoy?", "barato"),
+        ("¿Qué comprar hoy con mi aportación?", "barato"),
         ("¿Qué está barato?", "barato"),
         ("¿dónde meto la aportación de este mes?", "barato"),
         ("¿qué tengo en 4X?", "barato"),
@@ -239,3 +241,45 @@ def test_anclaje_formatos():
     # Recuentos y años no se anclan: «3 valores», «en 2026».
     assert ungrounded_numbers("3 valores en 2026", ctx) == []
     assert ungrounded_tickers("POOL y KKR", ctx) == ["KKR"]
+
+
+def test_purchase_question_unifies_saved_dca_with_plan_alerts_and_holdings(db, monkeypatch):
+    from dataclasses import replace
+
+    from tests.cerebro_seed import fake_dca_reader
+    def uber_four(session, tenant, symbols):
+        readings = fake_dca_reader(session, tenant, symbols)
+        if "UBER" in readings:
+            readings["UBER"] = replace(readings["UBER"], level=4, label="4X DCA")
+        return readings
+    monkeypatch.setattr(user_context, "default_dca_reader", uber_four)
+    provider = EchoProvider(reply="UBER tiene nivel DCA 4X DCA guardado. No es una orden de compra.")
+    response = _ask(db, "¿Qué debo comprar hoy?", provider)
+    assert response.llm_trace["path"] == "personal_context"
+    assert "UBER" in provider.user_data and "4X DCA" in provider.user_data
+    for block in ["Cartera", "Watchlist", "Tesis", "Avisos", "Diario", "Plan"]:
+        assert block in provider.user_data
+    assert "4 €" not in response.answer
+
+
+def test_named_purchase_question_does_not_bypass_personal_snapshot(db):
+    provider = EchoProvider()
+    response = _ask(db, "¿Qué debo comprar hoy de UBER con mi aportación?", provider)
+    assert response.llm_trace["path"] == "personal_context"
+    assert "UBER" in provider.user_data and "Plan" in provider.user_data
+
+
+def test_saved_purchase_context_works_when_ticker_field_is_explicit(db):
+    provider = EchoProvider()
+    response = asyncio.run(ChatService(provider=provider).answer(db, "¿Qué debo comprar hoy?", "portfolio", "UBER"))
+    assert response.llm_trace["path"] == "personal_context"
+    assert "UBER" in provider.user_data and "Watchlist" in provider.user_data
+
+
+def test_purchase_fallback_keeps_plan_before_bounded_dca_candidates(db):
+    from app.services.personal_answer import answer_personal_question
+    intent = detect_personal_intent("¿Qué debo comprar hoy?")
+    response = asyncio.run(answer_personal_question(db, "¿Qué debo comprar hoy?", intent, None, use_llm=False))
+    assert "300,00 EUR" in response.answer
+    assert "no cotizaciones en directo" in response.answer
+    assert "2026-10-01" in response.answer

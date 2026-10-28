@@ -46,7 +46,7 @@ class PersonalIntent:
 
 _INTENT_SECTIONS: dict[str, tuple[str, ...]] = {
     "fiscal": ("fiscal",),
-    "barato": ("watchlist", "cartera", "tesis", "plan"),
+    "barato": ("watchlist", "cartera", "tesis", "avisos", "diario", "plan"),
     "watchlist": ("watchlist", "tesis"),
     "riesgo": ("cartera", "tesis", "avisos", "watchlist"),
     "plan": ("plan", "cartera", "watchlist"),
@@ -72,7 +72,7 @@ _FISCAL = re.compile(
 )
 _CHEAP = re.compile(
     r"\b(?:barat\w*|infravalorad\w*|margen de seguridad|descuento|oportunidad\w*|chollo\w*|"
-    r"zona de compra|niveles? dca|[1-4]x|que (?:compro|deberia comprar|me compro)|"
+    r"zona de compra|niveles? dca|[1-4]x|que (?:compro|debo comprar|deberia comprar|comprar|me compro)|"
     r"donde (?:meto|invierto|pongo|aporto)|cheap|undervalued)\b"
 )
 _WATCHLIST = re.compile(r"\b(?:watch\s?-?list|lista de seguimiento|seguimiento|(?:valores|empresas|acciones) que sigo)\b")
@@ -207,7 +207,7 @@ def _cheap_answer(ctx: UserContext) -> list[str]:
         lines.append("Lo más barato de tu watchlist por margen de seguridad (V − P) / V (watchlist):")
         lines += [f"- {r['ticker']}: {pct_es(r['mos'], signed=True)}{_dca_word(r.get('dca_level'))}." for r in cheap[:6]]
     else:
-        lines.append("Ningún valor de tu watchlist cotiza por debajo de su valor justo con los datos guardados.")
+        lines.append("No hay margen positivo calculable entre los datos guardados; si falta precio o valor justo no puedo clasificar ese valor.")
     if dca_buy:
         lines.append(
             "En zona de compra fuerte por DCA pero sin valor justo para medir el margen: "
@@ -282,7 +282,24 @@ def _risk_answer(ctx: UserContext, db: Session) -> list[str]:
 
 def deterministic_lines(intent: PersonalIntent, ctx: UserContext, db: Session) -> list[str]:
     if intent.kind == "barato":
-        return _cheap_answer(ctx)
+        lines = ["Lecturas guardadas, no cotizaciones en directo ni órdenes de compra."]
+        # Keep the plan and risk notices ahead of the bounded candidates, so
+        # fallback truncation cannot silently drop investment constraints.
+        for section, maximum in (("plan", 2), ("avisos", 2)):
+            lines.extend(_block_lines(ctx, section, maximum))
+        seen: set[str] = set()
+        for block in (ctx.block("cartera"), ctx.block("watchlist")):
+            if block:
+                for row in block.rows:
+                    symbol = row["ticker"]
+                    if symbol in seen or (row.get("dca_level") or 0) < 3:
+                        continue
+                    dated = next((line for line in block.lines if line.startswith(f"- {symbol} (") and "nivel DCA" in line), None)
+                    if dated:
+                        seen.add(symbol)
+                        lines.append(dated)
+        lines.extend(_cheap_answer(ctx))
+        return lines
     if intent.kind == "riesgo":
         return _risk_answer(ctx, db)
     if intent.kind == "cartera":

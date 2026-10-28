@@ -1075,6 +1075,22 @@ class ChatService:
                 if personal is not None:
                     personal.context = context_echo
                     return personal
+        # A purchase QUESTION is not an execution order. Use the same personal
+        # snapshot even when a company is named or the guide supplies a ticker.
+        # Otherwise "qué debo comprar hoy" lost DCA/plan/alerts on company routes.
+        from app.services.personal_answer import answer_personal_question, detect_personal_intent
+
+        purchase_intent = detect_personal_intent(question or "")
+        if purchase_intent is not None and purchase_intent.kind == "barato":
+            history_text = "\n".join(
+                f"{turn.role}: {turn.content[:300]}" for turn in (history or [])[-4:] if turn.content
+            ) or None
+            personal = await answer_personal_question(
+                db, question or "", purchase_intent, self.provider, history_text=history_text
+            )
+            if personal is not None:
+                personal.context = context_echo
+                return personal
         data_answer = answer_data_question(db, question)
         if data_answer is not None:
             # A quote question may also request a concrete metric. Do not let
