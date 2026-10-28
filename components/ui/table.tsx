@@ -42,7 +42,7 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
     <div
       data-slot="table-region"
       data-dense={dense ? "" : undefined}
-      className="group/table relative w-full min-w-0 overflow-x-auto"
+      className="group/table scroll-affordance-x relative w-full min-w-0 overflow-x-auto"
       {...(regionLabel
         ? { role: "region", "aria-label": regionLabel, tabIndex: 0 }
         : null)}
