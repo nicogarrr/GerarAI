@@ -23,7 +23,7 @@ test('no sources stays empty; unsafe URLs never become links', () => {
 test('brain action and UI pass citations through', async () => {
     const { readFileSync } = await import('node:fs');
     const action = readFileSync(new URL('../lib/actions/brain.actions.ts', import.meta.url), 'utf8');
-    const ui = readFileSync(new URL('../components/brain/GlobalBrain.tsx', import.meta.url), 'utf8');
+    const ui = readFileSync(new URL('../components/brain/GlobalBrain.tsx', import.meta.url), 'utf8') + readFileSync(new URL('../components/brain/GlobalBrainPanel.tsx', import.meta.url), 'utf8');
     assert.match(action, /citations: toPortfolioChatCitations\(response.sources\)/);
     assert.match(ui, /citations: result.citations/);
     assert.match(ui, /<BrainSources citations=\{m.citations\}/);
@@ -45,7 +45,7 @@ test('Cerebro enlaza datos propios solo a rutas internas conocidas', () => {
 
 test('panel Cerebro bloquea y restaura el scroll de fondo', async () => {
     const { readFileSync } = await import('node:fs');
-    const ui = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+    const ui = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
     assert.ok(ui.includes("document.body.style.overflow = 'hidden'"));
     assert.ok(ui.includes('document.body.style.overflow = previousOverflow'));
 });

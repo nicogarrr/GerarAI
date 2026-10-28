@@ -21,7 +21,7 @@ import test from 'node:test';
 
 const openBrain = readFileSync('lib/brain/open-brain.ts', 'utf8');
 const redirect = readFileSync('components/research/AssistantRedirect.tsx', 'utf8');
-const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
 const button = readFileSync('components/research/GuideBrainButton.tsx', 'utf8');
 const seguir = readFileSync('components/research/GuideContextPanel.tsx', 'utf8');
 const client = readFileSync('lib/research/assistant-client.ts', 'utf8');

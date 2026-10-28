@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 test('scroll and underlying page content cannot hide the mobile Cerebro entry', () => {
-  const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+  const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
   const nav = readFileSync('components/layout/BottomNav.tsx', 'utf8');
   const layout = readFileSync('app/(root)/layout.tsx', 'utf8');
   assert.ok(!brain.includes('fabScrollHidden'));
