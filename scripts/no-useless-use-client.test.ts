@@ -232,7 +232,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/screeners/FilterFields.tsx': 'useState, jsx-onChange',
   'components/screeners/ScreenBreadcrumbName.tsx': 'useEffect, browser:window',
   'components/screeners/SubmitButton.tsx': 'useFormStatus',
-  'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form',
+  'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form, dynamic (QR qrcode.react diferido: solo se usa al activar 2FA)',
   'components/security/PrivacySettings.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/security/ChangePassword.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/auth/ForgotPasswordForm.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
