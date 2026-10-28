@@ -2033,16 +2033,9 @@ def ingest_spy_daily(
 
 def _official_close_session_key() -> str:
     """Last completed US session, never today's still-open session."""
-    from datetime import datetime, timedelta
-    from zoneinfo import ZoneInfo
-
-    local = datetime.now(ZoneInfo("America/New_York"))
-    day = local.date()
-    if (local.hour, local.minute) < (16, 30):
-        day -= timedelta(days=1)
-    while day.weekday() >= 5:
-        day -= timedelta(days=1)
-    return day.isoformat()
+    from datetime import UTC, datetime
+    from app.services.market_close_sync import last_completed_us_session
+    return last_completed_us_session(datetime.now(UTC)).isoformat()
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
@@ -2056,13 +2049,17 @@ def sync_official_closes(
     Strict distributed lock: Redis failure retries instead of local fallback.
     Success survives lock release, so queued legacy duplicates skip too.
     """
-    from app.services.market_close_sync import sync_official_closes as _sync
+    from app.services.market_close_sync import MIN_TARGET_COVERAGE, sync_official_closes as _sync
 
     client = _redis_client()
     if client is None:
         raise RuntimeError("Redis required for global official closes")
     lock = "cavaai:job-lease:sync_official_closes:global"
-    done = "cavaai:official-closes:done:" + _official_close_session_key()
+    session_key = _official_close_session_key()
+    # Preserve existing markers; an operator backs up and clears any known
+    # false positive explicitly after this fix is deployed.
+    done = "cavaai:official-closes:done:" + session_key
+    attempts = "cavaai:official-closes:attempts:" + session_key
     token = uuid.uuid4().hex
     acquired = False
     db = None
@@ -2072,9 +2069,15 @@ def sync_official_closes(
             return {"status": "skipped", "reason": "lease_held"}
         if client.get(done):
             return {"status": "skipped", "reason": "session_already_synced"}
+        # Global lease serializes counters too. Cap full downloads at three
+        # per session, including holidays and swallowed per-symbol failures.
+        tried = int(client.get(attempts) or 0)
+        if tried >= 3:
+            return {"status": "skipped", "reason": "session_attempt_cap", "attempts": tried}
+        client.set(attempts, str(tried + 1), ex=7 * 86400)
         db = _session(tenant_id, user_id)
         result = _sync(db)
-        if result.get("status") == "ok" and result.get("covered", 0) > 0 and result.get("latest_date") == _official_close_session_key():
+        if result.get("status") == "ok" and result.get("target_coverage", 0) >= MIN_TARGET_COVERAGE and result.get("target_date") == session_key:
             client.set(done, "1", ex=7 * 86400)
         return {"actor": "sync_official_closes", **result}
     except Exception:

@@ -216,3 +216,26 @@ def test_todos_los_lotes_caidos_propaga_el_error(db):
 
     with pytest.raises(TimeoutError):
         sync_official_closes(db, fetcher=fetcher, now=datetime(2026, 10, 16, 22, 30, tzinfo=UTC))
+
+
+def test_target_date_coverage_not_historical_coverage(db):
+    _company(db)
+    for ticker in ['MSFT','NVDA','META']:
+        db.add(Company(ticker=ticker,name=ticker,exchange='NASDAQ',currency='USD',sector='S',industry='I',company_type='holding',valuation_model='unassigned',special_sources=[],special_risks=[],factor_tags=[]))
+    db.flush()
+    old=PriceBar(date(2026,10,26),Decimal('10'),Decimal('10'),10)
+    fresh=PriceBar(date(2026,10,27),Decimal('11'),Decimal('11'),11)
+    history={t:[old] for t in ['AAPL','MSFT','NVDA','META']}
+    history['AAPL']=[old,fresh]
+    out=sync_official_closes(db,fetcher=lambda symbols,period:history,now=datetime(2026,10,28,3,tzinfo=UTC))
+    assert out['covered']==4
+    assert out['target_date']=='2026-10-27'
+    assert out['target_covered']==1 and out['target_coverage']==.25
+    assert out['status']=='partial'
+
+
+def test_fully_covered_target_date_is_success(db):
+    _company(db)
+    bar=PriceBar(date(2026,10,27),Decimal('11'),Decimal('11'),11)
+    out=sync_official_closes(db,fetcher=lambda symbols,period:{'AAPL':[bar]},now=datetime(2026,10,28,3,tzinfo=UTC))
+    assert out['target_coverage']==1.0 and out['status']=='ok'
