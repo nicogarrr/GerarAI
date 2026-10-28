@@ -32,7 +32,6 @@ function YieldCell({ item }: { item: DeepValueItem }) {
         <div className="flex flex-col gap-1">
             <span className="text-sm font-semibold text-gray-100">
                 {formatPercent(item.dividend_yield)}
-                <span className="ml-1 text-xs font-normal text-gray-400">Yahoo (fuente no oficial)</span>
             </span>
             {item.desacuerdo_fuentes && item.finnhub_yield_indicated !== null && (
                 <span className="inline-flex w-fit items-center gap-1 rounded border border-amber-600/60 bg-amber-900/20 px-1.5 py-0.5 text-xs text-amber-300">

@@ -17,8 +17,12 @@ test('el aviso de que NO es el filtro de calidad es visible en la vista', () => 
     assert.match(view, /role="note"/);
 });
 
-test('el dividendo lleva la etiqueta de fuente no oficial en cada cifra', () => {
-    assert.match(view, /fuente no oficial/);
+test('decision de Nico (28-oct, wamid verificado): sin etiqueta por cifra en el yield', () => {
+    // La fuente sigue declarada en la nota de cabecera (rotulo del servidor,
+    // test 1 y 5) y la API mantiene el campo fuente; solo se retira la marca
+    // repetida junto a cada cifra. Este guard fija la decision para que no
+    // reaparezca por accidente.
+    assert.doesNotMatch(view, /Yahoo \(fuente no oficial\)/);
 });
 
 test('el desacuerdo entre fuentes se muestra con ambas cifras', () => {
