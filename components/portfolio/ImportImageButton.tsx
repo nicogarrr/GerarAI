@@ -13,6 +13,11 @@ import { toast } from 'sonner';
 
 type Draft = { query: string; instrument: ImageInstrument | null; quantity: string; checked: boolean };
 
+/** Toast de confirmación: concordancia es-ES («1 posición importada»). */
+export function importedPositionsMessage(imported: number): string {
+    return `${formatNumber(imported, { maximumFractionDigits: 0 })} ${imported === 1 ? 'posición importada' : 'posiciones importadas'}`;
+}
+
 export default function ImportImageButton() {
     const [open, setOpen] = useState(false);
     const [busy, setBusy] = useState(false);
@@ -109,7 +114,7 @@ export default function ImportImageButton() {
                 </>}
             <details className="mt-4 text-xs leading-relaxed text-gray-500"><summary className="cursor-pointer text-gray-400">Qué se importa y qué no</summary><p className="mt-2">Solo posiciones nuevas. No sustituye las existentes ni reconstruye compras, coste o rentabilidad histórica. Caja y margen no se determinan. Para conciliar una cartera existente, usa el fichero del bróker.</p></details>
             </div>
-            {review && <div className="grid shrink-0 gap-2 border-t border-gray-800 bg-gray-900 px-5 py-4 sm:px-6"><p className="mb-1 text-xs text-gray-400">Solo posiciones nuevas. Coste, caja y margen no determinados.</p><Button className="min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !review.can_confirm || review.already_imported} onClick={() => void run(async () => { const result = await confirmPortfolioImage(review.review_id); toast.success(result.status === 'already_imported' ? 'Esta importación ya estaba guardada' : `${result.positions_imported} posiciones importadas`); setOpen(false); setPreview(null); setDrafts([]); setReview(null); router.refresh(); })}>Confirmar y guardar posiciones</Button><Button className="min-h-11" variant="ghost" disabled={busy} onClick={() => setReview(null)}>Corregir filas</Button></div>}
+            {review && <div className="grid shrink-0 gap-2 border-t border-gray-800 bg-gray-900 px-5 py-4 sm:px-6"><p className="mb-1 text-xs text-gray-400">Solo posiciones nuevas. Coste, caja y margen no determinados.</p><Button className="min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !review.can_confirm || review.already_imported} onClick={() => void run(async () => { const result = await confirmPortfolioImage(review.review_id); toast.success(result.status === 'already_imported' ? 'Esta importación ya estaba guardada' : importedPositionsMessage(result.positions_imported)); setOpen(false); setPreview(null); setDrafts([]); setReview(null); router.refresh(); })}>Confirmar y guardar posiciones</Button><Button className="min-h-11" variant="ghost" disabled={busy} onClick={() => setReview(null)}>Corregir filas</Button></div>}
         </DialogContent>
     </Dialog>;
 }

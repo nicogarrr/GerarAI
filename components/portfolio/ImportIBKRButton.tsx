@@ -34,7 +34,12 @@ function count(value: number): string {
     return formatNumber(value, { maximumFractionDigits: 0 });
 }
 
-function describeResult(result: ImportCounts): string {
+/** Concordancia es-ES: «1 posición» / «2 posiciones». Un solo literal por par. */
+function plural(n: number, singular: string, pluralForm: string): string {
+    return `${count(n)} ${n === 1 ? singular : pluralForm}`;
+}
+
+export function describeResult(result: ImportCounts): string {
     const parts: string[] = [];
     const positions = num(result.positions_imported);
     if (positions !== null) {
@@ -43,20 +48,22 @@ function describeResult(result: ImportCounts): string {
         const fees = num(result.fees_imported) ?? 0;
         const cash = num(result.cash_imported) ?? 0;
         parts.push(
-            `IBKR: ${count(positions)} posiciones, ${count(trades)} operaciones, ` +
-            `${count(dividends)} dividendos, ${count(fees)} comisiones, ` +
-            `${count(cash)} cuentas de efectivo`
+            `IBKR: ${plural(positions, 'posición', 'posiciones')}, ` +
+            `${plural(trades, 'operación', 'operaciones')}, ` +
+            `${plural(dividends, 'dividendo', 'dividendos')}, ` +
+            `${plural(fees, 'comisión', 'comisiones')}, ` +
+            `${plural(cash, 'cuenta de efectivo', 'cuentas de efectivo')}`
         );
     } else {
         const trades = num(result.trades_imported) ?? 0;
-        parts.push(`IBKR CSV: ${count(trades)} operaciones importadas`);
+        parts.push(`IBKR CSV: ${plural(trades, 'operación importada', 'operaciones importadas')}`);
     }
     const duplicates = num(result.duplicate_trades) ?? 0;
     if (duplicates > 0) {
-        parts.push(`${count(duplicates)} operaciones ya importadas`);
+        parts.push(plural(duplicates, 'operación ya importada', 'operaciones ya importadas'));
     }
     if (result.rows_skipped) {
-        parts.push(`${count(result.rows_skipped)} filas omitidas`);
+        parts.push(plural(result.rows_skipped, 'fila omitida', 'filas omitidas'));
     }
     return parts.join(' · ');
 }
@@ -110,7 +117,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
             if (result.identity_warning) toast.warning(result.identity_warning);
             if (result.row_errors?.length) {
                 toast.warning(
-                    `${formatNumber(result.row_errors.length, { maximumFractionDigits: 0 })} filas con avisos. Primera: ${result.row_errors[0]}`,
+                    `${plural(result.row_errors.length, 'fila con avisos', 'filas con avisos')}. Primera: ${result.row_errors[0]}`,
                     { duration: 8000 }
                 );
             }
