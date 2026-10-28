@@ -28,7 +28,11 @@ import { OPEN_BRAIN_PENDING_KEY, openBrain } from '@/lib/brain/open-brain';
 import { brainStorageKey } from '@/lib/brain/conversation';
 
 const KEY = brainStorageKey('u1');
-const open = () => fireEvent.click(screen.getByRole('button', { name: 'Abrir el cerebro' }));
+const open = async () => {
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir el cerebro' }));
+    // El panel carga asíncrono (next/dynamic): aparece cuando llega el chunk.
+    await screen.findByRole('dialog', { name: 'Cerebro GerarAI' });
+};
 const box = () => screen.getByLabelText('Pregunta al cerebro');
 const ask = (text: string) => {
     fireEvent.change(box(), { target: { value: text } });
@@ -68,7 +72,7 @@ describe('GlobalBrain: botón y apertura', () => {
     });
     it('abrir muestra el diálogo modal con saludo y preguntas sugeridas que rellenan el input', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         const dialog = screen.getByRole('dialog', { name: 'Cerebro GerarAI' });
         expect(dialog).toHaveAttribute('aria-modal', 'true');
         expect(await within(dialog).findByText(/Soy el cerebro de GerarAI/)).toBeInTheDocument();
@@ -77,16 +81,17 @@ describe('GlobalBrain: botón y apertura', () => {
         fireEvent.click(screen.getByRole('button', { name: '¿Qué riesgos tiene mi cartera?' }));
         expect(box()).toHaveValue('¿Qué riesgos tiene mi cartera?');
     });
-    it('Escape cierra, restaura el scroll del body y devuelve el foco al botón que abrió', () => {
+    it('Escape cierra, restaura el scroll del body y devuelve el foco al botón que abrió', async () => {
         render(<GlobalBrain userId="u1" />);
         const trigger = screen.getByRole('button', { name: 'Abrir el cerebro' });
         trigger.focus();
         fireEvent.click(trigger);
+        await screen.findByRole('dialog', { name: 'Cerebro GerarAI' });
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(document.body.style.overflow).toBe('');
     });
-    it('mientras está abierto el resto de la página queda inert y aria-hidden, y se restaura al cerrar', () => {
+    it('mientras está abierto el resto de la página queda inert y aria-hidden, y se restaura al cerrar', async () => {
         const { container } = render(
             <div>
                 <main id="page" aria-hidden="false">página</main>
@@ -94,16 +99,16 @@ describe('GlobalBrain: botón y apertura', () => {
             </div>,
         );
         const page = container.querySelector('#page') as HTMLElement;
-        open();
+        await open();
         expect(page.inert).toBe(true);
         expect(page).toHaveAttribute('aria-hidden', 'true');
         fireEvent.click(screen.getByRole('button', { name: 'Cerrar el cerebro' }));
         expect(page.inert).toBeFalsy();
         expect(page).toHaveAttribute('aria-hidden', 'false');
     });
-    it('maximizar y restaurar alterna la etiqueta', () => {
+    it('maximizar y restaurar alterna la etiqueta', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.click(screen.getByRole('button', { name: 'Maximizar el cerebro' }));
         expect(screen.getByRole('dialog').className).toContain('left-4');
         fireEvent.click(screen.getByRole('button', { name: 'Restaurar el cerebro' }));
@@ -119,9 +124,9 @@ describe('GlobalBrain: trampa de foco', () => {
         // jsdom no tiene layout: se declara que todo es visible para el filtro de tab stops.
         vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
     });
-    it('Tab desde el último vuelve al primero y Shift+Tab desde el primero va al último', () => {
+    it('Tab desde el último vuelve al primero y Shift+Tab desde el primero va al último', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         const items = focusables();
         const first = items[0];
         const last = items[items.length - 1];
@@ -131,9 +136,9 @@ describe('GlobalBrain: trampa de foco', () => {
         fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
         expect(document.activeElement).toBe(last);
     });
-    it('con el foco en el propio panel, Tab entra por el primero y Shift+Tab por el último', () => {
+    it('con el foco en el propio panel, Tab entra por el primero y Shift+Tab por el último', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         const items = focusables();
         screen.getByRole('dialog').focus();
         fireEvent.keyDown(document, { key: 'Tab' });
@@ -142,16 +147,16 @@ describe('GlobalBrain: trampa de foco', () => {
         fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
         expect(document.activeElement).toBe(items[items.length - 1]);
     });
-    it('una tecla cualquiera que no es Tab no mueve el foco', () => {
+    it('una tecla cualquiera que no es Tab no mueve el foco', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         const before = document.activeElement;
         fireEvent.keyDown(document, { key: 'a' });
         expect(document.activeElement).toBe(before);
     });
-    it('sin elementos enfocables, Tab se queda en el panel', () => {
+    it('sin elementos enfocables, Tab se queda en el panel', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
         fireEvent.keyDown(document, { key: 'Tab' });
         expect(document.activeElement).toBe(screen.getByRole('dialog'));
@@ -159,17 +164,17 @@ describe('GlobalBrain: trampa de foco', () => {
 });
 
 describe('GlobalBrain: pastilla "Viendo"', () => {
-    it('muestra la sección actual como enlace a la página', () => {
+    it('muestra la sección actual como enlace a la página', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         const pill = screen.getByTestId('brain-page-context');
         expect(pill).toHaveTextContent('Viendo Cartera');
         expect(pill).toHaveAttribute('href', '/portfolio');
     });
-    it('en una página no identificable no hay pastilla', () => {
+    it('en una página no identificable no hay pastilla', async () => {
         pathname = '/pagina-rara';
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         expect(screen.queryByTestId('brain-page-context')).not.toBeInTheDocument();
     });
     it('el eco del servidor manda sobre la etiqueta local y la pastilla navega a la ficha', async () => {
@@ -178,7 +183,7 @@ describe('GlobalBrain: pastilla "Viendo"', () => {
             context: { label: 'ASTS', ticker: 'ASTS', company_name: 'AST SpaceMobile', company_resolved: true },
         });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         ask('¿Cómo va ASTS?');
         await waitFor(() => expect(screen.getByTestId('brain-page-context')).toHaveTextContent('Viendo ASTS'));
         expect(screen.getByTestId('brain-page-context')).toHaveAttribute('href', '/research/ASTS');
@@ -190,7 +195,7 @@ describe('GlobalBrain: pastilla "Viendo"', () => {
             context: { label: 'Mi cartera', ticker: null, company_name: null, company_resolved: false },
         });
         const { rerender } = render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         ask('¿Cómo va mi cartera?');
         await waitFor(() => expect(screen.getByTestId('brain-page-context')).toHaveTextContent('Viendo Mi cartera'));
         expect(screen.getByTestId('brain-page-context')).toHaveAttribute('href', '/portfolio');
@@ -208,7 +213,7 @@ describe('GlobalBrain: chat de cartera', () => {
             citations: [{ document: 'Informe 10-K', url: 'https://sec.gov/10k', page: 3, locator: 'p3', kind: 'filing' }],
         });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         ask('  ¿Cuántas posiciones?  ');
         expect(box()).toHaveValue('');
         expect(screen.getByRole('status')).toHaveTextContent('escribiendo');
@@ -227,9 +232,9 @@ describe('GlobalBrain: chat de cartera', () => {
         );
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
-    it('no envía si el texto es solo espacios (botón desactivado)', () => {
+    it('no envía si el texto es solo espacios (botón desactivado)', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.change(box(), { target: { value: '   ' } });
         expect(screen.getByRole('button', { name: 'Enviar pregunta' })).toBeDisabled();
         fireEvent.submit(box().closest('form')!);
@@ -238,7 +243,7 @@ describe('GlobalBrain: chat de cartera', () => {
     it('fallo controlado del servidor: muestra su mensaje o uno genérico', async () => {
         chatWithPortfolio.mockResolvedValueOnce({ success: false, message: 'Límite diario alcanzado' });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         ask('hola que tal');
         expect(await screen.findByText('Límite diario alcanzado')).toBeInTheDocument();
         chatWithPortfolio.mockResolvedValueOnce({ success: false, message: '' });
@@ -248,7 +253,7 @@ describe('GlobalBrain: chat de cartera', () => {
     it('excepción: avisa sin romper el panel y permite reintentar', async () => {
         chatWithPortfolio.mockRejectedValueOnce(new Error('boom'));
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         ask('hola que tal');
         expect(await screen.findByText(/No se pudo completar la respuesta/)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Enviar pregunta' })).toBeDisabled(); // input vacío, no cargando
@@ -259,7 +264,7 @@ describe('GlobalBrain: chat de cartera', () => {
         const writeText = vi.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         expect(screen.queryByRole('button', { name: 'Copiar' })).not.toBeInTheDocument();
         ask('pregunta uno');
         const copy = await screen.findByRole('button', { name: 'Copiar' });
@@ -273,9 +278,9 @@ describe('GlobalBrain: chat de cartera', () => {
 });
 
 describe('GlobalBrain: modo guía', () => {
-    it('el botón Guía abre el selector; al perder el foco vacío se pliega; con ticker cambia el placeholder', () => {
+    it('el botón Guía abre el selector; al perder el foco vacío se pliega; con ticker cambia el placeholder', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         const field = screen.getByLabelText('Ticker de la guía de investigación');
         fireEvent.blur(field);
@@ -289,7 +294,7 @@ describe('GlobalBrain: modo guía', () => {
     it('con ticker pregunta al asistente de research (no al chat), en mayúsculas, con su página e historial', async () => {
         askResearchAssistantAction.mockResolvedValue({ mode: 'guide', status: 'answered', answer: 'Conclusión ASTS', sections: [] });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         fireEvent.click(screen.getByRole('button', { name: 'elegir ASTS' }));
         ask('¿Qué riesgos tiene?');
@@ -307,7 +312,7 @@ describe('GlobalBrain: modo guía', () => {
             context: { label: 'ASTS', ticker: 'ASTS', company_name: null, company_resolved: true },
         });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         fireEvent.click(screen.getByRole('button', { name: 'elegir ASTS' }));
         ask('¿Y los números?');
@@ -317,7 +322,7 @@ describe('GlobalBrain: modo guía', () => {
     });
     it('pregunta demasiado corta o larga: se rechaza en cliente sin llamar al servidor', async () => {
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         fireEvent.click(screen.getByRole('button', { name: 'elegir ASTS' }));
         ask('ab');
@@ -330,7 +335,7 @@ describe('GlobalBrain: modo guía', () => {
     it('fallo del asistente: avisa de que no se modificó nada', async () => {
         askResearchAssistantAction.mockRejectedValue(new Error('x'));
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         fireEvent.click(screen.getByRole('button', { name: 'elegir ASTS' }));
         ask('¿Qué riesgos?');
@@ -343,7 +348,7 @@ describe('GlobalBrain: apertura desde otras pantallas', () => {
         askResearchAssistantAction.mockResolvedValue({ mode: 'guide', status: 'answered', answer: 'ok', sections: [] });
         render(<GlobalBrain userId="u1" />);
         act(() => openBrain({ ticker: 'asts', review_id: 7, question: '¿Cambió la tesis?' }));
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        await screen.findByRole('dialog');
         expect(box()).toHaveValue('¿Cambió la tesis?');
         expect(screen.getByText(/Revisión #7/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
@@ -352,12 +357,12 @@ describe('GlobalBrain: apertura desde otras pantallas', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Quitar la revisión anclada' }));
         expect(screen.queryByText(/Revisión #7/)).not.toBeInTheDocument();
     });
-    it('una apertura sin ticker no hereda el ancla anterior', () => {
+    it('una apertura sin ticker no hereda el ancla anterior', async () => {
         render(<GlobalBrain userId="u1" />);
         act(() => openBrain({ ticker: 'ASTS', review_id: 3 }));
-        expect(screen.getByText(/Revisión #3/)).toBeInTheDocument();
+        expect(await screen.findByText(/Revisión #3/)).toBeInTheDocument();
         act(() => openBrain({ question: 'x'.repeat(2500) }));
-        expect(screen.queryByText(/Revisión #3/)).not.toBeInTheDocument();
+        await waitFor(() => expect(screen.queryByText(/Revisión #3/)).not.toBeInTheDocument());
         expect((box() as HTMLInputElement).value).toHaveLength(2000);
         expect(box()).toHaveAttribute('placeholder', 'Pregunta al cerebro...');
     });
@@ -385,7 +390,7 @@ describe('GlobalBrain: persistencia', () => {
         ]));
         chatWithPortfolio.mockResolvedValue({ success: true, message: 'Nueva respuesta', citations: [{ document: 'D', url: null, page: null, locator: 'l', kind: 'filing' }] });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         // La restauración se aplica en un microtask tras montar.
         expect(await screen.findByText('Saludo guardado')).toBeInTheDocument();
         expect(screen.getByText('Pregunta previa')).toBeInTheDocument();
@@ -401,7 +406,7 @@ describe('GlobalBrain: persistencia', () => {
     it('la conversación de otro usuario no se carga', async () => {
         window.sessionStorage.setItem(brainStorageKey('otro'), JSON.stringify([{ role: 'assistant', content: 'Secreto de otro' }]));
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         expect(screen.queryByText('Secreto de otro')).not.toBeInTheDocument();
         expect(await screen.findByText(/Soy el cerebro de GerarAI/)).toBeInTheDocument();
     });
@@ -410,7 +415,7 @@ describe('GlobalBrain: persistencia', () => {
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('quota'); });
         chatWithPortfolio.mockResolvedValue({ success: true, message: 'Sigue', citations: [] });
         render(<GlobalBrain userId="u1" />);
-        open();
+        await open();
         ask('pregunta sin storage');
         expect(await screen.findByText('Sigue')).toBeInTheDocument();
     });
@@ -422,6 +427,7 @@ describe('Cerebro único: biblioteca y cartas', () => {
     askKnowledge.mockResolvedValue({ answers: [], message: 'Sin datos guardados', status: 'sin_datos', retrieval: 'solo_texto' });
     render(<GlobalBrain userId="u1" />);
     act(() => openBrain({ ticker: 'UBER' }));
+    await screen.findByRole('dialog');
     act(() => openBrain({ knowledge: { scope: 'letters', authors: ['Buffett'] }, question: '¿Recompras?' }));
     expect(screen.queryByLabelText('Ticker de la guía de investigación')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Autor'), { target: { value: 'Buffett' } });
@@ -439,6 +445,7 @@ it('401 de biblioteca se muestra como sesión caducada sin borrar conversación'
   askKnowledge.mockRejectedValue(Object.assign(new Error('Unauthorized'), {statusCode:401}));
   render(<GlobalBrain userId="u1" />);
   act(() => openBrain({knowledge:{scope:'library'},question:'Pregunta válida'}));
+  await screen.findByRole('dialog');
   fireEvent.click(screen.getByRole('button',{name:'Enviar pregunta'}));
   await screen.findByText('Sesión caducada. Vuelve a iniciar sesión.');
   expect(screen.getByText('Pregunta válida')).toBeInTheDocument();

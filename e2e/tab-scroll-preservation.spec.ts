@@ -17,8 +17,9 @@ async function medirSalto(
   layoutEstable?: import("@playwright/test").Locator,
 ) {
   // La cabecera de la ficha llega por streaming: el Suspense de la cotización
-  // muestra un fallback bajo (h-40) y al resolverse lo sustituye la cotización
-  // + el gráfico, mucho más alto. Medir `antes` con el fallback falseaba la
+  // muestra un fallback y al resolverse lo sustituye la cotización. En modo
+  // compacto el gráfico queda oculto; el wrapper de cotización visible indica
+  // que el streaming terminó, sin depender del gráfico oculto. Medir `antes` con el fallback falseaba la
   // comparación: al crecer la cabecera, el anclaje de scroll del navegador
   // desplaza scrollY para mantener visible lo que el usuario ve (el salto de
   // ~487px en móvil / ~76px en desktop era ESO, no el clic), y `después`
@@ -60,7 +61,7 @@ test("ficha: las pestañas de módulo conservan la posición de scroll (desktop)
     page,
     page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Tesis", exact: true }),
     /\/research\/MSFT\?view=thesis/,
-    page.getByTestId("company-technical-chart"),
+    page.getByTestId("company-header-quote"),
   );
 });
 
@@ -72,7 +73,7 @@ test("ficha: los 3 pasos conservan la posición de scroll (móvil)", async ({ pa
     page,
     page.getByRole("navigation", { name: "Secciones de la empresa", exact: true }).getByRole("link", { name: "Finanzas", exact: true }),
     /\/research\/MSFT\?view=financials/,
-    page.getByTestId("company-technical-chart"),
+    page.getByTestId("company-header-quote"),
   );
 });
 

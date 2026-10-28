@@ -9,7 +9,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const COMPONENT = 'components/work-products/WorkProductButton.tsx';
+const COMPONENT = 'components/work-products/WorkProductDialog.tsx';
 const SERVICE = 'data-engine/app/services/work_product_service.py';
 
 describe('el entregable se muestra como documento legible', () => {

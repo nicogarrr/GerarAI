@@ -54,10 +54,23 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import (
     Company,
+    FxConversion,
     Position,
     TaxReport,
     Tenant,
     Transaction,
+)
+from app.services.currency_ledger import (
+    ANALOGY_LABEL,
+    COMPUTED,
+    CRITERION,
+    INCOMPLETE,
+    SOURCES,
+    Conversion,
+    CurrencyLot,
+    Outflow,
+    compute_currency_ledger,
+    lots_from_sales,
 )
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.tax_irpf_filing import (
@@ -103,6 +116,16 @@ def _execution_time(transaction) -> str:
             if len(digits) >= 4:
                 return digits[:6].ljust(6, "0")
     return ""
+
+
+def _fx_time(conversion) -> str:
+    """HHMMSS de un cambio de divisa: dateTime del Flex o, si no, tradeTime."""
+    found = _execution_time(conversion)
+    if found:
+        return found
+    payload = conversion.raw_payload if isinstance(conversion.raw_payload, dict) else {}
+    digits = "".join(ch for ch in str(payload.get("tradeTime") or "") if ch.isdigit())
+    return digits[:6].ljust(6, "0") if len(digits) >= 4 else ""
 
 
 def _fifo_sort_key(transaction) -> tuple:
@@ -636,7 +659,8 @@ class TaxReportService:
         self.fx = PortfolioFXService()
         self.settings = get_settings()
 
-    def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None) -> dict:
+    def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None, fx_conversions=None, fx_opening_complete: bool = False,
+        fx_income_by_analogy: bool = False) -> dict:
         # IRPF y Modelo 720 se declaran SIEMPRE en euros al tipo del BCE de la
         # fecha de cada operacion, sea cual sea la divisa base de la cartera
         # (EUR, USD...). La divisa base es una preferencia de visualizacion;
@@ -1103,6 +1127,11 @@ class TaxReportService:
             (Decimal(str(b["blocked_loss_base"] or 0)) for b in realized), Decimal("0")
         )
 
+        currency_ledger = self._currency_ledger(
+            db, tx_rows, resolve_rate, base_currency, start, end, fx_conversions, fx_opening_complete,
+            income_by_analogy=fx_income_by_analogy,
+        )
+
         summary = {
             "fiscal_year": fiscal_year,
             "base_currency": base_currency,
@@ -1157,6 +1186,13 @@ class TaxReportService:
             ),
             "method": FIFO_METHOD,
             "securities_fx_criterion": SECURITIES_FX_CRITERION,
+            "currency_ledger_criterion": currency_ledger["criterion"],
+            "currency_ledger_status": currency_ledger["status"],
+            "currency_ledger_gain_base": currency_ledger["gain_base"],
+            "currency_ledger_blocked_loss_base": currency_ledger.get("blocked_loss_base"),
+            "currency_ledger_by_currency": currency_ledger.get("by_currency") or {},
+            "currency_ledger_note": currency_ledger.get("analogy"),
+            "currency_ledger_reason": currency_ledger["reason"],
             "incomplete_fx": incomplete_fx,
             "missing_fx": sorted(
                 {b["ticker"] for b in dividends if b["missing_fx"]}
@@ -1184,6 +1220,204 @@ class TaxReportService:
         if include_filing:
             data["filing"] = self._build_filing(db, fiscal_year, data, tme=tme)
         return data
+
+    def _currency_ledger(
+        self, db, tx_rows, resolve_rate, base_currency, start, end, fx_conversions, opening_complete,
+        income_by_analogy: bool = False,
+    ) -> dict:
+        """Libro de divisas por divisa (DGT V2466-08, V0234-07, V0282-22).
+
+        Conversiones: argumento explicito o tabla ``fx_conversions`` (Flex
+        Trades CASH). Sin ellas, "no calculado". Flujos de divisa que el libro
+        aun no modela (compras de valores, dividendos, intereses y comisiones
+        en esa divisa) hacen el resultado ``incomplete``, no un numero.
+        """
+        if fx_conversions is None:
+            stored = db.scalars(
+                select(FxConversion)
+                .where(FxConversion.trade_date <= end)
+                .order_by(FxConversion.trade_date, FxConversion.id)
+            ).all()
+            raw = [
+                (c.trade_date, c.disposed_currency, c.disposed_amount, c.acquired_currency, f"fx#{c.id}", c.acquired_amount, _fx_time(c))
+                for c in stored
+            ]
+        else:
+            raw = [(c.converted_on, "USD", c.amount, base_currency, c.ref, None, c.time) for c in fx_conversions]
+            explicit_rates = {c.converted_on: c.ecb_rate for c in fx_conversions}
+        if not raw:
+            return compute_currency_ledger([], [], start, end)
+        # Tabla BCE propia: las conversiones pueden ser posteriores a la ultima
+        # operacion del ejercicio y la tabla del informe se corta ahi.
+        _table = self.fx.fx_table(
+            db,
+            currencies={(r[1] or "").upper() for r in raw} | {(r[3] or "").upper() for r in raw},
+            base_currency=base_currency,
+            as_of_max=max(r[0] for r in raw),
+        )
+
+        def conv_rate(currency: str, as_of: date):
+            return _rate_not_older_than(
+                _table, quote_currency=currency, base_currency=base_currency,
+                as_of=as_of, max_age_days=MAX_FX_AGE_DAYS,
+            )
+
+        by_currency: dict[str, list] = {}
+        unsupported: list[str] = []
+        bought_with_base: dict[str, list[CurrencyLot]] = {}
+        for day, disposed, amount, acquired, ref, acquired_amount, when in raw:
+            disposed = (disposed or "").upper()
+            if disposed == base_currency:
+                # Comprar divisa con EUR: entrada de lote cuyo valor de adquisicion
+                # es el EUR pagado (art. 35 LIRPF, coste real). No es transmision
+                # de divisa extranjera. Añadido propio, pendiente de Auditor 2.
+                if acquired_amount is not None:
+                    bought_with_base.setdefault((acquired or "").upper(), []).append(
+                        CurrencyLot(day, Decimal(str(acquired_amount)), Decimal(str(amount)), f"cambio {ref}", when)
+                    )
+                continue
+            if (acquired or "").upper() != base_currency:
+                unsupported.append(f"{disposed}->{(acquired or '?').upper()} {day}")
+                by_currency.setdefault(disposed, [])
+                continue
+            rate = (
+                explicit_rates.get(day)
+                if fx_conversions is not None
+                else conv_rate(disposed, day)
+            )
+            by_currency.setdefault(disposed, []).append(Conversion(day, Decimal(str(amount)), rate, ref, when))
+        results = []
+        all_events = {}
+        for transaction, company in tx_rows:
+            if company is not None:
+                all_events.setdefault(company.ticker, []).append(transaction)
+        for currency, conversions in sorted(by_currency.items()):
+            sales = []
+            for events in all_events.values():
+                if not any((t.currency or "").upper() == currency for t in events):
+                    continue
+                _, hist = replay_tax_fifo(events, resolve_rate, date.min, end)
+                sales += [
+                    {
+                        "date": e["transaction"].trade_date,
+                        "proceeds_native": e["proceeds_native"],
+                        "proceeds_base": e["proceeds_base"],
+                        "ref": f"sale#{e['transaction'].id}",
+                        "time": _execution_time(e["transaction"]),
+                    }
+                    for e in hist
+                    if (e["transaction"].currency or "").upper() == currency
+                ]
+            outflows: list[Outflow] = []
+            extra_lots: list[CurrencyLot] = []
+            unmodeled: list[str] = []
+            fund_like = 0
+            for transaction, company in tx_rows:
+                if (transaction.currency or "").upper() != currency:
+                    continue
+                action = (transaction.action or "").lower()
+                day = transaction.trade_date
+                payload = transaction.raw_payload if isinstance(transaction.raw_payload, dict) else {}
+                if (
+                    str(payload.get("assetCategory") or "").upper() == "FUND"
+                    or str(payload.get("subCategory") or "").upper() in {"ETF", "ETN"}
+                ) and (action in BUY_ACTIONS or action in SELL_ACTIONS):
+                    fund_like += 1
+                if action in BUY_ACTIONS:
+                    # V0282-22 / V0706-22: la compra (con su comision) consume divisa sin resultado.
+                    outflows.append(
+                        Outflow(day, transaction.quantity * transaction.price + transaction.fees, "compra", f"buy#{transaction.id}")
+                    )
+                elif action in SELL_ACTIONS:
+                    continue  # entrada: ya esta en los lotes de ventas
+                elif "fee" in action and "dividend" not in action:
+                    outflows.append(Outflow(day, abs(cash_amount(transaction)), "comision", f"fee#{transaction.id}"))
+                elif "withholding" in action or "dividend" in action or "interest" in action:
+                    if not income_by_analogy:
+                        unmodeled.append(action)
+                        continue
+                    amount = (
+                        -withholding_cost(transaction)
+                        if "withholding" in action
+                        else cash_amount(transaction)
+                    )
+                    if amount > 0:
+                        rate = resolve_rate(currency, day)
+                        extra_lots.append(
+                            CurrencyLot(day, amount, None if rate is None else amount * rate, f"{action}#{transaction.id}", _execution_time(transaction))
+                        )
+                    elif amount < 0:
+                        outflows.append(Outflow(day, -amount, action, f"{action}#{transaction.id}"))
+                else:
+                    unmodeled.append(action or "?")
+            data_through = max(
+                [t.trade_date for t, _ in tx_rows] + [c.converted_on for c in conversions]
+            )
+            result = compute_currency_ledger(
+                lots_from_sales(sales) + extra_lots + bought_with_base.get(currency, []), conversions, start, end,
+                opening_complete=opening_complete, outflows=outflows, data_through=data_through,
+            )
+            notes = []
+            if unmodeled:
+                notes.append(
+                    f"{len(unmodeled)} movimientos en {currency} sin modelar (dividendos, intereses, retenciones u otros; "
+                    "activar fx_income_by_analogy para tratarlos por analogia)"
+                )
+            if fund_like:
+                notes.append(
+                    f"{fund_like} operaciones con fondos/ETF en {currency} (V0775-21, diferencia imputada al reembolsar): fuera de alcance"
+                )
+            if income_by_analogy and any(
+                k in (t.action or "").lower() for t, _ in tx_rows for k in ("dividend", "interest", "withholding")
+            ):
+                result["analogy"] = ANALOGY_LABEL
+                notes.append(f"dividendos/intereses como entradas: {ANALOGY_LABEL}")
+            if unmodeled or fund_like:
+                result["status"], result["gain_base"], result["blocked_loss_base"] = INCOMPLETE, None, None
+            result["reason"] = "; ".join(filter(None, [result["reason"], *notes])) or None
+            result["currency"] = currency
+            for row in result["rows"]:
+                row["currency"] = currency
+            results.append(result)
+        if unsupported:
+            for r in results:
+                r["status"], r["gain_base"] = INCOMPLETE, None
+                r["reason"] = "; ".join(filter(None, [r["reason"], "cambios a otra divisa distinta de EUR no soportados: " + ", ".join(unsupported)]))
+        if not results:
+            return compute_currency_ledger([], [], start, end)
+        worst = (
+            COMPUTED
+            if all(r["status"] == COMPUTED for r in results)
+            else INCOMPLETE
+        )
+        return {
+            "criterion": CRITERION,
+            "status": worst,
+            "gain_base": float(sum(Decimal(str(r["gain_base"])) for r in results)) if worst == COMPUTED else None,
+            "reason": "; ".join(dict.fromkeys(r["reason"] for r in results if r["reason"])) or None,
+            "rows": [row for r in results for row in r["rows"]],
+            # Por divisa: cada una con su estado, ganancia en EUR y divisa sin convertir
+            # (en unidades de esa divisa). El total EUR (gain_base) va aparte y solo
+            # existe si todas las divisas estan calculadas.
+            "by_currency": {
+                r["currency"]: {
+                    "status": r["status"],
+                    "gain_base": r["gain_base"],
+                    "blocked_loss_base": r["blocked_loss_base"],
+                    "unconverted": r["unconverted"],
+                    "reason": r["reason"],
+                }
+                for r in results
+            },
+            "unconverted": {r["currency"]: r["unconverted"] for r in results},
+            "blocked_loss_base": (
+                float(sum(Decimal(str(r["blocked_loss_base"])) for r in results))
+                if worst == COMPUTED
+                else None
+            ),
+            "analogy": next((r["analogy"] for r in results if r.get("analogy")), None),
+            "sources": list(SOURCES),
+        }
 
     def _build_filing(self, db: Session, fiscal_year: int, data: dict, tme: Decimal | None = None) -> dict:
         """Capa de declaracion IRPF (casillas Modelo 100 + doble imposicion).
@@ -1333,9 +1567,15 @@ class TaxReportService:
         data["versioning"] = report_versioning(data["summary"], persisted=False)
         return data
 
-    def regenerate_report(self, db: Session, fiscal_year: int) -> dict:
+    def regenerate_report(
+        self, db: Session, fiscal_year: int, fx_opening_complete: bool = False,
+        fx_income_by_analogy: bool = False,
+    ) -> dict:
         """Recalcula y PERSISTE el informe del ejercicio (camino POST)."""
-        data = self.compute_report(db, fiscal_year)
+        data = self.compute_report(
+            db, fiscal_year, fx_opening_complete=fx_opening_complete,
+            fx_income_by_analogy=fx_income_by_analogy,
+        )
         portfolio = self.fx.ensure_portfolio(db)
         report = db.scalar(
             select(TaxReport).where(TaxReport.fiscal_year == fiscal_year)

@@ -17,6 +17,7 @@ export default function ThesisAudioPlayer({ ticker, version }: { ticker: string;
     const query = version === null ? '' : `?version=${version}`;
     const [state, setState] = useState<AudioState>('loading');
     const [requesting, setRequesting] = useState(false);
+    const [pollCycle, setPollCycle] = useState(0);
 
     const refresh = useCallback(async (): Promise<AudioState> => {
         try {
@@ -43,13 +44,16 @@ export default function ThesisAudioPlayer({ ticker, version }: { ticker: string;
             cancelled = true;
             if (timer) clearTimeout(timer);
         };
-    }, [refresh, version]);
+    }, [refresh, version, pollCycle]);
 
     async function generate() {
         setRequesting(true);
         try {
             const res = await fetch(`${base}${query}`, { method: 'POST' });
             setState(res.ok ? 'pending' : 'error');
+            // El sondeo inicial acaba en missing/error. Reiniciarlo tras el POST
+            // permite llegar a ready sin tener que recargar la página.
+            if (res.ok) setPollCycle(cycle => cycle + 1);
         } catch {
             setState('error');
         } finally {

@@ -85,6 +85,13 @@ const TAX_LABELS: Record<string, string> = {
     cost_unknown: 'Ventas con coste heredado desconocido',
     method: 'Método de valoración',
     securities_fx_criterion: 'Criterio FX en valores',
+    currency_ledger_criterion: 'Criterio libro de divisas',
+    currency_ledger_status: 'Libro de divisas (USD a EUR)',
+    currency_ledger_gain_base: 'G/P por conversión de divisa',
+    currency_ledger_reason: 'Libro de divisas: motivo',
+    currency_ledger_blocked_loss_base: 'Pérdida de divisa diferida (recompra en el año posterior)',
+    currency_ledger_note: 'Libro de divisas: nota de criterio',
+    currency_ledger_by_currency: 'Libro de divisas por divisa',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',
     generated_at: 'Generado',
@@ -205,6 +212,17 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = WASH_BASIS_LABELS[String(value)] ?? String(value);
         } else if (key === 'securities_fx_criterion') {
             display[label] = SECURITIES_FX_LABELS[String(value)] ?? String(value);
+        } else if (key === 'currency_ledger_status') {
+            display[label] = ({ not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' } as Record<string, string>)[String(value)] ?? String(value);
+        } else if (key === 'currency_ledger_gain_base') {
+            display[label] = value === null || value === undefined ? 'No calculado' : value;
+        } else if (key === 'currency_ledger_by_currency') {
+            const byCurrency = (value ?? {}) as Record<string, { status?: string; gain_base?: number | null; unconverted?: number | null }>;
+            const names: Record<string, string> = { not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' };
+            const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? 'No calculado' : `${v.gain_base} EUR`} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, sin convertir ${v.unconverted} ${cur}`})`);
+            display[label] = parts.length > 0 ? parts.join(' · ') : 'Sin conversiones';
+        } else if (key === 'currency_ledger_reason') {
+            display[label] = value ?? 'Ninguno';
         } else if (key === 'method') {
             display[label] = METHOD_LABELS[String(value).toLowerCase()] ?? String(value);
         } else if (key === 'generated_at') {

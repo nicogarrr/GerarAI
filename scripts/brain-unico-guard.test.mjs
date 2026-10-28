@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
-const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
 const client = readFileSync('lib/research/assistant-client.ts', 'utf8');
 const contract = readFileSync('lib/research/assistant-contract.ts', 'utf8');
 const openBrain = readFileSync('lib/brain/open-brain.ts', 'utf8');

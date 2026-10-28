@@ -21,7 +21,10 @@ async function addBySymbol(page: Page, symbol: string) {
   await page.getByRole("button", { name: "Añadir empresa" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Añadir a la watchlist" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("combobox").or(dialog.getByRole("textbox")).first().fill(symbol);
+  await dialog.getByRole("combobox", { name: "Buscar acciones para añadir a la watchlist" }).fill(symbol);
+  // Este caso prueba alta manual: salir del buscador cancela su debounce
+  // y cierra sugerencias antes de pulsar el botón del símbolo escrito.
+  await dialog.getByRole("heading", { name: "Añadir a la watchlist" }).click();
   await dialog.getByRole("button", { name: `Añadir «${symbol}» por su símbolo` }).click();
   await expect(page.getByText(`${symbol} añadido a la watchlist`)).toBeVisible({ timeout: 20_000 });
   await page.keyboard.press("Escape");

@@ -93,14 +93,14 @@ describe('F215: búsqueda con estado explícito', () => {
 
   it('los buscadores de ticker de la app usan el componente compartido', () => {
     for (const file of [
-      'components/portfolio/AddTransactionButton.tsx',
+      'components/portfolio/AddTransactionDialog.tsx',
       'components/insider/InsiderSignalsView.tsx',
       'components/alerts/AlertsManager.tsx',
     ]) {
       assert.ok(source(file).includes('TickerSearchInput'), `${file} debe usar el buscador compartido`);
     }
     // Sin implementaciones duplicadas del dropdown inline.
-    assert.ok(!source('components/portfolio/AddTransactionButton.tsx').includes('Dropdown de resultados'), 'no queda dropdown duplicado en cartera');
+    assert.ok(!source('components/portfolio/AddTransactionDialog.tsx').includes('Dropdown de resultados'), 'no queda dropdown duplicado en cartera');
   });
 });
 

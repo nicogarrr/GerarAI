@@ -43,7 +43,9 @@ from app.models.entities import (
     FundamentalModelVersion,
     FundamentalValuationSnapshot,
     FundManager,
+    FxConversion,
     FXRate,
+    IbkrRawRow,
     InferredInput,
     InsiderFiling,
     InsiderTransaction,
@@ -113,6 +115,8 @@ from app.models.entities import (
 __all__ = [
     "WorkflowStepRun",
     "WorkflowRun",
+    "FxConversion",
+    "IbkrRawRow",
     "InsiderTransaction",
     "ITUNotice",
     "InsiderFiling",
@@ -262,3 +266,7 @@ __all__.extend(["KnowledgeRagParent", "KnowledgeRagSource"])
 from app.models.ibkr_connection import IBKRConnection as IBKRConnection  # noqa: E402
 
 __all__.append("IBKRConnection")
+
+from app.models.ibkr_connection import IBKRSyncReceipt as IBKRSyncReceipt  # noqa: E402
+
+__all__.append("IBKRSyncReceipt")

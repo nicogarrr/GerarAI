@@ -21848,7 +21848,10 @@ export interface operations {
     };
     regenerate_tax_report_api_taxes_report__fiscal_year__regenerate_post: {
         parameters: {
-            query?: never;
+            query?: {
+                fx_opening_complete?: boolean;
+                fx_income_by_analogy?: boolean;
+            };
             header?: {
                 "x-cavaai-user"?: string | null;
                 "x-cavaai-tenant"?: string | null;

@@ -18,19 +18,20 @@ vi.mock('@/components/search/TickerSearchInput', () => ({
 }));
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 
-function open(followed: string[] = []) {
+async function open(followed: string[] = []) {
     render(<WatchlistAddButton followedSymbols={followed} />);
     fireEvent.click(screen.getByRole('button', { name: /Añadir empresa/ }));
-    return within(screen.getByRole('dialog'));
+    // El contenido del diálogo llega en chunk diferido (next/dynamic).
+    return within(await screen.findByRole('dialog'));
 }
-const type = (d: ReturnType<typeof open>, v: string) => fireEvent.change(d.getByLabelText('q'), { target: { value: v } });
+const type = (d: Awaited<ReturnType<typeof open>>, v: string) => fireEvent.change(d.getByLabelText('q'), { target: { value: v } });
 
 beforeEach(() => vi.clearAllMocks());
 
 describe('WatchlistAddButton alta', () => {
     it('seleccionar un resultado lo anade con su nombre, avisa y refresca', async () => {
         h.add.mockResolvedValue({ success: true });
-        const d = open();
+        const d = await open();
         fireEvent.click(d.getByText('pick-san'));
         await waitFor(() => expect(h.success).toHaveBeenCalledWith('SAN.MC añadido a la watchlist'));
         expect(h.add).toHaveBeenCalledWith('SAN.MC', 'Santander');
@@ -40,13 +41,13 @@ describe('WatchlistAddButton alta', () => {
 
     it('sin nombre pasa undefined, no cadena vacia', async () => {
         h.add.mockResolvedValue({ success: true });
-        const d = open();
+        const d = await open();
         fireEvent.click(d.getByText('pick-aapl'));
         await waitFor(() => expect(h.add).toHaveBeenCalledWith('AAPL', undefined));
     });
 
-    it('un ticker ya seguido no se vuelve a anadir', () => {
-        const d = open(['aapl']);
+    it('un ticker ya seguido no se vuelve a anadir', async () => {
+        const d = await open(['aapl']);
         fireEvent.click(d.getByText('pick-aapl'));
         expect(h.add).not.toHaveBeenCalled();
         expect(d.getByTestId('disabled').textContent).toBe('AAPL');
@@ -54,7 +55,7 @@ describe('WatchlistAddButton alta', () => {
 
     it('duplicado devuelto por el servidor: se marca como seguido y se avisa', async () => {
         h.add.mockResolvedValue({ success: false, code: 'duplicate', message: 'dup' });
-        const d = open();
+        const d = await open();
         fireEvent.click(d.getByText('pick-aapl'));
         await waitFor(() => expect(h.showError).toHaveBeenCalled());
         expect(h.showError.mock.calls[0][0]).toBe('dup');
@@ -65,7 +66,7 @@ describe('WatchlistAddButton alta', () => {
 
     it('otro error: no se marca como seguido, texto de reserva y reintento', async () => {
         h.add.mockResolvedValue({ success: false });
-        const d = open();
+        const d = await open();
         fireEvent.click(d.getByText('pick-aapl'));
         await waitFor(() => expect(h.showError).toHaveBeenCalled());
         expect(h.showError.mock.calls[0][0]).toBe('No se pudo añadir a la watchlist');
@@ -77,7 +78,7 @@ describe('WatchlistAddButton alta', () => {
 
     it('excepcion: showErrorToast y se puede volver a intentar', async () => {
         h.add.mockRejectedValue(new Error('net'));
-        const d = open();
+        const d = await open();
         fireEvent.click(d.getByText('pick-aapl'));
         await waitFor(() => expect(h.showError).toHaveBeenCalled());
         expect(d.getByLabelText('q')).not.toBeDisabled();
@@ -86,7 +87,7 @@ describe('WatchlistAddButton alta', () => {
     it('mientras anade: estado Anadiendo y buscador desactivado', async () => {
         let resolve!: (v: unknown) => void;
         h.add.mockReturnValue(new Promise((r) => { resolve = r; }));
-        const d = open();
+        const d = await open();
         fireEvent.click(d.getByText('pick-aapl'));
         expect(await d.findByText('Añadiendo AAPL…')).toBeInTheDocument();
         expect(d.getByLabelText('q')).toBeDisabled();
@@ -100,20 +101,20 @@ describe('WatchlistAddButton alta', () => {
 describe('WatchlistAddButton alta manual por simbolo', () => {
     it('texto con forma de ticker ofrece anadir en mayusculas y lo guarda sin nombre', async () => {
         h.add.mockResolvedValue({ success: true });
-        const d = open();
+        const d = await open();
         type(d, ' kkr ');
         fireEvent.click(d.getByRole('button', { name: 'Añadir «KKR» por su símbolo' }));
         await waitFor(() => expect(h.add).toHaveBeenCalledWith('KKR', undefined));
     });
 
-    it.each([['', 0], ['   ', 0], ['no es ticker!', 0], ['a'.repeat(40), 0]])('%j no ofrece alta manual', (value) => {
-        const d = open();
+    it.each([['', 0], ['   ', 0], ['no es ticker!', 0], ['a'.repeat(40), 0]])('%j no ofrece alta manual', async (value) => {
+        const d = await open();
         type(d, value as string);
         expect(d.queryByRole('button', { name: /por su símbolo/ })).not.toBeInTheDocument();
     });
 
-    it('un ticker ya seguido no ofrece alta manual y dice que ya se sigue', () => {
-        const d = open(['KKR']);
+    it('un ticker ya seguido no ofrece alta manual y dice que ya se sigue', async () => {
+        const d = await open(['KKR']);
         type(d, 'kkr');
         expect(d.queryByRole('button', { name: /por su símbolo/ })).not.toBeInTheDocument();
         expect(d.getByText(/Ya sigues «KKR»/)).toBeInTheDocument();

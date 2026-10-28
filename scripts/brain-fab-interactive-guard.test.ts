@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 test('mobile access is in its reserved navigation row, not over page controls', () => {
-  const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+  const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
   const nav = readFileSync('components/layout/BottomNav.tsx', 'utf8');
   // #1848: la burbuja es ahora un envoltorio (boton + pista "Pregunta al
   // Cerebro"), asi que el literal cambia de orden pero NO de significado:
