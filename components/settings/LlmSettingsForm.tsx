@@ -285,7 +285,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                             if (event.target.checked) setApiKey('');
                         }}
                         className="mt-0.5 size-5 shrink-0 accent-teal-500"
-                    type="checkbox"
+                        type="checkbox"
                     />
                     Borrar la clave guardada y desactivar la IA propia
                 </label>
