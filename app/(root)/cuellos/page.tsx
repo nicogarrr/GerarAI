@@ -61,7 +61,7 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
       </p>
       {signal.evidence?.length ? (
         <details className="mt-3 text-xs">
-          <summary className="cursor-pointer text-teal-300">Ver evidencias guardadas ({signal.evidence.length})</summary>
+          <summary className="min-h-11 cursor-pointer py-3 text-teal-300">Ver evidencias guardadas ({signal.evidence.length})</summary>
           <ul className="mt-2 space-y-2">
             {signal.evidence.map((item) => (
               <li key={item.id}>

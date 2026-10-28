@@ -206,7 +206,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                             <td className="py-3 text-gray-400">{row.put_call ?? row.share_type}</td>
                                             <td className="py-3">
                                                 <a
-                                                    className="inline-flex items-center gap-1 text-teal-300 hover:text-teal-200"
+                                                    className="inline-flex min-h-11 items-center gap-1 text-teal-300 hover:text-teal-200"
                                                     href={row.filing_url}
                                                     rel="noreferrer"
                                                     target="_blank"
