@@ -10,10 +10,12 @@ const runUiE2E = process.env.E2E_UI_RUN === "1";
 test.describe("frontend audit closure", () => {
   test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 
-  test("las páginas legales en borrador se muestran con noindex", async ({ page }) => {
+  test("las páginas legales publicadas llevan disclaimer y noindex", async ({ page }) => {
     for (const path of ["/privacidad", "/terminos"]) {
       await page.goto(path);
-      await expect(page.getByText(/Aviso de borrador/).first()).toBeVisible();
+      // Documentos ya aprobados y completos: el aviso de borrador se sustituyó
+      // por el disclaimer (ver 3630e76 y el guard equivalente de scripts/).
+      await expect(page.getByText(/informativo y no constituye asesoramiento jurídico/).first()).toBeVisible();
       const robots = await page.locator('meta[name="robots"]').getAttribute("content");
       expect(robots ?? "").toContain("noindex");
     }

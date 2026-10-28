@@ -1,5 +1,6 @@
 import { readSessionWhenCookies } from "@/lib/anonymous-session";
-import { publicSans, publicEditorial } from "@/lib/public-fonts";
+import { publicSans } from "@/lib/public-fonts";
+import { publicEditorial } from "@/lib/public-fonts-editorial";
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import React from 'react';

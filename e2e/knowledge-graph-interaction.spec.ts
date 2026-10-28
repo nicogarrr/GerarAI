@@ -357,7 +357,7 @@ test.describe("knowledge-graph interactivo (D2b)", () => {
     const rows = page.locator('[data-testid^="kg-row-"]');
     const label = await labelOfRow(rows.nth(2));
     await page.getByTestId("kg-search").fill(label.slice(0, Math.min(12, label.length)));
-    await expect(page.getByRole("status").filter({ hasText: /nodos coinciden/ })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: /nodos? coinciden?/ })).toBeVisible();
 
     const suggestion = page.locator('[data-testid^="kg-suggestion-"]').first();
     await suggestion.click();
