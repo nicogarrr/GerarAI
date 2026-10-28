@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 
 import { getExtendedQuote } from '@/lib/actions/watchlist.actions';
+import { requestCache } from '@/lib/cache/requestCache';
 import { extendedQuoteLabel, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { formatNumber, formatPercent, formatPrice } from '@/lib/format';
 
@@ -13,7 +14,14 @@ import { formatNumber, formatPercent, formatPrice } from '@/lib/format';
  * tope aunque la línea es secundaria. Ahora se pide en cliente tras el
  * primer pintado; hasta que responde no se pinta nada — igual que cuando la
  * lectura falla — nunca un dato inventado.
+ *
+ * /watchlist y /portfolio montan la línea DOS veces por fila (tarjetas
+ * móviles y tabla de escritorio van las dos en el DOM): pasaba a ser 2
+ * llamadas idénticas por símbolo. requestCache deduplica las concurrentes y
+ * guarda el dato EXTENDED_QUOTE_TTL_S: cada símbolo se pide 1 vez por
+ * minuto aunque cambie la paginación.
  */
+const EXTENDED_QUOTE_TTL_S = 60;
 export default function ExtendedHoursLine({
     symbol,
     currency,
@@ -29,7 +37,7 @@ export default function ExtendedHoursLine({
 
     useEffect(() => {
         let cancelled = false;
-        getExtendedQuote(symbol)
+        requestCache.get(`extended-quote:${symbol.toUpperCase()}`, () => getExtendedQuote(symbol), EXTENDED_QUOTE_TTL_S)
             .then((data) => {
                 if (!cancelled) setQuote(data);
             })

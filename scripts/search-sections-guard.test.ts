@@ -35,7 +35,7 @@ test('la etiqueta del destino y la descripción también casan, sin tildes', () 
 });
 
 test('SearchCommand usa el matcher de secciones en vez de filtrar solo por label', () => {
-    const view = readFileSync('components/SearchCommand.tsx', 'utf8');
+    const view = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
     assert.match(view, /navSectionMatchesSearch\(section, searchTerm, flattenNavItems\)/);
     assert.match(view, /navItemMatchesSearch\(section, item, searchTerm\)/);
     assert.doesNotMatch(view, /item\.label\.toLocaleLowerCase\(\)\.includes/);

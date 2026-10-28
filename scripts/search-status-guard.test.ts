@@ -25,7 +25,7 @@ describe('F215: búsqueda con estado explícito', () => {
   });
 
   it('el buscador global no pinta "sin resultados" cuando el proveedor falla', () => {
-    const cmd = source('components/SearchCommand.tsx');
+    const cmd = source('components/SearchCommand.tsx') + source('components/SearchCommandDialog.tsx');
     assert.ok(cmd.includes('searchStocksWithStatus'), 'SearchCommand debe usar la variante con estado');
     assert.ok(
       cmd.includes("result.status === 'error'"),

@@ -61,7 +61,7 @@ void test('los componentes usan las etiquetas, no la cadena cruda', () => {
     assert.match(risk, /exposureRecord\(value, etiquetaFactor\)/);
     assert.match(risk, /etiquetaSeveridad\(formatRecordValue\(alert\.severity\)\)/);
     assert.doesNotMatch(risk, /hace falta historia de precios/);
-    const search = readFileSync('components/SearchCommand.tsx', 'utf8');
+    const search = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
     assert.match(search, /etiquetaTipoInstrumento\(stock\.type\)/);
     const news = (readFileSync('app/(root)/research/news/page.tsx', 'utf8') + readFileSync('components/research/NewsEventsFlow.tsx', 'utf8'));
     // La tabla ya no muestra la columna de tier (SERIE 1): si vuelve a

@@ -11,7 +11,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('components/SearchCommand.tsx', 'utf8');
+const source = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
 
 void test('los fallos de carga del buscador no disparan toast (superficie única inline)', () => {
     assert.doesNotMatch(source, /showErrorToast/, 'el error de búsqueda ya se muestra inline; el toast duplicaba');
