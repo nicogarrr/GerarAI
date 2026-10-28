@@ -68,6 +68,7 @@ from app.services.tax_irpf_filing import (
     build_loss_compensation,
 )
 from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
+from app.services.currency_ledger import compute_currency_ledger, lots_from_sales
 from app.valuation.currency import normalize_currency
 
 FIFO_METHOD = "fifo"
@@ -608,7 +609,7 @@ class TaxReportService:
         self.fx = PortfolioFXService()
         self.settings = get_settings()
 
-    def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None) -> dict:
+    def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None, fx_conversions=None) -> dict:
         # IRPF y Modelo 720 se declaran SIEMPRE en euros al tipo del BCE de la
         # fecha de cada operacion, sea cual sea la divisa base de la cartera
         # (EUR, USD...). La divisa base es una preferencia de visualizacion;
@@ -1058,6 +1059,18 @@ class TaxReportService:
             (Decimal(str(b["blocked_loss_base"] or 0)) for b in realized), Decimal("0")
         )
 
+        # Libro de divisas (DGT V2466-08, V0234-07, V0282-22): sin
+        # conversiones reales como entrada queda "no calculado", nunca 0.
+        _ledger_lots = lots_from_sales(
+            {**sale, "date": date.fromisoformat(sale["date"])}
+            for b in realized
+            if (b.get("currency") or base_currency) != base_currency
+            for sale in b.get("sales", [])
+        )
+        currency_ledger = compute_currency_ledger(
+            _ledger_lots, fx_conversions, date(fiscal_year, 1, 1), date(fiscal_year, 12, 31)
+        )
+
         summary = {
             "fiscal_year": fiscal_year,
             "base_currency": base_currency,
@@ -1109,6 +1122,10 @@ class TaxReportService:
             ),
             "method": FIFO_METHOD,
             "securities_fx_criterion": SECURITIES_FX_CRITERION,
+            "currency_ledger_criterion": currency_ledger["criterion"],
+            "currency_ledger_status": currency_ledger["status"],
+            "currency_ledger_gain_base": currency_ledger["gain_base"],
+            "currency_ledger_reason": currency_ledger["reason"],
             "incomplete_fx": incomplete_fx,
             "missing_fx": sorted(
                 {b["ticker"] for b in dividends if b["missing_fx"]}

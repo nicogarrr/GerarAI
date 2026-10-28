@@ -85,6 +85,10 @@ const TAX_LABELS: Record<string, string> = {
     cost_unknown: 'Ventas con coste heredado desconocido',
     method: 'Método de valoración',
     securities_fx_criterion: 'Criterio FX en valores',
+    currency_ledger_criterion: 'Criterio libro de divisas',
+    currency_ledger_status: 'Libro de divisas (USD a EUR)',
+    currency_ledger_gain_base: 'G/P por conversión de divisa',
+    currency_ledger_reason: 'Libro de divisas: motivo',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',
     generated_at: 'Generado',
@@ -205,6 +209,12 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = WASH_BASIS_LABELS[String(value)] ?? String(value);
         } else if (key === 'securities_fx_criterion') {
             display[label] = SECURITIES_FX_LABELS[String(value)] ?? String(value);
+        } else if (key === 'currency_ledger_status') {
+            display[label] = ({ not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' } as Record<string, string>)[String(value)] ?? String(value);
+        } else if (key === 'currency_ledger_gain_base') {
+            display[label] = value === null || value === undefined ? 'No calculado' : value;
+        } else if (key === 'currency_ledger_reason') {
+            display[label] = value ?? 'Ninguno';
         } else if (key === 'method') {
             display[label] = METHOD_LABELS[String(value).toLowerCase()] ?? String(value);
         } else if (key === 'generated_at') {
