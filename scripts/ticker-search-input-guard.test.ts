@@ -40,7 +40,7 @@ describe('buscador de ticker unificado (autocompletado inline)', () => {
         assert.ok(insider.includes("from '@/components/search/TickerSearchInput'"), 'Form 4 lo usa');
         assert.ok(alerts.includes("from '@/components/search/TickerSearchInput'"), 'crear alerta lo usa');
         assert.ok(cartera.includes("from '@/components/search/TickerSearchInput'"), 'añadir inversión lo usa');
-        for (const path of ['app/(root)/search/page.tsx', 'app/(root)/knowledge-graph/page.tsx', 'app/(root)/portfolio/stress/page.tsx', 'app/(root)/research/page.tsx', 'app/(root)/research/sources/page.tsx', 'components/brain/GlobalBrainPanel.tsx', 'components/plan/PlanSetupDialog.tsx', 'components/work-products/WorkProductButton.tsx', 'components/watchlist/WatchlistAddButton.tsx', 'components/portfolio/EditTransactionDialog.tsx']) {
+        for (const path of ['app/(root)/search/page.tsx', 'app/(root)/knowledge-graph/page.tsx', 'app/(root)/portfolio/stress/page.tsx', 'app/(root)/research/page.tsx', 'app/(root)/research/sources/page.tsx', 'components/brain/GlobalBrainPanel.tsx', 'components/plan/PlanSetupDialog.tsx', 'components/work-products/WorkProductDialog.tsx', 'components/watchlist/WatchlistAddDialog.tsx', 'components/portfolio/EditTransactionDialog.tsx']) {
             assert.ok(readFileSync(path, 'utf8').includes('TickerSearchInput'), path);
         }
         assert.ok(!insider.includes("import { Input } from '@/components/ui/input'"), 'Form 4 ya no usa el input plano');
