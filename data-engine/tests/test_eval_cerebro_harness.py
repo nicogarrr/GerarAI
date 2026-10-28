@@ -35,3 +35,49 @@ def test_cerebro_harness_stub_suite_passes(tmp_path):
     assert data["summary"]["failed"] == 0
     assert data["summary"]["total"] == 18
     assert data["actual_list_price_eur"] == 0.0
+
+
+def load_harness():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('harness_security', DATA_ENGINE_ROOT / 'scripts' / 'eval_cerebro_harness.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_untrusted_endpoint_rejected_before_catalogue(monkeypatch):
+    import pytest
+    h = load_harness()
+    monkeypatch.setattr(h, '_get_json', lambda *args: pytest.fail('network must not run'))
+    with pytest.raises(SystemExit, match='allowlist'):
+        h.verify_free_model('https://untrusted.invalid/paid/v1', h.DEFAULT_MODEL)
+
+
+def test_redirects_rejected():
+    import pytest
+    h = load_harness()
+    with pytest.raises(SystemExit, match='redirección'):
+        h.NoRedirects().redirect_request(None, None, 302, '', {}, 'https://untrusted.invalid/')
+
+
+def test_external_provider_disabled_before_app_or_network(monkeypatch):
+    import pytest
+    h = load_harness()
+    monkeypatch.setattr(h, '_get_json', lambda *args: pytest.fail('network must not run'))
+    with pytest.raises(SystemExit, match='deshabilitado'):
+        h.build_zen_provider(h.DEFAULT_BASE_URL, h.DEFAULT_MODEL)
+
+
+def test_cli_overrides_production_environment(monkeypatch, tmp_path):
+    h = load_harness()
+    for key, value in [('APP_ENV', 'production'), ('WORKERS_ENABLED', 'true'), ('RESEARCH_AUTH_REQUIRED', 'true')]:
+        monkeypatch.setenv(key, value)
+    async def fake(args):
+        import os
+        assert os.environ['APP_ENV'] == 'test'
+        assert os.environ['WORKERS_ENABLED'] == 'false'
+        assert os.environ['RESEARCH_AUTH_REQUIRED'] == 'false'
+        return {'summary': {'failed': 0}}
+    monkeypatch.setattr(h, 'run_suite', fake)
+    monkeypatch.setattr(sys, 'argv', ['eval_cerebro_harness.py'])
+    assert h.main() == 0

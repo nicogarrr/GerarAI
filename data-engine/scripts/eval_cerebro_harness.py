@@ -5,28 +5,26 @@ Modos de proveedor:
 
 - ``stub`` (por defecto, sin red ni clave): un modelo simulado honesto que
   valida la fontanería del arnés y las rutas deterministas del Cerebro.
-- ``opencode-zen``: un modelo free REAL del catálogo público de OpenCode Zen
-  (por defecto ``deepseek-v4.1-flash-free``). Antes de llamar nada, el arnés
-  verifica contra la fuente oficial que (1) el id EXACTO existe en
-  ``{base_url}/models`` y (2) models.dev lo lista con coste 0 entrada/salida
-  y sin estado deprecated. Si cualquiera falla, aborta sin gastar nada.
+- ``opencode-zen``: DESHABILITADO. La semilla reutiliza tickers personales.
+  No se permite enviar sus prompts a un servicio externo antes de anonimizar
+  la semilla y verificar su aislamiento de forma independiente. ``--yes`` no
+  elude esta puerta. El catálogo solo se verifica en el endpoint oficial
+  exacto y sin redirecciones; no existe fallback de proveedor ni modelo.
 
 Uso (desde data-engine/):
 
     # Offline, sin clave: valida arnés + rutas deterministas
     APP_ENV=test python scripts/eval_cerebro_harness.py --provider stub
 
-    # Modelo free real de OpenCode (cuota gratuita; sin saldo no hay cargos,
-    # el proveedor bloquea con 429 cuando la cuota se agota):
+    # Rechazado hasta anonimizar la semilla:
     OPENCODE_API_KEY=... python scripts/eval_cerebro_harness.py \
         --provider opencode-zen --model deepseek-v4.1-flash-free --yes
 
     # Comparar "agentes" (variantes de prompt) sobre la misma suite:
     ... --variant minimal | estricto
 
-La base es 100 % sintética (tests/cerebro_seed.py): ningún dato real sale
-hacia el proveedor. ``--yes`` confirma que entiendes que hay llamadas de red
-a un servicio externo (con datos sintéticos y coste 0 verificado).
+La base usa cifras de prueba, pero conserva tickers de la cartera del usuario.
+Por eso el único modo ejecutable es stub, sin llamadas a proveedores externos.
 """
 
 from __future__ import annotations
@@ -114,10 +112,22 @@ class RecordingProvider:
         return response
 
 
+class NoRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise SystemExit("Rechazado: redirección en verificación del proveedor")
+
+
+def require_zen_endpoint(base_url: str) -> None:
+    if base_url != DEFAULT_BASE_URL:
+        raise SystemExit("Rechazado: endpoint fuera de la allowlist exacta de OpenCode Zen")
+
+
 def _get_json(url: str, timeout: float):
     """GET JSON con UA propio: models.dev sirve 403 al UA generico de urllib."""
     request = urllib.request.Request(url, headers={"User-Agent": "gerarai/1.0"})
-    with urllib.request.urlopen(request, timeout=timeout) as resp:
+    with urllib.request.build_opener(NoRedirects()).open(request, timeout=timeout) as resp:
+        if resp.geturl() != url:
+            raise SystemExit("Rechazado: destino efectivo distinto de la URL verificada")
         return json.loads(resp.read().decode())
 
 
@@ -128,6 +138,7 @@ def verify_free_model(base_url: str, model: str, *, timeout: float = 15.0) -> di
     registro público models.dev (coste y estado). Devuelve la evidencia;
     lanza SystemExit con el motivo si el modelo no pasa las puertas.
     """
+    require_zen_endpoint(base_url)
     evidence: dict[str, object] = {"model": model, "base_url": base_url, "checks": {}}
     if not (model.endswith("-free") or model in REPO_VERIFIED_FREE):
         raise SystemExit(
@@ -167,25 +178,9 @@ def build_zen_provider(base_url: str, model: str):
     respaldo (Groq/Gemini): el arnés mide ESTE modelo y ningún otro, y jamás
     toca un proveedor con facturación posible.
     """
-    from app.llm.adapters import OpenAICompatibleProvider
-    from app.llm.factory import _pin_to_model
+    require_zen_endpoint(base_url)
+    raise SystemExit("Proveedor externo deshabilitado: la semilla contiene tickers personales y requiere anonimización independiente antes de cualquier envío")
 
-    api_key = (os.environ.get("OPENCODE_API_KEY") or os.environ.get("OPENCODE_GO_API_KEY") or "").strip()
-    if not api_key:
-        raise SystemExit("Falta OPENCODE_API_KEY (u OPENCODE_GO_API_KEY) en el entorno.")
-    return OpenAICompatibleProvider(
-        api_key=api_key,
-        base_url=base_url,
-        default_model=model,
-        provider_name="opencode-zen-free",
-        extra_headers={"User-Agent": "gerarai/1.0", "x-opencode-session": "cerebro-eval"},
-        model_overrides=_pin_to_model(model),
-        fallback_model=None,
-        strip_response_format=True,
-        max_retries=0,
-        timeout_seconds=30.0,
-        total_timeout_seconds=55.0,
-    )
 
 
 PROMPT_VARIANTS: dict[str, dict[str, str]] = {
@@ -299,6 +294,9 @@ def validate_case(case: dict, answer: str, sources: list, trace: dict, model: st
 
 
 async def run_suite(args) -> dict:
+    if args.provider != "stub":
+        require_zen_endpoint(args.base_url)
+        raise SystemExit("Proveedor externo deshabilitado hasta anonimizar la semilla")
     from app.services import user_context
     from app.services.chat_service import ChatService
     from tests.cerebro_seed import fake_dca_reader, seeded_session
@@ -442,9 +440,9 @@ def main() -> int:
         return 0
 
     # Entorno de pruebas ANTES de importar la app (settings cacheados).
-    os.environ.setdefault("APP_ENV", "test")
-    os.environ.setdefault("RESEARCH_AUTH_REQUIRED", "false")
-    os.environ.setdefault("WORKERS_ENABLED", "false")
+    os.environ["APP_ENV"] = "test"
+    os.environ["RESEARCH_AUTH_REQUIRED"] = "false"
+    os.environ["WORKERS_ENABLED"] = "false"
     os.environ.setdefault("MPLBACKEND", "Agg")
     os.environ["DATABASE_URL"] = f"sqlite:///{Path(os.environ.get('TMPDIR', '/tmp')) / f'cerebro_eval_{os.getpid()}.db'}"
 
