@@ -76,7 +76,11 @@ def finish_run(
         row.errors_count = len(summary.get("errors", []))
         row.alerted_count = len(summary.get("alerted", []))
         row.params_version = summary.get("params_version")
+        # Se conserva lo que el llamador ya dejo en ``detail`` (simbolos pedidos,
+        # resumen de la tanda manual): asi el estado final y su resumen se
+        # confirman en el MISMO commit y nadie lee "ok" sin resumen.
         row.detail = {
+            **(row.detail or {}),
             "skipped": _trim(summary.get("skipped")),
             "errors": _trim(summary.get("errors")),
             # El detalle por simbolo esta acotado: si no cabe, se declara.

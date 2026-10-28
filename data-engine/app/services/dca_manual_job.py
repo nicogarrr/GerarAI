@@ -55,9 +55,10 @@ def run_manual_job(db, run_id: int, token: str) -> dict:
         summary = evaluate_watchlist(db, symbols=set(requested))
         summary.update(requested=len(requested), pending_remaining=remaining,
             cooldown_seconds=dca_manual.COOLDOWN_SECONDS)
-        dca_run_log.finish_run(db, row, summary=summary)
+        # Summary first: finish_run commits status 'ok' together with it, so a
+        # poll between two commits never sees 'ok' without a summary.
         row.detail = {**(row.detail or {}), 'requested_symbols': requested, 'summary': summary}
-        db.commit()
+        dca_run_log.finish_run(db, row, summary=summary)
         return {'status': 'ok', 'run_id': run_id}
     except Exception as exc:
         db.rollback()
