@@ -9,6 +9,7 @@ import { AppError, classifyError, getFriendlyErrorMessage, type ErrorCause } fro
 import { getStockQuote, getStockValuationBasics } from '@/lib/actions/finnhub.actions';
 import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { isUsQuoteLine, quoteSymbolFor } from '@/lib/market/quote-symbol';
+import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import { hasPriorClose } from '@/lib/market/session-change';
 import { sessionDateEt } from '@/lib/market/quote-freshness';
 import type { ExtendedQuote } from '@/lib/market/extended-quote';
@@ -240,9 +241,18 @@ export async function getWatchlistEntryData(
 
     // F358: la cotización llega con frescura validada en origen; solo se
     // muestra precio si hay kind ('live' o 'close' etiquetado), nunca stale.
+    // Unidad de la cotización (Yahoo declara «GBp» en Londres: 118,25 p =
+    // 1,1825 £). El precio se pasa a la unidad mayor antes de rotularlo con
+    // la divisa del master (GBP); sin esto la fila decía «118,25 GBP» (×100).
+    const quoteUnit = chartPriceUnit(quote?.currency ?? null);
+    const masterUnit = chartPriceUnit(base.currency);
+    const unitDivisor =
+        quoteUnit && quoteUnit.divisor !== 1 && (!masterUnit || masterUnit.currency === quoteUnit.currency)
+            ? quoteUnit.divisor
+            : 1;
     const price =
         quote && typeof quote.c === 'number' && Number.isFinite(quote.c) && quote.c > 0
-            ? quote.c
+            ? quote.c / unitDivisor
             : null;
     const priceKind = price !== null ? quote?.kind ?? null : null;
     const priceAsOf = priceKind === 'close'
@@ -273,13 +283,18 @@ export async function getWatchlistEntryData(
         // ser línea US — sin divisa real, número pelado.
         // Master curado manda; para no-US el backend devuelve la divisa real
         // de la compañía y la rellena cuando el master no la conoce.
-        currency: base.currency ?? backendAll?.currency ?? null,
+        // Precio pasado a la unidad mayor (peniques -> GBP): se rotula con la
+        // unidad mayor, que coincide con la del master (o la declara la
+        // cotización si el master no tiene divisa).
+        currency: base.currency !== null && unitDivisor === 1
+            ? base.currency
+            : unitDivisor !== 1 && quoteUnit ? quoteUnit.currency : backendAll?.currency ?? null,
         price,
         change:
             price === null || !hasPriorClose(quote)
                 ? null
                 : typeof quote?.d === 'number' && Number.isFinite(quote.d)
-                  ? quote.d
+                  ? quote.d / unitDivisor
                   : null,
         changePercent:
             price === null || !hasPriorClose(quote)
