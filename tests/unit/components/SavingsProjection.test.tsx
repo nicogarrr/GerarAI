@@ -30,11 +30,22 @@ describe('SavingsProjection',()=>{
   await waitFor(()=>expect(getPlan).toHaveBeenCalledTimes(2));
   expect(getSavingsProjection).toHaveBeenCalledTimes(2);
  });
+ it('entrada ambigua usa el aviso canónico y no llama al servidor',async()=>{
+  render(<SavingsProjection/>);await screen.findAllByText(/405.804,49/);
+  fireEvent.change(screen.getByLabelText('Aportación mensual'),{target:{value:'1,234'}});
+  fireEvent.click(screen.getByRole('button',{name:'Simular sin guardar'}));
+  expect(screen.getByRole('alert')).toHaveTextContent('Formato de número ambiguo: usa la coma');
+  expect(getSavingsProjection).toHaveBeenCalledTimes(1);
+ });
  it('sin divisa no inventa resultados, permite un preview explícito',async()=>{
   getSavingsProjection.mockResolvedValue({...projection,status:'currency_missing',currency:null,scenarios:[]});
   render(<SavingsProjection/>);
   expect(await screen.findByText(/no tiene divisa registrada/)).toBeInTheDocument();
   expect(screen.queryByText(/405.804/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText('Divisa de la aportación')).toHaveValue('');
+  fireEvent.click(screen.getByRole('button',{name:'Simular sin guardar'}));
+  expect(screen.getByRole('alert')).toHaveTextContent('Elige la divisa');
+  expect(getSavingsProjection).toHaveBeenCalledTimes(1);
  });
  it('fallo no se convierte en cero ni borra el estado anterior',async()=>{
   render(<SavingsProjection/>);await screen.findAllByText(/405.804,49/);

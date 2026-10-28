@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getPlan, getSavingsProjection, type PlanRecord } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
-import { formatMoney, formatNumber, formatNumberForInput, parseLocalizedNumber } from '@/lib/format';
+import { formatMoney, formatNumber, formatNumberForInput, parseLocalizedNumber, parseLocalizedNumberDetailed } from '@/lib/format';
 import type { SavingsProjection as Projection } from '@/lib/plan/savings-projection';
 
 const control = 'min-h-[44px] w-full rounded-lg border border-gray-600 bg-gray-950 px-3 py-2 text-gray-100';
@@ -32,6 +32,7 @@ export default function SavingsProjection() {
             setProjection(data);
             if (typeof data.monthly_contribution === 'number') setMonthly(formatNumberForInput(data.monthly_contribution));
             if (data.currency) setCurrency(data.currency);
+            else if (data.plan_exists) setCurrency('');
             if (data.horizon_years) setYears(data.horizon_years);
         }).catch(() => { if (active) setError('No se pudo leer el plan. Puedes reintentar una proyección sin guardar.'); })
             .finally(() => { if (active) setLoading(false); });
@@ -40,6 +41,17 @@ export default function SavingsProjection() {
 
     async function simulate(event: React.FormEvent) {
         event.preventDefault();
+        if (!currency) {
+            setError('Elige la divisa de la aportación mensual.');
+            return;
+        }
+        if ([monthly, dividendYield, inflation].some((value) => {
+            const parsed = parseLocalizedNumberDetailed(value);
+            return !parsed.ok && parsed.error === 'ambiguous';
+        })) {
+            setError('Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).');
+            return;
+        }
         const amount = parseLocalizedNumber(monthly);
         const yieldPct = parseLocalizedNumber(dividendYield);
         const inflationPct = parseLocalizedNumber(inflation);
@@ -68,7 +80,7 @@ export default function SavingsProjection() {
                 <p className="text-sm text-teal-300">{plan ? 'Conectado a tu plan de inversión' : 'Ejemplo editable · no guardado'}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm">Aportación mensual<input className={control} inputMode="decimal" value={monthly} onChange={(e) => { setMonthly(e.target.value); edit(); }} /></label>
-                    <label className="grid gap-1 text-sm">Divisa de la aportación<select className={control} value={currency} onChange={(e) => { setCurrency(e.target.value); edit(); }}>{['EUR', 'USD', 'GBP', 'CHF', 'JPY'].map((c) => <option key={c}>{c}</option>)}</select></label>
+                    <label className="grid gap-1 text-sm">Divisa de la aportación<select className={control} value={currency} onChange={(e) => { setCurrency(e.target.value); edit(); }}><option value="">Elige divisa</option>{['EUR', 'USD', 'GBP', 'CHF', 'JPY'].map((c) => <option key={c}>{c}</option>)}</select></label>
                 </div>
                 <fieldset><legend className="mb-2 text-sm">Horizonte</legend><div className="grid grid-cols-4 gap-2">{Array.from(new Set([5, 10, 20, 30, years])).sort((a, b) => a - b).map((y) => <button key={y} type="button" disabled={loading} aria-pressed={years === y} className={`min-h-[44px] rounded-lg border px-2 text-sm ${years === y ? 'border-teal-500 bg-teal-950 text-teal-200' : 'border-gray-700'}`} onClick={() => { setYears(y); edit(); }}>{y} años</button>)}</div></fieldset>
                 <details><summary className="min-h-[44px] cursor-pointer py-2 text-sm text-teal-300">Supuestos de dividendos e inflación</summary><div className="grid gap-3 sm:grid-cols-2">
