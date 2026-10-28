@@ -11,7 +11,7 @@ import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
 const ALERT_SYMBOL_PATTERN = /^[A-Z0-9.\-]{1,20}$/;
 
 import { createAlertResult, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
-import { parseLocalizedNumber } from '@/lib/format';
+import { parseLocalizedNumberDetailed } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     Dialog,
@@ -154,11 +154,17 @@ function AlertsManager() {
                 return;
             }
             const isValueless = formData.type === 'news' || formData.type === 'earnings';
-            const parsedValue = parseLocalizedNumber(String(formData.condition.value));
-            if (!isValueless && parsedValue === null) {
-                toast.error('Introduce un valor numérico válido');
+            const parsed = parseLocalizedNumberDetailed(String(formData.condition.value));
+            if (!isValueless && !parsed.ok) {
+                // El umbral ambiguo («1,234») se rechaza enseñando el formato,
+                // como en transacciones/tesis/screener: el mensaje genérico no
+                // le dice al usuario qué corregir.
+                toast.error(parsed.error === 'ambiguous'
+                    ? 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).'
+                    : 'Introduce un valor numérico válido');
                 return;
             }
+            const parsedValue = parsed.ok ? parsed.value : null;
             if ((formData.type === 'price_above' || formData.type === 'price_below') && (parsedValue === null || parsedValue <= 0)) {
                 toast.error('El precio debe ser mayor que 0');
                 return;
