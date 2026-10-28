@@ -17,6 +17,9 @@ describe('CompanyNavigation', () => {
     }
     for (const item of MODULES) expect(hrefs).toContain(moduleHref('ASTS', item));
     expect(screen.getByTestId('decision-journal-entry')).toHaveAttribute('href', '/research/ASTS?view=changes#diario-decisiones');
+    // agent-qa 28/10: con scroll={false} Next no baja al ancla y el usuario se
+    // queda arriba, en «Qué ha cambiado», a ~4.000 px del diario.
+    expect(screen.getByTestId('decision-journal-entry')).not.toHaveAttribute('data-scroll', 'false');
     expect(screen.getByTestId('decision-journal-entry').closest('details')).toBe(screen.getByText('Análisis avanzado').closest('details'));
     expect(screen.getByText('Análisis avanzado').closest('details')).not.toHaveAttribute('open');
   });

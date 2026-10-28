@@ -19,6 +19,8 @@ describe('entrada al diario de decisiones desde la ficha', () => {
         const linkStart = navigation.lastIndexOf('<Link', entry);
         const tag = navigation.slice(linkStart, navigation.indexOf('>', entry));
         assert.doesNotMatch(tag, /\bhidden\b/);
+        // Enlace a un ancla: con scroll={false} Next no baja hasta el diario.
+        assert.doesNotMatch(tag, /scroll=\{false\}/);
         const details = navigation.indexOf('<details');
         const summary = navigation.indexOf('<summary', details);
         assert.ok(details >= 0 && summary > details && entry > summary);
