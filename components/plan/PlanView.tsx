@@ -8,7 +8,7 @@ import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
 import ContributionSplitCard from '@/components/plan/ContributionSplitCard';
 import type { ContributionSplit } from '@/lib/plan/contribution-split';
-import { formatMoney, formatNumber, formatPercent, formatMarketDate, NA } from '@/lib/format';
+import { formatDate, formatMoney, formatNumber, formatPercent, formatMarketDate, NA } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { t } from '@/lib/i18n/t';
 
@@ -91,18 +91,27 @@ const linkCartera = (
 const FIELD_LABELS: Record<string, string> = {
     kind: 'Tipo', label: 'Objetivo', target_pct: 'Peso objetivo', band_pct: 'Banda de tolerancia',
     direction: 'Acción', detail: 'Detalle', within_band: 'Dentro de la banda', current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
+    // Claves de missing_fx (drift y contributions_missing_fx): antes caían al
+    // fallback y el usuario leía «quote currency», «as of» y «position» en crudo.
+    quote_currency: 'Divisa de cotización', base_currency: 'Divisa base', as_of: 'Fecha', ticker: 'Ticker',
 };
+/** Valores de `kind` que manda el drift en missing_fx (cash/position): no son
+ *  tipos de objetivo (PLAN_KIND) y salían en inglés en la tarjeta de desviación. */
+const DRIFT_KIND: Record<string, string> = { cash: 'Caja', position: 'Posición' };
 function planValue(value: unknown, currency?: string, weights = false): string {
     if (value == null) return NA;
     if (Array.isArray(value)) return value.length ? value.map(item => planValue(item, currency, weights)).join('\n\n') : NA;
     if (typeof value === 'object') {
         const record = value as DataRecord;
+        // asset_class:Cash llega en inglés del contrato; en la cabecera se veía
+        // «Clase de activo: Cash» (las claves ticker:/asset_class: ya traducen Caja).
         const heading = typeof record.kind === 'string' && typeof record.label === 'string'
-            ? `${PLAN_KIND[record.kind] ?? record.kind}: ${etiquetaSector(record.label)}` : null;
+            ? `${PLAN_KIND[record.kind] ?? record.kind}: ${record.label === 'Cash' ? 'Caja' : etiquetaSector(record.label)}` : null;
         const lines = Object.entries(value).filter(([key]) => !heading || (key !== 'kind' && key !== 'label')).map(([key, item]) => {
         const text = (weights || key.endsWith('_pct') || key.startsWith('ticker:') || key.startsWith('asset_class:')) ? formatPercent(item as number, { fromRatio: false, digits: 2 })
             : key === 'amount_base' ? (currency ? formatMoney(item as number, currency) : NA)
-            : key === 'kind' ? PLAN_KIND[String(item)] ?? String(item) : planValue(item, currency);
+            : key === 'kind' ? PLAN_KIND[String(item)] ?? DRIFT_KIND[String(item)] ?? String(item)
+            : key === 'as_of' ? formatDate(item as string | null) : planValue(item, currency);
         return `${FIELD_LABELS[key] ?? etiquetaSector(key.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja').replaceAll('_', ' '))}: ${text}`;
     });
         return [heading, ...lines].filter(Boolean).join('\n');
