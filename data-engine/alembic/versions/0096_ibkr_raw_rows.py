@@ -1,6 +1,6 @@
 """Filas crudas del Flex de IBKR (todos los atributos, aunque aun no se usen).
 
-Tabla nueva y vacia; nada se retro-rellena. Downgrade la elimina.
+Tabla nueva y vacia; nada se retro-rellena. Downgrade solo si esta vacia.
 """
 import sqlalchemy as sa
 
@@ -33,4 +33,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_table("ibkr_raw_rows")
+    bind = op.get_bind()
+    if not sa.inspect(bind).has_table("ibkr_raw_rows"):
+        return
+    # Raw Flex rows can be the only surviving tax evidence. A rollback must
+    # not destroy them; export/archive and an explicit retention decision are
+    # separate operations, never implicit in a schema downgrade.
+    if bind.execute(sa.text("SELECT 1 FROM ibkr_raw_rows LIMIT 1")).first():
+        raise RuntimeError("ibkr_raw_rows contains retained evidence; downgrade refused")
+    op.drop_table("ibkr_raw_rows", if_exists=True)

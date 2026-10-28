@@ -311,6 +311,9 @@ async def connect_ibkr(payload: IBKRConnectRequest, db: Session = Depends(get_db
             account_id=account_id, complete_query=payload.complete_query,
             statement_date=statement_date,
         )
+    except ibkr.SyncBusy as exc:
+        await run_in_threadpool(db.rollback)
+        raise HTTPException(status_code=409, detail=str(exc)) from None
     except (ibkr.ConnectionError, LLMSettingsCryptoError) as exc:
         await run_in_threadpool(db.rollback)
         detail = str(exc) if isinstance(exc, ibkr.ConnectionError) else "El cifrado no está disponible. No se ha guardado el token."
@@ -321,7 +324,11 @@ async def connect_ibkr(payload: IBKRConnectRequest, db: Session = Depends(get_db
 def disconnect_ibkr(db: Session = Depends(get_db)) -> dict:
     from app.services import ibkr_connection_service as ibkr
     _require_tenant(db)
-    return ibkr.disconnect(db)
+    try:
+        return ibkr.disconnect(db)
+    except ibkr.SyncBusy as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from None
 
 
 @router.post("/ibkr/sync", dependencies=[Depends(enforce_llm_test_rate_limit)])

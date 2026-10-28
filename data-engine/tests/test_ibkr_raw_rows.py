@@ -135,6 +135,7 @@ def test_migration_0096_upgrade_downgrade_idempotent():
             mod.upgrade()
             assert "ibkr_raw_rows" in sa.inspect(conn).get_table_names()
             mod.downgrade()
+            mod.downgrade()
             assert "ibkr_raw_rows" not in sa.inspect(conn).get_table_names()
 
 
@@ -149,3 +150,20 @@ def test_flex_doc_lists_sections_and_has_no_token_placeholder():
     urls = re.findall(r"https?://[^\s)]+", doc)
     assert any(urlparse(url).hostname in {"ibkrguides.com", "www.ibkrguides.com"} for url in urls)
     assert "nunca" in doc.lower()
+
+
+def test_migration_0096_refuses_to_drop_tax_evidence():
+    path = Path(__file__).resolve().parents[1] / 'alembic/versions/0096_ibkr_raw_rows.py'
+    spec = importlib.util.spec_from_file_location('m0096_retention', path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+    with sa.create_engine('sqlite://').begin() as conn:
+        conn.execute(sa.text('CREATE TABLE tenants(id INTEGER PRIMARY KEY)'))
+        with Operations.context(MigrationContext.configure(conn)):
+            mod.upgrade()
+            conn.execute(sa.text("INSERT INTO ibkr_raw_rows(section, path, row_hash, payload) VALUES ('Trades', 'Trades/Trade', 'synthetic', '{}')"))
+            with pytest.raises(RuntimeError, match='retained evidence'):
+                mod.downgrade()
+            assert conn.execute(sa.text('SELECT count(*) FROM ibkr_raw_rows')).scalar() == 1
