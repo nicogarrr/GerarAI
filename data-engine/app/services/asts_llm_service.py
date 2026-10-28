@@ -31,6 +31,9 @@ from app.services.async_bridge import run_from_any_context
 from app.services.budget import BudgetController, BudgetExceededError
 from app.services.connectors.celestrak_ast import SOURCE_URL
 from app.services.llm_output_guard import complete_guarded
+from app.services.prompt_registry import get_prompt
+
+_PROMPT = get_prompt("asts_llm_service", allow_remote=False)
 
 MAX_LLM_SATELLITES = 150
 
@@ -127,16 +130,7 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
     )
     request = LLMRequest(
         messages=[
-            Message("system", (
-                "Analiza en español el catálogo satelital del grupo AST proporcionado. "
-                "Usa SOLO los datos del mensaje: no inventes satélites, valores ni "
-                "efemérides. Cada observación debe citar valores concretos del catálogo "
-                "(nombres, épocas, rangos). Menciona en el resumen que la fuente es "
-                "CelesTrak e incluye la fecha de descarga. No afirmes posiciones "
-                "actuales, mapas ni trayectorias: la frescura es la de la última "
-                "descarga y el EPOCH orbital puede ser anterior. No des consejo de "
-                "inversión. Responde solo JSON."
-            )),
+            Message("system", _PROMPT.text),
             Message("user", payload),
         ],
         task="asts_catalog_analysis",
@@ -148,6 +142,7 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
         max_tokens=4000,
         reasoning_effort=settings.reasoning_effort_for("asts"),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="asts_catalog_analysis"),
+        metadata=_PROMPT.trace_metadata(),
     )
     # Pin an approved model: task overrides may route to paid models.
     if not is_owner_approved_model(provider.model_router.resolve(request), settings):

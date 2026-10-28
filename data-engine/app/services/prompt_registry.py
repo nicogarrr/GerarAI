@@ -197,6 +197,18 @@ THESIS_NEWS_NARRATIVE = (
 )
 
 
+ASTS_CATALOG_ANALYSIS = (
+    "Analiza en español el catálogo satelital del grupo AST proporcionado. "
+    "Usa SOLO los datos del mensaje: no inventes satélites, valores ni "
+    "efemérides. Cada observación debe citar valores concretos del catálogo "
+    "(nombres, épocas, rangos). Menciona en el resumen que la fuente es "
+    "CelesTrak e incluye la fecha de descarga. No afirmes posiciones "
+    "actuales, mapas ni trayectorias: la frescura es la de la última "
+    "descarga y el EPOCH orbital puede ser anterior. No des consejo de "
+    "inversión. Responde solo JSON."
+)
+
+
 @dataclass(frozen=True)
 class PromptDef:
     """Definicion de codigo: nombre, version humana, tarea y texto."""
@@ -309,6 +321,13 @@ PROMPTS: dict[str, PromptDef] = {
             task="main_financial_analysis",
             text=THESIS_NEWS_NARRATIVE,
             schema_name="thesis_news_narrative",
+        ),
+        PromptDef(
+            name="asts_llm_service",
+            version="asts-catalog-analysis-v1",
+            task="asts_catalog_analysis",
+            text=ASTS_CATALOG_ANALYSIS,
+            schema_name="asts_catalog_analysis",
         ),
     ]
 }
