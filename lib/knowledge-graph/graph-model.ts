@@ -475,10 +475,27 @@ export function serializeSvg(scene: Scene, options: ExportOptions = {}): string 
     ]),
   );
   const anchorOf = (node: { x: number; label: string }) => labelAnchor(node, bounds, 6.7);
-  const minX = bounds ? bounds.minX - SCENE_MARGIN : 0;
-  const minY = bounds ? bounds.minY - SCENE_MARGIN : 0;
-  const width = bounds ? bounds.maxX - bounds.minX + SCENE_MARGIN * 2 : 1;
-  const height = bounds ? bounds.maxY - bounds.minY + SCENE_MARGIN * 2 : 1;
+  // El canvas recorta la etiqueta a 28 caracteres, pero el SVG conserva el
+  // texto completo. Su viewBox debe incluirlo, no solo los círculos. Un em
+  // por unidad UTF-16 es una cota conservadora para la fuente sans-serif a
+  // 12 px (también reserva espacio para pares sustitutos y caracteres anchos).
+  const exportBounds = boundsOf(nodes.flatMap((node) => {
+    const anchor = anchorOf(node);
+    const x = anchor === 'end' ? node.x - node.radius - 4 : node.x + (anchor === 'middle' ? 0 : node.radius + 4);
+    const y = anchor === 'middle' ? node.y + node.radius + 15 : node.y + 4;
+    const labelWidth = node.label.length * 12;
+    const left = anchor === 'end' ? x - labelWidth : anchor === 'middle' ? x - labelWidth / 2 : x;
+    return [
+      { x: node.x - node.radius - 6, y: node.y - node.radius - 6 },
+      { x: node.x + node.radius + 6, y: node.y + node.radius + 6 },
+      { x: left, y: y - 14 },
+      { x: left + labelWidth, y: y + 4 },
+    ];
+  }));
+  const minX = exportBounds ? exportBounds.minX - SCENE_MARGIN : 0;
+  const minY = exportBounds ? exportBounds.minY - SCENE_MARGIN : 0;
+  const width = exportBounds ? exportBounds.maxX - exportBounds.minX + SCENE_MARGIN * 2 : 1;
+  const height = exportBounds ? exportBounds.maxY - exportBounds.minY + SCENE_MARGIN * 2 : 1;
   const parts: string[] = [];
   parts.push(`<?xml version="1.0" encoding="UTF-8"?>`);
   parts.push(
@@ -494,7 +511,7 @@ export function serializeSvg(scene: Scene, options: ExportOptions = {}): string 
   }
   parts.push(`</g>`);
   for (const node of nodes) {
-    parts.push(`<g><circle cx="${round(node.x)}" cy="${round(node.y)}" r="${round(node.radius)}" fill="${node.color}"><title>${escapeXml(node.label)}</title></circle><text x="${round(anchorOf(node) === 'end' ? node.x - node.radius - 4 : node.x + (anchorOf(node) === 'middle' ? 0 : node.radius + 4))}" y="${round(anchorOf(node) === 'middle' ? node.y + node.radius + 15 : node.y + 4)}" font-size="12" fill="#d4d4d8" text-anchor="${anchorOf(node)}">${escapeXml(node.label)}</text></g>`);
+    parts.push(`<g><circle cx="${round(node.x)}" cy="${round(node.y)}" r="${round(node.radius)}" fill="${node.color}"><title>${escapeXml(node.label)}</title></circle><text x="${round(anchorOf(node) === 'end' ? node.x - node.radius - 4 : node.x + (anchorOf(node) === 'middle' ? 0 : node.radius + 4))}" y="${round(anchorOf(node) === 'middle' ? node.y + node.radius + 15 : node.y + 4)}" font-size="12" font-family="sans-serif" fill="#d4d4d8" text-anchor="${anchorOf(node)}">${escapeXml(node.label)}</text></g>`);
   }
   if (options.selectedId !== null && options.selectedId !== undefined && nodes.some((node) => node.id === options.selectedId)) {
     const selected = nodes.find((node) => node.id === options.selectedId)!;
