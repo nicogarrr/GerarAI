@@ -179,6 +179,10 @@ async function loadDemoData(): Promise<DemoData> {
 
 export default async function PaperTradingPage() {
     const { account, ledger, historyHasMore, historyNextBefore, loadError, valuation, valuationAsOf } = await loadDemoData();
+    // Misma condicion que loadDemoData: fixtures dev sin Mongo. El comentario
+    // de DEV_DATA prometia etiqueta en pantalla y no existia; sin ella la QA
+    // visual leia saldos ficticios como si fueran una cuenta real.
+    const usingFixtures = process.env.NODE_ENV !== 'production' && !process.env.MONGODB_URI;
 
     // Cableado real: la acción valida TODO en servidor dentro de la
     // transacción (saldo, posición, idempotencia); el cliente solo manda el
@@ -233,6 +237,11 @@ export default async function PaperTradingPage() {
             {loadError ? (
                 <p role="alert" className="mt-4 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
                     No se pudo cargar la cuenta demo: {loadError}
+                </p>
+            ) : null}
+            {usingFixtures ? (
+                <p role="note" className="mt-4 rounded-lg border border-sky-900/60 bg-sky-950/40 px-3 py-2 text-xs text-sky-200">
+                    Datos de ejemplo para QA visual: sin MONGODB_URI la cuenta no está conectada y registrar operaciones fallará.
                 </p>
             ) : null}
             <ManualDemoPanel
