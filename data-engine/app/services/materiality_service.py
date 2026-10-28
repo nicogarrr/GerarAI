@@ -46,10 +46,28 @@ ASSUMPTIONS_BY_EVENT_TYPE = {
 }
 
 # Palabra completa inequívoca; lo ambiguo va por frase con contexto abajo.
-POSITIVE_TERMS = ["approval", "buyback", "accelerate"]
+# Verbos de mercado habituales: sin ellos el 85-100 % de los titulares salía
+# «neutral» (medido en prod 28-oct-2026: BABA 60/60 neutral) y «upgrade» no
+# era positivo mientras «downgrade» sí era negativo (asimetría). Las formas
+# irregulares van explícitas: la flexión automática no cubre «won», «fell»,
+# «sank», «slid» ni la doble consonante de «dropped»/«slipped».
+POSITIVE_TERMS = [
+    "approval", "buyback", "accelerate",
+    "upgrade", "upgrading", "outperform", "overweight",
+    "surge", "surging", "rally", "rallies", "rallied",
+    "jump", "gain", "climb", "soar", "win", "won",
+    "secure", "rise", "rose", "rising",
+    "sube", "suben", "repunta", "aprueba", "aprueban",
+]
 NEGATIVE_TERMS = [
     "delay", "offering", "investigation", "default", "halt", "fraud",
-    "overvalued", "downgrade", "sell-off", "selloff", "plunge", "lawsuit",
+    "overvalued", "downgrade", "sell-off", "selloff", "plunge", "plunging",
+    "lawsuit",
+    "tumble", "tumbling", "slump", "sink", "sank", "slide", "slid", "sliding",
+    "slip", "slipped", "slipping", "fell", "falls", "falling",
+    "drop", "dropped", "dropping", "warn", "downside", "scrutiny",
+    "crackdown", "curb", "setback", "underperform", "underweight",
+    "cae", "caen", "desploma", "multa",
 ]
 CRITICAL_TERMS = ["bankruptcy", "fraud", "halt", "default"]
 
@@ -70,6 +88,7 @@ POSITIVE_PATTERNS = [
     "contract award",
 ]
 NEGATIVE_PATTERNS = [
+    "under pressure",
     "misses estimates", "missed estimates", "misses expectations",
     "missed expectations", "earnings miss", "revenue miss",
     "cuts guidance", "cut guidance", "guidance cut", "cuts forecast",
@@ -104,6 +123,16 @@ def _has_phrase(lower_text: str, phrase: str) -> bool:
     text, words = _fold(lower_text), _fold(phrase)
     return re.search(rf"(?<![a-z0-9]){re.escape(words)}(?![a-z0-9])", text) is not None
 
+
+
+def _has_resumption(lower_text: str) -> bool:
+    """El texto anuncia la reanudación de la cotización tras un halt."""
+    return (
+        _has_term(lower_text, "resumption")
+        or _has_phrase(lower_text, "resumes trading")
+        or _has_phrase(lower_text, "trading resumes")
+        or _has_phrase(lower_text, "resume trading")
+    )
 
 
 _NAME_NOISE = {
@@ -212,7 +241,16 @@ class MaterialityService:
         if "dilution" in matched_types:
             materiality += 2
             reasons.append("dilution +2")
-        if any(_has_term(lower_text, word) for word in CRITICAL_TERMS):
+        critical_hits = [word for word in CRITICAL_TERMS if _has_term(lower_text, word)]
+        # Un aviso de reanudación («Trade Resumption», «trading resumes»)
+        # siempre convive con la palabra «halt»: el crítico es el halt, no la
+        # reanudación. Sin esta excepción la reanudación heredaba el 10/10
+        # negativo del halt (QA prod 28-oct-2026: CIRO «Trade Resumption -
+        # BN.PF.N» a 10/10 negativo con aviso de tesis).
+        if _has_resumption(lower_text) and "halt" in critical_hits:
+            critical_hits.remove("halt")
+            reasons.append("trade_resumption: halt no critico")
+        if critical_hits:
             materiality = max(materiality, 10)
             reasons.append("critical_term => 10")
         if company and ("pre_fcf" in company.factor_tags or "speculative" in company.factor_tags):
@@ -317,7 +355,14 @@ class MaterialityService:
         positive = any(_has_term(lower_text, word) for word in POSITIVE_TERMS) or any(
             _has_phrase(lower_text, phrase) for phrase in POSITIVE_PATTERNS
         )
-        negative = any(_has_term(lower_text, word) for word in NEGATIVE_TERMS) or any(
+        negative_terms = [
+            word
+            for word in NEGATIVE_TERMS
+            # La reanudación de cotización no es el halt: «Trade Resumption»
+            # vuelve a neutral en vez de heredar el negativo de «halt».
+            if not (word == "halt" and _has_resumption(lower_text))
+        ]
+        negative = any(_has_term(lower_text, word) for word in negative_terms) or any(
             _has_phrase(lower_text, phrase) for phrase in NEGATIVE_PATTERNS
         )
         if positive and negative:
