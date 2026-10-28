@@ -177,3 +177,16 @@ def test_jev_fallback_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert resolved.text == prompt_registry.JEV_FALLBACK
+
+
+def test_knowledge_analysis_prompt_version_and_hash_are_pinned():
+    from app.services import knowledge_analysis
+
+    resolved = prompt_registry.get_prompt("knowledge_analysis", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "knowledge-analysis-v1",
+        "5589f5cca3e1",
+        "chat",
+    )
+    assert resolved.source == "code"
+    assert knowledge_analysis.SYSTEM_PROMPT == resolved.text == prompt_registry.KNOWLEDGE_ANALYSIS
