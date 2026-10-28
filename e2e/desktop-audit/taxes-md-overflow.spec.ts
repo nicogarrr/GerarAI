@@ -11,7 +11,7 @@ test("taxes md768: sin scroll horizontal de página", async ({ page }) => {
   await page.waitForTimeout(4000);
   await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
   await expect(page.locator("main")).toBeVisible();
-  await expect(page.getByText("Posiciones Fiscales", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Posiciones Fiscales", exact: true })).toBeVisible();
   const m = await page.evaluate(() => {
     const el = document.scrollingElement ?? document.documentElement;
     const main = document.querySelector("main");
