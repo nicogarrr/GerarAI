@@ -3570,6 +3570,41 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
+def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Ingesta diaria de dividendos declarados de los tickers con paper trades vivos.
+
+    Misma fuente gratuita y servicio que la cartera real (Yahoo, FMP de
+    respaldo): sin ellos el devengo del paper book no tiene con que computar.
+    """
+    from sqlalchemy import select
+
+    from app.models.paper_trading import PaperTrade as _PT
+    from app.services.async_bridge import run_from_any_context
+    from app.services.dividend_ingestion_service import DividendIngestionService
+
+    db = _session(tenant_id, user_id)
+    try:
+        tickers = [
+            t for (t,) in db.execute(
+                select(_PT.ticker).where(_PT.status.in_(("pending", "open"))).distinct()
+            ).all()
+        ]
+        service = DividendIngestionService()
+        synced, unavailable = [], []
+        for ticker in tickers:
+            db.commit()  # sesion libre antes de la red
+            result = run_from_any_context(service.sync_company(db, ticker=ticker))
+            (synced if result.get("status") == "ok" else unavailable).append(ticker)
+        return {"actor": "sync_paper_dividends", "status": "ok",
+                "tickers": len(tickers), "synced": synced, "unavailable": unavailable}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("sync_paper_dividends", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+
+
 # RAG de conocimiento: registra el actor de ingesta (cola "knowledge").
 import app.workers.knowledge_rag_actors  # noqa: E402,F401
 

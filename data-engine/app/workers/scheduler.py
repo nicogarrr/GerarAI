@@ -56,6 +56,7 @@ from app.workers.dramatiq_app import (
     sync_ibkr_flex,
     sync_investor_holdings,
     sync_official_closes,
+    sync_paper_dividends,
     sync_portfolio_dividends,
     sync_tenant_ibkr_connections,
     tenant_contexts,
@@ -434,6 +435,10 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # alimentan /corporate-actions y las respuestas de Cerebro. Una vez al dia.
     _register(scheduler, partial(enqueue_for_all_tenants, sync_portfolio_dividends),
               "cron", job_id="portfolio_dividends_daily", hour=6, minute=20, jitter=300)
+    # Dividendos de los tickers con paper trades vivos: el devengo del track
+    # record neto se computa sobre DividendRecord. Misma fuente gratuita.
+    _register(scheduler, partial(enqueue_for_all_tenants, sync_paper_dividends),
+              "cron", job_id="paper_dividends_daily", hour=6, minute=50, jitter=300)
     # Splits declarados (Yahoo, FMP de respaldo): sin ellos el modelo no puede
     # ajustar los recuentos historicos de acciones y degrada el CAGR a N/D.
     # Semanal: cartera+watchlist completo; universo en chunks auto-encolados.

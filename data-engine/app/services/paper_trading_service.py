@@ -170,7 +170,8 @@ def scoreboard(rows: list[PaperTrade], now: datetime | None = None) -> dict:
         groups[(row.horizon, row.currency or "sin_datos")].append(row)
     cells = []
     for (horizon, currency), trades in sorted(groups.items()):
-        closed = [r for r in trades if r.status == "closed"]
+        distorted = [r for r in trades if r.status == "closed" and r.corporate_action_warning]
+        closed = [r for r in trades if r.status == "closed" and not r.corporate_action_warning]
         results = [pnl(r, r.exit_price) for r in closed]
         realized = [r for r in results if r is not None]
         wins = sum(r > 0 for r in realized)
@@ -188,6 +189,7 @@ def scoreboard(rows: list[PaperTrade], now: datetime | None = None) -> dict:
             "hit_rate": wins / len(realized) if realized else None,
             "realized_pnl": sum(realized, Decimal(0)) if realized else None,
             # Neto del supuesto persistido por trade; los legados no tienen neto.
+            "closed_distorted": len(distorted),
             "closed_net": len(realized_net),
             "hit_rate_net": wins_net / len(realized_net) if realized_net else None,
             "realized_pnl_net": sum(realized_net, Decimal(0)) if realized_net else None,
@@ -243,12 +245,20 @@ def refresh_trades(db: Session, fetch_quote=None, *, only_id: int | None = None)
             if row is None or row.status not in {"pending", "open"}:
                 unavailable += 1
             else:
+                from app.services.paper_corporate_actions_service import (
+                    PENDING_SPLIT_WARNING,
+                    sync_corporate_actions,
+                    sync_dividends,
+                )
                 now = datetime.now(UTC)
                 row.updated_at = now
-                if apply_quote(row, quotes[ticker], now, costs=costs):
+                sync_corporate_actions(db, row)  # niveles ajustados ANTES del fill
+                blocked = row.status == "pending" and row.corporate_action_warning == PENDING_SPLIT_WARNING
+                if not blocked and apply_quote(row, quotes[ticker], now, costs=costs):
                     changed += 1
                 else:
                     unavailable += 1
+                sync_dividends(db, row)
             db.commit()
         except Exception:
             db.rollback()

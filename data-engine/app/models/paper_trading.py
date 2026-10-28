@@ -46,3 +46,14 @@ class PaperTrade(TenantOwnedMixin, Base, TimestampMixin):
     entry_fee: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
     exit_fee: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
     cost_assumption_version: Mapped[str | None] = mapped_column(String(80))
+    # Dividendos devengados (DividendRecord con fuente) y ajustes por splits.
+    # NULL = no computado (trade legado o empresa fuera del tenant).
+    dividends_total: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    dividends_count: Mapped[int | None] = mapped_column()
+    dividends_uncertain: Mapped[int | None] = mapped_column()
+    dividends_wrong_currency: Mapped[int | None] = mapped_column()
+    dividends_source: Mapped[str | None] = mapped_column(String(160))
+    split_adjustments: Mapped[int | None] = mapped_column()
+    applied_split_ids: Mapped[str | None] = mapped_column(String(500))
+    last_corporate_action: Mapped[str | None] = mapped_column(String(160))
+    corporate_action_warning: Mapped[str | None] = mapped_column(String(60))
