@@ -38,7 +38,11 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
 
     cost_checks = reconcile_ibkr_costs(db, positions)
     cost_reviews = sum(r["status"] == "review_required" for r in cost_checks.values())
+    cost_unverified = sum(r["status"] == "not_comparable" or not r.get("cost_unit_verified", True)
+                          for r in cost_checks.values())
     reasons = []
+    if cost_unverified:
+        reasons.append("ibkr_cost_currency_unverified")
     if cost_reviews:
         reasons.append("ibkr_cost_mismatch")
     if missing_cost:
@@ -51,7 +55,7 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
         reasons.append("insufficient_verified_returns")
     return {
         "status": "incomplete" if reasons else "ok", "positions": len(positions),
-        "missing_cost_positions": missing_cost, "cost_review_positions": cost_reviews, "position_dates": pdates, "cash_dates": cdates,
+        "missing_cost_positions": missing_cost, "cost_review_positions": cost_reviews, "cost_unverified_positions": cost_unverified, "position_dates": pdates, "cash_dates": cdates,
         "cash_native": cash_native,
         "position_sources": sorted({p.source for p in positions}),
         "cash_sources": sorted({c.source for c in cash}),

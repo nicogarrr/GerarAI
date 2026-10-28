@@ -11,8 +11,8 @@ from app.services.ibkr_import_service import IBKRImportService
 
 
 def xml(*, cost="108.396746", quantity="6.0572", trades_first=False, currency="USD"):
-    position = f'<OpenPosition symbol="BABA" position="{quantity}" markPrice="130" costBasisPrice="{cost}" currency="USD" reportDate="2026-10-27"/>'
-    trades = f'<Trade symbol="BABA" tradeID="B1" buySell="BUY" quantity="6.0572" tradePrice="125.56" ibCommission="0.047968" currency="{currency}" tradeDate="2026-10-01"/>'
+    position = f'<OpenPosition accountId="U1" costBasisCurrency="USD" symbol="BABA" position="{quantity}" markPrice="130" costBasisPrice="{cost}" currency="USD" reportDate="2026-10-27"/>'
+    trades = f'<Trade accountId="U1" symbol="BABA" tradeID="B1" buySell="BUY" quantity="6.0572" tradePrice="125.56" ibCommission="0.047968" currency="{currency}" tradeDate="2026-10-01"/>'
     body = trades + position if trades_first else position + trades
     return f'<FlexQueryResponse><FlexStatements><FlexStatement>{body}</FlexStatement></FlexStatements></FlexQueryResponse>'
 
@@ -135,3 +135,176 @@ def test_future_trade_is_excluded_from_snapshot_comparison(db):
     from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
     p = db.query(Position).one()
     assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "no_native_trades"
+
+
+def test_explicit_base_cost_uses_each_buy_historical_fx_not_snapshot_fx(db):
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="EUR" costBasisMoney="656.580769"')
+    source = source.replace('tradeID="B1"', 'tradeID="B1" baseCurrency="EUR" fxRateToBase="0.8"')
+    source = source.replace('quantity="6.0572" tradePrice="125.56" ibCommission="0.047968"',
+                            'quantity="3" tradePrice="100" ibCommission="0"')
+    source = source.replace('</FlexStatement>', '<Trade accountId="U1" symbol="BABA" tradeID="B2" buySell="BUY" quantity="3.0572" tradePrice="150.6580468585633913384796546" ibCommission="0" currency="USD" baseCurrency="EUR" fxRateToBase="0.9044468157672824419558816913" tradeDate="2026-10-02"/></FlexStatement>')
+    result = IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import mask_cost_under_review, reconcile_ibkr_costs
+    p = db.query(Position).one()
+    review = reconcile_ibkr_costs(db, [p])[p.id]
+    assert result["cost_review_required"] == []
+    assert review["status"] == "ok"
+    assert review["currency"] == "EUR"
+    assert review["trade_cost_native"] == pytest.approx(656.580769, abs=.01)
+    # Read-only reconciliation must not silently serve an EUR cost as USD.
+    assert mask_cost_under_review({"average_cost": 108.396746, "market_value": 800}, review)["average_cost"] is None
+    assert p.average_cost == Decimal("108.396746")
+
+
+def test_ambiguous_baba_cost_is_nd_not_a_false_mismatch(db):
+    source = xml().replace('costBasisCurrency="USD" ', '')
+    source = source.replace('tradeID="B1"', 'tradeID="B1" baseCurrency="EUR" fxRateToBase="0.863251909030332"')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import mask_cost_under_review, reconcile_ibkr_costs
+    p = db.query(Position).one()
+    review = reconcile_ibkr_costs(db, [p])[p.id]
+    assert review["status"] == "not_comparable"
+    assert review["reason"] == "unknown_cost_currency"
+    assert mask_cost_under_review({"average_cost": 108.396746}, review)["average_cost"] is None
+
+
+def test_missing_raw_snapshot_is_nd_even_if_stored_currency_says_usd(db):
+    IBKRImportService().import_flex_xml(db, xml())
+    from app.models import IbkrRawRow
+    db.query(IbkrRawRow).delete()
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "missing_snapshot_evidence"
+
+
+@pytest.mark.parametrize("rate", [None, "0", "NaN", "-1", "Infinity"])
+def test_base_cost_requires_valid_historical_fx_on_every_buy(db, rate):
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="EUR"')
+    if rate is not None:
+        source = source.replace('tradeID="B1"', f'tradeID="B1" baseCurrency="EUR" fxRateToBase="{rate}"')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "missing_trade_fx_evidence"
+
+
+def test_genuine_base_currency_mismatch_is_flagged(db):
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="EUR"')
+    source = source.replace('tradeID="B1"', 'tradeID="B1" baseCurrency="EUR" fxRateToBase="0.7"')
+    result = IBKRImportService().import_flex_xml(db, source)
+    assert result["cost_review_required"] == ["BABA"]
+
+
+def test_contradictory_raw_cost_money_is_nd(db):
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="USD" costBasisMoney="999"')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["status"] == "not_comparable"
+
+
+def test_raw_from_foreign_tenant_is_not_snapshot_evidence(db):
+    IBKRImportService().import_flex_xml(db, xml())
+    from app.models import IbkrRawRow
+    other = Tenant(external_id="raw-foreign", name="raw-foreign")
+    db.add(other)
+    db.flush()
+    local_tenant = db.info["tenant_id"]
+    evidence = [(row.account_id, row.section, row.path, row.row_hash, row.payload)
+                for row in db.query(IbkrRawRow).all()]
+    db.query(IbkrRawRow).delete()
+    db.info["tenant_id"] = other.id
+    for account, section, path, digest, payload in evidence:
+        db.add(IbkrRawRow(account_id=account, section=section, path=path, row_hash=digest, payload=payload))
+    db.flush()
+    db.info["tenant_id"] = local_tenant
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "missing_snapshot_evidence"
+
+
+def test_two_matching_raw_rows_are_ambiguous_not_latest_wins(db):
+    source = xml()
+    IBKRImportService().import_flex_xml(db, source)
+    IBKRImportService().import_flex_xml(db, source.replace('costBasisCurrency="USD"', 'costBasisCurrency="EUR"'))
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "ambiguous_snapshot_evidence"
+
+
+def test_missing_fx_destination_does_not_assume_portfolio_base(db):
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="EUR"')
+    source = source.replace('tradeID="B1"', 'tradeID="B1" fxRateToBase="0.8632"')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "missing_trade_fx_evidence"
+
+
+def test_native_raw_cost_and_native_trades_can_corroborate_currency(db):
+    source = xml(cost="125.57").replace('costBasisCurrency="USD" ', '')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["status"] == "ok"
+
+
+def test_snapshot_from_other_account_is_not_evidence(db):
+    IBKRImportService().import_flex_xml(db, xml().replace('OpenPosition accountId="U1"', 'OpenPosition accountId="U2"'))
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "snapshot_account_mismatch"
+
+
+def test_quality_counts_unverified_costs_without_claiming_mismatch(db):
+    source = xml().replace('costBasisCurrency="USD" ', '')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.portfolio_quality_service import portfolio_quality
+    quality = portfolio_quality(db)
+    assert quality["cost_review_positions"] == 0
+    assert quality["cost_unverified_positions"] == 1
+    assert "ibkr_cost_currency_unverified" in quality["reasons"]
+
+
+def test_non_eur_base_is_not_guessed_to_be_eur(db):
+    from app.models import Portfolio
+    db.add(Portfolio(name="Main", base_currency="CHF", is_default=True))
+    db.flush()
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="CHF"')
+    source = source.replace('tradeID="B1"', 'tradeID="B1" baseCurrency="CHF" fxRateToBase="0.863251909030332"')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    review = reconcile_ibkr_costs(db, [p])[p.id]
+    assert review["status"] == "ok"
+    assert review["currency"] == "CHF"
+
+
+def test_conflicting_cost_currency_attributes_are_nd(db):
+    source = xml().replace('costBasisCurrency="USD"', 'costBasisCurrency="USD" costBasisMoneyCurrency="EUR"')
+    IBKRImportService().import_flex_xml(db, source)
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    p = db.query(Position).one()
+    assert reconcile_ibkr_costs(db, [p])[p.id]["reason"] == "contradictory_cost_currency"
+
+
+def test_baba_nine_purchase_synthetic_matches_reported_historical_base_total(db):
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+    usd_total = Decimal("760.591780856")
+    eur_total = Decimal("656.58076956379116")
+    trades = []
+    for i in range(9):
+        qty = Decimal(".6") if i < 8 else Decimal("1.2572")
+        amount = Decimal("80") if i < 8 else usd_total - Decimal("640")
+        rate = Decimal(".85") if i < 8 else (eur_total - Decimal("544")) / amount
+        trades.append(f'<Trade accountId="U1" symbol="BABA" tradeID="B{i}" buySell="BUY" quantity="{qty}" tradePrice="{amount / qty}" currency="USD" ibCommission="0" baseCurrency="EUR" fxRateToBase="{rate}" tradeDate="2026-10-01"/>')
+    import re
+    source = re.sub(r'<Trade [^>]*/>', ''.join(trades), xml())
+    source = source.replace('costBasisCurrency="USD"', 'costBasisCurrency="EUR" costBasisMoney="656.580769"')
+    result = IBKRImportService().import_flex_xml(db, source)
+    p = db.query(Position).one()
+    review = reconcile_ibkr_costs(db, [p])[p.id]
+    assert db.query(Transaction).count() == 9
+    assert review["status"] == "ok" and result["cost_review_required"] == []
+    assert review["trade_cost_native"] == pytest.approx(float(eur_total), abs=.00001)
+    assert p.cost_basis_native == Decimal("656.580770")
