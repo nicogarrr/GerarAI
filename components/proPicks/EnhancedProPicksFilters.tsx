@@ -56,7 +56,7 @@ const DEFAULT_FILTERS: ProPicksFilters = {
 export default function EnhancedProPicksFilters({ filters, disabled = false, neutralSorts = [], onFiltersChange, onApply }: Props) {
   // Móvil: colapsado por defecto para que los picks sean lo primero que se
   // ve (Tester 4: el panel ocupaba toda la primera pantalla). En escritorio
-  // (lg) el cuerpo siempre visible y el toggle oculto.
+  // (xl) el cuerpo siempre visible y el toggle oculto.
   const [open, setOpen] = useState(false);
   const updateFilter = <K extends keyof ProPicksFilters>(key: K, value: ProPicksFilters[K]) => {
     onFiltersChange({ ...filters, [key]: value });
@@ -96,7 +96,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
                 aria-expanded={open}
                 aria-controls="propicks-filtros-cuerpo"
                 aria-label={open ? 'Ocultar filtros' : 'Mostrar filtros'}
-                className="min-h-[44px] lg:hidden"
+                className="min-h-[44px] xl:hidden"
                 onClick={() => setOpen((v) => !v)}
                 size="sm"
                 type="button"
@@ -107,7 +107,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
             </div>
           </div>
         </CardHeader>
-        <CardContent className={`space-y-6 ${open ? '' : 'hidden'} lg:block`} id="propicks-filtros-cuerpo">
+        <CardContent className={`space-y-6 ${open ? '' : 'hidden'} xl:block`} id="propicks-filtros-cuerpo">
           {/* Cantidad de Resultados */}
           <div className="space-y-3">
             <Label id="propicks-filtro-limit-label" className="text-sm font-medium text-gray-200">
@@ -195,7 +195,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           </div>
 
           {/* Botón Aplicar */}
-          <Button onClick={onApply} className="h-11 w-full">
+          <Button onClick={onApply} className="min-h-11 w-full whitespace-normal text-center leading-tight">
             <Filter className="h-4 w-4 mr-2" />
             Aplicar Filtros
           </Button>

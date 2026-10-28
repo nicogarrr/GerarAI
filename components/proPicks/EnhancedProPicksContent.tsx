@@ -159,9 +159,9 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
     };
 
     return (
-        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-4">
+        <div className="grid w-full min-w-0 grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-4">
             {/* Sidebar con filtros */}
-            <div className="min-w-0 lg:col-span-1">
+            <div className="min-w-0 xl:col-span-1">
                 <EnhancedProPicksFilters
                     filters={filters}
                     disabled={loading}
@@ -179,7 +179,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         onClick={handleRefresh}
                         disabled={loading}
                         aria-busy={loading}
-                        className="h-11 w-full gap-2"
+                        className="min-h-11 w-full gap-2 whitespace-normal text-center leading-tight"
                     >
                         {loading ? (
                             <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
@@ -208,7 +208,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
             </div>
 
             {/* Resultados */}
-            <div className="min-w-0 lg:col-span-3">
+            <div className="min-w-0 xl:col-span-3">
                 {/* Header */}
                 <div className="mb-6">
                     <div className="flex items-center justify-between mb-2">
