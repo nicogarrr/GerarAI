@@ -208,7 +208,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                         {/* Panel Izquierdo: Gráfico de Rendimiento */}
                         <div className="bg-[#111111] border border-gray-800 rounded-2xl p-4 sm:p-6">
                             <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
-                                <h3 className="text-gray-400 text-sm font-medium">Valor de la cartera</h3>
+                                <h2 className="text-gray-400 text-sm font-medium">Valor de la cartera</h2>
                                 <div className="flex w-full flex-wrap gap-1 sm:w-auto">
                                     {['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'].map((period) => (
                                         <button

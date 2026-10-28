@@ -20,6 +20,6 @@ describe('Temas: paginacion y objetivos tactiles', () => {
     assert.doesNotMatch(pagina, /IntersectionObserver|onScroll|useInfinite/);
   });
   it('el ticker de la tabla es un objetivo de 44 px', () => {
-    assert.match(pagina, /inline-flex min-h-11 items-center text-teal-300[^"]*"\s+href=\{`\/research\/\$\{row\.ticker\}`\}/);
+    assert.match(pagina, /inline-flex min-h-11[^"]*items-center[^"]*text-teal-300[^"]*"\s+href=\{`\/research\/\$\{row\.ticker\}`\}/);
   });
 });

@@ -125,3 +125,44 @@ def test_defer_base_acumula_y_propaga_lo_desconocido():
     _defer_base(other, Decimal("1"), {"loss_per_share_base": None})
     assert other["deferred_base"] is None
     assert other["deferred_unknown"] is False
+
+
+
+def test_cash_amount_cae_a_quantity_solo_sin_price():
+    from app.services.tax_report_service import cash_amount
+
+    assert cash_amount(SimpleNamespace(price=Decimal("0"), quantity=Decimal("1"))) == Decimal("0")
+    assert cash_amount(SimpleNamespace(price=None, quantity=Decimal("25"))) == Decimal("25")
+    assert cash_amount(SimpleNamespace(price=None, quantity=None)) == Decimal("0")
+    assert cash_amount(SimpleNamespace(price=None)) == Decimal("0")
+
+
+def test_money_redondea_mitad_hacia_arriba():
+    from app.services.tax_report_service import _money
+
+    assert _money(Decimal("0.125")) == 0.13   # banquero daria 0.12
+    assert _money(Decimal("2.675")) == 2.68
+    assert _money(Decimal("-0.125")) == -0.13
+    assert _money(None) is None
+
+
+def test_fila_de_broker_firmada_y_retencion():
+    from app.services.tax_report_service import (
+        cash_quantity_is_canonical,
+        is_broker_signed_cash_row,
+        withholding_cost,
+    )
+
+    ibkr = SimpleNamespace(raw_payload={"trxID": "1"}, price=Decimal("-15"), quantity=Decimal("1"))
+    manual = SimpleNamespace(raw_payload=None, price=Decimal("15"), quantity=Decimal("1"))
+    weird = SimpleNamespace(raw_payload="trxID", price=Decimal("-15"), quantity=Decimal("1"))
+    assert is_broker_signed_cash_row(ibkr) is True
+    assert is_broker_signed_cash_row(manual) is False
+    assert is_broker_signed_cash_row(weird) is False
+    assert is_broker_signed_cash_row(SimpleNamespace(raw_payload={"other": 1})) is False
+    assert is_broker_signed_cash_row(SimpleNamespace()) is False
+    assert withholding_cost(ibkr) == Decimal("15")
+    assert withholding_cost(manual) == Decimal("15")
+    assert withholding_cost(weird) == Decimal("15")  # no es IBKR: valor absoluto
+    assert cash_quantity_is_canonical(SimpleNamespace()) is True
+    assert cash_quantity_is_canonical(SimpleNamespace(quantity=Decimal("25"))) is False

@@ -20,7 +20,14 @@ describe('formularios de operaciones aceptan decimales', () => {
         it(`${file} no restringe cantidad/precio a 2 decimales`, () => {
             const text = source(file);
             assert.ok(!text.includes('step="0.01"'));
-            assert.ok((text.match(/step="any"/g) ?? []).length >= 2);
+            for (const field of ['quantity', 'price']) {
+                const input = text.match(new RegExp(`<Input[^>]*id="${field}"[^>]*>`, 's'))?.[0];
+                assert.ok(input, `${field} input exists`);
+                assert.match(input, /type="text"/, `${field} must avoid browser number rounding`);
+                assert.match(input, /inputMode="decimal"/, `${field} keeps decimal keyboard`);
+                assert.ok(!input.includes('step='), `${field} has no precision restriction`);
+            }
+            assert.match(text, /parseLocalizedNumber/);
         });
     }
 });

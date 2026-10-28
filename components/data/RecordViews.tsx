@@ -118,6 +118,12 @@ export type ReplaceRecord = (patch: DataRecord) => void;
 
 export interface RecordListProps {
     title: string;
+    /**
+     * Nivel del título de la tarjeta. Por defecto h3 (tarjeta dentro de una
+     * sección); una pantalla que la pinta justo bajo su h1 pasa "h2" para no
+     * saltarse un nivel (axe heading-order, visto en /taxes con Lighthouse).
+     */
+    titleAs?: 'h2' | 'h3';
     description?: string;
     icon?: ReactNode;
     /** Oculta título, descripción e icono (la página ya los muestra): queda solo «Refrescar». El título sigue como texto accesible. */
@@ -148,6 +154,7 @@ export interface RecordListProps {
 
 export function RecordList({
     title,
+    titleAs,
     description,
     icon,
     hideTitle = false,
@@ -193,12 +200,12 @@ export function RecordList({
         <Card className="rounded-lg border border-gray-700">
             <CardHeader className={`flex flex-col gap-3 border-b border-gray-700/50 pb-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0${hideTitle ? ' items-end' : ''}`}>
                 {hideTitle ? (
-                    <CardTitle className="sr-only">{title}</CardTitle>
+                    <CardTitle as={titleAs} className="sr-only">{title}</CardTitle>
                 ) : (
                     <div className="flex items-center gap-3">
                         {icon}
                         <div>
-                            <CardTitle className="text-lg font-semibold text-gray-100">{title}</CardTitle>
+                            <CardTitle as={titleAs} className="text-lg font-semibold text-gray-100">{title}</CardTitle>
                             {description && <CardDescription className="mt-0.5 text-sm text-gray-500">{description}</CardDescription>}
                         </div>
                     </div>
@@ -319,6 +326,12 @@ export function RecordList({
 
 export interface RecordDetailProps {
     title: string;
+    /**
+     * Nivel del título de la tarjeta. Por defecto h3 (tarjeta dentro de una
+     * sección); una pantalla que la pinta justo bajo su h1 pasa "h2" para no
+     * saltarse un nivel (axe heading-order, visto en /taxes con Lighthouse).
+     */
+    titleAs?: 'h2' | 'h3';
     description?: string;
     icon?: ReactNode;
     record: DataRecord | null;
@@ -344,6 +357,7 @@ export interface RecordDetailProps {
 /** Tarjeta clave/valor para respuestas de objeto único (plan, drift, risk dashboard, reporte fiscal...) */
 export function RecordDetail({
     title,
+    titleAs,
     description,
     icon,
     record,
@@ -395,7 +409,7 @@ export function RecordDetail({
                 <div className="flex items-center gap-3">
                     {icon}
                     <div>
-                        <CardTitle className="text-lg font-semibold text-gray-100">{title}</CardTitle>
+                        <CardTitle as={titleAs} className="text-lg font-semibold text-gray-100">{title}</CardTitle>
                         {description && <CardDescription className="mt-0.5 text-sm text-gray-500">{description}</CardDescription>}
                     </div>
                 </div>
