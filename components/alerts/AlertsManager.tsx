@@ -270,7 +270,7 @@ function AlertsManager() {
             return `${symbol}: ${ALERT_TYPE_LABELS.price_below} ${threshold}`;
         }
         if (type === 'price_change') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.price_change} ${operator === '>' ? 'mayor' : 'menor'} a ${value}%`;
+            return `${symbol}: ${ALERT_TYPE_LABELS.price_change} ${operator === '>' ? 'mayor' : 'menor'} a ${threshold}%`;
         }
         if (type === 'news') {
             return `${symbol}: ${ALERT_TYPE_LABELS.news}`;
