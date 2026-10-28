@@ -46,7 +46,7 @@ test('hay preguntas sugeridas en castellano y sin inventar datos', () => {
 });
 
 test('el panel restaura, guarda, sugiere y copia', () => {
-    const panel = readFileSync('components/brain/GlobalBrain.tsx', 'utf8');
+    const panel = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
     assert.ok(panel.includes('restoreConversation'));
     assert.ok(panel.includes('sessionStorage.setItem'));
     assert.ok(panel.includes('BRAIN_SUGGESTED_QUESTIONS'));
