@@ -1655,8 +1655,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3"><h1 className="text-2xl font-bold sm:text-3xl">{ticker}</h1>{exchangeDisplayName(company.exchange) ? <Badge variant="outline">{exchangeDisplayName(company.exchange)}</Badge> : null}<Badge variant="outline">{company.currency}</Badge></div>
-              <p className="mt-2 text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>
-              <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
             </div>
             <div className="-mr-2 flex shrink-0 items-center">
               <FollowButton compact symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />
@@ -1664,6 +1662,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               <div id="alerta" className="scroll-mt-6"><QuickAlertButton compact ticker={ticker} currency={company.currency} /></div>
               <CompanyActionsMenu ticker={ticker} changeCount={recentChangeCount} />
             </div>
+          </div>
+          {/* Nombre y sector a todo el ancho en móvil: dentro de la columna del ticker
+              (entre logo y 3 botones) quedaban en ~110px y partían en 3-4 líneas. En
+              ≥sm se alinean con la columna del ticker (logo 56px + gap 16px). */}
+          <div className="-mt-1 sm:pl-[72px]">
+            <p className="text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>
+            <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
           </div>
           <CompanyNavigation ticker={ticker} activeView={activeView} />
           {(() => {
