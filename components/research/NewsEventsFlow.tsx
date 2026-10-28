@@ -4,7 +4,7 @@ import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { TickerContextBadges } from '@/components/common/TickerContextBadges';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import type { NewsLane } from '@/lib/news-paging';
-import { formatPercent, formatTimeAgo, formatUserDateTime, NA } from '@/lib/format';
+import { formatPercent, formatTimeAgo, formatUserDate, formatUserDateTime, NA } from '@/lib/format';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { NewsSummary } from './NewsSummary';
 import { NewsSecondOrder } from '@/components/research/NewsSecondOrder';
@@ -61,13 +61,15 @@ function NewsPager({label,lane,page,hasMore,ticker}:{label:string;lane:NewsLane;
  * enlaces Anterior/Siguiente la cambian. El carril se filtra en la API (no
  * sobre una ventana fija), así que "Macro" y "Empresas" recorren todo el histórico.
  */
-/** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto). */
-function eventDateText(value: string): string {
+/** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto).
+ *  El día sin hora se pinta en es-ES con formatUserDate (día de calendario literal, sin
+ *  desplazamiento por zona); antes se devolvía el ISO crudo («2026-10-27»). */
+export function eventDateText(value: string): string {
   const day = value.split('T')[0];
   const match = /T(\d{2}:\d{2})/.exec(value);
-  if (!match || match[1] === '00:00') return day;
+  if (!match || match[1] === '00:00') return formatUserDate(day);
   const formatted = formatUserDateTime(value);
-  return formatted === NA ? day : formatted;
+  return formatted === NA ? formatUserDate(day) : formatted;
 }
 
 /** Materialidad como indicador visual: barra proporcional + número, color por impacto. */
