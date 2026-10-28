@@ -144,3 +144,38 @@ jobs:
             data-engine/htmlcov/.coverage
           if-no-files-found: warn
           retention-days: 14
+
+  # Informe por FUNCIONALIDAD (impuestos, DCA, cartera, auth...) a partir del
+  # coverage.json que deja el gate. Informativo: sin umbrales, nunca bloquea
+  # (continue-on-error + `if: always()`); solo escribe el resumen del job y sube
+  # un artefacto. El gate que bloquea sigue siendo el job `coverage`.
+  coverage-by-feature:
+    name: Backend coverage by feature (informativo)
+    needs: coverage
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: "3.12"
+      - name: Descargar el informe del gate
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: coverage-report
+          path: data-engine/htmlcov
+      - name: Resumen por funcionalidad
+        working-directory: data-engine
+        run: |
+          python scripts/coverage_by_feature.py --markdown --json htmlcov/coverage-by-feature.json | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Publicar el informe por funcionalidad
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-by-feature
+          path: data-engine/htmlcov/coverage-by-feature.json
+          if-no-files-found: warn
+          retention-days: 14
