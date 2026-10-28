@@ -61,9 +61,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest "mutmut>=3.8,<4"
       - name: mutmut
+        env:
+          BACKEND_MODULE: ${{ inputs.backend_module }}
         run: |
           set -o pipefail
-          python scripts/mutation/run_mutmut.py "${{ inputs.backend_module }}" --max-children 4 --survivors \
+          python scripts/mutation/run_mutmut.py "$BACKEND_MODULE" --max-children 4 --survivors \
             | tee mutation-report.txt
           tail -n 1 mutation-report.txt >> "$GITHUB_STEP_SUMMARY" || true
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7

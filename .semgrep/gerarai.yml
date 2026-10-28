@@ -182,6 +182,20 @@ rules:
   pattern-either:
   - pattern: SimpleNamespace(..., tenant_id=$A, ...)
   - pattern: SimpleNamespace(..., company_id=$A, ...)
+- id: gerarai-gha-run-expression-injection
+  languages:
+  - yaml
+  severity: ERROR
+  message: 'Expresion ${{ inputs.* / github.event.* }} interpolada dentro de un run: de GitHub Actions. El texto se pega en el script antes de ejecutarlo (inyeccion de shell, y el step puede llevar secretos en su env). Pasalo por env: (p. ej. PERSONAS: ${{ inputs.personas }}) y usa "$PERSONAS" en el script.'
+  paths:
+    include:
+    - .github/workflows/
+  patterns:
+  - pattern-inside: 'steps: [...]'
+  - pattern: 'run: $SHELL'
+  - metavariable-regex:
+      metavariable: $SHELL
+      regex: (?s).*\$\{\{\s*(inputs\.|github\.event\.|github\.head_ref|github\.event_name\b.*\binputs).*
 - id: gerarai-tenant-raw-sql
   languages:
   - python
