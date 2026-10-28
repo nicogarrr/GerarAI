@@ -11,6 +11,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
@@ -145,7 +146,7 @@ class PortfolioTransactionInput(BaseModel):
     @field_validator("trade_date")
     @classmethod
     def _no_future_trade_date(cls, value: date) -> date:
-        if value > date.today():
+        if value > local_today():
             raise ValueError("trade_date cannot be in the future")
         return value
 
