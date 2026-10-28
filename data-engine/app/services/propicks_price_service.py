@@ -89,6 +89,12 @@ def yahoo_symbol(company: Company) -> str | None:
     cualquier otra cosa -> None, y los consumidores (worker intradia y
     refresh propicks) omiten el simbolo: «sin precio» antes que el precio
     de otro instrumento."""
+    from app.services.listing_identity import reviewed_listing
+
+    listing = reviewed_listing(getattr(company, "isin", None))
+    if listing:
+        # Known issuer but conflicting master currency: never label EUR bars USD.
+        return listing.yahoo if company.currency == listing.currency else None
     ticker = (company.ticker or "").strip()
     if not ticker:
         return None

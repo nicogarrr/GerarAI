@@ -874,7 +874,7 @@ class IBKRImportService:
                     rows_skipped += 1
                     position_rows_skipped += 1
                     continue
-                company = self._company(db, companies, symbol)
+                company = self._company(db, companies, symbol, element)
                 self._capture_isin(company, element)
                 quantity = _decimal(_attr(element, "position", "quantity"))
                 market_price = _decimal(_attr(element, "markPrice", "marketPrice", "price"))
@@ -1031,7 +1031,7 @@ class IBKRImportService:
                 ):
                     unknown_tickers[symbol.upper().strip()] = unknown_tickers.get(symbol.upper().strip(), 0) + 1
                     continue
-                company = self._company(db, companies, symbol)
+                company = self._company(db, companies, symbol, element)
                 self._capture_isin(company, element)
                 action = self._action(_attr(element, "buySell", "transactionType", "tradeType"))
                 quantity = abs(_decimal(_attr(element, "quantity", "shares")))
@@ -1151,7 +1151,7 @@ class IBKRImportService:
                 symbol = _attr(element, "symbol", "underlyingSymbol")
                 company_id = None
                 if symbol:
-                    corp_company = self._company(db, companies, symbol)
+                    corp_company = self._company(db, companies, symbol, element)
                     company_id = corp_company.id
                 amount = _decimal(_attr(element, "amount", "proceeds", "netCash"))
                 transaction = Transaction(
@@ -1500,17 +1500,36 @@ class IBKRImportService:
             "row_errors": row_errors,
         }
 
-    def _company(self, db: Session, cache: dict[str, Company], symbol: str) -> Company:
-        ticker = symbol.upper().strip()
+    def _company(
+        self, db: Session, cache: dict[str, Company], symbol: str,
+        element: ElementTree.Element | None = None,
+    ) -> Company:
+        from app.services.listing_identity import reviewed_listing
+
+        isin = ((_attr(element, "isin") if element is not None else None) or "").strip().upper()
+        listing = reviewed_listing(isin)
+        ticker = listing.ticker if listing else symbol.upper().strip()
+        # ISIN precedes the broker symbol, but multiple listings of an issuer
+        # must not be collapsed by ISIN alone.
+        currency = ((_attr(element, "currency") if element is not None else None) or "").strip().upper()
+        exchange = ((_attr(element, "listingExchange") if element is not None else None) or "UNKNOWN").strip()
+        if listing and currency and currency != listing.currency:
+            raise IBKRImportError("La divisa Flex contradice el listado verificado por ISIN.")
         if ticker in cache:
-            return cache[ticker]
+            cached = cache[ticker]
+            if isin and cached.isin and cached.isin != isin:
+                raise IBKRImportError("El símbolo Flex coincide con otro ISIN; requiere revisión manual.")
+            return cached
         company = db.scalar(select(Company).where(Company.ticker == ticker))
+        if company is not None and isin and company.isin and company.isin != isin:
+            raise IBKRImportError("El símbolo Flex coincide con otro ISIN; requiere revisión manual.")
         if company is None:
             company = Company(
                 ticker=ticker,
-                name=ticker,
-                exchange="UNKNOWN",
-                currency="USD",
+                name=listing.name if listing else ticker,
+                exchange=listing.exchange if listing else exchange,
+                currency=listing.currency if listing else currency,
+                isin=isin or None,
                 sector="Unknown",
                 industry="Unknown",
                 company_type="imported_holding",
@@ -1522,6 +1541,11 @@ class IBKRImportService:
             db.add(company)
             db.flush()
         cache[ticker] = company
+        # A verified listing must never be enriched using its bare US homonym.
+        if listing:
+            if company.currency != listing.currency or company.exchange != listing.exchange:
+                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            return company
         # Enriquecer el placeholder con el nombre real desde las APIs de datos.
         # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional; nunca bloquea el import
         try:

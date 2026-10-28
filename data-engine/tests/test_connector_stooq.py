@@ -36,3 +36,12 @@ def test_stooq_rejects_challenge_and_bad_prices():
     with pytest.raises(RuntimeError, match="invalid"):
         _run(lambda _: httpx.Response(200, text="Date,Open,High,Low,Close,Volume\n2026-09-24,100,103,99,-1,10\n"),
              "aapl.us", date(2026, 9, 1), date(2026, 9, 25))
+
+
+def test_basic_fit_yahoo_symbol_maps_to_verified_stooq_listing():
+    def handler(request):
+        assert request.url.params["s"] == "bfit.nl"
+        return httpx.Response(200, text="Date,Open,High,Low,Close,Volume\n2026-09-24,30,31,29,30,100\n")
+
+    rows = _run(handler, "BFIT.AS", date(2026, 9, 1), date(2026, 9, 25))
+    assert rows[0]["symbol"] == "bfit.nl"
