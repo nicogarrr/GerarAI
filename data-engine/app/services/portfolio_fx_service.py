@@ -18,7 +18,9 @@ def currency_key(raw: str) -> str:
     """Injective monetary-unit key: GBP and GBp must never collide."""
     major, divisor = normalize_currency(raw)
     if major is None:
-        raise ValueError("Divisa no registrada")
+        # Missing is a distinct key, never a guessed ISO currency. Preserve
+        # the pure helper contract for incomplete imported data.
+        return ""
     return major if divisor == 1 else f"{major}/{divisor}"
 
 

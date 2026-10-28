@@ -196,9 +196,10 @@ def test_snapshot_mixed_pound_and_pence_cash(db):
     assert snapshot.cash_value_base == Decimal("118.17")
 
 
-def test_currency_key_rejects_missing_currency_instead_of_returning_none():
-    import pytest
-
+def test_currency_key_preserves_missing_as_distinct_unregistered_key():
     from app.services.portfolio_fx_service import currency_key
-    with pytest.raises(ValueError, match="Divisa no registrada"):
-        currency_key("")
+
+    assert currency_key("") == ""
+    assert currency_key("  ") == ""
+    assert currency_key("") != currency_key("EUR")
+    assert currency_key("") != currency_key("USD")
