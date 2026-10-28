@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {readFileSync} from 'node:fs';
 test('company results participate in cmdk selection before section shortcuts',()=>{
- const s=readFileSync('components/SearchCommand.tsx','utf8');
+ const s=readFileSync('components/SearchCommand.tsx','utf8')+readFileSync('components/SearchCommandDialog.tsx','utf8');
  assert.ok(s.includes('value={`stock:${stock.symbol}`}'));
  assert.ok(s.includes('setSelectedValue(result.stocks[0]'));
  assert.ok(s.indexOf('value={`stock:${stock.symbol}`}') < s.indexOf('value={`ir ${item.label}`}'));

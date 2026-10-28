@@ -469,6 +469,9 @@ def positions(
         db, {company.id: position.as_of for position, company in rows}
     )
     analysis_states = tracked_statuses(db, [company.ticker for _, company in rows])
+    from app.services.ibkr_cost_reconciliation import mask_cost_under_review, reconcile_ibkr_costs
+
+    cost_checks = reconcile_ibkr_costs(db, [position for position, _ in rows])
     payloads = []
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
@@ -551,7 +554,8 @@ def positions(
             "fiscal_bucket": fiscal_info["fiscal_bucket"],
             }
         )
-    return payloads
+    return [mask_cost_under_review(payload, cost_checks.get(position.id))
+            for payload, (position, _) in zip(payloads, rows, strict=True)]
 
 
 @router.get("/transactions")

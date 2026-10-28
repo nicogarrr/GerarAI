@@ -135,7 +135,7 @@ describe('scrollToHashAnchor', () => {
 
 describe('la paleta desplaza al ancla tras router.push', () => {
     it('go() aplica scrollToHashAnchor cuando el href lleva hash', () => {
-        const source = readFileSync('components/SearchCommand.tsx', 'utf8');
+        const source = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
         assert.ok(source.includes('import { hashFromHref, scrollToHashAnchor } from "@/lib/search/scroll-to-hash"'));
         const goBody = source.slice(source.indexOf('const go = useCallback'));
         assert.ok(goBody.indexOf('router.push(href)') < goBody.indexOf('scrollToHashAnchor(hash)'));

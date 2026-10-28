@@ -89,6 +89,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/DocumentsList.tsx': 'useState y useMemo, onChange para búsqueda y página actual',
   'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',
   'components/research/Pager.tsx': 'jsx-onClick para avanzar y retroceder páginas',
+  'components/HomeAttention.tsx':
+    'useEffect loads independent attention sources; useState controls retries and bounded pagination',
   'app/(root)/inversores/_components/LibraryChat.tsx':
     'useSyncExternalStore retrasa el slot hasta hidratar la pagina; evita insertar el portal del layout en HTML SSR aun sin hidratar',
   'components/research/DecisionJournalEntryLink.tsx':
@@ -141,7 +143,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/OnlineBanner.tsx': 'jsx-spread, importa cliente: hooks/useOnlineStatus.ts',
   'components/PersonalizedOverview.tsx': 'jsx-onClick, useState, useEffect, jsx-onRetry',
   'components/PublicMobileNav.tsx': 'useState, useRef, useEffect, browser:HTMLElement, browser:document, browser:window, jsx-onClick',
-  'components/SearchCommand.tsx': 'useRouter, useState, useRef, browser:HTMLElement, browser:document, useEffect, browser:window, jsx-onClick, jsx-onOpenChange, jsx-onCloseAutoFocus, jsx-onValueChange, jsx-onSelect, jsx-onMouseEnter, jsx-onFocus, importa cliente: components/ui/command.tsx',
+  'components/SearchCommand.tsx': 'useRef, browser:HTMLElement, browser:document, useEffect, browser:window, jsx-onClick, jsx-onPointerDown, jsx-onFocus, dynamic (paleta cmdk diferida en SearchCommandDialog)',
+  'components/SearchCommandDialog.tsx': 'useRouter, useState, useRef, useEffect, jsx-onOpenChange, jsx-onCloseAutoFocus, jsx-onValueChange, jsx-onSelect, jsx-onMouseEnter, importa cliente: components/ui/command.tsx (chunk diferido: solo se descarga al abrir el buscador)',
   'components/settings/BaseCurrencyForm.tsx': 'useState para la divisa seleccionada y el estado de guardado; onValueChange y onClick para cambiar y persistir la divisa base',
   'components/search/TickerSearchInput.tsx': 'useState, useCallback, useRef, useEffect, browser:fetch, jsx-onChange, jsx-onClick',
   'components/UserDropdown.tsx': 'useRouter, jsx-onClick, importa cliente: components/ui/dropdown-menu.tsx, importa cliente: components/ui/avatar.tsx',
@@ -155,7 +158,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/export/ExportView.tsx': 'useState, useEffect, browser:document, jsx-onValueChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
   'components/export/ObsidianVaultCard.tsx': 'useState, browser:document, jsx-onClick, jsx-onOpenChange, importa cliente: components/ui/confirm-dialog.tsx',
   'components/forms/AccessRequestForm.tsx': 'useState, jsx-onSubmit',
-  'components/forms/CountrySelectField.tsx': 'useState, jsx-onOpenChange, jsx-onSelect, jsx-onChange, libreria cliente: react-hook-form, libreria cliente: react-select-country-list, importa cliente: components/ui/popover.tsx, importa cliente: components/ui/command.tsx, importa cliente: components/ui/label.tsx',
+  'components/forms/CountrySelectField.tsx': 'useState, jsx-onOpenChange, jsx-onChange, libreria cliente: react-hook-form, libreria cliente: react-select-country-list, importa cliente: components/ui/popover.tsx, importa cliente: components/ui/label.tsx, dynamic (menú cmdk diferido en CountrySelectCommand)',
+  'components/forms/CountrySelectCommand.tsx': 'jsx-onSelect, importa cliente: components/ui/command.tsx (chunk diferido: solo se descarga al abrir el selector de país)',
   'components/forms/FileUploadInput.tsx': 'useRef, useState, useEffect, jsx-spread, jsx-onChange, libreria cliente: sonner',
   'components/forms/MutationForm.tsx': 'useRef, useState, jsx-spread, libreria cliente: sonner',
   'components/forms/SignUpForm.tsx': 'useRouter, jsx-onSubmit, libreria cliente: react-hook-form, libreria cliente: sonner, importa cliente: components/forms/CountrySelectField.tsx, importa cliente: components/forms/AccessRequestForm.tsx',
@@ -218,7 +222,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/PrintButton.tsx': 'jsx-onClick, browser:window',
   'components/research/QuickAlertButton.tsx': 'useSyncExternalStore, useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/select.tsx',
   'components/research/ScrollToOnMount.tsx': 'useEffect, browser:document',
-  'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, libreria cliente: recharts, importa cliente: components/ui/panel.tsx',
+  'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, importa cliente: components/ui/panel.tsx, dynamic (gráfica recharts diferida en ShareCapitalChart)',
+  'components/research/ShareCapitalChart.tsx': 'libreria cliente: recharts (chunk diferido: solo se descarga al cargar la gráfica de evolución)',
   'components/research/ThesisApproveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
   'components/research/ThesisAudioPlayer.tsx': 'useState, useEffect, fetch al pulsar, jsx-onClick, jsx-onError',
   'components/research/ThesisDebatePanel.tsx': 'useState, jsx-onClick',

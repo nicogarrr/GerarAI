@@ -46,8 +46,9 @@ export default function SettingsContent({ declarant, llm, currency, ibkr }: Sett
         {currency ? <BaseCurrencyForm initial={currency} /> : <Unavailable />}
       </Panel>
       <Panel className="scroll-mt-24" id="telegram" title="Telegram">
+        <p className="text-sm text-gray-400">La vinculación de Telegram desde la app no está disponible todavía. En Alertas puedes consultar el estado del canal configurado en el servidor.</p>
         <Link className="inline-flex min-h-11 items-center gap-2 text-sm text-teal-300 hover:underline" href="/alerts">
-          Conectar Telegram y gestionar alertas <span aria-hidden="true">→</span>
+          Ver estado de Telegram y gestionar alertas <span aria-hidden="true">→</span>
         </Link>
       </Panel>
       <SettingsSection

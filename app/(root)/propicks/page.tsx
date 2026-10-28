@@ -17,7 +17,8 @@ export const metadata: Metadata = {
         'Selección vigente del embudo IA sobre el universo líquido, con la fecha de datos de cada tarjeta y backtesting walk-forward aparte.',
 };
 
-export default async function ProPicksPage() {
+export default async function ProPicksPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+    const { tab } = await searchParams;
     // El render inicial usa el run persistido: no consulta fuentes externas opcionales.
     let initialResult: Awaited<ReturnType<typeof generateEnhancedProPicksWithRun>>;
     let strategies: Awaited<ReturnType<typeof getAvailableStrategies>>;
@@ -76,7 +77,7 @@ export default async function ProPicksPage() {
             </div>
 
             {/* Picks IA + Backtesting por estrategia */}
-            <ProPicksTabs strategies={strategies} initialPicks={initialResult.picks} generatedAt={generatedAt} passedCount={initialResult.passedCount} />
+            <ProPicksTabs initialTab={tab === 'paper' ? 'paper' : 'picks'} strategies={strategies} initialPicks={initialResult.picks} generatedAt={generatedAt} passedCount={initialResult.passedCount} />
         </main>
     );
 }

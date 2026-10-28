@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sintetico y anonimo: cuenta U0000001 y emisores ficticios (ACME, BETA). Modelado sobre atributos Flex documentados, NO capturado de una cuenta real. -->
+<FlexQueryResponse queryName="synthetic" type="AF">
+<FlexStatements count="1">
+<FlexStatement accountId="U0000001" fromDate="20261026" toDate="20261026" period="LastBusinessDay" whenGenerated="20261026;180000">
+<Trades>
+<Trade accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" tradeID="T-1001" ibOrderID="O-1" tradeDate="20261026" buySell="BUY" quantity="100" tradePrice="10.00" ibCommission="-1.00" notes="O"/>
+<Trade accountId="U0000001" assetCategory="STK" symbol="BETA" currency="EUR" tradeID="T-1002" ibOrderID="O-2" tradeDate="20261026" buySell="BUY" quantity="50" tradePrice="20.00" ibCommission="-1.00" notes="O"/>
+</Trades>
+<OpenPositions>
+<OpenPosition accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" position="100" markPrice="10.50" positionValue="1050" costBasisPrice="10.01" fifoPnlUnrealized="40.00" reportDate="20261026"/>
+<OpenPosition accountId="U0000001" assetCategory="STK" symbol="BETA" currency="EUR" position="50" markPrice="20.20" positionValue="1010" costBasisPrice="20.02" fifoPnlUnrealized="9.00" reportDate="20261026"/>
+</OpenPositions>
+<CashReport>
+<CashReportCurrency accountId="U0000001" currency="USD" endingCash="8948.50" endingSettledCash="8948.50" reportDate="20261026"/>
+<CashReportCurrency accountId="U0000001" currency="EUR" endingCash="999.00" endingSettledCash="999.00" reportDate="20261026"/>
+</CashReport>
+<CashTransactions>
+<CashTransaction accountId="U0000001" type="Dividends" symbol="ACME" currency="USD" amount="12.50" dateTime="20261026" transactionID="C-2001"/>
+<CashTransaction accountId="U0000001" type="Withholding Tax" symbol="ACME" currency="USD" amount="-1.88" dateTime="20261026" transactionID="C-2002"/>
+<CashTransaction accountId="U0000001" type="Other Fees" symbol="" currency="USD" amount="-0.50" dateTime="20261026" transactionID="C-2003"/>
+</CashTransactions>
+</FlexStatement>
+</FlexStatements>
+</FlexQueryResponse>

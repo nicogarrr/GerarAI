@@ -1,3 +1,4 @@
+import BlockedValuation from '@/components/research/BlockedValuation';
 import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
 import BrainAskForm from '@/components/research/BrainAskForm';
@@ -465,11 +466,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
     );
   }
   if (valuation.status === 'insufficient_data') {
-    return (
-      <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
-        La valoración está bloqueada por entradas faltantes: {(valuation.missing_inputs ?? []).map(termLabel).join(', ') || 'entradas sin especificar'}.
-      </div>
-    );
+    return <BlockedValuation valuation={valuation} ticker={ticker} />;
   }
   const engine = typeof valuation.trace?.engine === 'string' ? valuation.trace.engine : null;
   const method = typeof valuation.trace?.method === 'string' ? valuation.trace.method : null;
