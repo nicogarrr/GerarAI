@@ -80,3 +80,25 @@ def test_ten_bins_with_enough_sample_and_conviction_one_included():
     assert result["muestra_insuficiente"] is False and result["aviso"] is None
     assert len(result["bins"]) == 10
     assert sum(b["cerradas"] for b in result["bins"]) == MIN_CLOSED
+
+
+def test_basis_reflects_costs_dividends_and_splits():
+    """La base declarada no puede seguir diciendo "sin dividendos": PR #2637
+    aplica dividendos con fuente y ajusta splits; lo que sigue fuera es FX,
+    cash ledger y financiacion de cortos."""
+    base = calibration([], NOW)["base"]
+    assert "dividendos declarados aplicados con fuente" in base
+    assert "splits" in base
+    assert "sin FX, dividendos" not in base
+
+
+def test_closed_trade_with_corporate_action_warning_excluded():
+    """Misma regla que scoreboard(): una cerrada con split (warning persistido)
+    no entra en los bins de acierto ni en cerradas_con_resultado; su P&L no
+    es comparable porque la historia pre-split no se reescribe."""
+    clean = closed_trade(0.9, 110)
+    warned = closed_trade(0.9, 110)
+    warned.corporate_action_warning = "split_cerrado_sin_ajustar"
+    result = calibration([clean, warned], NOW)
+    assert result["cerradas_con_resultado"] == 1
+    assert result["propuestas_llm"] == 2
