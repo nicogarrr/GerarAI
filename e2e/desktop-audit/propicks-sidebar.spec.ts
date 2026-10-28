@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1");
 
 for (const width of [1024, 1280]) {
@@ -28,9 +28,20 @@ for (const width of [1024, 1280]) {
       return out;
     });
     console.log(`PPSB ${width} ` + JSON.stringify({ toggleVisible, ...data }));
+    expect(toggleVisible).toBe(width < 1280);
+    for (const key of ['aplicar', 'actualizar']) {
+      const button = data[key] as {clientW: number; scrollW: number; visible: boolean; right: number} | null;
+      expect(button, `${key} exists`).not.toBeNull();
+      expect(button!.visible, `${key} visible`).toBe(true);
+      expect(button!.scrollW, `${key} content fits`).toBeLessThanOrEqual(button!.clientW);
+      expect(button!.right, `${key} inside viewport`).toBeLessThanOrEqual(width);
+    }
+    const pageSize = data.page as {scrollW: number; clientW: number};
+    expect(pageSize.scrollW, 'no page overflow').toBeLessThanOrEqual(pageSize.clientW);
+
     if (width === 1024) {
       await page.addStyleTag({ content: "nextjs-portal{display:none!important}" });
-      await page.screenshot({ path: "/tmp/shots/pp_after_1024.png", fullPage: true });
+      await page.screenshot({ path: test.info().outputPath("pp_after_1024.png"), fullPage: true });
     }
   });
 }
