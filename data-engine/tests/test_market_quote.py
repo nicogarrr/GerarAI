@@ -285,3 +285,22 @@ def test_quote_missing_ohlc_is_none_not_filled_with_close():
     assert out["c"] == 10.0 and out["pc"] == 9.0 and out["dp"] == pytest.approx(11.111, rel=1e-3)
     assert out["h"] is None and out["l"] is None and out["o"] is None
 
+
+def _after_close_payload(rmt, close_today=None):
+    # sesion regular 13:30-20:00 UTC (EDT); hoy = 1793107800
+    meta = {"chartPreviousClose": 339.5, "regularMarketPrice": 347.1, "regularMarketTime": rmt,
+            "exchangeTimezoneName": "America/New_York",
+            "currentTradingPeriod": {"regular": {"start": 1793107800, "end": 1793131200}}}
+    return {"chart": {"result": [{"meta": meta, "timestamp": [1793021400, 1793107800],
+            "indicators": {"quote": [{"close": [343.91, close_today], "open": [344.0, None],
+                                      "high": [345.0, None], "low": [343.0, None]}]}}]}}
+
+
+def test_after_close_today_bar_without_close_uses_provider_final_price():
+    out = market._fetch_yahoo_quote(_Client(resp=_Resp(200, _after_close_payload(1793131201))), "AAPL")
+    assert out["c"] == 347.1 and out["pc"] == 343.91 and out["cd"] == "2026-10-27"
+
+
+def test_during_session_today_bar_still_discarded():
+    out = market._fetch_yahoo_quote(_Client(resp=_Resp(200, _after_close_payload(1793120000))), "AAPL")
+    assert out["c"] == 343.91 and out["cd"] == "2026-10-26"
