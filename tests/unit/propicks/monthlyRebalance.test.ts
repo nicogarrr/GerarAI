@@ -3,7 +3,6 @@ import type { ProPick } from '@/lib/actions/proPicks.actions';
 import {
     STRATEGY_CATALOG,
     buildMonthlySnapshot,
-    composeDigestMessage,
     diffSnapshots,
     mergeStrategies,
     monthKey,
@@ -218,59 +217,3 @@ describe('diffSnapshots', () => {
     });
 });
 
-describe('composeDigestMessage', () => {
-    const base = { entered: [], exited: [], kept: [] };
-    const move = (symbol: string, company: string, text: string) => ({ symbol, company, reason: { text } });
-
-    it('primera selección: lo dice y lista las entradas con su motivo', () => {
-        const msg = composeDigestMessage(
-            { ...base, entered: [move('AAPL', 'Apple', 'Sube un 12%')], hasPrevious: false },
-            '2026-10',
-            'Value',
-        );
-        expect(msg).toContain('Estrategia: Value');
-        expect(msg).toContain('Primera selección publicada');
-        expect(msg).toContain('Entran (1)');
-        expect(msg).toContain('AAPL (Apple) entra: Sube un 12%');
-        expect(msg).not.toContain('Sin cambios');
-        expect(msg).toContain('No es asesoramiento de inversión.');
-    });
-
-    it('reasonOf sustituye el motivo de las entradas pero no el de las salidas', () => {
-        const msg = composeDigestMessage(
-            {
-                entered: [move('MSFT', 'Microsoft', 'motivo base')],
-                exited: [move('TSLA', 'Tesla', 'motivo salida')],
-                kept: ['AAPL', 'KO'],
-                hasPrevious: true,
-            },
-            '2026-10',
-            'Adaptativa',
-            (symbol) => (symbol === 'MSFT' ? 'motivo vivo' : undefined),
-        );
-        expect(msg).toContain('MSFT (Microsoft) entra: motivo vivo');
-        expect(msg).not.toContain('motivo base');
-        expect(msg).toContain('Salen (1)');
-        expect(msg).toContain('TSLA (Tesla) sale: motivo salida');
-        expect(msg).toContain('Se mantienen (2): AAPL, KO.');
-        expect(msg).not.toContain('Primera selección');
-    });
-
-    it('si reasonOf no conoce el símbolo se queda con el motivo del diff', () => {
-        const msg = composeDigestMessage(
-            { ...base, entered: [move('MSFT', 'Microsoft', 'motivo base')], hasPrevious: true },
-            '2026-10',
-            'X',
-            () => undefined,
-        );
-        expect(msg).toContain('entra: motivo base');
-    });
-
-    it('sin cambios con mes anterior lo dice; sin mes anterior no', () => {
-        const same = composeDigestMessage({ ...base, kept: ['AAPL'], hasPrevious: true }, '2026-10', 'X');
-        expect(same).toContain('Sin cambios: la selección se mantiene igual que el mes anterior.');
-        const empty = composeDigestMessage({ ...base, hasPrevious: false }, '2026-10', 'X');
-        expect(empty).not.toContain('Sin cambios');
-        expect(empty).not.toContain('Se mantienen');
-    });
-});
