@@ -32,6 +32,33 @@ describe('Confirmed watchlist removal while server refresh is pending', () => {
         expect(screen.getByText('2 empresas · Página 1 de 1')).toBeInTheDocument();
         expect(refresh).not.toHaveBeenCalled();
     });
+    it('a thrown request keeps the entry and can retry successfully', async () => {
+        const error = new Error('Offline');
+        remove.mockRejectedValueOnce(error).mockResolvedValueOnce({ success: true });
+        render(<View />);
+        fireEvent.click(screen.getByRole('button', { name: 'Quitar AAPL de la watchlist' }));
+        await waitFor(() => expect(showError).toHaveBeenCalledWith(error, { onRetry: expect.any(Function) }));
+        expect(screen.getByText('AAPL card')).toBeInTheDocument();
+        expect(screen.getByRole('button')).toBeEnabled();
+        expect(refresh).not.toHaveBeenCalled();
+        await act(async () => { await showError.mock.calls[0][1].onRetry(); });
+        expect(remove).toHaveBeenCalledTimes(2);
+        expect(screen.queryByText('AAPL card')).not.toBeInTheDocument();
+        expect(screen.queryByText('AAPL row')).not.toBeInTheDocument();
+        expect(screen.getByText('1 empresa · Página 1 de 1')).toBeInTheDocument();
+        expect(refresh).toHaveBeenCalledOnce();
+    });
+    it('an unsuccessful response exposes retry and never flashes a success', async () => {
+        remove.mockResolvedValueOnce({ success: false }).mockResolvedValueOnce({ success: true });
+        render(<View />);
+        fireEvent.click(screen.getByRole('button', { name: 'Quitar AAPL de la watchlist' }));
+        await waitFor(() => expect(showError).toHaveBeenCalledWith('No se pudo eliminar de la watchlist', { onRetry: expect.any(Function) }));
+        expect(success).not.toHaveBeenCalled();
+        expect(screen.getByText('2 empresas · Página 1 de 1')).toBeInTheDocument();
+        await act(async () => { await showError.mock.calls[0][1].onRetry(); });
+        expect(success).toHaveBeenCalledWith('AAPL eliminado de la watchlist');
+        expect(screen.getByText('1 empresa · Página 1 de 1')).toBeInTheDocument();
+    });
     it('does not remove before the server confirms the DELETE', async () => {
         let resolve!: (value: { success: boolean }) => void;
         remove.mockReturnValue(new Promise((done) => { resolve = done; }));

@@ -7,6 +7,9 @@ mapas no divergen.
 """
 
 FRAMEWORK_TERMS_ES: dict[str, str] = {
+    'non_negative_fcf_margin': 'margen de flujo de caja libre no negativo',
+    'normalized_fcf_or_fcf_margin': 'flujo de caja libre normalizado o margen de flujo de caja libre',
+    'standard_dcf': 'DCF de flujo de caja libre',
     'arpu': 'ARPU',
     'arr': 'ARR',
     'aum': 'AUM',

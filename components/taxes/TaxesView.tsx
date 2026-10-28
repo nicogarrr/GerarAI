@@ -48,6 +48,23 @@ function toDisplayReport(raw: DataRecord | null): DataRecord | null {
     return humanized;
 }
 
+/** Aviso de informe guardado con un criterio de cálculo anterior. Sale del
+ *  bloque `versioning` que calcula el backend (tax_report_versioning.py): la UI
+ *  no decide nada, solo lo muestra. Sin `versioning` (backend antiguo) o con
+ *  `stale` distinto de true no hay aviso. */
+function staleReportNotice(raw: DataRecord | null): string | null {
+    const versioning = raw?.versioning;
+    if (!versioning || typeof versioning !== 'object' || Array.isArray(versioning)) return null;
+    if ((versioning as DataRecord).stale !== true) return null;
+    const outdated = (versioning as DataRecord).outdated;
+    const markers = Array.isArray(outdated) ? outdated : [];
+    const missing = markers.some((item) => (item as DataRecord | null)?.reason === 'criterio_no_registrado');
+    const why = missing
+        ? 'se guardó antes de registrar el criterio de cálculo'
+        : 'se guardó con un criterio de cálculo anterior al vigente';
+    return `Este informe ${why}: las cifras guardadas pueden no reflejar las reglas actuales. Regenéralo para recalcularlo; hasta entonces no lo tomes como actualizado.`;
+}
+
 /** Etiquetas en español para las claves conocidas del resumen fiscal (F20).
  *  Las claves desconocidas se humanizan (snake_case -> frase) sin ocultarse. */
 const TAX_LABELS: Record<string, string> = {
@@ -68,6 +85,13 @@ const TAX_LABELS: Record<string, string> = {
     cost_unknown: 'Ventas con coste heredado desconocido',
     method: 'Método de valoración',
     securities_fx_criterion: 'Criterio FX en valores',
+    currency_ledger_criterion: 'Criterio libro de divisas',
+    currency_ledger_status: 'Libro de divisas (USD a EUR)',
+    currency_ledger_gain_base: 'G/P por conversión de divisa',
+    currency_ledger_reason: 'Libro de divisas: motivo',
+    currency_ledger_blocked_loss_base: 'Pérdida de divisa diferida (recompra en el año posterior)',
+    currency_ledger_note: 'Libro de divisas: nota de criterio',
+    currency_ledger_by_currency: 'Libro de divisas por divisa',
     incomplete_fx: 'Tipos de cambio incompletos',
     missing_fx: 'Sin tipo de cambio para',
     generated_at: 'Generado',
@@ -188,6 +212,17 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = WASH_BASIS_LABELS[String(value)] ?? String(value);
         } else if (key === 'securities_fx_criterion') {
             display[label] = SECURITIES_FX_LABELS[String(value)] ?? String(value);
+        } else if (key === 'currency_ledger_status') {
+            display[label] = ({ not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' } as Record<string, string>)[String(value)] ?? String(value);
+        } else if (key === 'currency_ledger_gain_base') {
+            display[label] = value === null || value === undefined ? 'No calculado' : value;
+        } else if (key === 'currency_ledger_by_currency') {
+            const byCurrency = (value ?? {}) as Record<string, { status?: string; gain_base?: number | null; unconverted?: number | null }>;
+            const names: Record<string, string> = { not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' };
+            const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? 'No calculado' : `${v.gain_base} EUR`} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, sin convertir ${v.unconverted} ${cur}`})`);
+            display[label] = parts.length > 0 ? parts.join(' · ') : 'Sin conversiones';
+        } else if (key === 'currency_ledger_reason') {
+            display[label] = value ?? 'Ninguno';
         } else if (key === 'method') {
             display[label] = METHOD_LABELS[String(value).toLowerCase()] ?? String(value);
         } else if (key === 'generated_at') {
@@ -292,6 +327,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
     const holdingPages = Math.max(1, Math.ceil(initialHoldings.length / 10));
     const currentHoldingPage = Math.min(holdingPage, holdingPages - 1);
     const report = reportForYear(override, initialReport, year);
+    const staleNotice = staleReportNotice(report);
 
     const handleYearChange = (next: string) => {
         const parsed = Number.parseInt(next, 10);
@@ -357,6 +393,18 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     ))}
                 </select>
             </div>
+            {staleNotice ? (
+                <div
+                    role="status"
+                    data-testid="stale-report-notice"
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200"
+                >
+                    <span className="min-w-0 flex-1">{staleNotice}</span>
+                    <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={regenerating}>
+                        Regenerar ahora
+                    </Button>
+                </div>
+            ) : null}
             <RecordDetail
                 key={recordDetailKey(year, reportKey)}
                 title={`Reporte Fiscal ${year}`}

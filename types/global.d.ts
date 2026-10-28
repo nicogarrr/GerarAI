@@ -64,6 +64,13 @@ declare global {
         initialStocks?: StockWithWatchlistStatus[];
     };
 
+    type SearchCommandDialogProps = {
+        open: boolean;
+        initialStocks?: StockWithWatchlistStatus[];
+        /** Elemento al que devolver el foco al cerrar la paleta. */
+        getFocusTarget: () => HTMLElement | null;
+    };
+
     type User = {
         id: string;
         name: string;

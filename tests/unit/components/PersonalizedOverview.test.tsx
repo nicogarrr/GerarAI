@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('@/components/HomeAttention', () => ({ default: () => <div>Atención aislada</div> }));
+
 const getPortfolioSummary = vi.fn();
 const getUserAlerts = vi.fn();
 const getRecentTriggeredAlerts = vi.fn();

@@ -21,15 +21,16 @@ import { runWalkForwardBacktest, type WalkForwardBacktestResult } from '@/lib/ac
 import { generateProPicksForStrategy, type ProPick } from '@/lib/actions/proPicks.actions';
 
 interface ProPicksTabsProps {
+    initialTab?: 'picks' | 'paper';
     strategies: Array<{ id: string; name: string; description: string }>;
     initialPicks: ProPick[];
     generatedAt?: string;
     passedCount?: number | null;
 }
 
-export default function ProPicksTabs({ strategies, initialPicks, generatedAt, passedCount = null }: ProPicksTabsProps) {
+export default function ProPicksTabs({ strategies, initialPicks, generatedAt, passedCount = null, initialTab = 'picks' }: ProPicksTabsProps) {
     const merged = mergeStrategies(strategies);
-    const [activeTab, setActiveTab] = useState('picks');
+    const [activeTab, setActiveTab] = useState<string>(initialTab);
     const [currentStrategy, setCurrentStrategy] = useState<string>(merged[0]?.id ?? 'adaptive');
     const [walkForward, setWalkForward] = useState<WalkForwardBacktestResult | null>(null);
     const [loading, setLoading] = useState(false);
@@ -149,7 +150,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 <TabsTrigger value="backtest" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
                     Backtesting
                 </TabsTrigger>
-                <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Paper trading</TabsTrigger>
+                <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Resultados simulados de la IA</TabsTrigger>
                 <TabsTrigger value="radar" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Radar global</TabsTrigger>
             </TabsList>
 

@@ -231,7 +231,7 @@ async def fetch_filing_deadlines(
             return ticker, data if isinstance(data, dict) else None, not isinstance(data, dict)
 
     tasks = {asyncio.ensure_future(one(t)): t for t in to_query}
-    done: set[asyncio.Future] = set()
+    done: set[asyncio.Task[tuple[str, dict[str, Any] | None, bool]]] = set()
     if tasks:
         done, pending = await asyncio.wait(tasks, timeout=budget_seconds)
         for task in pending:

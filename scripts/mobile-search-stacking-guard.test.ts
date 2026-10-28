@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const searchCommand = readFileSync('components/SearchCommand.tsx', 'utf8');
+const searchCommand = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
 const mobileNav = readFileSync('components/MobileNav.tsx', 'utf8');
 const command = readFileSync('components/ui/command.tsx', 'utf8');
 const dialog = readFileSync('components/ui/dialog.tsx', 'utf8');

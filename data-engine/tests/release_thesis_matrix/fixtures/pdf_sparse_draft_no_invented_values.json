@@ -1,0 +1,59 @@
+{
+  "id": "pdf_sparse_draft_no_invented_values",
+  "kind": "pdf_source",
+  "facets": [
+    "pdf_no_invented_values",
+    "insufficient_data_contract"
+  ],
+  "company": {
+    "ticker": "PDFT",
+    "name": "PDF Matrix",
+    "exchange": "NYSE",
+    "currency": "USD"
+  },
+  "thesis": {
+    "version": 1,
+    "status": "draft",
+    "rating": "watch",
+    "thesis_markdown": "# Borrador\n\nLa valoración indicativa es 999 USD y el margen 40 %.",
+    "executive_summary": "Margen de seguridad del 40 % según una fuente incompleta.",
+    "hypothesis": "Valor indicativo de 999 USD por acción.",
+    "current_price": "888",
+    "bear_value": "777",
+    "base_value": "999",
+    "bull_value": "1111",
+    "expected_value": "1000",
+    "margin_of_safety": "0.40",
+    "scenario_probabilities": {
+      "bear": 0.2,
+      "base": 0.6,
+      "bull": 0.2
+    }
+  },
+  "expected_markdown": "pdf_sparse_draft.md",
+  "expected": {
+    "memo_contains": [
+      "# Memo de tesis — PDFT (PDF Matrix)",
+      "BORRADOR sin publicar",
+      "## Catalizadores\n_Pendiente._",
+      "## Criterios de invalidación\n_Pendiente._",
+      "fingerprint n/a"
+    ],
+    "memo_forbidden": [
+      "999",
+      "888",
+      "777",
+      "1111",
+      "1000",
+      "40 %",
+      "$",
+      "Valoración y escenarios",
+      "Margen de seguridad",
+      "rating",
+      "## Hipótesis",
+      "## Resumen ejecutivo",
+      "## Secciones",
+      "## Fuentes"
+    ]
+  }
+}

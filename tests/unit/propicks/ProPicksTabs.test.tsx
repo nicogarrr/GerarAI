@@ -79,7 +79,7 @@ describe('ProPicksTabs', () => {
             'Deep value',
             'Estrategia y rebalanceo',
             'Backtesting',
-            'Paper trading',
+            'Resultados simulados de la IA',
             'Radar global',
         ]);
         expect(screen.getByRole('tab', { name: 'Selección IA' })).toHaveAttribute('aria-selected', 'true');
@@ -100,7 +100,7 @@ describe('ProPicksTabs', () => {
 
     it('Paper trading muestra su vista', () => {
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Paper trading');
+        openTab('Resultados simulados de la IA');
         expect(screen.getByText('vista-paper')).toBeInTheDocument();
     });
 
@@ -228,4 +228,11 @@ describe('ProPicksTabs', () => {
         openTab('Estrategia y rebalanceo');
         expect(screen.getByText(/ficha:adaptive:.*:sin-datos/)).toBeInTheDocument();
     });
+});
+
+
+it('el enlace desde la cuenta demo abre directamente los resultados de IA', () => {
+    render(<ProPicksTabs strategies={strategies} initialPicks={[]} initialTab="paper" />);
+    expect(screen.getByRole('tab', { name: 'Resultados simulados de la IA' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('vista-paper')).toBeInTheDocument();
 });

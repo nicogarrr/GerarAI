@@ -59,7 +59,7 @@ describe('RiskDashboardView', () => {
         expect(screen.getByText(/Valor bruto de las posiciones/)).toBeInTheDocument();
         expect(screen.getByText('Exposición por sector')).toBeInTheDocument();
         expect(screen.getByText(/Tecnología 45,0/)).toBeInTheDocument();
-        expect(screen.getByText('Correcto')).toBeInTheDocument();
+        expect(screen.getByText('Completos')).toBeInTheDocument();
         const links = screen.getAllByRole('link', { name: 'asts' });
         expect(links[0]).toHaveAttribute('href', '/research/ASTS');
         expect(screen.getByRole('link', { name: /Ver cartera/ })).toHaveAttribute('href', '/portfolio');
@@ -172,4 +172,21 @@ describe('RiskDashboardView', () => {
         expect(within(rows[1]).getAllByText('N/D').length).toBeGreaterThan(0);
         expect(within(rows[1]).getByText('Raro')).toBeInTheDocument();
     });
+});
+
+
+it('separa integridad del cálculo y alertas, prioriza alertas y usa la base real de pesos', () => {
+    const { rerender } = render(<RiskDashboardView initialDashboard={base} />);
+    const alertHeading = screen.getByText('Alertas de concentración y liquidez');
+    const dataHeading = screen.getByText('Exposiciones de cartera');
+    expect(alertHeading.compareDocumentPosition(dataHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('2 alertas altas')).toBeInTheDocument();
+    expect(screen.getByText('Datos del cálculo')).toBeInTheDocument();
+    expect(screen.queryByText('Correcto')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Peso (valor bruto)')).toHaveLength(3);
+    expect(screen.queryByText('Peso (con caja)')).not.toBeInTheDocument();
+    rerender(<RiskDashboardView initialDashboard={{ ...base, weight_basis: 'total_with_cash' }} />);
+    expect(screen.getAllByText('Peso (con caja)')).toHaveLength(3);
+    rerender(<RiskDashboardView initialDashboard={{ ...base, weight_basis: null }} />);
+    expect(screen.getAllByText('Peso (base no disponible)')).toHaveLength(3);
 });

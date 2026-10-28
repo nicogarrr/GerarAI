@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { safeAssistantSourceUrl, type AssistantCitationKind, type AssistantResponse, type AssistantSectionKey } from '@/lib/research/assistant-contract';
@@ -22,24 +23,25 @@ const CITATION_LABELS: Record<AssistantCitationKind, string> = {
  */
 function emptyAnswerCopy(status: 'answered' | 'insufficient_data'): string {
     return status === 'insufficient_data'
-        ? 'El asistente no ha escrito una conclusión: la evidencia disponible no permite una confirmada. Lo que falta está enumerado en «Datos que faltan», más abajo.'
-        : 'El asistente ha devuelto la respuesta sin texto: no hay nada que mostrar como respuesta. Lo que sí ha enviado son las secciones y las citas de abajo.';
+        ? 'El asistente no ha escrito una conclusión: la evidencia disponible no permite confirmar una conclusión. Revisa «Datos que faltan» más abajo para ver si se indica qué falta.'
+        : 'El asistente ha devuelto la respuesta sin texto: no hay nada que mostrar como respuesta. Revisa las secciones y las fuentes disponibles más abajo.';
 }
 
 function emptySectionCopy(status: 'answered' | 'insufficient_data'): string {
     return status === 'insufficient_data'
-        ? 'Sección sin cuerpo: el asistente no ha escrito nada aquí porque la evidencia no daba para tanto.'
+        ? 'Esta sección no contiene texto. La respuesta está marcada como «Datos insuficientes», pero no indica el motivo de este apartado vacío.'
         : 'Sección sin cuerpo: el asistente la ha enviado vacía. Sin texto no hay nada que leer.';
 }
 
-function GuideCitation({ citation }: { citation: AssistantResponse['citations'][number] }) {
+function GuideCitation({ citation, index, id }: { citation: AssistantResponse['citations'][number]; index: number; id: string }) {
     const url = safeAssistantSourceUrl(citation.url);
     return (
-        <li className="min-w-0 rounded-lg border border-slate-700/60 bg-slate-900/60 p-2 text-xs text-slate-400">
+        <li id={id} className="min-w-0 scroll-mt-3 rounded-lg border border-slate-700/60 bg-slate-900/60 p-2 text-xs text-slate-400">
             <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold text-slate-200">Fuente {index + 1}</span>
                 <Badge variant="outline">{CITATION_LABELS[citation.kind] ?? 'Fuente sin clasificar'}</Badge>
                 {url
-                    ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 break-all text-indigo-300 underline underline-offset-2 hover:text-indigo-200">{citation.source || 'Fuente sin nombre'}<ExternalLink aria-hidden className="h-3 w-3 shrink-0" /></a>
+                    ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-indigo-300 underline underline-offset-2 hover:text-indigo-200"><span className="min-w-0 break-words">{citation.source || 'Fuente sin nombre'}</span><ExternalLink aria-hidden className="h-3 w-3 shrink-0" /></a>
                     : <span className="min-w-0 break-all text-slate-200">{citation.source || 'Fuente sin nombre'}</span>}
             </div>
             <div className="mt-1 break-all">Fecha de referencia: {citation.as_of || t('signals.noDate')}</div>
@@ -57,6 +59,7 @@ function GuideCitation({ citation }: { citation: AssistantResponse['citations'][
  * cliente por herencia de GlobalBrain.
  */
 export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
+    const sourcePrefix = useId();
     return (
         <div className="space-y-3">
             <p className="text-xs text-slate-500">Guía de {result.mode === 'guide' ? 'empresa' : 'exploración'} · Sin escritura: solo lectura, no modifica nada.</p>
@@ -74,9 +77,22 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
                             <summary className="min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-slate-200">{SECTION_LABELS[section.key] ?? 'Sección sin clasificar'}</summary>
                             <div className="border-t border-slate-800 px-3 py-2">
                                 <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{section.body?.trim() ? section.body : emptySectionCopy(result.status)}</p>
-                                {section.citation_ids.length
-                                    ? <p className="mt-1 break-words text-xs text-slate-500">Citas: {section.citation_ids.length}</p>
-                                    : <p className="mt-1 text-xs text-slate-500">Sin citas para esta sección</p>}
+                                {section.citation_ids.length ? (
+                                    <ul aria-label="Fuentes de esta sección" className="mt-2 space-y-1 text-xs">
+                                        {[...new Set(section.citation_ids)].map((citationId) => {
+                                            const sourceIndex = result.citations.findIndex((citation) => citation.id === citationId);
+                                            return (
+                                                <li key={citationId}>
+                                                    {sourceIndex >= 0 ? (
+                                                        <a href={`#${sourcePrefix}-source-${sourceIndex}`} className="break-words text-indigo-300 underline underline-offset-2">
+                                                            Fuente {sourceIndex + 1}: {result.citations[sourceIndex].source || 'Fuente sin nombre'}
+                                                        </a>
+                                                    ) : <span className="text-amber-200">Referencia sin fuente disponible: no se puede comprobar esta cita.</span>}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                ) : <p className="mt-1 text-xs text-slate-500">Sin citas para esta sección: comprueba sus afirmaciones antes de usarlas.</p>}
                             </div>
                         </details>
                     ))}
@@ -87,7 +103,7 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
                     <h4 className="text-sm font-semibold text-amber-200">Datos que faltan</h4>
                     {result.missing_data.length
                         ? <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-slate-300">{result.missing_data.map((item, index) => <li key={index}>{item}</li>)}</ul>
-                        : <p className="mt-1 text-sm text-slate-400">Sin datos sobre qué información falta.</p>}
+                        : <p className="mt-1 text-sm text-slate-400">El asistente no ha indicado qué información falta. Puedes preguntar por el dato y el periodo que necesitas comprobar.</p>}
                 </div>
             ) : null}
             {result.suggested_next_steps.length ? (
@@ -99,8 +115,8 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
             <div className="border-t border-slate-800 pt-2">
                 <h4 className="text-sm font-semibold text-slate-200">Citas y fuentes ({result.citations.length})</h4>
                 {result.citations.length
-                    ? <ul className="mt-2 grid min-w-0 gap-2">{result.citations.map((citation, index) => <GuideCitation key={`${citation.id}-${index}`} citation={citation} />)}</ul>
-                    : <p className="mt-1 text-sm text-slate-500">Sin datos de fuentes.</p>}
+                    ? <ul className="mt-2 grid min-w-0 gap-2">{result.citations.map((citation, index) => <GuideCitation key={`${citation.id}-${index}`} citation={citation} index={index} id={`${sourcePrefix}-source-${index}`} />)}</ul>
+                    : <p className="mt-1 text-sm text-slate-500">El asistente no ha adjuntado fuentes. No puedes comprobar esta respuesta desde aquí.</p>}
             </div>
         </div>
     );

@@ -5,6 +5,9 @@
  * («ARR × retention × expansion») se traducen término a término.
  */
 export const FRAMEWORK_TERMS: Record<string, string> = {
+    non_negative_fcf_margin: 'margen de flujo de caja libre no negativo',
+    normalized_fcf_or_fcf_margin: 'flujo de caja libre normalizado o margen de flujo de caja libre',
+    standard_dcf: 'DCF de flujo de caja libre',
     // siglas
     arpu: 'ARPU', arr: 'ARR', aum: 'AUM', nav: 'NAV', noi: 'NOI', rpo: 'RPO', sbc: 'compensación en acciones (SBC)',
     tpv: 'volumen total de pagos (TPV)', 'r&d': 'I+D', cet1_ratio: 'ratio CET1', rote: 'ROTE', affo_per_share: 'AFFO por acción',

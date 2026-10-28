@@ -35,7 +35,7 @@ void test('regresión: pestaña de calendario mantiene cadena y etiqueta propia'
 
 void test('regresión: hijo declarado del mismo hub conserva a su padre por URL', () => {
     assert.deepEqual(labels('/research/news'), ['Inicio', 'Análisis', 'Research', 'Noticias']);
-    assert.deepEqual(labels('/screener'), ['Inicio', 'Análisis', 'Screeners', 'Mercado']);
+    assert.deepEqual(labels('/screener'), ['Inicio', 'Análisis', 'Screeners', 'Explorar acciones']);
 });
 
 void test('regresión: /inversores a secas no se mueve', () => {
@@ -58,8 +58,8 @@ void test('dedupe: /portfolio no repite Cartera cuando la sección ya lo dice', 
 });
 
 void test('una etiqueta por ruta: Mercados, Cuenta demo y Biblioteca', () => {
-    assert.deepEqual(labels('/mercados'), ['Inicio', 'Análisis', 'Mercados']);
-    assert.deepEqual(labels('/paper-trading'), ['Inicio', 'Cartera', 'Cuenta demo']);
+    assert.deepEqual(labels('/mercados'), ['Inicio', 'Análisis', 'Panorama de mercado']);
+    assert.deepEqual(labels('/paper-trading'), ['Inicio', 'Cartera', 'Mi cuenta demo']);
     assert.deepEqual(labels('/knowledge'), ['Inicio', 'Análisis', 'Biblioteca']);
 });
 

@@ -1,11 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import dynamic from 'next/dynamic';
 import type { CapitalFact, ShareCapital } from '@/lib/actions/share-capital.actions';
 import { formatCompact, formatMarketDate, formatNumber } from '@/lib/format';
 import { Panel } from '@/components/ui/panel';
 import { Stat } from '@/components/ui/stat';
+
+// recharts (~120 KB gzip con sus d3) solo sirve para la gráfica de evolución:
+// se carga diferida y el panel (stats + tabla) pinta sin ella. El esqueleto
+// reserva el mismo h-64 del contenedor: no hay salto de layout al llegar.
+const ShareCapitalChart = dynamic(() => import('@/components/research/ShareCapitalChart'), {
+  loading: () => <div className="h-full w-full animate-pulse rounded bg-slate-800/40" aria-hidden="true" />,
+});
 
 const compact = (value: number) => formatCompact(value);
 const percent = (value: number | null) => value == null ? 'N/D' : `${value > 0 ? '+' : ''}${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
@@ -36,12 +43,7 @@ export function ShareCapitalPanel({ data }: { data: ShareCapital }) {
     <p className="text-xs text-gray-400">Saldos sin ajustar por splits. El cambio neto no identifica emisiones ni recompras.</p>
     {data.series.length > 1 && <Panel title="Evolución de acciones · OFICIAL">
       <div className="h-64 min-w-0" role="img" aria-label="Evolución de los saldos de acciones publicados; cifras exactas en la tabla de saldos">
-        <ResponsiveContainer width="100%" height="100%"><LineChart data={data.series} margin={{ left: 8, right: 16, top: 10, bottom: 10 }}>
-          <CartesianGrid stroke="#374151" strokeDasharray="3 3" /><XAxis dataKey="date" tickFormatter={(value) => formatMarketDate(String(value), { month: 'short', year: '2-digit' })} tick={{ fontSize: 10, fill: '#9ca3af' }} minTickGap={32} />
-          <YAxis tickFormatter={compact} tick={{ fontSize: 10, fill: '#9ca3af' }} width={65} domain={['auto', 'auto']} />
-          <Tooltip formatter={(value) => [compact(Number(value)), 'Acciones']} labelFormatter={(value) => formatMarketDate(String(value))} contentStyle={{ background: '#111827', border: '1px solid #374151', color: '#f3f4f6' }} />
-          <Line type="linear" dataKey="value" stroke="#2dd4bf" dot={false} strokeWidth={2} isAnimationActive={false} />
-        </LineChart></ResponsiveContainer>
+        <ShareCapitalChart series={data.series} />
       </div>
     </Panel>}
     <Panel title="Historial">

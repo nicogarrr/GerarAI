@@ -303,6 +303,8 @@ class Settings(BaseSettings):
     # Vendor de quotes/profile del screener real ("finnhub" | "yahoo").
     # Env: SCREENER_QUOTE_VENDOR. Default Finnhub (comportamiento actual).
     screener_quote_vendor: str = "finnhub"
+    # Opt in only after dedicated consumer and measured memory budget are ready.
+    ibkr_dedicated_sync_enabled: bool = False
     ibkr_flex_token: str | None = None
     ibkr_flex_query_id: str | None = None
     # Tenant dueño del token Flex (cuenta propietaria). Sin él la sincronizacion

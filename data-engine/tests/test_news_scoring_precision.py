@@ -102,3 +102,32 @@ def test_assess_news_scores_celebrity_noise_low():
         assert assessment.requires_update is False
     finally:
         db.close()
+
+
+@pytest.mark.parametrize(
+    "text,expected",
+    [
+        # Auditoría prod 28-oct-2026: titulares reales que salían «neutral».
+        ("Scotiabank Upgrades AST SpaceMobile to Sector Outperform From Sector Perform", "positive"),
+        ("AST SpaceMobile Stock Is Gaining Monday: What's Going On?", "positive"),
+        ("Alibaba Won A Pentagon Injunction", "positive"),
+        ("Intuitive Machines Surges 9% as Small-Cap Space Selloff Reverses; Rocket Lab Climbs 7%", "mixed"),
+        ("Las acciones de AST SpaceMobile suben tras la mejora de recomendación", "positive"),
+        ("Alibaba shares tumble as China presses e-commerce platforms", "negative"),
+        ("Alibaba Shares Post Steepest Drop in Two Months on China Curbs", "negative"),
+        ("Morgan Stanley Sees More Downside In Chinese Stocks", "negative"),
+        ("Alibaba Stock Slips as China Renews Regulatory Scrutiny", "negative"),
+        ("AST SpaceMobile Stock Under Pressure: SpaceX Competition, ViaSat Dispute", "negative"),
+        ("Rocket Lab Just Dropped 29% in a Month", "negative"),
+        ("AST SpaceMobile Stock Falls 1.8% - Here's What Happened", "negative"),
+        ("Alibaba cae un 5% tras nuevas restricciones", "negative"),
+        # Controles que no deben moverse.
+        ("Analysts praise the execution plan", "neutral"),
+        ("BlackRock's stake includes sole voting power over 14.9M shares", "neutral"),
+        ("New iPhone expected this fall", "neutral"),
+        ("Company beats estimates and raises guidance", "positive"),
+        ("Company misses estimates and cuts guidance", "negative"),
+    ],
+)
+def test_market_verbs_and_spanish_direction(text, expected):
+    assert _direction(text) == expected
