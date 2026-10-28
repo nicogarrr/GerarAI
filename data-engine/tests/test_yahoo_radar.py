@@ -36,6 +36,8 @@ def _db_mt() -> Session:
 # Payload grabado con la forma real del screener Yahoo (formatted=false):
 # dividendYield en porcentaje, trailingAnnualDividendYield en fraccion,
 # numericos como {raw, fmt}.
+# Claves verificadas contra el Yahoo real (28-oct): priceToBook (ratio),
+# dividendYield (porcentaje), trailingAnnualDividendYield (fraccion).
 FIXTURE = {
     "finance": {
         "result": [
@@ -46,27 +48,45 @@ FIXTURE = {
                         "longName": "HK Properties Ltd",
                         "fullExchangeName": "HKEX",
                         "currency": "HKD",
-                        "priceToBookRatio": {"raw": 0.22, "fmt": "0.22"},
+                        "priceToBook": {"raw": 0.22, "fmt": "0.22"},
                         "dividendYield": {"raw": 8.1, "fmt": "8.10%"},
+                        "trailingAnnualDividendYield": {"raw": 0.081},
                     },
                     {
                         "symbol": "VALU",
                         "shortName": "Valu Bancorp",
                         "fullExchangeName": "NYSE",
                         "currency": "USD",
-                        "priceToBookRatio": 0.45,
+                        "priceToBook": 0.45,
                         "trailingAnnualDividendYield": 0.082,
                     },
                     {
                         "symbol": "EXTR",
                         "fullExchangeName": "NYSE",
                         "currency": "USD",
+                        "priceToBook": 0.9,
                         "dividendYield": {"raw": 27.0},
                     },
                     {
                         "symbol": "MINI",
                         "fullExchangeName": "BME",
                         "currency": "EUR",
+                        "priceToBook": 0.6,
+                    },
+                    {
+                        # 0 ambiguo de Yahoo (HK pese a pasar filtro): N/D, no 0,0%
+                        "symbol": "CERO.HK",
+                        "fullExchangeName": "HKSE",
+                        "currency": "HKD",
+                        "priceToBook": 0.3,
+                        "dividendYield": 0,
+                        "trailingAnnualDividendYield": 0,
+                    },
+                    {
+                        "symbol": "NEG",
+                        "fullExchangeName": "HKSE",
+                        "currency": "HKD",
+                        "priceToBook": -0.002,  # equity negativo: fail-closed
                     },
                     {"longName": "Sin simbolo SA"},
                 ]
@@ -76,33 +96,42 @@ FIXTURE = {
 }
 
 
-def test_query_pura_operadores_y_regiones():
-    q = radar.build_screener_query(
-        pb_max=Decimal("1.0"), yield_min=Decimal("0.05"),
-        regions=["HK", "us"], size=500,
-    )
+def test_query_pura_solo_operadores_y_campos_verificados():
+    """Yahoo real (28-oct): `in` da 400; regiones van como or-de-eq. No existe
+    filtro P/B (pricebookratio se ignora en silencio): la query NO lo lleva.
+    dividendyield filtra en porcentaje (0.05 -> 5.0)."""
+    q = radar.build_screener_query(yield_min=Decimal("0.05"), regions=["HK", "us"], size=500)
     ops = q["query"]["operands"]
-    assert {"operator": "in", "operands": ["region", ["hk", "us"]]} in ops
-    assert {"operator": "lt", "operands": ["pricebookratio", 1.0]} in ops
-    assert {"operator": "gt", "operands": ["dividendyield", 0.05]} in ops
+    assert {"operator": "or", "operands": [
+        {"operator": "eq", "operands": ["region", "hk"]},
+        {"operator": "eq", "operands": ["region", "us"]},
+    ]} in ops
+    assert {"operator": "gt", "operands": ["dividendyield", 5.0]} in ops
+    assert all("pricebook" not in str(op).lower() for op in ops)  # nunca pb en query
     assert q["size"] == radar.MAX_SIZE  # cap
-    # sin filtro pb ni yield: solo region
-    q2 = radar.build_screener_query(pb_max=None, yield_min=Decimal("0"), regions=["es"], size=10)
-    assert q2["query"]["operands"] == [{"operator": "in", "operands": ["region", ["es"]]}]
+    # una sola region: eq directo, sin or innecesario
+    q2 = radar.build_screener_query(yield_min=Decimal("0"), regions=["es"], size=10)
+    assert q2["query"]["operands"] == [{"operator": "eq", "operands": ["region", "es"]}]
 
 
 def test_parseo_unidades_por_campo_y_fail_closed():
     out = radar.parse_screener_quotes(FIXTURE)
     by = {c.symbol: c for c in out}
-    assert "SIN SIMBOLO" not in by and len(out) == 4  # el sin symbol se descarta
+    assert "SIN SIMBOLO" not in by and len(out) == 6  # el sin symbol se descarta
     hk = by["0883.HK"]
     assert hk.price_to_book == Decimal("0.22")
-    assert hk.dividend_yield == Decimal("8.1") / Decimal(100)  # % -> fraccion
+    # trailingAnnualDividendYield (fraccion) manda sobre dividendYield (%)
+    assert hk.dividend_yield == Decimal("0.081")
     us = by["VALU"]
-    assert us.dividend_yield == Decimal("0.082")  # ya fraccion, intacto
-    assert by["EXTR"].yield_extremo_revisar is True  # 27% > umbral extremo
+    assert us.dividend_yield == Decimal("0.082")  # fraccion, intacto
+    extr = by["EXTR"]
+    assert extr.dividend_yield == Decimal("0.27")  # solo % presente: /100
+    assert extr.yield_extremo_revisar is True  # 27% > umbral extremo
     mini = by["MINI"]
-    assert mini.price_to_book is None and mini.dividend_yield is None  # N/D, no 0
+    assert mini.price_to_book == Decimal("0.6") and mini.dividend_yield is None
+    cero = by["CERO.HK"]
+    assert cero.dividend_yield is None  # 0 ambiguo de Yahoo: N/D, nunca 0,0%
+    assert by["NEG"].price_to_book is None  # pb negativo (equity<0): fail-closed
     assert all(c.fuente == radar.YAHOO_LABEL for c in out)
 
 
@@ -122,6 +151,9 @@ def test_radar_marca_universo_propio_y_via_cotejo_sin_escribir_nada():
         db, fetcher=lambda q: FIXTURE, regions=["hk", "us"]
     )
     by = {c.symbol: c for c in candidates}
+    # pb por defecto 1.0 en cliente: todos los del fixture pasan salvo NEG
+    # (sin cifra de pb -> fail-closed, fuera del radar)
+    assert "NEG" not in by
     assert by["VALU"].en_universo_propio is True
     assert by["0883.HK"].en_universo_propio is False
     assert by["0883.HK"].via_cotejo == radar.HKEXNEWS_SEARCH_URL
@@ -150,6 +182,18 @@ def test_endpoint_ok_y_rotulo_no_oficial(monkeypatch):
     assert hk["fuente"] == radar.YAHOO_LABEL
     assert hk["via_cotejo"] == radar.HKEXNEWS_SEARCH_URL
     assert hk["dividend_yield"] == pytest.approx(0.081)
+    assert hk["price_to_book"] == pytest.approx(0.22)
+
+
+def test_pb_max_filtra_en_cliente_fail_closed():
+    """pb_max=0.4: entran 0883.HK (0.22) y CERO.HK (0.3); fuera VALU (0.45),
+    EXTR (0.9), MINI (0.6) y NEG (sin cifra). Sin pb_max no hay filtro."""
+    db = _db()
+    rows = radar.run_radar(db, fetcher=lambda q: FIXTURE, regions=["hk"], pb_max=Decimal("0.4"))[0]
+    assert sorted(c.symbol for c in rows) == ["0883.HK", "CERO.HK"]
+    rows_all = radar.run_radar(db, fetcher=lambda q: FIXTURE, regions=["hk"], pb_max=None)[0]
+    assert "VALU" in {c.symbol for c in rows_all}
+    assert "NEG" in {c.symbol for c in rows_all}  # sin filtro pb entra con N/D
 
 
 def test_endpoint_503_honesto_si_yahoo_falla(monkeypatch):
