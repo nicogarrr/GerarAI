@@ -611,7 +611,7 @@ class MarketRefreshService:
                 stale_prices.append({"ticker": company.ticker, "status": "missing_market_price"})
                 continue
             age_days = (as_of - latest.date).days
-            if age_days > self.settings.market_price_max_age_days:
+            if age_days >= min(self.settings.market_price_max_age_days, 1):
                 stale_prices.append(
                     {
                         "ticker": company.ticker,

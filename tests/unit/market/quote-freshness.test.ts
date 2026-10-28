@@ -25,14 +25,17 @@ describe('classifyQuoteKind (EDT: 13:30-20:00 UTC)', () => {
         expect(classifyQuoteKind(sec(utc(26, 19, 59)), pre)).toBe('close');
         expect(classifyQuoteKind(sec(utc(25, 19, 59)), pre)).toBe('stale');
     });
-    it('lunes y fin de semana: la referencia es el viernes', () => {
+    it('viernes solo vale como cierre durante 24h, sin excepción de fin de semana', () => {
         const mondayPre = utc(26, 12, 0);
         const saturday = utc(24, 15, 0);
         const sunday = utc(25, 15, 0);
         const friday = sec(utc(23, 19, 59));
         const thursday = sec(utc(22, 19, 59));
-        for (const now of [mondayPre, saturday, sunday]) {
-            expect(classifyQuoteKind(friday, now)).toBe('close');
+        expect(classifyQuoteKind(friday, saturday)).toBe('close');
+        expect(classifyQuoteKind(friday, utc(24, 19, 59))).toBe('close');
+        expect(classifyQuoteKind(friday, utc(24, 20, 0))).toBe('stale');
+        for (const now of [mondayPre, sunday]) {
+            expect(classifyQuoteKind(friday, now)).toBe('stale');
             expect(classifyQuoteKind(thursday, now)).toBe('stale');
         }
     });

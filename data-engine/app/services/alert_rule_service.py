@@ -298,7 +298,7 @@ class AlertRuleService:
                     "age_days": age_days,
                     "status": (
                         "stale"
-                        if age_days > get_settings().market_price_max_age_days
+                        if age_days >= min(get_settings().market_price_max_age_days, 1)
                         else "fresh"
                     ),
                 }
@@ -322,7 +322,7 @@ class AlertRuleService:
                         "status": (
                             "stale"
                             if (date.today() - position.as_of).days
-                            > get_settings().market_price_max_age_days
+                            >= min(get_settings().market_price_max_age_days, 1)
                             else "fresh"
                         ),
                     },
@@ -370,7 +370,7 @@ class AlertRuleService:
                 "age_days": age_days,
                 "status": (
                     "stale"
-                    if age_days > get_settings().market_price_max_age_days
+                    if age_days >= min(get_settings().market_price_max_age_days, 1)
                     else "fresh"
                 ),
             }
