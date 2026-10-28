@@ -130,9 +130,9 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
     // Al cambiar el contexto de conocimiento (slot de biblioteca o handoff) el
     // modo guía se reinicia: es lo que hacía el shell antes del split. Ajuste
     // durante el render (reset al cambiar un valor), no efecto.
-    const prevKnowledgeRef = useRef(knowledge);
-    if (prevKnowledgeRef.current !== knowledge) {
-        prevKnowledgeRef.current = knowledge;
+    const [previousKnowledge, setPreviousKnowledge] = useState(knowledge);
+    if (previousKnowledge !== knowledge) {
+        setPreviousKnowledge(knowledge);
         setGuideTicker('');
         setReviewId(undefined);
         setAuthor('');
