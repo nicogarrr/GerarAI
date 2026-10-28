@@ -6,6 +6,8 @@ thresholds, future yields or personal concentration preferences.
 """
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import hashlib
 import json
 from decimal import Decimal
@@ -54,6 +56,13 @@ def emit_plan_notice(db: Session, plan: InvestmentPlan, *, changed: bool = False
         'Cartera, Cerebro y reparto DCA leen el mismo plan. Revisa los escenarios de ahorro: '
         'son hipótesis, no promesas de rentabilidad ni instrucciones de compra.'
     )
+    # Only the current plan state remains open. Dismissed states stay dismissed.
+    for old in db.scalars(select(ResearchAlert).where(
+        ResearchAlert.alert_type == 'savings_plan_review',
+        ResearchAlert.status == 'open', *tenant_filters(db, ResearchAlert))):
+        if (old.metadata_ or {}).get('plan_id') == plan.id:
+            old.status = 'resolved'
+            old.resolved_at = datetime.now(UTC)
     alert = service.emit_alert(db, company_id=None, alert_type='savings_plan_review',
         severity='medium' if missing_currency else 'low', title=title, message=message,
         fingerprint_parts=parts, channels=['in_app'], metadata={
