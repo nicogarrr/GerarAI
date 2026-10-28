@@ -1,10 +1,13 @@
 import { canShowThesisText, WithheldThesisText } from '@/components/research/ThesisSummary';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, FileDown, FileText } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ArrowLeft, ChevronDown, FileDown, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
+import { buttonVariants } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
+import { ErrorState } from '@/components/ui/error-state';
 import { formatGeneratedDate, formatPercent, formatUserDate } from '@/lib/format';
 import {
   getResearchCompanySnapshot,
@@ -19,6 +22,7 @@ import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-ite
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { publicEditorial } from '@/lib/public-fonts-editorial';
+import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,6 +66,100 @@ function money(value: string | null, currency: string | null | undefined): strin
   return thesisMoney(parsed, currency);
 }
 
+/*
+ * Tipografia de lectura. La vista es un documento largo: medida de ~70
+ * caracteres (40rem a 16px), interlineado 1,75 y titulos de seccion en la
+ * serif editorial con tinta clara. Antes cada h2 iba en teal (catorce veces
+ * el acento por pantalla) a 95 caracteres por linea e interlineado doble.
+ */
+const EDITORIAL = { fontFamily: 'var(--font-editorial), Georgia, serif' };
+const PARAGRAPH = 'mt-3 text-base leading-7 text-gray-200';
+const LIST = 'mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200 marker:text-gray-500';
+const EXPORT_LINK = cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'font-medium');
+
+type TocItem = { id: string; title: string };
+
+function SectionTitle({ id, children }: { id: string; children: ReactNode }) {
+  return (
+    <h2 id={id} style={EDITORIAL} className="scroll-mt-24 text-2xl leading-tight text-gray-50">
+      {children}
+    </h2>
+  );
+}
+
+/**
+ * Indice del documento. En escritorio es una columna fija a la derecha del
+ * texto; en movil, un desplegable cerrado bajo la cabecera (no empuja la
+ * lectura). No se imprime: el papel ya tiene su orden.
+ */
+function ThesisToc({ items, variant }: { items: TocItem[]; variant: 'aside' | 'inline' }) {
+  if (items.length < 3) return null;
+  const list = (
+    <ol className="space-y-1 text-sm">
+      {items.map((item) => (
+        <li key={item.id}>
+          <a
+            href={`#${item.id}`}
+            className="flex min-h-11 items-center rounded-md px-2 text-gray-400 transition-colors hover:bg-gray-800/60 hover:text-gray-100 lg:min-h-0 lg:py-1"
+          >
+            {item.title}
+          </a>
+        </li>
+      ))}
+    </ol>
+  );
+  if (variant === 'inline') {
+    return (
+      <details className="group rounded-lg border border-gray-800 print:hidden lg:hidden">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-sm text-gray-300 [&::-webkit-details-marker]:hidden">
+          Índice del documento
+          <ChevronDown aria-hidden="true" className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180" />
+        </summary>
+        <nav aria-label="Índice de la tesis" className="border-t border-gray-800 px-1 py-2">{list}</nav>
+      </details>
+    );
+  }
+  return (
+    <aside className="hidden print:hidden lg:block">
+      <nav aria-label="Índice de la tesis" className="sticky top-[calc(var(--shell-top)+1.5rem)]">
+        <p className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">En este documento</p>
+        <div className="mt-2 border-l border-gray-800 pl-2">{list}</div>
+      </nav>
+    </aside>
+  );
+}
+
+/** Dominio legible de una fuente («sec.gov»), sin IDs internos ni la URL entera. */
+function sourceHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'fuente';
+  }
+}
+
+type ThesisLike = {
+  executive_summary?: string | null;
+  hypothesis?: string | null;
+  narrative_sections?: { titulo: string; parrafos: string[] }[] | null;
+  catalysts?: { label?: string | null; date?: string | null }[] | null;
+  invalidation_criteria?: string[] | null;
+};
+
+const narrativeId = (index: number) => `seccion-${index + 1}`;
+
+function tocFor(thesis: ThesisLike, extra: { provenance: boolean }): TocItem[] {
+  return [
+    thesis.executive_summary ? { id: 'resumen', title: 'Resumen ejecutivo' } : null,
+    thesis.hypothesis ? { id: 'hipotesis', title: 'Hipótesis' } : null,
+    { id: 'escenarios', title: 'Escenarios y valoración' },
+    extra.provenance ? { id: 'procedencia', title: 'Procedencia de las cifras' } : null,
+    ...(thesis.narrative_sections ?? []).map((section, index) => ({ id: narrativeId(index), title: section.titulo })),
+    (thesis.catalysts ?? []).length > 0 ? { id: 'catalizadores', title: 'Catalizadores' } : null,
+    (thesis.invalidation_criteria ?? []).length > 0 ? { id: 'invalidacion', title: 'Qué invalidaría la tesis' } : null,
+  ].filter((item): item is TocItem => item !== null);
+}
+
 /**
  * Vista de lectura de la tesis PUBLICADA: documento limpio, imprimible y
  * descargable (PDF/Markdown). Solo lo que contiene la version publicada;
@@ -78,7 +176,11 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const company = snapshot?.company ?? null;
   const currency = company?.currency ?? null;
   const latest = workspace?.thesis ?? null;
-  const published = workspace ? await readLatestPublished(ticker) : null;
+  // `getResearchThesisWorkspace` devuelve `thesis: null` cuando NO hay tesis
+  // (404) y lanza cuando el backend falla: `workspace === null` es un fallo,
+  // no un «todavía no hay tesis». Lo mismo con las versiones.
+  const versions = workspace ? await readLatestPublished(ticker) : { published: null, failed: false };
+  const published = versions.published;
   // Fuentes por cifra: /versions no las trae; /latest si. Solo se muestran
   // cuando la publicada ES la ultima version: la procedencia de un borrador
   // mas nuevo no describe este documento y afirmarlo seria inventarlo.
@@ -118,10 +220,13 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   // Retain all persisted free text and numeric values together. A missing
   // snapshot is not evidence of publishability, even for a published archive.
   const displayedVersion = published ?? latest;
-  if (displayedVersion && !canShowThesisText(displayedVersion, snapshot?.model_summary)) {
+  // Sin snapshot no se puede evaluar la puerta de publicacion: si habia una
+  // version que mostrar, eso es un fallo de carga y se dice como tal.
+  const loadFailed = workspace === null || versions.failed || (displayedVersion !== null && snapshot === null);
+  if (!loadFailed && displayedVersion && !canShowThesisText(displayedVersion, snapshot?.model_summary)) {
     return (
-      <main id="content" className={`print-document min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8 ${publicEditorial.variable}`}>
-        <div className="mx-auto max-w-3xl">
+      <main id="content" className={`print-document min-h-screen bg-surface-0 text-gray-100 ${publicEditorial.variable}`}>
+        <div className="mx-auto max-w-[40rem]">
           <Link href={`/research/${encoded}?view=thesis`} className="text-sm text-teal-300 underline">Ficha de {ticker}</Link>
           <h1 className="mt-8 text-3xl text-gray-50">{ticker} · {name}</h1>
           <WithheldThesisText thesis={displayedVersion} model={snapshot?.model_summary} />
@@ -131,108 +236,111 @@ export default async function ThesisReadingPage({ params }: PageProps) {
     );
   }
 
+  const toc = published
+    ? tocFor(published, { provenance: Boolean(provenance && provenance.length > 0) })
+    : latest
+      ? tocFor(latest, { provenance: false })
+      : [];
+
   return (
-    <main id="content" className={`print-document min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8 ${publicEditorial.variable}`}>
-      <div className="mx-auto max-w-3xl">
-        <div className="print:hidden flex flex-wrap items-center gap-3">
+    <main id="content" className={`print-document min-h-screen bg-surface-0 text-gray-100 ${publicEditorial.variable}`}>
+      <div className="mx-auto max-w-5xl">
+        <div className="print:hidden">
           <Link
             href={`/research/${encoded}?view=thesis`}
             className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />Ficha de {ticker}
           </Link>
-          {published ? (
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <PrintButton />
-            <a
-              href={`/api/thesis/${encoded}/pdf`}
-              download
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
-            >
-              <FileDown className="h-4 w-4" />PDF
-            </a>
-            <a
-              href={`/api/thesis-memo/${encoded}`}
-              download
-              className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
-            >
-              <FileText className="h-4 w-4" />Markdown
-            </a>
-          </div>
-          ) : null}
         </div>
 
-        {!published && latest && latest.status === 'insufficient_data' ? (
-          <article className="mt-8 min-w-0 max-w-full space-y-8 [overflow-wrap:anywhere]">
-            <header className="border-b border-gray-800 pb-6">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Tesis de inversión</p>
-              <h1 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="mt-2 text-3xl text-gray-50 sm:text-4xl">
+        {loadFailed ? (
+          <div className="mt-8 max-w-[40rem]">
+            <ErrorState
+              action={(
+                <>
+                  <a className={EXPORT_LINK} href={`/research/${encoded}/tesis`}>Reintentar</a>
+                  <Link className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'font-medium')} href={`/research/${encoded}?view=thesis`}>Ir a la ficha</Link>
+                </>
+              )}
+              description={`El servicio de research no respondió al pedir la tesis de ${ticker}. No significa que no exista: vuelve a intentarlo en unos segundos.`}
+              title={`No se pudo cargar la tesis de ${ticker}`}
+              titleAs="h1"
+            />
+          </div>
+        ) : !published && latest && latest.status === 'insufficient_data' ? (
+          <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,40rem)_13rem] lg:justify-between lg:gap-12">
+          <article className="min-w-0 max-w-full space-y-10 [overflow-wrap:anywhere]">
+            <header className="space-y-4 border-b border-gray-800 pb-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tesis de inversión</p>
+              <h1 style={EDITORIAL} className="text-3xl leading-tight text-gray-50 sm:text-4xl">
                 {ticker} · {name}
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">PROVISIONAL — no publicada</Badge>
                 <Badge variant="outline">{statusLabel(latest.status)}</Badge>
                 <Badge variant="outline">v{latest.version}</Badge>
                 {latest.created_at ? <span className="text-xs text-gray-500">generada el {formatGeneratedDate(latest.created_at)}</span> : null}
               </div>
-              <p role="status" className="mt-4 rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+              <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
                 Documento provisional generado con la evidencia disponible: no es una versión
                 publicada. El modelo no produjo una valoración calculable (la causa exacta está
                 declarada en el memo, secciones 13 y 21): esta vista no contiene cifras de
                 valoración porque no existen, no porque se oculten.
               </p>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
                 <PrintButton />
                 <a
                   href={`/api/thesis/${encoded}/pdf?draft=1`}
                   download
-                  className="inline-flex min-h-[44px] items-center gap-2 rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-200 transition hover:border-teal-700 hover:text-teal-200 sm:min-h-0"
+                  className={EXPORT_LINK}
                 >
                   <FileDown className="h-4 w-4" />Ficha del borrador (PDF, v{latest.version})
                 </a>
-                <span className="text-xs text-gray-500">
-                  El PDF solo lleva la ficha del borrador (lista blanca del backend); el documento completo es esta página.
-                </span>
                 <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink>
               </div>
+              <p className="text-xs text-gray-500 print:hidden">
+                El PDF solo lleva la ficha del borrador (lista blanca del backend); el documento completo es esta página.
+              </p>
+              <ThesisToc items={toc} variant="inline" />
             </header>
 
             {latest.executive_summary ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Resumen ejecutivo</h2>
-                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(latest.executive_summary)}</p>
+                <SectionTitle id="resumen">Resumen ejecutivo</SectionTitle>
+                <p className={PARAGRAPH}>{cleanThesisText(latest.executive_summary)}</p>
               </section>
             ) : null}
 
             {latest.hypothesis ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Hipótesis</h2>
-                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(latest.hypothesis)}</p>
+                <SectionTitle id="hipotesis">Hipótesis</SectionTitle>
+                <p className={PARAGRAPH}>{cleanThesisText(latest.hypothesis)}</p>
               </section>
             ) : null}
 
             <section>
-              <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Escenarios y valoración</h2>
-              <p className="mt-4 text-sm text-gray-400">
+              <SectionTitle id="escenarios">Escenarios y valoración</SectionTitle>
+              <p className="mt-4 text-sm leading-6 text-gray-400">
                 Sin cifras de valoración en esta vista: el modelo no produjo una valoración
                 calculable con los datos disponibles; la causa exacta está declarada en el memo
                 (sección 13) y los datos pendientes en la sección 21.
               </p>
             </section>
 
-            {(latest.narrative_sections ?? []).map((section) => (
+            {(latest.narrative_sections ?? []).map((section, index) => (
               <section key={section.titulo}>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">{section.titulo}</h2>
-                {section.parrafos.map((parrafo, index) => (
-                  <p key={index} className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(parrafo)}</p>
+                <SectionTitle id={narrativeId(index)}>{section.titulo}</SectionTitle>
+                {section.parrafos.map((parrafo, paragraphIndex) => (
+                  <p key={paragraphIndex} className={PARAGRAPH}>{cleanThesisText(parrafo)}</p>
                 ))}
               </section>
             ))}
 
             {(latest.catalysts ?? []).length > 0 ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Catalizadores</h2>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                <SectionTitle id="catalizadores">Catalizadores</SectionTitle>
+                <ul className={LIST}>
                   {(latest.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
                       {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
@@ -244,8 +352,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {(latest.invalidation_criteria ?? []).length > 0 ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Qué invalidaría la tesis</h2>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                <SectionTitle id="invalidacion">Qué invalidaría la tesis</SectionTitle>
+                <ul className={LIST}>
                   {(latest.invalidation_criteria ?? []).map((criterion, index) => (
                     <li key={index}>{criterion}</li>
                   ))}
@@ -264,6 +372,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               </p>
             </footer>
           </article>
+          <ThesisToc items={toc} variant="aside" />
+          </div>
         ) : !published ? (
           <div className="mt-10">
             <EmptyState
@@ -274,48 +384,69 @@ export default async function ThesisReadingPage({ params }: PageProps) {
             />
           </div>
         ) : (
-          <article className="mt-8 min-w-0 max-w-full space-y-8 [overflow-wrap:anywhere]">
-            <header className="border-b border-gray-800 pb-6">
-              <p className="text-xs uppercase tracking-wide text-gray-500">Tesis de inversión</p>
-              <h1 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="mt-2 text-3xl text-gray-50 sm:text-4xl">
+          <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,40rem)_13rem] lg:justify-between lg:gap-12">
+          <article className="min-w-0 max-w-full space-y-10 [overflow-wrap:anywhere]">
+            <header className="space-y-4 border-b border-gray-800 pb-6">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tesis de inversión</p>
+              <h1 style={EDITORIAL} className="text-3xl leading-tight text-gray-50 sm:text-4xl">
                 {ticker} · {name}
               </h1>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <Badge>{RATING_LABELS[published.rating] ?? published.rating}</Badge>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Rating: {RATING_LABELS[published.rating] ?? published.rating}</Badge>
                 <Badge variant="outline">v{published.version}</Badge>
                 {generated ? <span className="text-xs text-gray-500">generada el {generated}</span> : null}
               </div>
               {latest && latest.version !== published.version ? (
-                <p className="mt-3 text-xs text-amber-300">
+                <p className="text-xs text-amber-300">
                   Existe una v{latest.version} en borrador pendiente de aprobación; sus cifras no se muestran hasta publicarse.
                 </p>
               ) : null}
+              {published ? (
+              <div className="flex flex-wrap items-center gap-2 print:hidden">
+                <a
+                  href={`/api/thesis/${encoded}/pdf`}
+                  download
+                  className={EXPORT_LINK}
+                >
+                  <FileDown className="h-4 w-4" />PDF
+                </a>
+                <a
+                  href={`/api/thesis-memo/${encoded}`}
+                  download
+                  className={EXPORT_LINK}
+                >
+                  <FileText className="h-4 w-4" />Markdown
+                </a>
+                <PrintButton />
+              </div>
+              ) : null}
+              <ThesisToc items={toc} variant="inline" />
             </header>
 
             {published.executive_summary ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Resumen ejecutivo</h2>
-                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(published.executive_summary)}</p>
+                <SectionTitle id="resumen">Resumen ejecutivo</SectionTitle>
+                <p className={PARAGRAPH}>{cleanThesisText(published.executive_summary)}</p>
               </section>
             ) : null}
 
             {published.hypothesis ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Hipótesis</h2>
-                <p className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(published.hypothesis)}</p>
+                <SectionTitle id="hipotesis">Hipótesis</SectionTitle>
+                <p className={PARAGRAPH}>{cleanThesisText(published.hypothesis)}</p>
               </section>
             ) : null}
 
             <section>
-              <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Escenarios y valoración</h2>
+              <SectionTitle id="escenarios">Escenarios y valoración</SectionTitle>
               {hasScenarioValues ? (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-700 text-left text-xs uppercase text-gray-500">
-                      <th className="py-2 pr-4">Escenario</th>
-                      <th className="py-2 pr-4">Valor</th>
-                      {hasProbabilities ? <th className="py-2">Probabilidad</th> : null}
+                    <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wide text-gray-500">
+                      <th scope="col" className="py-2 pr-4 font-medium">Escenario</th>
+                      <th scope="col" className="py-2 pr-4 text-right font-medium">Valor por acción</th>
+                      {hasProbabilities ? <th scope="col" className="py-2 text-right font-medium">Probabilidad</th> : null}
                     </tr>
                   </thead>
                   <tbody className="text-gray-200">
@@ -325,10 +456,10 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                       ['Alcista', published.bull_value, published.scenario_probabilities?.bull],
                     ] as const).map(([label, value, probability]) => (
                       <tr key={label} className="border-b border-gray-800/70">
-                        <td className="py-2 pr-4 text-gray-400">{label}</td>
-                        <td className="py-2 pr-4 font-medium">{money(value, currency)}</td>
+                        <th scope="row" className="py-2 pr-4 text-left font-normal text-gray-400">{label}</th>
+                        <td className="py-2 pr-4 text-right font-medium tabular-nums">{money(value, currency)}</td>
                         {hasProbabilities ? (
-                          <td className="py-2">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : 'N/D'}</td>
+                          <td className="py-2 text-right tabular-nums">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : 'N/D'}</td>
                         ) : null}
                       </tr>
                     ))}
@@ -338,18 +469,28 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               ) : (
                 <p className="mt-4 text-sm text-gray-400">Sin cifras de valoración.</p>
               )}
-              <p className="mt-3 text-sm text-gray-400">
-                {modelPriceLabel}: {money(published.current_price, currency)} · Valor esperado: {money(published.expected_value, currency)}
-                {published.margin_of_safety !== null
-                  ? ` · Margen de seguridad: ${formatPercent(Number(published.margin_of_safety))}`
-                  : ''}
-              </p>
+              <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-gray-500">{modelPriceLabel}</dt>
+                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.current_price, currency)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-gray-500">Valor esperado</dt>
+                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.expected_value, currency)}</dd>
+                </div>
+                {published.margin_of_safety !== null ? (
+                  <div>
+                    <dt className="text-xs text-gray-500">Margen de seguridad</dt>
+                    <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{formatPercent(Number(published.margin_of_safety))}</dd>
+                  </div>
+                ) : null}
+              </dl>
             </section>
 
             {provenance && provenance.length > 0 ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Procedencia de las cifras</h2>
-                <div className="mt-4 space-y-4">
+                <SectionTitle id="procedencia">Procedencia de las cifras</SectionTitle>
+                <div className="mt-4 space-y-5">
                   {PROVENANCE_GROUPS.map((group) => {
                     const rows = provenance.filter(
                       (item) => provenanceGroup(item.label as string | undefined, isVerifiedOficial(item)) === group.key,
@@ -362,11 +503,12 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                           {rows.map((item) => {
                             const urls = provenanceUrls(item);
                             const basis = provenanceBasisEs(item.base_inferencia ?? item.method);
+                            const label = capitalizeLabel(metricLabel(item.key));
                             return (
                               <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
-                                <dt className="text-gray-300">{capitalizeLabel(metricLabel(item.key))}</dt>
+                                <dt className="text-gray-300">{label}</dt>
                                 <dd className="ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</dd>
-                                <dd className="basis-full text-xs text-gray-500">
+                                <dd className="basis-full text-xs leading-5 text-gray-500">
                                   {basis ?? 'Base no documentada'}
                                   {urls.map((url, index) => (
                                     <a
@@ -374,10 +516,10 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                                       href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      aria-label={`Fuente ${index + 1}`}
-                                      className="ml-1 text-teal-400 underline print:text-gray-700 print:no-underline"
+                                      aria-label={`Fuente ${index + 1} de ${label}: ${sourceHost(url)} (se abre en otra pestaña)`}
+                                      className="ml-2 text-gray-300 underline decoration-gray-600 underline-offset-2 hover:text-gray-100 hover:decoration-gray-300 print:text-gray-700 print:no-underline"
                                     >
-                                      [{index + 1}]
+                                      {sourceHost(url)}
                                     </a>
                                   ))}
                                 </dd>
@@ -392,19 +534,19 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               </section>
             ) : null}
 
-            {(published.narrative_sections ?? []).map((section) => (
+            {(published.narrative_sections ?? []).map((section, index) => (
               <section key={section.titulo}>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">{section.titulo}</h2>
-                {section.parrafos.map((parrafo, index) => (
-                  <p key={index} className="mt-3 text-base leading-8 text-gray-200">{cleanThesisText(parrafo)}</p>
+                <SectionTitle id={narrativeId(index)}>{section.titulo}</SectionTitle>
+                {section.parrafos.map((parrafo, paragraphIndex) => (
+                  <p key={paragraphIndex} className={PARAGRAPH}>{cleanThesisText(parrafo)}</p>
                 ))}
               </section>
             ))}
 
             {(published.catalysts ?? []).length > 0 ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Catalizadores</h2>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                <SectionTitle id="catalizadores">Catalizadores</SectionTitle>
+                <ul className={LIST}>
                   {(published.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
                       {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
@@ -416,8 +558,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {(published.invalidation_criteria ?? []).length > 0 ? (
               <section>
-                <h2 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="text-xl text-teal-300">Qué invalidaría la tesis</h2>
-                <ul className="mt-3 list-disc space-y-2 pl-5 text-base leading-7 text-gray-200">
+                <SectionTitle id="invalidacion">Qué invalidaría la tesis</SectionTitle>
+                <ul className={LIST}>
                   {(published.invalidation_criteria ?? []).map((criterion, index) => (
                     <li key={index}>{criterion}</li>
                   ))}
@@ -435,13 +577,19 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               </p>
             </footer>
           </article>
+          <ThesisToc items={toc} variant="aside" />
+          </div>
         )}
       </div>
     </main>
   );
 }
 
-/** La publicada con contenido completo: /versions trae cada version entera. */
+/**
+ * La publicada con contenido completo: /versions trae cada version entera.
+ * Un fallo de red o del backend vuelve como `failed`, nunca como «no hay
+ * publicada»: la pagina lo pinta como error con reintento.
+ */
 async function readLatestPublished(ticker: string) {
   const { researchRequest } = await import('@/lib/research/client');
   type Version = NonNullable<Awaited<ReturnType<typeof getResearchThesisWorkspace>>['thesis']>;
@@ -452,10 +600,10 @@ async function readLatestPublished(ticker: string) {
       { timeoutMs: 12_000 },
     );
   } catch {
-    versions = [];
+    return { published: null, failed: true };
   }
   const published = versions
     .filter((version) => version.status === 'published')
     .sort((a, b) => b.version - a.version)[0];
-  return published ?? null;
+  return { published: published ?? null, failed: false };
 }
