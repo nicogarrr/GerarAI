@@ -67,27 +67,6 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     useEffect(() => {
         if (isOpen) void import('react-markdown');
     }, [isOpen]);
-    // The page owns only a slot. This layout instance keeps the transcript
-    // when moving between embedded doctrine and the floating panel elsewhere.
-    useEffect(() => {
-        let current: HTMLElement | null = null;
-        const sync = () => {
-            const slot = document.getElementById('brain-library-slot');
-            if (slot === current) return;
-            current = slot;
-            setLibrarySlot(slot);
-            if (slot) {
-                let authors: string[] = [];
-                try { authors = JSON.parse(slot.dataset.authors ?? '[]'); } catch { /* empty filter */ }
-                setKnowledge(knowledgeHandoff({ knowledge: { scope: slot.dataset.scope === 'letters' ? 'letters' : 'library', authors, documentId: Number(slot.dataset.documentId), documentTitle: slot.dataset.documentTitle } }));
-                setGuideTicker(''); setReviewId(undefined); setAuthor(''); setAnalysis(false);
-            } else { setKnowledge(null); setIsOpen(false); }
-        };
-        queueMicrotask(sync);
-        const observer = new MutationObserver(sync);
-        observer.observe(document.body, { childList: true, subtree: true });
-        return () => observer.disconnect();
-    }, [pathname]);
     // Pista de apertura: la etiqueta "Pregunta al Cerebro" se ve unos
     // segundos al cargar y se pliega sola (vuelve con hover/foco). Sin ella
     // el botón flotante era un cerebro suelto que nadie tocaba (Tester Nico).
@@ -126,6 +105,28 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         const t = setTimeout(() => setShowHint(false), 4000);
         return () => clearTimeout(t);
     }, []);
+
+    // The page owns only a slot. This layout instance keeps the transcript
+    // when moving between embedded doctrine and the floating panel elsewhere.
+    useEffect(() => {
+        let current: HTMLElement | null = null;
+        const sync = () => {
+            const slot = document.getElementById('brain-library-slot');
+            if (slot === current) return;
+            current = slot;
+            setLibrarySlot(slot);
+            if (slot) {
+                let authors: string[] = [];
+                try { authors = JSON.parse(slot.dataset.authors ?? '[]'); } catch { /* empty filter */ }
+                setKnowledge(knowledgeHandoff({ knowledge: { scope: slot.dataset.scope === 'letters' ? 'letters' : 'library', authors, documentId: Number(slot.dataset.documentId), documentTitle: slot.dataset.documentTitle } }));
+                setGuideTicker(''); setReviewId(undefined); setAuthor(''); setAnalysis(false);
+            } else { setKnowledge(null); setIsOpen(false); }
+        };
+        queueMicrotask(sync);
+        const observer = new MutationObserver(sync);
+        observer.observe(document.body, { childList: true, subtree: true });
+        return () => observer.disconnect();
+    }, [pathname]);
 
     function applyOpenBrainDetail(detail?: OpenBrainDetail | null) {
         // Cada apertura sustituye el anclaje anterior, incluso sin review_id.
