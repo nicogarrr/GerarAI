@@ -14,12 +14,13 @@ test('chat sends only signed server requests and renders quotes as plain text', 
   assert.ok(action.includes("timeoutMs: mode === 'analisis' ? 90_000 : 60_000"));
   assert.ok(!action.includes('fetch('));
   assert.ok(action.includes("method: 'POST'"));
-  const component = read('app/(root)/inversores/_components/LibraryChat.tsx');
+  const component = read('components/brain/BrainLibraryAnswer.tsx');
+  assert.ok(read('components/brain/GlobalBrain.tsx').includes('Doctrina, no datos actuales'));
   assert.ok(component.includes('{point.citation.quote}') && component.includes('{answer.citation.quote}'));
   // B4: sin «Página/Fecha no registrada»: el dato que falta se omite, nunca se inventa.
   assert.ok(!component.includes('Página no registrada') && !component.includes('Fecha no registrada'));
   assert.ok(component.includes('if (cite.page_number !== null)') && component.includes('if (cite.publication_date)'));
-  assert.ok(component.includes('Doctrina, no datos actuales'));
+
   assert.ok(!component.includes('dangerouslySetInnerHTML'));
   assert.ok(component.includes('chunk-${cite.chunk_id}'));
 });

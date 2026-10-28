@@ -4,6 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 let pathname = '/portfolio';
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 
+const askKnowledge = vi.fn();
+vi.mock('@/lib/actions/knowledge-chat.actions', () => ({ askKnowledge: (...a: unknown[]) => askKnowledge(...a) }));
+vi.mock('@/components/brain/BrainLibraryAnswer', () => ({ BrainLibraryAnswer: () => <div>Citas conservadas</div> }));
 const chatWithPortfolio = vi.fn();
 vi.mock('@/lib/actions/brain.actions', () => ({ chatWithPortfolio: (...a: unknown[]) => chatWithPortfolio(...a) }));
 const askResearchAssistantAction = vi.fn();
@@ -38,6 +41,7 @@ beforeEach(() => {
     Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
     pathname = '/portfolio';
     chatWithPortfolio.mockReset();
+    askKnowledge.mockReset();
     askResearchAssistantAction.mockReset();
     window.sessionStorage.clear();
 });
@@ -410,4 +414,32 @@ describe('GlobalBrain: persistencia', () => {
         ask('pregunta sin storage');
         expect(await screen.findByText('Sigue')).toBeInTheDocument();
     });
+});
+
+
+describe('Cerebro único: biblioteca y cartas', () => {
+  it('handoff elimina ticker anterior y conserva autor, modo y endpoint de conocimiento', async () => {
+    askKnowledge.mockResolvedValue({ answers: [], message: 'Sin datos guardados', status: 'sin_datos', retrieval: 'solo_texto' });
+    render(<GlobalBrain userId="u1" />);
+    act(() => openBrain({ ticker: 'UBER' }));
+    act(() => openBrain({ knowledge: { scope: 'letters', authors: ['Buffett'] }, question: '¿Recompras?' }));
+    expect(screen.queryByLabelText('Ticker de la guía de investigación')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Autor'), { target: { value: 'Buffett' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
+    await waitFor(() => expect(askKnowledge).toHaveBeenCalledWith('¿Recompras?', 'letters', 'Buffett', 'analisis', expect.objectContaining({ path: '/portfolio' }), undefined));
+    expect(chatWithPortfolio).not.toHaveBeenCalled();
+    expect(askResearchAssistantAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Volver al chat general' }));
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  });
+});
+
+it('401 de biblioteca se muestra como sesión caducada sin borrar conversación', async () => {
+  askKnowledge.mockRejectedValue(Object.assign(new Error('Unauthorized'), {statusCode:401}));
+  render(<GlobalBrain userId="u1" />);
+  act(() => openBrain({knowledge:{scope:'library'},question:'Pregunta válida'}));
+  fireEvent.click(screen.getByRole('button',{name:'Enviar pregunta'}));
+  await screen.findByText('Sesión caducada. Vuelve a iniciar sesión.');
+  expect(screen.getByText('Pregunta válida')).toBeInTheDocument();
 });

@@ -6,7 +6,7 @@ import { test } from 'node:test';
 // pueden contener markdown (tablas, listas). Renderizarlas como texto plano
 // mostraba tuberías crudas ("| dividendo | estable |"). Deben pasar por
 // ReactMarkdown, igual que los fragmentos de /knowledge.
-const src = readFileSync('app/(root)/inversores/_components/LibraryChat.tsx', 'utf8');
+const src = readFileSync('components/brain/BrainLibraryAnswer.tsx', 'utf8');
 
 test('las citas del chat de biblioteca se renderizan como markdown, no como texto crudo', () => {
   const quotes = src.match(/blockquote[\s\S]*?citation\.quote[\s\S]*?blockquote/g) ?? [];

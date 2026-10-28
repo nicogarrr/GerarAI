@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { brainHandoffContext } from '@/lib/brain/open-brain';
+import { brainHandoffContext, knowledgeHandoff } from '@/lib/brain/open-brain';
 
 describe('brain handoff context replacement', () => {
   it('AAPL review 1 does not leak into a new ticker without review_id', () => {
@@ -22,4 +22,12 @@ describe('brain handoff context replacement', () => {
   it('keeps an explicitly supplied valid review on the new ticker', () => {
     expect(brainHandoffContext({ ticker: 'msft', review_id: 2 })).toEqual({ ticker: 'MSFT', reviewId: 2 });
   });
+});
+
+describe('knowledge handoff validation', () => {
+ it('accepts only supported scopes and bounded author names', () => {
+  expect(knowledgeHandoff({knowledge:{scope:'library',authors:['Buffett']}})).toEqual({scope:'library',authors:['Buffett']});
+  expect(knowledgeHandoff({ticker:'UBER'})).toBeNull();
+  expect(knowledgeHandoff({knowledge:{scope:'other'} as never})).toBeNull();
+ });
 });
