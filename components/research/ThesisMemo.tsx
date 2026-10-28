@@ -10,13 +10,21 @@ import { metricLabel } from '@/lib/research/metric-labels';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { GlossaryTerm } from '@/components/GlossaryTerm';
 import ScenarioAssumptions from '@/components/research/ScenarioAssumptions';
-import ThesisHumanInputForm from '@/components/research/ThesisHumanInputForm';
-import ThesisInvalidationRulesForm from '@/components/research/ThesisInvalidationRulesForm';
-import { coerceInvalidationRules } from '@/lib/research/thesis-invalidation-rules';
-import ThesisDebatePanel from '@/components/research/ThesisDebatePanel';
 import ThesisMarkdownPager from '@/components/research/ThesisMarkdownPager';
+import { coerceInvalidationRules } from '@/lib/research/thesis-invalidation-rules';
+
 import { splitMemoPages } from '@/lib/research/memo-pages';
 import { Badge } from '@/components/ui/badge';
+// Las piezas interactivas del memorando (alta de supuestos, reglas de
+// invalidación y debate bull/bear) están bajo el pliegue y solo se usan al
+// leer la tesis en profundidad: cargan diferidas (ver LazyMemoControls) para
+// no inflar el JS inicial de /research/[ticker]. El paginador del memo
+// completo se queda eager: es contenido SSR, no una isla interactiva.
+import {
+  LazyThesisHumanInputForm as ThesisHumanInputForm,
+  LazyThesisInvalidationRulesForm as ThesisInvalidationRulesForm,
+  LazyThesisDebatePanel as ThesisDebatePanel,
+} from '@/components/research/LazyMemoControls';
 import type { ResearchThesis } from '@/lib/actions/research.actions';
 import type { GlossaryKey } from '@/lib/glossary';
 

@@ -39,7 +39,10 @@ import { isE2EMarketFixtureEnabled } from '@/lib/e2e-market-fixture';
 import { e2eExtendedQuoteFixture } from '@/lib/e2e-extended-quote-fixture';
 import { MoatTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
-import { FileUploadInput } from '@/components/forms/FileUploadInput';
+// El input de subida (procesa imágenes en canvas) solo aparece en la vista de
+// documentos: carga diferido (ver FileUploadInputLazy) para que su JS no
+// viaje en la ficha inicial.
+import { FileUploadInputLazy as FileUploadInput } from '@/components/forms/FileUploadInputLazy';
 import { CompanyHeaderQuote } from '@/components/research/CompanyHeaderQuote';
 import { CompanyHeaderQuoteSkeleton } from '@/components/research/CompanyHeaderQuoteSkeleton';
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
