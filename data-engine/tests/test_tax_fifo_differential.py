@@ -56,7 +56,7 @@ def _f(v):
 
 
 class _Lot:
-    __slots__ = ("qty", "unit", "unit_base", "deferred", "deferred_base", "capacity", "date")
+    __slots__ = ("qty", "unit", "unit_base", "deferred", "deferred_base", "capacity", "date", "unknown")
 
     def __init__(self, qty, unit, unit_base, when):
         self.qty = qty
@@ -64,6 +64,8 @@ class _Lot:
         self.unit_base = unit_base
         self.deferred = F(0)
         self.deferred_base = F(0) if unit_base is not None else None
+        # Recibio la perdida diferida de una venta descubierta (#2590).
+        self.unknown = False
         self.capacity = qty
         self.date = when
 
@@ -90,7 +92,10 @@ def ref_replay(events, resolve_rate, start, end):
                 if s["qty_unblocked"] > 0 and lot.capacity > 0:
                     take = min(lot.capacity, s["qty_unblocked"])
                     lot.deferred += take * s["lps"]
-                    if lot.deferred_base is not None:
+                    if s["unknown"]:
+                        lot.unknown = True
+                        lot.deferred_base = None
+                    elif lot.deferred_base is not None:
                         lot.deferred_base = (
                             None if s["lps_base"] is None else lot.deferred_base + take * s["lps_base"]
                         )
@@ -111,10 +116,13 @@ def ref_replay(events, resolve_rate, start, end):
         remaining = q
         cost = F(0)
         cost_base: F | None = F(0)
+        cost_unknown = False
         li = 0
         while remaining > 0 and li < len(lots):
             lot = lots[li]
             take = min(lot.qty, remaining)
+            if lot.unknown:
+                cost_unknown = True
             cost += take * lot.unit
             if cost_base is not None and lot.unit_base is not None:
                 cost_base += take * lot.unit_base
@@ -142,6 +150,10 @@ def ref_replay(events, resolve_rate, start, end):
         proceeds_base = proceeds * r if r is not None else None
         cost_base = cost * r if r is not None else None
         gain_base = gain * r if r is not None else None
+        if cost_unknown:
+            # #2590: coste heredado de una venta descubierta, N/D en euros.
+            cost_base = None
+            gain_base = None
         hist_sells.append((tx.trade_date, q))
         is_loss = gain_base < 0 if gain_base is not None else gain < 0
         sale = None
@@ -152,6 +164,7 @@ def ref_replay(events, resolve_rate, start, end):
                 "lps": max(-gain, F(0)) / q,
                 "lps_base": (max(-gain_base, F(0)) / q if gain_base is not None else None),
                 "blocked": F(0),
+                "unknown": over_qty > 0 or cost_unknown,
             }
             wstart = tx.trade_date - WASH
             buys_w = [(d, qq) for d, qq in hist_buys if wstart <= d <= tx.trade_date]
@@ -176,7 +189,10 @@ def ref_replay(events, resolve_rate, start, end):
                     continue
                 take = min(lot.capacity, lot.qty, to_block, sale["qty_unblocked"])
                 lot.deferred += take * sale["lps"]
-                if lot.deferred_base is not None:
+                if sale["unknown"]:
+                    lot.unknown = True
+                    lot.deferred_base = None
+                elif lot.deferred_base is not None:
                     lot.deferred_base = (
                         None if sale["lps_base"] is None else lot.deferred_base + take * sale["lps_base"]
                     )

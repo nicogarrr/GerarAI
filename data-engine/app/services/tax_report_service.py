@@ -439,8 +439,6 @@ def replay_tax_fifo(events, resolve_rate, start, end):
         # vez de registrar una ganancia silenciosa.
         over_sell_quantity = remaining if remaining > Decimal("0") else Decimal("0")
         over_sell = over_sell_quantity > 0
-        if cost_unknown:
-            cost_base = None
 
         gain_native = proceeds_native - cost_native
         # Criterio DGT elegido: ganancia en moneda del valor, convertida una
@@ -450,6 +448,12 @@ def replay_tax_fifo(events, resolve_rate, start, end):
         proceeds_base = proceeds_native * sell_rate if sell_rate is not None else None
         cost_base = cost_native * sell_rate if sell_rate is not None else None
         gain_base_raw = gain_native * sell_rate if sell_rate is not None else None
+        if cost_unknown:
+            # El coste nativo arrastra la pérdida diferida (inventada) de una
+            # venta descubierta: convertirlo al cambio de la venta no lo hace
+            # conocido. Coste y resultado en euros, N/D (#2590).
+            cost_base = None
+            gain_base_raw = None
         # TODA venta válida entra en el historial, con ganancia o con
         # pérdida: holdings_before_window alimenta la excepción de
         # compra única del Manual, y omitir las ventas rentables lo
