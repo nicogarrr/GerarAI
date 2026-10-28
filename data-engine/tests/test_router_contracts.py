@@ -91,11 +91,31 @@ def test_legacy_direct_vector_knowledge_routes_are_retired():
 
 
 def test_api_prefix_still_serves_research_routes():
-    client = TestClient(main.app, raise_server_exceptions=False)
+    # /api/news lee la tabla news_events: el test aporta su propio esquema en
+    # memoria (get_db sobreescrito) en vez de depender de un SQLite compartido
+    # que otro test haya migrado antes (dependencia de orden).
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
 
-    # Sin firma la API protegida responde 401; el 404 de ruta inexistente
-    # solo debe aparecer para paths legacy (no montados).
-    response = client.get("/api/news")
+    from app.core.database import Base, get_db
+
+    engine = create_engine(
+        "sqlite:///:memory:", poolclass=StaticPool, connect_args={"check_same_thread": False}
+    )
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+
+    def _db():
+        with factory() as session:
+            yield session
+
+    main.app.dependency_overrides[get_db] = _db
+    try:
+        client = TestClient(main.app, raise_server_exceptions=False)
+        response = client.get("/api/news")
+    finally:
+        main.app.dependency_overrides.pop(get_db, None)
     assert response.status_code in (401, 200)
 
 
