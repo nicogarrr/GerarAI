@@ -271,3 +271,14 @@ def test_analysis_request_uses_registered_prompt_and_traces_it(monkeypatch):
     resolved = prompt_registry.get_prompt("knowledge_analysis", allow_remote=False)
     assert provider.request.messages[0].content == resolved.text
     assert provider.request.metadata == resolved.trace_metadata()
+
+
+def test_answer_request_uses_registered_prompt_and_traces_it(monkeypatch):
+    from app.services import prompt_registry
+
+    monkeypatch.setenv("CAVAAI_ENABLE_VECTOR_SEARCH", "0")
+    provider = Provider()
+    asyncio.run(ask_library(setup_library(), "repurchases", author="Buffett", provider=provider))
+    resolved = prompt_registry.get_prompt("knowledge_chat", allow_remote=False)
+    assert provider.request.messages[0].content == resolved.text
+    assert provider.request.metadata == resolved.trace_metadata()
