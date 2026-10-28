@@ -1,0 +1,29 @@
+# Schemathesis (CLI) contra un data-engine local en APP_ENV=test.
+# El fuzzing de CI va por pytest (tests/fuzz/), que firma cada petición con la
+# auth estricta real; este fichero sirve para lanzarlo a mano contra un
+# servidor levantado:
+#
+#   APP_ENV=test uvicorn main:app --port 8765 &
+#   schemathesis run http://127.0.0.1:8765/openapi.json
+#
+# Sin firma, las rutas privadas responden 401: es la sonda de bypass de auth
+# (cualquier 2xx en una ruta privada es un bug). Ver docs/testing/api-fuzzing.md.
+
+workers = 4
+continue-on-failure = true
+request-timeout = 10.0
+
+[generation]
+max-examples = 20
+mode = "all"
+
+[phases.stateful]
+enabled = true
+max-steps = 6
+
+[checks]
+not_a_server_error.enabled = true
+# Contratos de respuesta: útiles para revisar, hoy con falsos positivos
+# conocidos (422 con detail en texto, códigos no documentados).
+response_schema_conformance.enabled = false
+status_code_conformance.enabled = false
