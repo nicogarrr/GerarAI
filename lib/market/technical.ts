@@ -1,8 +1,6 @@
 /** Deterministic daily-bar indicators. No quote is mixed into historical bars. */
 export type TechnicalBar = { date: string; close: number; open?: number | null; high?: number | null; low?: number | null; volume: number | null };
 export type ChartRange = '1M' | '6M' | 'YTD' | '1A';
-export const DAILY_RANGES: ChartRange[] = ['1M', '6M', 'YTD', '1A'];
-
 export function cleanBars(history: readonly TechnicalBar[]): TechnicalBar[] {
     const dates = new Map<string, TechnicalBar>();
     for (const bar of history) {
