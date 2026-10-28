@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-// @ts-expect-error TS7016: módulo .mjs sin tipos
 const { classify, summarize, render, OTHER } = await import('./frontend-coverage-by-feature.mjs');
 
 describe('frontend-coverage-by-feature', () => {
