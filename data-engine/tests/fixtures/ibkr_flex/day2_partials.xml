@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sintetico y anonimo: cuenta U0000001 y emisores ficticios (ACME, BETA). Modelado sobre atributos Flex documentados, NO capturado de una cuenta real. -->
+<FlexQueryResponse queryName="synthetic" type="AF">
+<FlexStatements count="1">
+<FlexStatement accountId="U0000001" fromDate="20261026" toDate="20261027" period="Last2BusinessDays" whenGenerated="20261027;180000">
+<Trades>
+<Trade accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" tradeID="T-1001" ibOrderID="O-1" tradeDate="20261026" buySell="BUY" quantity="100" tradePrice="10.00" ibCommission="-1.00" notes="O"/>
+<Trade accountId="U0000001" assetCategory="STK" symbol="BETA" currency="EUR" tradeID="T-1002" ibOrderID="O-2" tradeDate="20261026" buySell="BUY" quantity="50" tradePrice="20.00" ibCommission="-1.00" notes="O"/>
+<Trade accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" tradeID="T-1003" ibOrderID="O-3" tradeDate="20261027" buySell="SELL" quantity="-40" tradePrice="11.00" ibCommission="-0.40" notes="C;P"/>
+<Trade accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" tradeID="T-1004" ibOrderID="O-3" tradeDate="20261027" buySell="SELL" quantity="-20" tradePrice="11.10" ibCommission="-0.20" notes="C;P"/>
+<Trade accountId="U0000001" assetCategory="STK" symbol="BETA" currency="EUR" tradeID="T-1005" ibOrderID="O-4" tradeDate="20261027" buySell="SELL" quantity="-50" tradePrice="20.40" ibCommission="-1.00" notes="C"/>
+</Trades>
+<OpenPositions>
+<OpenPosition accountId="U0000001" assetCategory="STK" symbol="ACME" currency="USD" position="40" markPrice="11.20" positionValue="448" costBasisPrice="10.01" fifoPnlUnrealized="47.60" reportDate="20261027"/>
+</OpenPositions>
+<CashReport>
+<CashReportCurrency accountId="U0000001" currency="USD" endingCash="9606.90" endingSettledCash="9606.90" reportDate="20261027"/>
+<CashReportCurrency accountId="U0000001" currency="EUR" endingCash="2017.00" endingSettledCash="2017.00" reportDate="20261027"/>
+</CashReport>
+<CashTransactions>
+<CashTransaction accountId="U0000001" type="Dividends" symbol="ACME" currency="USD" amount="12.50" dateTime="20261026" transactionID="C-2001"/>
+<CashTransaction accountId="U0000001" type="Withholding Tax" symbol="ACME" currency="USD" amount="-1.88" dateTime="20261026" transactionID="C-2002"/>
+<CashTransaction accountId="U0000001" type="Other Fees" symbol="" currency="USD" amount="-0.50" dateTime="20261026" transactionID="C-2003"/>
+</CashTransactions>
+</FlexStatement>
+</FlexStatements>
+</FlexQueryResponse>

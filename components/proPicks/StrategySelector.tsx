@@ -64,7 +64,7 @@ export default function StrategySelector({ strategies, currentStrategy, onStrate
         <div className="flex w-full min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <label className="shrink-0 text-sm font-medium text-gray-400">Estrategia:</label>
             <Select value={currentStrategy} onValueChange={handleStrategyChange}>
-                <SelectTrigger className="h-11 w-full border-gray-700 bg-gray-800 text-sm text-gray-300 sm:w-[300px]">
+                <SelectTrigger aria-label="Estrategia" className="h-11 w-full border-gray-700 bg-gray-800 text-sm text-gray-300 sm:w-[300px]">
                     <SelectValue placeholder="Seleccionar estrategia">{selectedOption?.name}</SelectValue>
                 </SelectTrigger>
                 <SelectContent className="bg-gray-800 border-gray-700">
