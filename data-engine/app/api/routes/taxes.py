@@ -52,11 +52,16 @@ def tax_holdings(db: Session = Depends(get_db)) -> list[dict]:
 
 @router.post("/report/{fiscal_year}/regenerate")
 def regenerate_tax_report(
-    fiscal_year: int, fx_opening_complete: bool = False, db: Session = Depends(get_db)
+    fiscal_year: int,
+    fx_opening_complete: bool = False,
+    fx_income_by_analogy: bool = False,
+    db: Session = Depends(get_db)
 ) -> dict:
     _validate_year(fiscal_year)
     try:
-        return TaxReportService().regenerate_report(db, fiscal_year, fx_opening_complete=fx_opening_complete)
+        return TaxReportService().regenerate_report(db, fiscal_year, fx_opening_complete=fx_opening_complete,
+            fx_income_by_analogy=fx_income_by_analogy,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

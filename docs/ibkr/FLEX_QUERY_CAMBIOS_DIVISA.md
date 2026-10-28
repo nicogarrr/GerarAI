@@ -46,6 +46,19 @@ solo si tu histórico en GerarAI está completo desde el primer dólar), hay cam
 a otra divisa distinta de EUR, o hay compras, dividendos, intereses o comisiones en
 esa divisa, que el libro todavía no modela.
 
+## Reglas del libro (doctrina aportada por Auditor 2)
+
+- Entradas: ventas de acciones al tipo con que tributaron (V0282-22) y cambios EUR a divisa
+  (valor de adquisición = EUR pagados; añadido propio, art. 35 LIRPF, pendiente de validar).
+- Salidas sin resultado propio: compras de valores y comisiones en la divisa (V0282-22, V0706-22).
+  El resultado aparece solo al convertir a EUR.
+- Pérdida al convertir: no se integra en la parte cubierta por adquisición de la misma divisa en el
+  año anterior o posterior (art. 33.5.e LIRPF, V1613-25), no 2 meses. Se suma al valor de los lotes
+  readquiridos. Si la ventana de 1 año sigue abierta a fecha de los datos, queda "incompleto".
+- Dividendos e intereses como entradas: sin consulta, solo analogía. Solo con
+  `?fx_income_by_analogy=true`, etiquetado "criterio por analogía, sin consulta".
+- Fondos/ETF comprados con divisa propia (V0775-21): fuera de alcance, "incompleto".
+
 ## Fuentes
 
 - https://github.com/csingley/ibflex (`ibflex/Types.py`: `Trade`, `FxTransaction`,

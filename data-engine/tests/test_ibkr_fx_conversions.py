@@ -100,14 +100,16 @@ def test_report_without_conversions_is_not_computed(db):
     assert s["currency_ledger_status"] == "not_computed" and s["currency_ledger_gain_base"] is None
 
 
-def test_report_with_stored_conversion_but_unmodeled_buy_is_incomplete_not_a_number(db):
+def test_report_with_sale_and_stored_conversion_is_computed(db):
     _rates(db)
-    _tx(db, "buy", 10, 100, date(2025, 1, 2))
-    _tx(db, "sell", 10, 120, date(2025, 1, 5))
-    IBKRImportService().import_flex_xml(db, _xml(FX_BUY))
+    _tx(db, "buy", 10, 100, date(2024, 12, 20))
+    _tx(db, "sell", 10, 120, date(2025, 1, 5))  # 1200 USD x 0.90 = 1080 EUR de valor
+    # compra de 10 acciones en 2024 queda fuera de esta divisa (anterior al lote): se pasa saldo confirmado
+    IBKRImportService().import_flex_xml(db, _xml(FX_BUY), trades_only=True)
     s = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]
+    # La compra de 1000 USD en 2024 no tiene lote anterior: incompleta, nunca un numero inventado.
     assert s["currency_ledger_status"] == "incomplete" and s["currency_ledger_gain_base"] is None
-    assert "sin modelar" in s["currency_ledger_reason"]
+    assert "compra" in s["currency_ledger_reason"]
 
 
 def test_report_missing_opening_balance_is_incomplete(db):
@@ -134,3 +136,46 @@ def test_backfill_trades_only_also_stores_fx_conversions(db):
     r = IBKRImportService().import_flex_xml(db, _xml(STK, FX_BUY), trades_only=True)
     assert r["fx_conversions_imported"] == 1 and r["non_stock_skipped"] == 1
     assert len(db.scalars(select(FxConversion)).all()) == 1
+
+
+EUR_TO_USD = ("<Trade assetCategory='CASH' symbol='EUR.USD' buySell='SELL' quantity='-400' tradePrice='1.25' "
+              "proceeds='500' currency='USD' tradeDate='20250101' tradeID='e2u'/>")
+USD_100_TO_EUR = ("<Trade assetCategory='CASH' symbol='EUR.USD' buySell='BUY' quantity='95' tradePrice='1.0526' "
+                  "proceeds='-100' currency='USD' tradeDate='20250301' tradeID='u2e'/>")
+
+
+def _flow(db):
+    _rates(db)
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date(2025, 2, 1), rate=D("0.92"), source="ECB"))
+    db.commit()
+    IBKRImportService().import_flex_xml(db, _xml(EUR_TO_USD, USD_100_TO_EUR), trades_only=True)
+    _tx(db, "buy", 4, 100, date(2025, 1, 2))  # 400 USD salen sin resultado (V0282-22, V0706-22)
+
+
+def test_eur_to_usd_lot_purchase_outflow_and_conversion_give_a_number(db):
+    _flow(db)
+    s = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]
+    # 500 USD costaron 400 EUR; compra de 400 USD consume 320 EUR de coste sin resultado;
+    # quedan 100 USD a 80 EUR; convertidos a 0.95 = 95 EUR -> +15
+    assert s["currency_ledger_status"] == "computed" and s["currency_ledger_gain_base"] == 15.0
+
+
+def test_dividend_in_currency_blocks_result_unless_analogy_flag(db):
+    _flow(db)
+    _tx(db, "dividend", 1, 10, date(2025, 2, 1))
+    svc = TaxReportService()
+    s = svc.compute_report(db, 2025, fx_opening_complete=True)["summary"]
+    assert s["currency_ledger_status"] == "incomplete" and "sin modelar" in s["currency_ledger_reason"]
+    s2 = svc.compute_report(db, 2025, fx_opening_complete=True, fx_income_by_analogy=True)["summary"]
+    assert s2["currency_ledger_status"] == "computed" and s2["currency_ledger_gain_base"] == 15.0
+    assert "analogía, sin consulta" in s2["currency_ledger_note"]
+
+
+def test_fund_purchase_in_currency_is_out_of_scope(db):
+    _flow(db)
+    company = db.scalars(select(Company)).first()
+    db.add(Transaction(company_id=company.id, trade_date=date(2025, 1, 3), action="buy", quantity=D(1), price=D(1), fees=D(0),
+                       currency="USD", raw_payload={"assetCategory": "FUND"}))
+    db.commit()
+    s = TaxReportService().compute_report(db, 2025, fx_opening_complete=True)["summary"]
+    assert s["currency_ledger_status"] == "incomplete" and "V0775-21" in s["currency_ledger_reason"]
