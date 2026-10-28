@@ -1,4 +1,4 @@
-"""Alimentacion del paper book con propuestas LLM (item 5), con cuota y sin scheduler.
+"""Alimentacion del paper book con propuestas LLM (item 5), con cuota compartida.
 
 Elige candidatos entre las empresas del tenant con titulares materiales recientes
 y pide UNA propuesta por ticker a `generate_proposal` (que valida contra una

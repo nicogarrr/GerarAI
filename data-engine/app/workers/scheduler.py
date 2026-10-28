@@ -27,6 +27,7 @@ from app.workers.dramatiq_app import (
     ingest_sec_bottleneck_filings,
     ingest_spy_daily,
     ingest_uk_pdmr_filings,
+    propose_paper_trades,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
@@ -439,6 +440,12 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # record neto se computa sobre DividendRecord. Misma fuente gratuita.
     _register(scheduler, partial(enqueue_for_all_tenants, sync_paper_dividends),
               "cron", job_id="paper_dividends_daily", hour=6, minute=50, jitter=300)
+    # Propuestas LLM automaticas del paper book: UNA pasada diaria con la misma
+    # cuota compartida (5/dia) y el mismo guard de modelos EUR0 del endpoint
+    # manual: coste LLM nuevo = 0. Tras el refresco de noticias de la manana EU
+    # y con el pre-market US ya publicado.
+    _register(scheduler, partial(enqueue_for_all_tenants, propose_paper_trades),
+              "cron", job_id="paper_proposals_daily", hour=15, minute=30, jitter=600)
     # Splits declarados (Yahoo, FMP de respaldo): sin ellos el modelo no puede
     # ajustar los recuentos historicos de acciones y degrada el CAGR a N/D.
     # Semanal: cartera+watchlist completo; universo en chunks auto-encolados.
