@@ -41,12 +41,12 @@ export default function HistoricalStressView({ report }: { report: HistoricalStr
         {report.mode === 'portfolio' && <section aria-label="Escenario de cartera">
             <h2 className="mb-3 font-semibold text-gray-100">Cartera actual</h2>
             <p className="mb-4 text-sm text-gray-400">Pesos actuales de renta variable, comprar y mantener. Sin caja ni efecto divisa. No es tu rendimiento real.</p>
-            <div className="grid gap-3 md:grid-cols-3">{report.portfolio.map(window => <WindowCard key={window.year} window={window} />)}</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{report.portfolio.map(window => <WindowCard key={window.year} window={window} />)}</div>
         </section>}
         {report.companies.length === 0 && <p className="rounded-xl border border-gray-800 p-5 text-gray-400">Sin posiciones de renta variable. Busca una compañía.</p>}
         {report.companies.slice(page * size, (page + 1) * size).map(company => <section key={company.ticker} aria-label={company.ticker}>
             <h2 className="mb-3 font-semibold text-teal-300">{company.ticker}{company.weight !== null ? ` · ${formatPercent(company.weight)} de renta variable` : ''}</h2>
-            <div className="grid gap-3 md:grid-cols-3">{company.windows.map(window => <WindowCard key={window.year} window={window} />)}</div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{company.windows.map(window => <WindowCard key={window.year} window={window} />)}</div>
             <p className="mt-2 text-xs text-gray-500">
                 {company.source_url ? <a className="inline-flex min-h-11 min-w-11 items-center text-teal-300 underline" href={company.source_url} target="_blank" rel="noopener noreferrer">{company.source}</a> : company.source} · Cierre ajustado · {company.currency ?? 'Divisa sin datos'} · Consultado {day(company.fetched_at)}
                 {company.weight_as_of ? ` · Peso al ${day(company.weight_as_of)}` : ''}
