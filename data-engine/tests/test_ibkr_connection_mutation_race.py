@@ -5,9 +5,10 @@ from threading import Event
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.core.database import Base
 from app.models import CashBalance, IbkrRawRow, IBKRSyncReceipt, Position
@@ -26,7 +27,7 @@ def pg_engine():
     schema = f'ibkr_race_{uuid4().hex}'
     admin = create_engine(url)
     with admin.begin() as conn:
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
+        conn.execute(CreateSchema(schema))
     engine = create_engine(url, connect_args={'options': f'-csearch_path={schema}'})
     try:
         Base.metadata.create_all(engine)
@@ -34,7 +35,7 @@ def pg_engine():
     finally:
         engine.dispose()
         with admin.begin() as conn:
-            conn.execute(text(f'DROP SCHEMA {schema} CASCADE'))
+            conn.execute(DropSchema(schema, cascade=True))
         admin.dispose()
 
 
