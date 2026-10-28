@@ -445,8 +445,17 @@
 /* Vista de lectura de la tesis (/research/[ticker]/tesis): impresion limpia
    en papel claro y sin el chrome de la app (sidebar, header, navegacion). */
 @media print {
-  body:has(.print-document) :is(header, nav, aside) {
+  /* Solo el chrome de la app. Antes `:is(header, nav, aside)` se aplicaba
+     tambien DENTRO del documento y el <header> del articulo (ticker, empresa,
+     rating, version y fecha) no salia en papel. Lo fijo (burbuja del Cerebro,
+     barra inferior) tampoco se imprime. */
+  body:has(.print-document) :is(header, nav, aside, .fixed):not(.print-document *) {
     display: none !important;
+  }
+  /* Con "graficos de fondo" activado el papel salia casi negro bajo tinta
+     #111: el fondo del documento impreso es siempre blanco. */
+  body:has(.print-document) {
+    background: #ffffff !important;
   }
   body:has(.print-document) main {
     padding: 0 !important;
