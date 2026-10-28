@@ -103,6 +103,8 @@ APP_SERVICES = (
     "worker-alerts",
     "worker-gdelt",
     "worker-knowledge",
+    "worker-official-closes",
+    "worker-dca-manual",
     "scheduler",
 )
 
