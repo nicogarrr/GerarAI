@@ -2,7 +2,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
@@ -57,3 +57,8 @@ class PaperTrade(TenantOwnedMixin, Base, TimestampMixin):
     applied_split_ids: Mapped[str | None] = mapped_column(String(500))
     last_corporate_action: Mapped[str | None] = mapped_column(String(160))
     corporate_action_warning: Mapped[str | None] = mapped_column(String(60))
+    # Tesis del tenant vigente al crear la propuesta (la que vio el modelo).
+    # Inmutable; NULL = no había tesis o trade anterior al anclaje.
+    thesis_version_id: Mapped[int | None] = mapped_column(
+        ForeignKey("thesis_versions.id", ondelete="SET NULL"), nullable=True, index=True
+    )

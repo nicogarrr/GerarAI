@@ -13,6 +13,7 @@ from app.services.llm_proposal_runner import QuotaExceeded, generate_proposal
 from app.services.llm_proposal_service import ProposalRejected
 from app.services.paper_calibration_service import calibration
 from app.services.paper_cost_service import current_assumptions
+from app.services.paper_thesis_anchor import thesis_anchors
 from app.services.paper_trading_service import (
     UnknownProposalCurrency,
     close_position,
@@ -63,9 +64,17 @@ async def llm_propose(body: LLMProposalRequest, db: Session = Depends(get_db)) -
 
 
 @router.get("/proposals")
-def proposals(limit: int = Query(100, ge=1, le=500), db: Session = Depends(get_db)) -> list[dict]:
-    rows = db.scalars(select(PaperTrade).order_by(PaperTrade.id.desc()).limit(limit)).all()
-    return [trade_out(row) for row in rows]
+def proposals(
+    limit: int = Query(100, ge=1, le=500),
+    ticker: str | None = Query(None, min_length=1, max_length=20, description="Solo las propuestas de este ticker (ficha de empresa)."),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    statement = select(PaperTrade)
+    if ticker is not None:
+        statement = statement.where(PaperTrade.ticker == ticker.strip().upper())
+    rows = db.scalars(statement.order_by(PaperTrade.id.desc()).limit(limit)).all()
+    anchors = thesis_anchors(db, rows)
+    return [{**trade_out(row), "thesis_anchor": anchors.get(row.thesis_version_id)} for row in rows]
 
 
 @router.get("/scoreboard")

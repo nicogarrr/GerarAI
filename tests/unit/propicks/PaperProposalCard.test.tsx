@@ -89,4 +89,24 @@ describe('Paper proposal display without real orders', () => {
         expect(screen.getByRole('status')).toHaveTextContent('no se ejecuta');
         expect(within(screen.getByRole('region', { name: 'Precios observados' })).queryByText(/Motivo de cierre/)).not.toBeInTheDocument();
     });
+    it('names the anchored thesis version and links to the company thesis', () => {
+        render(<PaperProposalCard trade={fixture({ ticker: 'A/B', thesis_version_id: 7,
+            thesis_anchor: { id: 7, version: 2, created_at: '2026-01-15T10:00:00Z', latest_version: 2, superseded: false } })} />);
+        expect(screen.getByText(/Evaluaba la tesis v2 del 15\/1\/2026/)).toHaveTextContent('Sigue siendo la tesis vigente.');
+        expect(screen.getByRole('link', { name: 'Ver tesis' })).toHaveAttribute('href', '/research/A%2FB?view=thesis');
+    });
+    it('warns when the thesis changed after the simulation started', () => {
+        render(<PaperProposalCard trade={fixture({ thesis_version_id: 7,
+            thesis_anchor: { id: 7, version: 2, created_at: null, latest_version: 4, superseded: true } })} />);
+        expect(screen.getByText(/La tesis ha cambiado desde entonces \(vigente: v4\)/)).toHaveClass('text-amber-200');
+        expect(screen.queryByText(/Sigue siendo la tesis vigente/)).not.toBeInTheDocument();
+    });
+    it.each([
+        [null, /Sin tesis anclada/],
+        [undefined, /Tesis de referencia no disponible/],
+    ])('does not invent a thesis link when the anchor is %s', (thesis_version_id, text) => {
+        render(<PaperProposalCard trade={fixture({ thesis_version_id, thesis_anchor: null })} />);
+        expect(screen.getByText(text)).toBeVisible();
+        expect(screen.queryByRole('link', { name: 'Ver tesis' })).not.toBeInTheDocument();
+    });
 });

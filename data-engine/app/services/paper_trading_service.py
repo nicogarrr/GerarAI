@@ -17,6 +17,7 @@ from app.services.paper_cost_service import (
     current_assumptions,
     execution_fee,
 )
+from app.services.paper_thesis_anchor import current_thesis
 
 
 def utc(value: datetime) -> datetime:
@@ -37,13 +38,26 @@ def _same_proposal(existing: PaperTrade, proposal: PaperProposal) -> PaperTrade:
     return existing
 
 
-def create_proposal(db: Session, proposal: PaperProposal) -> PaperTrade:
+_LOOKUP_THESIS = object()
+
+
+def create_proposal(db: Session, proposal: PaperProposal, *, thesis_version_id=_LOOKUP_THESIS) -> PaperTrade:
+    """Guarda la propuesta anclada a una tesis del servidor, nunca a una del cliente.
+
+    El generador LLM pasa la versión que vio el modelo (o None si no había);
+    sin argumento se ancla a la tesis vigente al guardar. Un reintento idéntico
+    conserva el ancla original.
+    """
     existing = db.scalar(select(PaperTrade).where(PaperTrade.proposal_key == proposal.proposal_key))
     if existing:
         return _same_proposal(existing, proposal)
+    if thesis_version_id is _LOOKUP_THESIS:
+        thesis = current_thesis(db, proposal.ticker)
+        thesis_version_id = thesis.id if thesis is not None else None
     row = PaperTrade(
         **{**proposal.model_dump(), "ticker": proposal.ticker.upper()},
         proposal_currency=proposal.currency, proposal_currency_known=True,
+        thesis_version_id=thesis_version_id,
     )
     db.add(row)
     try:

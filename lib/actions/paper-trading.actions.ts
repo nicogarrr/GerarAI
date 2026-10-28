@@ -18,6 +18,13 @@ export interface PaperTradeView {
     dividends_source?: string | null;
     split_adjustments?: number | null; last_corporate_action?: string | null;
     corporate_action_warning?: string | null;
+    /** Tesis vigente del tenant al crear la propuesta (null = no había). */
+    thesis_version_id?: number | null;
+    thesis_anchor?: PaperThesisAnchor | null;
+}
+/** Versión de tesis anclada y si existe una más nueva para la misma empresa. */
+export interface PaperThesisAnchor {
+    id: number; version: number; created_at: string | null; latest_version: number; superseded: boolean;
 }
 export interface PaperCalibration {
     base: string; calculado_en: string; propuestas_llm: number; cerradas_con_resultado: number;

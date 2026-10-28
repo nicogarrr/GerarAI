@@ -17506,6 +17506,8 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                /** @description Solo las propuestas de este ticker (ficha de empresa). */
+                ticker?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;

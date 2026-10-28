@@ -21,6 +21,26 @@ function conviction(value: string) {
     return value.trim() && Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? `${number(parsed * 100)} %` : 'Sin datos';
 }
 
+/** Qué tesis evaluaba la simulación; avisa si la tesis ha cambiado desde entonces. */
+export function PaperThesisLine({ trade }: { trade: PaperTradeView }) {
+    const anchor = trade.thesis_anchor;
+    const thesisHref = `/research/${encodeURIComponent(trade.ticker)}?view=thesis`;
+    if (!anchor) {
+        return <p className="text-xs text-gray-400">
+            {trade.thesis_version_id === undefined
+                ? 'Tesis de referencia no disponible.'
+                : 'Sin tesis anclada: no había tesis guardada al crear la propuesta o es anterior al anclaje.'}
+        </p>;
+    }
+    return <p className="text-xs text-gray-400">
+        Evaluaba la tesis v{anchor.version}{anchor.created_at ? ` del ${new Date(anchor.created_at).toLocaleDateString('es-ES', { timeZone: 'Europe/Madrid' })}` : ''}.{' '}
+        {anchor.superseded
+            ? <span className="text-amber-200">La tesis ha cambiado desde entonces (vigente: v{anchor.latest_version}); el resultado no valida la versión nueva.</span>
+            : 'Sigue siendo la tesis vigente.'}{' '}
+        <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={thesisHref}>Ver tesis</a>
+    </p>;
+}
+
 export function PaperProposalCard({ trade }: { trade: PaperTradeView }) {
     const direction = trade.direction === 'long' ? 'Largo' : trade.direction === 'short' ? 'Corto' : 'Sin dirección';
     const horizon = trade.horizon === 'five_years' ? 'Tesis 5 años' : trade.horizon === 'short' ? 'Operación a 30 días' : 'Sin horizonte';
@@ -38,6 +58,7 @@ export function PaperProposalCard({ trade }: { trade: PaperTradeView }) {
             </dl>
             <p className="text-xs text-gray-400">La convicción declarada no es una probabilidad de acierto validada. Los niveles son una propuesta, no precios de ejecución.</p>
             <p className="break-words whitespace-pre-wrap">Razonamiento: {trade.inference_basis || 'Sin datos'}</p>
+            <PaperThesisLine trade={trade} />
             <p className="text-xs text-gray-400">Creada: {date(trade.created_at)} (hora de Madrid)</p>
         </section>
         <section aria-label="Precios observados" className="space-y-2 border-t border-gray-700 pt-3">

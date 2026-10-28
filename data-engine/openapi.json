@@ -44300,6 +44300,26 @@
             }
           },
           {
+            "description": "Solo las propuestas de este ticker (ficha de empresa).",
+            "in": "query",
+            "name": "ticker",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 20,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Solo las propuestas de este ticker (ficha de empresa).",
+              "title": "Ticker"
+            }
+          },
+          {
             "in": "header",
             "name": "x-cavaai-user",
             "required": false,
