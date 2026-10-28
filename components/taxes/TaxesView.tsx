@@ -327,7 +327,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
         : Array.from({ length: 6 }, (_, index) => currentYear - index);
 
     return (
-        <div className="grid gap-6">
+        <div className="grid gap-6 [&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:items-center">
             <div className="flex flex-wrap items-center gap-3">
                 <label htmlFor="tax-year" className="text-sm text-gray-400">
                     {t('taxes.year')}
@@ -336,7 +336,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     id="tax-year"
                     value={year}
                     onChange={(event) => handleYearChange(event.target.value)}
-                    className="h-9 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200"
+                    className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200"
                 >
                     {yearOptions.map((option) => (
                         <option key={option} value={option}>

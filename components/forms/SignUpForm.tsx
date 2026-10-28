@@ -187,11 +187,11 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                     legales no se crea la cuenta. Los enlaces abren en otra
                     pestaña para no perder lo ya rellenado. */}
                 <div>
-                    <label className="flex items-start gap-2 text-sm leading-6 text-gray-300" htmlFor="acceptTerms">
+                    <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6 text-gray-300" htmlFor="acceptTerms">
                         <input
                             id="acceptTerms"
                             type="checkbox"
-                            className="mt-1 h-4 w-4 shrink-0 accent-teal-500"
+                            className="mt-0.5 size-5 shrink-0 accent-teal-500"
                             {...register('acceptTerms', {
                                 required: 'Debes aceptar los Términos de uso y la Política de privacidad para crear la cuenta',
                             })}

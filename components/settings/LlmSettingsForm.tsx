@@ -276,7 +276,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
             </div>
 
             {status.api_key_configured ? (
-                <label className="flex items-center gap-2 text-sm text-gray-300">
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6 text-gray-300">
                     <input
                         checked={clearApiKey}
                         disabled={busy}
@@ -284,17 +284,19 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                             setClearApiKey(event.target.checked);
                             if (event.target.checked) setApiKey('');
                         }}
-                        type="checkbox"
+                        className="mt-0.5 size-5 shrink-0 accent-teal-500"
+                    type="checkbox"
                     />
                     Borrar la clave guardada y desactivar la IA propia
                 </label>
             ) : null}
 
-            <label className="flex items-center gap-2 text-sm text-gray-300">
+            <label className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm leading-6 text-gray-300">
                 <input
                     checked={enabled}
                     disabled={busy}
                     onChange={(event) => setEnabled(event.target.checked)}
+                    className="mt-0.5 size-5 shrink-0 accent-teal-500"
                     type="checkbox"
                 />
                 Usar esta configuración para la IA de mi cuenta
