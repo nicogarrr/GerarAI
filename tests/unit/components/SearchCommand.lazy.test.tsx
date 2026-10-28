@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -12,6 +13,13 @@ import SearchCommand from '@/components/SearchCommand';
 import { getSearchCommandSnapshot, closeSearchCommand } from '@/lib/search/search-command-store';
 
 describe('SearchCommand: gatillo eager + paleta diferida', () => {
+    it('keeps the heavy dialog out of static imports and behind the owning open state', () => {
+        const source = readFileSync(`${process.cwd()}/components/SearchCommand.tsx`, 'utf8');
+        expect(source).toMatch(/dynamic\(\(\) => import\(['"]@\/components\/SearchCommandDialog['"]\)/);
+        expect(source).not.toMatch(/from\s+['"]cmdk['"]/);
+        expect(source).not.toMatch(/from\s+['"][^'"]*(?:SearchCommandDialog|ui\/command|finnhub\.actions)['"]/);
+        expect(source).toMatch(/ownerId === instanceId\s*&&\s*\(\s*<SearchCommandDialog/);
+    });
     it('monta el gatillo sin abrir nada y sin estado de store', () => {
         render(<SearchCommand renderAs="icon" />);
         expect(screen.getByRole('button', { name: 'Abrir buscador' })).toBeInTheDocument();
