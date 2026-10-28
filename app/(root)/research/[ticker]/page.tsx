@@ -858,7 +858,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               description: `${ticker} no está en la cobertura verificada de GerarAI y el proveedor de mercado no está disponible para comprobarlo. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo; inténtalo de nuevo más tarde.`,
             };
     return (
-      <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">
+      <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
         <div className="mx-auto max-w-[1600px] space-y-6">
           <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
           <EmptyState
@@ -1653,14 +1653,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
 
   return (
-    <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 px-4 py-6 text-gray-100 sm:px-6 lg:px-8">
+    <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
       <div className="mx-auto max-w-[1600px]">
-        <Link className="mb-5 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+        {/* Desde md las migas ya llevan a Research: la flecha solo queda en movil. */}
+        <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
           <div className="flex items-start gap-3 sm:gap-4">
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2 sm:gap-3"><h1 className="text-2xl font-bold sm:text-3xl">{ticker}</h1>{exchangeDisplayName(company.exchange) ? <Badge variant="outline">{exchangeDisplayName(company.exchange)}</Badge> : null}<Badge variant="outline">{company.currency}</Badge></div>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3"><h1 className="text-2xl font-bold sm:text-3xl">{ticker}</h1><span className="inline-flex items-center gap-2">{exchangeDisplayName(company.exchange) ? <Badge variant="outline">{exchangeDisplayName(company.exchange)}</Badge> : null}<Badge variant="outline">{company.currency}</Badge></span></div>
             </div>
             <div className="-mr-2 flex shrink-0 items-center">
               <FollowButton compact symbol={ticker} company={company.name} isFollowed={isFollowed} stateUnknown={watchlistUnknown} />

@@ -106,7 +106,7 @@ async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
   const rows = vista === 'subidas' ? movers.gainers : vista === 'bajadas' ? movers.losers : movers.most_active;
   const caption = vista === 'subidas' ? 'Mayores subidas' : vista === 'bajadas' ? 'Mayores bajadas' : 'Mayor volumen';
   return (
-    <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
+    <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip">
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
         {movers.session_date ? (
@@ -141,7 +141,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
   const vista = vistaDe(params?.vista);
   if (vista === 'regimen') {
     return (
-      <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
+      <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold break-words text-gray-100">{t('nav.screener')}</h1>
         </div>
@@ -205,7 +205,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       : formatNumber(i.price, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip p-4 sm:p-6">
+    <main id="content" tabIndex={-1} className="mx-auto w-full max-w-full min-w-0 space-y-6 overflow-x-clip">
       <div className="flex min-w-0 items-baseline gap-3">
         <h1 className="text-xl font-semibold break-words text-gray-100 sm:text-2xl">{t('nav.screener')}</h1>
         {universeSize ? (

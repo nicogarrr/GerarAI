@@ -127,7 +127,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
     const chartData = periodData[effectivePeriod];
     const hasDrawableHistory = periodData.Todo.length >= 2;
     return (
-        <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip p-4 pb-24 sm:p-4 sm:pb-24 lg:p-6 lg:pb-24">
+        <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip">
                 {/* Header */}
                 <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">

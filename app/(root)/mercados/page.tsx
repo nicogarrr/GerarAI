@@ -17,7 +17,7 @@ export default async function MercadosPage() {
     // el error inicial nunca deja la pagina en blanco.
     const initial = await getLiveMarkets().catch(() => null);
     return (
-        <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-6">
+        <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl">
             <PageHeader
                 title="Mercados"
                 description="Índices, futuros, acciones, materias primas y divisas, actualizado cada minuto."

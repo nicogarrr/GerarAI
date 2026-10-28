@@ -70,6 +70,22 @@ describe('SectionNav', () => {
         expect(screen.getByRole('link', { name: 'Inteligencia' })).toHaveAttribute('aria-current', 'page');
         expect(screen.getByRole('link', { name: 'Impuestos' })).not.toHaveAttribute('aria-current');
     });
+    it('en una ficha de empresa (detalle bajo Empresas) no apila el subnav del hub', () => {
+        mocks.pathname.mockReturnValue('/research/MSFT');
+        const { container } = render(<SectionNav />);
+        expect(container).toBeEmptyDOMElement();
+        mocks.pathname.mockReturnValue('/research/MSFT/tesis');
+        const { container: thesis } = render(<SectionNav />);
+        expect(thesis).toBeEmptyDOMElement();
+    });
+    it('en una herramienta del hub sí lo pinta y marca la actual', () => {
+        mocks.pathname.mockReturnValue('/research/news');
+        render(<SectionNav />);
+        const nav = screen.getByRole('navigation', { name: 'Herramientas de la sección' });
+        expect(nav).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Noticias' })).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('link', { name: 'Empresas' })).not.toHaveAttribute('aria-current');
+    });
     it('empieza plegado, despliega al pulsar y recuerda la decisión en localStorage', () => {
         mocks.pathname.mockReturnValue('/portfolio');
         render(<SectionNav />);

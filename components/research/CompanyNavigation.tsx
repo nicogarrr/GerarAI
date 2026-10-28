@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { ChevronDown } from 'lucide-react';
 
 import { DecisionJournalEntryLink } from '@/components/research/DecisionJournalEntryLink';
 import { MODULES, moduleHref, type View } from '@/lib/research/research-views';
@@ -14,7 +15,13 @@ const ADVANCED = [
   { label: 'Señales específicas', keys: ['satellites'] },
 ] as const;
 
-/** Same links and visual tokens, with specialist tools behind one disclosure. */
+/**
+ * Same links and visual tokens, with specialist tools behind one disclosure.
+ * Jerarquia: pestañas primarias subrayadas (la marca teal fina dice "estas
+ * aqui", como la barra del sidebar) y modulos como control segmentado neutro:
+ * antes eran botones con borde y relleno teal que competian con las acciones
+ * de la cabecera.
+ */
 export function CompanyNavigation({ ticker, activeView }: { ticker: string; activeView: View }) {
   const primary = PRIMARY.find((group) => group.keys.some((key) => key === activeView));
   const advancedActive = ADVANCED.some((group) => group.keys.some((key) => key === activeView));
@@ -23,8 +30,8 @@ export function CompanyNavigation({ ticker, activeView }: { ticker: string; acti
     return <Link
       aria-current={activeView === key ? 'page' : undefined}
       className={compact
-        ? `flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm transition ${activeView === key ? 'bg-teal-950/40 text-teal-200' : 'text-gray-400 hover:text-gray-200'}`
-        : `inline-flex min-h-[44px] items-center rounded-lg border px-4 py-2.5 text-sm transition ${activeView === key ? 'border-teal-600 bg-teal-950/40 text-teal-200' : 'border-gray-800 text-gray-400 hover:border-gray-700 hover:text-gray-200'}`}
+        ? `flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm transition ${activeView === key ? 'bg-gray-800 font-medium text-gray-100' : 'text-gray-400 hover:text-gray-200'}`
+        : `inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-sm transition ${activeView === key ? 'bg-gray-800 font-medium text-gray-100' : 'text-gray-400 hover:bg-gray-800/60 hover:text-gray-200'}`}
       href={moduleHref(ticker, item)} key={key} scroll={'path' in item}
     >{item.label}{compact ? <span aria-hidden="true">→</span> : null}</Link>;
   };
@@ -41,7 +48,7 @@ export function CompanyNavigation({ ticker, activeView }: { ticker: string; acti
     </nav> : null}
     <details className="group rounded-lg border border-gray-800" open={advancedActive}>
       <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200 [&::-webkit-details-marker]:hidden">
-        Análisis avanzado <span aria-hidden="true" className="transition-transform group-open:rotate-180">⌄</span>
+        Análisis avanzado <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180" />
       </summary>
       <nav aria-label="Análisis avanzado" className="grid gap-4 px-3 pb-3 md:grid-cols-3">
         {ADVANCED.map((group) => {

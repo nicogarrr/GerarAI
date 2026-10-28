@@ -32,7 +32,7 @@ export default async function Home() {
     const userId = await getUserId();
 
     return (
-        <main id="content" tabIndex={-1} className="flex w-full max-w-full min-w-0 flex-col gap-6 overflow-x-clip p-4 sm:gap-8 sm:p-6">
+        <main id="content" tabIndex={-1} className="flex w-full max-w-full min-w-0 flex-col gap-6 overflow-x-clip sm:gap-8">
             {/*
                 PersonalizedOverview no lleva <Suspense>: es un client component
                 que pinta sus propios esqueletos, así que el fallback de servidor

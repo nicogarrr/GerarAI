@@ -9,6 +9,7 @@ import { expect, test } from "@playwright/test";
 test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1 to run browser tests.");
 
 const SCROLL_PX = 300;
+const MIN_SCROLL_PX = 40;
 
 async function medirSalto(
   page: import("@playwright/test").Page,
@@ -26,7 +27,11 @@ async function medirSalto(
   // reflejaba el layout definitivo. Esperando a que el layout sea el final,
   // `antes` y `después` se miden contra la misma página.
   if (layoutEstable) await expect(layoutEstable).toBeVisible();
-  await page.evaluate((y) => window.scrollTo(0, y), SCROLL_PX);
+  // Desplazamiento real (> 0) que deja la pestaña a la vista bajo la cabecera
+  // fija: con la cabecera compacta de la ficha las pestañas quedan a ~300px
+  // del inicio, y a 300px exactos el hover volvía a subir la página hasta 0.
+  const top = await destino.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+  await page.evaluate((y) => window.scrollTo(0, y), Math.max(MIN_SCROLL_PX, Math.min(SCROLL_PX, top - 160)));
   // Un usuario real pulsa la pestaña que VE. El hover provoca el mismo
   // scroll-into-view de Playwright que el clic, así `antes` se mide en la
   // posición desde la que se pulsa de verdad. Medir a 300px con la pestaña
