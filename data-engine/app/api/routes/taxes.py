@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -106,7 +106,11 @@ def preview_tax_filing(
 class DeclarantInput(BaseModel):
     model_config = {"extra": "forbid"}
 
-    nif: str | None = None
+    # La validez de formato (DNI/NIE/CIF con dígito de control) se avisa en
+    # cliente sin bloquear: puede ser un identificador fiscal extranjero.
+    # Aquí solo se rechaza lo absurdo: longitud desmesurada o caracteres de
+    # control, que nunca son un identificador y suelen ser pegado corrupto.
+    nif: str | None = Field(default=None, max_length=32)
     apellidos_nombre: str | None = None
     numero_declaracion: str | None = None
     telefono: str | None = None
@@ -114,6 +118,13 @@ class DeclarantInput(BaseModel):
     custody: dict[str, str | None] | None = None
     custody_entities: dict[str, dict[str, str | None] | None] | None = None
     first_acquisition_dates: dict[str, str | None] | None = None
+
+    @field_validator("nif")
+    @classmethod
+    def _nif_sin_caracteres_de_control(cls, value: str | None) -> str | None:
+        if value is not None and any(ord(ch) < 32 or ord(ch) == 127 for ch in value):
+            raise ValueError("El NIF contiene caracteres de control no imprimibles.")
+        return value
 
 
 @router.get("/declarant")
