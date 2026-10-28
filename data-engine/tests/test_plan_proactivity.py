@@ -36,7 +36,11 @@ def test_actual_plan_changes_emit_in_app_only_with_sources(db):
     save(db)
     assert len(db.scalars(select(ResearchAlert)).all()) == 1
     save(db, amount='500')
-    assert len(db.scalars(select(ResearchAlert)).all()) == 2
+    rows = db.scalars(select(ResearchAlert).order_by(ResearchAlert.id)).all()
+    assert len(rows) == 2
+    assert rows[0].status == 'resolved' and rows[0].resolved_at is not None
+    assert rows[1].status == 'open'
+    assert sum(a.status == 'open' for a in rows) == 1
 
 
 def test_resolved_state_does_not_reopen_and_daily_review_dedupes(db):
