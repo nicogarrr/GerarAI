@@ -223,6 +223,28 @@ def test_llm_request_pins_free_model_even_with_paid_override(monkeypatch):
         asyncio.run(service._analyze_with_llm("payload"))
 
 
+def test_llm_request_uses_registered_prompt_and_traces_it(monkeypatch):
+    from app.services import prompt_registry
+
+    seen = []
+
+    class Router:
+        def resolve(self, request):
+            seen.append(request)
+            return "paid-model-x"  # corta antes de llamar al proveedor
+
+    class Provider:
+        name = "test"
+        model_router = Router()
+
+    monkeypatch.setattr(service, "create_llm_provider", lambda: Provider())
+    with pytest.raises(RuntimeError, match="owner-approved"):
+        asyncio.run(service._analyze_with_llm("payload"))
+    resolved = prompt_registry.get_prompt("asts_llm_service", allow_remote=False)
+    assert seen[0].messages[0].content == resolved.text
+    assert seen[0].metadata == resolved.trace_metadata()
+
+
 def test_requires_tenant(db):
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)

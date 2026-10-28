@@ -135,3 +135,16 @@ def test_thesis_narrative_services_use_registry_text_and_trace_it():
     deep_request = thesis_deep_narrative._build_request([{"id": "f1", "texto": "t", "fuente": "x"}])
     assert deep_request.messages[0].content == deep.text
     assert deep_request.metadata == deep.trace_metadata()
+
+
+def test_asts_llm_service_prompt_version_and_hash_are_pinned():
+    # Hash del texto ANTES de moverlo al registro: editar el prompt sin subir
+    # la version (y este hash a proposito) rompe el test.
+    resolved = prompt_registry.get_prompt("asts_llm_service", allow_remote=False)
+    assert (resolved.version, resolved.content_hash, resolved.task) == (
+        "asts-catalog-analysis-v1",
+        "bc4b6648d20d",
+        "asts_catalog_analysis",
+    )
+    assert resolved.source == "code"
+    assert resolved.text == prompt_registry.ASTS_CATALOG_ANALYSIS
