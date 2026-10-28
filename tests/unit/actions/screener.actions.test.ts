@@ -59,7 +59,7 @@ describe('screenStocks (legacy Finnhub, cliente)', () => {
         const quote: Record<string, object> = {
             AAPL: { c: 150, d: 1.5, dp: 1, v: 5_000_000 },
             MSFT: { c: 300, d: -3, dp: -1, v: 2_000_000 },
-            SPY: { c: 500, d: 2, dp: 0.4, v: 50_000_000 },
+            SPY: { c: 500, d: null, dp: null, v: 50_000_000 },
         };
         const profile: Record<string, object> = {
             AAPL: { name: 'Apple', marketCapitalization: 2_500_000, finnhubIndustry: 'Technology', exchange: 'NASDAQ' },
@@ -88,7 +88,7 @@ describe('screenStocks (legacy Finnhub, cliente)', () => {
         expect(rows.find((r) => r.symbol === 'AAPL')).toMatchObject({
             marketCap: 2_500_000_000_000, type: 'Stock', sector: 'Technology', pe: 25, beta: 1.2,
         });
-        expect(rows.find((r) => r.symbol === 'SPY')?.type).toBe('ETF');
+        expect(rows.find((r) => r.symbol === 'SPY')).toMatchObject({ type: 'ETF', change: null, changePercent: null });
         vi.unstubAllGlobals();
     });
 

@@ -34,8 +34,8 @@ export type ScreenerResult = {
   symbol: string;
   name: string;
   price: number;
-  change: number;
-  changePercent: number;
+  change: number | null;
+  changePercent: number | null;
   marketCap: number;
   pe: number;
   pb: number;
@@ -111,8 +111,8 @@ export const screenStocks = cache(async (filters: ScreenerFilters): Promise<Scre
         }
         
         const price = quote.c || 0;
-        const change = quote.d || 0;
-        const changePercent = quote.dp || 0;
+        const change = typeof quote.d === 'number' && Number.isFinite(quote.d) ? quote.d : null;
+        const changePercent = typeof quote.dp === 'number' && Number.isFinite(quote.dp) ? quote.dp : null;
         
         const result: ScreenerResult = {
           symbol,
