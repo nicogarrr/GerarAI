@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 async function chooseCurrency(page: Page, code: string) {
   await page.getByRole("combobox", { name: "Divisa base" }).click();
   await page.getByRole("option", { name: new RegExp(`^${code}\\b`) }).click();
-  await page.getByRole("button", { name: "Guardar" }).click();
+  await page.getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(page.getByText(new RegExp(`Divisa base: ${code}\\. Cartera revalorada\\.`)).first()).toBeVisible({ timeout: 30_000 });
 }
 
@@ -25,7 +25,7 @@ for (const vp of VIEWPORTS) {
 
       const combo = page.getByRole("combobox", { name: "Divisa base" });
       if (!/EUR/.test((await combo.textContent()) ?? "")) await chooseCurrency(page, "EUR");
-      await expect(page.getByRole("button", { name: "Guardar" })).toBeDisabled();
+      await expect(page.getByRole("button", { name: "Guardar", exact: true })).toBeDisabled();
 
       await chooseCurrency(page, "USD");
       const { json } = await backendCall("GET", "/api/portfolio/summary");
