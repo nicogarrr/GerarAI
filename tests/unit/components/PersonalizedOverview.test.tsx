@@ -124,13 +124,26 @@ describe('PersonalizedOverview', () => {
         await renderHome();
         expect(screen.getByText('desglose 5000')).toBeInTheDocument();
         expect(screen.getByText(/Pesos sobre el valor bruto/)).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: /Ver qué ha cambiado en ASTS/ })).toHaveAttribute('href', '/research/ASTS?view=changes');
+        expect(screen.getByRole('link', { name: 'Revisar ASTS (mayor variación desde la compra)' })).toHaveAttribute('href', '/research/ASTS?view=changes');
         const asts = screen.getByRole('link', { name: /^ASTS/ });
         expect(asts).toHaveAttribute('href', '/research/ASTS');
         expect(within(asts).getByText('-35,00 %')).toBeInTheDocument();
         await waitFor(() => expect(within(asts).getByText(/VJ \+50 %/)).toBeInTheDocument());
         expect(within(asts).getByText(/tesis/)).toBeInTheDocument();
         await waitFor(() => expect(within(screen.getByRole('link', { name: /^META/ })).getByText('Sin valor justo')).toBeInTheDocument());
+    });
+
+    it('no presenta la variación desde la compra como cambio de hoy ni causa verificada', async () => {
+        setup({ portfolio: summary([
+            holding('KRKNF', { gainPercent: -40, firstBuyDate: '2020-01-01' }),
+            holding('META', { gainPercent: 15 }),
+        ]) });
+        await renderHome();
+        const review = screen.getByRole('link', { name: 'Revisar KRKNF (mayor variación desde la compra)' });
+        expect(review).toHaveAttribute('href', '/research/KRKNF?view=changes');
+        expect(review).not.toHaveClass('whitespace-nowrap');
+        expect(review.textContent).not.toMatch(/hoy|diari[oa]|qué ha cambiado|por qué|causa/i);
+        expect(screen.queryByRole('link', { name: /Ver qué ha cambiado en/i })).not.toBeInTheDocument();
     });
 
     it('valor justo en otra divisa: muestra el valor sin porcentaje y la fuente', async () => {
