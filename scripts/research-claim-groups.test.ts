@@ -15,6 +15,11 @@ test('claims retain all entries and remain distinct by persisted thesis id', () 
 
 test('missing forecast or actual value cannot render a successful review status', () => {
   const panel = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
-  assert.equal((panel.match(/Sin comparación: falta dato/g) ?? []).length, 2);
-  assert.match(panel, /N\/D significa que falta el dato esperado o real/);
+  const list = readFileSync('components/research/ExpectationsList.tsx', 'utf8');
+  assert.equal((panel.match(/Sin comparación: falta dato/g) ?? []).length, 1);
+  assert.match(list, /N\/D significa que falta el dato esperado o real/);
+  assert.match(panel, /review\.expected_value != null && review\.actual_value != null && Number\.isFinite\(review\.expected_value\) && Number\.isFinite\(review\.actual_value\)/);
+  assert.match(panel, /status: comparable \? reviewStatusLabel\(review\.status\) : 'Sin comparación: falta dato'/);
+  assert.match(list, /<Badge variant="outline">\{r\.status\}<\/Badge>/);
+  assert.match(list, /N\/D significa que falta el dato esperado o real/);
 });

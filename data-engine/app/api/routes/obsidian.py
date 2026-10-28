@@ -15,7 +15,7 @@ from app.models import (
     ThesisVersion,
     WatchItem,
 )
-from app.services.company_resolver import resolve_company
+from app.services.company_resolver import resolve_companies, resolve_company
 from app.services.obsidian_export import (
     CompanyEntry,
     Note,
@@ -182,7 +182,7 @@ def export_obsidian_vault(db: Session = Depends(get_db)) -> Response:
     unresolved: list[str] = []
     watch_items = list(db.scalars(select(WatchItem)).all())
     # Match exacto de todos los símbolos en un IN (antes, resolve_company por
-    # símbolo). resolve_company solo se usa para los que no casan exacto
+    # símbolo). resolve_companies (lote) solo se usa para los que no casan exacto
     # (sufijo de mercado, clase de acción, FIGI), con la misma política.
     wanted = sorted({item.symbol.strip().upper() for item in watch_items})
     exact = (
@@ -193,13 +193,20 @@ def export_obsidian_vault(db: Session = Depends(get_db)) -> Response:
         if wanted
         else {}
     )
-    for item in watch_items:
-        company = exact.get(item.symbol.strip().upper()) or resolve_company(db, item.symbol)
-        if company is None:
-            unresolved.append(item.symbol)
-            continue
+    for company in exact.values():
         watch_tickers.add(company.ticker)
         companies.setdefault(company.ticker, company)
+    # Los que no casan exacto, en lote (1-2 IN): el coste no crece con el
+    # numero de simbolos.
+    pending = [symbol for symbol in wanted if symbol not in exact]
+    resolved, missing = resolve_companies(db, pending)
+    for company in resolved:
+        watch_tickers.add(company.ticker)
+        companies.setdefault(company.ticker, company)
+    missing_set = set(missing)
+    unresolved.extend(
+        item.symbol for item in watch_items if item.symbol.strip().upper() in missing_set
+    )
 
     entries = [
         CompanyEntry(

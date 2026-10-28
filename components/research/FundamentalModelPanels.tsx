@@ -5,6 +5,7 @@ import { etiquetaTipoEvento } from '@/lib/labels';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { frameworkLabel, frameworkTerm } from '@/lib/research/framework-terms';
 import { expectationMetricLabel, reviewStatusLabel } from '@/lib/research/expectation-labels';
+import { ExpectationsList, type ExpectationRow } from '@/components/research/ExpectationsList';
 import { BarChart3, BrainCircuit, CircleHelp, GitBranch } from 'lucide-react';
 import { GlossaryTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
@@ -349,6 +350,22 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
   );
 }
 
+function expectationRows(reviews: ResearchExpectationReview[]): ExpectationRow[] {
+  const year = new Date().getUTCFullYear();
+  return reviews.map((review) => {
+    const comparable = review.expected_value != null && review.actual_value != null && Number.isFinite(review.expected_value) && Number.isFinite(review.actual_value);
+    return {
+      id: review.id,
+      year: review.fiscal_year,
+      metric: expectationMetricLabel(review.metric),
+      expected: compactNumber(review.expected_value),
+      actual: compactNumber(review.actual_value),
+      status: comparable ? reviewStatusLabel(review.status) : 'Sin comparación: falta dato',
+      pending: !comparable && review.actual_value == null && review.fiscal_year >= year,
+    };
+  });
+}
+
 export function DecisionAndRealityPanel({
   ticker,
   decisions,
@@ -474,48 +491,7 @@ export function DecisionAndRealityPanel({
         {reviews.length === 0 ? (
           <p className="text-sm text-gray-500">Sin comparaciones persistidas. Solo se pueden contrastar previsiones que tengan datos esperados y reales.</p>
         ) : (
-          <>
-            <p className="mb-3 text-xs leading-5 text-gray-500">N/D significa que falta el dato esperado o real: no hay una comparación verificable, ni un acierto medido.</p>
-            {reviews.length > 40 ? (
-              <p className="mb-3 text-xs text-gray-500">Se muestran 40 de {formatNumber(reviews.length, { maximumFractionDigits: 0 })} comparaciones.</p>
-            ) : null}
-            {/* Móvil: cards sin scroll horizontal */}
-            <div className="max-h-[560px] space-y-3 overflow-auto md:hidden">
-              {reviews.slice(0, 40).map((review) => (
-                <div className="rounded-md border border-gray-800 p-3 text-sm" key={review.id}>
-                  <div className="font-medium text-gray-200">{review.fiscal_year} · {expectationMetricLabel(review.metric)}</div>
-                  <div className="mt-2 space-y-1 text-xs text-gray-400">
-                    <div className="flex justify-between gap-2"><span>Esperado</span><span className="text-gray-200">{compactNumber(review.expected_value)}</span></div>
-                    <div className="flex justify-between gap-2"><span>Real</span><span className="text-gray-200">{compactNumber(review.actual_value)}</span></div>
-                  </div>
-                  <div className="mt-2"><Badge variant="outline">{review.expected_value == null || review.actual_value == null || !Number.isFinite(review.expected_value) || !Number.isFinite(review.actual_value) ? 'Sin comparación: falta dato' : reviewStatusLabel(review.status)}</Badge></div>
-                </div>
-              ))}
-            </div>
-            <div aria-label="Revisión de forecasts" className="hidden max-h-[560px] overflow-auto md:block" role="region" tabIndex={0}>
-            <table className="w-full text-left text-sm">
-              <caption className="sr-only">Revisión de forecasts: año y KPI, valor esperado, valor real y estado de la comparación</caption>
-              <thead className="text-xs uppercase text-gray-500">
-                <tr>
-                  <th className="border-b border-gray-800 py-2" scope="col">Año / KPI</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">Esperado</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">Real</th>
-                  <th className="border-b border-gray-800 py-2 text-right" scope="col">Estado</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reviews.slice(0, 40).map((review) => (
-                  <tr key={review.id} className="border-b border-gray-900">
-                    <th className="py-3 text-left text-sm font-normal text-gray-300" scope="row">{review.fiscal_year} · {expectationMetricLabel(review.metric)}</th>
-                    <td className="py-3 text-right text-gray-400">{compactNumber(review.expected_value)}</td>
-                    <td className="py-3 text-right text-gray-400">{compactNumber(review.actual_value)}</td>
-                    <td className="py-3 text-right"><Badge variant="outline">{review.expected_value == null || review.actual_value == null || !Number.isFinite(review.expected_value) || !Number.isFinite(review.actual_value) ? 'Sin comparación: falta dato' : reviewStatusLabel(review.status)}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </>
+          <ExpectationsList rows={expectationRows(reviews)} />
         )}
       </div>
     </section>

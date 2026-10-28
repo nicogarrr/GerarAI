@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { PaperProposalCard } from './PaperProposalCard';
@@ -46,7 +47,8 @@ function PaperFeedButton() {
 export function PaperTradingContent({ data }: { data: PaperState }) {
     if (data.error) return <p role="alert" className="text-red-300">{data.error}</p>;
     return <section className="min-w-0 space-y-4" aria-label="Cartera simulada LLM">
-        <h2 className="text-xl font-semibold text-gray-100">Cartera simulada · IA</h2>
+        <h2 className="text-xl font-semibold text-gray-100">Resultados simulados de la IA</h2>
+        <p className="text-sm text-gray-400">Seguimiento de propuestas simuladas del modelo, no de tus operaciones manuales. <Link href="/paper-trading" className="text-teal-300 hover:underline">Ir a mi cuenta demo</Link>.</p>
         <div className="grid gap-3 sm:grid-cols-2">
             {data.score.groups.map(group => <article key={`${group.horizon}-${group.currency}`} className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                 <h3 className="font-medium text-teal-300">{horizon(group.horizon)} · {group.currency === 'sin_datos' ? 'Sin divisa' : group.currency}</h3>

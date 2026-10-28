@@ -11,8 +11,10 @@ vi.mock('next/dynamic', () => ({
     // sustituido por un stub ligero con los props que asertan los tests.
     default: (loader: () => Promise<{ default: any }>, opts?: { ssr?: boolean }) => {
         if (opts?.ssr === false) {
-            return (props: { data: unknown[]; positive: boolean; currency: string }) =>
+            const NavChartStub = (props: { data: unknown[]; positive: boolean; currency: string }) =>
                 <div data-testid="nav-chart" data-points={props.data.length} data-positive={String(props.positive)} data-currency={props.currency} />;
+            NavChartStub.displayName = "NavChartStub";
+            return NavChartStub;
         }
         let Comp: any = null;
         void loader().then((mod) => { Comp = mod.default; });
@@ -154,5 +156,27 @@ describe('PortfolioTabs contenido', () => {
     it('serie con fechas pero sin nav no dibuja', () => {
         renderTabs({ scores: { history: { dates: ['2026-01-01'], nav: [] } } });
         expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
+    });
+});
+
+
+describe('Cartera: jerarquía y periodos honestos', () => {
+    it('ordena las pestañas por uso, sin perder ninguna', () => {
+        renderTabs();
+        expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Resumen', 'Posiciones', 'Movimientos', 'Dividendos', 'Previsión', 'Factores']);
+    });
+    it.each([undefined, { dates: ['2026-01-01'], nav: [100] }, { dates: ['2026-01-01', '2026-01-02'], nav: [null, null] }])('sin dos valoraciones no ofrece rangos ni gráfico', history => {
+        renderTabs({ scores: { history } });
+        expect(screen.queryByRole('group', { name: 'Periodo del gráfico de valor' })).not.toBeInTheDocument();
+        expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
+        expect(screen.getByText('G/P desde compra:')).toBeInTheDocument();
+    });
+    it('una ventana sin dos puntos se desactiva, Todo sigue accesible y G/P no cambia de significado', () => {
+        renderTabs({ scores: { history: { dates: ['2025-01-01', '2026-01-02'], nav: [100, 120] } } });
+        expect(screen.getByRole('button', { name: '1M' })).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Todo' })).toBeEnabled();
+        fireEvent.click(screen.getByRole('button', { name: 'Todo' }));
+        expect(screen.getByTestId('nav-chart')).toHaveAttribute('data-points', '2');
+        expect(screen.getByText('G/P desde compra:').closest('p')).toHaveTextContent(/25,00/);
     });
 });

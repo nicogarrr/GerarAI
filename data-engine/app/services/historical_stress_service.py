@@ -23,6 +23,11 @@ from app.services.propicks_price_service import yahoo_symbol
 
 YEARS = (2008, 2020, 2022)
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+# Fallos de proveedor en memoria corta y presupuesto total de la peticion: con
+# Yahoo caido o lento no se repiten N peticiones en cada carga.
+_FAILED_UNTIL: dict[str, float] = {}
+FAILURE_TTL_SECONDS = 120.0
+BUDGET_SECONDS = 25.0
 
 
 async def load_history(ticker: str) -> dict[str, Any]:
@@ -112,7 +117,9 @@ def _failed_windows(reason: str) -> list[dict[str, Any]]:
 
 
 class HistoricalStressService:
-    async def build(self, db: Session, *, ticker: str | None = None) -> dict[str, Any]:
+    async def build(
+        self, db: Session, *, ticker: str | None = None, budget_seconds: float = BUDGET_SECONDS
+    ) -> dict[str, Any]:
         weights: dict[str, float] = {}
         missing_values: list[str] = []
         weight_dates: dict[str, str | None] = {}
@@ -165,10 +172,13 @@ class HistoricalStressService:
                      "symbol": instrument["symbol"], "failure": None}
             if instrument["symbol"] is None:
                 return tick, {**empty, "failure": "no_safe_symbol"}
+            if _FAILED_UNTIL.get(instrument["symbol"], 0.0) > time.monotonic():
+                return tick, {**empty, "failure": "provider_error"}
             async with semaphore:
                 try:
                     history = await load_history(instrument["symbol"])
                 except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
+                    _FAILED_UNTIL[instrument["symbol"]] = time.monotonic() + FAILURE_TTL_SECONDS
                     return tick, {**empty, "failure": "provider_error"}
             expected = instrument["currency"]
             got = (history.get("currency") or "").strip().upper() or None
@@ -178,7 +188,23 @@ class HistoricalStressService:
                               "failure": "currency_mismatch" if got else "currency_unverified"}
             return tick, {**history, "symbol": instrument["symbol"], "failure": None}
 
-        histories = dict(await asyncio.gather(*(fetch(tick) for tick in tickers)))
+        tasks = {asyncio.ensure_future(fetch(tick)): tick for tick in tickers}
+        histories: dict[str, dict[str, Any]] = {}
+        if tasks:
+            done, pending = await asyncio.wait(tasks, timeout=budget_seconds)
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            for task in done:
+                tick, payload = task.result()
+                histories[tick] = payload
+        for tick in tickers:
+            if tick not in histories:  # presupuesto agotado: parcial marcado, no inventado
+                instrument = instruments.get(tick) or {"symbol": None, "currency": None}
+                histories[tick] = {"prices": {}, "source": "Yahoo Finance", "source_url": None,
+                                   "fetched_at": datetime.now(UTC).isoformat(), "currency": None,
+                                   "symbol": instrument["symbol"], "failure": "provider_error"}
         companies = [{"ticker": tick, "weight": weights.get(tick), "weight_as_of": weight_dates.get(tick),
                       **{k: v for k, v in histories[tick].items() if k not in ("prices", "failure")},
                       "history_failure": histories[tick]["failure"],

@@ -60,6 +60,7 @@ from app.workers.dramatiq_app import (
     sync_paper_dividends,
     sync_portfolio_dividends,
     sync_tenant_ibkr_connections,
+    sync_tenant_ibkr_connections_dedicated,
     tenant_contexts,
 )
 
@@ -209,7 +210,13 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # faltan token, query id o IBKR_FLEX_TENANT_ID; corre una vez al dia, con el
     # extracto del ultimo dia habil ya generado por IBKR.
     _register(scheduler, sync_ibkr_flex.send, "cron", job_id="ibkr_flex_sync", hour=6, minute=40)
-    _register(scheduler, sync_tenant_ibkr_connections.send, "cron", job_id="tenant_ibkr_flex_sync", hour=6, minute=50)
+    # Default behavior stays unchanged until the dedicated consumer is installed.
+    ibkr_actor = sync_tenant_ibkr_connections
+    if get_settings().ibkr_dedicated_sync_enabled:
+        ibkr_actor = sync_tenant_ibkr_connections_dedicated
+        _register(scheduler, ibkr_actor.send, "cron", job_id="tenant_ibkr_post_close",
+                  day_of_week="mon-fri", hour=18, minute=0, timezone="America/New_York")
+    _register(scheduler, ibkr_actor.send, "cron", job_id="tenant_ibkr_flex_sync", hour=6, minute=50)
     # One global GP + SupGP fetch every 2 h, never per tenant or more often.
     _register(scheduler, refresh_asts_catalog.send, "interval", job_id="asts_celestrak_refresh", hours=2)
     _register(

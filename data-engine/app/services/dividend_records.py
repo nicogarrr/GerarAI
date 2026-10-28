@@ -65,3 +65,35 @@ def resolve_yahoo_events(
                 )
             )
     return kept, uncertain
+
+
+def resolve_cross_provider_events(
+    records: Iterable[Any],
+    uncertain: Iterable[UncertainDividendEvent] = (),
+) -> tuple[list[Any], list[UncertainDividendEvent]]:
+    """Segunda pasada, solo para proyecciones: Yahoo y FMP no se suman.
+
+    Un grupo (empresa, ex_date, divisa) con filas de AL MENOS dos proveedores
+    y AL MENOS dos importes distintos puede ser el mismo evento con importe
+    ajustado (Yahoo) y declarado (FMP), o un ordinario + un especial: no hay
+    forma de saberlo con los datos guardados, asi que se excluye entero y se
+    devuelve como INCIERTO, igual que ``resolve_yahoo_events``. Un solo
+    proveedor (p.ej. dos filas FMP el mismo dia) no se toca. Importes iguales
+    entre proveedores no existen en BD (unique por empresa, fecha e importe).
+    No borra ni actualiza nada.
+    """
+    kept: list[Any] = []
+    groups: dict[tuple[Any, Any, Any], list[Any]] = defaultdict(list)
+    for record in records:
+        groups[(record.company_id, record.ex_date, record.currency)].append(record)
+    out_uncertain = list(uncertain)
+    for (company_id, ex_date, currency), rows in groups.items():
+        sources = {r.source for r in rows}
+        amounts = {Decimal(r.amount) for r in rows}
+        if len(sources) >= 2 and len(amounts) >= 2:
+            out_uncertain.append(
+                UncertainDividendEvent(company_id, ex_date, currency, tuple(sorted(amounts)))
+            )
+        else:
+            kept.extend(rows)
+    return kept, out_uncertain

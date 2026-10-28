@@ -85,6 +85,12 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',
+  'components/research/DocumentsList.tsx': 'useState y useMemo, onChange para búsqueda y página actual',
+  'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',
+  'components/research/Pager.tsx': 'jsx-onClick para avanzar y retroceder páginas',
+  'components/HomeAttention.tsx':
+    'useEffect loads independent attention sources; useState controls retries and bounded pagination',
   'app/(root)/inversores/_components/LibraryChat.tsx':
     'useSyncExternalStore retrasa el slot hasta hidratar la pagina; evita insertar el portal del layout en HTML SSR aun sin hidratar',
   'components/research/DecisionJournalEntryLink.tsx':
@@ -134,7 +140,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'app/global-error.tsx': 'jsx-onClick',
   'components/ErrorBoundary.tsx': 'jsx-onClick, browser:window, jsx-spread',
   'components/GlossaryTerm.tsx': 'importa cliente: components/ui/tooltip.tsx',
-  'components/MobileNav.tsx': 'useState, useRef, useEffect, browser:HTMLElement, browser:document, browser:window, jsx-onClick, importa cliente: components/NavItems.tsx, importa cliente: components/SearchCommand.tsx',
+  'components/MobileNav.tsx': 'useState, useRef, jsx-onClick, jsx-onPointerDown, jsx-onFocus, dynamic (drawer diferido en MobileNavDrawer)',
+  'components/MobileNavDrawer.tsx': 'useRef, useEffect, browser:HTMLElement, browser:document, browser:window, jsx-onClick, react-dom:createPortal, importa cliente: components/NavItems.tsx, importa cliente: components/SearchCommand.tsx (chunk diferido: solo se descarga al abrir el menú)',
   'components/NavItems.tsx': 'usePathname',
   'components/OnlineBanner.tsx': 'jsx-spread, importa cliente: hooks/useOnlineStatus.ts',
   'components/PersonalizedOverview.tsx': 'jsx-onClick, useState, useEffect, jsx-onRetry',

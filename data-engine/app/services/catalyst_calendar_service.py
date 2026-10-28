@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import calendar
 import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import date, timedelta
 from typing import Any
@@ -178,6 +179,15 @@ def _default_sec_fetchers() -> tuple[Any, Any]:
     return sec.cik_for_ticker, sec.submissions
 
 
+# Tope de emisores consultados por peticion, presupuesto total de tiempo y
+# memoria corta de fallos: con la SEC caida o lenta, el calendario devuelve
+# parcial marcado en vez de repetir N reintentos en cada carga.
+MAX_DEADLINE_TICKERS = 60
+DEADLINE_BUDGET_SECONDS = 20.0
+DEADLINE_FAILURE_TTL_SECONDS = 120.0
+_FAILED_UNTIL: dict[str, float] = {}
+
+
 async def fetch_filing_deadlines(
     tickers: set[str],
     desde: date,
@@ -186,6 +196,7 @@ async def fetch_filing_deadlines(
     cik_fetcher: Callable[[str], Awaitable[str | None]] | None = None,
     submissions_fetcher: Callable[[str], Awaitable[dict[str, Any] | None]] | None = None,
     concurrency: int = 4,
+    budget_seconds: float = DEADLINE_BUDGET_SECONDS,
 ) -> dict[str, Any]:
     """(events, status, errors) de plazos 10-Q/10-K para tickers US con posicion.
 
@@ -201,6 +212,11 @@ async def fetch_filing_deadlines(
         submissions_fetcher if submissions_fetcher is not None else default_subs
     )
     gate = asyncio.Semaphore(concurrency)
+    now = time.monotonic()
+    ordered = sorted(tickers)
+    to_query = [t for t in ordered if _FAILED_UNTIL.get(t, 0.0) <= now][:MAX_DEADLINE_TICKERS]
+    skipped_failed = [t for t in ordered if _FAILED_UNTIL.get(t, 0.0) > now]
+    skipped_cap = [t for t in ordered if t not in to_query and t not in skipped_failed]
 
     async def one(ticker: str) -> tuple[str, dict[str, Any] | None, bool]:
         async with gate:
@@ -214,11 +230,29 @@ async def fetch_filing_deadlines(
                 return ticker, None, True
             return ticker, data if isinstance(data, dict) else None, not isinstance(data, dict)
 
-    results = await asyncio.gather(*(one(t) for t in sorted(tickers)))
+    tasks = {asyncio.ensure_future(one(t)): t for t in to_query}
+    done: set[asyncio.Task[tuple[str, dict[str, Any] | None, bool]]] = set()
+    if tasks:
+        done, pending = await asyncio.wait(tasks, timeout=budget_seconds)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+    results = [task.result() for task in done if not task.cancelled() and task.exception() is None]
+    answered = {r[0] for r in results}
     events: list[dict[str, Any]] = []
     errors: list[str] = []
-    for ticker, data, failed in results:
+    for ticker in skipped_cap:
+        errors.append(f"Plazos 10-Q/10-K: no consultado {ticker} (tope de {MAX_DEADLINE_TICKERS} emisores por petición)")
+    for ticker in skipped_failed:
+        errors.append(f"Plazos 10-Q/10-K: EDGAR no disponible para {ticker}")
+    for ticker in to_query:
+        if ticker not in answered:
+            _FAILED_UNTIL[ticker] = now + DEADLINE_FAILURE_TTL_SECONDS
+            errors.append(f"Plazos 10-Q/10-K: EDGAR no disponible para {ticker}")
+    for ticker, data, failed in sorted(results):
         if failed or data is None:
+            _FAILED_UNTIL[ticker] = now + DEADLINE_FAILURE_TTL_SECONDS
             errors.append(f"Plazos 10-Q/10-K: EDGAR no disponible para {ticker}")
             continue
         event = filing_deadline_event(data, ticker)

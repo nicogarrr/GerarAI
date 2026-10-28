@@ -61,6 +61,7 @@ export type PortfolioHolding = {
     symbol: string;
     quantity: number;
     avgPrice: number;
+    costReviewMessage?: string | null;
     /** null = valoración en suspensión: no hay cotización actual que mostrar. */
     currentPrice: number | null;
     /** Motivo y fecha de la suspensión de valoración (p. ej. split sin precio post-split verificado). */
@@ -132,7 +133,8 @@ type ResearchPortfolioPosition = {
     analysis?: TrackedAnalysisStatus | null;
     ticker: string;
     quantity: number;
-    average_cost: number;
+    average_cost: number | null;
+    cost_reconciliation?: { status: string; message?: string | null } | null;
     // null = valoración en suspenso (p. ej. split sin precio post-split verificado).
     market_price: number | null;
     market_value: number | null;
@@ -142,11 +144,11 @@ type ResearchPortfolioPosition = {
     native_currency: string;
     base_currency: string;
     realized_pnl: number;
-    cost_basis: number;
+    cost_basis: number | null;
     as_of: string;
     market_value_native: number;
     market_value_base: number | null;
-    cost_basis_native: number;
+    cost_basis_native: number | null;
     unrealized_pnl_native?: number | null;
     cost_basis_base: number | null;
     unrealized_pnl_base: number | null;
@@ -284,7 +286,8 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             symbol: position.ticker,
             analysis: position.analysis,
             quantity: position.quantity,
-            avgPrice: position.average_cost,
+            avgPrice: position.average_cost ?? 0,
+            costReviewMessage: position.cost_reconciliation && (position.cost_reconciliation.status !== 'ok' || position.average_cost == null) ? position.cost_reconciliation.message || 'Divisa del coste de IBKR sin verificar.' : null,
             currentPrice,
             valuationHold: position.valuation_hold ? { reason: position.valuation_hold.reason, effectiveDate: position.valuation_hold.effective_date } : null,
             value,
