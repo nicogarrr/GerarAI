@@ -5,7 +5,7 @@ import BrainAskForm from '@/components/research/BrainAskForm';
 import LegacyChatRedirect from '@/components/research/LegacyChatRedirect';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
-import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
+import { changeSummaryText } from '@/lib/research/change-copy';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
@@ -44,12 +44,13 @@ import { FileUploadInput } from '@/components/forms/FileUploadInput';
 import { CompanyHeaderQuote } from '@/components/research/CompanyHeaderQuote';
 import { CompanyHeaderQuoteSkeleton } from '@/components/research/CompanyHeaderQuoteSkeleton';
 import { ChangesSinceVisit } from '@/components/research/ChangesSinceVisit';
+import { DocumentsList } from '@/components/research/DocumentsList';
+import { ChangesFeed } from '@/components/research/ChangesFeed';
 import { AnalystTargetsSection } from '@/components/research/AnalystTargetsSection';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 import { TtmPanel } from '@/components/research/TtmPanel';
 import { GuideContextPanel } from '@/components/research/GuideContextPanel';
 import { getGuideContext } from '@/lib/research/assistant-client';
-import { ChangeImpactCard } from '@/components/research/ChangeImpactCard';
 import { ChatIntentLinks } from '@/components/research/ChatIntentLinks';
 import { NextStepLink } from '@/components/research/NextStepLink';
 import { missingLayerAction, missingLayerLabel } from '@/lib/research/missing-layer-guidance';
@@ -112,7 +113,6 @@ import { findUnavailableViewFailure, viewRetryHref } from '@/lib/research/view-o
 import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
-import { groupReviews } from '@/lib/research/review-groups';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
@@ -1343,29 +1343,17 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const guideContext = await getGuideContext(ticker).catch(() => null);
     content = (
       <div className="space-y-6">
-        <Panel title="Qué ha cambiado">
-          <div className="space-y-3">
-            {data.changes.length ? data.changes.map((change) => (
-              <ChangeImpactCard
-                change={change}
-                directionLabel={label(change.impact_direction)}
-                key={change.id}
-                ticker={ticker}
-                typeLabel={changeTypeLabel(change.change_type)}
-              />
-            )) : (
-              <EmptyState
-                action={<EmptyLink href="/research/news">Analiza la última noticia</EmptyLink>}
-                title="Sin cambios materiales registrados."
-              />
-            )}
-          </div>
-        </Panel>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel title="Revisiones abiertas"><div className="space-y-2">{data.reviews.length ? groupReviews(data.reviews).map((group) => <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg border border-gray-800 p-3 text-sm text-gray-300" key={group.ids[0]}><span className="min-w-0 flex-1">{group.title}</span>{group.count > 1 ? <Badge variant="outline">×{group.count}</Badge> : null}{group.latest ? <span className="text-xs text-gray-500">última {formatUserDateTime(group.latest)}</span> : null}</div>) : <EmptyState title="Sin revisiones abiertas." />}</div></Panel>
-          <Panel title="Alertas"><div className="space-y-2">{data.alerts.length ? data.alerts.map((alert) => <div className="rounded-lg border border-gray-800 p-3 text-sm" key={alert.id}><Badge variant="outline">{label(alert.severity)}</Badge><p className="mt-2 text-gray-300">{alert.message}</p><p className="mt-2 text-xs text-gray-500">Registrada el {formatUserDateTime(alert.created_at)} (Madrid)</p>{safeHttpUrl(alert.source_url) ? <a className="mt-2 inline-block text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(alert.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Ver fuente</a> : null}</div>) : <EmptyState title="Sin alertas." />}</div></Panel>
-        </div>
-        <GuideContextPanel ticker={ticker} context={guideContext} />
+        {data.changes.length || data.reviews.length || data.alerts.length ? (
+          <ChangesFeed alerts={data.alerts} changes={data.changes} reviews={data.reviews} ticker={ticker} />
+        ) : (
+          <Panel title="Qué ha cambiado">
+            <EmptyState
+              action={<EmptyLink href="/research/news">Analiza la última noticia</EmptyLink>}
+              title="Sin cambios materiales registrados."
+            />
+          </Panel>
+        )}
+        <GuideContextPanel ticker={ticker} context={guideContext} hideReviews />
         <DecisionAndRealityPanel ticker={ticker} decisions={data.decisions} reviews={data.expectations} trades={data.trades} />
       </div>
     );
@@ -1550,16 +1538,30 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     ]);
     content = (
       <div className="space-y-6">
+        <details className="rounded-lg border border-gray-800 bg-surface-1 p-4" data-testid="add-source">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">Añadir fuente (subir archivo o importar URL)</summary>
+          <div className="mt-4">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Panel title="Sube una fuente primaria"><MutationForm action={importResearchDocumentFile} className="grid grid-cols-1 gap-3" successMessage="Documento subido"><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder="Título del documento" required /><FileUploadInput name="file" required /><Button type="submit">Subir</Button></MutationForm></Panel>
           <Panel title="Importar desde una URL"><MutationForm action={importResearchDocumentUrl} className="grid grid-cols-1 gap-3" successMessage="Documento importado"><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder="Título del documento" required /><Input name="url" type="url" placeholder="https://..." required /><Input name="source_type" placeholder="sec_filing / investor_relations" defaultValue="url" /><Button type="submit">Importar</Button></MutationForm></Panel>
         </div>
+          </div>
+        </details>
         {/* F249: las fichas enlazan a la fuente primaria cuando el
             documento tiene source_url (filings SEC la traen); sin URL la
             ficha queda como texto, nunca un enlace roto. */}
         <Panel title="Documentos" actions={<Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/filings`}>Informe frente al año anterior</Link>}>
           {documents.length ? (
-            <div className="space-y-3">{documents.map((document) => <div className="rounded-lg border border-gray-800 p-4" key={document.id}><div className="flex flex-wrap items-center gap-2"><FileText className="h-4 w-4 text-teal-300" />{safeHttpUrl(document.source_url) ? <a className="font-medium text-gray-200 underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={safeHttpUrl(document.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">{document.title}</a> : <span className="font-medium text-gray-200">{document.title}</span>}<Badge variant="outline">{etiquetaTierFuente(document.source_tier)}</Badge></div><p className="mt-2 text-xs text-gray-500">{label(document.source_type)} · {document.published_at ? formatDate(document.published_at) : 'fecha desconocida'}</p></div>)}</div>
+            <DocumentsList
+              documents={documents.map((document) => ({
+                id: document.id,
+                title: document.title,
+                url: safeHttpUrl(document.source_url),
+                tier: etiquetaTierFuente(document.source_tier),
+                type: label(document.source_type),
+                published: document.published_at ? formatDate(document.published_at) : 'fecha desconocida',
+              }))}
+            />
           ) : (
             <EmptyState
               action={<EmptyLink href="/research/sources">Importa tu primer documento</EmptyLink>}
@@ -1663,7 +1665,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             return listing.stale ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" role="status">{listing.message}</p> : null;
           })()}
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
-          {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
+          {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
           <MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse>
           <MobileCollapse title="Señales DCA: histórico"><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
