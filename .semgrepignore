@@ -1,0 +1,11 @@
+# Semgrep: lo que NO se escanea. Sustituye al ignore por defecto de semgrep,
+# que excluye tests/ (y las reglas de falsos ORM viven en data-engine/tests).
+node_modules/
+.next/
+.venv/
+dist/
+build/
+coverage/
+*.min.js
+data-engine/alembic/versions/
+data-engine/quantstats/

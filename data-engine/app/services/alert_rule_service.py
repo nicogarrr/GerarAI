@@ -204,6 +204,7 @@ class AlertRuleService:
                     alert_metadata["source_url"] = news_event.url
             # Correlación para el digest visual. No suprime la entrega:
             # una similitud de texto no prueba que dos fuentes sean idénticas.
+            # nosemgrep: gerarai-broad-except-pass -- marca opcional de Jev (best-effort); no decide la alerta
             try:
                 from app.services.jev_gates import DIGEST_CRITERIA, mark_only
                 previous = db.scalar(select(ResearchAlert).where(

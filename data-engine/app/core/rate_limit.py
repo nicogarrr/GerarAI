@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import logging
 import math
 import time
 import uuid
@@ -24,6 +25,8 @@ from fastapi import Depends, HTTPException, Request, Response
 
 from app.core.auth import ResearchPrincipal, get_research_principal
 from app.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 WINDOW_SECONDS = 60
 
@@ -373,4 +376,4 @@ class AuthFailureLimitMiddleware:
                     degrade_to_local=True,
                 )
             except Exception:  # noqa: BLE001
-                pass
+                logger.warning("auth_failure_hit_not_recorded", exc_info=True)

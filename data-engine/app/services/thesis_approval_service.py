@@ -362,6 +362,7 @@ def _answer_callback(
 ) -> None:
     if not isinstance(callback_query_id, str) or not callback_query_id:
         return
+    # nosemgrep: gerarai-broad-except-pass -- answerCallbackQuery de Telegram es cosmetico (quita el spinner); la decision ya se guardo
     try:
         response = client.post(
             f"{base_url}/bot{token}/answerCallbackQuery",

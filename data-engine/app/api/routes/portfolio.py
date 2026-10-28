@@ -125,13 +125,20 @@ def _fiscal_info_batch(
     return result
 
 
+MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
+MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+
+
 class PortfolioTransactionInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
     action: Literal["buy", "sell", "dividend", "interest", "fee", "cash_misc"]
-    quantity: Decimal = Field(ge=0)
-    price: Decimal = Field(ge=0)
+    # Topes = lo que cabe en Transaction (Numeric(20, 6) / Numeric(20, 2)).
+    # Sin ellos, "1e400" pasaba la validación, se guardaba como precio nulo y
+    # cada transacción posterior del ticker daba 500 al recalcular la posición.
+    quantity: Decimal = Field(ge=0, le=MAX_NUMERIC_20_6)
+    price: Decimal = Field(ge=0, le=MAX_NUMERIC_20_6)
     trade_date: date
-    fees: Decimal = Field(default=Decimal("0"), ge=0)
+    fees: Decimal = Field(default=Decimal("0"), ge=0, le=MAX_NUMERIC_20_2)
     currency: str = Field(default="USD", min_length=3, max_length=10)
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -464,6 +471,7 @@ def positions(
     payloads = []
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
+        # nosemgrep: gerarai-money-none-to-zero -- comparacion booleana: None no es coste conocido, igual que 0
         has_cost = position.average_cost > 0 and (position.cost_basis_base or 0) > 0
         held = bool(position.valuation_hold_reason)
         payloads.append(

@@ -30,8 +30,8 @@ const UserDropdown = ({ user }: { user: User }) => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700" aria-label="Menú de usuario">
-                    <Avatar className="h-8 w-8">
+                <Button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700" aria-label={`Menú de usuario de ${user.name}`}>
+                    <Avatar aria-hidden="true" className="h-8 w-8">
                         <AvatarFallback className="bg-teal-500 text-teal-900 text-sm font-bold">
                             {user.name[0]}
                         </AvatarFallback>

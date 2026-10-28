@@ -247,6 +247,7 @@ def _jev_marker(theme: Theme) -> dict:
     """Metadata only. No TypeSafe call until the credit-aware #560 is present."""
     if os.getenv("SECOND_ORDER_JEV_ENABLED") != "1":
         return {"direction": None, "confidence": None, "backend": None}
+    # nosemgrep: gerarai-broad-except-pass -- marca opcional de credito Jev (best-effort)
     try:
         from app.services.jev_availability import credit_status
         from app.services.jev_gates import jev_choice_sync

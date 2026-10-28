@@ -114,7 +114,7 @@ def main() -> int:
             "synced_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "source": "SEC EDGAR (companyfacts/submissions oficiales)",
             # Proveniencia por archivo: sha1 del contenido oficial servido.
-            "files": {p: hashlib.sha1(c).hexdigest() for p, c in uploads.items()},
+            "files": {p: hashlib.sha1(c, usedforsecurity=False).hexdigest() for p, c in uploads.items()},
         }).encode()
 
     # Publicacion atomica: un unico commit con todos los ficheros cambiados
@@ -130,7 +130,7 @@ def main() -> int:
         old_files = {}
     operations = []
     for path, content in sorted(uploads.items()):
-        digest = hashlib.sha1(content).hexdigest()
+        digest = hashlib.sha1(content, usedforsecurity=False).hexdigest()
         if path != "manifest.json" and old_files.get(path) == digest:
             continue
         operations.append(CommitOperationAdd(

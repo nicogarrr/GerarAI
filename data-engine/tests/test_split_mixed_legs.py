@@ -536,6 +536,7 @@ def test_hold_alert_observation_ignores_the_zero_sentinel(db):
     db.commit()
     _apply(db, c, "2", date(2025, 6, 1), price=None, as_of=None)
     db.commit()
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- _observe solo lee rule.company_id y rule.target; la consulta real va contra precios
     rule = SimpleNamespace(company_id=c.id, target={"kind": "market_price"})
     value, info = AlertRuleService()._observe(db, rule)
     assert value is None and info["status"] == "missing"

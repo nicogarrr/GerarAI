@@ -913,6 +913,7 @@ def real_time_screener(
             # Sin key/no Finnhub no hay una respuesta real que esperar: el mock
             # o el fallback local puede resolverse en este pequeño budget. Con
             # Finnhub configurado, una petición de red nunca bloquea el cold start.
+            # nosemgrep: gerarai-broad-except-pass -- espera acotada del arranque en frio; el refresco sigue en segundo plano y la respuesta usa la cache
             try:
                 future.result(timeout=_COLD_START_WAIT_SECONDS)
             except Exception:  # noqa: BLE001 — el background seguirá intentando

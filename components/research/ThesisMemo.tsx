@@ -2,7 +2,7 @@ import { canShowThesisText } from '@/components/research/ThesisSummary';
 import { frameworkTerm } from '@/lib/research/framework-terms';
 import { thesisMoney, thesisEps } from '@/lib/research/thesis-number-format';
 import { thesisScenarioDisplay } from '@/lib/research/listed-share-values';
-import { formatGeneratedDate, formatPercent, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
+import { formatGeneratedDate, formatPercent, formatUserDate, isValidCurrencyCode, marginOfSafetyDisplay, NA } from '@/lib/format';
 import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
@@ -112,6 +112,7 @@ function ScenarioCell({
   probability,
   highlight = false,
   glossaryKey,
+  caption,
 }: {
   label: string;
   value: number | string | null | undefined;
@@ -119,6 +120,8 @@ function ScenarioCell({
   probability?: number | null;
   highlight?: boolean;
   glossaryKey?: GlossaryKey;
+  /** Línea secundaria bajo el valor (p. ej. la fecha de la cotización). */
+  caption?: string | null;
 }) {
   return (
     <div
@@ -139,6 +142,7 @@ function ScenarioCell({
       {probability !== null && probability !== undefined ? (
         <div className="mt-0.5 text-xs text-gray-500">p = {formatPercent(probability, { digits: 0 })}</div>
       ) : null}
+      {caption ? <div className="mt-0.5 text-xs text-gray-500">{caption}</div> : null}
     </div>
   );
 }
@@ -370,7 +374,14 @@ export default function ThesisMemo({
           </p>
         ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-          <ScenarioCell label="Precio" value={thesis.current_price} currency={currency} />
+          {/* El precio guardado es el que usó el modelo al generar la versión,
+              no la cotización de hoy; la fecha solo si quedó persistida. */}
+          <ScenarioCell
+            label="Precio del modelo"
+            value={thesis.current_price}
+            currency={currency}
+            caption={thesis.valuation_basis?.price_as_of ? `cotización al ${formatUserDate(thesis.valuation_basis.price_as_of)}` : null}
+          />
           <ScenarioCell label={`Bear${scenarios.label}`} value={scenarios.values.bear} currency={currency} probability={probabilities['bear']} glossaryKey="bear" />
           <ScenarioCell label={`Base${scenarios.label}`} value={scenarios.values.base} currency={currency} probability={probabilities['base']} highlight glossaryKey="base" />
           <ScenarioCell label={`Bull${scenarios.label}`} value={scenarios.values.bull} currency={currency} probability={probabilities['bull']} glossaryKey="bull" />

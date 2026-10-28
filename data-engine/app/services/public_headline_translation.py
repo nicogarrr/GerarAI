@@ -123,6 +123,7 @@ async def translate_external_headline(db, original: str, *, provider=None) -> di
         cached = _cache.get(key)
         if cached and cached[0] > time.monotonic():
             return cached[1]
+        # nosemgrep: gerarai-broad-except-pass -- traduccion opcional: si falla se muestra el titular original
         try:
             chain = [(provider, None)] if provider is not None else free_provider_chain()
             chain = [(candidate, m) for candidate, m in chain if candidate is not None and candidate.name != "disabled"]

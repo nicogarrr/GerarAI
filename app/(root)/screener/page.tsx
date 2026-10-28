@@ -224,7 +224,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,0.4fr)]">
         <Card className="min-w-0 border-gray-800">
           <CardHeader>
-            <CardTitle className="text-base break-words">Oportunidades — {sectorEs(sector)}</CardTitle>
+            <CardTitle as="h2" className="text-base break-words">Oportunidades — {sectorEs(sector)}</CardTitle>
           </CardHeader>
           <CardContent className="min-w-0 px-3 sm:px-6">
             {rows.length === 0 ? (

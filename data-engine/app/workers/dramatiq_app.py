@@ -317,6 +317,7 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
             def _release() -> None:
                 if client is None:
                     return
+                # nosemgrep: gerarai-broad-except-pass -- lock/cola Redis best-effort con caducidad por TTL o fallback local documentado
                 try:
                     # Compare-and-delete atomico (Lua): un GET+DELETE a mano
                     # dejaba una ventana en la que, si el claim expiraba y
@@ -592,6 +593,7 @@ def acquire_job_lease(
     """
     token = uuid.uuid4().hex
     if redis_url:
+        # nosemgrep: gerarai-broad-except-pass -- lock/cola Redis best-effort con caducidad por TTL o fallback local documentado
         try:
             import redis as redis_sync
 
@@ -640,6 +642,7 @@ def release_job_lease(
     documentado: monitorizar la disponibilidad de Redis).
     """
     if redis_url:
+        # nosemgrep: gerarai-broad-except-pass -- lock/cola Redis best-effort con caducidad por TTL o fallback local documentado
         try:
             import redis as redis_sync
 

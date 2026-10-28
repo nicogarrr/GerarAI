@@ -3120,6 +3120,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ownership/schedule-13dg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Schedule 13Dg
+         * @description Filings SC 13D/13G persistidos del ticker; campos no parseados = N/D.
+         */
+        get: operations["schedule_13dg_api_ownership_schedule_13dg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ownership/schedule-13dg/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Schedule 13Dg Sync
+         * @description Ingesta acotada de SC 13D/13G para UN ticker SEGUIDO.
+         *
+         *     "Seguido" = watchlist o cartera del tenant (misma definicion que el
+         *     monitor diario); cualquier otro ticker se rechaza con 404 en lugar de
+         *     gastar peticiones a la SEC en un emisor que el usuario no sigue.
+         */
+        post: operations["schedule_13dg_sync_api_ownership_schedule_13dg_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/paper-trading/feed": {
         parameters: {
             query?: never;
@@ -16970,6 +17014,90 @@ export interface operations {
             path: {
                 cik: string;
             };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_13dg_api_ownership_schedule_13dg_get: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    schedule_13dg_sync_api_ownership_schedule_13dg_sync_post: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

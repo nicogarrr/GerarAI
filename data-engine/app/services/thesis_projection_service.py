@@ -24,6 +24,7 @@ Dos invariantes de procedencia:
 from __future__ import annotations
 
 import hashlib
+import math
 import threading
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -172,7 +173,7 @@ def _num(value: Any) -> float | None:
         parsed = float(value)
     except (TypeError, ValueError):
         return None
-    return parsed if parsed == parsed and abs(parsed) != float("inf") else None
+    return parsed if math.isfinite(parsed) else None
 
 
 class ThesisProjectionService:

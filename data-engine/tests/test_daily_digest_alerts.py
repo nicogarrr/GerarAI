@@ -108,6 +108,7 @@ def test_copy_seals_universe_sampling_time(db):
 def test_foreign_tenant_digest_is_rejected(db):
     from types import SimpleNamespace
     digest = make_digest(db)
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- falso digest a proposito: prueba el rechazo de un objeto de otro tenant / un build_digest parcheado
     foreign = SimpleNamespace(tenant_id=2, digest_date=AS_OF, items=[], coverage="complete",
                               generated_at=digest.generated_at, id=digest.id)
     with pytest.raises(ValueError):
@@ -201,6 +202,7 @@ def _patch_actor(monkeypatch, db, emit):
     import app.services.portfolio_moves_service as pms
     from app.workers import dramatiq_app
     monkeypatch.setattr(dramatiq_app, "_session", lambda *a, **kw: db)
+    # nosemgrep: gerarai-orm-fake-simplenamespace -- falso digest a proposito: prueba el rechazo de un objeto de otro tenant / un build_digest parcheado
     digest = SimpleNamespace(id=1, coverage="complete", tenant_id=1, digest_date=AS_OF)
     monkeypatch.setattr(pms, "build_digest", lambda _db, _as_of: digest)
     monkeypatch.setattr(dda, "emit_digest_alert", emit)

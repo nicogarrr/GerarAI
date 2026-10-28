@@ -1252,6 +1252,7 @@ class IBKRImportService:
             db.flush()
         cache[ticker] = company
         # Enriquecer el placeholder con el nombre real desde las APIs de datos.
+        # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional; nunca bloquea el import
         try:
             from app.services.company_enrichment_service import CompanyEnrichmentService
 

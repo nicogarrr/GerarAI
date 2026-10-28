@@ -63,7 +63,7 @@ export default function RootLayout({
         <Toaster />
         {/* Service worker (app shell + fallback offline). Solo en build de
             producción: en dev las cachés del SW estorban al hot-reload. */}
-        {process.env.NODE_ENV === 'production' ? <ServiceWorkerRegister /> : null}
+{process.env.NODE_ENV === 'production' ? <ServiceWorkerRegister /> : null}
       </body>
     </html>
   );

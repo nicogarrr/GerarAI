@@ -68,7 +68,7 @@ export default function ExportView() {
                 <div className="flex items-center gap-3">
                     <FileDown className="h-5 w-5 text-teal-400" />
                     <div>
-                        <CardTitle className="text-lg font-semibold text-gray-100">Diario de decisiones</CardTitle>
+                        <CardTitle as="h2" className="text-lg font-semibold text-gray-100">Diario de decisiones</CardTitle>
                         <CardDescription className="mt-0.5 text-sm text-gray-500">
                             Decisiones de un año en CSV o JSON.
                         </CardDescription>

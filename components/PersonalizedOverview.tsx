@@ -438,7 +438,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 el error y su reintento, porque es la dueña del dato. */}
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
-                    <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
+                    <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Wallet aria-hidden="true" className="h-5 w-5 text-blue-400" />
                         Tu Cartera Hoy
                     </CardTitle>
@@ -526,7 +526,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             {/* 2 · Alertas: la sección que faltaba en el inicio pese a existir /alerts. */}
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
-                    <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
+                    <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <BellRing aria-hidden="true" className="h-5 w-5 text-amber-400" />
                         Alertas
                     </CardTitle>
@@ -629,7 +629,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             {/* 3 · Watchlist: mirada de 3 filas. La lista completa es /watchlist. */}
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
-                    <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
+                    <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Eye aria-hidden="true" className="h-5 w-5 text-yellow-400" />
                         Watchlist
                     </CardTitle>
@@ -704,7 +704,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
             {!opportunitiesLoading && (opportunitiesError || opportunities.length > 0) && (
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-2 pb-2 border-b border-gray-700/50">
-                    <CardTitle className="text-lg text-gray-100 flex items-center gap-2">
+                    <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Gem aria-hidden="true" className="h-5 w-5 text-purple-400" />
                         Oportunidades por valor intrínseco (DCF)
                     </CardTitle>

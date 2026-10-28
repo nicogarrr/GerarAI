@@ -157,6 +157,7 @@ def _external_flow(transaction: Any) -> float:
     """
     action = (transaction.action or "").lower()
     if action in {"deposit", "withdrawal"}:
+        # nosemgrep: gerarai-money-none-to-zero -- quantity/price de Transaction son NOT NULL (default 0); el `or` es defensivo
         amount = abs(float(transaction.quantity or 0) * float(transaction.price or 0))
         return -amount if action == "deposit" else amount
     return -float(cash_amount(transaction))
@@ -1223,6 +1224,7 @@ class PortfolioIntelligenceService:
         }
         for position, company in rows:
             if base_values is None:
+                # nosemgrep: gerarai-money-none-to-zero -- rama muerta: la unica llamada (linea 321) pasa siempre base_values
                 value = float(position.market_value_base or 0)
             else:
                 value = base_values.get(position.id)

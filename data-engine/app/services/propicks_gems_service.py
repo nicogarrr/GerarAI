@@ -207,6 +207,7 @@ def _smart_money(
         .where(*tenant_filters(db, ManagerHolding))
     ).all():
         key = (h.report_date, h.cusip, h.manager_id)
+        # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
         shares[key] = shares.get(key, 0.0) + float(h.shares or 0)
     adding: dict[str, int] = dict.fromkeys(cusip_ticker.values(), 0)
     for (d, cusip, mid), sh in shares.items():
