@@ -129,6 +129,22 @@ export function parseLocalizedNumber(value: string): number | null {
   return result.ok ? result.value : null;
 }
 
+/**
+ * Precarga de inputs numéricos: el number del backend (p.ej. 6.0572 o 1e-7)
+ * se escribe con la gramática es-ES del formulario («6,0572», «0,0000001»),
+ * nunca con Number.toString() («6.0572», «1e-7»), que el propio parser del
+ * formulario rechazaría o mostraría con punto decimal en una UI en español.
+ * Sin separador de miles para no estorbar al editar; hasta 12 decimales para
+ * que el valor sobreviva al round-trip guardar-sin-tocar. No finito -> ''.
+ */
+export function formatNumberForInput(value: number): string {
+  if (!Number.isFinite(value)) return '';
+  return new Intl.NumberFormat(FORMAT_LOCALE, {
+    useGrouping: false,
+    maximumFractionDigits: 12,
+  }).format(value);
+}
+
 function toDate(value: string | number | Date | null | undefined): Date | null {
   if (value === null || value === undefined || value === '') return null;
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;

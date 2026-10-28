@@ -16,7 +16,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { upsertPlan, type PlanTargetInput } from '@/lib/actions/plan.actions';
-import { formatNumber, parseLocalizedNumber, todayLocal } from '@/lib/format';
+import { formatNumber, formatNumberForInput, parseLocalizedNumber, todayLocal } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { overallocatedDimension } from '@/lib/plan/target-totals';
 import { showErrorToast } from '@/lib/toast';
@@ -42,7 +42,11 @@ const CURRENCY_REQUIRED_ERROR = 'Elige la divisa de la aportación mensual.';
 const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'JPY'];
 
 function asText(value: unknown): string {
-    return typeof value === 'number' || typeof value === 'string' ? String(value) : '';
+    // Números del backend en gramática es-ES (el parser del formulario la
+    // espera): String(300.5) daría «300.5» con punto; las fechas y demás
+    // cadenas pasan intactas.
+    if (typeof value === 'number') return formatNumberForInput(value);
+    return typeof value === 'string' ? value : '';
 }
 
 export default function PlanSetupDialog({

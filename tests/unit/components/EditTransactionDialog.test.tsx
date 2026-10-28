@@ -38,7 +38,7 @@ describe('EditTransactionDialog comisiones', () => {
     it('precarga la comisión registrada y la reenvía editada', async () => {
         const dialog = await open({ ...base, fees: 2.5 });
         const input = within(dialog).getByLabelText(/^Comisiones/) as HTMLInputElement;
-        expect(input.value).toBe('2.5');
+        expect(input.value).toBe('2,5');
         fireEvent.change(input, { target: { value: '3' } });
         await act(async () => {
             fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
@@ -53,6 +53,18 @@ describe('EditTransactionDialog comisiones', () => {
             fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
         });
         expect(updateTransaction.mock.calls[0][9]).toBe(2.5);
+    });
+
+    it('precarga cantidad/precio fraccionados en gramática es-ES y el guardar sin tocar conserva el valor', async () => {
+        const dialog = await open({ ...base, quantity: 6.0572, price: 150.5 });
+        expect((within(dialog).getByLabelText('Cantidad') as HTMLInputElement).value).toBe('6,0572');
+        expect((within(dialog).getByLabelText(/^Precio/) as HTMLInputElement).value).toBe('150,5');
+        await act(async () => {
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+        });
+        expect(updateTransaction).toHaveBeenCalledTimes(1);
+        expect(updateTransaction.mock.calls[0][4]).toBeCloseTo(6.0572, 10);
+        expect(updateTransaction.mock.calls[0][5]).toBeCloseTo(150.5, 10);
     });
 
     it('fila sin dato de comisión: el campo va vacío y guardar sin tocarlo OMITE fees (no borra la registrada)', async () => {

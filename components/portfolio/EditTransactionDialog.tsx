@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
-import { parseLocalizedNumber } from '@/lib/format';
+import { formatNumberForInput, parseLocalizedNumber } from '@/lib/format';
 
 type Transaction = {
     _id: string;
@@ -48,10 +48,10 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
     const [formData, setFormData] = useState({
         symbol: transaction.symbol,
         type: transaction.type,
-        quantity: transaction.quantity.toString(),
-        price: transaction.price.toString(),
+        quantity: formatNumberForInput(transaction.quantity),
+        price: formatNumberForInput(transaction.price),
         // Sin dato de comisión en la fila el campo queda vacío: guardar sin tocarlo OMITE fees y el backend conserva la registrada (nunca se resetea a 0).
-        fees: transaction.fees === undefined ? '' : transaction.fees.toString(),
+        fees: transaction.fees === undefined ? '' : formatNumberForInput(transaction.fees),
         date: transaction.date.slice(0, 10),
         notes: transaction.notes || '',
         currency: transaction.currency || 'USD',
