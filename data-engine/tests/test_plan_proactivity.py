@@ -62,7 +62,8 @@ def test_resolved_state_does_not_reopen_and_daily_review_dedupes(db):
 def test_other_tenant_does_not_read_plan_or_alerts(db):
     save(db)
     db.info['tenant_id'] = 'other'
-    assert review_savings_plan(db) == {'plan_exists': False, 'new_in_app_alerts': 0}
+    result = review_savings_plan(db)
+    assert result['plan_exists'] is False and result['new_in_app_alerts'] == 0
 
 
 def test_resolution_preserves_prior_metadata_and_other_tenant(db):

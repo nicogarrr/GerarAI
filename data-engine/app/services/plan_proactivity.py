@@ -78,9 +78,11 @@ def emit_plan_notice(db: Session, plan: InvestmentPlan, *, changed: bool = False
 
 def review_savings_plan(db: Session) -> dict:
     """Daily DCA worker also reviews plan data, without sending email."""
+    from app.services.portfolio_proactivity import review_portfolio_data
+    portfolio_review = review_portfolio_data(db)
     plan = db.scalar(select(InvestmentPlan).where(*tenant_filters(db, InvestmentPlan))
         .order_by(InvestmentPlan.created_at.asc(), InvestmentPlan.id.asc()).limit(1))
     if plan is None:
-        return {'plan_exists': False, 'new_in_app_alerts': 0}
+        return {'plan_exists': False, 'new_in_app_alerts': portfolio_review['new_in_app_alerts'], 'portfolio_review': portfolio_review}
     alert_id = emit_plan_notice(db, plan)
-    return {'plan_exists': True, 'new_in_app_alerts': int(alert_id is not None)}
+    return {'plan_exists': True, 'new_in_app_alerts': int(alert_id is not None) + portfolio_review['new_in_app_alerts'], 'portfolio_review': portfolio_review}
