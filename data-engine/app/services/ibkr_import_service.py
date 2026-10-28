@@ -563,6 +563,71 @@ def _snapshot_blockers(
     return reasons
 
 
+def _is_cancel_trade(element: ElementTree.Element) -> bool:
+    """Fila Flex que anula una operacion anterior: ``BUY (Ca.)``/``SELL (Ca.)`` o ``TradeCancel``."""
+    side = (_attr(element, "buySell") or "").lower()
+    kind = (_attr(element, "transactionType", "tradeType") or "").lower()
+    return "(ca" in side or kind in {"tradecancel", "fracsharecancel"}
+
+
+def _cancelled_side(element: ElementTree.Element) -> str | None:
+    raw = (_attr(element, "buySell") or "").split("(", 1)[0]
+    side = raw.strip().lower()
+    if side in {"buy", "bot", "b"}:
+        return "buy"
+    if side in {"sell", "sold", "s"}:
+        return "sell"
+    return None
+
+
+def _find_cancelled_trade(
+    db: Session,
+    element: ElementTree.Element,
+    company: Company,
+    file_trades: list[Transaction],
+) -> Transaction | None:
+    """Operacion original que anula ``element``, o None si no hay UNA sola candidata.
+
+    Si la fila trae ``origTradeID`` se usa tal cual. Si no, deben coincidir empresa,
+    sentido, cantidad absoluta, precio y ``ibOrderID`` (cuando ambos lo traen). Con cero
+    o varias candidatas no se adivina: se devuelve None y la fila se omite para revision.
+    """
+    orig_id = _attr(element, "origTradeID")
+    quantity = abs(_decimal(_attr(element, "quantity", "shares")))
+    price = _decimal(_attr(element, "tradePrice", "price"))
+    side = _cancelled_side(element)
+    order_id = _attr(element, "ibOrderID")
+    pool = [t for t in file_trades if t.company_id == company.id]
+    pool += list(
+        db.scalars(
+            select(Transaction).where(
+                Transaction.company_id == company.id,
+                Transaction.action.in_(("buy", "sell")),
+                *tenant_filters(db, Transaction),
+            )
+        ).all()
+    )
+    seen: set[int] = set()
+    candidates: list[Transaction] = []
+    for trade in pool:
+        if id(trade) in seen or trade.action not in ("buy", "sell"):
+            continue
+        seen.add(id(trade))
+        if orig_id and orig_id != "0":
+            if trade.external_id == orig_id:
+                candidates.append(trade)
+            continue
+        payload_order = (trade.raw_payload or {}).get("ibOrderID")
+        if (
+            trade.action == side
+            and trade.quantity == quantity
+            and trade.price == price
+            and (not order_id or not payload_order or order_id == payload_order)
+        ):
+            candidates.append(trade)
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def _auto_link_journal_after_import(db: Session) -> None:
     """Enlaza decisiones del diario con las operaciones recien importadas (inequivocas)."""
     from app.services.journal_trade_link import auto_link_journal_trades_best_effort
@@ -698,6 +763,11 @@ class IBKRImportService:
             # Primero los Trade: crean los emisores a los que luego se atribuyen
             # los dividendos (orden estable, el resto mantiene su orden).
             elements.sort(key=lambda e: 0 if _tag_name(e) == "Trade" else 1)
+        # Las anulaciones se procesan despues de todas las operaciones del extracto,
+        # vengan en el orden que vengan, para poder neutralizar a su original.
+        elements.sort(key=lambda e: 1 if _tag_name(e) == "Trade" and _is_cancel_trade(e) else 0)
+        file_trades: list[Transaction] = []
+        trades_cancelled = 0
         cash_misc_skipped = 0
         fx_conversions_imported = 0
         fx_conversions_skipped = 0
@@ -860,6 +930,42 @@ class IBKRImportService:
                 if external_id and external_id in existing_ids:
                     trades_already_present += 1
                     continue
+                if _is_cancel_trade(element):
+                    cancel_company = self._company_by_symbol(db, symbol)
+                    original = (
+                        _find_cancelled_trade(db, element, cancel_company, file_trades)
+                        if cancel_company is not None
+                        else None
+                    )
+                    if original is None:
+                        rows_skipped += 1
+                        row_errors.append(
+                            f"Anulacion {external_id or '?'} de {symbol}: no se localizo una unica operacion "
+                            "original, se omite; revisa esa operacion a mano."
+                        )
+                        continue
+                    # La original deja de ser compra/venta (no cuenta en posicion, FIFO ni
+                    # diario) y se conserva con su rastro; la anulacion queda como fila propia.
+                    original.action = "cancelled"
+                    original.raw_payload = {**(original.raw_payload or {}), "cancelled_by": external_id}
+                    db.add(
+                        Transaction(
+                            portfolio_id=portfolio.id,
+                            company_id=cancel_company.id,
+                            trade_date=_date(_attr(element, "tradeDate", "dateTime", "date")),
+                            action="cancel",
+                            quantity=abs(_decimal(_attr(element, "quantity", "shares"))),
+                            price=_decimal(_attr(element, "tradePrice", "price")),
+                            fees=abs(_decimal(_attr(element, "ibCommission", "commission", "fees"))),
+                            currency=_attr(element, "currency") or cancel_company.currency,
+                            external_id=external_id,
+                            raw_payload={**dict(element.attrib), "cancels": original.external_id},
+                        )
+                    )
+                    if external_id:
+                        existing_ids.add(external_id)
+                    trades_cancelled += 1
+                    continue
                 if (
                     trades_only
                     and only_existing_companies
@@ -890,6 +996,7 @@ class IBKRImportService:
                     # inválida no oculta a una válida posterior con el mismo id.
                     existing_ids.add(external_id)
                 db.add(transaction)
+                file_trades.append(transaction)
                 trades_imported += 1
 
             elif tag == "CashTransaction":
@@ -1016,6 +1123,7 @@ class IBKRImportService:
                 "status": "dry_run" if dry_run else "imported",
                 "trades_imported": trades_imported,
                 "trades_already_present": trades_already_present,
+                "trades_cancelled": trades_cancelled,
                 "non_stock_skipped": non_stock_skipped,
                 "fx_conversions_imported": fx_conversions_imported,
                 "fx_conversions_skipped": fx_conversions_skipped,
@@ -1120,6 +1228,7 @@ class IBKRImportService:
             "trades_imported": trades_imported,
             "fx_conversions_imported": fx_conversions_imported,
             "fx_conversions_skipped": fx_conversions_skipped,
+            "trades_cancelled": trades_cancelled,
             "dividends_imported": dividends_imported,
             "fees_imported": fees_imported,
             "cash_transactions_imported": cash_transactions_imported,
