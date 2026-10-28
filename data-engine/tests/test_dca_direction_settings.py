@@ -1,19 +1,19 @@
 """Destination thresholds, persistence/isolation and migration reversal."""
-from importlib.util import spec_from_file_location, module_from_spec
+from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, select, inspect
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, inspect, select
+from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from app.api.routes.dca_settings import router
 from app.core.database import Base, get_db
-from app.models import DcaAlertOverride, DcaAlertSettings, Tenant
+from app.models import DcaAlertOverride, Tenant
 from app.services.dca_alert_settings_service import effective_policy, save_policy, settings_view
 from app.services.dca_signal_service import should_alert
 

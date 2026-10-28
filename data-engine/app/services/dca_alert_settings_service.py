@@ -1,7 +1,9 @@
 """Tenant-wide directional policy, with effective defaults 3X up / 1X down."""
 from types import SimpleNamespace
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
 from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
 from app.models import DcaAlertOverride, DcaAlertSettings

@@ -360,4 +360,5 @@ async def sync_ibkr_connection(db: Session = Depends(get_db)) -> dict:
 
 # No service-wide env mutation: these settings belong to the signed tenant.
 from app.api.routes.dca_settings import router as dca_settings_router
+
 router.include_router(dca_settings_router, prefix="/dca", tags=["settings"])

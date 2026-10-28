@@ -4,6 +4,7 @@ No backfill and no edits to legacy ticker overrides. Downgrade returns to the
 legacy behavior and drops only the new directional policy table.
 """
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0098_dca_direction_settings"

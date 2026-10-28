@@ -654,7 +654,6 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     """Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado)."""
     from app.core.config import get_settings
     from app.services import dca_signal_service as dca
-
     from app.services.dca_alert_settings_service import effective_policy
     policy = effective_policy(db)
     key = symbol.strip().upper()

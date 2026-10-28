@@ -1,6 +1,7 @@
 """Tenant-wide directional DCA notifications; old symbol overrides are retained."""
 from sqlalchemy import CheckConstraint, ForeignKey, Integer, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 from app.models.entities import TenantOwnedMixin, TimestampMixin
 
