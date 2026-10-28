@@ -238,6 +238,54 @@ def _csv_rows(csv_text: str) -> list[list[str]]:
     return list(csv.reader(io.StringIO(text), delimiter=_csv_delimiter(text)))
 
 
+_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+
+
+def _date_token(value: str | None) -> str:
+    return (value or "").strip().split(";", 1)[0].split(" ", 1)[0]
+
+
+def _csv_slash_day_first(day_cells: list[str], delimiter: str) -> bool | None:
+    """Orden de las fechas «nn/nn/aaaa» de UN fichero CSV.
+
+    Excel/LibreOffice en español guardan las fechas como dd/mm/aaaa (y usan
+    «;» porque la coma es el decimal); IBKR en inglés escribe mm/dd/aaaa. Se
+    decide por fichero: un primer número > 12 solo puede ser día, un segundo
+    número > 12 solo puede ser día en mm/dd. Sin evidencia, manda el
+    separador («;» = es-ES = día primero). Evidencia en los dos sentidos ->
+    ``None``: el fichero mezcla formatos y cualquier lectura falsearía fechas.
+    """
+    day_first_seen = month_first_seen = False
+    for cell in day_cells:
+        match = _SLASH_DATE.match(_date_token(cell))
+        if not match:
+            continue
+        first, second = int(match.group(1)), int(match.group(2))
+        # Solo cuenta una fecha válida en UN orden («32/13/2026» no es
+        # evidencia de nada: será un error de esa fila).
+        day_first_seen |= first > 12 and 1 <= second <= 12
+        month_first_seen |= second > 12 and 1 <= first <= 12
+    if day_first_seen and month_first_seen:
+        return None
+    if day_first_seen or month_first_seen:
+        return day_first_seen
+    return delimiter == ";"
+
+
+def _csv_date_value(value: str | None, day_first: bool) -> date | None:
+    """Fecha de una celda CSV con el orden del fichero; None si no es fecha."""
+    token = _date_token(value)
+    if not token:
+        return None
+    if _SLASH_DATE.match(token):
+        fmt = "%d/%m/%Y" if day_first else "%m/%d/%Y"
+        try:
+            return datetime.strptime(token, fmt).date()
+        except ValueError:
+            return None
+    return _date(token) if _is_date(token) else None
+
+
 def validate_ibkr_csv(csv_text: str) -> list[str]:
     """Valida un CSV de actividad de IBKR (cabecera + filas).
 
@@ -265,6 +313,16 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
             "La cabecera del CSV no tiene las columnas obligatorias: symbol, action, quantity, price y date "
             "(se aceptan alias como ticker, buySell, shares, tradePrice o tradeDate). "
             f"Cabecera encontrada: {', '.join(rows[0])}."
+        ]
+    date_cells = [
+        row[mapping["date"]] for row in rows[1:] if mapping["date"] < len(row)
+    ]
+    day_first = _csv_slash_day_first(date_cells, _csv_delimiter(csv_text.strip()))
+    if day_first is None:
+        return [
+            "Las fechas del CSV mezclan dd/mm/aaaa y mm/dd/aaaa (hay filas con día > 12 en "
+            "las dos posiciones): no se puede saber qué fecha es cada operación. Exporta de "
+            "nuevo con fechas AAAA-MM-DD."
         ]
     errors: list[str] = []
     for line_number, row in enumerate(rows[1:], start=2):
@@ -299,7 +357,7 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
                 "Corrige el valor o elimina la fila."
             )
         day = row[mapping["date"]].strip() if mapping["date"] < len(row) else ""
-        if not _is_date(day):
+        if _csv_date_value(day, day_first) is None:
             errors.append(
                 f"Fila {line_number} del CSV ({symbol}): la fecha '{day}' no tiene un formato "
                 "reconocido (usa AAAA-MM-DD). Corrige el valor o elimina la fila."
@@ -348,7 +406,7 @@ def _decimal(value: str | None, default: str = "0") -> Decimal:
     return parsed[0]
 
 
-def _csv_decimal(value: str) -> Decimal:
+def _csv_decimal(value: str, *, decimal_comma: bool = False) -> Decimal:
     """Number from an IBKR CSV cell (en-US or es-ES notation).
 
     The old code stripped every comma, so "12,50" became 1250 and "1.234,56"
@@ -357,10 +415,18 @@ def _csv_decimal(value: str) -> Decimal:
     keep their identity. A cell with a comma goes through the shared
     localized parser (same one the validation uses); "1,234" still reads as
     1234 and "1,5"/"12,50" as decimals. Not interpretable -> error, never 0.
+
+    ``decimal_comma`` (a «;»-separated file, Excel es-ES): the comma is ALWAYS
+    the decimal separator there, so "32,725" is 32.725 and not 32725 (a
+    3-decimal IBKR price re-saved by Spanish Excel came out x1000).
     """
     plain = str(value).strip()
     if "," not in plain and _MACHINE_DECIMAL.match(plain):
         return Decimal(plain)
+    if decimal_comma and plain.count(",") == 1 and "." not in plain:
+        candidate = plain.replace(",", ".")
+        if _MACHINE_DECIMAL.match(candidate):
+            return Decimal(candidate)
     parsed = parse_localized_number(plain)
     if parsed is None:
         raise IBKRImportError(
@@ -380,6 +446,27 @@ def _legacy_csv_values(symbol: str, action: str, cell) -> list[str] | None:
             str(Decimal(cell("price").replace(",", "")).normalize()),
             _date(cell("date")).isoformat(),
             str(abs(Decimal(cell("fees").replace(",", "")).normalize())) if cell("fees") else "0",
+            cell("currency").upper() or "USD",
+        ]
+    except Exception:  # noqa: BLE001 - unreadable legacy form: no legacy identity
+        return None
+
+
+def _semicolon_v1_csv_values(symbol: str, action: str, cell) -> list[str] | None:
+    """Fingerprint values as the first «;» importer (#2685) built them.
+
+    It read a «;» file with the en-US rules: "32,725" -> 32725 and
+    "05/03/2026" -> 3 May. Rows stored under THAT identity must be recognised
+    on re-import, or the corrected reading inserts a twin.
+    """
+    try:
+        return [
+            symbol,
+            action,
+            str(abs(_csv_decimal(cell("quantity")).normalize())),
+            str(_csv_decimal(cell("price")).normalize()),
+            _date(cell("date")).isoformat(),
+            str(abs(_csv_decimal(cell("fees")).normalize())) if cell("fees") else "0",
             cell("currency").upper() or "USD",
         ]
     except Exception:  # noqa: BLE001 - unreadable legacy form: no legacy identity
@@ -1355,6 +1442,22 @@ class IBKRImportService:
         data_rows = [row for row in _csv_rows(csv_text) if any(cell.strip() for cell in row)]
         mapping = _map_csv_columns(data_rows[0])
         assert mapping is not None  # garantizado por validate_ibkr_csv
+        delimiter = _csv_delimiter(csv_text.strip())
+        decimal_comma = delimiter == ";"
+        day_first = _csv_slash_day_first(
+            [row[mapping["date"]] for row in data_rows[1:] if mapping["date"] < len(row)],
+            delimiter,
+        )
+        assert day_first is not None  # garantizado por validate_ibkr_csv
+
+        def _num(text: str) -> Decimal:
+            return _csv_decimal(text, decimal_comma=decimal_comma)
+
+        def _day(text: str) -> date:
+            parsed = _csv_date_value(text, bool(day_first))
+            if parsed is None:  # pragma: no cover - validate_ibkr_csv ya la omitio
+                raise IBKRImportError(f"Fecha no interpretable: {text!r}.")
+            return parsed
         ledger = PortfolioLedgerService()
         trades_imported = 0
         duplicate_trades = 0
@@ -1374,7 +1477,7 @@ class IBKRImportService:
             date_pos = mapping.get("date")
             action_pos = mapping.get("action")
             try:
-                day = _date(raw[date_pos].strip()).isoformat() if date_pos is not None else "9999-12-31"
+                day = _day(raw[date_pos].strip()).isoformat() if date_pos is not None else "9999-12-31"
             except Exception:  # noqa: BLE001 - las filas invalidas ya estan en bad_lines
                 day = "9999-12-31"
             kind = (
@@ -1401,10 +1504,10 @@ class IBKRImportService:
             # Provider IDs share identity with Flex XML. Without one, use the
             # canonical economic row plus occurrence count, preserving two
             # identical fills in one file while making replay/reordering safe.
-            values = [symbol, action, str(abs(_csv_decimal(_cell("quantity")).normalize())),
-                      str(_csv_decimal(_cell("price")).normalize()),
-                      _date(_cell("date")).isoformat(),
-                      str(abs(_csv_decimal(_cell("fees")).normalize())) if _cell("fees") else "0",
+            values = [symbol, action, str(abs(_num(_cell("quantity")).normalize())),
+                      str(_num(_cell("price")).normalize()),
+                      _day(_cell("date")).isoformat(),
+                      str(abs(_num(_cell("fees")).normalize())) if _cell("fees") else "0",
                       _cell("currency").upper() or "USD"]
             fingerprint = hashlib.sha256(json.dumps(values).encode()).hexdigest()
             occurrences[fingerprint] += 1
@@ -1428,35 +1531,48 @@ class IBKRImportService:
                 # Re-importing the same file would insert a corrected twin of a
                 # row already in the ledger. If the legacy identity exists, the
                 # row is blocked with an explanation and nothing is mutated.
-                legacy_values = _legacy_csv_values(symbol, action, _cell)
-                if legacy_values is not None and legacy_values != values:
+                legacy_candidates: list[list[str]] = []
+                for legacy_values in (
+                    _legacy_csv_values(symbol, action, _cell),
+                    _semicolon_v1_csv_values(symbol, action, _cell) if decimal_comma else None,
+                ):
+                    if (
+                        legacy_values is not None
+                        and legacy_values != values
+                        and legacy_values not in legacy_candidates
+                    ):
+                        legacy_candidates.append(legacy_values)
+                legacy_hit = False
+                for legacy_values in legacy_candidates:
                     legacy_fp = hashlib.sha256(json.dumps(legacy_values).encode()).hexdigest()
                     legacy_occurrences[legacy_fp] += 1
                     legacy_id = f"ibkr-csv-{legacy_fp}-{legacy_occurrences[legacy_fp]}"
-                    if db.scalar(
+                    legacy_hit |= db.scalar(
                         select(Transaction.id).where(
                             Transaction.external_id == legacy_id,
                             *tenant_filters(db, Transaction),
                         )
-                    ) is not None:
-                        rows_skipped += 1
-                        legacy_reimport_blocked += 1
-                        row_errors.append(
-                            f"Fila {line_number} del CSV: ya existe una operacion importada antes con "
-                            "esta misma fila leida con decimales corruptos (coma decimal). No se "
-                            "duplica ni se modifica; revisa y corrige la operacion existente a mano."
-                        )
-                        continue
+                    ) is not None
+                if legacy_hit:
+                    rows_skipped += 1
+                    legacy_reimport_blocked += 1
+                    row_errors.append(
+                        f"Fila {line_number} del CSV: ya existe una operacion importada antes con "
+                        "esta misma fila leida con decimales corruptos (coma decimal) o con la "
+                        "fecha dd/mm leida como mm/dd. No se duplica ni se modifica; revisa y "
+                        "corrige la operacion existente a mano."
+                    )
+                    continue
             try:
                 with db.begin_nested():
                     transaction = ledger.create_transaction(
                         db,
                         ticker=symbol,
                         action=action,
-                        quantity=abs(_csv_decimal(_cell("quantity"))),
-                        price=_csv_decimal(_cell("price")),
-                        trade_date=_date(_cell("date")),
-                        fees=abs(_csv_decimal(_cell("fees"))) if _cell("fees") else Decimal("0"),
+                        quantity=abs(_num(_cell("quantity"))),
+                        price=_num(_cell("price")),
+                        trade_date=_day(_cell("date")),
+                        fees=abs(_num(_cell("fees"))) if _cell("fees") else Decimal("0"),
                         currency=_cell("currency").upper() or "USD",
                     )
                     transaction.external_id = external_id
