@@ -10,12 +10,12 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree
 
-from sqlalchemy import select
+from sqlalchemy import select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models import CashBalance, Company, Position, Transaction
+from app.models import CashBalance, Company, FxConversion, Position, Transaction
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
@@ -415,6 +415,51 @@ def _date(value: str | None) -> date:
     return date.today()
 
 
+def parse_fx_trade(element: ElementTree.Element) -> dict | None:
+    """Cambio de divisa de un Trade con assetCategory CASH (simbolo ``EUR.USD``).
+
+    Fuente: ibflex ``Trade`` (assetCategory=CASH, buySell, quantity, tradePrice,
+    proceeds) e IBKR Flex Trades: «Proceeds ... negative for buys and positive
+    for sales». Par ``BASE.QUOTE``: BUY compra BASE y gasta QUOTE; SELL vende
+    BASE y recibe QUOTE. Sin lado, fecha o importes legibles: None (se omite,
+    nunca se inventa). Las comisiones no se restan del importe cambiado.
+    """
+    symbol = (_attr(element, "symbol") or "").upper().strip()
+    if "." not in symbol:
+        return None
+    base, _, quote = symbol.partition(".")
+    side = (_attr(element, "buySell") or "").upper().strip()
+    raw_date = _attr(element, "tradeDate", "dateTime", "date")
+    if not base or not quote or side not in {"BUY", "SELL"} or not _is_date(raw_date):
+        return None
+    raw_qty = _attr(element, "quantity")
+    raw_proceeds = _attr(element, "proceeds")
+    raw_price = _attr(element, "tradePrice", "price")
+    if not _is_number(raw_qty):
+        return None
+    base_amount = abs(_decimal(raw_qty))
+    if _is_number(raw_proceeds):
+        quote_amount = abs(_decimal(raw_proceeds))
+    elif _is_number(raw_price):
+        quote_amount = base_amount * abs(_decimal(raw_price))
+    else:
+        return None
+    if base_amount <= 0 or quote_amount <= 0:
+        return None
+    if side == "BUY":
+        disposed, acquired = (quote, quote_amount), (base, base_amount)
+    else:
+        disposed, acquired = (base, base_amount), (quote, quote_amount)
+    return {
+        "trade_date": _date(raw_date),
+        "disposed_currency": disposed[0],
+        "disposed_amount": disposed[1],
+        "acquired_currency": acquired[0],
+        "acquired_amount": acquired[1],
+        "external_id": _attr(element, "tradeID", "transactionID", "ibExecID"),
+    }
+
+
 def _attr(element: ElementTree.Element, *names: str) -> str | None:
     lowered = {key.lower(): value for key, value in element.attrib.items()}
     for name in names:
@@ -673,13 +718,20 @@ class IBKRImportService:
             in {"tradeid", "transactionid", "ibexecid", "trxid", "id"}
             and value
         }
+        # Una sola consulta: ids ya presentes en operaciones y en cambios de divisa.
         existing_ids = (
             {
                 row[0]
                 for row in db.execute(
-                    select(Transaction.external_id).where(
-                        Transaction.external_id.in_(report_ids),
-                        *tenant_filters(db, Transaction),
+                    union_all(
+                        select(Transaction.external_id).where(
+                            Transaction.external_id.in_(report_ids),
+                            *tenant_filters(db, Transaction),
+                        ),
+                        select(FxConversion.external_id).where(
+                            FxConversion.external_id.in_(report_ids),
+                            *tenant_filters(db, FxConversion),
+                        ),
                     )
                 ).all()
             }
@@ -717,8 +769,27 @@ class IBKRImportService:
         file_trades: list[Transaction] = []
         trades_cancelled = 0
         cash_misc_skipped = 0
+        fx_conversions_imported = 0
+        fx_conversions_skipped = 0
+        fx_conversions_already_present = 0
         for element in elements:
             tag = _tag_name(element)
+            if tag == "Trade" and (_attr(element, "assetCategory") or "").upper() == "CASH":
+                # Cambio de divisa: va al libro de divisas, NUNCA al FIFO de
+                # acciones (antes EUR.USD se importaba como un valor mas).
+                fx_row = parse_fx_trade(element)
+                if fx_row is None:
+                    fx_conversions_skipped += 1
+                elif fx_row["external_id"] and fx_row["external_id"] in existing_ids:
+                    fx_conversions_already_present += 1
+                else:
+                    if fx_row["external_id"]:
+                        existing_ids.add(fx_row["external_id"])
+                    db.add(FxConversion(**fx_row, raw_payload=dict(element.attrib)))
+                    fx_conversions_imported += 1
+                if trades_only:
+                    non_stock_skipped += 1  # contrato del backfill: no es una accion
+                continue
             if trades_only and tag != "Trade" and not (include_cash_income and tag == "CashTransaction"):
                 continue
             if trades_only and tag == "Trade" and (_attr(element, "assetCategory") or "STK").upper() != "STK":
@@ -1054,6 +1125,9 @@ class IBKRImportService:
                 "trades_already_present": trades_already_present,
                 "trades_cancelled": trades_cancelled,
                 "non_stock_skipped": non_stock_skipped,
+                "fx_conversions_imported": fx_conversions_imported,
+                "fx_conversions_skipped": fx_conversions_skipped,
+                "fx_conversions_already_present": fx_conversions_already_present,
                 "dividends_imported": dividends_imported,
                 "fees_imported": fees_imported,
                 "cash_transactions_imported": cash_transactions_imported,
@@ -1161,6 +1235,8 @@ class IBKRImportService:
             "cost_review_required": cost_review_required,
             "cash_imported": cash_imported,
             "trades_imported": trades_imported,
+            "fx_conversions_imported": fx_conversions_imported,
+            "fx_conversions_skipped": fx_conversions_skipped,
             "trades_cancelled": trades_cancelled,
             "dividends_imported": dividends_imported,
             "fees_imported": fees_imported,
