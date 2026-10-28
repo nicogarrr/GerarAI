@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models import CashBalance, Company, FxConversion, Position, Transaction
+from app.models import CashBalance, Company, FxConversion, IbkrRawRow, Position, Transaction
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
@@ -460,6 +460,43 @@ def parse_fx_trade(element: ElementTree.Element) -> dict | None:
     }
 
 
+def collect_raw_rows(root: ElementTree.Element) -> list[dict]:
+    """Todas las filas con atributos de cada FlexStatement, tal cual vienen.
+
+    Una fila es cualquier elemento con atributos bajo una seccion del
+    statement (tambien anidados, p. ej. Lot dentro de OpenPositions y secciones
+    futuras que aun no conocemos). Los contenedores sin atributos no son filas.
+    ``path`` es la ruta desde la seccion; el hash incluye ruta, cuenta y todos
+    los atributos, asi un valor corregido es una fila nueva.
+    """
+    rows: list[dict] = []
+    for statement in (e for e in root.iter() if _tag_name(e) == "FlexStatement"):
+        statement_account = statement.attrib.get("accountId")
+
+        def walk(node: ElementTree.Element, trail: list[str]) -> None:
+            for child in node:
+                path = [*trail, _tag_name(child)]
+                if child.attrib:
+                    payload = dict(child.attrib)
+                    account = payload.get("accountId") or statement_account
+                    digest = hashlib.sha256(
+                        json.dumps([ "/".join(path), account, sorted(payload.items())], ensure_ascii=False).encode()
+                    ).hexdigest()
+                    rows.append(
+                        {
+                            "account_id": (account or None),
+                            "section": path[0],
+                            "path": "/".join(path),
+                            "row_hash": digest,
+                            "payload": payload,
+                        }
+                    )
+                walk(child, path)
+
+        walk(statement, [])
+    return rows
+
+
 def _attr(element: ElementTree.Element, *names: str) -> str | None:
     lowered = {key.lower(): value for key, value in element.attrib.items()}
     for name in names:
@@ -738,6 +775,26 @@ class IBKRImportService:
             if report_ids
             else set()
         )
+        raw_rows = {row["row_hash"]: row for row in collect_raw_rows(root)}
+        raw_present: set[str] = set()
+        hashes = list(raw_rows)
+        for offset in range(0, len(hashes), 500):
+            chunk = hashes[offset : offset + 500]
+            raw_present |= {
+                found[0]
+                for found in db.execute(
+                    select(IbkrRawRow.row_hash).where(
+                        IbkrRawRow.row_hash.in_(chunk), *tenant_filters(db, IbkrRawRow)
+                    )
+                ).all()
+            }
+        raw_rows_stored = 0
+        for digest, row in raw_rows.items():
+            if digest in raw_present:
+                continue
+            db.add(IbkrRawRow(**row))
+            raw_rows_stored += 1
+        raw_rows_already_present = len(raw_present)
         fx_service = PortfolioFXService()
         portfolio = fx_service.ensure_portfolio(db)
         companies: dict[str, Company] = {}
@@ -1125,6 +1182,8 @@ class IBKRImportService:
                 "trades_already_present": trades_already_present,
                 "trades_cancelled": trades_cancelled,
                 "non_stock_skipped": non_stock_skipped,
+                "raw_rows_stored": raw_rows_stored,
+                "raw_rows_already_present": raw_rows_already_present,
                 "fx_conversions_imported": fx_conversions_imported,
                 "fx_conversions_skipped": fx_conversions_skipped,
                 "fx_conversions_already_present": fx_conversions_already_present,
@@ -1235,6 +1294,8 @@ class IBKRImportService:
             "cost_review_required": cost_review_required,
             "cash_imported": cash_imported,
             "trades_imported": trades_imported,
+            "raw_rows_stored": raw_rows_stored,
+            "raw_rows_already_present": raw_rows_already_present,
             "fx_conversions_imported": fx_conversions_imported,
             "fx_conversions_skipped": fx_conversions_skipped,
             "trades_cancelled": trades_cancelled,

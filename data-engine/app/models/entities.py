@@ -378,6 +378,26 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
+    """Fila cruda de un Flex de IBKR, con TODOS sus atributos, se use o no todavia.
+
+    Un valor corregido es una fila nueva (hash distinto); nada se sobrescribe.
+    """
+
+    __tablename__ = "ibkr_raw_rows"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "row_hash", name="uq_ibkr_raw_row_tenant_hash"),
+        Index("ix_ibkr_raw_rows_section", "section"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    account_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    section: Mapped[str] = mapped_column(String(80))
+    path: Mapped[str] = mapped_column(String(200))
+    row_hash: Mapped[str] = mapped_column(String(64))
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
 class FxConversion(TenantOwnedMixin, Base, TimestampMixin):
     """Cambio de divisa real (Flex Trades con assetCategory CASH, p. ej. EUR.USD).
 

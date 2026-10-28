@@ -32,7 +32,9 @@ test.describe("audit closure flows", () => {
     await page.goto("/alerts");
     await expect(page.getByRole("heading", { name: "Alertas", level: 1 })).toBeVisible();
     // Espera a que el manager cliente termine de cargar antes de contar estados.
-    await expect(page.getByText("Cargando alertas...")).toBeHidden({ timeout: 30000 });
+    // Suspense puede conservar un fallback oculto junto al loader cliente.
+    // Espera todos los loaders visibles, sin elegir uno ni omitir estados.
+    await expect(page.getByText("Cargando alertas...", { exact: true }).filter({ visible: true })).toHaveCount(0, { timeout: 30000 });
     // Guía Telegram (si falta config) o estado del motor por regla.
     const guide = page.getByText("Telegram sin configurar");
     const engineLine = page.getByText(/Motor: /);

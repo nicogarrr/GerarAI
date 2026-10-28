@@ -10,6 +10,7 @@ import { readFileSync } from 'node:fs';
  */
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const card = readFileSync('components/research/ChangeImpactCard.tsx', 'utf8');
+const feed = readFileSync('components/research/ChangesFeed.tsx', 'utf8');
 
 describe('cambios y revisiones: qué supuesto toca y qué revisión queda', () => {
     it('marca la revisión pendiente en la tarjeta del cambio', () => {
@@ -27,10 +28,12 @@ describe('cambios y revisiones: qué supuesto toca y qué revisión queda', () =
         assert.match(card, /change\.affected_metrics\.length \|\| change\.affected_claim_ids\.length \? \(/);
     });
     it('la ficha monta la tarjeta y el panel de revisiones abiertas sigue', () => {
-        assert.match(page, /<ChangeImpactCard/);
+        assert.match(page, /<ChangesFeed/);
+        assert.match(feed, /formatUserDateTime\(c\.created_at\)/);
+        assert.match(feed, /revisión pendiente/);
         // QA 5: la vista declara fecha en cambios y alertas, como las demas vistas.
         assert.match(card, /formatUserDateTime\(change\.created_at\)/);
-        assert.match(page, /formatUserDateTime\(alert\.created_at\)/);
-        assert.match(page, /<Panel title="Revisiones abiertas">/);
+        assert.match(feed, /formatUserDateTime\(a\.created_at\)/);
+        assert.match(feed, /event\.hasOpenReview \|\| event\.requiresReview/);
     });
 });

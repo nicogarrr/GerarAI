@@ -287,7 +287,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             analysis: position.analysis,
             quantity: position.quantity,
             avgPrice: position.average_cost ?? 0,
-            costReviewMessage: position.cost_reconciliation?.status === 'review_required' ? position.cost_reconciliation.message : null,
+            costReviewMessage: position.cost_reconciliation && (position.cost_reconciliation.status !== 'ok' || position.average_cost == null) ? position.cost_reconciliation.message || 'Divisa del coste de IBKR sin verificar.' : null,
             currentPrice,
             valuationHold: position.valuation_hold ? { reason: position.valuation_hold.reason, effectiveDate: position.valuation_hold.effective_date } : null,
             value,
