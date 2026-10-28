@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { researchRequest, requireAuthenticatedUser, revalidatePath } = vi.hoisted(() => ({
-    researchRequest: vi.fn(),
-    requireAuthenticatedUser: vi.fn(),
-    revalidatePath: vi.fn(),
+    researchRequest: vi.fn<(...args: any[]) => any>(),
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(),
+    revalidatePath: vi.fn<(...args: any[]) => any>(),
 }));
 vi.mock('@/lib/research/client', () => ({ researchRequest, jsonBody: JSON.stringify }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
@@ -104,7 +104,7 @@ describe('getResearchDashboard', () => {
         });
         const dashboard = await getResearchDashboard();
         expect(dashboard.companies).toHaveLength(501);
-        expect(dashboard.companies.at(-1).ticker).toBe('ZZZZ');
+        expect(dashboard.companies.at(-1)?.ticker).toBe('ZZZZ');
     });
 
     it('thesis-tickers ilegible -> null (degrada el bucket, no afirma tesis)', async () => {
@@ -373,7 +373,7 @@ describe('getResearchSources: total honesto y página acotada', () => {
         researchRequest.mockImplementation(async (path: string) => (path.includes('/count') ? { total: 0 } : []));
         await getResearchSources({ q: 'x'.repeat(200) });
         const countCall = researchRequest.mock.calls.find((c) => String(c[0]).includes('/count'));
-        expect(countCall[0]).toContain(`q=${'x'.repeat(120)}`);
+        expect(countCall?.[0]).toContain(`q=${'x'.repeat(120)}`);
     });
 });
 

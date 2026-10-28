@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { researchRequest, requireAuthenticatedUser, cacheStore } = vi.hoisted(() => ({
-    researchRequest: vi.fn(async () => ({})),
-    requireAuthenticatedUser: vi.fn(async () => ({ id: 'user-1' })),
+    researchRequest: vi.fn<(...args: any[]) => any>(async () => ({})),
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(async () => ({ id: 'user-1' })),
     cacheStore: new Map<string, unknown>(),
 }));
 vi.mock('@/lib/research/client', () => ({ researchRequest, jsonBody: JSON.stringify }));

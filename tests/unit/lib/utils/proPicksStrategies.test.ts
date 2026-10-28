@@ -78,7 +78,7 @@ describe('selectRebalancedPicks', () => {
         const out = selectRebalancedPicks(candidates(30), [], '2026-10-27');
         expect(out).toHaveLength(20);
         expect(out[0].symbol).toBe('N0');
-        expect(out.every((c) => c.asOf === '2026-10-27')).toBe(true);
+        expect(out.every((c) => (c as { asOf?: string }).asOf === '2026-10-27')).toBe(true);
     });
 
     it('mantiene incumbentes dentro del top-30 y rellena con máximo 8 nuevos', () => {

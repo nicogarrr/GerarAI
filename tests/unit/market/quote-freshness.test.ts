@@ -63,7 +63,7 @@ describe('sanitizeFinnhubQuote / mapBackendYahooQuote', () => {
         expect(sanitizeFinnhubQuote({ c: 10, pc: 9 }, now)).toBeNull(); // sin t no hay frescura demostrable
     });
     it('Yahoo del backend: sin hora, solo con la fecha exacta de la vela; fecha imposible => null', () => {
-        const q = mapBackendYahooQuote({ c: 5, d: 'x', dp: Number.NaN, pc: 4, cd: '2026-10-27' });
+        const q = mapBackendYahooQuote({ c: 5, d: 'x' as unknown as number, dp: Number.NaN, pc: 4, cd: '2026-10-27' });
         expect(q).toMatchObject({ source: 'Yahoo Finance', t: null, kind: 'close', closeDate: '2026-10-27', d: 0, dp: 0 });
         expect(mapBackendYahooQuote({ c: 5, cd: '2026-02-31' })!.closeDate).toBeNull(); // no acepta desbordes de calendario
         expect(mapBackendYahooQuote({ c: 5, cd: 'ayer' })!.closeDate).toBeNull();

@@ -6,19 +6,19 @@ const {
     datedQuoteMetrics, marketHistoryStatus, sessionDateEt, fetchDatedChanges,
     quoteSymbolFor, normalizeChartCandles, e2eMarketFixture, isE2EMarketFixtureEnabled,
 } = vi.hoisted(() => ({
-    requireAuthenticatedUser: vi.fn(async () => ({ id: 'user-1' })),
-    researchIdentityHeaders: vi.fn(async () => ({ 'X-Tenant': 'user-1' })),
-    getCandles: vi.fn(async () => ({ c: [], source: 'Finnhub', currency: 'USD' })),
-    getProfile: vi.fn(async () => null),
-    getStockQuote: vi.fn(async () => null),
-    datedQuoteMetrics: vi.fn(() => ({ open: null, high: null, low: null, previousClose: null, source: null, timestamp: null })),
-    marketHistoryStatus: vi.fn((n: number) => (n > 0 ? 'available' : 'unavailable')),
-    sessionDateEt: vi.fn(() => '2026-10-27'),
-    fetchDatedChanges: vi.fn(async () => ({})),
-    quoteSymbolFor: vi.fn(),
-    normalizeChartCandles: vi.fn(() => []),
-    e2eMarketFixture: vi.fn(() => ({ ticker: 'E2E', status: 'available' })),
-    isE2EMarketFixtureEnabled: vi.fn(() => false),
+    requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(async () => ({ id: 'user-1' })),
+    researchIdentityHeaders: vi.fn<(...args: any[]) => any>(async () => ({ 'X-Tenant': 'user-1' })),
+    getCandles: vi.fn<(...args: any[]) => any>(async () => ({ c: [], source: 'Finnhub', currency: 'USD' })),
+    getProfile: vi.fn<(...args: any[]) => any>(async () => null),
+    getStockQuote: vi.fn<(...args: any[]) => any>(async () => null),
+    datedQuoteMetrics: vi.fn<(...args: any[]) => any>(() => ({ open: null, high: null, low: null, previousClose: null, source: null, timestamp: null })),
+    marketHistoryStatus: vi.fn<(...args: any[]) => any>((n: number) => (n > 0 ? 'available' : 'unavailable')),
+    sessionDateEt: vi.fn<(...args: any[]) => any>(() => '2026-10-27'),
+    fetchDatedChanges: vi.fn<(...args: any[]) => any>(async () => ({})),
+    quoteSymbolFor: vi.fn<(...args: any[]) => any>(),
+    normalizeChartCandles: vi.fn<(...args: any[]) => any>(() => []),
+    e2eMarketFixture: vi.fn<(...args: any[]) => any>(() => ({ ticker: 'E2E', status: 'available' })),
+    isE2EMarketFixtureEnabled: vi.fn<(...args: any[]) => any>(() => false),
 }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
 vi.mock('@/lib/auth/research-identity', () => ({ researchIdentityHeaders }));
@@ -33,7 +33,7 @@ vi.mock('@/lib/e2e-market-fixture', () => ({ e2eMarketFixture, isE2EMarketFixtur
 
 import { getCompanyMarketSnapshot, getResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 
-const fetchMock = vi.fn();
+const fetchMock = vi.fn<(...args: any[]) => any>();
 vi.stubGlobal('fetch', fetchMock);
 
 beforeEach(() => {
