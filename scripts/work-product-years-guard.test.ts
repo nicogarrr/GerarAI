@@ -17,7 +17,7 @@ describe('años de los work products', () => {
         const backend = source('data-engine/app/api/routes/work_products.py');
         const maxYears = Number(/years: int = Field\([^)]*le=(\d+)/.exec(backend)?.[1]);
         assert.ok(Number.isFinite(maxYears));
-        const ui = source('components/work-products/WorkProductButton.tsx');
+        const ui = source('components/work-products/WorkProductDialog.tsx');
         assert.match(ui, new RegExp(`Math\\.min\\(${maxYears},`));
         assert.match(ui, new RegExp(`max=\\{${maxYears}\\}`));
     });
