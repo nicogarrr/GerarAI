@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ pathname: vi.fn(() => '/inicio') }));
@@ -79,10 +79,10 @@ describe('SectionNav', () => {
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(window.localStorage.getItem('subnav-seccion')).toBe('abierto');
     });
-    it('con la preferencia guardada «abierto» arranca desplegado', () => {
+    it('con la preferencia guardada «abierto» arranca desplegado', async () => {
         window.localStorage.setItem('subnav-seccion', 'abierto');
         mocks.pathname.mockReturnValue('/portfolio');
         render(<SectionNav />);
-        expect(screen.getByRole('button', { name: /Resumen|Secciones/ })).toHaveAttribute('aria-expanded', 'true');
+        await waitFor(() => expect(screen.getByRole('button', { name: /Resumen|Secciones/ })).toHaveAttribute('aria-expanded', 'true'));
     });
 });
