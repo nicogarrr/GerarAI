@@ -266,6 +266,23 @@ PUBLIC_HEADLINE_TRANSLATION = (
 )
 
 
+SECOND_ORDER_NEWS = (
+    "Extrae hasta 8 hipótesis causales indirectas de la noticia. "
+    "No verifiques hechos, no afirmes que la noticia es cierta. "
+    "Cada exposure debe ser un nombre de industria o factor concreto "
+    "que pueda coincidir literalmente con los metadatos de empresas; "
+    "un sector amplio solo no genera candidatos. "
+    "No uses etiquetas de riesgo o madurez como speculative, pre_fcf, "
+    "pre_revenue, growth o high_beta como exposición causal. "
+    "Si hay contexto verificado de la empresa, úsalo para afinar las "
+    "hipótesis; las relaciones entre empresas solo existen cuando el "
+    "contexto las lista ('sin relaciones conocidas' = no hay datos). "
+    "Devuelve una cadena explícita de 1 a 4 pasos por hipótesis. "
+    "No propongas tickers; no hagas recomendaciones de inversión. "
+    "Si no hay señal, devuelve themes vacío. Responde solo JSON."
+)
+
+
 @dataclass(frozen=True)
 class PromptDef:
     """Definicion de codigo: nombre, version humana, tarea y texto."""
@@ -430,6 +447,13 @@ PROMPTS: dict[str, PromptDef] = {
             version="public-headline-translation-v1",
             task="public_headline_translation",
             text=PUBLIC_HEADLINE_TRANSLATION,
+        ),
+        PromptDef(
+            name="second_order_news_service",
+            version="second-order-news-v1",
+            task="news_second_order",
+            text=SECOND_ORDER_NEWS,
+            schema_name="second_order_themes",
         ),
     ]
 }
