@@ -19,6 +19,18 @@ const MUTED = '#6b7280';
 const ACCENT = '#0f766e';
 const RULE = '#d1d5db';
 
+/**
+ * Sin ligaduras OpenType en la tipografía de marca: la ligadura «fi» se
+ * incrustaba como un único glifo y al copiar texto del PDF varios visores
+ * lo soltaban («financiero» -> «fnanciero» en el pie). Helvetica (base 14)
+ * no liga, así que solo se desactiva en los textos con Display.
+ */
+const SIN_LIGADURAS = {
+  // pdfkit/fontkit acepta en runtime el objeto {etiqueta: boolean}; el tipado
+  // publicado solo declara la forma array y no exporta su tipo, de ahí el cast.
+  features: { liga: false } as unknown as never[],
+} as const;
+
 type InlineToken = { text: string; bold?: boolean; italic?: boolean };
 
 /** Inline minimo del memo: **negrita**, _cursiva_, [texto](url). */
@@ -165,13 +177,13 @@ export async function buildMemoPdf(markdown: string): Promise<Buffer> {
     }
     if (line.startsWith('# ')) {
       doc.moveDown(0.4);
-      doc.font('Display').fontSize(22).fillColor(INK).text(line.slice(2), { lineGap: 2 });
+      doc.font('Display').fontSize(22).fillColor(INK).text(line.slice(2), { lineGap: 2, ...SIN_LIGADURAS });
       doc.moveDown(0.2);
       doc.moveTo(left, doc.y).lineTo(left + contentWidth, doc.y).lineWidth(0.75).strokeColor(ACCENT).stroke();
       doc.moveDown(0.5);
     } else if (line.startsWith('## ')) {
       doc.moveDown(0.8);
-      doc.font('Display').fontSize(16).fillColor(ACCENT).text(line.slice(3), { lineGap: 2 });
+      doc.font('Display').fontSize(16).fillColor(ACCENT).text(line.slice(3), { lineGap: 2, ...SIN_LIGADURAS });
       doc.moveDown(0.25);
     } else if (line.startsWith('### ')) {
       doc.moveDown(0.5);
@@ -207,7 +219,7 @@ export async function buildMemoPdf(markdown: string): Promise<Buffer> {
     doc.page.margins.bottom = 0;
     const bottom = doc.page.height - 40;
     doc.font('DisplayItalic').fontSize(9).fillColor(MUTED).text('GerarAI — documento informativo, no es asesoramiento financiero', 56, bottom, {
-      width: contentWidth, align: 'left', lineBreak: false,
+      width: contentWidth, align: 'left', lineBreak: false, ...SIN_LIGADURAS,
     });
     doc.font('Helvetica').fontSize(9).fillColor(MUTED).text(`${i + 1} / ${range.start + range.count}`, 56, bottom, {
       width: contentWidth, align: 'right', lineBreak: false,

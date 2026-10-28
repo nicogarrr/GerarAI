@@ -369,7 +369,7 @@ def test_release_thesis_matrix_pdf_source_never_invents_values(db: Session) -> N
 
     memo = build_memo_markdown(db, company, thesis, draft=True)
     normalized = re.sub(
-        r"Generado \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC",
+        r"Generado \d{1,2} [a-z]{3,4} \d{4}, \d{2}:\d{2} UTC",
         "Generado <generated> UTC",
         memo,
     )

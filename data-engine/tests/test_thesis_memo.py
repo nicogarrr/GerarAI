@@ -5,6 +5,7 @@ persisted section verbatim, mark anything missing as "pendiente" (never
 fabricate), and always close with the not-financial-advice disclaimer.
 """
 
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -157,7 +158,7 @@ def test_stale_flag_warns_with_latest_data_date(db):
         db, company, thesis, stale=True, latest_data_at=datetime(2026, 9, 20, tzinfo=UTC),
     )
     assert "DESACTUALIZADA" in memo
-    assert "hasta 2026-09-20" in memo
+    assert "hasta 20 sept 2026" in memo
 
 
 def test_stale_flag_without_date_is_honest_unknown(db):
@@ -455,10 +456,64 @@ def test_model_price_shows_quote_date_only_when_persisted(db):
     thesis = _full_thesis(db, company.id)
     thesis.valuation_basis = {"price_as_of": "2026-10-20"}
     memo = build_memo_markdown(db, company, thesis)
-    assert "Precio del modelo al 2026-10-20: $200.00" in memo
+    assert "Precio del modelo al 20 oct 2026: $200.00" in memo
     assert "Precio actual" not in memo
 
     thesis.valuation_basis = None
     memo = build_memo_markdown(db, company, thesis)
     assert "Precio del modelo: $200.00" in memo
     assert "Precio actual" not in memo
+
+
+def test_narrative_paragraphs_render_as_separate_paragraphs(db):
+    """Cada párrafo narrativo es un párrafo propio: con salto simple se
+    fusionaban en uno solo en Markdown y salían pegados en el PDF."""
+    company = _company(db)
+    thesis = ThesisVersion(
+        company_id=company.id, version=1, status="published", rating="watch",
+        thesis_markdown="# t", executive_summary="s",
+        narrative_sections=[{"titulo": "Foso", "parrafos": [
+            "Primer párrafo del análisis.",
+            "Segundo párrafo del análisis.",
+            "Evidencia 10-K: dato uno.",
+            "Evidencia 10-K: dato dos.",
+        ]}],
+    )
+    db.add(thesis)
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis)
+
+    assert (
+        "### Foso\nPrimer párrafo del análisis.\n\nSegundo párrafo del análisis.\n\n"
+        "- Evidencia 10-K: dato uno.\n- Evidencia 10-K: dato dos."
+    ) in memo
+    # Las evidencias consecutivas siguen formando una sola lista.
+    assert "dato uno.\n\n- Evidencia" not in memo
+
+
+def test_memo_dates_use_web_short_spanish_format_not_iso(db):
+    """Las fechas del memo van como la ficha («24 oct 2026»), nunca en ISO."""
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.created_at = datetime(2026, 10, 20, 14, 3, tzinfo=UTC)
+    thesis.updated_at = datetime(2026, 10, 24, 9, 41, tzinfo=UTC)
+    thesis.valuation_basis = {"price_as_of": "2026-10-24"}
+    db.commit()
+
+    memo = build_memo_markdown(
+        db, company, thesis, stale=True, latest_data_at=datetime(2026, 10, 27, tzinfo=UTC),
+    )
+
+    assert "generada 20 oct 2026, 14:03 UTC · actualizada 24 oct 2026, 09:41 UTC" in memo
+    assert "hasta 27 oct 2026" in memo
+    assert "Precio del modelo al 24 oct 2026: $200.00" in memo
+    # El pie tambien en formato corto: «Generado 28 oct 2026, 22:29 UTC ...».
+    assert re.search(r"Generado \d{1,2} [a-z]{3,4} \d{4}, \d{2}:\d{2} UTC", memo)
+    # Ninguna marca del propio memo queda en ISO.
+    assert "2026-10-20" not in memo
+    assert "2026-10-24" not in memo
+    assert "2026-10-27" not in memo
+    # La fecha del catalizador se conserva tal cual está persistida: la ficha
+    # la muestra igual y el memo no reescribe datos.
+    assert "- Próximos resultados (2026-11-05)" in memo
