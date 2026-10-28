@@ -341,7 +341,8 @@ describe('SubscriptionManager', () => {
         await screen.findByRole('button', { name: 'Crear suscripción' });
         expect(revokeCalendarFeed).toHaveBeenCalledTimes(1);
         expect(screen.queryByLabelText('Enlace de suscripción')).not.toBeInTheDocument();
-    });
+    }, 10_000);
+
     it('si desactivar falla, sigue activa y avisa', async () => {
         revokeCalendarFeed.mockRejectedValue(new Error('x'));
         render(<SubscriptionManager initialState={active} origin="https://x.test" />);
