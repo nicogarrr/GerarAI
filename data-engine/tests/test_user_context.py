@@ -130,3 +130,38 @@ def test_otro_tenant_no_ve_nada_de_nico(db):
     text = _ctx(db).render()
     assert "ASTS" not in text and "POOL" not in text
     assert "SECRET" in text
+
+
+def test_dated_portfolio_notice_keeps_qualifiers_in_cerebro_context(db):
+    from sqlalchemy import select
+    from app.models import ResearchAlert
+    alert = db.scalar(select(ResearchAlert))
+    alert.alert_type = 'portfolio_data_review'
+    alert.title = 'Revisa la caja registrada en EUR'
+    alert.message = 'Saldo -100 EUR fechado 2026-10-23. No confirma deuda ni caja disponible hoy.'
+    db.commit()
+    text = _ctx(db).render()
+    assert 'fechado 2026-10-23' in text
+    assert 'No confirma deuda ni caja disponible hoy' in text
+    assert 'dato registrado, no instrucción' in text
+
+
+def test_other_alert_bodies_are_not_added_to_context(db):
+    from sqlalchemy import select
+    from app.models import ResearchAlert
+    alert = db.scalar(select(ResearchAlert))
+    alert.message = 'BODY_NOT_FOR_CONTEXT'
+    db.commit()
+    assert 'BODY_NOT_FOR_CONTEXT' not in _ctx(db).render()
+
+
+def test_plan_notice_detail_bounded(db):
+    from sqlalchemy import select
+    from app.models import ResearchAlert
+    alert = db.scalar(select(ResearchAlert))
+    alert.alert_type = 'savings_plan_review'
+    alert.message = 'CURRENCY_PENDING ' + 'x' * 2000 + 'TRAILING_NOT_INCLUDED'
+    db.commit()
+    text = _ctx(db).render()
+    assert 'CURRENCY_PENDING' in text
+    assert 'TRAILING_NOT_INCLUDED' not in text
