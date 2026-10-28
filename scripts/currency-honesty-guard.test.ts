@@ -135,11 +135,6 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         why: "Mismo bloque Form 4 que InsiderSignalsView/InsiderFeed: las operaciones insider se declaran y liquidan en USD ante la SEC; el precio medio lleva 2 decimales.",
     },
     {
-        file: 'lib/actions/proPicks.actions.ts',
-        snippet: '(objetivo $${round1(targetPrice)} vs $${round1(currentPrice)}',
-        why: "Texto de la alerta de proPicks, mismo universo US-only: el «$» acompaña a un precio de cotización del S&P 500.",
-    },
-    {
         file: 'lib/market/flows.ts',
         snippet: "`$${scaled.toLocaleString('en-US', { maximumFractionDigits: digits })}${suffix}`",
         why: "Flujos de dinero: la regla de Nico para USD es en-US con $ delante («$35.7B») y solo se aplica en la rama unit === 'USD'; la divisa llega de cada fila del backend y el resto va en es-ES con código explícito.",
