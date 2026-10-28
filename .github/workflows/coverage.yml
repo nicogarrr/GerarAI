@@ -123,7 +123,9 @@ jobs:
         # -n 2 via REMAINDER del script: mismo conjunto de tests y misma
         # linea base, solo repartidos entre los 2 vCPU del runner. Los tests
         # `services` aqui se auto-saltan igual que antes (sin Qdrant service).
-        run: uv run --frozen python scripts/run_coverage_gate.py -- -n 2
+        # Un atasco de un test debe dejar su nodeid y su pila antes del timeout
+        # global. No cambia la suite, la medicion ni el ratchet.
+        run: uv run --frozen python -u scripts/run_coverage_gate.py -- -n 2 -vv -o faulthandler_timeout=120 --durations=30
 
       - name: Informe legible para logs
         if: ${{ always() }}
