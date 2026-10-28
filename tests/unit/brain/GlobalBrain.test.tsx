@@ -357,10 +357,11 @@ describe('GlobalBrain: apertura desde otras pantallas', () => {
         expect((box() as HTMLInputElement).value).toHaveLength(2000);
         expect(box()).toHaveAttribute('placeholder', 'Pregunta al cerebro...');
     });
-    it('el handoff pendiente en sessionStorage se recoge al montar, una sola vez', () => {
+    it('el handoff pendiente en sessionStorage se recoge al montar, una sola vez', async () => {
         window.sessionStorage.setItem(OPEN_BRAIN_PENDING_KEY, JSON.stringify({ ticker: 'KO', question: 'hola KO' }));
         render(<GlobalBrain userId="u1" />);
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        // El handoff se aplica en un microtask (no setState síncrono en el efecto).
+        expect(await screen.findByRole('dialog')).toBeInTheDocument();
         expect(box()).toHaveValue('hola KO');
         expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBeNull();
         expect(box()).toHaveAttribute('placeholder', 'Pregunta sobre KO...');
@@ -381,7 +382,8 @@ describe('GlobalBrain: persistencia', () => {
         chatWithPortfolio.mockResolvedValue({ success: true, message: 'Nueva respuesta', citations: [{ document: 'D', url: null, page: null, locator: 'l', kind: 'filing' }] });
         render(<GlobalBrain userId="u1" />);
         open();
-        expect(screen.getByText('Saludo guardado')).toBeInTheDocument();
+        // La restauración se aplica en un microtask tras montar.
+        expect(await screen.findByText('Saludo guardado')).toBeInTheDocument();
         expect(screen.getByText('Pregunta previa')).toBeInTheDocument();
         expect(screen.queryByRole('group', { name: 'Preguntas sugeridas' })).not.toBeInTheDocument();
         ask('¿Y ahora?');
