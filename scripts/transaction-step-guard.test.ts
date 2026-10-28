@@ -15,7 +15,7 @@ const source = (p: string): string => readFileSync(join(root, p), 'utf8');
 describe('formularios de operaciones aceptan decimales', () => {
     for (const file of [
         'components/portfolio/EditTransactionDialog.tsx',
-        'components/portfolio/AddTransactionButton.tsx',
+        'components/portfolio/AddTransactionDialog.tsx',
     ]) {
         it(`${file} no restringe cantidad/precio a 2 decimales`, () => {
             const text = source(file);
