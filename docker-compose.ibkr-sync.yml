@@ -1,0 +1,39 @@
+# Opt-in only. Adds 384 MiB: requires a measured rebalance before activation.
+services:
+  scheduler:
+    environment:
+      IBKR_DEDICATED_SYNC_ENABLED: "true"
+  worker-ibkr-sync:
+    image: cavaai-backend:prod
+    container_name: cavaai-worker-ibkr-sync
+    restart: unless-stopped
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "1", "-Q", "ibkr-sync"]
+    environment:
+      IBKR_DEDICATED_SYNC_ENABLED: "true"
+      APP_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      REDIS_URL: ${REDIS_URL:?Set REDIS_URL}
+      RESEARCH_AUTH_REQUIRED: "true"
+      RESEARCH_AUTH_SECRET: ${RESEARCH_AUTH_SECRET:?Set RESEARCH_AUTH_SECRET}
+      LLM_SETTINGS_ENCRYPTION_KEY: ${LLM_SETTINGS_ENCRYPTION_KEY:?Set encryption key}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
