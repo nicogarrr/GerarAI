@@ -24,17 +24,17 @@ export function CompanyPositionPanel({ context }: { context: CompanyHoldingConte
     const { holding, weightPercent, positionsAsOf } = context;
     const base = holding.baseCurrency;
     const native = holding.nativeCurrency;
-    const valueKnown = !holding.valueMissing && !holding.fxMissing && !holding.valuationHold;
-    const costKnown = !holding.costReviewMessage && holding.cost > 0;
+    const valueKnown = !holding.valueMissing && !holding.valuationHold;
+    const costKnown = !holding.costReviewMessage && holding.cost > 0 && holding.avgPrice > 0;
     const value = valueKnown ? money(holding.value, base) : null;
     const gain = valueKnown && costKnown ? money(holding.gain, base) : null;
-    const nativeGain = !holding.valuationHold && !holding.costReviewMessage && native !== base ? money(holding.nativeGain, native) : null;
+    const nativeGain = costKnown && !holding.valuationHold && native !== base ? money(holding.nativeGain, native) : null;
     const asOf = positionsAsOf ? formatDate(positionsAsOf) : null;
     return <Panel density="compact" description={asOf ? `Datos de tu cartera a ${asOf}.` : 'Datos de tu cartera.'} title="Tu posición">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
             <div><dt className="text-gray-500">Acciones</dt><dd className="font-semibold text-gray-100">{formatNumber(holding.quantity, { maximumFractionDigits: 6 })}</dd></div>
             <div><dt className="text-gray-500">Coste medio</dt><dd className="font-semibold text-gray-100">
-                {holding.costReviewMessage ? 'En revisión' : isValidCurrencyCode(native) ? formatPrice(holding.avgPrice, native) : formatNumber(holding.avgPrice)}
+                {holding.costReviewMessage ? 'En revisión' : !costKnown ? 'N/D' : isValidCurrencyCode(native) ? formatPrice(holding.avgPrice, native) : formatNumber(holding.avgPrice)}
             </dd></div>
             <div><dt className="text-gray-500">Valor</dt><dd className="font-semibold text-gray-100">{value ?? 'N/D'}</dd></div>
             <div><dt className="text-gray-500">Plusvalía latente</dt><dd className={`font-semibold ${gain === null ? 'text-gray-100' : holding.gain > 0 ? 'text-emerald-300' : holding.gain < 0 ? 'text-red-300' : 'text-gray-100'}`}>
@@ -45,7 +45,8 @@ export function CompanyPositionPanel({ context }: { context: CompanyHoldingConte
             {holding.firstBuyDate ? <div><dt className="text-gray-500">Primera compra</dt><dd className="font-semibold text-gray-100">{formatDate(holding.firstBuyDate)}</dd></div> : null}
         </dl>
         {holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">Valoración en suspensión: {holding.valuationHold.reason}</p> : null}
-        {!holding.valuationHold && (holding.valueMissing || holding.fxMissing) ? <p className="mt-3 text-xs text-amber-200" role="status">Sin valor en {base}: falta el precio o el tipo de cambio.</p> : null}
+        {!holding.valuationHold && holding.valueMissing ? <p className="mt-3 text-xs text-amber-200" role="status">Sin valor en {base}: falta el precio o el tipo de cambio.</p> : null}
+        {!costKnown && !holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">Coste de adquisición desconocido. No se puede calcular la plusvalía.</p> : null}
         {holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">{holding.costReviewMessage}</p> : null}
         <Link className="mt-2 inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">Ver en la cartera</Link>
     </Panel>;
