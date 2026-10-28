@@ -7,7 +7,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const button = readFileSync('components/watchlist/WatchlistAddButton.tsx', 'utf8');
 const dialog = readFileSync('components/watchlist/WatchlistAddDialog.tsx', 'utf8');
@@ -37,7 +37,7 @@ describe('watchlist: diálogo de alta diferido', () => {
 describe('watchlist: islas del panel DCA diferidas', () => {
     it('el panel consume las versiones perezosas, sin imports estáticos de las islas', () => {
         assert.ok((panel + settings).includes("from '@/components/watchlist/LazyDcaControls'"), 'el panel debe usar la frontera perezosa');
-        for (const isla of ['DcaEvaluateButton', 'DcaHitRatesPopover', 'DcaMinLevelSelect']) {
+        for (const isla of ['DcaEvaluateButton', 'DcaHitRatesPopover']) {
             assert.ok(!(panel + settings).includes(`import ${isla} from`), `${isla} no debe tener import estático en el panel`);
             assert.ok(lazy.includes(`dynamic(() => import('@/components/watchlist/${isla}')`), `${isla} debe cargar con dynamic()`);
         }
@@ -45,5 +45,20 @@ describe('watchlist: islas del panel DCA diferidas', () => {
 
     it('las islas diferidas declaran un fallback con role=status', () => {
         assert.ok(lazy.includes('role="status"'), 'el fallback anuncia la carga');
+    });
+});
+
+describe('watchlist: selector DCA por empresa retirado (#2829)', () => {
+    const actions = readFileSync('lib/actions/dca-signals.actions.ts', 'utf8');
+
+    it('el componente y su isla perezosa ya no existen', () => {
+        assert.ok(!existsSync('components/watchlist/DcaMinLevelSelect.tsx'), 'DcaMinLevelSelect fue retirado: nada lo renderiza');
+        assert.ok(!lazy.includes('DcaMinLevelSelect'), 'la frontera perezosa no debe exportar LazyDcaMinLevelSelect');
+    });
+
+    it('la server action del selector fue retirada; el endpoint por ticker sigue en el backend', () => {
+        assert.ok(!actions.includes('setDcaAlertMinLevel'), 'ningun cliente llama a la action retirada');
+        const routes = readFileSync('data-engine/app/api/routes/watchlist.py', 'utf8');
+        assert.ok(routes.includes('dca-alert-min-level'), 'el endpoint por ticker se mantiene por compatibilidad');
     });
 });

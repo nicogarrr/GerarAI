@@ -6,7 +6,6 @@ import type { DcaSignalItem, DcaSignalsResponse } from '@/lib/dca/types';
 vi.mock('@/components/watchlist/LazyDcaControls', () => ({
     LazyDcaEvaluateButton: () => <button>Ejecutar pendientes ahora</button>,
     LazyDcaHitRatesPopover: ({ symbol }: { symbol: string }) => <button aria-label={`Histórico de señales DCA de ${symbol}`}>Histórico</button>,
-    LazyDcaMinLevelSelect: ({ symbol, override, globalMinLevel }: { symbol: string; override: number | null; globalMinLevel: number }) => <select aria-label={`Nivel mínimo de aviso DCA para ${symbol}`} defaultValue={override ?? 'global'}><option value="global">Global ({globalMinLevel}X)</option><option value="4">4X</option><option value="0">Desactivado</option></select>,
 }));
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import DcaAlertSettingsList from '@/components/watchlist/DcaAlertSettingsList';
