@@ -110,3 +110,14 @@ describe('signalLabel / signalTooltip', () => {
         expect(signalTooltip(null)).toBeUndefined();
     });
 });
+
+describe('insiderRole: cargos compuestos observados en móvil', () => {
+    it('traduce el título completo sin perder relaciones gubernamentales', () => {
+        expect(insiderRole('Officer', 'SVP, GC and Government Affairs')).toBe('Vicepresidente senior y Asesor jurídico general y Relaciones gubernamentales');
+        expect(insiderRole('Officer', 'Officer')).toBe('Directivo');
+    });
+    it('no inventa la expansión de CLO ni de divisiones desconocidas', () => {
+        expect(insiderRole('Officer, Director', 'CFO and CLO')).toBe('CFO and CLO · Director');
+        expect(insiderRole('Officer', 'SVP, Government Affairs Europe')).toBe('SVP, Government Affairs Europe');
+    });
+});

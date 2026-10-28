@@ -118,7 +118,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                     <dd className="tabular-nums font-semibold text-gray-100">
                         {tx.source_url ? (
                             <a
-                                className="inline-flex items-center gap-1 hover:text-teal-300"
+                                className="inline-flex min-h-11 min-w-11 items-center gap-1 hover:text-teal-300"
                                 href={tx.source_url}
                                 rel="noopener noreferrer"
                                 target="_blank"
@@ -271,7 +271,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                 <td className="py-2 pl-3 text-right tabular-nums">
                                                     {tx.source_url ? (
                                                         <a
-                                                            className="inline-flex items-center gap-1 text-gray-100 hover:text-teal-300"
+                                                            className="inline-flex min-h-11 min-w-11 items-center gap-1 text-gray-100 hover:text-teal-300"
                                                             href={tx.source_url}
                                                             rel="noopener noreferrer"
                                                             target="_blank"

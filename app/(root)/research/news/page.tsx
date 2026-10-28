@@ -107,7 +107,7 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
       />
 
       <details className="rounded-lg border border-gray-800 bg-surface-1 p-5">
-        <summary className="cursor-pointer font-semibold text-gray-300">Añadir noticias</summary>
+        <summary className="min-h-11 cursor-pointer py-2.5 font-semibold text-gray-300">Añadir noticias</summary>
         <div className="mt-4 grid gap-6">
       <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
@@ -131,13 +131,13 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
             <label className="text-sm font-semibold text-gray-400" htmlFor="source">
               Fuente
             </label>
-            <Input id="source" name="source" placeholder="Bloomberg, FT, RI..." />
+            <Input className="min-h-11" id="source" name="source" placeholder="Bloomberg, FT, RI..." />
           </div>
           <div className="grid gap-2 sm:grid-cols-[160px_1fr] sm:items-center">
             <label className="text-sm font-semibold text-gray-400" htmlFor="url">
               URL de la fuente
             </label>
-            <Input id="url" name="url" placeholder="https://..." type="url" />
+            <Input className="min-h-11" id="url" name="url" placeholder="https://..." type="url" />
           </div>
           <Button className="w-full sm:w-fit" type="submit">
             Analizar noticia
@@ -155,7 +155,7 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
             <label className="text-sm font-semibold text-gray-400" htmlFor="feed-source">
               Fuente
             </label>
-            <Input defaultValue="manual_feed" id="feed-source" name="source" />
+            <Input className="min-h-11" defaultValue="manual_feed" id="feed-source" name="source" />
           </div>
           <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Noticias del lote (JSON)</span><Textarea
             className="min-h-[180px] border-gray-800 bg-black/30 font-mono text-xs text-gray-200 focus-visible:ring-teal-500"
