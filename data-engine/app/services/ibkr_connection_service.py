@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import re
+from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
+from functools import wraps
 from threading import Lock
+from typing import Concatenate, ParamSpec, TypeVar
 from xml.etree import ElementTree
 
 from sqlalchemy import select, text
@@ -71,6 +74,24 @@ def sync_lease(db: Session):
                 # Never return a pooled connection still owning a session lock.
                 lease.invalidate()
                 raise
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def _connection_mutation(fn: Callable[Concatenate[Session, _P], _R]) -> Callable[Concatenate[Session, _P], _R]:
+    """Serialize credential changes with sync across importer commit boundaries.
+
+    Reject rather than wait: the caller can retry when the sync completes. The
+    separate session advisory lease survives every commit on the ORM session.
+    Acquire before any row lock to keep the lock order identical to sync.
+    """
+    @wraps(fn)
+    def guarded(db: Session, *args: _P.args, **kwargs: _P.kwargs) -> _R:
+        with sync_lease(db):
+            return fn(db, *args, **kwargs)
+    return guarded
 
 
 def start_receipt(db: Session, *, revision: int) -> int:
@@ -183,6 +204,7 @@ async def download(token: str, query_id: str) -> str:
         raise ConnectionError("IBKR no pudo entregar el informe. Revisa token, caducidad, Query ID y restricciones de IP; si está preparándolo, prueba más tarde.") from None
 
 
+@_connection_mutation
 def save_connection(db: Session, settings: Settings, *, token: str, query_id: str,
                     account_id: str, complete_query: bool, statement_date: date) -> dict:
     tenant_id = require_tenant(db)
@@ -213,6 +235,7 @@ def save_connection(db: Session, settings: Settings, *, token: str, query_id: st
     return view(db)
 
 
+@_connection_mutation
 def disconnect(db: Session) -> dict:
     row = connection(db, lock=True)
     if row:
