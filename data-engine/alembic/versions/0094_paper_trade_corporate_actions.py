@@ -7,7 +7,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0094_paper_trade_corporate_actions"
+revision = "0094_paper_trade_actions"
 down_revision = "0093_paper_trade_costs"
 branch_labels = None
 depends_on = None

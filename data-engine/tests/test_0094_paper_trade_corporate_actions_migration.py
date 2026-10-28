@@ -33,3 +33,12 @@ def test_upgrade_idempotent_and_downgrade_preserves_trades(monkeypatch):
         assert {c["name"] for c in inspect(conn).get_columns("paper_trades")} == {"id", "status"}
         assert list(conn.exec_driver_sql("SELECT * FROM paper_trades ORDER BY id")) == [
             (1, "closed"), (2, "open"), (3, "closed")]
+
+
+def test_revision_fits_alembic_version_column_and_keeps_chain():
+    module = _load()
+    context = MigrationContext.configure(dialect_name="postgresql")
+    limit = context._version.c.version_num.type.length
+    assert len(module.revision) <= limit
+    assert module.revision == "0094_paper_trade_actions"
+    assert module.down_revision == "0093_paper_trade_costs"
