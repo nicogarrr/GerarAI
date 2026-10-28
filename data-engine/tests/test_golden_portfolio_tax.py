@@ -177,7 +177,7 @@ def _trade(direction, entry, exit_price, conviction=Decimal("0.5"), quantity=Dec
     return SimpleNamespace(
         author="LLM", status="closed", direction=direction, entry_price=entry,
         exit_price=exit_price, quantity=quantity, conviction=conviction,
-        horizon="short", close_reason="target", currency="USD",
+        horizon="short", close_reason="target", currency="USD", corporate_action_warning=None,
     )
 
 

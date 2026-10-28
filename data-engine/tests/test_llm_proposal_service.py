@@ -195,6 +195,7 @@ def test_proposal_keeps_quote_currency_and_ledger_rejects_other_currency():
         return SimpleNamespace(
             **{**proposal.model_dump(), "ticker": "AAPL", "status": "pending", "created_at": NOW,
                "mark_at": None, "entry_price": None, "entry_at": None, "mark_price": None,
+               "entry_fee": None,
                "exit_price": None, "exit_at": None, "close_reason": None, "price_source": None}
         )
 

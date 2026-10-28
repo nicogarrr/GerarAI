@@ -173,6 +173,8 @@ def test_refetch_items_market_cap_none_without_profile(monkeypatch):
 
 
 def test_as_of_is_data_capture_time_not_serve_time(monkeypatch):
+    # This test checks cache timestamps, not live background providers.
+    monkeypatch.setattr(screeners, "_schedule_real_refresh", lambda *args, **kwargs: None)
     class _Settings:
         finnhub_api_key = ""
         screener_quote_vendor = "finnhub"
