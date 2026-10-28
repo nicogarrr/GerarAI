@@ -227,7 +227,7 @@ def test_same_level_rerun_and_flicker_do_not_realert(db):
     fetcher.set("UBER", series(80.0))  # y otra vez a 2X: huella de bajada ya existe
     _run(db, fetcher)
     titles = [a.title for a in _alerts(db)]
-    assert titles == ["UBER entró en 3X DCA", "UBER baja a 2X DCA (desde 3X DCA)"]
+    assert titles == ["UBER entró en 3X DCA"]
     state = _state(db, "UBER")
     assert state.level == 2 and state.previous_level == 3
 
@@ -239,22 +239,22 @@ def test_drop_alerts_as_informational(db):
     _run(db, fetcher)
     fetcher.set("UBER", series(80.0))  # baja a 2X
     summary = _run(db, fetcher)
-    assert [a["level"] for a in summary["alerted"]] == [2]
+    assert summary["alerted"] == []
     fetcher.set("UBER", series(100.0))  # baja a 1X: sale de zona de compra
     _run(db, fetcher)
     alerts = _alerts(db)
-    assert [a.title for a in alerts] == ["UBER baja a 2X DCA (desde 3X DCA)", "UBER baja a 1X DCA (desde 2X DCA)"]
-    assert [a.severity for a in alerts] == ["low", "low"]
+    assert [a.title for a in alerts] == ["UBER baja a 1X DCA (desde 2X DCA)"]
+    assert [a.severity for a in alerts] == ["low"]
     dca = alerts[0].metadata_["dca"]
-    assert (dca["direction"], dca["informational"], dca["previous_level"]) == ("down", True, 3)
-    assert dca["previous_label"] == "3X DCA"
-    assert alerts[0].message.splitlines()[2] == "Aviso informativo: el nivel baja desde 3X DCA a 2X DCA."
+    assert (dca["direction"], dca["informational"], dca["previous_level"]) == ("down", True, 2)
+    assert dca["previous_label"] == "2X DCA"
+    assert alerts[0].message.splitlines()[2] == "Aviso informativo: el nivel baja desde 2X DCA a 1X DCA."
     uber = _state(db, "UBER")
     assert (uber.level, uber.last_alerted_level) == (1, 1)
 
 
 def test_rise_after_drop_to_same_level_still_alerts(db):
-    """Una bajada a 2X no gasta la huella de la subida a 2X del mismo mes."""
+    """Con 3X/1X no se avisa de 3->2 ni 1->2, solo de 2->1."""
     _watch(db, "UBER")
     fetcher = FakeFetcher()
     fetcher.set("UBER", series(70.0))  # 3X: siembra
@@ -266,8 +266,8 @@ def test_rise_after_drop_to_same_level_still_alerts(db):
     fetcher.set("UBER", series(80.0))  # sube a 2X
     _run(db, fetcher)
     alerts = _alerts(db)
-    assert [a.metadata_["dca"]["direction"] for a in alerts] == ["down", "down", "up"]
-    assert alerts[-1].title == "UBER entró en 2X DCA" and alerts[-1].severity == "medium"
+    assert [a.metadata_["dca"]["direction"] for a in alerts] == ["down"]
+    assert alerts[-1].title == "UBER baja a 1X DCA (desde 2X DCA)" and alerts[-1].severity == "low"
 
 
 def test_drop_email_marks_direction():
@@ -296,7 +296,7 @@ def test_escalation_alerts_again(db):
     fetcher.set("UBER", series(55.0))
     _run(db, fetcher)
     alerts = _alerts(db)
-    assert [a.title for a in alerts] == ["UBER entró en 2X DCA", "UBER entró en 3X DCA", "UBER entró en 4X DCA"]
+    assert [a.title for a in alerts] == ["UBER entró en 3X DCA", "UBER entró en 4X DCA"]
     assert alerts[-1].severity == "critical"
 
 
@@ -558,3 +558,21 @@ def test_selected_symbols_only_fetch_selected_without_deleting_others(db):
     db.commit()
     assert pending_symbols(db, now=NOW) == ['MANUALB']
     assert set(pending_symbols(db, now=NOW + timedelta(hours=25))) == {'MANUALA', 'MANUALB'}
+
+
+def test_tenant_directions_ignore_legacy_override_and_saved_policy_wins(db):
+    from app.services.dca_alert_settings_service import save_policy
+    _watch(db, "UBER")
+    db.add(DcaAlertOverride(tenant_id=1, symbol="UBER", min_level=0))
+    db.commit()
+    fetcher = FakeFetcher()
+    fetcher.set("UBER", series(80.0))  # 2X, first evaluation: no alert
+    assert _run(db, fetcher)["alerted"] == []
+    fetcher.set("UBER", series(70.0))  # default destination 3X: alert despite old OFF
+    assert [a["level"] for a in _run(db, fetcher)["alerted"]] == [3]
+    save_policy(db, 4, 2)
+    fetcher.set("UBER", series(80.0))  # saved down threshold 2X
+    assert [a["level"] for a in _run(db, fetcher)["alerted"]] == [2]
+    fetcher.set("UBER", series(70.0))  # saved up threshold 4X: no alert
+    assert _run(db, fetcher)["alerted"] == []
+    assert db.scalar(select(DcaAlertOverride).where(DcaAlertOverride.symbol == "UBER")).min_level == 0

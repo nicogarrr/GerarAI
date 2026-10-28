@@ -4456,6 +4456,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/dca": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Settings */
+        get: operations["read_settings_api_settings_dca_get"];
+        /** Update Settings */
+        put: operations["update_settings_api_settings_dca_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/ibkr": {
         parameters: {
             query?: never;
@@ -6924,6 +6942,30 @@ export interface components {
             /** Trigger */
             trigger: string;
         };
+        /** DcaSettingsOut */
+        DcaSettingsOut: {
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /** Configured */
+            configured: boolean;
+            /** Down Max Level */
+            down_max_level: number;
+            /** Legacy Min Level */
+            legacy_min_level: number;
+            /** Legacy Override Count */
+            legacy_override_count: number;
+            /** Trims Enabled */
+            trims_enabled: boolean;
+            /** Up Min Level */
+            up_min_level: number;
+        };
+        /** DcaSettingsUpdate */
+        DcaSettingsUpdate: {
+            /** Down Max Level */
+            down_max_level: number;
+            /** Up Min Level */
+            up_min_level: number;
+        };
         /** DcaSignalItemOut */
         DcaSignalItemOut: {
             /** Alerts On */
@@ -7017,6 +7059,13 @@ export interface components {
             alerts_enabled: boolean;
             /** Channels */
             channels: string[];
+            /**
+             * Directional Policy
+             * @default false
+             */
+            directional_policy: boolean;
+            /** Down Max Level */
+            down_max_level?: number | null;
             /** Email Configured */
             email_configured: boolean;
             /**
@@ -7033,6 +7082,8 @@ export interface components {
             signal_months?: number | null;
             /** Trims Enabled */
             trims_enabled: boolean;
+            /** Up Min Level */
+            up_min_level?: number | null;
             /** Zones */
             zones: components["schemas"]["DcaZoneOut"][];
         };
@@ -20725,6 +20776,86 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_settings_api_settings_dca_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaSettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_settings_api_settings_dca_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DcaSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DcaSettingsOut"];
                 };
             };
             /** @description Validation Error */

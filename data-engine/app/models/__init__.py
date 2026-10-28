@@ -144,6 +144,7 @@ __all__ = [
     "ConnectorState",
     "DailyBrief",
     "DcaAlertOverride",
+    "DcaAlertSettings",
     "DcaEvaluationRun",
     "DcaSignalState",
     "Document",
@@ -270,3 +271,4 @@ __all__.append("IBKRConnection")
 from app.models.ibkr_connection import IBKRSyncReceipt as IBKRSyncReceipt  # noqa: E402
 
 __all__.append("IBKRSyncReceipt")
+from app.models.dca_alert_settings import DcaAlertSettings

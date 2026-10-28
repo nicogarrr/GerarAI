@@ -67,6 +67,9 @@ export interface DcaSignalsResponse {
     /** false = la evaluación diaria está apagada en el servidor (DCA_EVALUATION_ENABLED). Ausente en backends antiguos. */
     evaluation_enabled?: boolean;
     global_min_level: number;
+    directional_policy?: boolean;
+    up_min_level?: number | null;
+    down_max_level?: number | null;
     trims_enabled: boolean;
     channels: string[];
     email_configured: boolean;

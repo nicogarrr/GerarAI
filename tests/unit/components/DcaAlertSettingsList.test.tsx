@@ -23,19 +23,20 @@ describe('avisos DCA sin repetir el veredicto', () => {
         const { container } = render(<DcaSignalsPanel data={data} unavailable={false} />);
         const details = container.querySelector('details')!;
         expect(details.open).toBe(false);
-        expect(details.querySelector('summary')).toHaveTextContent('Configurar avisos DCA');
+        expect(details.querySelector('summary')).toHaveTextContent('Avisos DCA e histórico');
         expect(details.querySelector('summary')?.tabIndex).toBe(0);
         expect(screen.getByText(/No cambia el veredicto ni realiza órdenes/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Configurar avisos DCA en Ajustes/ })).toHaveAttribute('href', '/settings#dca');
         expect(container.querySelector('[data-testid="dca-level-badge"]')).toBeNull();
         expect(container.textContent).not.toContain('Leyenda de zonas DCA');
     });
     it('solo monta cinco ajustes, conserva histórico y empresas solo en cartera', () => {
-        render(<DcaAlertSettingsList items={items} globalMinLevel={2} />);
-        const list = screen.getByRole('list', { name: 'Avisos DCA por empresa' });
+        render(<DcaAlertSettingsList items={items} />);
+        const list = screen.getByRole('list', { name: 'Histórico DCA por empresa' });
         expect(within(list).getAllByRole('listitem')).toHaveLength(5);
         expect(screen.getAllByText('en cartera')).toHaveLength(5);
         expect(screen.getByRole('button', { name: 'Histórico de señales DCA de TEST0' })).toBeInTheDocument();
-        expect(screen.getByRole('combobox', { name: 'Nivel mínimo de aviso DCA para TEST0' })).toHaveValue('4');
+        expect(screen.queryByRole('combobox')).toBeNull();
         expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled();
         fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
         expect(screen.getByRole('status')).toHaveTextContent('6-10 de 12 · Página 2 de 3');
@@ -47,10 +48,10 @@ describe('avisos DCA sin repetir el veredicto', () => {
         expect(screen.getByRole('status')).toHaveTextContent('Página 2 de 3');
     });
     it('acota la página si el servidor reduce la lista y no recicla ajustes entre símbolos', () => {
-        const { rerender } = render(<DcaAlertSettingsList items={items} globalMinLevel={2} />);
+        const { rerender } = render(<DcaAlertSettingsList items={items} />);
         fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
-        expect(screen.getByRole('combobox', { name: 'Nivel mínimo de aviso DCA para TEST5' })).toHaveValue('global');
-        rerender(<DcaAlertSettingsList items={items.slice(0, 2)} globalMinLevel={2} />);
+        expect(screen.getByText('TEST5')).toBeInTheDocument();
+        rerender(<DcaAlertSettingsList items={items.slice(0, 2)} />);
         expect(screen.getByRole('status')).toHaveTextContent('1-2 de 2 · Página 1 de 1');
         expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
     });

@@ -13,7 +13,8 @@ Reglas de aviso (deduplicacion):
   con ``direction`` en el aviso: ``up`` (1X -> 2X, 3X -> 4X; hacia recorte:
   1X -> ligero -> fuerte) o ``down`` (3X -> 2X, 2X -> 1X, fuerte -> ligero,
   recorte -> 1X), que se redacta como aviso informativo («baja a 2X»).
-  Una bajada avisa si el nivel de partida llegaba al minimo efectivo.
+  Con politica por tenant: subida si destino >= minimo, bajada si destino <= maximo.
+  Sin tenant se conserva la regla legacy del nivel de partida.
 * La primera evaluacion de un ticker (sin estado guardado, p. ej. recien
   anadido a la watchlist) solo guarda el nivel, sin aviso.
 * Huella ``dca_level:{simbolo}:{mes}:{nivel}`` (subidas) y
@@ -22,7 +23,8 @@ Reglas de aviso (deduplicacion):
   (3X -> 2X -> 3X -> 2X da dos avisos, no cuatro).
 * Escalar (2X -> 3X -> 4X) avisa de nuevo; seguir en el mismo nivel al
   cambiar de mes no.
-* Recortes solo con DCA_ALERT_TRIMS=true. Ajuste por ticker 0 = sin avisos.
+* Recortes solo con DCA_ALERT_TRIMS=true. Overrides por ticker se conservan,
+  pero no afectan a los avisos si hay contexto de tenant (defaults 3X/1X).
 
 Datos: Yahoo Finance (yfinance, historia completa) con la linea real del
 listado (``yahoo_symbol``); si falla, los cierres de ``market_prices``. Se usa
@@ -213,6 +215,8 @@ def should_alert(
     previous_level: int | None,
     min_level: int,
     trims_enabled: bool,
+    up_min_level: int | None = None,
+    down_max_level: int | None = None,
 ) -> bool:
     """Regla de aviso por cambio de nivel en ambas direcciones (sin mirar la huella del mes).
 
@@ -220,6 +224,19 @@ def should_alert(
     """
     direction = alert_direction(level, previous_level)
     if direction is None or previous_level is None:
+        return False
+    if up_min_level is not None and down_max_level is not None:
+        # Explicit tenant policy: destination threshold, independently per direction.
+        if level >= 1 and previous_level >= 1:
+            if direction == "up":
+                return up_min_level > 0 and level >= up_min_level
+            return down_max_level > 0 and level <= down_max_level
+        # Returning from trim to a buy zone still obeys the buy threshold.
+        if previous_level < 0 and level >= 2:
+            return (up_min_level > 0 and level >= up_min_level) or bool(trims_enabled)
+        # Trims are a separate server-controlled opt-in, unchanged by this form.
+        if level < 0 or previous_level < 0:
+            return bool(trims_enabled)
         return False
     if min_level <= 0:
         return False
@@ -432,6 +449,8 @@ def evaluate_watchlist(
     fetch = fetcher or fetch_yahoo_history
     tracked = tracked_symbols(db)
     per_ticker = overrides(db)
+    from app.services.dca_alert_settings_service import effective_policy
+    policy = effective_policy(db)
     states = {
         row.symbol.upper(): row
         for row in db.scalars(select(DcaSignalState).where(*tenant_filters(db, DcaSignalState)))
@@ -520,6 +539,8 @@ def evaluate_watchlist(
             previous_level=previous_level,
             min_level=min_level,
             trims_enabled=bool(settings.dca_alert_trims),
+            up_min_level=policy.up_min_level if policy else None,
+            down_max_level=policy.down_max_level if policy else None,
         ):
             continue
         dca = _dca_payload(

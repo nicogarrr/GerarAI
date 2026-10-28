@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import DcaAlertSettingsList from '@/components/watchlist/DcaAlertSettingsList';
 // Los controles siguen diferidos; el disclosure nativo funciona antes de hidratar.
@@ -29,18 +30,21 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
     return (
         <details className="group rounded-lg border border-gray-700 bg-gray-800/30" data-testid="dca-signals">
             <summary className="min-h-11 cursor-pointer rounded-lg px-4 py-3 text-sm font-semibold text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400">
-                Configurar avisos DCA
+                Avisos DCA e histórico
                 <span className="ml-2 text-xs font-normal text-gray-400">({data.items.length} empresas)</span>
             </summary>
             <div className="space-y-3 px-4 pb-4">
+                <Link href="/settings#dca" className="inline-flex min-h-11 items-center text-sm text-teal-300 underline">Configurar avisos DCA en Ajustes →</Link>
                 <p className="text-sm text-gray-300">
-                    Elige el nivel mínimo para recibir un aviso. No cambia el veredicto ni realiza órdenes.
+                    Configura los avisos globales de subida y bajada en Ajustes. No cambia el veredicto ni realiza órdenes.
                     Los niveles DCA se muestran en las tarjetas o la tabla de tu watchlist.
                 </p>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                         <p className="text-xs text-gray-500">
-                            Aviso mínimo global {data.global_min_level}X ·
+                            {data.directional_policy
+                                ? `Subida: ${data.up_min_level ? `desde ${data.up_min_level}X` : 'desactivada'} · bajada: ${data.down_max_level ? `hasta ${data.down_max_level}X` : 'desactivada'}`
+                                : `Aviso mínimo global ${data.global_min_level}X`} ·
                             recortes {data.trims_enabled ? 'con aviso' : 'sin aviso'} · canales: {channels.join(', ')}
                             {data.channels.includes('email') && !data.email_configured ? ' (correo sin configurar)' : ''}
                             {data.alerts_enabled ? '' : ' · avisos desactivados'}
@@ -58,7 +62,7 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
                             : 'Todavía no hay niveles porque la evaluación diaria automática está desactivada en el servidor. Pulsa «Ejecutar pendientes ahora» para calcularlos con los cierres de hoy.'}
                     </p>
                 ) : null}
-                <DcaAlertSettingsList items={data.items} globalMinLevel={data.global_min_level} />
+                <DcaAlertSettingsList items={data.items} />
                 <p className="text-[11px] text-gray-500">
                     1X = aportación base; 2X-4X = múltiplos de tu aportación mensual. Fórmula propia y transparente, no la de DCA
                     Optimizer. Apoyo a la decisión, no asesoramiento financiero.

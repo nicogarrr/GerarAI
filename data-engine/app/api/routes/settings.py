@@ -357,3 +357,7 @@ async def sync_ibkr_connection(db: Session = Depends(get_db)) -> dict:
     finally:
         if entered:
             await run_in_threadpool(lease.__exit__, None, None, None)
+
+# No service-wide env mutation: these settings belong to the signed tenant.
+from app.api.routes.dca_settings import router as dca_settings_router
+router.include_router(dca_settings_router, prefix="/dca", tags=["settings"])

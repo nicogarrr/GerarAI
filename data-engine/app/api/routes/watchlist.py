@@ -512,6 +512,9 @@ class DcaSignalsOut(BaseModel):
     # servidor: ningun ticker tendra nivel salvo con «Evaluar ahora».
     evaluation_enabled: bool = True
     global_min_level: int
+    directional_policy: bool = False
+    up_min_level: int | None = None
+    down_max_level: int | None = None
     trims_enabled: bool
     channels: list[str]
     email_configured: bool
@@ -602,6 +605,8 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
     settings = get_settings()
     tracked = dca.tracked_symbols(db)
     per_ticker = dca.overrides(db)
+    from app.services.dca_alert_settings_service import effective_policy
+    policy = effective_policy(db)
     states = {
         row.symbol.upper(): row
         for row in db.scalars(select(DcaSignalState).where(*tenant_filters(db, DcaSignalState)))
@@ -612,7 +617,7 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
     items = []
     for symbol, item in tracked.items():
         override = per_ticker.get(symbol)
-        effective = dca.effective_min_level(override, settings)
+        effective = policy.up_min_level if policy else dca.effective_min_level(override, settings)
         state = states.get(symbol)
         items.append({
             "symbol": symbol,
@@ -622,7 +627,7 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
             "in_portfolio": "portfolio" in item.sources,
             "min_level_override": override,
             "effective_min_level": effective,
-            "alerts_on": bool(settings.dca_alerts_enabled) and effective > 0,
+            "alerts_on": bool(settings.dca_alerts_enabled) and (effective > 0 or (policy is not None and policy.down_max_level > 0)),
             "state": _dca_state_payload(state) if state is not None else None,
             "evaluation_status": (ev := dca_run_log.item_evaluation(symbol, state is not None, run))["status"],
             "evaluation_reason": ev["reason"],
@@ -630,7 +635,10 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
     return {
         "alerts_enabled": bool(settings.dca_alerts_enabled),
         "evaluation_enabled": bool(settings.dca_evaluation_enabled),
-        "global_min_level": int(settings.dca_alert_min_level),
+        "global_min_level": policy.up_min_level if policy else int(settings.dca_alert_min_level),
+        "directional_policy": policy is not None,
+        "up_min_level": policy.up_min_level if policy else None,
+        "down_max_level": policy.down_max_level if policy else None,
         "trims_enabled": bool(settings.dca_alert_trims),
         "channels": dca.alert_channels(settings),
         "email_configured": smtp_configured(settings),
@@ -647,6 +655,8 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     from app.core.config import get_settings
     from app.services import dca_signal_service as dca
 
+    from app.services.dca_alert_settings_service import effective_policy
+    policy = effective_policy(db)
     key = symbol.strip().upper()
     if key not in dca.tracked_symbols(db):
         raise HTTPException(status_code=404, detail="El ticker no está en tu watchlist ni en tu cartera")
@@ -664,7 +674,7 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     return {
         "symbol": key,
         "min_level_override": payload.min_level,
-        "effective_min_level": dca.effective_min_level(payload.min_level, get_settings()),
+        "effective_min_level": (policy.up_min_level if policy else dca.effective_min_level(payload.min_level, get_settings())),
     }
 
 
