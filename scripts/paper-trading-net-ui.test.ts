@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import type { PaperTradeView } from '../lib/actions/paper-trading.actions';
 
 const base: PaperTradeView = {
@@ -18,7 +19,7 @@ async function render(patch: Partial<PaperTradeView> = {}) {
     mkdirSync(dir, { recursive: true });
     writeFileSync(`${dir}/view.mjs`, ts.transpileModule(readFileSync('components/proPicks/PaperProposalCard.tsx', 'utf8'), {
         compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
-    }).outputText);
+    }).outputText.replaceAll("from '@/lib/format'", `from '${pathToFileURL(`${process.cwd()}/lib/format.ts`).href}'`));
     const mod = await import(`${process.cwd()}/${dir}/view.mjs?v=${Date.now()}`);
     return renderToStaticMarkup(createElement(mod.PaperProposalCard, { trade: { ...base, ...patch } }));
 }

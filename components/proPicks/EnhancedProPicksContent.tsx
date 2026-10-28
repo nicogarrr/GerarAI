@@ -12,7 +12,7 @@ import { generateFunnelRunNow } from '@/lib/actions/propicks-funnel.actions';
 import { allNeutralCategory, categoryDisplay } from '@/lib/propicks/category-display';
 import { CATEGORY_KEYS, categoryNeutralNote } from './category-display';
 import { addToWatchlist } from '@/lib/actions/watchlist.actions';
-import { formatCompanyName, formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime } from '@/lib/format';
+import { formatCompanyName, formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime, formatCountEs } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
 import { t } from '@/lib/i18n/t';
 import { toast } from 'sonner';
@@ -83,7 +83,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
             setPassedCount(result.passedCount);
             setAppliedFilters(requestedFilters);
             setRefreshStatus(result.picks.length
-                ? `Selección consultada: ${result.picks.length} empresas.`
+                ? `Selección consultada: ${formatCountEs(result.picks.length, 'empresa', 'empresas')}.`
                 // Mensaje honesto del 0: distingue "tus filtros excluyen todo"
                 // de "el embudo no seleccionó nada", que no es fallo del usuario.
                 : result.passedCount
@@ -115,7 +115,9 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                 return;
             }
             setRefreshStatus(run.passed_count > 0
-                ? `Selección generada: ${run.passed_count} empresas superan el embudo.`
+                ? run.passed_count === 1
+                    ? 'Selección generada: 1 empresa supera el embudo.'
+                    : `Selección generada: ${formatCountEs(run.passed_count, 'empresa', 'empresas')} superan el embudo.`
                 : `Selección generada: 0 de ${run.universe_size} empresas del universo superan el embudo con los datos disponibles; ninguna cumple todos los criterios ahora mismo.`);
             requestInFlight.current = false;
             setLoading(false);

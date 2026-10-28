@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { formatDate, formatMarketCapUsd, formatNumber, formatPrice } from '@/lib/format';
+import { formatDate, formatMarketCapUsd, formatNumber, formatPrice, formatCountEs } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -137,7 +137,7 @@ function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
             company.totals.buy.rows_without_value + company.totals.sell.rows_without_value > 0 ? (
                 <p className="mt-3 border-t border-gray-700/50 pt-2 text-xs text-gray-500">
                     {company.excluded_codes > 0
-                        ? `${formatNumber(company.excluded_codes, { maximumFractionDigits: 0 })} operaciones de otros códigos (concesiones, ejercicios…) no suman al agregado. `
+                        ? `${formatCountEs(company.excluded_codes, 'operación de otros códigos', 'operaciones de otros códigos')} (concesiones, ejercicios…) no ${company.excluded_codes === 1 ? 'suma' : 'suman'} al agregado. `
                         : ''}
                     {company.excluded_derivative > 0
                         ? `${formatNumber(company.excluded_derivative, { maximumFractionDigits: 0 })} derivadas excluidas. `

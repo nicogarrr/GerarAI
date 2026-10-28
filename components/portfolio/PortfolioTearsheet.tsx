@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Gauge, TrendingDown, Target } from 'lucide-react';
 import type { PortfolioTearsheet } from '@/lib/actions/portfolio.actions';
-import { formatDate, formatNumber, formatPercent } from '@/lib/format';
+import { formatDate, formatNumber, formatPercent, formatCountEs } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 
 type Props = {
@@ -61,10 +61,10 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
                     ))}
                 </div>
                 <p className="mt-3 text-xs text-gray-500">
-                    {formatNumber(metrics.n_observations, { maximumFractionDigits: 0 })} sesiones · Ret. acumulado{' '}
+                    {formatCountEs(metrics.n_observations, 'sesión', 'sesiones')} · Ret. acumulado{' '}
                     {formatRatioPercent(metrics.cumulative_return)} · Mejor día {formatRatioPercent(metrics.best_day)} · Peor día{' '}
                     {formatRatioPercent(metrics.worst_day)}
-                    {tearsheet.exposure ? ` · ${formatNumber(tearsheet.exposure.n_positions, { maximumFractionDigits: 0 })} posiciones` : ''}
+                    {tearsheet.exposure ? ` · ${formatCountEs(tearsheet.exposure.n_positions, 'posición', 'posiciones')}` : ''}
                     {tearsheet.exposure ? ` · datos hasta el ${formatDate(tearsheet.exposure.snapshot_date)}` : ''}
                 </p>
             </CardContent>

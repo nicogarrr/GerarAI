@@ -125,7 +125,7 @@ describe('EnhancedProPicksContent: estados vacíos', () => {
         expect(generateFunnelRunNow).toHaveBeenCalledTimes(1);
         expect(generateEnhancedProPicksWithRun).toHaveBeenCalledTimes(1);
         expect(onRunUpdated).toHaveBeenCalledWith('2026-10-28');
-        expect(screen.getByRole('status')).toHaveTextContent('Selección consultada: 1 empresas.');
+        expect(screen.getByRole('status')).toHaveTextContent('Selección consultada: 1 empresa.');
     });
 
     it('si generar el run devuelve error lo dice y no consulta picks', async () => {
@@ -217,7 +217,7 @@ describe('EnhancedProPicksContent: actualizar y filtros', () => {
         generateEnhancedProPicksWithRun.mockResolvedValue(result([pick()]));
         render(<EnhancedProPicksContent initialPicks={[pick()]} generatedAt="2026-10-27" />);
         fireEvent.click(screen.getByRole('button', { name: /Aplicar Filtros/ }));
-        expect(await screen.findByText(/Selección consultada: 1 empresas/)).toBeInTheDocument();
+        expect(await screen.findByText(/Selección consultada: 1 empresa/)).toBeInTheDocument();
         expect(screen.getByText(/puntuación mínima de 70/)).toBeInTheDocument();
     });
 });

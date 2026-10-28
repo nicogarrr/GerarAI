@@ -1,4 +1,5 @@
 import type { PaperTradeView } from '@/lib/actions/paper-trading.actions';
+import { formatCountEs } from '@/lib/format';
 
 const stateLabel: Record<string, string> = { pending: 'Pendiente de entrada', open: 'Abierta', closed: 'Cerrada' };
 const closeLabel: Record<string, string> = { stop: 'Límite de pérdidas', target: 'Objetivo', horizon: 'Fin del horizonte', manual: 'Cierre anticipado' };
@@ -52,7 +53,7 @@ export function PaperProposalCard({ trade }: { trade: PaperTradeView }) {
             <p>Resultado neto simulado (tras costes supuestos y dividendos): {number(trade.status === 'closed' ? trade.realized_pnl_net : trade.unrealized_pnl_net)} {trade.currency || ''}</p>
             {trade.cost_label === 'supuesto' && <p className="text-xs text-gray-400">Costes simulados (supuesto, no tarifa de broker): entrada {number(trade.entry_fee)} · salida {trade.status === 'closed' ? number(trade.exit_fee) : 'estimada al cierre'}.</p>}
             {(trade.dividends_count || trade.dividends_uncertain || trade.dividends_wrong_currency) ? <p className="text-xs text-gray-400">
-                Dividendos devengados: {number(trade.dividends_total)} {trade.currency || ''} ({trade.dividends_count ?? 0} eventos{trade.dividends_source ? `, fuente: ${trade.dividends_source}` : ''}).
+                Dividendos devengados: {number(trade.dividends_total)} {trade.currency || ''} ({formatCountEs(trade.dividends_count ?? 0, 'evento', 'eventos')}{trade.dividends_source ? `, fuente: ${trade.dividends_source}` : ''}).
                 {trade.dividends_uncertain ? ` ${trade.dividends_uncertain} evento(s) incierto(s) excluido(s).` : ''}
                 {trade.dividends_wrong_currency ? ` ${trade.dividends_wrong_currency} en otra divisa ignorado(s), nunca convertidos.` : ''}
             </p> : null}

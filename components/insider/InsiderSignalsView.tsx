@@ -1,6 +1,6 @@
 'use client';
 
-import { formatDate, formatUserDateTime, formatNumber, formatPrice } from '@/lib/format';
+import { formatDate, formatUserDateTime, formatNumber, formatPrice, formatCountEs } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -259,7 +259,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                     </Link>
                                 </CardTitle>
                                 <CardDescription className="mt-0.5 text-sm text-gray-500">
-                                    {formatNumber(signals.length, { maximumFractionDigits: 0 })} señales ·{' '}
+                                    {formatCountEs(signals.length, 'señal', 'señales')} ·{' '}
                                     {countText(initialResult.buy_count)} compras ·{' '}
                                     {countText(initialResult.filings_scanned)} filings · datos al{' '}
                                     {t('signals.asOf', { date: formatFetchedAt((initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at) })}

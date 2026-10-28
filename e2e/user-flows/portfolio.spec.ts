@@ -55,7 +55,7 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByText("IBKR CSV: 2 operaciones importadas")).toBeVisible({ timeout: 30_000 });
 
       await upload(page, "ibkr-es.csv", CSV_ES);
-      await expect(page.getByText("IBKR CSV: 1 operaciones importadas")).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText("IBKR CSV: 1 operación importada")).toBeVisible({ timeout: 30_000 });
       await expect(page.getByText(/Importación falló|cabecera del CSV/)).toHaveCount(0);
 
       // El backend tiene las tres operaciones con los importes exactos.
