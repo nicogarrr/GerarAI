@@ -21,20 +21,23 @@ import socket
 from dataclasses import dataclass, field
 from uuid import uuid4
 
-import main
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+import main
 from app.core import auth as auth_module
 from app.core.database import SessionLocal, init_db
 from app.models.entities import (
     AlertRule,
     Company,
+    CompanyKPI,
     Document,
     DocumentChunk,
+    InvestmentPrinciple,
     KnowledgeChunk,
     KnowledgeDocument,
+    KPIExtractionCandidate,
     ProcessingJob,
     ResearchAlert,
     ResearchReview,
@@ -131,10 +134,31 @@ def world(monkeypatch):
         )
         db.add(rule)
 
+        kpi = CompanyKPI(
+            company_id=company.id, metric_key="marker_kpi", display_name=MARKER, aliases=[],
+            metadata_={},
+        )
+        db.add(kpi)
+        db.flush()
+        candidate = KPIExtractionCandidate(
+            company_id=company.id, company_kpi_id=kpi.id, document_id=doc.id,
+            document_chunk_id=db.scalar(select(DocumentChunk.id).where(DocumentChunk.document_id == doc.id)),
+            metric_key="marker_kpi", raw_label=MARKER, raw_value="42", period="2024",
+            source_locator={}, trace={},
+        )
+        db.add(candidate)
+        principle = InvestmentPrinciple(
+            knowledge_document_id=kdoc.id, principle=f"{MARKER} principle",
+            principle_fingerprint=f"fp-{suffix}", category="risk",
+            application_conditions=[], exceptions=[], applies_to_company_ids=[],
+            exact_fragment=MARKER, metadata_={},
+        )
+        db.add(principle)
+
         run = WorkflowRun(workflow_name="GenerateThesisWorkflow", status="completed")
         db.add(run)
         db.commit()
-        ids.update(alert_rule=rule.id, job=job.id, review=review.id, alert=alert.id, thesis_run=run.id)
+        ids.update(kpi_candidate=candidate.id, principle=principle.id, alert_rule=rule.id, job=job.id, review=review.id, alert=alert.id, thesis_run=run.id)
 
     return World(call=call, ids=ids)
 
@@ -166,6 +190,11 @@ ATTACKS = [
     ("alert", "POST", "/api/alerts/{id}/dispatch", None),
     ("alert", "PATCH", "/api/alerts/{id}/channels", {"channels": ["telegram"]}),
     ("alert_rule", "DELETE", "/api/alerts/rules/{id}", None),
+    ("kpi_candidate", "POST", "/api/sources/kpi-candidates/{id}/action", {"action": "approve", "actor": "b"}),
+    ("kpi_candidate", "POST", "/api/sources/kpi-candidates/{id}/action", {"action": "reject", "actor": "b"}),
+    ("principle", "PUT", "/api/knowledge/principles/{id}", {"principle": "hijacked principle"}),
+    ("principle", "POST", "/api/knowledge/principles/{id}/action", {"action": "approve", "actor": "b"}),
+    ("principle", "POST", "/api/knowledge/principles/{id}/action", {"action": "reject", "actor": "b"}),
     ("thesis_run", "GET", "/api/thesis/jobs/{id}", None),
 ]
 
@@ -200,6 +229,11 @@ def test_foreign_attacks_leave_objects_of_a_intact(world):
         assert review is not None and review.status == "open"
         assert alert is not None and alert.status == "open" and alert.channels == ["in_app"]
         assert alert.acknowledged_by is None
+        candidate = db.get(KPIExtractionCandidate, world.ids["kpi_candidate"])
+        assert candidate is not None and candidate.status == "pending_approval"
+        principle = db.get(InvestmentPrinciple, world.ids["principle"])
+        assert principle is not None and principle.status == "proposed"
+        assert MARKER in principle.principle and principle.approved_by is None
         if "alert_rule" in world.ids:
             rule = db.get(AlertRule, world.ids["alert_rule"])
             assert rule is not None and rule.active is True
@@ -238,3 +272,15 @@ def test_forged_tenant_header_without_valid_signature_is_rejected(world, tenant_
     headers["X-CavaAI-Tenant"] = tenant_header_attack
     resp = client.get("/api/reviews", headers=headers)
     assert resp.status_code in (401, 403), resp.text[:200]
+
+
+def test_tenant_b_cannot_delete_holding_of_a(world):
+    created = world.call("a", "POST", "/api/portfolio/transactions", {
+        "ticker": "MSFT", "action": "buy", "quantity": 3, "price": 100,
+        "trade_date": "2024-01-15", "currency": "USD",
+    })
+    assert created.status_code in (200, 201), created.text
+    _assert_denied(world.call("b", "DELETE", "/api/portfolio/holdings/MSFT"), "holding delete")
+    mine = world.call("a", "GET", "/api/portfolio/transactions")
+    assert mine.status_code == 200 and "MSFT" in mine.text
+    assert "MSFT" not in world.call("b", "GET", "/api/portfolio/transactions").text
