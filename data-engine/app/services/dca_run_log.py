@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import DcaEvaluationRun
 
@@ -64,7 +65,11 @@ def finish_run(
         summary = summary or {}
         row.finished_at = datetime.now(UTC)
         row.status = "error" if error else "ok"
-        row.error = (error or None) and error[:300]
+        # El texto del error se muestra en la watchlist (last_run.error y el
+        # motivo por ticker). Una excepcion de httpx o de la base de datos trae
+        # la URL con ?apikey= o el DSN con la password: se redacta ANTES de
+        # recortar a 300, para que el recorte no deje medio secreto sin tapar.
+        row.error = (error or None) and redact_secrets(error)[:300]
         row.tracked = int(summary.get("tracked", 0))
         row.evaluated = int(summary.get("evaluated", 0))
         row.skipped_count = len(summary.get("skipped", []))
@@ -135,7 +140,8 @@ def run_payload(row: DcaEvaluationRun | None, now: datetime | None = None) -> di
         "skipped": row.skipped_count,
         "errors": row.errors_count,
         "alerted": row.alerted_count,
-        "error": row.error,
+        # Filas guardadas antes de redactar al escribir: se redacta tambien al leer.
+        "error": redact_secrets(row.error) if row.error else row.error,
         "skipped_detail": (row.detail or {}).get("skipped", []),
         "errors_detail": (row.detail or {}).get("errors", []),
     }
