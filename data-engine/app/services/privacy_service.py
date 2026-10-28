@@ -23,6 +23,7 @@ from app.llm.response_cache import purge_llm_response_cache
 from app.models import (
     AlertRule,
     AlertSubscription,
+    BudgetUsage,
     CashBalance,
     CashDailySnapshot,
     ChatSession,
@@ -31,10 +32,14 @@ from app.models import (
     ClaimEvidence,
     CustomMetricDefinition,
     DcaAlertOverride,
+    DcaEvaluationRun,
+    DcaSignalState,
     DecisionJournalEntry,
     DecisionLesson,
     Document,
     ExpectationReview,
+    FxConversion,
+    IbkrRawRow,
     InvestmentCaseStudy,
     InvestmentPlan,
     InvestmentPrinciple,
@@ -58,12 +63,15 @@ from app.models import (
     SavedScreen,
     TaxReport,
     Tenant,
+    TenantLLMSettings,
     ThesisChange,
     ThesisDiff,
     ThesisSection,
     ThesisVersion,
     Transaction,
     WatchItem,
+    WorkflowRun,
+    WorkflowStepRun,
 )
 from app.services.document_store import DocumentStore
 from app.services.rag import RAGIndex
@@ -91,12 +99,26 @@ SENSITIVE_COLUMNS = {
     "password",
     "secret",
     "api_key",
+    "api_key_ciphertext",
+    "api_key_last4",
+    "token_ciphertext",
+    "password_hash",
+    "refresh_token",
+    "access_token",
 }
 
 # Categorias pedidas por privacidad. No se incluyen las tablas derivadas del
 # mercado (hechos, metricas ni chunks crudos) porque no son datos aportados por
 # el usuario y multiplicarian el tamano sin valor de portabilidad.
 EXPORT_TABLES: tuple[tuple[str, Any], ...] = (
+    ("ibkr_raw_rows", IbkrRawRow),
+    ("fx_conversions", FxConversion),
+    ("dca_signal_states", DcaSignalState),
+    ("dca_evaluation_runs", DcaEvaluationRun),
+    ("tenant_llm_settings", TenantLLMSettings),
+    ("budget_usage", BudgetUsage),
+    ("workflow_runs", WorkflowRun),
+    ("workflow_step_runs", WorkflowStepRun),
     ("portfolios", Portfolio),
     ("positions", Position),
     ("transactions", Transaction),
@@ -149,7 +171,11 @@ def _json_value(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
     if isinstance(value, dict):
-        return {str(key): _json_value(item) for key, item in value.items()}
+        return {
+            str(key): _json_value(item) for key, item in value.items()
+            if str(key).lower() not in SENSITIVE_COLUMNS
+            and not any(part in str(key).lower() for part in ("ciphertext", "password", "secret", "api_key", "access_token", "refresh_token"))
+        }
     if isinstance(value, list):
         return [_json_value(item) for item in value]
     return value
@@ -185,7 +211,7 @@ class PrivacyService:
         # `created_by` es un id interno de autenticacion, no un dato portable.
         metadata.pop("created_by", None)
         data: dict[str, Any] = {
-            "schema_version": 1,
+            "schema_version": 2,
             "generated_at": datetime.now(UTC).isoformat(),
             "profile": {
                 "tenant": tenant.name if tenant else None,
