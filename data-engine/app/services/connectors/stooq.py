@@ -31,7 +31,11 @@ class StooqClient:
         """Read daily bars, preserving Stooq's symbol and observed trading date."""
         if start > end:
             raise ValueError("start must not be after end")
+        from app.services.listing_identity import BASIC_FIT
+
         symbol = ticker.strip().lower()
+        if symbol == BASIC_FIT.yahoo.lower():
+            symbol = BASIC_FIT.stooq
         if not symbol or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789.-^" for c in symbol):
             raise ValueError("Invalid Stooq symbol")
         params = {"s": symbol, "i": "d", "d1": start.strftime("%Y%m%d"), "d2": end.strftime("%Y%m%d")}
