@@ -192,7 +192,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/proPicks/EnhancedProPicksFilters.tsx': 'jsx-onClick, jsx-onValueChange, importa cliente: components/ui/label.tsx, importa cliente: components/ui/select.tsx',
   'components/proPicks/GemsView.tsx': 'useState, useEffect, jsx-onClick',
   'components/proPicks/MonthlyRebalanceView.tsx': 'useState, useRef, browser:document, jsx-onChange, jsx-onClick',
-  'components/proPicks/ProPicksTabs.tsx': 'useState, useEffect, jsx-onValueChange, jsx-onStrategyChange, jsx-onClick, importa cliente: components/ui/tabs.tsx, importa cliente: components/proPicks/EnhancedProPicksContent.tsx, importa cliente: components/proPicks/GemsView.tsx, importa cliente: components/proPicks/MonthlyRebalanceView.tsx, importa cliente: components/proPicks/StrategyFactsheet.tsx, importa cliente: components/proPicks/StrategySelector.tsx, importa cliente: components/proPicks/WalkForwardResults.tsx',
+  'components/proPicks/ProPicksTabs.tsx': 'useState, useEffect, jsx-onValueChange, jsx-onStrategyChange, jsx-onClick, importa cliente: components/ui/tabs.tsx, importa cliente: components/proPicks/EnhancedProPicksContent.tsx, dynamic (vistas de pestañas no iniciales diferidas: se descargan al abrir cada pestaña)',
   'components/proPicks/StrategySelector.tsx': 'useRouter, jsx-onValueChange, importa cliente: components/ui/select.tsx',
   'components/proPicks/TrackRecordView.tsx': 'useState, useEffect, jsx-onClick',
   'components/pwa/InstallApp.tsx': 'browser:window, useState, useEffect, jsx-onClick',

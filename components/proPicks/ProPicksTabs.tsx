@@ -1,24 +1,39 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { BarChart3, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import RadarGlobalView from './RadarGlobalView';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
-import GemsView from './GemsView';
-import DeepValueView from './DeepValueView';
-import PaperTradingView from './PaperTradingView';
-import MonthlyRebalanceView from './MonthlyRebalanceView';
-import StrategyFactsheet from './StrategyFactsheet';
-import TrackRecordView from './TrackRecordView';
-import StrategySelector from './StrategySelector';
-import WalkForwardResults from './WalkForwardResults';
-import DcaBacktestPanel from './DcaBacktestPanel';
 import { STRATEGY_CATALOG, mergeStrategies } from './monthlyRebalance';
 import { runWalkForwardBacktest, type WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
 import { generateProPicksForStrategy, type ProPick } from '@/lib/actions/proPicks.actions';
+
+// Las vistas de cada pestaña ya se montaban solo al abrirla (los TabsContent
+// de Radix no renderizan el panel inactivo), pero con imports estáticos su JS
+// viajaba igual en el bundle inicial de /propicks (~28 KB gz). Con dynamic
+// cada vista se descarga la primera vez que se abre su pestaña. «Selección IA»
+// se queda eager: es la pestaña inicial (LCP) y va montada siempre (forceMount)
+// para no perder la selección al cambiar de pestaña.
+const TabFallback = () => (
+    <Card aria-busy="true" className="flex items-center justify-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-10 text-gray-400">
+        <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-teal-400" />
+        <span>Cargando vista…</span>
+    </Card>
+);
+
+const RadarGlobalView = dynamic(() => import('./RadarGlobalView'), { loading: TabFallback });
+const GemsView = dynamic(() => import('./GemsView'), { loading: TabFallback });
+const DeepValueView = dynamic(() => import('./DeepValueView'), { loading: TabFallback });
+const PaperTradingView = dynamic(() => import('./PaperTradingView'), { loading: TabFallback });
+const MonthlyRebalanceView = dynamic(() => import('./MonthlyRebalanceView'), { loading: TabFallback });
+const StrategyFactsheet = dynamic(() => import('./StrategyFactsheet'), { loading: TabFallback });
+const TrackRecordView = dynamic(() => import('./TrackRecordView'), { loading: TabFallback });
+const StrategySelector = dynamic(() => import('./StrategySelector'), { loading: TabFallback });
+const WalkForwardResults = dynamic(() => import('./WalkForwardResults'), { loading: TabFallback });
+const DcaBacktestPanel = dynamic(() => import('./DcaBacktestPanel'), { loading: TabFallback });
 
 interface ProPicksTabsProps {
     strategies: Array<{ id: string; name: string; description: string }>;

@@ -88,20 +88,20 @@ describe('ProPicksTabs', () => {
         expect(generateProPicksForStrategy).not.toHaveBeenCalled();
     });
 
-    it('Joyas solo monta GemsView al abrirla, y la selección sigue montada pero oculta', () => {
+    it('Joyas solo monta GemsView al abrirla, y la selección sigue montada pero oculta', async () => {
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
         expect(screen.queryByText('vista-joyas')).not.toBeInTheDocument();
         openTab('Joyas');
-        expect(screen.getByText('vista-joyas')).toBeInTheDocument();
+        expect(await screen.findByText('vista-joyas')).toBeInTheDocument();
         const picksPanel = screen.getByTestId('picks').parentElement as HTMLElement;
         expect(picksPanel).toBeInTheDocument();
         expect(picksPanel).toHaveAttribute('hidden');
     });
 
-    it('Paper trading muestra su vista', () => {
+    it('Paper trading muestra su vista', async () => {
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
         openTab('Paper trading');
-        expect(screen.getByText('vista-paper')).toBeInTheDocument();
+        expect(await screen.findByText('vista-paper')).toBeInTheDocument();
     });
 
     it('Backtesting lanza el walk-forward una sola vez al abrirse y enseña el resultado', async () => {
@@ -109,8 +109,8 @@ describe('ProPicksTabs', () => {
         openTab('Backtesting');
         expect(await screen.findByText('walk-forward:12')).toBeInTheDocument();
         expect(runWalkForwardBacktest).toHaveBeenCalledTimes(1);
-        expect(screen.getByText('vista-track-record')).toBeInTheDocument();
-        expect(screen.getByText('panel-dca')).toBeInTheDocument();
+        expect(await screen.findByText('vista-track-record')).toBeInTheDocument();
+        expect(await screen.findByText('panel-dca')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Ejecutar backtest' })).toBeEnabled();
         // Cambiar de pestaña y volver no relanza la corrida.
         openTab('Joyas');
@@ -172,9 +172,9 @@ describe('ProPicksTabs', () => {
         generateProPicksForStrategy.mockReturnValueOnce(new Promise((r) => (resolve = r)));
         render(<ProPicksTabs strategies={strategies} initialPicks={[pick('INICIAL')]} generatedAt="2026-10-27" />);
         openTab('Estrategia y rebalanceo');
-        expect(screen.getByText('selector:adaptive')).toBeInTheDocument();
-        expect(screen.getByText('ficha:adaptive:Adaptativa:disponible')).toBeInTheDocument();
-        expect(screen.getByText(/^rebalanceo:adaptive:Adaptativa:loading::/)).toBeInTheDocument();
+        expect(await screen.findByText('selector:adaptive')).toBeInTheDocument();
+        expect(await screen.findByText('ficha:adaptive:Adaptativa:disponible')).toBeInTheDocument();
+        expect(await screen.findByText(/^rebalanceo:adaptive:Adaptativa:loading::/)).toBeInTheDocument();
         expect(generateProPicksForStrategy).toHaveBeenCalledWith('adaptive');
         await act(async () => resolve([pick('AAPL'), pick('MSFT')]));
         expect(await screen.findByText(/rebalanceo:adaptive:Adaptativa:ready:AAPL,MSFT:/)).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe('ProPicksTabs', () => {
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} generatedAt="2026-10-27" />);
         openTab('Estrategia y rebalanceo');
         await screen.findByText(/ready:ADA/);
-        fireEvent.click(screen.getByText('elegir-value'));
+        fireEvent.click(await screen.findByText('elegir-value'));
         await screen.findByText(/rebalanceo:value:Value:ready:VAL/);
         expect(generateProPicksForStrategy).toHaveBeenLastCalledWith('value');
         const calls = generateProPicksForStrategy.mock.calls.length;
@@ -205,7 +205,7 @@ describe('ProPicksTabs', () => {
             await screen.findByText(/rebalanceo:adaptive:Adaptativa:error::?.*No se pudieron cargar los picks de esta estrategia\./),
         ).toBeInTheDocument();
         generateProPicksForStrategy.mockResolvedValueOnce([pick('VAL')]);
-        fireEvent.click(screen.getByText('elegir-value'));
+        fireEvent.click(await screen.findByText('elegir-value'));
         expect(await screen.findByText(/rebalanceo:value:Value:ready:VAL:$/)).toBeInTheDocument();
     });
 
@@ -223,9 +223,9 @@ describe('ProPicksTabs', () => {
         expect(generateProPicksForStrategy).toHaveBeenCalledTimes(2);
     });
 
-    it('sin estrategias del servidor la ficha de la estrategia inicial queda sin datos', () => {
+    it('sin estrategias del servidor la ficha de la estrategia inicial queda sin datos', async () => {
         render(<ProPicksTabs strategies={[]} initialPicks={[]} />);
         openTab('Estrategia y rebalanceo');
-        expect(screen.getByText(/ficha:adaptive:.*:sin-datos/)).toBeInTheDocument();
+        expect(await screen.findByText(/ficha:adaptive:.*:sin-datos/)).toBeInTheDocument();
     });
 });
