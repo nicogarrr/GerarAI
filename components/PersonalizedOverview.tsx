@@ -31,6 +31,7 @@ import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-c
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { t } from '@/lib/i18n/t';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
+import HomeAttention from '@/components/HomeAttention';
 
 interface PersonalizedOverviewProps {
     userId: string;
@@ -523,6 +524,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 </CardContent>
             </Card>
 
+            <HomeAttention />
+
             {/* 2 · Alertas: la sección que faltaba en el inicio pese a existir /alerts. */}
             <Card className="bg-gray-800/50 border-gray-700">
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
@@ -631,7 +634,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Eye aria-hidden="true" className="h-5 w-5 text-yellow-400" />
-                        Watchlist
+                        Últimas añadidas
                     </CardTitle>
                     <Link href="/watchlist" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
                         <span className="whitespace-nowrap">Ver todo</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />

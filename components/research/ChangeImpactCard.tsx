@@ -18,7 +18,7 @@ export function ChangeImpactCard({ change, ticker, directionLabel, typeLabel }: 
   typeLabel: string;
 }) {
   return (
-    <div className="rounded-lg border border-gray-800 p-4">
+    <div id={`thesis-change-${change.id}`} className="scroll-mt-24 rounded-lg border border-gray-800 p-4">
       <div className="flex flex-wrap gap-2">
         <Badge>{directionLabel}</Badge>
         <Badge variant="outline">{typeLabel}</Badge>
