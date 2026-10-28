@@ -31,7 +31,7 @@ test('recovery respects canonical master listing, not naked Spanish US namesake'
 });
 test('unknown listing and missing company never reach quote provider', async () => {
   for (const company of [{ticker:'ALM',exchange:'UNKNOWN',currency:'EUR'}, {}]) {
-    const paths=serve(company);const r=await invoke('ALM');assert.equal(r.status,404);assert.equal(paths.length,1);
+    const paths=serve(company);const r=await invoke('ALM');assert.equal(r.status,200);assert.deepEqual(await r.json(),{status:'unavailable'});assert.equal(r.headers.get('Cache-Control'),'no-store');assert.equal(paths.length,1);
   }
 });
 test('master error is unavailable, not a fallback to US', async () => {
