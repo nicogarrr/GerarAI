@@ -124,6 +124,15 @@ def test_context_contains_only_evidence_texts(db):
     assert all(set(e) == {"id", "texto"} for e in payload["evidencias"])
 
 
+def test_request_uses_registered_prompt_and_traces_it(db):
+    from app.services import prompt_registry
+
+    request = svc.build_request(svc.load_theme_contexts(db)[0])
+    resolved = prompt_registry.get_prompt("bottleneck_discovery_service", allow_remote=False)
+    assert request.messages[0].content == resolved.text
+    assert request.metadata == resolved.trace_metadata()
+
+
 WORD_QUANTITIES = [
     "El precio de entrada es noventa y cinco por titulo y podria beneficiarse de la escasez.",
     "Fabrica obleas y registra ingresos de noventa por unidad, por lo que podria beneficiarse.",

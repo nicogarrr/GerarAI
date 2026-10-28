@@ -126,3 +126,25 @@ def test_mark_credit_exhausted_with_auth_required_writes_alerts(monkeypatch):
         assert len(alerts) == 2
         assert {alert.tenant_id for alert in alerts} == {1, 2}
     assert jev_availability.credit_status()["last_billing_failure_at"]
+
+
+def test_classify_free_request_uses_registered_prompt_and_traces_it(monkeypatch):
+    from app.services import jev_fallback, prompt_registry
+
+    seen = []
+
+    class Provider:
+        name = "fake"
+
+        async def generate_json(self, request, *, schema, schema_name):
+            seen.append(request)
+            return {"choice": "yes", "confidence": 0.9}
+
+    monkeypatch.setattr(jev_fallback, "create_llm_provider", lambda: Provider())
+    decision = asyncio.run(
+        jev_fallback.classify_free("texto", instructions="?", criteria={"yes": "si", "no": "no"})
+    )
+    assert decision is not None and decision.label == "yes"
+    resolved = prompt_registry.get_prompt("jev_fallback", allow_remote=False)
+    assert seen[0].messages[0].content == resolved.text
+    assert seen[0].metadata == resolved.trace_metadata()

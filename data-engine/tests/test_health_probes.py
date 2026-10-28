@@ -141,6 +141,16 @@ def test_ready_reports_ready_even_when_optional_probes_hang(monkeypatch):
         release.wait(timeout=10)
         return "ok"
 
+    # This regression isolates executor starvation, not database latency.
+    # Keep the required probe on its real executor and prove it ran off-loop.
+    required_threads: list[int] = []
+    caller_thread = threading.get_ident()
+
+    def _healthy_database(_settings) -> str:
+        required_threads.append(threading.get_ident())
+        return "ok"
+
+    monkeypatch.setattr(main_module, "_probe_database", _healthy_database)
     monkeypatch.setattr(main_module, "_probe_redis", _hang)
     monkeypatch.setattr(main_module, "_probe_qdrant", _hang)
     monkeypatch.setattr(main_module, "_probe_minio", _hang)
@@ -158,6 +168,7 @@ def test_ready_reports_ready_even_when_optional_probes_hang(monkeypatch):
         release.set()
 
     assert checks["database"] == "ok"
+    assert required_threads and required_threads[0] != caller_thread
     assert checks["redis"] == "error:TimeoutError"
 
 
