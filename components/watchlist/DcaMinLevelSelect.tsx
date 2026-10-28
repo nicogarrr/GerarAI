@@ -50,7 +50,7 @@ export default function DcaMinLevelSelect({ symbol, override, globalMinLevel }: 
         <Select value={value} onValueChange={handleChange} disabled={saving}>
             <SelectTrigger
                 aria-label={`Nivel mínimo de aviso DCA para ${symbol}`}
-                className="h-9 w-[150px] border-gray-700 bg-gray-800 text-xs text-gray-300"
+                className="min-h-11 w-[150px] border-gray-700 bg-gray-800 text-xs text-gray-300"
             >
                 <SelectValue>{labelFor(value)}</SelectValue>
             </SelectTrigger>
