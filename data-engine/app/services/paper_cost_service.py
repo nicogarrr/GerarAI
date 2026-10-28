@@ -69,4 +69,7 @@ def pnl_net(
     else:
         current = assumptions or current_assumptions()
         exit_fee = execution_fee(price, row.quantity, current)
-    return gross - row.entry_fee - exit_fee
+    # Dividendos devengados (DividendRecord con fuente); NULL = aun no computado
+    # en un trade nuevo o no computable en uno legado (cuyo neto ya es N/D por fees).
+    dividends = row.dividends_total if row.dividends_total is not None else Decimal(0)
+    return gross - row.entry_fee - exit_fee + dividends
