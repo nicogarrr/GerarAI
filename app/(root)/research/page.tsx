@@ -134,7 +134,7 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                                         className="text-xs text-gray-500"
                                         title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
                                     >
-                                        Cobertura {formatNumber(health?.score)}/100
+                                        Capas disponibles {formatNumber(health?.score)}/100
                                     </span>
                                 </>
                             ) : (
@@ -143,7 +143,7 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                                         className="text-xs text-gray-500"
                                         title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
                                     >
-                                        Cobertura {formatNumber(health?.score)}/100
+                                        Capas disponibles {formatNumber(health?.score)}/100
                                     </span>
                                     <span
                                         className="text-xs text-gray-500"
@@ -267,8 +267,9 @@ export default async function ResearchPage({
             />
 
             <Panel
-                title="Empresas con research"
+                title="Registro de empresas"
             >
+                <p className="mb-4 text-sm text-gray-400">Capas disponibles indica la presencia de documentos, hechos, tesis y modelo. No mide la fiabilidad de los datos ni garantiza que la empresa sea valorable.</p>
                 {ordered.length ? (
                     <>
                         <form action="/research" className="mb-4 flex flex-wrap items-center gap-2" method="get">

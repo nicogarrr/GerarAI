@@ -75,7 +75,7 @@ const RISK_LABELS: Record<string, string> = {
     margin_debt_base: 'Deuda de margen',
     sector_exposure: 'Exposición por sector',
     factor_exposure: 'Exposición por factor',
-    status: 'Estado',
+    status: 'Datos del cálculo',
     base_currency: 'Divisa base',
     cash_native: 'Caja en divisa original',
     missing_fx: 'Sin tipo de cambio para',
@@ -88,7 +88,7 @@ const RISK_LABELS: Record<string, string> = {
 };
 
 const RISK_STATUS_LABELS: Record<string, string> = {
-    ok: 'Correcto',
+    ok: 'Completos',
     incomplete_fx: 'Incompleto: faltan tipos de cambio',
     insufficient_data: 'Datos insuficientes',
     incomplete_valuation: 'Incompleto: valoración en suspenso',
@@ -295,6 +295,12 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
     };
     const positions = extractPositions(dashboard);
     const alerts = extractAlerts(dashboard);
+    const highAlerts = alerts.filter(alert => alert.severity === 'high').length;
+    const weightLabel = dashboard?.weight_basis === 'gross_equity'
+        ? 'Peso (valor bruto)'
+        : ['total_with_cash', 'with_cash'].includes(String(dashboard?.weight_basis))
+            ? 'Peso (con caja)'
+            : 'Peso (base no disponible)';
     // F43: misma regla que en el resumen - la divisa base viene del dashboard.
     const baseCurrency = dashboard && typeof dashboard.base_currency === 'string' && dashboard.base_currency
         ? dashboard.base_currency
@@ -302,15 +308,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
 
     return (
         <div className="grid gap-6">
-            <RecordDetail
-                title="Exposiciones de cartera"
-                icon={<Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />}
-                record={humanizeRiskDashboard(headlineRecord(dashboard))}
-                fetchRecord={refreshDashboard}
-                maxKeys={32}
-                hiddenKeys={['trace']}
-                emptyMessage="No hay métricas de riesgo disponibles. Comprueba que tu cartera tiene posiciones."
-            />
+
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
                 <CardHeader className="border-b border-gray-700/50 pb-4">
@@ -320,6 +318,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                             <CardTitle className="text-lg font-semibold text-gray-100">
                                 Alertas de concentración y liquidez
                             </CardTitle>
+                            {highAlerts > 0 ? <p className="mt-1 text-sm text-amber-300">{highAlerts} {highAlerts === 1 ? 'alerta alta' : 'alertas altas'}</p> : null}
                         </div>
                     </div>
                 </CardHeader>
@@ -345,6 +344,16 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                     )}
                 </CardContent>
             </Card>
+
+            <RecordDetail
+                title="Exposiciones de cartera"
+                icon={<Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />}
+                record={humanizeRiskDashboard(headlineRecord(dashboard))}
+                fetchRecord={refreshDashboard}
+                maxKeys={32}
+                hiddenKeys={['trace']}
+                emptyMessage="No hay métricas de riesgo disponibles. Comprueba que tu cartera tiene posiciones."
+            />
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-gray-700/50 pb-4">
@@ -380,7 +389,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                             <TableHead className="text-xs font-semibold uppercase text-gray-500">Nombre</TableHead>
                                             <TableHead className="text-xs font-semibold uppercase text-gray-500">Sector</TableHead>
                                             <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Valor</TableHead>
-                                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Peso (con caja)</TableHead>
+                                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{weightLabel}</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -423,7 +432,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                                 <dd className="break-words text-right text-sm text-gray-200">{positionValueText(position, baseCurrency)}</dd>
                                             </div>
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">Peso (con caja)</dt>
+                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{weightLabel}</dt>
                                                 <dd className="break-words text-right text-sm font-semibold text-gray-100">{weightText(position)}</dd>
                                             </div>
                                         </dl>
