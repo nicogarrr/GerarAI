@@ -20,7 +20,9 @@ test("la tesis impresa conserva su cabecera y no lleva chrome de la app", async 
   if (hasArticle) {
     await expect(page.getByText("Tesis de inversión", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "PDF" })).toBeHidden();
-    for (const badge of await page.locator('.thesis-meta-badge').all()) {
+    const badges = page.locator('.thesis-meta-badge');
+    expect(await badges.count()).toBeGreaterThan(0);
+    for (const badge of await badges.all()) {
       await expect(badge).toHaveCSS('color', 'rgb(17, 17, 17)');
       await expect(badge).toHaveCSS('-webkit-text-fill-color', 'rgb(17, 17, 17)');
       await expect(badge).toHaveCSS('opacity', '1');
