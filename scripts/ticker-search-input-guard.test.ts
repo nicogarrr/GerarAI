@@ -36,7 +36,7 @@ describe('buscador de ticker unificado (autocompletado inline)', () => {
     it('los consumidores lo usan (insider, alertas, cartera) sin inputs de ticker planos duplicados', () => {
         const insider = readFileSync('components/insider/InsiderSignalsView.tsx', 'utf8');
         const alerts = readFileSync('components/alerts/AlertsManager.tsx', 'utf8');
-        const cartera = readFileSync('components/portfolio/AddTransactionButton.tsx', 'utf8');
+        const cartera = readFileSync('components/portfolio/AddTransactionButton.tsx', 'utf8') + readFileSync('components/portfolio/AddTransactionDialog.tsx', 'utf8');
         assert.ok(insider.includes("from '@/components/search/TickerSearchInput'"), 'Form 4 lo usa');
         assert.ok(alerts.includes("from '@/components/search/TickerSearchInput'"), 'crear alerta lo usa');
         assert.ok(cartera.includes("from '@/components/search/TickerSearchInput'"), 'añadir inversión lo usa');
