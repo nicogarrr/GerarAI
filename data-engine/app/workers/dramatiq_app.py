@@ -1907,6 +1907,51 @@ def refresh_propicks_prices(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000)
+def refresh_valuation_metrics(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Metricas de valoracion (P/B, yield TTM) de todo el universo del tenant.
+
+    Corre tras los cierres oficiales; mismo patron de lease que
+    refresh_propicks_prices. Las fuentes (yfinance/Finnhub) son las por
+    defecto del servicio; en tests se inyectan fixtures.
+    """
+    from app.services.valuation_metrics_service import (
+        refresh_valuation_metrics as _refresh,
+    )
+
+    db = _session(tenant_id, user_id)
+    try:
+        lease = acquire_job_lease(
+            f"refresh_valuation_metrics:{tenant_id}",
+            ttl_seconds=3600,
+            redis_url=_lease_redis_url(),
+        )
+    except Exception:
+        db.close()
+        raise
+    if lease is None:
+        db.close()
+        return {
+            "status": "skipped",
+            "actor": "refresh_valuation_metrics",
+            "reason": "lease_held",
+        }
+    try:
+        result = _refresh(db)
+        return {"actor": "refresh_valuation_metrics", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("refresh_valuation_metrics", exc, tenant_id=tenant_id)
+    finally:
+        release_job_lease(
+            f"refresh_valuation_metrics:{tenant_id}", lease, redis_url=_lease_redis_url()
+        )
+        db.close()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000)
 def run_propicks_funnel(
     tenant_id: int | None = None,
     user_id: str | None = None,

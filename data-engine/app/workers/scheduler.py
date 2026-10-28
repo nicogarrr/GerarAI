@@ -46,6 +46,7 @@ from app.workers.dramatiq_app import (
     refresh_rss_feeds,
     refresh_sec_filings,
     refresh_ticker_news,
+    refresh_valuation_metrics,
     review_theses,
     run_daily_research,
     run_propicks_funnel,
@@ -497,6 +498,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day_of_week="mon-fri",
         hour=22,
         minute=40,
+    )
+    # Metricas de valoracion (P/B, yield TTM) de todo el universo, tras los
+    # cierres oficiales de las 22:30 UTC para usar el close del dia asentado.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, refresh_valuation_metrics),
+        "cron",
+        job_id="valuation_metrics_daily",
+        hour=22,
+        minute=50,
+        jitter=300,
     )
     # PDMR UK (tracefour, 60 req/h/IP): 1 GET por corrida cada 6 h basta y sobra.
     _register(
