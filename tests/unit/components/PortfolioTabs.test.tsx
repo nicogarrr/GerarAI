@@ -11,8 +11,10 @@ vi.mock('next/dynamic', () => ({
     // sustituido por un stub ligero con los props que asertan los tests.
     default: (loader: () => Promise<{ default: any }>, opts?: { ssr?: boolean }) => {
         if (opts?.ssr === false) {
-            return (props: { data: unknown[]; positive: boolean; currency: string }) =>
+            const NavChartStub = (props: { data: unknown[]; positive: boolean; currency: string }) =>
                 <div data-testid="nav-chart" data-points={props.data.length} data-positive={String(props.positive)} data-currency={props.currency} />;
+            NavChartStub.displayName = "NavChartStub";
+            return NavChartStub;
         }
         let Comp: any = null;
         void loader().then((mod) => { Comp = mod.default; });
