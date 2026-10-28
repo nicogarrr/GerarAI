@@ -53,6 +53,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import (
+    FxConversion,
     Company,
     Position,
     TaxReport,
@@ -68,7 +69,15 @@ from app.services.tax_irpf_filing import (
     build_loss_compensation,
 )
 from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
-from app.services.currency_ledger import compute_currency_ledger, lots_from_sales
+from app.services.currency_ledger import (
+    COMPUTED,
+    CRITERION,
+    INCOMPLETE,
+    SOURCES,
+    Conversion,
+    compute_currency_ledger,
+    lots_from_sales,
+)
 from app.valuation.currency import normalize_currency
 
 FIFO_METHOD = "fifo"
@@ -609,7 +618,7 @@ class TaxReportService:
         self.fx = PortfolioFXService()
         self.settings = get_settings()
 
-    def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None, fx_conversions=None) -> dict:
+    def compute_report(self, db: Session, fiscal_year: int, include_filing: bool = True, tme: Decimal | None = None, fx_conversions=None, fx_opening_complete: bool = False) -> dict:
         # IRPF y Modelo 720 se declaran SIEMPRE en euros al tipo del BCE de la
         # fecha de cada operacion, sea cual sea la divisa base de la cartera
         # (EUR, USD...). La divisa base es una preferencia de visualizacion;
@@ -1059,16 +1068,8 @@ class TaxReportService:
             (Decimal(str(b["blocked_loss_base"] or 0)) for b in realized), Decimal("0")
         )
 
-        # Libro de divisas (DGT V2466-08, V0234-07, V0282-22): sin
-        # conversiones reales como entrada queda "no calculado", nunca 0.
-        _ledger_lots = lots_from_sales(
-            {**sale, "date": date.fromisoformat(sale["date"])}
-            for b in realized
-            if (b.get("currency") or base_currency) != base_currency
-            for sale in b.get("sales", [])
-        )
-        currency_ledger = compute_currency_ledger(
-            _ledger_lots, fx_conversions, date(fiscal_year, 1, 1), date(fiscal_year, 12, 31)
+        currency_ledger = self._currency_ledger(
+            db, tx_rows, resolve_rate, base_currency, start, end, fx_conversions, fx_opening_complete
         )
 
         summary = {
@@ -1153,6 +1154,109 @@ class TaxReportService:
         if include_filing:
             data["filing"] = self._build_filing(db, fiscal_year, data, tme=tme)
         return data
+
+    def _currency_ledger(
+        self, db, tx_rows, resolve_rate, base_currency, start, end, fx_conversions, opening_complete
+    ) -> dict:
+        """Libro de divisas por divisa (DGT V2466-08, V0234-07, V0282-22).
+
+        Conversiones: argumento explicito o tabla ``fx_conversions`` (Flex
+        Trades CASH). Sin ellas, "no calculado". Flujos de divisa que el libro
+        aun no modela (compras de valores, dividendos, intereses y comisiones
+        en esa divisa) hacen el resultado ``incomplete``, no un numero.
+        """
+        if fx_conversions is None:
+            stored = db.scalars(
+                select(FxConversion)
+                .where(FxConversion.trade_date <= end)
+                .order_by(FxConversion.trade_date, FxConversion.id)
+            ).all()
+            raw = [
+                (c.trade_date, c.disposed_currency, c.disposed_amount, c.acquired_currency, f"fx#{c.id}")
+                for c in stored
+            ]
+        else:
+            raw = [(c.converted_on, "USD", c.amount, base_currency, c.ref) for c in fx_conversions]
+            explicit_rates = {c.converted_on: c.ecb_rate for c in fx_conversions}
+        if not raw:
+            return compute_currency_ledger([], [], start, end)
+        by_currency: dict[str, list] = {}
+        unsupported: list[str] = []
+        for day, disposed, amount, acquired, ref in raw:
+            disposed = (disposed or "").upper()
+            if disposed == base_currency:
+                continue  # comprar divisa con EUR: no es transmision de divisa extranjera
+            if (acquired or "").upper() != base_currency:
+                unsupported.append(f"{disposed}->{(acquired or '?').upper()} {day}")
+                by_currency.setdefault(disposed, [])
+                continue
+            rate = (
+                explicit_rates.get(day)
+                if fx_conversions is not None
+                else resolve_rate(disposed, day)
+            )
+            by_currency.setdefault(disposed, []).append(Conversion(day, Decimal(str(amount)), rate, ref))
+        results = []
+        all_events = {}
+        for transaction, company in tx_rows:
+            if company is not None:
+                all_events.setdefault(company.ticker, []).append(transaction)
+        for currency, conversions in sorted(by_currency.items()):
+            sales = []
+            unmodeled = 0
+            for events in all_events.values():
+                if not any((t.currency or "").upper() == currency for t in events):
+                    continue
+                _, hist = replay_tax_fifo(events, resolve_rate, date.min, end)
+                sales += [
+                    {
+                        "date": e["transaction"].trade_date,
+                        "proceeds_native": e["proceeds_native"],
+                        "proceeds_base": e["proceeds_base"],
+                        "ref": f"sale#{e['transaction'].id}",
+                    }
+                    for e in hist
+                    if (e["transaction"].currency or "").upper() == currency
+                ]
+            for transaction, company in tx_rows:
+                if (transaction.currency or "").upper() != currency:
+                    continue
+                action = (transaction.action or "").lower()
+                if action in BUY_ACTIONS or is_cash_action(action) or any(
+                    k in action for k in ("dividend", "withholding", "interest", "fee")
+                ):
+                    unmodeled += 1
+            result = compute_currency_ledger(
+                lots_from_sales(sales), conversions, start, end, opening_complete=opening_complete
+            )
+            if unmodeled and result["status"] == COMPUTED:
+                result["status"] = INCOMPLETE
+                result["gain_base"] = None
+            if unmodeled:
+                result["reason"] = "; ".join(
+                    filter(None, [result["reason"], f"{unmodeled} flujos en {currency} sin modelar (compras, dividendos, intereses o comisiones)"])
+                )
+            results.append(result)
+        if unsupported:
+            for r in results:
+                r["status"], r["gain_base"] = INCOMPLETE, None
+                r["reason"] = "; ".join(filter(None, [r["reason"], "cambios a otra divisa distinta de EUR no soportados: " + ", ".join(unsupported)]))
+        if not results:
+            return compute_currency_ledger([], [], start, end)
+        worst = (
+            COMPUTED
+            if all(r["status"] == COMPUTED for r in results)
+            else INCOMPLETE
+        )
+        return {
+            "criterion": CRITERION,
+            "status": worst,
+            "gain_base": float(sum(Decimal(str(r["gain_base"])) for r in results)) if worst == COMPUTED else None,
+            "reason": "; ".join(dict.fromkeys(r["reason"] for r in results if r["reason"])) or None,
+            "rows": [row for r in results for row in r["rows"]],
+            "unconverted": None,
+            "sources": list(SOURCES),
+        }
 
     def _build_filing(self, db: Session, fiscal_year: int, data: dict, tme: Decimal | None = None) -> dict:
         """Capa de declaracion IRPF (casillas Modelo 100 + doble imposicion).
@@ -1302,9 +1406,9 @@ class TaxReportService:
         data["versioning"] = report_versioning(data["summary"], persisted=False)
         return data
 
-    def regenerate_report(self, db: Session, fiscal_year: int) -> dict:
+    def regenerate_report(self, db: Session, fiscal_year: int, fx_opening_complete: bool = False) -> dict:
         """Recalcula y PERSISTE el informe del ejercicio (camino POST)."""
-        data = self.compute_report(db, fiscal_year)
+        data = self.compute_report(db, fiscal_year, fx_opening_complete=fx_opening_complete)
         portfolio = self.fx.ensure_portfolio(db)
         report = db.scalar(
             select(TaxReport).where(TaxReport.fiscal_year == fiscal_year)

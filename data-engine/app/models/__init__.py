@@ -46,6 +46,7 @@ from app.models.entities import (
     FXRate,
     InferredInput,
     InsiderFiling,
+    FxConversion,
     InsiderTransaction,
     InvestmentCaseStudy,
     InvestmentPlan,
@@ -113,6 +114,7 @@ from app.models.entities import (
 __all__ = [
     "WorkflowStepRun",
     "WorkflowRun",
+    "FxConversion",
     "InsiderTransaction",
     "ITUNotice",
     "InsiderFiling",
