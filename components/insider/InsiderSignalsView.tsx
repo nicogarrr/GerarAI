@@ -146,6 +146,12 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 fetched.push(...next.filings);
             }
             setExtraFilings((current) => [...current, ...fetched]);
+            if (filings.length + fetched.length < needed) {
+                // El total puede estar desactualizado: no avanzar a una página
+                // incompleta ni confundir una respuesta vacía con éxito.
+                setFilingsError(true);
+                return;
+            }
             setFilingsPage(page);
         } catch {
             // La página no cambia: se queda la actual y se avisa.

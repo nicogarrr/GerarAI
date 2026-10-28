@@ -8,6 +8,7 @@ const route = readFileSync('data-engine/app/api/routes/insider.py', 'utf8');
 
 test('filings persistidos: paginación numerada, total honesto y sin recorte silencioso a 10', () => {
   assert.doesNotMatch(view, /filings\.slice\(0, 10\)/);
+  assert.match(view, /FILINGS_PAGE_SIZE = 20/, '20 filings por página');
   assert.doesNotMatch(view, /Cargar más/, 'Nico 2026-10-28: paginación, no «Cargar más»');
   assert.match(view, /<Pagination[\s\S]*?label="Filings persistidos"/);
   assert.match(view, /de \{filingsTotal\}/);
