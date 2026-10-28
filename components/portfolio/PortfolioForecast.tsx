@@ -3,7 +3,7 @@ import type {
   PortfolioForecastExcluded,
 } from '@/lib/actions/portfolio.actions';
 import Link from 'next/link';
-import { formatMarketDate } from '@/lib/format';
+import { formatMarketDate, formatCountEs } from '@/lib/format';
 import { Panel } from '@/components/ui/panel';
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -136,7 +136,7 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
           )}
         </p>
         <p className="mt-1 text-xs text-gray-500">
-          {noThesis.length} de {portfolio.position_count} posiciones sin tesis publicada vigente (un borrador no cuenta)
+          {noThesis.length} de {formatCountEs(portfolio.position_count, 'posición', 'posiciones')} sin tesis publicada vigente (un borrador no cuenta)
           {others > 0 ? `; ${others} sin comparación verificada por otro motivo (ver detalle)` : ''}.
         </p>
         {others > 0 ? <ExcludedList items={forecast.excluded.filter((item) => item.reason_code !== 'no_published_thesis')} /> : null}
@@ -184,7 +184,7 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
       </div>
       <Panel
         title="Por posición"
-        description={`Cobertura: ${portfolio.covered_weight !== null ? pct(portfolio.covered_weight) : 'N/D (hay posiciones sin conversión; pesos sobre el subset valorado)'} de la cartera con tesis computable (${portfolio.covered_count} de ${portfolio.position_count} posiciones).`}
+        description={`Cobertura: ${portfolio.covered_weight !== null ? pct(portfolio.covered_weight) : 'N/D (hay posiciones sin conversión; pesos sobre el subset valorado)'} de la cartera con tesis computable (${portfolio.covered_count} de ${formatCountEs(portfolio.position_count, 'posición', 'posiciones')}).`}
       >
         <div className="overflow-x-auto" role="region" aria-label="Contribuciones por posición" tabIndex={0}>
           <table className="w-full text-left text-sm">
@@ -228,7 +228,7 @@ export default function PortfolioForecast({ forecast }: { forecast: PortfolioFor
                   </td>
                   <td className="py-2 text-xs text-gray-500">
                     Precio {item.price_source} · <Veracity value={item.price_veracity} /> · {formatMarketDate(item.price_as_of)} · tesis v{item.thesis_version} ({item.thesis_status})
-                    {item.model_version !== null ? ` · modelo v${item.model_version}` : ''} · {item.horizon_years} años
+                    {item.model_version !== null ? ` · modelo v${item.model_version}` : ''} · {formatCountEs(item.horizon_years, 'año', 'años')}
                   </td>
                 </tr>
               ))}

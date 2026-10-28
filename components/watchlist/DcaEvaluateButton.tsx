@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { formatCountEs } from '@/lib/format';
 import { useRouter } from 'next/navigation';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,7 +20,7 @@ export default function DcaEvaluateButton() {
             const res = await evaluateDcaSignalsNow();
             if (res.success && res.summary) {
                 const { evaluated, alerted, skipped } = res.summary;
-                const parts = [`${evaluated} evaluados`, `${alerted.length} avisos nuevos`];
+                const parts = [formatCountEs(evaluated, 'evaluado', 'evaluados'), formatCountEs(alerted.length, 'aviso nuevo', 'avisos nuevos')];
                 if (skipped.length > 0) parts.push(`${skipped.length} sin datos suficientes`);
                 toast.success(`Señales DCA actualizadas: ${parts.join(' · ')}`);
                 router.refresh();

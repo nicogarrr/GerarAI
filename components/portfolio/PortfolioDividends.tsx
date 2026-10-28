@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { PortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
-import { formatMoney, formatDate, formatPrice } from '@/lib/format';
+import { formatMoney, formatDate, formatPrice, formatCountEs } from '@/lib/format';
 import SyncDividendsButton from '@/components/portfolio/SyncDividendsButton';
 import { Panel } from '@/components/ui/panel';
 import {
@@ -164,7 +164,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                 en «Supuestos fiscales y fuentes» y en el aviso junto al bruto. */}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                 <span>
-                    Proyección a {projection.horizon_months} meses · datos al {formatDate(projection.as_of)}
+                    Proyección a {formatCountEs(projection.horizon_months, 'mes', 'meses')} · datos al {formatDate(projection.as_of)}
                 </span>
             </div>
 
@@ -215,7 +215,7 @@ export default function PortfolioDividends({ projection, userId }: { projection:
                     >
                         {activeMonths.length === 0 ? (
                             <p className="text-sm text-gray-400">
-                                Ningún pago proyectado en los próximos {projection.horizon_months} meses con los datos registrados.
+                                Ningún pago proyectado en {projection.horizon_months === 1 ? 'el próximo mes' : `los próximos ${formatCountEs(projection.horizon_months, 'mes', 'meses')}`} con los datos registrados.
                             </p>
                         ) : (
                             <div className="overflow-x-auto" role="region" aria-label="Proyección mes a mes" tabIndex={0}>

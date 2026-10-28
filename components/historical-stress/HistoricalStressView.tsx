@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { HistoricalStressReport, StressWindow } from '@/types/historical-stress';
-import { formatPercent, formatMarketDate } from '@/lib/format';
+import { formatPercent, formatMarketDate, formatCountEs } from '@/lib/format';
 
 const day = (value?: string | null) => value ? formatMarketDate(value) : 'Sin datos';
 
@@ -28,7 +28,7 @@ function WindowCard({ window }: { window: StressWindow }) {
                 <div className="flex justify-between gap-2"><dt className="text-gray-400">Pico / mínimo</dt><dd className="text-right">{day(window.peak_date)}<br />{day(window.trough_date)}</dd></div>
                 <div className="flex justify-between gap-2"><dt className="text-gray-400">Recuperación desde el pico</dt><dd className="text-right"><span className="whitespace-nowrap">{window.recovery_date ? `${window.recovery_days} días` : window.recovery_status === 'history_gaps' ? 'Sin verificar: huecos' : 'No recuperado'}</span><br /><span className="whitespace-nowrap">{window.recovery_date ? day(window.recovery_date) : `Hasta ${day(window.last_observation)}`}</span></dd></div>
             </dl>
-            <p className="mt-4 border-t border-gray-800 pt-3 text-xs text-gray-500">{day(window.start_date)} a {day(window.end_date)} · {window.observations} sesiones</p>
+            <p className="mt-4 border-t border-gray-800 pt-3 text-xs text-gray-500">{day(window.start_date)} a {day(window.end_date)} · {formatCountEs(window.observations ?? 0, 'sesión', 'sesiones')}</p>
         </>}
     </article>;
 }

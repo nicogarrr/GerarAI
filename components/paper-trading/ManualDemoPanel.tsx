@@ -10,7 +10,7 @@ import { FxTicket } from './FxTicket';
 import { LedgerTable } from './LedgerTable';
 import { OrderTicket } from './OrderTicket';
 import { PositionsTable } from './PositionsTable';
-import { formatMoney } from '@/lib/format';
+import { formatMoney, formatCountEs } from '@/lib/format';
 import { valuationMatches, type DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, HistoryPageResult, HistoryRow, SubmitFill, SubmitFx } from './submit';
 
@@ -62,7 +62,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
     return (
         <div className="mb-3 space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-300">
             <p>
-                Valoradas {valuation.coverage.valued} de {valuation.coverage.total} posiciones con cotización del proveedor.
+                Valoradas {valuation.coverage.valued} de {formatCountEs(valuation.coverage.total, 'posición', 'posiciones')} con cotización del proveedor.
                 {valuation.totals.length > 0 ? ' Los totales suman solo las valoradas, por divisa:' : ' Sin totales: ninguna posición tiene cotización.'}
             </p>
             {valuation.totals.length > 0 ? (

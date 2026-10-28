@@ -220,7 +220,7 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         const asOf = Date.UTC(2026, 9, 27, 16, 30);
         setup({ account: accountView({ positions: [pos] }), valuation: valuationFor(pos), valuationAsOf: asOf });
         openTab('Posiciones');
-        expect(byTextContent('P', /^Valoradas 1 de 1 posiciones con cotización del proveedor\./)).toBeInTheDocument();
+        expect(byTextContent('P', /^Valoradas 1 de 1 posición con cotización del proveedor\./)).toBeInTheDocument();
         expect(byTextContent('LI', `USD: valor ${formatMoney(500, 'USD')}`)).toBeInTheDocument();
         const asOfFormat = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
         expect(document.body.textContent).toContain(`consultado a las ${asOfFormat.format(new Date(asOf))} (hora de Madrid)`);
@@ -256,12 +256,12 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         expect(screen.getByText(/Valoración no disponible todavía/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Consultar cotizaciones' }));
         await flush();
-        expect(byTextContent('P', /^Valoradas 1 de 1 posiciones/)).toBeInTheDocument();
+        expect(byTextContent('P', /^Valoradas 1 de 1 posición/)).toBeInTheDocument();
         refreshValuation.mockResolvedValue({ ok: false, error: 'cuota agotada' });
         fireEvent.click(screen.getByRole('button', { name: 'Actualizar cotizaciones' }));
         await flush();
         expect(screen.getByRole('alert')).toHaveTextContent('No se pudieron actualizar las cotizaciones: cuota agotada');
-        expect(byTextContent('P', /^Valoradas 1 de 1 posiciones/)).toBeInTheDocument();
+        expect(byTextContent('P', /^Valoradas 1 de 1 posición/)).toBeInTheDocument();
     });
 
     it('reconsulta sola cada 60 s con la pestaña visible y posiciones, con backoff exponencial tras fallos', async () => {

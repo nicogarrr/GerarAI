@@ -14,7 +14,7 @@ import { getTaxHoldings, getTaxReport, regenerateTaxReport } from '@/lib/actions
 import { FilingSection, Modelo720Section } from '@/components/taxes/FilingSections';
 import { recordDetailKey } from '@/components/taxes/record-detail-key';
 import { reportForYear, type ReportOverride } from '@/lib/taxes/report-state';
-import { formatUserDateTime, formatMoney, formatNumber, isValidCurrencyCode, NA, USER_TZ } from '@/lib/format';
+import { formatUserDateTime, formatMoney, formatNumber, isValidCurrencyCode, NA, USER_TZ, formatCountEs } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { showErrorToast } from '@/lib/toast';
 import { toast } from 'sonner';
@@ -433,7 +433,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             />
             {holdingPages > 1 && <nav aria-label="Páginas de posiciones fiscales" className="flex items-center justify-between gap-2">
                 <Button size="sm" variant="outline" disabled={currentHoldingPage === 0} onClick={() => setHoldingPage(currentHoldingPage - 1)}>Anterior</Button>
-                <span className="text-xs text-gray-400">{currentHoldingPage + 1} / {holdingPages} · {initialHoldings.length} posiciones</span>
+                <span className="text-xs text-gray-400">{currentHoldingPage + 1} / {holdingPages} · {formatCountEs(initialHoldings.length, 'posición', 'posiciones')}</span>
                 <Button size="sm" variant="outline" disabled={currentHoldingPage + 1 >= holdingPages} onClick={() => setHoldingPage(currentHoldingPage + 1)}>Siguiente</Button>
             </nav>}
         </div>

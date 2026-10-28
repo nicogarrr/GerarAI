@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { RecordList } from '@/components/data/RecordViews';
 import TmePreviewForm from '@/components/taxes/TmePreviewForm';
-import { formatUserDate } from '@/lib/format';
+import { formatUserDate, formatCountEs } from '@/lib/format';
 import { Landmark, FileDown, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatMoney, NA } from '@/lib/format';
@@ -336,8 +336,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
                     {file720.available === true ? (
                         <div className="space-y-3">
                             <p className="text-sm text-gray-400">
-                                Borrador de fichero generado ({String(file720.detail_records)} registros de
-                                detalle
+                                Borrador de fichero generado ({formatCountEs(Number(file720.detail_records), 'registro de detalle', 'registros de detalle')}
                                 {typeof file720.record_length === 'number' ? ` de ${String(file720.record_length)} bytes` : ''}
                                 {typeof file720.encoding === 'string' ? `, en ${file720.encoding}` : ''}). Es el
                                 contenido real que produce el generador, no una estimación: puedes descargarlo y

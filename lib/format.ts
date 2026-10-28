@@ -359,6 +359,15 @@ export function formatPercent(
  * call sites existentes; para fechas con zona definida usa `formatUserDate`
  * o `formatMarketDate`.
  */
+/**
+ * Conteo con concordancia es-ES: formatCountEs(1, 'posición', 'posiciones')
+ * -> «1 posición»; formatCountEs(5, 'posición', 'posiciones') ->
+ * «5 posiciones». El número lleva separador de miles es-ES.
+ */
+export function formatCountEs(value: number, singular: string, pluralForm: string): string {
+  return `${formatNumber(value, { maximumFractionDigits: 0 })} ${value === 1 ? singular : pluralForm}`;
+}
+
 export function formatDate(
   value: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
