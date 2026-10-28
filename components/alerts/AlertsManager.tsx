@@ -10,7 +10,7 @@ import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
 // Espejo de la validación de createAlert (lib/actions/alerts.actions.ts).
 const ALERT_SYMBOL_PATTERN = /^[A-Z0-9.\-]{1,20}$/;
 
-import { createAlert, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
+import { createAlertResult, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
 import { parseLocalizedNumber } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
@@ -168,7 +168,7 @@ function AlertsManager() {
                 : (parsedValue as number);
 
             setCreating(true);
-            await createAlert({
+            const result = await createAlertResult({
                 ...formData,
                 condition: {
                     ...formData.condition,
@@ -185,6 +185,13 @@ function AlertsManager() {
                     value: numericValue,
                 },
             });
+            if (!result.ok) {
+                // Rechazo de negocio (símbolo inexistente, duplicada): su
+                // mensaje, sin «reintenta» ni cerrar el diálogo.
+                if (result.cause === 'duplicate') toast.info(result.message);
+                else toast.error(result.message);
+                return;
+            }
             toast.success('Alerta creada');
 
             setOpen(false);

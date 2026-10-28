@@ -102,6 +102,46 @@ export async function createAlert(input: CreateAlertInput): Promise<Alert> {
     return toAlert(alert);
 }
 
+export type CreateAlertResult =
+    | { ok: true; alert: Alert }
+    | { ok: false; cause: 'validation' | 'duplicate'; message: string };
+
+/**
+ * Alta de alerta con los rechazos de negocio como RESULTADO, no como throw.
+ *
+ * Bug (suite E2E de flujos, 28-oct-2026): un símbolo con formato válido pero
+ * inexistente (ZZZQX) llega al backend, que responde 422 «Símbolo no
+ * reconocido: ZZZQX. Comprueba que exista en bolsa.». Lanzado desde la server
+ * action salía como POST /alerts 500 y, en producción, Next enmascara el
+ * mensaje («An error occurred in the Server Components render…»): el
+ * cliente lo clasificaba como motor caído y pedía «reintenta en unos
+ * segundos» para un símbolo que nunca va a existir. Un 4xx de negocio viaja
+ * ahora como dato serializable con su mensaje en español; lo demás (motor
+ * caído, sesión) sigue lanzando.
+ */
+export async function createAlertResult(input: CreateAlertInput): Promise<CreateAlertResult> {
+    try {
+        return { ok: true, alert: await createAlert(input) };
+    } catch (error) {
+        if (isNextRedirectError(error)) throw error;
+        if (error instanceof AppError) {
+            if (error.code === 'VALIDATION_ERROR') {
+                return { ok: false, cause: 'validation', message: error.message };
+            }
+            if (error.code === 'RESEARCH_API_ERROR' && error.statusCode === 409) {
+                return { ok: false, cause: 'duplicate', message: 'Ya tienes esta alerta configurada.' };
+            }
+            if (error.code === 'RESEARCH_API_ERROR' && [400, 404, 422].includes(error.statusCode)) {
+                const message = error.statusCode === 404
+                    ? `Símbolo no reconocido: ${input.symbol.trim().toUpperCase()}. Comprueba que exista en bolsa.`
+                    : error.message;
+                return { ok: false, cause: 'validation', message };
+            }
+        }
+        throw error;
+    }
+}
+
 /**
  * Claves de caché con alcance de usuario: la caché vive en memoria del
  * servidor Next, así que una clave global ("alerts:user:active") podría

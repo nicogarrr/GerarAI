@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }));
 vi.mock('@/lib/actions/alerts.actions', () => ({
-    createAlert: vi.fn(), deleteAlert: vi.fn(),
+    createAlert: vi.fn(), createAlertResult: vi.fn(async () => ({ ok: true, alert: {} })), deleteAlert: vi.fn(),
     getUserAlertsResult: vi.fn(async () => ({
         ok: true,
         alerts: [
