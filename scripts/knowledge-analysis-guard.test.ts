@@ -60,7 +60,7 @@ describe('atajos y sugeridas', () => {
 });
 
 describe('componente y acción', () => {
-  const chat = source('components/brain/GlobalBrain.tsx');
+  const chat = source('components/brain/GlobalBrain.tsx') + source('components/brain/GlobalBrainPanel.tsx');
   const action = source('lib/actions/knowledge-chat.actions.ts');
   it('el modo normal sigue siendo el predeterminado', () => {
     assert.ok(action.includes("mode: 'respuesta' | 'analisis' = 'respuesta'"));
