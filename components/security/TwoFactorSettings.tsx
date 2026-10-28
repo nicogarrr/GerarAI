@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import dynamic from 'next/dynamic';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
@@ -11,6 +11,15 @@ import {
     disableTwoFactor,
     enableTwoFactorTotp,
 } from '@/lib/actions/auth.actions';
+
+// qrcode.react (~10 KB gz) solo se usa al activar 2FA, no al abrir /security:
+// el QR se pinta tras enviar la contraseña, así que carga diferido. El chunk
+// se precarga al enviar el formulario de activación: baja en paralelo con la
+// server action y el QR aparece sin espera extra.
+const loadQrCode = () => import('qrcode.react').then((mod) => mod.QRCodeSVG);
+const QRCodeSVG = dynamic(loadQrCode, {
+    loading: () => <span className="block h-[160px] w-[160px] animate-pulse rounded bg-gray-200" aria-hidden="true" />,
+});
 
 type Props = {
     initiallyEnabled: boolean;
@@ -46,6 +55,8 @@ export default function TwoFactorSettings({ initiallyEnabled }: Props) {
 
     const handleEnable = async ({ password }: PasswordForm) => {
         setBusy(true);
+        // Precarga del QR mientras el servidor genera el secreto.
+        void loadQrCode();
         try {
             const result = await enableTwoFactorTotp({ password });
             if (!result.success || !result.data?.totpURI) {
