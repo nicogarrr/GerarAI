@@ -2031,37 +2031,62 @@ def ingest_spy_daily(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000)
+def _official_close_session_key() -> str:
+    """Last completed US session, never today's still-open session."""
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    local = datetime.now(ZoneInfo("America/New_York"))
+    day = local.date()
+    if (local.hour, local.minute) < (16, 30):
+        day -= timedelta(days=1)
+    while day.weekday() >= 5:
+        day -= timedelta(days=1)
+    return day.isoformat()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
+                queue_name="official-closes")
 def sync_official_closes(
     tenant_id: int | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    """Cierres diarios oficiales (yfinance) de todo el universo en market_prices."""
+    """One global download; legacy per-tenant default messages stay harmless.
+
+    Strict distributed lock: Redis failure retries instead of local fallback.
+    Success survives lock release, so queued legacy duplicates skip too.
+    """
     from app.services.market_close_sync import sync_official_closes as _sync
 
-    db = _session(tenant_id, user_id)
+    client = _redis_client()
+    if client is None:
+        raise RuntimeError("Redis required for global official closes")
+    lock = "cavaai:job-lease:sync_official_closes:global"
+    done = "cavaai:official-closes:done:" + _official_close_session_key()
+    token = uuid.uuid4().hex
+    acquired = False
+    db = None
     try:
-        lease = acquire_job_lease(
-            f"sync_official_closes:{tenant_id}",
-            ttl_seconds=3600,
-            redis_url=_lease_redis_url(),
-        )
+        acquired = bool(client.set(lock, token, nx=True, ex=3900))
+        if not acquired:
+            return {"status": "skipped", "reason": "lease_held"}
+        if client.get(done):
+            return {"status": "skipped", "reason": "session_already_synced"}
+        db = _session(tenant_id, user_id)
+        result = _sync(db)
+        if result.get("status") == "ok" and result.get("covered", 0) > 0 and result.get("latest_date") == _official_close_session_key():
+            client.set(done, "1", ex=7 * 86400)
+        return {"actor": "sync_official_closes", **result}
     except Exception:
-        db.close()
+        if db is not None:
+            _rollback(db)
         raise
-    if lease is None:
-        db.close()
-        return {"status": "skipped", "actor": "sync_official_closes", "reason": "lease_held"}
-    try:
-        return {"actor": "sync_official_closes", **_sync(db)}
-    except Exception as exc:
-        _rollback(db)
-        return _handle_actor_error("sync_official_closes", exc, tenant_id=tenant_id)
     finally:
-        release_job_lease(
-            f"sync_official_closes:{tenant_id}", lease, redis_url=_lease_redis_url()
-        )
-        db.close()
+        if db is not None:
+            db.close()
+        if acquired:
+            client.eval(_RELEASE_LEASE_LUA, 1, lock, token)
+        client.close()
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=1_800_000)

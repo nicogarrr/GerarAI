@@ -155,6 +155,16 @@ def enqueue_for_all_tenants(actor, **kwargs) -> dict:
     return {"actor": actor.actor_name, "queued": queued}
 
 
+def enqueue_official_closes_once() -> dict:
+    """Prices are global, unlike tenant portfolios: enqueue only one context."""
+    contexts = list(tenant_contexts())
+    if not contexts:
+        return {"actor": "sync_official_closes", "queued": []}
+    tenant_id, user_id = contexts[0]
+    message = sync_official_closes.send(tenant_id, user_id)
+    return {"actor": "sync_official_closes", "queued": [str(message.message_id)]}
+
+
 def build_scheduler(*, background: bool = False) -> BlockingScheduler | BackgroundScheduler:
     scheduler_cls = BackgroundScheduler if background else BlockingScheduler
     scheduler = scheduler_cls(timezone="UTC")
@@ -534,13 +544,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # 22:30 UTC: tras el cierre US tanto en EDT como en EST.
     _register(
         scheduler,
-        partial(enqueue_for_all_tenants, sync_official_closes),
+        enqueue_official_closes_once,
         "cron",
         job_id="official_closes_daily",
         day_of_week="mon-fri",
         hour=22,
         minute=30,
     )
+    # Automatic recovery after backlog/deploy, not a manual bulk download.
+    # Actor's completed-session marker makes successful sessions a cheap skip.
+    _register(scheduler, enqueue_official_closes_once, "interval",
+              job_id="official_closes_recovery", hours=1)
     # Senales DCA por niveles (watchlist + cartera): tras los cierres oficiales
     # de las 22:30 UTC, para evaluar con el cierre del dia ya asentado.
     _register(
