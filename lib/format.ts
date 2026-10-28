@@ -458,21 +458,6 @@ export function formatTimeAgo(
 }
 
 
-/**
- * El backend serializa los Numeric monetarios como string|null (nunca
- * asumir string): convierte a number con fallback cuando falta el dato
- * o llega malformado. Vive aquí (módulo puro) porque las server actions
- * no pueden exportar funciones síncronas.
- */
-export function researchMoneyToNumber(
-  value: string | null | undefined,
-  fallback = 0,
-): number {
-  if (value === null || value === undefined || value === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 /** Margen de seguridad para mostrar. MoS = (valor esperado - precio)/valor esperado, el estándar de Graham
  *  (no el potencial valor/precio - 1; base explícita en la UI): con un escenario base
  *  no positivo el numero (p. ej. -249 %) no es interpretable, asi que se muestra N/D

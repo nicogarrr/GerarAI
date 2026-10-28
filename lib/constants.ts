@@ -38,25 +38,6 @@ export const TIMEOUTS = {
   SERVER_SELECTION: 30000, // 30 segundos para selección de servidor MongoDB
 } as const;
 
-// Cache TTL (en segundos)
-export const CACHE_TTL = {
-  REALTIME_DATA: 60, // Datos en tiempo real (precios, noticias)
-  SEMI_STATIC_DATA: 3600, // Datos semi-estáticos (perfiles, métricas)
-  STATIC_DATA: 21600, // Datos estáticos (info de empresa) - 6 horas
-} as const;
-
-// Rate limits
-export const RATE_LIMITS = {
-  API_ROUTE: {
-    window: '1 m', // 1 minuto
-    limit: 60, // 60 requests por ventana
-  },
-  QUOTE_API: {
-    window: '1 m',
-    limit: 30, // 30 requests por minuto para quotes
-  },
-} as const;
-
 // Validación de símbolos
 export const SYMBOL_VALIDATION = {
   MIN_LENGTH: 1,

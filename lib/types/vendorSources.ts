@@ -12,14 +12,6 @@
  * Mismo patron que lib/chat/citations.ts, que ya documenta la restriccion.
  */
 
-export enum DataSource {
-    FINNHUB = 'finnhub',
-    ALPHA_VANTAGE = 'alpha_vantage',
-    POLYGON = 'polygon',
-    YAHOO_FINANCE = 'yahoo_finance',
-    TWELVE_DATA = 'twelve_data',
-}
-
 export enum NewsSource {
     FINNHUB = 'finnhub',
     ALPHA_VANTAGE = 'alpha_vantage',
