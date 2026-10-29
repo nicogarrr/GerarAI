@@ -185,7 +185,7 @@ def test_source_hierarchy_classifies_regulatory_urls_as_highest_tier():
     assert tier.trust_score == 1.0
 
 
-def test_source_tier_catalog_is_exactly_the_known_eight():
+def test_source_tier_catalog_is_exactly_the_known_nine():
     """Tripwire: si SOURCE_TIERS crece, la etiqueta UI (etiquetaTierFuente en
     lib/labels.ts) debe crecer con él - un tier sin etiqueta se pinta crudo
     en /research/news (F175)."""
@@ -199,6 +199,7 @@ def test_source_tier_catalog_is_exactly_the_known_eight():
         "tier_5_data_provider",
         "tier_6_bootstrap",
         "tier_7_user_input",
+        "tier_8_social",
         "tier_unknown",
     ]
 
