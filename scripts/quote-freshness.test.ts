@@ -19,14 +19,16 @@ test('F358: cache de AYER servida durante la sesion de hoy es stale (se rechaza)
     assert.equal(classifyQuoteKind(t('2026-09-29T19:30:00Z'), now('2026-09-30T15:00:00Z')), 'stale');
 });
 
-test('finde NO rompe: cierre del viernes es close (ultimo cierre fechado), no stale', () => {
+test('finde conserva cierre solo hasta 24h y rechaza despues', () => {
     const fridayClose = t('2026-10-02T20:00:00Z'); // viernes 16:00 ET
-    assert.equal(classifyQuoteKind(fridayClose, now('2026-10-03T22:00:00Z')), 'close'); // sabado noche
-    assert.equal(classifyQuoteKind(fridayClose, now('2026-10-04T15:00:00Z')), 'close'); // domingo
+    assert.equal(classifyQuoteKind(fridayClose, now('2026-10-03T19:59:00Z')), 'close');
+    assert.equal(classifyQuoteKind(fridayClose, now('2026-10-03T20:00:00Z')), 'close'); // exactamente 24h
+    assert.equal(classifyQuoteKind(fridayClose, now('2026-10-03T22:00:00Z')), 'stale'); // >24h
+    assert.equal(classifyQuoteKind(fridayClose, now('2026-10-04T15:00:00Z')), 'stale'); // domingo
 });
 
-test('lunes pre-market: cierre del viernes sigue siendo close', () => {
-    assert.equal(classifyQuoteKind(t('2026-10-02T20:00:00Z'), now('2026-10-05T12:00:00Z')), 'close'); // 08:00 ET
+test('lunes pre-market: cierre del viernes supera 24h y es stale', () => {
+    assert.equal(classifyQuoteKind(t('2026-10-02T20:00:00Z'), now('2026-10-05T12:00:00Z')), 'stale'); // 08:00 ET
 });
 
 test('lunes EN sesion: cierre del viernes es stale (la cache 429 >24h no cuela)', () => {
@@ -69,8 +71,9 @@ test('F358 real: sanitizeFinnhubQuote rechaza la cache de ayer y acepta la fresc
     assert.ok(fresh);
     assert.equal(fresh.kind, 'live');
     assert.equal(fresh.c, 36.4);
-    // Finde: cierre del viernes = close fechado, no rechazo.
-    const fridayClose = sanitizeFinnhubQuote({ ...stalePayload, t: t('2026-10-02T20:00:00Z') }, now('2026-10-03T22:00:00Z'));
+    // Finde: se conserva cierre dentro de 24h, se rechaza después.
+    const fridayClose = sanitizeFinnhubQuote({ ...stalePayload, t: t('2026-10-02T20:00:00Z') }, now('2026-10-03T19:00:00Z'));
+    assert.equal(sanitizeFinnhubQuote({ ...stalePayload, t: t('2026-10-02T20:00:00Z') }, now('2026-10-03T22:00:00Z')), null);
     assert.ok(fridayClose);
     assert.equal(fridayClose.kind, 'close');
     // Ceros de simbolo invalido -> miss.
