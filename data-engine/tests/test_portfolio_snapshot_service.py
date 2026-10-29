@@ -225,6 +225,36 @@ def test_cash_is_not_carried_forward_across_a_later_transaction(db):
     assert snapshot.daily_return is None
 
 
+def test_cash_is_not_carried_forward_across_a_trade_in_another_portfolio(db):
+    """La caja es de CUENTA (CashBalance no tiene portfolio_id) y el servicio
+    la arrastra solo si "no hay ninguna operacion posterior al saldo". Una
+    compra en OTRA cartera mueve esa misma caja: no puede pasar el filtro por
+    cartera de la foto."""
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=TODAY)  # cartera por defecto
+    from app.models.entities import Portfolio
+
+    other = Portfolio(name="Second", base_currency="EUR", is_default=False)
+    db.add(other)
+    db.commit()
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=YESTERDAY))
+    db.add(
+        Transaction(
+            portfolio_id=other.id, trade_date=TODAY, action="buy",
+            quantity=Decimal("1"), price=Decimal("10"), currency="EUR",
+            external_id="buy-other-portfolio",
+        )
+    )
+    db.commit()
+
+    snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
+
+    assert snapshot.cash_value_base == Decimal("0")
+    assert snapshot.pricing_coverage < Decimal("1")
+    assert snapshot.metadata_["cash_carried_forward"] == []
+    assert snapshot.daily_return is None
+
+
 def test_future_dated_cash_is_never_used_for_an_earlier_day(db):
     company = _company(db)
     _portfolio_positions(db, company, as_of=YESTERDAY)

@@ -117,7 +117,7 @@ class PortfolioSnapshotService:
             carried = (
                 base is not None
                 and cash.as_of < snapshot_date
-                and self._cash_unchanged_since(db, portfolio.id, cash.as_of, snapshot_date)
+                and self._cash_unchanged_since(db, cash.as_of, snapshot_date)
             )
             if carried:
                 cash_carried_forward.append(
@@ -326,7 +326,7 @@ class PortfolioSnapshotService:
 
     @staticmethod
     def _cash_unchanged_since(
-        db: Session, portfolio_id: int, cash_as_of: date, snapshot_date: date
+        db: Session, cash_as_of: date, snapshot_date: date
     ) -> bool:
         """True si el saldo de caja sigue siendo valido en ``snapshot_date``.
 
@@ -337,11 +337,15 @@ class PortfolioSnapshotService:
         arrastra solo si no hay ninguna operacion (compra, venta, deposito,
         retirada, divisa...) posterior a la fecha del saldo; si la hay, el
         saldo es dudoso y la foto sigue marcandolo como sin valorar.
+
+        La caja es de CUENTA (``CashBalance`` no tiene ``portfolio_id``):
+        cualquier operacion del tenant la mueve, incluidas las de otras
+        carteras. Filtrar las transacciones por la cartera de la foto
+        arrastraba un saldo ya movido por una operacion ajena.
         """
         later = db.scalar(
             select(Transaction.id)
             .where(
-                Transaction.portfolio_id == portfolio_id,
                 Transaction.trade_date > cash_as_of,
                 Transaction.trade_date <= snapshot_date,
                 *tenant_filters(db, Transaction),
