@@ -40,6 +40,7 @@ import { isE2EMarketFixtureEnabled } from '@/lib/e2e-market-fixture';
 import { e2eExtendedQuoteFixture } from '@/lib/e2e-extended-quote-fixture';
 import { MoatTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
+import { ResearchClaimForm } from '@/components/research/ResearchClaimForm';
 // El input de subida (procesa imágenes en canvas) solo aparece en la vista de
 // documentos: carga diferido (ver FileUploadInputLazy) para que su JS no
 // viaje en la ficha inicial.
@@ -84,7 +85,6 @@ import { Panel } from '@/components/ui/panel';
 import { PagedList } from '@/components/ui/pagination';
 import { Stat } from '@/components/ui/stat';
 import { getCompanyPer } from '@/lib/actions/company-per.actions';
-import { Textarea } from '@/components/ui/textarea';
 import {
   createResearchClaim,
   getResearchChangesWorkspace,
@@ -1314,11 +1314,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </div>
         <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
         <Panel title="Afirmaciones y evidencia">
-          <MutationForm action={createResearchClaim.bind(null, ticker)} className="mb-5 grid gap-3 sm:grid-cols-[1fr_150px_auto] sm:items-start" resetOnSuccess successMessage="Afirmación creada">
-            <Textarea id="statement" name="statement" placeholder="Una afirmación falsable y específica de la empresa" required className="min-h-[44px] text-base sm:text-sm" />
-            <Input name="materiality_score" type="number" min="0" max="10" defaultValue="5" className="h-11 text-base sm:h-9 sm:text-sm" />
-            <Button type="submit" className="min-h-[44px] sm:min-h-0">Añadir afirmación</Button>
-          </MutationForm>
+          <ResearchClaimForm action={createResearchClaim.bind(null, ticker)} />
           <div className="space-y-3">
             {data.claims.length ? groupClaimsByVersion(data.claims, data.history).map((group) => (
               <details key={group.key} open={group.claims.some((claim) => claim.thesis_version_id === data.thesis?.id)} className="rounded-lg border border-gray-800 p-3">
