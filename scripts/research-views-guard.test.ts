@@ -2,45 +2,37 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { asView, moduleHref, GROUPS, MODULES, type View } from '../lib/research/research-views.ts';
+import { MODULES, TABS, asView, canonicalViewUrl, moduleHref, subrouteRedirect, tabHref, type View } from '../lib/research/research-views.ts';
 
-describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
-    it('las pestañas abren su módulo de entrada', () => {
-        assert.equal(asView('resumen'), 'overview');
-        assert.equal(asView('numeros'), 'financials');
-        assert.equal(asView('fuentes'), 'documents');
-        assert.equal(asView('mas'), 'changes');
-        assert.equal(GROUPS.length, 4);
-        assert.deepEqual(GROUPS.map((g) => g.label), ['Resumen', 'Números', 'Fuentes', 'Más']);
-    });
-    it('los 3 pasos anteriores (Entender/Valorar/Seguir) siguen abriendo lo mismo', () => {
-        assert.equal(asView('entender'), 'overview');
-        assert.equal(asView('valorar'), 'model');
-        assert.equal(asView('seguir'), 'changes');
-    });
-    it('cada módulo cuelga de la pestaña acordada', () => {
-        const groupOf = (key: string) => MODULES.find((m) => m.key === key)?.group;
-        for (const key of ['overview', 'thesis', 'noticias']) assert.equal(groupOf(key), 'resumen');
-        for (const key of ['financials', 'valuation', 'model', 'peers', 'moat', 'capital', 'terminal']) assert.equal(groupOf(key), 'numeros');
-        for (const key of ['documents', 'sources', 'chat']) assert.equal(groupOf(key), 'fuentes');
-        for (const key of ['changes', 'holders', 'lecciones', 'directiva', 'satellites', 'supuestos', 'market-opportunity']) assert.equal(groupOf(key), 'mas');
-        assert.equal(MODULES.filter((m) => m.group === 'numeros').length, 7);
-    });
-    it('las 6 claves de grupo antiguas siguen abriendo su módulo', () => {
+describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
+    it('las seis pestañas abren su módulo de entrada', () => {
+        assert.equal(TABS.length, 6);
+        assert.deepEqual(TABS.map((t) => t.label), ['Resumen', 'Tesis', 'Finanzas', 'Valoración', 'Seguimiento', 'Fuentes']);
         assert.equal(asView('resumen'), 'overview');
         assert.equal(asView('tesis'), 'thesis');
-        assert.equal(asView('financieros'), 'financials');
-        assert.equal(asView('modelo'), 'model');
-        assert.equal(asView('evidencia'), 'documents');
+        assert.equal(asView('finanzas'), 'financials');
+        assert.equal(asView('valoracion'), 'valuation');
         assert.equal(asView('seguimiento'), 'changes');
+        assert.equal(asView('fuentes'), 'documents');
     });
-    it('cada módulo ?view= se abre a sí mismo y las subrutas caen a overview', () => {
-        const views = MODULES.filter((m) => !('path' in m));
-        const subs = MODULES.filter((m) => 'path' in m);
-        assert.equal(views.length, 15);
-        assert.equal(subs.length, 5);
-        for (const m of views) assert.equal(asView(m.key), m.key);
-        for (const m of subs) assert.equal(asView(m.key), 'overview');
+    it('cada módulo cuelga de la pestaña acordada', () => {
+        const tabOf = (key: string) => MODULES.find((m) => m.key === key)?.tab;
+        for (const key of ['overview', 'noticias']) assert.equal(tabOf(key), 'resumen');
+        for (const key of ['thesis']) assert.equal(tabOf(key), 'tesis');
+        for (const key of ['financials', 'terminal', 'capital']) assert.equal(tabOf(key), 'finanzas');
+        for (const key of ['valuation', 'model', 'supuestos', 'market-opportunity', 'peers', 'moat']) assert.equal(tabOf(key), 'valoracion');
+        for (const key of ['changes', 'holders', 'directiva', 'lecciones', 'satellites']) assert.equal(tabOf(key), 'seguimiento');
+        for (const key of ['documents', 'sources', 'chat']) assert.equal(tabOf(key), 'fuentes');
+        assert.equal(MODULES.length, 20);
+    });
+    it('las claves de módulo y los grupos históricos siguen abriendo lo suyo', () => {
+        assert.equal(asView('moat'), 'valuation');
+        assert.equal(asView('capital'), 'financials');
+        assert.equal(asView('numeros'), 'financials');
+        assert.equal(asView('mas'), 'changes');
+        assert.equal(asView('entender'), 'overview');
+        assert.equal(asView('valorar'), 'valuation');
+        assert.equal(asView('seguir'), 'changes');
     });
     it('claves desconocidas o ausentes caen en la vista general', () => {
         assert.equal(asView(undefined), 'overview');
@@ -56,27 +48,54 @@ describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
         const src = readFileSync('lib/research/research-views.ts', 'utf8');
         assert.match(src, /new Map<string, View>/, 'el mapa legacy es un Map, no un Record');
     });
-    it('todo módulo cuelga de un paso existente y su href es el esperado', () => {
-        const groupKeys = new Set(GROUPS.map((g) => g.key));
+    it('una URL por contenido: módulos y grupos redirigen a su URL canónica', () => {
+        assert.equal(canonicalViewUrl('AAPL', undefined), null);
+        assert.equal(canonicalViewUrl('AAPL', 'finanzas'), null);
+        assert.equal(canonicalViewUrl('AAPL', 'moat'), '/research/AAPL?view=valoracion#foso');
+        assert.equal(canonicalViewUrl('AAPL', 'overview'), '/research/AAPL');
+        assert.equal(canonicalViewUrl('AAPL', 'numeros'), '/research/AAPL?view=finanzas');
+        assert.equal(canonicalViewUrl('AAPL', 'no-existe'), null);
+        assert.equal(tabHref('AAPL', 'resumen'), '/research/AAPL');
         for (const m of MODULES) {
-            assert.ok(groupKeys.has(m.group), `${m.key} en paso desconocido ${m.group}`);
             const href = moduleHref('AAPL', m);
-            assert.equal(href, 'path' in m ? `/research/AAPL/${m.path}` : `/research/AAPL?view=${m.key}`);
+            const base = 'anchor' in m ? `${tabHref('AAPL', m.tab)}#${m.anchor}` : tabHref('AAPL', m.tab);
+            assert.equal(href, base, `${m.key} tiene su URL canónica`);
+        }
+        for (const [sub, expected] of [
+            ['financial-terminal', '/research/AAPL?view=finanzas#terminal'],
+            ['share-capital', '/research/AAPL?view=finanzas#dilucion'],
+            ['driver-assumptions', '/research/AAPL?view=valoracion#supuestos'],
+            ['management-credibility', '/research/AAPL?view=seguimiento#directiva'],
+            ['decision-lessons', '/research/AAPL?view=seguimiento#lecciones'],
+        ] as const) {
+            assert.equal(subrouteRedirect('AAPL', sub), expected, `${sub} redirige a su sección`);
         }
     });
 
-    it('el resumen omite la tarjeta de metadatos y conserva acceso al modelo completo', () => {
+    it('la página compone cada pestaña como secciones seguidas con título y ancla', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        const overviewStart = page.indexOf("if (activeView === 'overview') {");
-        const overviewEnd = page.indexOf("} else if (activeView === 'thesis')", overviewStart);
-        assert.ok(overviewStart > 0 && overviewEnd > overviewStart, 'región overview identificada');
-        const overview = page.slice(overviewStart, overviewEnd);
-        assert.doesNotMatch(overview, /title="Modelo fundamental a largo plazo"/, 'no restaurar la tarjeta redundante');
-        assert.doesNotMatch(overview, /model_summary\.(framework_key|engine_version|horizon_years)/, 'metadatos internos fuera del resumen');
-        assert.match(overview, /<Link[^>]+href=\{`[^`]+\?view=model`\}[^>]*>\{snapshot\.model_summary\.publishable \? 'publicable' : 'bloqueado'\}<\/Link>/, 'el estado sigue enlazando al modelo');
-        const modelStart = page.indexOf("} else if (activeView === 'model')");
-        const modelEnd = page.indexOf("} else if (activeView === 'market-opportunity')", modelStart);
-        assert.ok(modelStart > overviewEnd && modelEnd > modelStart, 'vista Modelo identificada');
+        // Redirect canónico antes de resolver la vista, conservando parámetros.
+        assert.match(page, /const canonicalView = canonicalViewUrl\(ticker, query\.view\);/);
+        assert.match(page, /search\.set\(key, value\)/, 'conserva ?chat=, ?pagina= y los controles del terminal');
+        // Las seis pestañas con sus secciones.
+        for (const anchor of ['financieros', 'terminal', 'dilucion', 'valoracion', 'modelo', 'supuestos', 'oportunidad', 'comparables', 'foso', 'cambios', 'superinversores', 'directiva', 'lecciones', 'documentos', 'fuentes', 'chat']) {
+            const inline = page.includes(`id: '${anchor}'`);
+            const optional = page.includes(`optionalSection('${anchor}'`);
+            assert.ok(inline || optional, `sección ${anchor} presente`);
+        }
+        // Sumario local de la pestaña: nunca otra barra global.
+        assert.match(page, /aria-label="En esta página"/);
+        // Las secciones no principales degradan a aviso inline, nunca a vacío.
+        assert.match(page, /optionalSection\('terminal', 'Terminal financiero'/);
+        assert.match(page, /<SectionLoadError retryHref=/);
+    });
+
+    it('el resumen conserva el acceso al modelo completo en su ancla canónica', () => {
+        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+        assert.match(page, /\?view=valoracion#modelo`\}[^>]*>\{snapshot\.model_summary\.publishable \? 'publicable' : 'bloqueado'\}/, 'el estado sigue enlazando al modelo');
+        const modelStart = page.indexOf('const buildModelSection');
+        const modelEnd = page.indexOf('const buildMarketOpportunitySection', modelStart);
+        assert.ok(modelStart > 0 && modelEnd > modelStart, 'sección Modelo identificada');
         const modelView = page.slice(modelStart, modelEnd);
         assert.match(modelView, /await viewData\('model'\)/, 'sigue leyendo el modelo real');
         assert.match(modelView, /<LongTermModelPanel model=\{model\?\.status === 'not_generated' \? null : model\} ticker=\{ticker\}/, 'conserva el panel completo y su estado vacío');

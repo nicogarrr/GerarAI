@@ -25,5 +25,5 @@ export const CHAT_INTENTS = [
 
 /** URL del chat de la ficha con la pregunta de la intención ya puesta. */
 export function chatIntentHref(ticker: string, intent: (typeof CHAT_INTENTS)[number]): string {
-  return `/research/${encodeURIComponent(ticker)}?view=chat&chat=${encodeURIComponent(intent.question(ticker))}#chat-empresa`;
+  return `/research/${encodeURIComponent(ticker)}?view=fuentes&chat=${encodeURIComponent(intent.question(ticker))}#chat`;
 }

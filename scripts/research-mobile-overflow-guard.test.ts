@@ -12,7 +12,8 @@ test('thesis long URLs wrap; markdown table/code retain bounded internal scroll'
  assert.match(markdown,/min-w-0 max-w-full overflow-x-auto/);
 });
 test('financial terminal scroll region is bounded and keyboard-accessible', () => {
- const src = readFileSync('app/(root)/research/[ticker]/financial-terminal/page.tsx','utf8');
+ // El terminal es una sección de la pestaña Finanzas desde el 29-oct-2026.
+ const src = readFileSync('components/research/sections/FinancialTerminalSection.tsx','utf8');
  assert.match(src,/OverflowScrollRegion/);
  assert.match(src,/className="mt-4 w-full min-w-0 max-w-full"/);
  assert.match(src,/regionClassName="overscroll-x-contain"/);
