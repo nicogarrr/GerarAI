@@ -23,7 +23,10 @@ test('el calendario no depende de la SEC: acciones sin red propia, Suspense y fa
 });
 
 test('historia: la pagina pide los ultimos dias y el backend solo sirve historia confirmada', () => {
-    assert.match(readFileSync('app/(root)/calendar/resultados/page.tsx', 'utf8'), /desde: addDays\(todayInMadrid\(\), -HISTORY_DAYS\)/);
+    const page = readFileSync('app/(root)/calendar/resultados/page.tsx', 'utf8');
+    // La fecha de Madrid se calcula una sola vez para no cruzar medianoche entre rangos.
+    assert.match(page, /const today = todayInMadrid\(\);/);
+    assert.match(page, /desde: addDays\(today, -HISTORY_DAYS\)/);
     const svc = readFileSync('data-engine/app/services/earnings_dates_service.py', 'utf8');
     assert.match(svc, /return row\.confirmed is True/);
 });
