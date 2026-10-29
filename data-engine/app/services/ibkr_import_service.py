@@ -247,6 +247,7 @@ _CSV_COLUMN_ALIASES = {
     "date": {"date", "tradedate", "datetime"},
     "fees": {"fees", "commission", "ibcommission"},
     "currency": {"currency", "currencyprimary"},
+    "isin": {"isin"},
 }
 
 
@@ -1539,6 +1540,7 @@ class IBKRImportService:
         los errores fatales (cabecera ausente, fichero vacío) lanzan
         :class:`IBKRImportError`.
         """
+        from app.services.listing_identity import reviewed_listing
         from app.services.portfolio_ledger_service import PortfolioLedgerService
 
         errors = validate_ibkr_csv(csv_text)
@@ -1672,11 +1674,22 @@ class IBKRImportService:
                         "corrige la operacion existente a mano."
                     )
                     continue
+            # An ISIN column routes a reviewed listing (Basic-Fit «BFIT» ->
+            # BFIT.AS) to its own company, never to the bare US homonym. The
+            # fingerprint above keeps the broker symbol so re-imports dedupe.
+            listing = reviewed_listing(_cell("isin"))
             try:
                 with db.begin_nested():
+                    if listing is not None:
+                        row_currency = _cell("currency").upper()
+                        if row_currency and row_currency != listing.currency:
+                            raise IBKRImportError("la divisa contradice el listado verificado por ISIN")
+                        self._reconcile_reviewed_listing(
+                            ledger.ensure_company(db, listing.ticker, listing.name), listing
+                        )
                     transaction = ledger.create_transaction(
                         db,
-                        ticker=symbol,
+                        ticker=listing.ticker if listing is not None else symbol,
                         action=action,
                         quantity=abs(_num(_cell("quantity"))),
                         price=_num(_cell("price")),
