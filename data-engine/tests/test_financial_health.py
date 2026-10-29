@@ -82,3 +82,11 @@ def test_currency_periods_denominators_and_missing_altman():
     out = calc([f for f in sample() if f.metric != "retained_earnings"])
     assert out["altman"]["score"] is None
     assert out["piotroski"]["score"] == 9
+
+
+def test_health_calculation_does_not_mutate_evidence():
+    facts = sample()
+    original = list(facts)
+    first = calc(facts)
+    assert facts == original
+    assert calc(facts) == first
