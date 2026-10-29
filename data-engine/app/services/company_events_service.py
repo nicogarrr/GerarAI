@@ -17,6 +17,7 @@ motivo. La red es inyectable (tests herméticos sin salir a internet).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
@@ -46,6 +47,9 @@ FILING_FORMS = (
 )
 
 CALENDAR_CHUNK_DAYS = 90
+# Tope total (cik + submissions + reintentos + EFTS) de la SEC dentro del GET
+# /api/companies/{ticker}/filings.
+FILINGS_SEC_BUDGET_SECONDS = 4.0
 CALENDAR_PAST_DAYS = 400
 CALENDAR_FUTURE_DAYS = 120
 
@@ -109,7 +113,7 @@ class CompanyEventsService:
         try:
             payload = await self._sec.submissions(cik)
         except Exception as exc:
-            logger.warning("EDGAR submissions CIK%s falló: %s", cik, exc)
+            logger.warning("EDGAR submissions CIK%s falló: %s", cik, redact_secrets(str(exc)))
             return None
         return payload if isinstance(payload, dict) else None
 
@@ -117,7 +121,7 @@ class CompanyEventsService:
         try:
             return await self._sec.cik_for_ticker(ticker)
         except Exception as exc:
-            logger.warning("EDGAR cik_for_ticker %s falló: %s", ticker, exc)
+            logger.warning("EDGAR cik_for_ticker %s falló: %s", ticker, redact_secrets(str(exc)))
             return None
 
     # ------------------------------------------------------------------
@@ -248,14 +252,42 @@ class CompanyEventsService:
     # Índice de filings
     # ------------------------------------------------------------------
     async def get_filings(self, company: Company, *, limit: int = 40) -> dict[str, Any]:
-        cik = company.cik or await self._cik_fetcher(company.ticker)
+        # Presupuesto TOTAL de red para la SEC dentro del GET: con EDGAR caido,
+        # los reintentos con backoff + el fallback EFTS tardaban ~15 s y el
+        # usuario esperaba con la pestana colgada. Pasado el presupuesto se
+        # sirve lo que ya hay en la base (documentos importados) con estado
+        # honesto ``unavailable``.
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + FILINGS_SEC_BUDGET_SECONDS
+        timed_out = False
+        cik: str | None = company.cik
+        if not cik:
+            try:
+                cik = await asyncio.wait_for(
+                    self._cik_fetcher(company.ticker), max(0.0, deadline - loop.time())
+                )
+            except TimeoutError:
+                timed_out = True
+                cik = None
         filings: list[dict[str, Any]] = []
         sec_status = "unavailable"
         note: str | None = None
         partial_source: str | None = None
 
         if cik:
-            payload = await self._submissions_fetcher(str(cik).zfill(10))
+            try:
+                payload = await asyncio.wait_for(
+                    self._submissions_fetcher(str(cik).zfill(10)),
+                    max(0.0, deadline - loop.time()),
+                )
+            except TimeoutError:
+                timed_out = True
+                payload = None
+                logger.warning(
+                    "EDGAR submissions CIK%s sin respuesta en %.1fs; se sirve la base",
+                    cik,
+                    FILINGS_SEC_BUDGET_SECONDS,
+                )
             if payload is not None:
                 fallback = payload.get("_fallback")
                 # Origen y estado honestos: una respuesta reconstruida desde
@@ -267,8 +299,12 @@ class CompanyEventsService:
                     for entry in filings:
                         entry["source"] = "SEC EDGAR (efts.sec.gov)"
                     note = payload.get("_fallback_note") or partial_source
+            elif timed_out:
+                note = "SEC EDGAR no respondió a tiempo; se listan los documentos ya importados."
             else:
                 note = "SEC EDGAR no accesible desde el servidor en este momento."
+        elif timed_out:
+            note = "SEC EDGAR no respondió a tiempo; se listan los documentos ya importados."
         if not filings:
             db_docs = self._db_documents(company, limit)
             if db_docs:
