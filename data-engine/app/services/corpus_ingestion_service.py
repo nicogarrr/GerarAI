@@ -18,6 +18,7 @@ from datetime import date
 import httpx
 from sqlalchemy import select
 
+from app.core.errors import redact_secrets
 from app.models import KnowledgeCollection
 from app.services.knowledge_library_service import KnowledgeLibraryService
 
@@ -306,6 +307,6 @@ def ingest_free_corpus(db) -> dict:
                     stats["ingested"] += 1
             except Exception as exc:  # noqa: BLE001 - una fuente no frena al corpus
                 db.rollback()
-                stats["failed"].append({"title": source["title"], "error": str(exc)[:200]})
+                stats["failed"].append({"title": source["title"], "error": redact_secrets(str(exc))[:200]})
             time.sleep(1.0)
     return stats

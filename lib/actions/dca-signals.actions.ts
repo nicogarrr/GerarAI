@@ -26,21 +26,6 @@ export interface DcaMutationResult {
     message?: string;
 }
 
-/** Evaluación manual (compatibilidad con clientes anteriores; tandas de diez cada cinco minutos). */
-export async function evaluateDcaSignalsNow(): Promise<DcaMutationResult & { summary?: DcaEvaluateSummary }> {
-    try {
-        await requireAuthenticatedUser();
-        const summary = await researchRequest<DcaEvaluateSummary>('/api/watchlist/dca-signals/evaluate', {
-            method: 'POST',
-        });
-        revalidatePath('/watchlist');
-        return { success: true, summary };
-    } catch (error) {
-        console.error('evaluateDcaSignalsNow error:', error);
-        return { success: false, code: classifyError(error), message: getFriendlyErrorMessage(error) };
-    }
-}
-
 export async function startDcaManualJob(): Promise<DcaMutationResult & { runId?: number }> {
     try {
         await requireAuthenticatedUser();

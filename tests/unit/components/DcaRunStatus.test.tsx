@@ -58,6 +58,14 @@ function panel(items: DcaSignalItem[], last_run: DcaRun | null | undefined): Dca
 }
 
 describe('dcaMissingBadge', () => {
+    it('fallo del job: mensaje genérico del backend sin doble punto', () => {
+        const generic = 'No se pudo completar la evaluación DCA. Reintenta más tarde.';
+        const badge = dcaMissingBadge(item({ evaluation_status: 'job_failed', evaluation_reason: generic }));
+        expect(badge.text).toBe('Evaluación fallida');
+        expect(badge.title).toBe(`La última evaluación falló para este ticker: ${generic}`);
+        expect(badge.title).not.toContain('..');
+    });
+
     it('sin información del backend se trata como nunca ejecutado', () => {
         expect(dcaMissingBadge(item()).text).toBe('Sin evaluar');
         expect(dcaMissingBadge(undefined).text).toBe('Sin evaluar');

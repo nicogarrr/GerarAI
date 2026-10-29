@@ -713,3 +713,12 @@ def test_workflow_es_yaml_valido():
     assert jobs
     for name, job in jobs.items():
         assert "steps" in job, f"el job {name} no tiene steps"
+
+
+def test_exec_permission_denied_fails_closed_with_reason(monkeypatch):
+    def denied(*args, **kwargs):
+        raise PermissionError("synthetic execution denied")
+
+    monkeypatch.setattr(_kit.subprocess, "run", denied)
+    with pytest.raises(FailClosedError, match="no ejecutable"):
+        _kit.run(["synthetic-command"], what="prueba")

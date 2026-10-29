@@ -3,6 +3,9 @@ name: user-flows E2E (smoke, no bloquea)
 # Suite de flujos de usuario en navegador real (e2e/user-flows): sign-in,
 # watchlist (US/.L/.PA), ficha, cartera (CSV IBKR en-US y es-ES con «;»),
 # impuestos (IRPF + 720), alertas, divisa base, 404 y Cerebro (LLM simulado),
+# y las funciones desde el 28-10 (new-features.spec.ts: posición en la ficha,
+# diario con versiones + operaciones simuladas, tesis editorial e impresa con
+# seed_thesis.py, avisos DCA),
 # cada una en escritorio 1280x800 y móvil 375x812. En cada página: sin errores
 # de consola, sin 4xx/5xx inesperados, sin desborde horizontal, sin
 # NaN/undefined/null/Infinity/[object Object] visibles.

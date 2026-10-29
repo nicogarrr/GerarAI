@@ -9,16 +9,14 @@ from pathlib import Path
 import pytest
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, delete, inspect
 
-import main
 from app.core.database import SessionLocal, init_db
 from app.models import DcaEvaluationRun
 from app.services import dca_run_log, dca_signal_service
 from app.workers import dramatiq_app
 
-from .test_dca_signals_api import SYMBOLS, client  # noqa: F401 - fixture
+from .test_dca_signals_api import SYMBOLS, client, run_manual_batch  # noqa: F401 - fixture
 
 
 @pytest.fixture(autouse=True)
@@ -48,7 +46,7 @@ def test_never_run_is_reported_as_never_run_not_as_failure(client):
 
 def test_manual_run_is_recorded_and_symbol_is_evaluated(client):
     client.post("/api/watchlist", json={"symbol": "DCATST"})
-    assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+    run_manual_batch()
     body, item = _item(client)
     run = body["last_run"]
     assert run["status"] == "ok" and run["trigger"] == "manual"
@@ -63,13 +61,15 @@ def test_failed_run_marks_symbols_without_state_as_job_failed(client, monkeypatc
         raise RuntimeError("yahoo down")
 
     monkeypatch.setattr(dca_signal_service, "evaluate_watchlist", boom)
-    failing = TestClient(main.app, raise_server_exceptions=False)
-    assert failing.post("/api/watchlist/dca-signals/evaluate").status_code == 500
+    with pytest.raises(RuntimeError):
+        run_manual_batch()
     body, item = _item(client)
     assert body["last_run"]["status"] == "error"
-    assert "yahoo down" in body["last_run"]["error"]
+    # Decision de Nico (29-oct): mensaje generico; el detalle solo en el log.
+    assert body["last_run"]["error"] == dca_run_log.PUBLIC_RUN_ERROR
+    assert "yahoo down" not in body["last_run"]["error"]
     assert item["evaluation_status"] == "job_failed"
-    assert "yahoo down" in item["evaluation_reason"]
+    assert item["evaluation_reason"] == dca_run_log.PUBLIC_RUN_ERROR
 
 
 def test_per_symbol_errors_and_skips_are_visible(client, monkeypatch):
@@ -85,7 +85,7 @@ def test_per_symbol_errors_and_skips_are_visible(client, monkeypatch):
         }
 
     monkeypatch.setattr(dca_signal_service, "evaluate_watchlist", fake)
-    assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+    run_manual_batch()
     body, tst = _item(client, "DCATST")
     _, off = _item(client, "DCAOFF")
     assert body["last_run"]["status"] == "ok" and body["last_run"]["errors"] == 1

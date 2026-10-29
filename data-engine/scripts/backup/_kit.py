@@ -170,6 +170,14 @@ def run(
         )
     except FileNotFoundError as exc:
         raise FailClosedError(f"{label}: herramienta ausente ({argv[0]}): {exc}") from exc
+    except PermissionError as exc:
+        # EACCES al hacer exec: el binario no es ejecutable, un directorio del
+        # PATH es inaccesible o el entorno restringe exec (sandboxes). Es el
+        # mismo fallo operativo que "ausente": fail-closed con motivo, no un
+        # traceback sin redactar.
+        raise FailClosedError(
+            f"{label}: herramienta ausente o no ejecutable ({argv[0]}): {exc}"
+        ) from exc
     except subprocess.TimeoutExpired as exc:
         raise FailClosedError(f"{label}: timeout de {timeout}s en {argv[0]}") from exc
     result = CommandResult(tuple(argv), proc.returncode, proc.stdout, proc.stderr)

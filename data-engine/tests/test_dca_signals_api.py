@@ -46,9 +46,36 @@ class _RedisGate:
             if cooldown in self.data: return 300
             self.set(lock, token); self.set(cooldown, token)
             return 0
-        lock, token = args
+        lock, token, *_ = args
+        if "EXPIRE" in script:  # renovacion de la reserva por el worker
+            return 1 if self.get(lock) == token.encode() else 0
         if self.get(lock) == token.encode(): self.delete(lock)
         return 1
+
+
+def run_manual_batch() -> dict:
+    """Camino manual real sin broker: recibo como /evaluate-async y luego el job
+    del worker (``run_manual_job``). Datos de test sin tenant (legacy)."""
+    from datetime import UTC, datetime
+
+    from app.models import DcaEvaluationRun
+    from app.services import dca_manual, dca_manual_job
+
+    with SessionLocal() as db:
+        db.info["tenant_id"] = None
+        gate = dca_manual_job.redis_client()
+        token, wait = dca_manual.acquire_manual_gate(gate, "None")
+        if token is None:
+            return {"blocked": wait}
+        pending = dca_manual.pending_symbols(db)
+        requested = pending[:dca_manual.MAX_SYMBOLS]
+        row = DcaEvaluationRun(trigger="manual", status="queued", started_at=datetime.now(UTC),
+            detail={"requested_symbols": requested, "pending_remaining": max(0, len(pending) - len(requested))})
+        db.add(row)
+        db.commit()
+        dca_manual_job.run_manual_job(db, row.id, token)
+        db.refresh(row)
+        return row.detail["summary"]
 
 
 @pytest.fixture
@@ -111,9 +138,7 @@ def test_set_min_level_override_and_reset(client):
 
 def test_manual_evaluate_persists_state_and_is_rate_limited(client):
     client.post("/api/watchlist", json={"symbol": "DCATST"})
-    response = client.post("/api/watchlist/dca-signals/evaluate")
-    assert response.status_code == 200, response.text
-    summary = response.json()
+    summary = run_manual_batch()
     assert summary["evaluated"] >= 1
     item = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
     state = item["state"]
@@ -121,16 +146,22 @@ def test_manual_evaluate_persists_state_and_is_rate_limited(client):
     assert state["close"] == 55.0 and state["currency"] == "USD"
     assert state["status"] in {"forming", "confirmed"}
     assert set(state["level_prices"]) == {"2x", "3x", "4x"}
-    again = client.post("/api/watchlist/dca-signals/evaluate")
-    assert again.status_code == 429
-    assert "Retry-After" in again.headers
+    assert run_manual_batch() == {"blocked": 300}
+
+
+def test_sync_evaluate_endpoint_is_retired(client):
+    """La UI usa /evaluate-async; el POST sincrono viejo ya no existe."""
+    assert client.post("/api/watchlist/dca-signals/evaluate").status_code in {404, 405}
+    paths = set(main.app.openapi()["paths"])
+    assert "/api/watchlist/dca-signals/evaluate" not in paths
+    assert "/api/watchlist/dca-signals/evaluate-async" in paths
 
 
 def test_hit_rates_endpoint(client):
     client.post("/api/watchlist", json={"symbol": "DCATST"})
     # Sin evaluar: 404 explicito, no una tabla vacia inventada.
     assert client.get("/api/watchlist/dca-signals/DCATST/hit-rates").status_code == 404
-    assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+    run_manual_batch()
     response = client.get("/api/watchlist/dca-signals/dcatst/hit-rates")
     assert response.status_code == 200, response.text
     body = response.json()
@@ -169,7 +200,7 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
         body = client.get("/api/watchlist/dca-signals").json()
         assert body["evaluation_enabled"] is False
         # «Evaluar ahora» sigue funcionando con la evaluacion diaria apagada.
-        assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+        run_manual_batch()
         item = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
         assert item["state"] is not None
     finally:
@@ -181,7 +212,7 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
 def test_list_flags_stale_saved_level(client):
     """Un nivel guardado con el ultimo cierre viejo sale marcado como desactualizado."""
     client.post("/api/watchlist", json={"symbol": "DCATST"})
-    assert client.post("/api/watchlist/dca-signals/evaluate").status_code == 200
+    run_manual_batch()
     fresh = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
     assert fresh["state"]["stale"] is False
     assert fresh["state"]["data_age_days"] is not None and fresh["state"]["data_age_days"] <= 14
@@ -203,18 +234,32 @@ def test_staleness_helper_uses_configured_limit():
     assert watchlist_routes._dca_staleness(date(2026, 10, 12), today) == (15, True)
 
 
+def _tenant_db():
+    db = SessionLocal()
+    db.info.update(tenant_id=987654, user_id="u-gate")
+    return db
+
+
 def test_manual_uses_shared_lease_and_fails_closed_on_redis_outage(client, monkeypatch):
     import redis
-    store = redis.Redis.from_url('redis://127.0.0.1:6397/15')
-    store.set('cavaai:job-lease:evaluate_dca_signals:legacy', 'scheduler', ex=60)
-    response = client.post('/api/watchlist/dca-signals/evaluate')
-    assert response.status_code == 409
-    assert store.get('cavaai:job-lease:evaluate_dca_signals:legacy') == b'scheduler'
-    store.delete('cavaai:job-lease:evaluate_dca_signals:legacy')
-    store.close()
+    from fastapi import HTTPException
+    store = redis.Redis.from_url('redis://unused')
+    store.set('cavaai:job-lease:evaluate_dca_signals:987654', 'scheduler')
+    with _tenant_db() as db, pytest.raises(HTTPException) as busy:
+        watchlist_routes.enqueue_manual_dca(db)
+    assert busy.value.status_code == 409
+    assert store.get('cavaai:job-lease:evaluate_dca_signals:987654') == b'scheduler'
+    store.delete('cavaai:job-lease:evaluate_dca_signals:987654')
+    store.set('cavaai:dca-manual-cooldown:987654', 'x')
+    with _tenant_db() as db, pytest.raises(HTTPException) as cooling:
+        watchlist_routes.enqueue_manual_dca(db)
+    assert cooling.value.status_code == 429 and "Retry-After" in cooling.value.headers
+    store.delete('cavaai:dca-manual-cooldown:987654')
     monkeypatch.setattr('app.services.dca_manual.acquire_manual_gate',
         lambda *a: (_ for _ in ()).throw(redis.ConnectionError('test')))
-    assert client.post('/api/watchlist/dca-signals/evaluate').status_code == 503
+    with _tenant_db() as db, pytest.raises(HTTPException) as down:
+        watchlist_routes.enqueue_manual_dca(db)
+    assert down.value.status_code == 503
 
 
 def test_manual_limits_batch_and_reports_remaining(client, monkeypatch):
@@ -225,7 +270,7 @@ def test_manual_limits_batch_and_reports_remaining(client, monkeypatch):
         return {'tracked': 23, 'evaluated': len(symbols), 'alerted': [], 'skipped': [],
             'errors': [], 'alerts_enabled': False, 'params_version': 'test'}
     monkeypatch.setattr('app.services.dca_signal_service.evaluate_watchlist', evaluate)
-    result = client.post('/api/watchlist/dca-signals/evaluate').json()
+    result = run_manual_batch()
     assert len(seen[0]) == result['requested'] == 10
     assert result['pending_remaining'] == 13
     assert result['cooldown_seconds'] == 300

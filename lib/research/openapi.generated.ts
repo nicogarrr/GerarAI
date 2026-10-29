@@ -5444,26 +5444,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/watchlist/dca-signals/evaluate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Evaluate Dca Signals Now
-         * @description Refresh at most ten missing/stale states, shared lease and 5min cooldown.
-         */
-        post: operations["evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/watchlist/dca-signals/evaluate-async": {
         parameters: {
             query?: never;
@@ -23186,44 +23166,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DcaSignalsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    evaluate_dca_signals_now_api_watchlist_dca_signals_evaluate_post: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DcaEvaluateOut"];
                 };
             };
             /** @description Validation Error */
