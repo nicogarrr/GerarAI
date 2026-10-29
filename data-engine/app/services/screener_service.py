@@ -16,6 +16,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
@@ -469,7 +470,7 @@ class ScreenerService:
                             **criterion,
                             "passed": False,
                             "status": "unevaluable",
-                            "error": str(exc),
+                            "error": redact_secrets(str(exc)),
                         }
                     )
             rank_value = None

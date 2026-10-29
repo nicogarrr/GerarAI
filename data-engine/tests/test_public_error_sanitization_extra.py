@@ -58,6 +58,11 @@ _INFRASTRUCTURE_EXCEPTIONS = {
 _DETAIL_RAISE = re.compile(r"detail\s*=\s*(.+?)\)\s*from\s")
 _EXCEPT_LINE = re.compile(r"^\s*except\s+(.+?):")
 _AS_ALIAS = re.compile(r"\s+as\s+\w+$")
+# Texto crudo de la excepcion: f"{exc}", f"{exc!r}", str(exc), repr(exc).
+_EXC_TEXT = re.compile(r"\{exc(![rs])?(:[^}]*)?\}|\bstr\(exc\)|\brepr\(exc\)")
+
+
+_PAYLOAD_KEY = re.compile(r'"(error|reason|detail|message)"\s*:')
 
 
 def _except_types(line: str) -> set[str]:
@@ -83,12 +88,18 @@ def test_no_infrastructure_detail_reaches_the_client():
                 continue
             if "safe_detail(" in line:
                 continue
-            if not re.search(r"detail\s*=\s*.*\{exc\}", line):
+            # ``detail=str(exc)`` / ``repr(exc)`` filtran lo mismo que ``f"{exc}"``;
+            # antes solo se miraba la f-string y el ``str(exc)`` pasaba sin ver.
+            if not _EXC_TEXT.search(line.split("detail", 1)[1]):
                 continue
-            # Busca hacia atras el except que corresponde.
+            # Busca hacia atras el except que corresponde: el MAS CERCANO, no la
+            # union de todos los de las 12 lineas anteriores (un except
+            # ValueError despues de un except LLMError no es infraestructura).
             caught: set[str] = set()
             for back in range(index, max(-1, index - 12), -1):
-                caught |= _except_types(lines[back])
+                if _EXCEPT_LINE.match(lines[back]):
+                    caught = _except_types(lines[back])
+                    break
             if not caught:
                 offenders.append(f"{path.name}:{index + 1} sin except reconocible")
                 continue
@@ -144,9 +155,9 @@ def test_service_error_payloads_are_redacted():
     offenders: list[str] = []
     for path in _python_files(SERVICES):
         for index, line in enumerate(path.read_text(encoding="utf-8").splitlines()):
-            if '"error"' not in line and '"reason"' not in line:
+            if not _PAYLOAD_KEY.search(line):
                 continue
-            if "{exc}" in line and "redact_secrets" not in line:
+            if _EXC_TEXT.search(line) and "redact_secrets" not in line:
                 offenders.append(f"{path.name}:{index + 1}: {line.strip()}")
     # No todos los motivos son de infraestructura (algunos son texto fijo), asi
     # que se listan pero solo se exige el patron en los que interpolan exc.

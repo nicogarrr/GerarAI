@@ -306,7 +306,9 @@ async def extract_document_kpis(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LLMError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        # El texto de LLMError es diagnostico interno (proveedor, estado HTTP,
+        # motivo de configuracion), no un mensaje para el usuario.
+        raise HTTPException(status_code=503, detail="El modelo no está disponible ahora; reintenta más tarde.") from exc
     except BudgetExceededError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 

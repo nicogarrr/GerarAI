@@ -129,7 +129,7 @@ class ProviderIngestionService:
             return {
                 "ticker": company.ticker,
                 "status": "no_safe_symbol",
-                "error": str(exc)[:300],
+                "error": redact_secrets(str(exc))[:300],
                 "inserted": 0,
                 "existing": 0,
             }
