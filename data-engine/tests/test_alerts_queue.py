@@ -8,6 +8,7 @@ def test_alert_rail_actors_use_dedicated_queue():
     for actor in (
         dramatiq_app.evaluate_alert_rules,
         dramatiq_app.dispatch_tracked_news_alerts,
+        dramatiq_app.analyze_tracked_news_alert,
         dramatiq_app.reconcile_alert_analyses,
         dramatiq_app.dispatch_insider_alerts,
         dramatiq_app.dispatch_macro_reminders,

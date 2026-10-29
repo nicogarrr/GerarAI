@@ -352,6 +352,55 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
     return decorator
 
 
+# Ventana de la marca "analisis ya encolado" del carril de alertas. El
+# dispatch corre cada 15 min y el actor es idempotente (lease + gate de
+# estado en BD), asi que la marca solo frena DUPLICADOS EN COLA, nunca el
+# trabajo: al consumirse el mensaje la fila sale de "pending" y el
+# re-encolado deja de verla. Si el mensaje muere sin consumirse (reintentos
+# agotados), la marca expira y un ciclo posterior reintenta. 6 h absorbe un
+# backlog largo sin congelar la recuperacion.
+ANALYSIS_ENQUEUE_MARK_TTL_SECONDS = 6 * 60 * 60
+
+
+def _analysis_enqueue_mark_key(tenant_id: int | None, alert_id: int) -> str:
+    return f"analysis_enqueued:{tenant_id}:{alert_id}"
+
+
+def _claim_analysis_enqueue(tenant_id: int | None, alert_id: int) -> bool:
+    """Marca atomica "ya hay un analyze_tracked_news_alert en cola".
+
+    True = este ciclo debe enviar el mensaje; False = ya hay uno en vuelo.
+    Fail-open: sin Redis (o Redis roto) se envia igual, porque un duplicado
+    lo absorben el lease del actor y su gate de estado, y perder el analisis
+    seria peor.
+    """
+    try:
+        client = _redis_client()
+        if client is None:
+            return True
+        return bool(
+            client.set(
+                _analysis_enqueue_mark_key(tenant_id, alert_id),
+                "1",
+                nx=True,
+                ex=ANALYSIS_ENQUEUE_MARK_TTL_SECONDS,
+            )
+        )
+    except Exception:  # noqa: BLE001 - sonda best-effort, fail-open
+        return True
+
+
+def _clear_analysis_enqueue_mark(tenant_id: int | None, alert_id: int) -> None:
+    """Libera la marca si el send fallo tras reclamarla (broker caido): sin
+    esto la alerta esperaria el TTL entero pese a no tener mensaje en cola."""
+    try:
+        client = _redis_client()
+        if client is not None:
+            client.delete(_analysis_enqueue_mark_key(tenant_id, alert_id))
+    except Exception:  # noqa: BLE001 - expira por TTL solo
+        pass
+
+
 def _run(coroutine):
     """Ejecuta la corrutina del actor, venga de donde venga el loop.
 
@@ -398,6 +447,15 @@ ALERT_QUEUE_NAME = "alerts"
 # la ingesta (rss, insider, ir, sec-mirror, backfill) no pisa GDELT y se
 # queda en default con mas hilos.
 GDELT_QUEUE_NAME = "gdelt"
+# Carril de computo rapido de cara al usuario (patron thesis/kpis/alerts):
+# el run diario del embudo ProPicks y los calculos cortos se hambreaban en la
+# cola default detras de la ingesta masiva (29-oct: default con >10k mensajes,
+# ProPicks sin actualizar desde 28-oct 03:38 UTC por starvation, no por el
+# filtro). Cola dedicada "computed" con worker propio de poca CPU (hay un
+# spotdl en el mismo host). Los mensajes legacy ya en default los drena el
+# worker default: queue_name solo enruta mensajes NUEVOS, el actor se
+# resuelve por nombre al consumir.
+COMPUTED_QUEUE_NAME = "computed"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -1862,7 +1920,7 @@ def refresh_portfolio_prices_intraday(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def refresh_propicks_prices(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1951,7 +2009,7 @@ def refresh_valuation_metrics(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def run_propicks_funnel(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1989,7 +2047,7 @@ def run_propicks_funnel(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def freeze_propicks_snapshot(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2012,7 +2070,7 @@ def freeze_propicks_snapshot(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def ingest_spy_daily(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2472,7 +2530,7 @@ def refresh_rss_feeds(
         )
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
 def analyze_tracked_news_alert(alert_id: int, *, tenant_id: int | None = None,
                                user_id: str | None = None) -> dict[str, Any]:
     """Idempotent attributed-headline baseline, never a verified claim."""
@@ -2531,10 +2589,25 @@ def dispatch_tracked_news_alerts(tenant_id: int | None = None, user_id: str | No
             AlertAnalysis.status == "pending",
         ).order_by(AlertAnalysis.id).limit(20)).all()
         enqueued = 0
+        deduped = 0
         for row in pending:
-            analyze_tracked_news_alert.send(row.alert_id, tenant_id=tenant_id, user_id=user_id)
+            # Sin marca, cada ciclo re-encolaba las mismas filas pending bajo
+            # starvation (29-oct: 5.534 mensajes para ~20 analisis reales).
+            if not _claim_analysis_enqueue(tenant_id, row.alert_id):
+                deduped += 1
+                continue
+            try:
+                analyze_tracked_news_alert.send(row.alert_id, tenant_id=tenant_id, user_id=user_id)
+            except Exception:
+                _clear_analysis_enqueue_mark(tenant_id, row.alert_id)
+                raise
             enqueued += 1
-        return {"actor": "dispatch_tracked_news_alerts", **result, "analysis_enqueued": enqueued}
+        return {
+            "actor": "dispatch_tracked_news_alerts",
+            **result,
+            "analysis_enqueued": enqueued,
+            "analysis_deduped": deduped,
+        }
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("dispatch_tracked_news_alerts", exc, tenant_id=tenant_id)
@@ -3653,13 +3726,23 @@ def generate_thesis_job(run_id: int) -> None:
     run_thesis_job(run_id)
 
 
+# Se queda en default (29-oct, revision del piloto): no esta acreditado que
+# sea un job corto (hasta 50 quotes de proveedor + sync de acciones
+# corporativas por fila; time_limit 900 s) y en el worker-alerts de 2 hilos
+# dos refrescos simultaneos podian ocupar ambos hilos y retrasar las alertas.
+# La coalescencia hace que las copias encoladas bajo starvation se salten
+# casi gratis (patron rss/insider; la ventana 25 min < cadencia de 30 min,
+# como en refresh_news tracked).
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=900_000)
+@_coalesce_on_success("refresh_paper_trades", 25 * 60, ("tenant_id",))
 def refresh_paper_trades(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     from app.services.paper_trading_service import refresh_trades
 
     db = _session(tenant_id, user_id)
     try:
-        return {"actor": "refresh_paper_trades", **refresh_trades(db)}
+        # status ok explicito: sin el la marca de coalescencia nunca quedaba
+        # fresca (el decorador solo conserva el claim con status "ok").
+        return {"status": "ok", "actor": "refresh_paper_trades", **refresh_trades(db)}
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_paper_trades", exc, tenant_id=tenant_id)
