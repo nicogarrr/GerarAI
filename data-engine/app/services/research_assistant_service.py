@@ -322,13 +322,46 @@ def _thesis_citations(db: Session, company: Company, tenant_id: int) -> list[dic
     return citations
 
 
+def _linked_review_news(db: Session, review: ResearchReview, company: Company, tenant_id: int) -> list[dict]:
+    """A selected review is a source anchor, never evidence for another tenant."""
+    if not review.news_event_id:
+        return []
+    row = db.scalar(select(NewsEvent).where(
+        NewsEvent.id == review.news_event_id, NewsEvent.tenant_id == tenant_id,
+        NewsEvent.company_id == company.id,
+    ))
+    if row is None:
+        return []
+    provenance = row.metadata_ or {}
+    headline = provenance.get("source_headline")
+    date_source = provenance.get("date_source")
+    if provenance.get("connector") == "gdelt" and date_source == "source":
+        date_source = "gdelt_first_seen"
+    if not _url(row.url) or date_source not in {"source", "gdelt_first_seen"} or not isinstance(headline, str) or not headline.strip():
+        return []
+    label = "primera detección GDELT" if date_source == "gdelt_first_seen" else "fecha de la fuente"
+    return [{"id": f"news_event:{row.id}", "kind": "news_event", "source": row.source,
+             "url": _url(row.url), "as_of": f"{row.date.isoformat()} ({label})",
+             "excerpt": clip_words(headline.strip(), 500, ellipsis="")}]
+
+
+def _asks_about_selected_review(question: str, ticker: str) -> bool:
+    # Only deictic/general follow-ups use the anchor. A specific new topic must
+    # still match retrieved evidence; adding 'review' must not bypass ranking.
+    terms = _tokens(question) - _tokens(ticker)
+    context_words = _GENERAL | {"noticia", "revision", "ticket", "articulo", "esta", "esto", "esa", "ese", "ella", "ello", "explicamelo", "explicala"}
+    return bool(terms) and not (terms - context_words)
+
+
 def answer(db: Session, payload) -> dict:
     tenant_id = _tenant(db)
     if not payload.ticker:
         return _empty(payload.mode, "Indica un ticker para recuperar fuentes verificables del espacio de trabajo.")
     company = _company(db, payload.ticker)
     review = _review(db, payload.review_id, company.id, tenant_id)
-    citations = _evidence(db, company, tenant_id, payload.question)
+    anchored = review is not None and _asks_about_selected_review(payload.question, company.ticker)
+    citations = (_linked_review_news(db, review, company, tenant_id) if anchored
+                 else _evidence(db, company, tenant_id, payload.question))
     if not citations:
         response = _empty(payload.mode, f"Sin datos citables para {company.ticker}.")
         response["review_id"] = review.id if review else None
