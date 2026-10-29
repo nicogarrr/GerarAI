@@ -56,3 +56,23 @@ describe('loadedFinancialRange', () => {
         expect(loadedFinancialRange([])).toBeNull();
     });
 });
+
+
+describe('fórmulas owner earnings versión 2', () => {
+    it('traduce la convención de signo sin cambiar operadores ni el límite de mantenimiento', () => {
+        const formula = 'net_income + depreciation_amortization + change_in_working_capital - maintenance_capex, where change_in_working_capital is in cash-flow sign (negative = working capital absorbed cash) and maintenance_capex = min(abs(capital_expenditure), depreciation_amortization); maintenance capex is not separately reported - declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)';
+        const text = financialFormula(formula);
+        expect(text).toContain('negativo = el capital circulante absorbió efectivo');
+        expect(text).toContain('carta de Berkshire Hathaway de 1986');
+        expect(text).toContain('mínimo(valor absoluto(');
+        expect(text).not.toMatch(/cash-flow|working capital|is not separately|declared conservative/);
+        expect(text).toContain(' + ');
+        expect(text).toContain(' - ');
+    });
+    it('traduce la media de varios años manteniendo cobertura mínima y signo', () => {
+        const text = financialFormula('mean of annual (net_income + depreciation_amortization + change_in_working_capital - min(abs(capital_expenditure), depreciation_amortization)) over up to 5 most recent fiscal years, minimum 3; change_in_working_capital in cash-flow sign; maintenance capex is a declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)');
+        expect(text).toContain('un mínimo de 3');
+        expect(text).toContain('con el signo del flujo de caja');
+        expect(text).not.toMatch(/cash-flow|maintenance capex|declared conservative/);
+    });
+});
