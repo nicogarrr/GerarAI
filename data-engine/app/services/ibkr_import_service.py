@@ -1082,9 +1082,32 @@ class IBKRImportService:
                     market_value = quantity * market_price
                 average_cost = _decimal(_attr(element, "costBasisPrice", "costPrice", "avgPrice"))
                 position = db.scalar(select(Position).where(Position.company_id == company.id))
+                statement_day = _date(_attr(element, "reportDate", "asOfDate"))
+                if (
+                    position is not None
+                    and position.statement_as_of is not None
+                    and position.statement_as_of > statement_day
+                    and position.source == "ibkr_flex"
+                ):
+                    # Extracto mas antiguo que el que ya fijo cantidad y coste:
+                    # nunca retrocede.
+                    rows_skipped += 1
+                    position_rows_skipped += 1
+                    continue
+                kept_valuation = None
                 if position is None:
                     position = Position(company_id=company.id, portfolio_id=portfolio.id)
                     db.add(position)
+                elif position.as_of > statement_day and not position.valuation_hold_reason:
+                    # Cotizacion mas reciente que el extracto (refresco de precios):
+                    # se conserva; el extracto solo aporta cantidad, coste y caja.
+                    kept_valuation = {
+                        field: getattr(position, field)
+                        for field in (
+                            "market_price", "market_value", "market_value_native",
+                            "market_value_base", "fx_rate", "as_of",
+                        )
+                    }
                 position.quantity = quantity
                 position.average_cost = average_cost
                 position.market_price = market_price
@@ -1114,6 +1137,20 @@ class IBKRImportService:
                     else None
                 )
                 position.source = "ibkr_flex"
+                position.statement_as_of = statement_day
+                if kept_valuation is not None:
+                    for field, value in kept_valuation.items():
+                        setattr(position, field, value)
+                    # El PyG se recalcula con la cotizacion conservada y el coste
+                    # nuevo; el unrealized del extracto es de su propia fecha.
+                    if position.market_value_native is not None and position.cost_basis_native is not None:
+                        position.unrealized_pnl = position.market_value_native - position.cost_basis_native
+                    position.unrealized_pnl_base = (
+                        position.market_value_base - position.cost_basis_base
+                        if position.market_value_base is not None
+                        and position.cost_basis_base is not None
+                        else None
+                    )
                 if position.valuation_hold_reason:
                     # El hold no se levanta por una importacion: cantidad y coste
                     # llegan del extracto, la valoracion sigue en suspension y se

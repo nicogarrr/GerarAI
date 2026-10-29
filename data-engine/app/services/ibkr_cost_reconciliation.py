@@ -44,6 +44,15 @@ def _close(left: Decimal, right: Decimal) -> bool:
     return abs(left - right) <= max(COST_ABSOLUTE_TOLERANCE, abs(right) * COST_RELATIVE_TOLERANCE)
 
 
+def _cost_date(p: Position):
+    """Fecha del extracto que fijo cantidad y coste (no la de la cotizacion).
+
+    La raw row debe llevar EXACTAMENTE esa fecha: la conciliacion sigue atada
+    al extracto que produjo el coste, no a un precio refrescado despues.
+    """
+    return p.statement_as_of or p.as_of
+
+
 def _snapshot_evidence(p: Position, trades: list[Transaction], rows: list[IbkrRawRow]):
     accounts = {(t.raw_payload or {}).get("accountId") for t in trades}
     if len(accounts) != 1 or not next(iter(accounts)):
@@ -63,7 +72,7 @@ def _snapshot_evidence(p: Position, trades: list[Transaction], rows: list[IbkrRa
             continue
         qty = _number(raw.get("position", raw.get("quantity")))
         price = _number(raw.get("costBasisPrice", raw.get("costPrice", raw.get("avgPrice"))))
-        if report_date != p.as_of or qty is None or price is None:
+        if report_date != _cost_date(p) or qty is None or price is None:
             continue
         if abs(qty - p.quantity) > QUANTITY_TOLERANCE:
             continue
@@ -122,14 +131,14 @@ def reconcile_ibkr_costs(db: Session, positions: list[Position]) -> dict[int, di
     # ix_ibkr_raw_rows_snapshot), no el historico entero del tenant.
     raw_rows = list(db.scalars(select(IbkrRawRow).where(
         IbkrRawRow.path.in_(["OpenPosition", "OpenPositions/OpenPosition"]),
-        IbkrRawRow.report_date.in_({p.as_of for p in candidates}),
+        IbkrRawRow.report_date.in_({_cost_date(p) for p in candidates}),
         IbkrRawRow.symbol.in_({p.company.ticker for p in candidates}),
         *tenant_filters(db, IbkrRawRow),
     )))
     result = {}
     for p in candidates:
         trades = [t for t in by_company[p.company_id]
-                  if t.portfolio_id == p.portfolio_id and t.trade_date <= p.as_of]
+                  if t.portfolio_id == p.portfolio_id and t.trade_date <= _cost_date(p)]
         reason = None
         if not trades:
             reason = "no_native_trades"

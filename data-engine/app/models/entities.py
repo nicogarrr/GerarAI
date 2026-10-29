@@ -330,6 +330,10 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     fx_rate: Mapped[Decimal | None] = mapped_column(Numeric(20, 10), nullable=True)
     source: Mapped[str] = mapped_column(String(80), default="manual")
     as_of: Mapped[date] = mapped_column(Date, default=date.today)
+    # Fecha del extracto del broker que fijo cantidad y coste. Distinta de as_of
+    # (fecha de la cotizacion): un refresco de precios adelanta as_of sin tocar
+    # el coste. NULL = filas anteriores a esta columna: la conciliacion usa as_of.
+    statement_as_of: Mapped[date | None] = mapped_column(Date, nullable=True)
     # Valoracion en suspenso (p. ej. tras un split aplicado sin precio post-split
     # verificado). NULL = sin suspension. Mientras haya motivo, market_price /
     # market_value / unrealized_* NO son una cotizacion: ningun refresco ni rebuild
