@@ -4,10 +4,7 @@
   "buildCommand": "npm run build",
   "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "**": false
-    }
+    "deploymentEnabled": false
   },
   "regions": [
     "fra1"
