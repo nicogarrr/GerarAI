@@ -2,6 +2,9 @@
 export function factDisplayAudit(ticker: string, fact: {
   metric: string; unit: string; period: string; value: string;
 }): string | null {
+  if (fact.metric === 'market_cap' && !/^[A-Z]{3}$/.test(fact.unit)) {
+    return 'Capitalización pendiente de auditoría: unidad monetaria no verificada';
+  }
   if (fact.metric !== 'eps_diluted' && fact.metric !== 'eps') return null;
   // EPS is currency per share. A currency total or a share count is not EPS.
   if (!/^[A-Z]{3}\/(?:share|shares)$/.test(fact.unit)) {

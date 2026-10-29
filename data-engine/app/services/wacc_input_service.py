@@ -370,6 +370,9 @@ class WaccInputService:
             db.flush()
         else:
             fact.value = value
+            # A refreshed observation replaces its unit too. Legacy monetary
+            # facts were stored as decimal; retaining that unit displays x100%.
+            fact.unit = unit
             fact.source_id = source.id
             fact.confidence = confidence
         return fact
