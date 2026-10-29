@@ -318,3 +318,34 @@ def test_thesis_money_format_usd_en_us_other_es_es():
 
     assert _money(Decimal("1234.5"), "USD") == "$1,234.50"
     assert _money(Decimal("1234.5"), "EUR") == "1.234,50 EUR"
+
+
+def test_selected_news_review_is_anchor_for_explain_without_unrelated_sources(db):
+    tenant, other, company = setup(db)
+    news = NewsEvent(tenant_id=tenant.id, company_id=company.id, title="Composite legacy display",
+        summary="This is not primary evidence", source="Publisher", url="https://example.com/selected-news",
+        date=datetime(2026,10,29,tzinfo=UTC), metadata_={"source_headline":"Memory supplier costs may rise", "date_source":"source"})
+    db.add(news); db.flush()
+    review = ResearchReview(tenant_id=tenant.id, company_id=company.id, title="Selected review",
+        review_type="news", news_event_id=news.id, summary="Review summary is not evidence")
+    db.add(review); db.flush()
+    for question in ["explica la noticia", "explicame", "¿Qué dice esta revisión?"]:
+        response = answer(db, AssistantRequest(mode="guide", ticker="ASTS", review_id=review.id, question=question))
+        assert response["status"] == "answered"
+        assert [c["id"] for c in response["citations"]] == [f"news_event:{news.id}"]
+        assert response["citations"][0]["excerpt"] == "Memory supplier costs may rise"
+        assert "Fuente primaria no consultada" in response["answer"]
+        assert response["writeback"] is False
+    response = answer(db, AssistantRequest(mode="guide", ticker="ASTS", review_id=review.id, question="What is the uranium debt covenant?"))
+    assert response["status"] == "insufficient_data"
+    db.info["tenant_id"] = other.id
+    private_news = NewsEvent(tenant_id=other.id, company_id=company.id, title="Private headline",
+        source="Private source", url="https://example.com/private", date=datetime(2026,10,29,tzinfo=UTC),
+        metadata_={"source_headline":"Private headline", "date_source":"source"})
+    db.add(private_news); db.flush()
+    private_id = private_news.id
+    db.info["tenant_id"] = tenant.id
+    review.news_event_id = private_id
+    db.flush()
+    response = answer(db, AssistantRequest(mode="guide", ticker="ASTS", review_id=review.id, question="explica la noticia"))
+    assert response["status"] == "insufficient_data"
