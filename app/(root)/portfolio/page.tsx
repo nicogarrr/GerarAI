@@ -1,3 +1,4 @@
+import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import type { Metadata } from 'next';
 import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
 import { getPortfolioSummary, getPortfolioTransactionPage, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
@@ -84,6 +85,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
   const [summary, transactions, scores, tearsheet, forecast, dividends] = result;
 
   return (
+    <>
     <PortfolioTabs
       summary={summary}
       transactions={transactions.items}
@@ -95,5 +97,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       userId={userId}
       partialMessage={partialMessage}
     />
+    <ValuationSummaryGrid quotes={summary.holdings.map(h => ({ symbol: h.symbol, price: h.currentPrice, currency: h.nativeCurrency }))} />
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import { quoteObserved } from '@/lib/market/quote-observed';
 import type { Metadata } from 'next';
 import { getMarketIndicesResult, getMarketMoversResult } from '@/lib/actions/market.actions';
@@ -434,6 +435,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
       </Card>
 
 
+    <ValuationSummaryGrid quotes={rows.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency ?? null }))} />
     </main>
   );
 }
