@@ -39,6 +39,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/alerts/push/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Push Config */
+        get: operations["push_config_api_alerts_push_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/push/preferences/{event_type}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Push Preference */
+        put: operations["set_push_preference_api_alerts_push_preferences__event_type__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/push/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Push Status */
+        get: operations["push_status_api_alerts_push_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register Push Device */
+        post: operations["register_push_device_api_alerts_push_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/alerts/push/subscriptions/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Remove Push Device */
+        post: operations["remove_push_device_api_alerts_push_subscriptions_remove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts/rules": {
         parameters: {
             query?: never;
@@ -338,14 +423,16 @@ export interface paths {
          * Catalysts Calendar
          * @description Calendario unico de catalizadores de la cartera (por defecto, 14 dias).
          *
-         *     Une resultados y fecha ex-dividendo (NASDAQ publico, solo posiciones
-         *     abiertas en bolsa US y USD) y acciones corporativas registradas sin
-         *     aplicar. No incluye la fecha de pago: NASDAQ solo devuelve cada dividendo
-         *     el dia de su ex-date, asi que un pago con ex-date anterior al rango
-         *     quedaria fuera sin avisar. Si NASDAQ no
+         *     Une resultados y fecha ex-dividendo (NASDAQ publico, posiciones y
+         *     watchlist en bolsa US y USD), acciones corporativas registradas sin
+         *     aplicar y, desde el historial de dividendos ya ingerido (posiciones y
+         *     watchlist de cualquier mercado), las fechas de PAGO declaradas y los
+         *     ex-dividendos no-US que NASDAQ no cubre. Cuando la fila de NASDAQ trae
+         *     fecha de pago se muestra en el detalle del evento ex. Nada se estima:
+         *     si la fuente no trae fecha de pago, no hay evento de pago. Si NASDAQ no
          *     responde, ``status`` lo declara (``partial``/``unavailable``) y las
-         *     acciones corporativas propias se siguen mostrando; nunca devuelve 5xx
-         *     por un fallo del proveedor.
+         *     acciones corporativas propias y los dividendos ingeridos se siguen
+         *     mostrando; nunca devuelve 5xx por un fallo del proveedor.
          */
         get: operations["catalysts_calendar_api_calendar_catalysts_get"];
         put?: never;
@@ -496,6 +583,31 @@ export interface paths {
          *     evento y nunca rompe el calendario. Clave: ``TICKER|YYYY-MM-DD``.
          */
         get: operations["followed_materials_api_calendar_followed_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/ipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ipo Calendar
+         * @description Salidas a bolsa en EE. UU. del mes en curso y el siguiente (NASDAQ publico).
+         *
+         *     Incluye las proximas (fecha prevista por la fuente) y las ya fijadas del
+         *     periodo. Cobertura declarada: solo mercados US que publica NASDAQ (datos
+         *     de EDGAR Online); el resto de mercados no aparece. Si NASDAQ no responde,
+         *     ``status`` lo declara; nunca devuelve 5xx por un fallo del proveedor.
+         */
+        get: operations["ipo_calendar_api_calendar_ipos_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8745,6 +8857,62 @@ export interface components {
             /** Universe Size */
             universe_size: number;
         };
+        /** PushConfigOut */
+        PushConfigOut: {
+            /** Enabled */
+            enabled: boolean;
+            /** Public Key */
+            public_key?: string | null;
+        };
+        /** PushEndpointIn */
+        PushEndpointIn: {
+            /** Endpoint */
+            endpoint: string;
+        };
+        /** PushKeys */
+        PushKeys: {
+            /** Auth */
+            auth: string;
+            /** P256Dh */
+            p256dh: string;
+        };
+        /** PushPreferenceIn */
+        PushPreferenceIn: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+        };
+        /** PushPreferenceOut */
+        PushPreferenceOut: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Event Type
+             * @enum {string}
+             */
+            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event";
+        };
+        /** PushStatusOut */
+        PushStatusOut: {
+            /** Devices */
+            devices: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Preferences */
+            preferences: components["schemas"]["PushPreferenceOut"][];
+            /** Public Key */
+            public_key?: string | null;
+        };
+        /** PushSubscriptionIn */
+        PushSubscriptionIn: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushKeys"];
+            /** User Agent */
+            user_agent?: string | null;
+        };
         /** QueryRequest */
         QueryRequest: {
             /** As Of From */
@@ -9320,7 +9488,7 @@ export interface components {
              * Event Type
              * @enum {string}
              */
-            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels";
+            event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event";
         };
         /** ThesisApproveRequest */
         ThesisApproveRequest: {
@@ -9986,6 +10154,214 @@ export interface operations {
             };
         };
     };
+    push_config_api_alerts_push_config_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushConfigOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_push_preference_api_alerts_push_preferences__event_type__put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushPreferenceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushPreferenceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    push_status_api_alerts_push_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    register_push_device_api_alerts_push_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_push_device_api_alerts_push_subscriptions_remove_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushEndpointIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_alert_rules_api_alerts_rules_get: {
         parameters: {
             query?: {
@@ -10323,7 +10699,7 @@ export interface operations {
                 "x-cavaai-body-hash"?: string | null;
             };
             path: {
-                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels";
+                event_type: "thesis_broken" | "new_filing" | "insiders" | "shorts_rising" | "daily_digest" | "dca_levels" | "macro_event";
             };
             cookie?: never;
         };
@@ -10972,6 +11348,46 @@ export interface operations {
         };
     };
     followed_materials_api_calendar_followed_materials_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ipo_calendar_api_calendar_ipos_get: {
         parameters: {
             query?: never;
             header?: {

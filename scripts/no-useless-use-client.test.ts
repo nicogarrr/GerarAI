@@ -86,6 +86,7 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/ValuationSummaryGrid.tsx': 'useState y useEffect para carga batch asíncrona y descarte de respuestas de selección anterior',
+  'components/alerts/PushNotifications.tsx': 'useState/useEffect para permiso Notification, registro serviceWorker, PushManager y preferencias opt-in del navegador',
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',
   'components/research/DocumentsList.tsx': 'useState y useMemo, onChange para búsqueda y página actual',
   'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',

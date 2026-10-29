@@ -34,6 +34,13 @@ test('alerts without a company never print a placeholder company', () => {
   assert.match(digest.summary, /Resumen diario de tu cartera/);
 });
 
+test('macro event reminders show their own title and a source-aware summary', () => {
+  const card = alertCardCopy({ ...base, alert_type: 'macro_event', title: 'IPC de EE. UU. (inflación): mañana', ticker: null, companyName: null, eventDate: null, eventForm: null });
+  assert.equal(card.heading, 'IPC de EE. UU. (inflación): mañana');
+  assert.match(card.summary, /calendario macro oficial/);
+  assert.doesNotMatch(card.summary, /sin empresa asociada/);
+});
+
 test('source and detail controls exist on both surfaces', () => {
   for (const path of ['components/PersonalizedOverview.tsx', 'components/alerts/AlertsManager.tsx']) {
     const view = readFileSync(path, 'utf8');

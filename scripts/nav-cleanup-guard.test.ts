@@ -109,6 +109,7 @@ const CATALOG_EXCEPTIONS: Record<string, string> = {
     // El asistente de research se unificó en el Cerebro: la ruta queda solo
     // como redirect que lo abre (handoff sessionStorage + evento open-brain).
     '/calendar/resultados': 'pestaña de CalendarTabs (subnav propio de Calendarios)',
+    '/calendar/ipos': 'pestaña de CalendarTabs (subnav propio de Calendarios)',
     '/calendar/suscripcion': 'pestaña de CalendarTabs (subnav propio de Calendarios)',
     '/research/assistant': 'redirect de compatibilidad al Cerebro (asistente unificado)',
 };

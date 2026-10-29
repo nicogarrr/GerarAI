@@ -15,12 +15,13 @@ export const revalidate = 0;
 
 export const metadata: Metadata = {
     title: 'Catalizadores | Calendarios',
-    description: 'Resultados de tus posiciones y de tu watchlist en EE. UU. (USD), ex-dividendos, plazos 10-Q/10-K y acciones corporativas, con acceso al gestor de alertas.',
+    description: 'Resultados, ex-dividendos y fechas de pago de tus posiciones y tu watchlist, plazos 10-Q/10-K y acciones corporativas, con acceso al gestor de alertas.',
 };
 
 const TYPE_LABEL: Record<CatalystEvent['type'], string> = {
     earnings: 'Resultados',
     dividend_ex: 'Ex-dividendo',
+    dividend_payment: 'Pago de dividendo',
     filing_deadline: 'Plazo 10-Q/10-K',
     corporate_action: 'Acción corporativa',
 };
@@ -78,7 +79,7 @@ export default async function CalendarPage({
             <PageHeader
                 kicker="Cartera"
                 title="Catalizadores de tu cartera"
-                description={`Del ${formatMarketDate(calendar.desde)} al ${formatMarketDate(calendar.hasta)}. Los resultados cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); ex-dividendos y plazos 10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus posiciones abiertas.`}
+                description={`Del ${formatMarketDate(calendar.desde)} al ${formatMarketDate(calendar.hasta)}. Los resultados y ex-dividendos cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); las fechas de pago y los ex-dividendos de fuera de EE. UU. salen de tu historial de dividendos ya importado (posiciones y watchlist); los plazos 10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus posiciones abiertas.`}
                 actions={<div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <CalendarDays aria-hidden="true" className="h-4 w-4 text-teal-300" />
                     {formatNumber(calendar.count, { maximumFractionDigits: 0 })} {calendar.count === 1 ? 'evento' : 'eventos'}
@@ -101,9 +102,9 @@ export default async function CalendarPage({
                 </p>
             ) : groups.length === 0 && !degraded ? (
                 <p className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
-                    Sin eventos en este rango. Esto solo vale para resultados y ex-dividendos de tus posiciones en EE. UU. (USD)
-                    y para las acciones corporativas registradas de tus {formatNumber(calendar.held_count, { maximumFractionDigits: 0 })} posiciones abiertas;
-                    no cubre resultados ni dividendos de posiciones fuera de EE. UU.
+                    Sin eventos en este rango. Los resultados y ex-dividendos en vivo solo cubren EE. UU. (USD);
+                    las fechas de pago y los ex-dividendos de otros mercados salen de tu historial de dividendos importado,
+                    que solo muestra lo que su fuente ha declarado.
                 </p>
             ) : (
                 <ol className="flex flex-col gap-4">

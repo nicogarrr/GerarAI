@@ -41,11 +41,10 @@ function repo() {
   return { write, commit, run, base: commit('base') };
 }
 
-test('vercel.json usa el script como ignoreCommand y sigue desplegando solo main', () => {
+test('vercel.json desactiva TODOS los auto-deploys Git; manual solo por orden expresa', () => {
   const cfg = JSON.parse(readFileSync('vercel.json', 'utf8'));
   assert.equal(cfg.ignoreCommand, 'bash scripts/vercel-ignore-build.sh');
-  assert.equal(cfg.git.deploymentEnabled.main, true);
-  assert.equal(cfg.git.deploymentEnabled['**'], false);
+  assert.equal(cfg.git.deploymentEnabled, false);
 });
 
 test('solo backend, docs o tests desde el ultimo despliegue: no se construye (exit 0)', () => {

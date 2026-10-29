@@ -43,6 +43,13 @@ beforeEach(() => {
 });
 
 describe('CalendarTabs', () => {
+    it('incluye la pestaña de IPOs y la activa solo en /calendar/ipos', () => {
+        pathname = '/calendar/ipos';
+        render(<CalendarTabs />);
+        expect(screen.getByRole('link', { name: 'IPOs' })).toHaveAttribute('aria-current', 'page');
+        expect(screen.getByRole('link', { name: 'Catalizadores' })).not.toHaveAttribute('aria-current');
+    });
+
     it('marca solo la pestaña de href más largo: /calendar/resultados no enciende /calendar', () => {
         pathname = '/calendar/resultados';
         render(<CalendarTabs />);

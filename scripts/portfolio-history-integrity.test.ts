@@ -41,3 +41,19 @@ test('metrics cannot bridge incomplete history or use a stale/different period',
  assert.equal(qualifiedHistoricalMetrics([row('00'),...rows],history,metrics),null);
  assert.equal(qualifiedHistoricalMetrics(rows,history,{...metrics,cumulative_return:NaN}),null);
 });
+
+test('rebuild boundary: la serie visible empieza en la base nueva y se marca el corte',()=>{
+ const rebuilt=[row('01',{metadata:{positions_only:true}}),row('02',{metadata:{positions_only:true}})];
+ const base=row('03',{daily_return:null,cumulative_twr:null,metadata:{twr_base_after_scope_change:true}});
+ const v3=10000*Math.pow(1.01,2);
+ const after=[row('04',{total_value_base:v3*1.01,daily_return:0.01,cumulative_twr:0.01}),row('05',{total_value_base:v3*1.01*1.01,daily_return:0.01,cumulative_twr:1.01*1.01-1})];
+ const result=verifiedPortfolioHistory([...rebuilt,base,...after],'EUR');
+ assert.deepEqual(result?.dates,['2026-10-04','2026-10-05']);
+ assert.equal(result?.rebuild_reset_date,'2026-10-03');
+});
+test('sin reconstrucción no hay corte marcado; un hueco posterior lo anula',()=>{
+ assert.equal(verifiedPortfolioHistory([row('01'),row('02')],'EUR')?.rebuild_reset_date,null);
+ const base=row('01',{daily_return:null,cumulative_twr:null,metadata:{twr_base_after_scope_change:true}});
+ const r=verifiedPortfolioHistory([base,row('02',{daily_return:null}),row('03'),row('04')],'EUR');
+ assert.equal(r?.rebuild_reset_date,null);
+});

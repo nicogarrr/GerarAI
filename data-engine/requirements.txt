@@ -90,3 +90,6 @@ llama-index-core>=0.14.25,<0.15
 
 # Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
 cryptography>=46.0,<51
+
+# Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
+pywebpush>=2.0.0,<3

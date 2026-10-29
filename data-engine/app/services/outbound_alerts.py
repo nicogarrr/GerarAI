@@ -4,9 +4,10 @@ from datetime import UTC
 from sqlalchemy import exists, or_, select
 from sqlalchemy.orm import Session
 
-from app.models import AlertDelivery, AlertSubscription, NewsEvent, ResearchAlert
+from app.models import AlertDelivery, AlertSubscription, NewsEvent, PushPreference, ResearchAlert
 
-EVENT_TYPES = ("thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels")
+ALERT_TYPE_MACRO = "macro_event"
+EVENT_TYPES = ("thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event")
 
 
 def event_type(db: Session, alert: ResearchAlert) -> str | None:
@@ -15,6 +16,8 @@ def event_type(db: Session, alert: ResearchAlert) -> str | None:
         return "daily_digest"
     if kind == "dca_level":
         return "dca_levels"
+    if kind == ALERT_TYPE_MACRO:
+        return "macro_event"
     if kind in {"thesis_broken", "claim_contradicted"}:
         return "thesis_broken"
     if kind.startswith("insider_"):
@@ -59,6 +62,7 @@ def subscription_for(db: Session, alert: ResearchAlert) -> AlertSubscription | N
 def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
     """Periodic catch-up for emitters that only persist alerts, bounded/no replay."""
     from app.services.notification_service import NotificationService
+    from app.services.web_push import preference_for
 
     tenant = db.info.get("tenant_id")
     if tenant is None or not db.info.get("user_id"):
@@ -68,6 +72,12 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         AlertSubscription.user_id == db.info["user_id"],
         AlertSubscription.enabled.is_(True),
     )))
+    push_types = list(db.scalars(select(PushPreference.event_type).where(
+        PushPreference.tenant_id == tenant,
+        PushPreference.user_id == db.info["user_id"],
+        PushPreference.enabled.is_(True),
+    )))
+    types = list(dict.fromkeys([*types, *push_types]))
     if not types:
         return {"candidates": 0, "redispatched": 0, "errors": []}
     categories = []
@@ -83,10 +93,12 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         categories.append(ResearchAlert.alert_type == "daily_digest")
     if "dca_levels" in types:
         categories.append(ResearchAlert.alert_type == "dca_level")
-    oldest = db.scalar(select(AlertSubscription.enabled_at).where(
-        AlertSubscription.tenant_id == tenant,
-        AlertSubscription.enabled.is_(True),
-    ).order_by(AlertSubscription.enabled_at).limit(1))
+    if "macro_event" in types:
+        categories.append(ResearchAlert.alert_type == ALERT_TYPE_MACRO)
+    starts = [db.scalar(select(model.enabled_at).where(
+        model.tenant_id == tenant, model.enabled.is_(True),
+    ).order_by(model.enabled_at).limit(1)) for model in (AlertSubscription, PushPreference)]
+    oldest = min((value for value in starts if value is not None), key=lambda v: v.replace(tzinfo=None))
     # Excluding delivered/pending outbox rows prevents the first page from
     # starving later events; ineligible records are filtered by category below.
     candidates = list(db.scalars(select(ResearchAlert).where(
@@ -94,12 +106,12 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         ResearchAlert.created_at >= oldest,
         ResearchAlert.status == "open",
         ~exists().where(AlertDelivery.alert_id == ResearchAlert.id,
-                        AlertDelivery.channel == "telegram"),
+                        AlertDelivery.channel.in_(("telegram", "push"))),
         or_(*categories),
     ).order_by(ResearchAlert.id).limit(limit)))
     stats = {"candidates": len(candidates), "redispatched": 0, "errors": []}
     for alert in candidates:
-        if subscription_for(db, alert) is None:
+        if subscription_for(db, alert) is None and preference_for(db, alert) is None:
             # Record terminal skip without HTTP. Prevents a page of non-filing
             # news or events from before a later opt-in starving newer alerts.
             svc = NotificationService()

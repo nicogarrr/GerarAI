@@ -277,6 +277,11 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                                 <PortfolioNavChart data={chartData} positive={summary.totalGain >= 0} currency={summary.baseCurrency} />
                                 )}
                             </div>
+                            {chartData.length >= 2 && scores.history?.rebuild_reset_date ? (
+                                <p className="mt-2 text-xs text-amber-300/90" data-testid="twr-rebuild-reset">
+                                    {`Reconstrucción: serie reiniciada el ${formatDate(scores.history.rebuild_reset_date, { day: '2-digit', month: 'short', year: 'numeric' })}. El rendimiento acumulado (TWR) vuelve a empezar desde 0 en esa fecha; lo anterior era una serie reconstruida solo con posiciones.`}
+                                </p>
+                            ) : null}
                         </div>
 
                         {/* Panel Derecho: Pie Chart Completo */}

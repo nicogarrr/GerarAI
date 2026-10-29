@@ -94,9 +94,13 @@ class NotificationService:
 
         category = event_type(db, alert)
         subscription = subscription_for(db, alert) if category else None
+        from app.services import web_push
+
+        push_pref = web_push.preference_for(db, alert) if category else None
         channels = list(alert.channels)
-        if subscription and "telegram" not in channels:
-            channels.append("telegram")
+        added = [c for c, ok in (("telegram", subscription), ("push", push_pref)) if ok and c not in channels]
+        if added:
+            channels.extend(added)
             alert.channels = channels
             db.commit()
         for channel in channels:
@@ -118,6 +122,8 @@ class NotificationService:
                     result = self._result("delivered")
                 elif channel == "telegram":
                     result = self._dispatch_telegram(settings, {**payload, **({"chat_id": subscription.chat_id} if subscription else {})})
+                elif channel == "push" and push_pref:
+                    result = self._result(**web_push.send_to_user(db, settings, alert))
                 elif channel == "email" and smtp_configured(settings):
                     result = self._dispatch_email(settings, alert, payload)
                 else:
@@ -472,6 +478,9 @@ class NotificationService:
         if payload.get("type") == "dca_level":
             # El mensaje DCA ya va redactado en espanol con titular y metricas.
             return str(payload.get("message") or payload.get("title") or "")[:4090]
+        if payload.get("type") == "macro_event":
+            # Redactado en espanol con hora, fuente y etiqueta; sin ids tecnicos.
+            return f"{payload.get('title') or ''}\n{payload.get('message') or ''}"[:4090]
         # Non-filing/non-news alerts retain their established delivery format.
         text = (
             f"[{payload['severity'].upper()}] {payload['title']}\n"

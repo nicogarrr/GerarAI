@@ -7,13 +7,22 @@ hasta ahora vivian en pantallas distintas:
 * fecha ex-dividendo del mismo calendario,
 * acciones corporativas registradas en GerarAI (splits, etc.) aun no aplicadas.
 
+A eso se suman dos fuentes ingeridas:
+
+* fecha de PAGO de dividendo, de los ``DividendRecord`` ya ingeridos
+  (posiciones y watchlist, cualquier mercado): solo registros cuya fuente
+  trae fecha de pago; si la fuente no la trae (p. ej. Yahoo chart), no hay
+  evento de pago y nada se estima;
+* fecha ex-dividendo de posiciones y watchlist FUERA de bolsa US, desde los
+  mismos registros ingeridos (NASDAQ no las cubre).
+
 Cobertura declarada: el calendario de dividendos de NASDAQ se consulta por dia
-y solo devuelve las filas cuya fecha ex-dividendo cae en ese dia, por eso el
-calendario muestra la fecha ex y NO la fecha de pago (un pago cuyo ex-date fue
-anterior al rango no aparecaria y el calendario parecería completo sin serlo).
-Resultados y dividendos de NASDAQ se cruzan solo con posiciones en bolsa US y
-USD (misma regla que ``market_refresh_service._us_listed``): un ticker pelado
-de un emisor no-US puede coincidir con otro emisor.
+y solo devuelve las filas cuya fecha ex-dividendo cae en ese dia. Cuando la
+fila trae fecha de pago se muestra en el detalle del evento ex, aunque caiga
+fuera del rango. Resultados y dividendos de NASDAQ se cruzan solo con
+posiciones y watchlist en bolsa US y USD (misma regla que
+``market_refresh_service._us_listed``): un ticker pelado de un emisor no-US
+puede coincidir con otro emisor.
 
 Honestidad de datos: solo se emiten eventos que la fuente trae; nada se
 estima ni se inventa. Si NASDAQ no responde, el estado lo dice y las acciones
@@ -43,9 +52,27 @@ SOURCE_GERARAI = "Acción corporativa registrada en GerarAI"
 
 SOURCE_SEC_RULE = "Regla SEC (Form 10-Q/10-K) aplicada al último informe en EDGAR"
 
+# Historial de dividendos ya ingerido (DividendRecord): la etiqueta nombra el
+# proveedor del registro, nunca una fuente generica.
+_RECORD_SOURCE_LABEL = {
+    "yahoo_finance": "Historial de dividendos ingerido de Yahoo Finance",
+    "fmp": "Historial de dividendos ingerido de FMP",
+}
+
+
+def record_source_label(source: str) -> str:
+    """Etiqueta de fuente para eventos sacados de ``DividendRecord``."""
+    return _RECORD_SOURCE_LABEL.get(source, f"Historial de dividendos ingerido ({source})")
+
 logger = logging.getLogger(__name__)
 
-_TYPE_ORDER = {"earnings": 0, "dividend_ex": 1, "filing_deadline": 2, "corporate_action": 3}
+_TYPE_ORDER = {
+    "earnings": 0,
+    "dividend_ex": 1,
+    "dividend_payment": 2,
+    "filing_deadline": 3,
+    "corporate_action": 4,
+}
 
 # Valores reales de ``time`` del calendario NASDAQ (medidos), mas los alias antiguos.
 _TIME_LABEL = {
@@ -291,6 +318,69 @@ def watchlist_us_tickers(db: Session, held_us: set[str]) -> set[str]:
     }
 
 
+def watchlist_tickers(db: Session, held: set[str]) -> set[str]:
+    """Tickers de la watchlist (cualquier mercado) que NO estan en cartera.
+
+    Para los dividendos ingeridos no aplica el filtro US de NASDAQ: la fuente
+    es el historial propio. La cartera gana el origen igual que en el resto.
+    """
+    from app.models import WatchItem
+
+    rows = db.scalars(
+        select(Company)
+        .join(WatchItem, WatchItem.symbol == Company.ticker)
+        .where(*tenant_filters(db, WatchItem))
+    ).all()
+    return {
+        str(c.ticker).upper()
+        for c in rows
+        if c.ticker and str(c.ticker).upper() not in held
+    }
+
+
+def upcoming_dividend_records(
+    db: Session, tickers: set[str], desde: date, hasta: date
+) -> list[dict[str, Any]]:
+    """Dividendos ingeridos (``DividendRecord``) con fecha ex o de pago en rango.
+
+    Solo lo que la fuente declaro: registros sin fecha de pago (Yahoo chart no
+    la expone) salen con ``pay_date=None`` y no generan evento de pago. Las
+    cantidades de Yahoo vienen ajustadas por splits (lo declara el ingestion
+    service); la etiqueta de fuente va en cada fila.
+    """
+    from app.models import DividendRecord
+
+    if not tickers:
+        return []
+    rows = db.execute(
+        select(DividendRecord, Company.ticker)
+        .join(Company, DividendRecord.company_id == Company.id)
+        .where(
+            Company.ticker.in_(sorted(tickers)),
+            *tenant_filters(db, DividendRecord),
+            (
+                (DividendRecord.ex_date >= desde) & (DividendRecord.ex_date <= hasta)
+            )
+            | (
+                (DividendRecord.pay_date.is_not(None))
+                & (DividendRecord.pay_date >= desde)
+                & (DividendRecord.pay_date <= hasta)
+            ),
+        )
+    ).all()
+    return [
+        {
+            "ticker": str(ticker).upper(),
+            "ex_date": record.ex_date.isoformat() if record.ex_date else None,
+            "pay_date": record.pay_date.isoformat() if record.pay_date else None,
+            "amount": float(record.amount),
+            "currency": record.currency,
+            "source": record.source,
+        }
+        for record, ticker in rows
+    ]
+
+
 def held_tickers(db: Session) -> tuple[set[str], set[str]]:
     """(todos, solo_us): tickers en mayusculas con posicion abierta.
 
@@ -330,9 +420,18 @@ def build_catalysts(
     dividends: list[dict[str, Any]],
     actions: list[dict[str, Any]],
     watchlist_us: set[str] | None = None,
+    watchlist: set[str] | None = None,
+    records: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Filtra a cartera (+ watchlist US en resultados), normaliza y ordena."""
+    """Filtra a cartera + watchlist, normaliza y ordena.
+
+    ``records`` son los dividendos ingeridos (``upcoming_dividend_records``):
+    generan los eventos de fecha de pago (todas las empresas seguidas) y los
+    ex-dividendos no-US que NASDAQ no cubre.
+    """
     watchlist_us = watchlist_us or set()
+    watchlist = watchlist or set()
+    records = records or []
     events: list[dict[str, Any]] = []
     for row in earnings:
         ticker = str(row.get("symbol", "")).upper()
@@ -362,7 +461,8 @@ def build_catalysts(
         )
     for row in dividends:
         ticker = str(row.get("symbol", "")).upper()
-        if ticker not in held_us:
+        in_held = ticker in held_us
+        if not in_held and ticker not in watchlist_us:
             continue
         amount = row.get("amount")
         amount_txt = (
@@ -371,6 +471,12 @@ def build_catalysts(
         day = _parse_us_date(row.get("ex_date"))
         if day is None or not desde <= day <= hasta:
             continue
+        # La fecha de pago viaja en la misma fila de NASDAQ: se muestra en el
+        # detalle aunque caiga fuera del rango visible (nunca se estima).
+        pay = _parse_us_date(row.get("payment_date"))
+        if pay is not None:
+            pay_txt = f"pago el {pay.day}/{pay.month}/{pay.year}"
+            amount_txt = f"{amount_txt} · {pay_txt}" if amount_txt else pay_txt
         events.append(
             {
                 "date": day.isoformat(),
@@ -379,8 +485,52 @@ def build_catalysts(
                 "title": "Fecha ex-dividendo",
                 "detail": amount_txt,
                 "source": SOURCE_NASDAQ,
+                "origin": "cartera" if in_held else "watchlist",
             }
         )
+    # Dividendos ingeridos: pagos de TODAS las empresas seguidas y
+    # ex-dividendos no-US (los US ya salen del calendario NASDAQ en vivo).
+    nasdaq_us = held_us | watchlist_us
+    followed = held | watchlist
+    for record in records:
+        ticker = str(record.get("ticker", "")).upper()
+        if ticker not in followed:
+            continue
+        amount = record.get("amount")
+        currency = str(record.get("currency") or "").strip()
+        amount_txt = (
+            f"{_es_number(float(amount), 4)} {currency} por acción".strip()
+            if isinstance(amount, (int, float))
+            else None
+        )
+        origin = "cartera" if ticker in held else "watchlist"
+        source = record_source_label(str(record.get("source") or ""))
+        ex_day = _parse_us_date(record.get("ex_date"))
+        pay_day = _parse_us_date(record.get("pay_date"))
+        if ex_day is not None and desde <= ex_day <= hasta and ticker not in nasdaq_us:
+            events.append(
+                {
+                    "date": ex_day.isoformat(),
+                    "ticker": ticker,
+                    "type": "dividend_ex",
+                    "title": "Fecha ex-dividendo",
+                    "detail": amount_txt,
+                    "source": source,
+                    "origin": origin,
+                }
+            )
+        if pay_day is not None and desde <= pay_day <= hasta:
+            events.append(
+                {
+                    "date": pay_day.isoformat(),
+                    "ticker": ticker,
+                    "type": "dividend_payment",
+                    "title": "Pago de dividendo",
+                    "detail": amount_txt,
+                    "source": source,
+                    "origin": origin,
+                }
+            )
     for action in actions:
         ticker = str(action.get("ticker", "")).upper()
         day = _parse_us_date(action.get("effective_date"))

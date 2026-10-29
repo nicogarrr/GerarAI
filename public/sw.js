@@ -84,3 +84,45 @@ self.addEventListener('fetch', (event) => {
     );
   }
 });
+
+/*
+ * Web Push: avisos de alertas (macro, DCA, filings...). El servidor firma con
+ * VAPID y solo envia a quien activo el permiso Y eligio ese tipo de evento.
+ * El texto llega ya redactado en español; aqui solo se muestra. Nada se
+ * cachea ni se lee de la red.
+ */
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (_error) {
+    data = {};
+  }
+  const title = typeof data.title === 'string' && data.title ? data.title : 'GerarAI';
+  const body = typeof data.body === 'string' ? data.body : '';
+  // Solo rutas internas: un payload nunca puede abrir un sitio externo.
+  const url = typeof data.url === 'string' && data.url.startsWith('/') && !data.url.startsWith('//') ? data.url : '/alerts';
+  const tag = typeof data.tag === 'string' ? data.tag : undefined;
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      tag,
+      icon: '/assets/icons/icon-192.png',
+      badge: '/assets/icons/icon-192.png',
+      data: { url },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || '/alerts', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      for (const client of windows) {
+        if (client.url === target && 'focus' in client) return client.focus();
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});

@@ -95,7 +95,7 @@ test("ningun camino del workflow activa el deploy de previews por CLI", () => {
   assert.match(text, /deploy=false/);
   // Sin deploy no hay comentario que publicar en el PR.
   assert.match(text, /Previews de rama\/PR desactivados: solo main despliega/);
-  // vercel.json: solo main despliega por Git.
+  // vercel.json: ningun push ni merge despliega por Git; solo orden manual.
   const vercel = JSON.parse(readFileSync(new URL("../vercel.json", import.meta.url), "utf8"));
-  assert.deepEqual(vercel.git.deploymentEnabled, { main: true, "**": false });
+  assert.equal(vercel.git.deploymentEnabled, false);
 });
