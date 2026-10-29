@@ -24,3 +24,25 @@ BY_ISIN = {BASIC_FIT.isin: BASIC_FIT}
 
 def reviewed_listing(isin: str | None) -> ListingIdentity | None:
     return BY_ISIN.get((isin or "").strip().upper())
+
+
+# Names the app already uses for Euronext Amsterdam: IBKR Flex venue codes
+# (AEB, XAMS), our canonical label and Finnhub's labels (see
+# propicks_price_service._EXCHANGE_YAHOO_SUFFIX and wacc_input_service).
+_VENUE_ALIASES = {
+    "EURONEXT AMSTERDAM": frozenset({
+        "EURONEXT AMSTERDAM",
+        "NYSE EURONEXT - EURONEXT AMSTERDAM",
+        "NYSE EURONEXT - AMSTERDAM",
+        "AEB",
+        "XAMS",
+    }),
+}
+# Exchange values written by stubs before the venue is known.
+PLACEHOLDER_EXCHANGES = frozenset({"", "UNKNOWN"})
+
+
+def same_venue(listing: ListingIdentity, exchange: str | None) -> bool:
+    """True when ``exchange`` is one of the known names of the listing's venue."""
+    value = (exchange or "").strip().upper()
+    return value in _VENUE_ALIASES.get(listing.exchange, frozenset({listing.exchange}))

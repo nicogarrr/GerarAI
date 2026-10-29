@@ -1,12 +1,29 @@
 // @vitest-environment node
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 
 import { describe, expect, it } from 'vitest';
 
 import { buildMemoPdf } from '@/lib/thesis/memo-pdf';
 
 /** Páginas reales: objetos `/Type /Page` (no `/Pages`) del PDF generado. */
+/** Streams FlateDecode del PDF ya inflados (para inspeccionar CMaps y contenido). */
+function inflatedStreams(pdf: Buffer): string {
+    const raw = pdf.toString('latin1');
+    const parts: string[] = [];
+    const re = /stream\r?\n([\s\S]*?)endstream/g;
+    for (const match of raw.matchAll(re)) {
+        try {
+            parts.push(inflateSync(Buffer.from(match[1], 'latin1')).toString('latin1'));
+        } catch {
+            // Stream no flate (imagen, metadatos): no aplica a esta inspección.
+        }
+    }
+    return parts.join('\n');
+}
+
+
 const pageCount = (pdf: Buffer) => (pdf.toString('latin1').match(/\/Type \/Page(?!s)\b/g) ?? []).length;
 
 describe('buildMemoPdf', () => {
@@ -54,6 +71,22 @@ describe('buildMemoPdf', () => {
     it('un memo vacío sigue siendo un PDF válido de una página', async () => {
         const pdf = await buildMemoPdf('');
         expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
+        expect(pageCount(pdf)).toBe(1);
+    });
+
+    it('el pie y los títulos no ligan «fi»: copiar del PDF no suelta letras', async () => {
+        // Regresión: la tipografía de marca (Instrument Serif) fundía «fi» en
+        // un solo glifo y varios visores lo perdían al copiar («financiero»
+        // -> «fnanciero» en el pie). Sin la ligadura no hay glifo fusionado
+        // que incrustar, así que el mapa ToUnicode no puede llevar una
+        // entrada que expanda un glifo a «fi»/«Fi».
+        const pdf = await buildMemoPdf('# Memo de tesis — FIS (Fiserv)\n\nCifras de confianza.');
+        const text = inflatedStreams(pdf);
+        // Control positivo: la inspección sí encontró mapas ToUnicode (si no,
+        // el test pasaría en vacío aunque la ligadura siguiera ahí).
+        expect(text).toContain('beginbfrange');
+        expect(text).not.toContain('<0066 0069>');
+        expect(text).not.toContain('<0046 0069>');
         expect(pageCount(pdf)).toBe(1);
     });
 

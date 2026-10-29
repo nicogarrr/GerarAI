@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
+import { AppError } from '@/lib/types/errors';
 import { formatGeneratedDate, formatPercent, formatUserDate } from '@/lib/format';
 import {
   getResearchCompanySnapshot,
@@ -169,17 +170,24 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const { ticker: rawTicker } = await params;
   const ticker = rawTicker.toUpperCase();
 
-  const [snapshot, workspace] = await Promise.all([
-    getResearchCompanySnapshot(ticker).catch(() => null),
+  const [snapshotRead, workspace] = await Promise.all([
+    // null = 404 «compañía ausente del master» (getResearchCompanySnapshot
+    // solo devuelve null ahí); cualquier otro fallo es `failed`. Antes ambos
+    // eran null y un ticker fuera del master se contaba como caída del servicio.
+    getResearchCompanySnapshot(ticker).then(
+      (value) => ({ value, failed: false }),
+      () => ({ value: null, failed: true }),
+    ),
     getResearchThesisWorkspace(ticker).catch(() => null),
   ]);
+  const snapshot = snapshotRead.value;
   const company = snapshot?.company ?? null;
   const currency = company?.currency ?? null;
   const latest = workspace?.thesis ?? null;
   // `getResearchThesisWorkspace` devuelve `thesis: null` cuando NO hay tesis
   // (404) y lanza cuando el backend falla: `workspace === null` es un fallo,
   // no un «todavía no hay tesis». Lo mismo con las versiones.
-  const versions = workspace ? await readLatestPublished(ticker) : { published: null, failed: false };
+  const versions = workspace ? await readLatestPublished(ticker) : { published: null, failed: false, missing: false };
   const published = versions.published;
   // Fuentes por cifra: /versions no las trae; /latest si. Solo se muestran
   // cuando la publicada ES la ultima version: la procedencia de un borrador
@@ -222,7 +230,15 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   const displayedVersion = published ?? latest;
   // Sin snapshot no se puede evaluar la puerta de publicacion: si habia una
   // version que mostrar, eso es un fallo de carga y se dice como tal.
-  const loadFailed = workspace === null || versions.failed || (displayedVersion !== null && snapshot === null);
+  // Ticker fuera del master: el snapshot dio 404 y /versions también (o no hay
+  // nada que mostrar). No es un fallo del servicio: no hay tesis porque la
+  // empresa no está en la cobertura. Se dice tal cual, sin «Reintentar».
+  const companyMissing =
+    workspace !== null && !snapshotRead.failed && snapshot === null
+    && (versions.missing || displayedVersion === null);
+  const loadFailed = !companyMissing && (
+    workspace === null || versions.failed || (displayedVersion !== null && snapshot === null)
+  );
   if (!loadFailed && displayedVersion && !canShowThesisText(displayedVersion, snapshot?.model_summary)) {
     return (
       <main id="content" className={`print-document min-h-screen bg-surface-0 text-gray-100 ${publicEditorial.variable}`}>
@@ -254,7 +270,21 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           </Link>
         </div>
 
-        {loadFailed ? (
+        {companyMissing ? (
+          <div className="mt-8 max-w-[40rem]">
+            <EmptyState
+              action={(
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <EmptyLink href={`/research/${encoded}`}>Comprobar {ticker} en su ficha</EmptyLink>
+                  <EmptyLink href="/search">Buscar otra empresa</EmptyLink>
+                </div>
+              )}
+              description={`${ticker} no está en la cobertura verificada de GerarAI, así que no tiene tesis. Su ficha comprueba si el símbolo es correcto y a qué emisor corresponde.`}
+              title={`No hay tesis de ${ticker}`}
+              titleAs="h1"
+            />
+          </div>
+        ) : loadFailed ? (
           <div className="mt-8 max-w-[40rem]">
             <ErrorState
               action={(
@@ -599,11 +629,15 @@ async function readLatestPublished(ticker: string) {
       `/api/thesis/${encodeURIComponent(ticker)}/versions`,
       { timeoutMs: 12_000 },
     );
-  } catch {
-    return { published: null, failed: true };
+  } catch (error) {
+    // 404 = «Company not found» (ticker fuera del master): no es un fallo.
+    if (error instanceof AppError && error.statusCode === 404) {
+      return { published: null, failed: false, missing: true };
+    }
+    return { published: null, failed: true, missing: false };
   }
   const published = versions
     .filter((version) => version.status === 'published')
     .sort((a, b) => b.version - a.version)[0];
-  return { published: published ?? null, failed: false };
+  return { published: published ?? null, failed: false, missing: false };
 }

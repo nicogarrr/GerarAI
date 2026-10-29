@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getResearchCompanySnapshot, getResearchThesisWorkspace } from '@/lib/actions/research.actions';
 import { researchRequest } from '@/lib/research/client';
 import ThesisReadingPage from '@/app/(root)/research/[ticker]/tesis/page';
+import { AppError } from '@/lib/types/errors';
 
 vi.mock('@/lib/actions/research.actions', () => ({ getResearchCompanySnapshot: vi.fn(), getResearchThesisWorkspace: vi.fn() }));
 vi.mock('@/lib/research/client', () => ({ researchRequest: vi.fn() }));
@@ -51,6 +52,27 @@ describe('vista de lectura de la tesis: estados honestos', () => {
         render(await page());
         expect(screen.getByRole('alert')).toBeInTheDocument();
         expect(screen.queryByText('Resumen de prueba')).not.toBeInTheDocument();
+    });
+
+    it('ticker fuera del master (snapshot y versiones 404): dice que no está en la cobertura, no que el servicio falló', async () => {
+        vi.mocked(getResearchCompanySnapshot).mockResolvedValue(null);
+        vi.mocked(getResearchThesisWorkspace).mockResolvedValue({ thesis: null } as never);
+        vi.mocked(researchRequest).mockRejectedValue(new AppError('Company not found', 'RESEARCH_API_ERROR', 404));
+        render(await page());
+        expect(screen.getByRole('heading', { level: 1, name: 'No hay tesis de AAPL' })).toBeInTheDocument();
+        expect(screen.getByText(/AAPL no está en la cobertura verificada de GerarAI/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Comprobar AAPL en su ficha' })).toHaveAttribute('href', '/research/AAPL');
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+        expect(screen.queryByText(/no respondió/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: 'Reintentar' })).not.toBeInTheDocument();
+    });
+
+    it('un fallo real de /versions (no 404) sigue siendo error aunque falte el snapshot', async () => {
+        vi.mocked(getResearchCompanySnapshot).mockResolvedValue(null);
+        vi.mocked(getResearchThesisWorkspace).mockResolvedValue({ thesis } as never);
+        vi.mocked(researchRequest).mockRejectedValue(new AppError('boom', 'RESEARCH_API_ERROR', 503));
+        render(await page());
+        expect(screen.getByRole('heading', { level: 1, name: 'No se pudo cargar la tesis de AAPL' })).toBeInTheDocument();
     });
 
     it('sin ninguna tesis (404 = thesis null) sigue el estado vacío con su siguiente paso', async () => {

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Claim, ClaimEvidence, Company, SourceAudit, ThesisSection, ThesisVersion
+from app.services.display_es import fecha_es
 from app.services.memo_text_es import RATING_ES, STATUS_ES, label_es, money_thesis, percent_es
 from app.services.thesis_approval_service import APPROVAL_SECTION_TITLE
 from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
@@ -24,6 +25,15 @@ from app.valuation.margin_convention import (
     MARGIN_OF_SAFETY_CONVENTION,
     MARGIN_OF_SAFETY_FORMULA,
 )
+
+
+def _fecha_hora_utc(value: datetime) -> str:
+    """«24 oct 2026, 09:41 UTC»: la fecha en la forma corta que usa la web.
+
+    La ficha pinta «generada el 24 oct 2026» (formatGeneratedDate, es-ES);
+    el memo es el mismo documento y no puede fechar en ISO crudo.
+    """
+    return f"{fecha_es(value)}, {value:%H:%M} UTC"
 
 
 def _fraction_row_to_percent(line: str) -> str:
@@ -107,8 +117,18 @@ def _narrative_lines(narrative: list | None) -> list[str]:
         if not titulo or not parrafos:
             continue
         out.append(f"### {titulo}")
+        # Cada párrafo es un párrafo: con salto simple se fusionaban en uno
+        # solo en Markdown y salían pegados en el PDF. Las pistas «Evidencia»
+        # consecutivas siguen juntas (una lista, no párrafos separados).
+        primero = True
+        prev_evidencia = False
         for parrafo in parrafos:
-            out.append(f"- {parrafo}" if parrafo.startswith("Evidencia ") else parrafo)
+            es_evidencia = parrafo.startswith("Evidencia ")
+            if not primero and not (es_evidencia and prev_evidencia):
+                out.append("")
+            out.append(f"- {parrafo}" if es_evidencia else parrafo)
+            primero = False
+            prev_evidencia = es_evidencia
         out.append("")
     return out
 
@@ -178,10 +198,10 @@ def build_memo_markdown(
     lines.append(
         f"Versión {thesis.version} · estado {label_es(STATUS_ES, thesis.status)} · "
         f"{rating_part}"
-        f"generada {thesis.created_at:%Y-%m-%d %H:%M} UTC · actualizada {thesis.updated_at:%Y-%m-%d %H:%M} UTC"
+        f"generada {_fecha_hora_utc(thesis.created_at)} · actualizada {_fecha_hora_utc(thesis.updated_at)}"
     )
     if stale:
-        when = f"{latest_data_at:%Y-%m-%d}" if latest_data_at else "desconocida"
+        when = fecha_es(latest_data_at) if latest_data_at else "desconocida"
         lines.append(f"\n> AVISO: tesis potencialmente DESACTUALIZADA: hay datos mas nuevos (hasta {when}).")
     lines.append("")
 
@@ -266,7 +286,7 @@ def build_memo_markdown(
         # no la cotización de hoy: se rotula como tal, con la fecha de la
         # cotización solo si quedó persistida (nunca una fecha inventada).
         price_as_of = (thesis.valuation_basis or {}).get("price_as_of")
-        price_label = "Precio del modelo" + (f" al {price_as_of}" if price_as_of else "")
+        price_label = "Precio del modelo" + (f" al {fecha_es(price_as_of)}" if price_as_of else "")
         lines.append(
             f"\n{price_label}: {_money(thesis.current_price, company.currency)} · Valor esperado: "
             f"{_money(thesis.expected_value, company.currency)} · Margen de seguridad: "
@@ -346,12 +366,12 @@ def build_memo_markdown(
     lines.append("---")
     if isolated:
         lines.append(
-            f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde una ejecución aislada "
+            f"Generado {_fecha_hora_utc(datetime.now(UTC))} desde una ejecución aislada "
             "(rollback, no persistida; sin fingerprint persistido)."
         )
     else:
         lines.append(
-            f"Generado {datetime.now(UTC):%Y-%m-%d %H:%M} UTC desde la versión persistida "
+            f"Generado {_fecha_hora_utc(datetime.now(UTC))} desde la versión persistida "
             f"{thesis.version} (fingerprint {thesis.input_fingerprint or 'n/a'})."
         )
     lines.append(

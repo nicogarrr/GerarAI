@@ -213,7 +213,9 @@ def scoreboard(rows: list[PaperTrade], now: datetime | None = None) -> dict:
     # Native currencies are NEVER summed together. An early stop is not a 5y verdict.
     bins = []
     for low, high in ((0, 0.5), (0.5, 0.75), (0.75, 1.01)):
-        sample = [r for r in rows if r.status == "closed" and low <= float(r.conviction) < high and pnl(r, r.exit_price) is not None]
+        # Misma regla que los grupos y calibration(): una cerrada con split no es comparable.
+        sample = [r for r in rows if r.status == "closed" and not r.corporate_action_warning
+                  and low <= float(r.conviction) < high and pnl(r, r.exit_price) is not None]
         bins.append({"conviction_min": low, "conviction_max": min(high, 1), "closed": len(sample),
                      "hit_rate": sum((pnl(r, r.exit_price) or Decimal(0)) > 0 for r in sample) / len(sample) if sample else None})
     return {"groups": cells, "conviction_bins": bins, "hit_rate": "positive_gross_return_on_closed_positions",

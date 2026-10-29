@@ -6,6 +6,7 @@ import io
 import json
 import re
 from collections import Counter
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree
@@ -42,11 +43,53 @@ def _is_number(value: str | None) -> bool:
     return parse_localized_number(value) is not None
 
 
+# Orden de las fechas «nn/nn/aaaa» del Flex que se está leyendo. IBKR deja
+# elegir el formato de fecha de la Flex Query (MM/dd/yyyy por defecto, pero
+# también dd/MM/yyyy, el natural en España). Se decide por fichero en
+# validate_flex_xml/import_flex_xml; fuera de ellos vale mm/dd (lo de siempre).
+_FLEX_SLASH_DAY_FIRST: ContextVar[bool] = ContextVar("ibkr_flex_slash_day_first", default=False)
+_SLASH_VALUE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})(?:[;, ].*)?$")
+
+
+def _date_formats() -> tuple[str, ...]:
+    slash = (
+        ("%d/%m/%Y", "%d/%m/%y") if _FLEX_SLASH_DAY_FIRST.get() else ("%m/%d/%Y", "%m/%d/%y")
+    )
+    return ("%Y-%m-%d", "%Y%m%d", *slash, "%d-%b-%y", "%d-%b-%Y")
+
+
+def _flex_slash_day_first(root: ElementTree.Element) -> bool | None:
+    """Orden día/mes de las fechas con barra de UN Flex (todas las filas).
+
+    Un primer número > 12 solo puede ser día (dd/MM); un segundo > 12, solo
+    mm/dd. Sin evidencia se mantiene mm/dd (formato por defecto de IBKR).
+    Evidencia en los dos sentidos -> ``None`` (fichero incoherente).
+    """
+    day_first_seen = month_first_seen = False
+    for element in root.iter():
+        for value in element.attrib.values():
+            match = _SLASH_VALUE.match(value.strip())
+            if not match:
+                continue
+            first, second = int(match.group(1)), int(match.group(2))
+            day_first_seen |= first > 12 and 1 <= second <= 12
+            month_first_seen |= second > 12 and 1 <= first <= 12
+    if day_first_seen and month_first_seen:
+        return None
+    return day_first_seen
+
+
+_MIXED_FLEX_DATES = (
+    "Las fechas del Flex mezclan dd/MM/aaaa y MM/dd/aaaa: no se puede saber qué fecha es "
+    "cada fila. Configura la Flex Query con fechas aaaaMMdd (o aaaa-MM-dd) y descárgala de nuevo."
+)
+
+
 def _is_date(value: str | None) -> bool:
     if not value:
         return False
-    normalized = value.split(";", 1)[0].split(" ", 1)[0]
-    for fmt in ("%Y-%m-%d", "%Y%m%d", "%m/%d/%Y"):
+    normalized = value.split(";", 1)[0].split(" ", 1)[0].rstrip(",")
+    for fmt in _date_formats():
         try:
             datetime.strptime(normalized, fmt)
             return True
@@ -56,6 +99,22 @@ def _is_date(value: str | None) -> bool:
 
 
 def validate_flex_xml(xml_text: str) -> list[str]:
+    """Valida un Flex Query XML de IBKR (fechas con barra: orden por fichero)."""
+    try:
+        root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+    except ElementTree.ParseError:
+        root = None
+    day_first = _flex_slash_day_first(root) if root is not None else False
+    if day_first is None:
+        return [_MIXED_FLEX_DATES]
+    token = _FLEX_SLASH_DAY_FIRST.set(day_first)
+    try:
+        return _validate_flex_xml(xml_text)
+    finally:
+        _FLEX_SLASH_DAY_FIRST.reset(token)
+
+
+def _validate_flex_xml(xml_text: str) -> list[str]:
     """Valida un Flex Query XML de IBKR.
 
     Devuelve una lista de errores accionables en español
@@ -238,6 +297,56 @@ def _csv_rows(csv_text: str) -> list[list[str]]:
     return list(csv.reader(io.StringIO(text), delimiter=_csv_delimiter(text)))
 
 
+_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})$")
+
+
+def _date_token(value: str | None) -> str:
+    return (value or "").strip().split(";", 1)[0].split(" ", 1)[0]
+
+
+def _csv_slash_day_first(day_cells: list[str], delimiter: str) -> bool | None:
+    """Orden de las fechas «nn/nn/aaaa» de UN fichero CSV.
+
+    Excel/LibreOffice en español guardan las fechas como dd/mm/aaaa (y usan
+    «;» porque la coma es el decimal); IBKR en inglés escribe mm/dd/aaaa. Se
+    decide por fichero: un primer número > 12 solo puede ser día, un segundo
+    número > 12 solo puede ser día en mm/dd. Sin evidencia, manda el
+    separador («;» = es-ES = día primero). Evidencia en los dos sentidos ->
+    ``None``: el fichero mezcla formatos y cualquier lectura falsearía fechas.
+    """
+    day_first_seen = month_first_seen = False
+    for cell in day_cells:
+        match = _SLASH_DATE.match(_date_token(cell))
+        if not match:
+            continue
+        first, second = int(match.group(1)), int(match.group(2))
+        # Solo cuenta una fecha válida en UN orden («32/13/2026» no es
+        # evidencia de nada: será un error de esa fila).
+        day_first_seen |= first > 12 and 1 <= second <= 12
+        month_first_seen |= second > 12 and 1 <= first <= 12
+    if day_first_seen and month_first_seen:
+        return None
+    if day_first_seen or month_first_seen:
+        return day_first_seen
+    return delimiter == ";"
+
+
+def _csv_date_value(value: str | None, day_first: bool) -> date | None:
+    """Fecha de una celda CSV con el orden del fichero; None si no es fecha."""
+    token = _date_token(value)
+    if not token:
+        return None
+    slash = _SLASH_DATE.match(token)
+    if slash:
+        year = "%Y" if len(slash.group(3)) == 4 else "%y"
+        fmt = f"%d/%m/{year}" if day_first else f"%m/%d/{year}"
+        try:
+            return datetime.strptime(token, fmt).date()
+        except ValueError:
+            return None
+    return _date(token) if _is_date(token) else None
+
+
 def validate_ibkr_csv(csv_text: str) -> list[str]:
     """Valida un CSV de actividad de IBKR (cabecera + filas).
 
@@ -265,6 +374,16 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
             "La cabecera del CSV no tiene las columnas obligatorias: symbol, action, quantity, price y date "
             "(se aceptan alias como ticker, buySell, shares, tradePrice o tradeDate). "
             f"Cabecera encontrada: {', '.join(rows[0])}."
+        ]
+    date_cells = [
+        row[mapping["date"]] for row in rows[1:] if mapping["date"] < len(row)
+    ]
+    day_first = _csv_slash_day_first(date_cells, _csv_delimiter(csv_text.strip()))
+    if day_first is None:
+        return [
+            "Las fechas del CSV mezclan dd/mm/aaaa y mm/dd/aaaa (hay filas con día > 12 en "
+            "las dos posiciones): no se puede saber qué fecha es cada operación. Exporta de "
+            "nuevo con fechas AAAA-MM-DD."
         ]
     errors: list[str] = []
     for line_number, row in enumerate(rows[1:], start=2):
@@ -299,7 +418,7 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
                 "Corrige el valor o elimina la fila."
             )
         day = row[mapping["date"]].strip() if mapping["date"] < len(row) else ""
-        if not _is_date(day):
+        if _csv_date_value(day, day_first) is None:
             errors.append(
                 f"Fila {line_number} del CSV ({symbol}): la fecha '{day}' no tiene un formato "
                 "reconocido (usa AAAA-MM-DD). Corrige el valor o elimina la fila."
@@ -348,7 +467,7 @@ def _decimal(value: str | None, default: str = "0") -> Decimal:
     return parsed[0]
 
 
-def _csv_decimal(value: str) -> Decimal:
+def _csv_decimal(value: str, *, decimal_comma: bool = False) -> Decimal:
     """Number from an IBKR CSV cell (en-US or es-ES notation).
 
     The old code stripped every comma, so "12,50" became 1250 and "1.234,56"
@@ -357,10 +476,18 @@ def _csv_decimal(value: str) -> Decimal:
     keep their identity. A cell with a comma goes through the shared
     localized parser (same one the validation uses); "1,234" still reads as
     1234 and "1,5"/"12,50" as decimals. Not interpretable -> error, never 0.
+
+    ``decimal_comma`` (a «;»-separated file, Excel es-ES): the comma is ALWAYS
+    the decimal separator there, so "32,725" is 32.725 and not 32725 (a
+    3-decimal IBKR price re-saved by Spanish Excel came out x1000).
     """
     plain = str(value).strip()
     if "," not in plain and _MACHINE_DECIMAL.match(plain):
         return Decimal(plain)
+    if decimal_comma and plain.count(",") == 1 and "." not in plain:
+        candidate = plain.replace(",", ".")
+        if _MACHINE_DECIMAL.match(candidate):
+            return Decimal(candidate)
     parsed = parse_localized_number(plain)
     if parsed is None:
         raise IBKRImportError(
@@ -380,6 +507,27 @@ def _legacy_csv_values(symbol: str, action: str, cell) -> list[str] | None:
             str(Decimal(cell("price").replace(",", "")).normalize()),
             _date(cell("date")).isoformat(),
             str(abs(Decimal(cell("fees").replace(",", "")).normalize())) if cell("fees") else "0",
+            cell("currency").upper() or "USD",
+        ]
+    except Exception:  # noqa: BLE001 - unreadable legacy form: no legacy identity
+        return None
+
+
+def _semicolon_v1_csv_values(symbol: str, action: str, cell) -> list[str] | None:
+    """Fingerprint values as the first «;» importer (#2685) built them.
+
+    It read a «;» file with the en-US rules: "32,725" -> 32725 and
+    "05/03/2026" -> 3 May. Rows stored under THAT identity must be recognised
+    on re-import, or the corrected reading inserts a twin.
+    """
+    try:
+        return [
+            symbol,
+            action,
+            str(abs(_csv_decimal(cell("quantity")).normalize())),
+            str(_csv_decimal(cell("price")).normalize()),
+            _date(cell("date")).isoformat(),
+            str(abs(_csv_decimal(cell("fees")).normalize())) if cell("fees") else "0",
             cell("currency").upper() or "USD",
         ]
     except Exception:  # noqa: BLE001 - unreadable legacy form: no legacy identity
@@ -406,8 +554,8 @@ def _missing_position_fields(element: ElementTree.Element) -> list[str]:
 def _date(value: str | None) -> date:
     if not value:
         return date.today()
-    normalized = value.split(";", 1)[0].split(" ", 1)[0]
-    for fmt in ("%Y-%m-%d", "%Y%m%d", "%m/%d/%Y"):
+    normalized = value.split(";", 1)[0].split(" ", 1)[0].rstrip(",")
+    for fmt in _date_formats():
         try:
             return datetime.strptime(normalized, fmt).date()
         except ValueError:
@@ -673,7 +821,27 @@ def _auto_link_journal_after_import(db: Session) -> None:
 
 
 class IBKRImportService:
-    def import_flex_xml(
+    def import_flex_xml(self, db: Session, xml_text: str, **options) -> dict:
+        """Importa un Flex Query (ver ``_import_flex_xml``).
+
+        Las fechas con barra se leen con el orden del propio fichero: una Flex
+        Query configurada con dd/MM/yyyy fechaba el 05/03 como 3 de mayo y
+        omitía el 15/03 por «fecha no reconocida».
+        """
+        try:
+            root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        except ElementTree.ParseError:
+            root = None
+        day_first = _flex_slash_day_first(root) if root is not None else False
+        if day_first is None:
+            raise IBKRImportError(_MIXED_FLEX_DATES)
+        token = _FLEX_SLASH_DAY_FIRST.set(day_first)
+        try:
+            return self._import_flex_xml(db, xml_text, **options)
+        finally:
+            _FLEX_SLASH_DAY_FIRST.reset(token)
+
+    def _import_flex_xml(
         self,
         db: Session,
         xml_text: str,
@@ -1355,6 +1523,22 @@ class IBKRImportService:
         data_rows = [row for row in _csv_rows(csv_text) if any(cell.strip() for cell in row)]
         mapping = _map_csv_columns(data_rows[0])
         assert mapping is not None  # garantizado por validate_ibkr_csv
+        delimiter = _csv_delimiter(csv_text.strip())
+        decimal_comma = delimiter == ";"
+        day_first = _csv_slash_day_first(
+            [row[mapping["date"]] for row in data_rows[1:] if mapping["date"] < len(row)],
+            delimiter,
+        )
+        assert day_first is not None  # garantizado por validate_ibkr_csv
+
+        def _num(text: str) -> Decimal:
+            return _csv_decimal(text, decimal_comma=decimal_comma)
+
+        def _day(text: str) -> date:
+            parsed = _csv_date_value(text, bool(day_first))
+            if parsed is None:  # pragma: no cover - validate_ibkr_csv ya la omitio
+                raise IBKRImportError(f"Fecha no interpretable: {text!r}.")
+            return parsed
         ledger = PortfolioLedgerService()
         trades_imported = 0
         duplicate_trades = 0
@@ -1374,7 +1558,7 @@ class IBKRImportService:
             date_pos = mapping.get("date")
             action_pos = mapping.get("action")
             try:
-                day = _date(raw[date_pos].strip()).isoformat() if date_pos is not None else "9999-12-31"
+                day = _day(raw[date_pos].strip()).isoformat() if date_pos is not None else "9999-12-31"
             except Exception:  # noqa: BLE001 - las filas invalidas ya estan en bad_lines
                 day = "9999-12-31"
             kind = (
@@ -1401,10 +1585,10 @@ class IBKRImportService:
             # Provider IDs share identity with Flex XML. Without one, use the
             # canonical economic row plus occurrence count, preserving two
             # identical fills in one file while making replay/reordering safe.
-            values = [symbol, action, str(abs(_csv_decimal(_cell("quantity")).normalize())),
-                      str(_csv_decimal(_cell("price")).normalize()),
-                      _date(_cell("date")).isoformat(),
-                      str(abs(_csv_decimal(_cell("fees")).normalize())) if _cell("fees") else "0",
+            values = [symbol, action, str(abs(_num(_cell("quantity")).normalize())),
+                      str(_num(_cell("price")).normalize()),
+                      _day(_cell("date")).isoformat(),
+                      str(abs(_num(_cell("fees")).normalize())) if _cell("fees") else "0",
                       _cell("currency").upper() or "USD"]
             fingerprint = hashlib.sha256(json.dumps(values).encode()).hexdigest()
             occurrences[fingerprint] += 1
@@ -1428,35 +1612,48 @@ class IBKRImportService:
                 # Re-importing the same file would insert a corrected twin of a
                 # row already in the ledger. If the legacy identity exists, the
                 # row is blocked with an explanation and nothing is mutated.
-                legacy_values = _legacy_csv_values(symbol, action, _cell)
-                if legacy_values is not None and legacy_values != values:
+                legacy_candidates: list[list[str]] = []
+                for legacy_values in (
+                    _legacy_csv_values(symbol, action, _cell),
+                    _semicolon_v1_csv_values(symbol, action, _cell) if decimal_comma else None,
+                ):
+                    if (
+                        legacy_values is not None
+                        and legacy_values != values
+                        and legacy_values not in legacy_candidates
+                    ):
+                        legacy_candidates.append(legacy_values)
+                legacy_hit = False
+                for legacy_values in legacy_candidates:
                     legacy_fp = hashlib.sha256(json.dumps(legacy_values).encode()).hexdigest()
                     legacy_occurrences[legacy_fp] += 1
                     legacy_id = f"ibkr-csv-{legacy_fp}-{legacy_occurrences[legacy_fp]}"
-                    if db.scalar(
+                    legacy_hit |= db.scalar(
                         select(Transaction.id).where(
                             Transaction.external_id == legacy_id,
                             *tenant_filters(db, Transaction),
                         )
-                    ) is not None:
-                        rows_skipped += 1
-                        legacy_reimport_blocked += 1
-                        row_errors.append(
-                            f"Fila {line_number} del CSV: ya existe una operacion importada antes con "
-                            "esta misma fila leida con decimales corruptos (coma decimal). No se "
-                            "duplica ni se modifica; revisa y corrige la operacion existente a mano."
-                        )
-                        continue
+                    ) is not None
+                if legacy_hit:
+                    rows_skipped += 1
+                    legacy_reimport_blocked += 1
+                    row_errors.append(
+                        f"Fila {line_number} del CSV: ya existe una operacion importada antes con "
+                        "esta misma fila leida con decimales corruptos (coma decimal) o con la "
+                        "fecha dd/mm leida como mm/dd. No se duplica ni se modifica; revisa y "
+                        "corrige la operacion existente a mano."
+                    )
+                    continue
             try:
                 with db.begin_nested():
                     transaction = ledger.create_transaction(
                         db,
                         ticker=symbol,
                         action=action,
-                        quantity=abs(_csv_decimal(_cell("quantity"))),
-                        price=_csv_decimal(_cell("price")),
-                        trade_date=_date(_cell("date")),
-                        fees=abs(_csv_decimal(_cell("fees"))) if _cell("fees") else Decimal("0"),
+                        quantity=abs(_num(_cell("quantity"))),
+                        price=_num(_cell("price")),
+                        trade_date=_day(_cell("date")),
+                        fees=abs(_num(_cell("fees"))) if _cell("fees") else Decimal("0"),
                         currency=_cell("currency").upper() or "USD",
                     )
                     transaction.external_id = external_id
@@ -1504,7 +1701,7 @@ class IBKRImportService:
         self, db: Session, cache: dict[str, Company], symbol: str,
         element: ElementTree.Element | None = None,
     ) -> Company:
-        from app.services.listing_identity import reviewed_listing
+        from app.services.listing_identity import reviewed_listing, same_venue
 
         isin = ((_attr(element, "isin") if element is not None else None) or "").strip().upper()
         listing = reviewed_listing(isin)
@@ -1513,7 +1710,7 @@ class IBKRImportService:
         # must not be collapsed by ISIN alone.
         currency = ((_attr(element, "currency") if element is not None else None) or "").strip().upper()
         exchange = ((_attr(element, "listingExchange") if element is not None else None) or "UNKNOWN").strip()
-        if listing and exchange.upper() not in {"AEB", "XAMS", "EURONEXT AMSTERDAM"}:
+        if listing and not same_venue(listing, exchange):
             raise IBKRImportError("La plaza Flex es distinta o ambigua para el ISIN verificado.")
         if listing and currency and currency != listing.currency:
             raise IBKRImportError("La divisa Flex contradice el listado verificado por ISIN.")
@@ -1547,8 +1744,7 @@ class IBKRImportService:
         cache[ticker] = company
         # A verified listing must never be enriched using its bare US homonym.
         if listing:
-            if company.currency != listing.currency or company.exchange != listing.exchange:
-                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            self._reconcile_reviewed_listing(company, listing)
             return company
         # Enriquecer el placeholder con el nombre real desde las APIs de datos.
         # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional; nunca bloquea el import
@@ -1559,6 +1755,32 @@ class IBKRImportService:
         except Exception:  # noqa: BLE001 — nunca bloquear el import por el enriquecimiento
             pass
         return company
+
+    @staticmethod
+    def _reconcile_reviewed_listing(company: Company, listing) -> None:
+        """Align an existing row with the ISIN-verified listing, or fail.
+
+        The ficha, the search box and thesis generation create ``BFIT.AS`` as a
+        stub (exchange UNKNOWN, currency USD) and Finnhub later labels it
+        «NYSE EURONEXT - EURONEXT AMSTERDAM». Such a placeholder row (no ISIN,
+        placeholder or Amsterdam exchange, USD/EUR) is corrected to the verified
+        identity instead of rejecting the whole Flex file. A row that names
+        another venue or currency is a real conflict and still fails.
+        """
+        from app.services.listing_identity import PLACEHOLDER_EXCHANGES, same_venue
+
+        exchange = (company.exchange or "").strip().upper()
+        currency = (company.currency or "").strip().upper()
+        venue_ok = same_venue(listing, exchange)
+        if not company.isin:
+            placeholder = exchange in PLACEHOLDER_EXCHANGES or venue_ok
+            if not placeholder or currency not in {"", "USD", listing.currency}:
+                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            company.isin = listing.isin
+        elif not venue_ok or currency != listing.currency:
+            raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+        company.exchange = listing.exchange
+        company.currency = listing.currency
 
     @staticmethod
     def _capture_isin(company: Company, element: ElementTree.Element) -> None:

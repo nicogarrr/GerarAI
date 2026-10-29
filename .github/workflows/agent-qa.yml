@@ -86,11 +86,21 @@ jobs:
         env:
           QA_LLM_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
           ANONYMIZED_TELEMETRY: "false"
+          # Los inputs llegan por env (no interpolados en el script): un valor
+          # con ; o $(...) no se ejecuta en un step que lleva la API key.
+          QA_PERSONAS: ${{ inputs.personas }}
+          QA_MAX_STEPS: ${{ inputs.max_steps }}
         run: |
-          args="--base http://127.0.0.1:3720 --out qa-agents/out --parallel 4"
-          [ -n "${{ inputs.personas }}" ] && args="$args --only ${{ inputs.personas }}"
-          [ "${{ inputs.max_steps }}" != "0" ] && args="$args --max-steps ${{ inputs.max_steps }}"
-          timeout -k 10 2700 python qa-agents/run.py $args
+          args=(--base http://127.0.0.1:3720 --out qa-agents/out --parallel 4)
+          if [ -n "$QA_PERSONAS" ]; then
+            [[ "$QA_PERSONAS" =~ ^[A-Za-z0-9_,-]+$ ]] || { echo "::error::personas: solo slugs separados por comas"; exit 1; }
+            args+=(--only "$QA_PERSONAS")
+          fi
+          if [ -n "$QA_MAX_STEPS" ] && [ "$QA_MAX_STEPS" != "0" ]; then
+            [[ "$QA_MAX_STEPS" =~ ^[0-9]+$ ]] || { echo "::error::max_steps debe ser un entero"; exit 1; }
+            args+=(--max-steps "$QA_MAX_STEPS")
+          fi
+          timeout -k 10 2700 python qa-agents/run.py "${args[@]}"
           python qa-agents/report.py qa-agents/out >> "$GITHUB_STEP_SUMMARY"
 
       - name: Sube hallazgos y capturas
