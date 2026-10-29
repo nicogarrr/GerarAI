@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import date
@@ -318,11 +319,17 @@ def _currency_blocked_result(engine: ValuationEngine, context: ValuationContext,
     )
 
 
+logger = logging.getLogger(__name__)
+
+
 class ValuationService:
     def value_company(self, db: Session, company: Company, *, as_of: date | None = None) -> dict:
+        price_error = None
         try:
             resolved_price = resolve_model_price(db, company.id, as_of)
-        except Exception:  # noqa: BLE001 - sin precio, la valoracion sigue sin MOS
+        except Exception as exc:  # noqa: BLE001 - sin precio, la valoracion sigue sin MOS
+            price_error = type(exc).__name__
+            logger.warning("Model price lookup failed company_id=%s error=%s", company.id, price_error)
             resolved_price = None
         current_price = resolved_price.value if resolved_price is not None else None
         price_currency = (
@@ -410,6 +417,9 @@ class ValuationService:
                 _pit["filed_cutoff"] = _snapshot.filed_cutoff
                 _pit["filed_excluded_future"] = _snapshot.filed_excluded_future
                 _pit["filed_excluded_unknown"] = _snapshot.filed_excluded_unknown
+
+        if price_error is not None:
+            result["trace"]["price_error"] = price_error
 
         if current_price is None:
             result["trace"]["price_status"] = "missing_market_price"
