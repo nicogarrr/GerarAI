@@ -1257,7 +1257,8 @@ export type ResearchNewsEvent = {
   requires_update: boolean;
   /** 'source' = fecha de la fuente; 'ingested_at_fallback' = la fuente no da fecha. */
   date_source?: string | null;
-  /** 'macro' = evento macro GDELT sin ticker (#564); null/ausente = evento de empresa. */
+  /** 'macro' = evento macro GDELT sin ticker (#564); 'gobierno' = fuente oficial;
+   *  'social' = conversación StockTwits sin verificar; null/ausente = evento de empresa. */
   news_lane?: string | null;
   /** false = título de display generado por GerarAI (la UI omite el prefijo de ticker). */
   headline_from_source?: boolean;
@@ -1292,7 +1293,7 @@ type ResearchThesisVersion = {
 };
 
 export async function getResearchNews(
-  lane: 'empresa' | 'macro' | 'para-ti' | null = null,
+  lane: 'empresa' | 'macro' | 'gobierno' | 'social' | 'para-ti' | null = null,
   offset = 0,
   limit = 30,
   ticker: string | null = null,
@@ -1300,7 +1301,7 @@ export async function getResearchNews(
   tickers: string[] = [],
 ): Promise<ResearchNewsEvent[]> {
   const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-  if (lane === 'empresa' || lane === 'macro') params.set('lane', lane);
+  if (lane === 'empresa' || lane === 'macro' || lane === 'gobierno' || lane === 'social') params.set('lane', lane);
   if (ticker) params.set('ticker', ticker);
   if (lane === 'para-ti' && tickers.length) params.set('tickers', tickers.join(','));
   const events = await getJson<ResearchNewsEvent[]>(`/api/news?${params.toString()}`, []);

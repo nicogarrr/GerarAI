@@ -14,7 +14,9 @@ const CARRILES = [
   { key: null, label: 'Todas' },
   { key: 'para-ti', label: 'Para ti' },
   { key: 'empresa', label: 'Empresas' },
+  { key: 'gobierno', label: 'Gobierno' },
   { key: 'macro', label: 'Macro' },
+  { key: 'social', label: 'Social' },
 ] as const;
 
 function carrilHref(lane: NewsLane, ticker?: string | null): string {
@@ -23,6 +25,14 @@ function carrilHref(lane: NewsLane, ticker?: string | null): string {
   if (ticker) query.set('ticker', ticker);
   const text = query.toString();
   return text ? `/research/news?${text}` : '/research/news';
+}
+
+/** Paginación dentro de la ficha de empresa (?view=noticias&pagina=N): el
+ *  usuario no sale del contexto de la acción. */
+function fichaNewsPageHref(ticker: string, page: number): string {
+  const query = new URLSearchParams({ view: 'noticias' });
+  if (page > 1) query.set('pagina', String(page));
+  return `/research/${encodeURIComponent(ticker)}?${query.toString()}`;
 }
 
 const PAGER_LINK = 'inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-700 bg-black/30 px-4 py-2 text-sm font-medium text-gray-200 hover:border-teal-600 hover:text-teal-200';
@@ -37,17 +47,19 @@ function newsPageHref(lane: NewsLane, page: number, ticker?: string | null): str
   return text ? `/research/news?${text}` : '/research/news';
 }
 
-function NewsPager({label,lane,page,hasMore,ticker}:{label:string;lane:NewsLane;page:number;hasMore:boolean;ticker?:string|null}){
+function NewsPager({label,lane,page,hasMore,ticker,inFicha}:{label:string;lane:NewsLane;page:number;hasMore:boolean;ticker?:string|null;inFicha?:boolean}){
+ const href = (target: number) =>
+   inFicha && ticker ? fichaNewsPageHref(ticker, target) : newsPageHref(lane, target, ticker);
  return (
         <nav aria-label={label} className="mt-4 flex items-center justify-between gap-4">
           {page > 1 ? (
-            <Link className={PAGER_LINK} href={newsPageHref(lane, page - 1, ticker)} rel="prev">← Anterior</Link>
+            <Link className={PAGER_LINK} href={href(page - 1)} rel="prev">← Anterior</Link>
           ) : (
             <span aria-disabled="true" className={PAGER_OFF}>← Anterior</span>
           )}
           <span className="text-sm font-medium text-gray-400">Página {page}</span>
           {hasMore ? (
-            <Link className={PAGER_LINK} href={newsPageHref(lane, page + 1, ticker)} rel="next">Siguiente →</Link>
+            <Link className={PAGER_LINK} href={href(page + 1)} rel="next">Siguiente →</Link>
           ) : (
             <span aria-disabled="true" className={PAGER_OFF}>Siguiente →</span>
           )}
@@ -89,6 +101,31 @@ function MaterialityIndicator({ score }: { score: number }) {
         <span className={`block h-full ${color}`} style={{ width: `${clamped * 10}%` }} />
       </span>
       <span className={`font-semibold ${text}`}>{score}</span>
+    </span>
+  );
+}
+
+/** Buena/mala al lado de cada noticia: lectura automática por reglas del
+ *  titular (MaterialityService, determinista), NO un dato de la fuente ni una
+ *  recomendación. Se declara como lectura automática en title/aria. */
+const IMPACTO_ESTILO: Record<string, string> = {
+  positive: 'bg-teal-950/60 text-teal-300',
+  negative: 'bg-red-950/60 text-red-300',
+  neutral: 'bg-gray-800/60 text-gray-400',
+  mixed: 'bg-amber-950/60 text-amber-300',
+};
+
+export function ImpactBadge({ direction }: { direction?: string | null }) {
+  if (!direction) return null;
+  const estilo = IMPACTO_ESTILO[direction] ?? 'bg-gray-800/60 text-gray-400';
+  const nota = 'Lectura automática del titular por reglas; no es un dato de la fuente.';
+  return (
+    <span
+      aria-label={`Impacto ${etiquetaDireccionImpacto(direction)}. ${nota}`}
+      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilo}`}
+      title={nota}
+    >
+      {etiquetaDireccionImpacto(direction)}
     </span>
   );
 }
@@ -135,6 +172,27 @@ function MacroChip({ event }: { event: ResearchNewsEvent }) {
   return (
     <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">
       macro{event.macro_theme ? ` · ${etiquetaTemaMacro(event.macro_theme)}` : ''}
+    </span>
+  );
+}
+
+function GobiernoChip({ event }: { event: ResearchNewsEvent }) {
+  if (event.news_lane !== 'gobierno') return null;
+  return (
+    <span className="rounded-full bg-sky-950/60 px-2 py-0.5 text-xs font-semibold text-sky-300">
+      gobierno · oficial
+    </span>
+  );
+}
+
+function SocialChip({ event }: { event: ResearchNewsEvent }) {
+  if (event.news_lane !== 'social') return null;
+  return (
+    <span
+      className="rounded-full bg-fuchsia-950/60 px-2 py-0.5 text-xs font-semibold text-fuchsia-300"
+      title="Conversación de redes sociales (StockTwits). Sin verificar: no es una fuente contrastada."
+    >
+      social · sin verificar
     </span>
   );
 }
@@ -187,6 +245,7 @@ export function NewsEventsFlow({
   ticker,
   portfolioTickers,
   watchlistTickers,
+  inFicha = false,
 }: {
   events: ResearchNewsEvent[];
   hasMore: boolean;
@@ -195,6 +254,9 @@ export function NewsEventsFlow({
   ticker?: string | null;
   portfolioTickers: string[];
   watchlistTickers: string[];
+  /** true dentro de la ficha de empresa: sin filtro de carriles (es una sola
+   *  empresa) y la paginación apunta a ?view=noticias, no a /research/news. */
+  inFicha?: boolean;
 }) {
   const portfolioSet = new Set(portfolioTickers);
   const watchlistSet = new Set(watchlistTickers);
@@ -204,7 +266,12 @@ export function NewsEventsFlow({
           <AlertTriangle aria-hidden="true" className="h-5 w-5 text-teal-300" />
           <h2 className="text-lg font-semibold text-gray-100">Flujo de eventos</h2>
         </div>
-        <NewsPager label="Paginación" lane={lane} page={page} hasMore={hasMore} ticker={ticker} />
+        <NewsPager label="Paginación" lane={lane} page={page} hasMore={hasMore} ticker={ticker} inFicha={inFicha} />
+        {inFicha ? (
+          <p className="mb-4 mt-3 text-sm text-gray-500">
+            {events.length} {events.length === 1 ? 'evento' : 'eventos'} en la página {page}
+          </p>
+        ) : (
         <nav aria-label="Filtrar por carril" className="mb-4 mt-3 flex flex-wrap items-center gap-2">
           {CARRILES.map((option) => {
             const active = lane === option.key;
@@ -227,6 +294,7 @@ export function NewsEventsFlow({
             {events.length} {events.length === 1 ? 'evento' : 'eventos'} en la página {page}
           </span>
         </nav>
+        )}
         {/* F176: sin contain, Chrome propaga el overflow horizontal de la
             tabla al documento entero (zoom-out y recorte en movil) aunque la
             region ya scrolla por dentro; layout+paint lo contiene aqui. */}
@@ -250,7 +318,10 @@ export function NewsEventsFlow({
                   />
                 ) : null}
                 <MacroChip event={event} />
+                <GobiernoChip event={event} />
+                <SocialChip event={event} />
                 <CoverageChip event={event} />
+                <ImpactBadge direction={event.impact_direction} />
                 {event.requires_update ? (
                   <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">Revisar</span>
                 ) : null}
@@ -303,9 +374,11 @@ export function NewsEventsFlow({
                         watchlistTickers={watchlistSet}
                       />
                     ) : null}
-                    {event.news_lane === 'macro' ? (
+                    {event.news_lane === 'macro' || event.news_lane === 'gobierno' || event.news_lane === 'social' ? (
                       <div className="mt-1">
                         <MacroChip event={event} />
+                        <GobiernoChip event={event} />
+                        <SocialChip event={event} />
                       </div>
                     ) : null}
                     <div className="mt-1">
@@ -324,6 +397,9 @@ export function NewsEventsFlow({
                   </td>
                   <td className="px-3 py-2.5 text-center">
                     <MaterialityIndicator score={event.materiality_score} />
+                    <div className="mt-1">
+                      <ImpactBadge direction={event.impact_direction} />
+                    </div>
                   </td>
                   <td className="py-2.5 text-gray-300">
                     {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">Revisar</span> : null}
@@ -351,7 +427,7 @@ export function NewsEventsFlow({
             </tbody>
           </table>
         </div>
-        <NewsPager label="Paginación inferior" lane={lane} page={page} hasMore={hasMore} />
+        <NewsPager label="Paginación inferior" lane={lane} page={page} hasMore={hasMore} ticker={ticker} inFicha={inFicha} />
       </section>
   );
 }

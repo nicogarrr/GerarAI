@@ -5,7 +5,7 @@ import { DecisionJournalEntryLink } from '@/components/research/DecisionJournalE
 import { MODULES, moduleHref, type View } from '@/lib/research/research-views';
 
 const PRIMARY = [
-  { label: 'Resumen', entry: 'overview', keys: ['overview', 'thesis'] },
+  { label: 'Resumen', entry: 'overview', keys: ['overview', 'thesis', 'noticias'] },
   { label: 'Finanzas', entry: 'financials', keys: ['financials', 'valuation'] },
   { label: 'Fuentes', entry: 'documents', keys: ['documents', 'sources', 'chat'] },
 ] as const;

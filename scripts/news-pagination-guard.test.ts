@@ -29,7 +29,7 @@ test('el carril cambia de pagina conservando lane y la API acota limit/offset en
   assert.match(flow, /query\.set\('lane', lane\)/);
   assert.match(route, /Annotated\[int, Query\(ge=1, le=100\)\] = 100/);
   assert.match(route, /offset: Annotated\[int, Query\(ge=0\)\] = 0/);
-  assert.match(route, /lane: Literal\["empresa", "macro"\]/);
+  assert.match(route, /lane: Literal\["empresa", "macro", "gobierno", "social"\]/);
 });
 
 test('el móvil alcanza la siguiente página sin bajar treinta tarjetas',()=>{
