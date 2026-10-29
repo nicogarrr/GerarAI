@@ -24,6 +24,7 @@ from collections.abc import Callable
 from typing import Any
 from urllib.parse import quote_plus
 
+from app.core.errors import redact_secrets
 from app.services.connectors.base import ConnectorItem, ConnectorResult
 
 US_EXCHANGE_RE = re.compile(r"NASDAQ|NYSE|AMEX|ARCA|BATS|CBOE", re.IGNORECASE)
@@ -464,7 +465,7 @@ def sweep(
                 on_error()
                 errors.append(
                     {"ticker": company.ticker, "source": lane,
-                     "type": type(exc).__name__, "message": str(exc)}
+                     "type": type(exc).__name__, "message": redact_secrets(str(exc))}
                 )
             pause()
             if deadline.expired():  # post-unidad: el ultimo feed tambien cuenta

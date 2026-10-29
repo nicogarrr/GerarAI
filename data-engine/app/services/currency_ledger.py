@@ -138,7 +138,8 @@ def compute_currency_ledger(
 
     ``data_through``: fecha hasta la que hay datos (por defecto, el ultimo
     movimiento conocido). Una perdida cuya ventana de 1 año acaba despues queda
-    incompleta: una recompra futura aun podria bloquearla.
+    incompleta: una recompra futura aun podria bloquearla. Salvo que ya este
+    cubierta al 100 % por recompras: entonces no hay nada mas que bloquear.
 
     ``outflows``: compras y comisiones en la divisa. Consumen FIFO sin
     resultado. El mismo dia se procesan antes que las conversiones.
@@ -224,7 +225,15 @@ def compute_currency_ledger(
                     else:
                         q[2] += blocked * take / cover
                     left -= take
-            if window_open and in_year:
+            # Con la perdida ya cubierta al 100 % por recompras dentro del año
+            # posterior, toda ella queda sin computar (art. 33.5.e LIRPF: «No se
+            # computaran... cuando el transmitente vuelva a adquirirlos dentro
+            # del año siguiente... se integrara cuando se produzca la posterior
+            # transmision»; V1613-25 aplica la letra e a las divisas). Una
+            # recompra posterior no puede bloquear mas: la ventana abierta ya no
+            # deja el ejercicio incompleto. Con cobertura parcial si.
+            fully_covered = cover >= conv.amount
+            if window_open and in_year and not fully_covered:
                 reasons.append(
                     f"perdida del {day}: ventana de 1 año aun abierta, una recompra posterior la bloquearia"
                 )

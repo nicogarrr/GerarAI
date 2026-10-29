@@ -98,6 +98,8 @@ const ROUTES = [
   "/watchlist",
   "/research/MSFT",
   "/research/MSFT/tesis",
+  // Vista tesis de la ficha: formulario de afirmaciones (input de materialidad sin etiqueta, label crítica; 29-oct-2026).
+  "/research/MSFT?view=thesis",
   "/portfolio",
   "/portfolio/intelligence",
   "/taxes",

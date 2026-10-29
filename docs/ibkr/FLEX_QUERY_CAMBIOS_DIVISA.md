@@ -54,7 +54,8 @@ esa divisa, que el libro todavía no modela.
   El resultado aparece solo al convertir a EUR.
 - Pérdida al convertir: no se integra en la parte cubierta por adquisición de la misma divisa en el
   año POSTERIOR a la transmisión, solo posterior y solo la misma divisa (art. 33.5.e LIRPF, V1613-25; AEAT, Manual práctico IRPF 2025, https://sede.agenciatributaria.gob.es/Sede/ayuda/manuales-videos-folletos/manuales-practicos/irpf-2025/c11-ganancias-perdidas-patrimoniales/ganancias-perdidas-patrimoniales-que-no-bi/perdidas-patrimoniales-que-no-se-tales.html), no 2 meses. Se suma al valor de los lotes
-  readquiridos. Si la ventana de 1 año sigue abierta a fecha de los datos, queda "incompleto".
+  readquiridos. Si la ventana de 1 año sigue abierta a fecha de los datos, queda "incompleto",
+  salvo que la pérdida ya esté cubierta al 100 % por recompras (no queda nada por bloquear).
   - Mismo día: decisión conservadora de Auditor 2, sin consulta que la dirima. Si el Flex trae hora
     (`dateTime` o `tradeTime`, actívala en la Flex Query) en ambas operaciones, solo bloquea la
     recompra posterior a la conversión (misma hora no bloquea). Si falta alguna de las dos horas,

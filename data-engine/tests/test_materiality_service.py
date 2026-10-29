@@ -1,22 +1,28 @@
+from contextlib import contextmanager
 from decimal import Decimal
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 from sqlalchemy import delete, or_, select
 
 import main
-from app.core.database import SessionLocal, init_db
-from app.models import Company, ExternalClaim, NewsEvent, Position, ThesisChange
+from app.core.database import SessionLocal, get_db, init_db
+from app.models import Company, ExternalClaim, NewsEvent, Position, Tenant, ThesisChange
 from app.services.source_hierarchy_service import classify_source
 
 TARGET_TICKER = "MATBIG"
 OTHER_TICKER = "MATOTH"
+# Simula lo que otros tests del mismo worker de xdist dejan en la base de la
+# sesion: una posicion en otra divisa y sin valor en base. Con ella el peso
+# global se rompia (los dos tests de peso fallaban solo en paralelo).
+LEFTOVER_TICKER = "MATLEFT"
 
 
 def cleanup_materiality_artifacts() -> None:
     init_db()
     db = SessionLocal()
     try:
-        companies = db.scalars(select(Company).where(Company.ticker.in_([TARGET_TICKER, OTHER_TICKER]))).all()
+        companies = db.scalars(select(Company).where(Company.ticker.in_([TARGET_TICKER, OTHER_TICKER, LEFTOVER_TICKER]))).all()
         company_ids = [company.id for company in companies]
         if company_ids:
             news_events = db.scalars(select(NewsEvent).where(NewsEvent.company_id.in_(company_ids))).all()
@@ -60,6 +66,58 @@ def create_company(db, ticker: str, name: str) -> Company:
     return company
 
 
+@contextmanager
+def own_tenant():
+    """Tenant propio para el test: el peso de materialidad suma las posiciones
+    del tenant (todas sus carteras, igual que la pagina de cartera, Cerebro y
+    el panel de la ficha), asi que solo lo que crea el test entra en la cuenta.
+    Devuelve una fabrica de sesiones de ese tenant y enruta la API a el."""
+    init_db()
+    with SessionLocal() as db:
+        tenant = Tenant(external_id=f"materiality-{uuid4().hex[:12]}", name="materiality test")
+        db.add(tenant)
+        db.commit()
+        tenant_id = tenant.id
+
+    def session():
+        db = SessionLocal()
+        db.info["tenant_id"] = tenant_id
+        return db
+
+    def override():
+        db = session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    main.app.dependency_overrides[get_db] = override
+    try:
+        yield session
+    finally:
+        main.app.dependency_overrides.pop(get_db, None)
+        cleanup_materiality_artifacts()
+        with SessionLocal() as db:
+            db.execute(delete(Tenant).where(Tenant.id == tenant_id))
+            db.commit()
+
+
+def leave_foreign_position_behind() -> None:
+    """Posicion sin tenant (como las de otros tests legacy), en EUR y sin valor en base."""
+    db = SessionLocal()
+    try:
+        company = create_company(db, LEFTOVER_TICKER, "Materiality Leftover")
+        db.add(Position(
+            company_id=company.id, quantity=Decimal("1"), average_cost=Decimal("1"),
+            market_price=Decimal("1"), market_value=Decimal("90000000000000"),
+            unrealized_pnl=Decimal("0"), currency="EUR", base_currency="EUR",
+            source="test_materiality",
+        ))
+        db.commit()
+    finally:
+        db.close()
+
+
 def create_position(db, company: Company, market_value: str) -> None:
     db.add(
         Position(
@@ -77,17 +135,21 @@ def create_position(db, company: Company, market_value: str) -> None:
 
 def test_news_materiality_uses_portfolio_weight_and_source_hierarchy():
     cleanup_materiality_artifacts()
-    db = SessionLocal()
-    try:
-        target = create_company(db, TARGET_TICKER, "Materiality Target")
-        other = create_company(db, OTHER_TICKER, "Materiality Other")
-        create_position(db, target, "600000000000")
-        create_position(db, other, "400000000000")
-        db.commit()
-    finally:
-        db.close()
+    leave_foreign_position_behind()
+    with own_tenant() as tenant_session:
+        db = tenant_session()
+        try:
+            target = create_company(db, TARGET_TICKER, "Materiality Target")
+            other = create_company(db, OTHER_TICKER, "Materiality Other")
+            create_position(db, target, "600000000000")
+            create_position(db, other, "400000000000")
+            db.commit()
+        finally:
+            db.close()
+        _assert_news_materiality(TestClient(main.app))
 
-    client = TestClient(main.app)
+
+def _assert_news_materiality(client) -> None:
     response = client.post(
         "/api/news/manual",
         json={
@@ -115,8 +177,6 @@ def test_news_materiality_uses_portfolio_weight_and_source_hierarchy():
     assert event["source_tier"] == "tier_2_company"
     assert event["portfolio_weight"] >= 0.55
     assert event["materiality_reasons"]
-
-    cleanup_materiality_artifacts()
 
 
 def test_source_hierarchy_classifies_regulatory_urls_as_highest_tier():
@@ -176,7 +236,12 @@ def test_portfolio_weight_convierte_a_divisa_base_con_divisas_mezcladas():
     from app.services.materiality_service import MaterialityService
 
     cleanup_materiality_artifacts()
-    db = SessionLocal()
+    leave_foreign_position_behind()
+    with own_tenant() as tenant_session:
+        _assert_mixed_currency_weight(tenant_session(), MaterialityService())
+
+
+def _assert_mixed_currency_weight(db, service) -> None:
     try:
         target = create_company(db, TARGET_TICKER, "Materiality Target")
         other = create_company(db, OTHER_TICKER, "Materiality Other")
@@ -193,13 +258,11 @@ def test_portfolio_weight_convierte_a_divisa_base_con_divisas_mezcladas():
             source="test_materiality",
         ))
         db.commit()
-        service = MaterialityService()
         weight = service.portfolio_weight(db, target)
         assert abs(weight - 12000 / 112000) < 1e-9
         assert service._portfolio_adjustment(weight) == 1
     finally:
         db.close()
-        cleanup_materiality_artifacts()
 
 
 def test_trade_resumption_does_not_inherit_halt_criticality():

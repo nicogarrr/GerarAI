@@ -195,6 +195,42 @@ function SectionSkeleton({ rows = 3, className }: { rows?: number; className?: s
 
 
 
+/**
+ * Esqueleto de «Tu cartera hoy» con la MISMA estructura que la tarjeta con
+ * posiciones (desglose, fila de G/P, nota, rejilla de hasta 4 posiciones y
+ * enlace) y las mismas clases de rejilla, para que el hueco reservado crezca
+ * igual por breakpoint. Con 5 filas fijas (≈330 px) la tarjeta real medía
+ * ≈850 px a 375 px y ≈580 px en escritorio, y empujaba el resto del inicio:
+ * CLS 0,16 en móvil (barrido del 29-oct-2026).
+ */
+function PortfolioCardSkeleton() {
+    return (
+        <div data-testid="portfolio-skeleton">
+            <span className="sr-only" role="status">Cargando…</span>
+            <div aria-hidden="true" className="space-y-5">
+                <div className="rounded-xl border border-gray-700/50 bg-gray-900/60 p-4">
+                    <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
+                        {Array.from({ length: 4 }).map((_, index) => (
+                            <div key={index}>
+                                <Skeleton className="h-5 w-28" />
+                                <Skeleton className="mt-1 h-7 w-32" />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <Skeleton className="h-10 w-full sm:h-5" />
+                <Skeleton className="h-4 w-2/3" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                        <Skeleton className="h-14 w-full sm:h-[4.5rem]" key={index} />
+                    ))}
+                </div>
+                <Skeleton className="h-11 w-40" />
+            </div>
+        </div>
+    );
+}
+
 function InlineSectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
     return (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
@@ -449,10 +485,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 </CardHeader>
                 <CardContent className="pt-4">
                     {portfolioLoading ? (
-                        // 5 filas ≈ alto de «Primeros pasos» y del resumen con
-                        // posiciones: el hueco queda reservado y la tarjeta no empuja
-                        // al resto del inicio al llegar los datos (CLS móvil).
-                        <SectionSkeleton rows={5} />
+                        // Misma estructura que la tarjeta con posiciones: el hueco
+                        // reservado crece igual por breakpoint (CLS móvil).
+                        <PortfolioCardSkeleton />
                     ) : portfolioError ? (
                         <InlineSectionError message={portfolioError} onRetry={() => retrySection('portfolio')} />
                     ) : portfolioSummary && portfolioSummary.holdings.length > 0 ? (

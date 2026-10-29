@@ -10,6 +10,16 @@
 | `data-engine/tests/test_cross_tenant_probes.py` | Usuario A crea; usuario B intenta leer, editar y borrar cada recurso (transacciones, filtros, acciones corporativas, plan, memoria, colecciones, propuestas, diario, watchlist, promesas, Telegram). Nunca 2xx con datos de A. | Suite normal (≈10 s) |
 | `data-engine/tests/test_ssrf_url_params.py` | Cada parámetro URL que el servidor descarga o usa de base recibe 13 variantes internas (127.0.0.1, decimal, hex, IPv6 mapeada, `127.1`, `0.0.0.0`, nip.io, metadata 169.254…) apuntando a un canario local: 4xx y cero conexiones. | Suite normal (≈10 s) |
 
+## Ronda 3 (29-oct): el fuzzing estaba casi ciego
+
+- **Límite de peticiones**: todas las peticiones salen del mismo tenant e IP, así que a los pocos segundos casi todo era 429 (9.889 de 25.904 respuestas) y 200 de 329 operaciones no llegaron nunca al handler. `fuzz_app` desactiva el límite (tiene sus propios tests).
+- **Datos**: el tenant del fuzzing arranca con cartera (USD y EUR, con ventas y recompra), plan, política DCA, tesis con versiones y una propuesta simulada anclada.
+- **Tickers reales**: la mitad de los `{ticker}`/`{symbol}` generados son tickers del maestro sembrado; antes todos eran aleatorios y respondían 404.
+- `tests/fuzz/test_schemathesis_r3.py`: modos positivo + negativo y, en cualquier respuesta ≥400, ningún texto interno (traceback, ruta de fichero, clase de excepción, SQL). `FUZZ_STATS=fichero.tsv` guarda operación y código de cada respuesta para ver qué operaciones no llegan al handler.
+- `test_api_body_with_non_finite_numbers`: cada número de un cuerpo válido pasa a `Infinity` (o `NaN` con `FUZZ_NON_FINITE=nan`) y se envía en bruto, porque el cliente HTTP se niega a serializarlos. Encontró #2904.
+- `tests/test_properties_r3.py` (Hypothesis, sin `RUN_FUZZ`): invariantes de la proyección de ahorro y de los ajustes DCA (ida y vuelta, por tenant, niveles inválidos → 422).
+- `tests/test_cross_tenant_new_endpoints.py`: aislamiento A/B en los endpoints nuevos (política DCA, proyección de ahorro, bandeja de cambios de tesis, ejecuciones DCA manuales, propuestas por ticker con tesis anclada, lecturas de tesis/memo, regenerar informe fiscal).
+
 ## Ejecutar en local
 
 ```bash
@@ -30,5 +40,10 @@ La red saliente está cortada en el fuzzing (sin Yahoo, SEC ni LLM): un handler 
 - #2601: offset/ids más allá de un BIGINT → 500 en ~20 rutas; ahora 422.
 - #2606: importes de transacción que no caben en la columna → 500 y posición envenenada; ahora 422.
 - #2626: dos aportaciones al plan con `external_id` vacío → 500 (UNIQUE); ahora el vacío se guarda como NULL.
+
+- #2894: `POST /api/companies/{ticker}/kpi-registry/sync` → 500 la primera vez en el marco software_ai (dos etiquetas con la misma metric_key).
+- #2900: errores de extracción y de fuentes RAG guardados sin redactar.
+- #2904: `NaN`/`Infinity` en un cuerpo inválido → 500 en cualquier endpoint (el 422 no se podía serializar).
+- #2895: proveedor externo caído (FRED, Yahoo) → 500 en `refresh/wacc` y `refresh/yahoo-fundamentals`; ahora 502 controlado.
 
 Las sondas de aislamiento, bypass de auth y SSRF no encontraron fugas; quedan como regresión.

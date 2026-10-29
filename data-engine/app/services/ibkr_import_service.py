@@ -6,6 +6,7 @@ import io
 import json
 import re
 from collections import Counter
+from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree
@@ -42,11 +43,53 @@ def _is_number(value: str | None) -> bool:
     return parse_localized_number(value) is not None
 
 
+# Orden de las fechas «nn/nn/aaaa» del Flex que se está leyendo. IBKR deja
+# elegir el formato de fecha de la Flex Query (MM/dd/yyyy por defecto, pero
+# también dd/MM/yyyy, el natural en España). Se decide por fichero en
+# validate_flex_xml/import_flex_xml; fuera de ellos vale mm/dd (lo de siempre).
+_FLEX_SLASH_DAY_FIRST: ContextVar[bool] = ContextVar("ibkr_flex_slash_day_first", default=False)
+_SLASH_VALUE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})(?:[;, ].*)?$")
+
+
+def _date_formats() -> tuple[str, ...]:
+    slash = (
+        ("%d/%m/%Y", "%d/%m/%y") if _FLEX_SLASH_DAY_FIRST.get() else ("%m/%d/%Y", "%m/%d/%y")
+    )
+    return ("%Y-%m-%d", "%Y%m%d", *slash, "%d-%b-%y", "%d-%b-%Y")
+
+
+def _flex_slash_day_first(root: ElementTree.Element) -> bool | None:
+    """Orden día/mes de las fechas con barra de UN Flex (todas las filas).
+
+    Un primer número > 12 solo puede ser día (dd/MM); un segundo > 12, solo
+    mm/dd. Sin evidencia se mantiene mm/dd (formato por defecto de IBKR).
+    Evidencia en los dos sentidos -> ``None`` (fichero incoherente).
+    """
+    day_first_seen = month_first_seen = False
+    for element in root.iter():
+        for value in element.attrib.values():
+            match = _SLASH_VALUE.match(value.strip())
+            if not match:
+                continue
+            first, second = int(match.group(1)), int(match.group(2))
+            day_first_seen |= first > 12 and 1 <= second <= 12
+            month_first_seen |= second > 12 and 1 <= first <= 12
+    if day_first_seen and month_first_seen:
+        return None
+    return day_first_seen
+
+
+_MIXED_FLEX_DATES = (
+    "Las fechas del Flex mezclan dd/MM/aaaa y MM/dd/aaaa: no se puede saber qué fecha es "
+    "cada fila. Configura la Flex Query con fechas aaaaMMdd (o aaaa-MM-dd) y descárgala de nuevo."
+)
+
+
 def _is_date(value: str | None) -> bool:
     if not value:
         return False
-    normalized = value.split(";", 1)[0].split(" ", 1)[0]
-    for fmt in ("%Y-%m-%d", "%Y%m%d", "%m/%d/%Y"):
+    normalized = value.split(";", 1)[0].split(" ", 1)[0].rstrip(",")
+    for fmt in _date_formats():
         try:
             datetime.strptime(normalized, fmt)
             return True
@@ -56,6 +99,22 @@ def _is_date(value: str | None) -> bool:
 
 
 def validate_flex_xml(xml_text: str) -> list[str]:
+    """Valida un Flex Query XML de IBKR (fechas con barra: orden por fichero)."""
+    try:
+        root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+    except ElementTree.ParseError:
+        root = None
+    day_first = _flex_slash_day_first(root) if root is not None else False
+    if day_first is None:
+        return [_MIXED_FLEX_DATES]
+    token = _FLEX_SLASH_DAY_FIRST.set(day_first)
+    try:
+        return _validate_flex_xml(xml_text)
+    finally:
+        _FLEX_SLASH_DAY_FIRST.reset(token)
+
+
+def _validate_flex_xml(xml_text: str) -> list[str]:
     """Valida un Flex Query XML de IBKR.
 
     Devuelve una lista de errores accionables en español
@@ -238,7 +297,7 @@ def _csv_rows(csv_text: str) -> list[list[str]]:
     return list(csv.reader(io.StringIO(text), delimiter=_csv_delimiter(text)))
 
 
-_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
+_SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})$")
 
 
 def _date_token(value: str | None) -> str:
@@ -277,8 +336,10 @@ def _csv_date_value(value: str | None, day_first: bool) -> date | None:
     token = _date_token(value)
     if not token:
         return None
-    if _SLASH_DATE.match(token):
-        fmt = "%d/%m/%Y" if day_first else "%m/%d/%Y"
+    slash = _SLASH_DATE.match(token)
+    if slash:
+        year = "%Y" if len(slash.group(3)) == 4 else "%y"
+        fmt = f"%d/%m/{year}" if day_first else f"%m/%d/{year}"
         try:
             return datetime.strptime(token, fmt).date()
         except ValueError:
@@ -493,8 +554,8 @@ def _missing_position_fields(element: ElementTree.Element) -> list[str]:
 def _date(value: str | None) -> date:
     if not value:
         return date.today()
-    normalized = value.split(";", 1)[0].split(" ", 1)[0]
-    for fmt in ("%Y-%m-%d", "%Y%m%d", "%m/%d/%Y"):
+    normalized = value.split(";", 1)[0].split(" ", 1)[0].rstrip(",")
+    for fmt in _date_formats():
         try:
             return datetime.strptime(normalized, fmt).date()
         except ValueError:
@@ -760,7 +821,27 @@ def _auto_link_journal_after_import(db: Session) -> None:
 
 
 class IBKRImportService:
-    def import_flex_xml(
+    def import_flex_xml(self, db: Session, xml_text: str, **options) -> dict:
+        """Importa un Flex Query (ver ``_import_flex_xml``).
+
+        Las fechas con barra se leen con el orden del propio fichero: una Flex
+        Query configurada con dd/MM/yyyy fechaba el 05/03 como 3 de mayo y
+        omitía el 15/03 por «fecha no reconocida».
+        """
+        try:
+            root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        except ElementTree.ParseError:
+            root = None
+        day_first = _flex_slash_day_first(root) if root is not None else False
+        if day_first is None:
+            raise IBKRImportError(_MIXED_FLEX_DATES)
+        token = _FLEX_SLASH_DAY_FIRST.set(day_first)
+        try:
+            return self._import_flex_xml(db, xml_text, **options)
+        finally:
+            _FLEX_SLASH_DAY_FIRST.reset(token)
+
+    def _import_flex_xml(
         self,
         db: Session,
         xml_text: str,
@@ -1620,7 +1701,7 @@ class IBKRImportService:
         self, db: Session, cache: dict[str, Company], symbol: str,
         element: ElementTree.Element | None = None,
     ) -> Company:
-        from app.services.listing_identity import reviewed_listing
+        from app.services.listing_identity import reviewed_listing, same_venue
 
         isin = ((_attr(element, "isin") if element is not None else None) or "").strip().upper()
         listing = reviewed_listing(isin)
@@ -1629,7 +1710,7 @@ class IBKRImportService:
         # must not be collapsed by ISIN alone.
         currency = ((_attr(element, "currency") if element is not None else None) or "").strip().upper()
         exchange = ((_attr(element, "listingExchange") if element is not None else None) or "UNKNOWN").strip()
-        if listing and exchange.upper() not in {"AEB", "XAMS", "EURONEXT AMSTERDAM"}:
+        if listing and not same_venue(listing, exchange):
             raise IBKRImportError("La plaza Flex es distinta o ambigua para el ISIN verificado.")
         if listing and currency and currency != listing.currency:
             raise IBKRImportError("La divisa Flex contradice el listado verificado por ISIN.")
@@ -1663,8 +1744,7 @@ class IBKRImportService:
         cache[ticker] = company
         # A verified listing must never be enriched using its bare US homonym.
         if listing:
-            if company.currency != listing.currency or company.exchange != listing.exchange:
-                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            self._reconcile_reviewed_listing(company, listing)
             return company
         # Enriquecer el placeholder con el nombre real desde las APIs de datos.
         # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional; nunca bloquea el import
@@ -1675,6 +1755,32 @@ class IBKRImportService:
         except Exception:  # noqa: BLE001 — nunca bloquear el import por el enriquecimiento
             pass
         return company
+
+    @staticmethod
+    def _reconcile_reviewed_listing(company: Company, listing) -> None:
+        """Align an existing row with the ISIN-verified listing, or fail.
+
+        The ficha, the search box and thesis generation create ``BFIT.AS`` as a
+        stub (exchange UNKNOWN, currency USD) and Finnhub later labels it
+        «NYSE EURONEXT - EURONEXT AMSTERDAM». Such a placeholder row (no ISIN,
+        placeholder or Amsterdam exchange, USD/EUR) is corrected to the verified
+        identity instead of rejecting the whole Flex file. A row that names
+        another venue or currency is a real conflict and still fails.
+        """
+        from app.services.listing_identity import PLACEHOLDER_EXCHANGES, same_venue
+
+        exchange = (company.exchange or "").strip().upper()
+        currency = (company.currency or "").strip().upper()
+        venue_ok = same_venue(listing, exchange)
+        if not company.isin:
+            placeholder = exchange in PLACEHOLDER_EXCHANGES or venue_ok
+            if not placeholder or currency not in {"", "USD", listing.currency}:
+                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            company.isin = listing.isin
+        elif not venue_ok or currency != listing.currency:
+            raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+        company.exchange = listing.exchange
+        company.currency = listing.currency
 
     @staticmethod
     def _capture_isin(company: Company, element: ElementTree.Element) -> None:

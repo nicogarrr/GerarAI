@@ -17,8 +17,16 @@ from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware, _tena
 @pytest.fixture(autouse=True)
 def cleanup_synthetic_rows():
     yield
+    from sqlalchemy import inspect as sa_inspect
+
+    from app.core.database import engine
     from app.models.entities import WorkflowRun, WorkflowStepRun
 
+    # Con xdist (--dist load) un worker puede recibir solo tests de este
+    # modulo que no llaman a init_db(): su sqlite por proceso no tiene
+    # esquema y el SELECT de limpieza fallaba con "no such table: tenants".
+    if not sa_inspect(engine).has_table("tenants"):
+        return
     with SessionLocal() as db:
         tids = list(db.scalars(select(Tenant.id).where(Tenant.external_id.like("audit-%"))))
         if tids:
