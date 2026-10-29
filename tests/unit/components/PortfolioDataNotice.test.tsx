@@ -17,6 +17,8 @@ describe('PortfolioDataNotice', () => {
   const details=dates.closest('details');
   expect(details).not.toBeNull();
   expect(details).not.toHaveAttribute('open');
+  // El resumen del desplegable anuncia que dentro están las fechas.
+  expect(details?.querySelector('summary')).toHaveTextContent('Fechas, caja por divisa e historial');
   expect(dates).toHaveTextContent('29 oct 2026');
   expect(dates).toHaveTextContent('28 oct 2026');
   expect(screen.queryByText(/Posiciones y caja tienen fechas distintas/)).not.toBeInTheDocument();
