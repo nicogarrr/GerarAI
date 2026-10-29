@@ -172,6 +172,24 @@ def test_loss_with_window_still_open_is_incomplete():
     assert r["status"] == INCOMPLETE and r["gain_base"] is None and "ventana" in r["reason"]
 
 
+
+def test_loss_fully_covered_by_reacquisition_is_complete_with_window_open():
+    # art. 33.5.e LIRPF + V1613-25: perdida 100 % cubierta por recompra dentro
+    # del año siguiente -> no se computa y se integra al transmitir la divisa
+    # recomprada. Ninguna recompra futura cambia nada: no es «incompleto».
+    lots = [CurrencyLot(date(2025, 1, 1), D(100), D(100)), CurrencyLot(date(2025, 6, 1), D(120), D(108))]
+    r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("0.90"))], thru=date(2025, 12, 31))
+    row = r["rows"][0]
+    assert row["window_open"] is True and row["blocked_loss_base"] == 10.0 and row["integrated_gain_base"] == 0.0
+    assert r["status"] == COMPUTED and r["gain_base"] == 0.0 and r["blocked_loss_base"] == 10.0
+
+
+def test_loss_partially_covered_with_window_open_stays_incomplete():
+    lots = [CurrencyLot(date(2025, 1, 1), D(100), D(100)), CurrencyLot(date(2025, 6, 1), D(50), D(46))]
+    r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("0.90"))], thru=date(2025, 12, 31))
+    assert r["rows"][0]["blocked_loss_base"] == 5.0
+    assert r["status"] == INCOMPLETE and r["gain_base"] is None and "ventana" in r["reason"]
+
 def test_gain_is_never_blocked():
     lots = [CurrencyLot(date(2025, 1, 1), D(100), D(90)), CurrencyLot(date(2025, 6, 1), D(100), D(95))]
     r = _run(lots, [Conversion(date(2025, 3, 1), D(100), D("1.00"))])
