@@ -1,6 +1,6 @@
 import math
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -128,6 +128,7 @@ def _fiscal_info_batch(
 
 MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
 MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+MIN_NUMERIC_20_6 = Decimal("0.000001")
 
 
 class PortfolioTransactionInput(BaseModel):
@@ -142,6 +143,15 @@ class PortfolioTransactionInput(BaseModel):
     fees: Decimal = Field(default=Decimal("0"), ge=0, le=MAX_NUMERIC_20_2)
     currency: str = Field(default="USD", min_length=3, max_length=10)
     notes: str | None = Field(default=None, max_length=2000)
+
+    @field_validator("quantity", "price")
+    @classmethod
+    def _not_rounded_to_zero(cls, value: Decimal) -> Decimal:
+        # La columna guarda 6 decimales: 0,0000004 pasaba (> 0) y quedaba en
+        # el libro como 0, una compra de cero acciones o a precio cero.
+        if value > 0 and value.quantize(MIN_NUMERIC_20_6, rounding=ROUND_HALF_EVEN) == 0:
+            raise ValueError("must be at least 0.000001 (6 decimal places)")
+        return value
 
     @field_validator("trade_date")
     @classmethod
