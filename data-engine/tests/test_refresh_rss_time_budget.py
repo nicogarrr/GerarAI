@@ -82,6 +82,12 @@ def rss_env(monkeypatch):
     monkeypatch.setattr(fis, "RSSFeed", SimpleNamespace)
     db = _FakeDB()
     monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: db)
+    # Sin Redis: el wrapper coalesce opera fail-open (documentado). En CI hay
+    # Redis de verdad y un "ok" deja el claim 12 min: el siguiente test leia
+    # "skipped" por contaminacion entre tests (run 40969459260). El coalesce
+    # tiene su propia suite (test_coalesce_on_success.py); aqui se prueba el
+    # actor.
+    monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: None)
     service.db = db
     return service
 
