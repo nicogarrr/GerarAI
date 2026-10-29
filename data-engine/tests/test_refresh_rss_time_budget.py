@@ -9,7 +9,6 @@ los feeds diferidos en el resultado y deja el trabajo restante al proximo tick.
 """
 from __future__ import annotations
 
-import sys
 from types import SimpleNamespace
 
 import pytest
