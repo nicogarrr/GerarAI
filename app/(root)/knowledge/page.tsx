@@ -269,25 +269,6 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         </section>
       ) : null}
 
-      <section className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
-        <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
-          <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
-            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de colección</span><Input className="h-11 w-full" name="collection_type" defaultValue="custom" placeholder="Tipo de colección" required /></label>
-            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 sm:col-span-2"><span>Descripción (opcional)</span><Textarea className="min-h-[88px] w-full" name="description" placeholder="Ámbito y uso previsto" /></label>
-            <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit">Crear colección</Button>
-          </div>
-        </MutationForm>
-
-        <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-          <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Colecciones por defecto</h2></div>
-          {hasDefaultCollections(collections) ? <p className="text-sm text-gray-400">Colecciones por defecto instaladas.</p> : <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
-            <Button className="h-11 w-full sm:w-fit" type="submit"><Library aria-hidden="true" className="h-4 w-4" />Instalar por defecto</Button>
-          </MutationForm>}
-        </div>
-      </section>
-
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
         <h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>
         {/*
@@ -326,6 +307,25 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             ) : null}
           </>
         ) : <p className="text-sm text-gray-500">Sin colecciones.</p>}
+      </section>
+
+      <section className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
+        <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
+          <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de colección</span><select className="h-11 w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 md:text-sm" name="collection_type" defaultValue="custom" required><option value="custom">Personalizada</option><option value="investor">Por inversor o autor</option><option value="theme">Por tema o sector</option></select></label>
+            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 sm:col-span-2"><span>Descripción (opcional)</span><Textarea className="min-h-[88px] w-full" name="description" placeholder="Ámbito y uso previsto" /></label>
+            <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit">Crear colección</Button>
+          </div>
+        </MutationForm>
+
+        <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+          <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Colecciones por defecto</h2></div>
+          {hasDefaultCollections(collections) ? <p className="text-sm text-gray-400">Colecciones por defecto instaladas.</p> : <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
+            <Button className="h-11 w-full sm:w-fit" type="submit"><Library aria-hidden="true" className="h-4 w-4" />Instalar por defecto</Button>
+          </MutationForm>}
+        </div>
       </section>
 
       <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
