@@ -16,7 +16,7 @@ test("cabecera de la ficha con precio, variación y gráfico técnico (desktop)"
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   await expect(header(page).getByText(/^336,56\sUS\$$/)).toBeVisible();
   // La variación USD se pinta como moneda con signo (exceptZero): «+2,34 US$».
-  await expect(header(page).getByText(/^\+2,34\sUS\$$/)).toBeVisible();
+  await expect(header(page).getByText(/^\+2,34\sUS\$ · \+0,70\s%$/)).toBeVisible();
   await expect(header(page).getByRole("figure", { name: /Evolución del precio/ })).toBeVisible();
   await expect(header(page).getByTestId("technical-reading")).toBeVisible();
   const strip = header(page).getByTestId('company-metric-strip');
