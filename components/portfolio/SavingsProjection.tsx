@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { getPlan, getSavingsProjection, type PlanRecord } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
@@ -22,6 +22,7 @@ export default function SavingsProjection() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [dirty, setDirty] = useState(false);
+    const inputVersion = useRef(0);
     const [planVersion, setPlanVersion] = useState(0);
 
     useEffect(() => {
@@ -59,11 +60,14 @@ export default function SavingsProjection() {
             setError('Revisa importe, dividendo (0–50 %) e inflación (mayor que −99 % y hasta 100 %).');
             return;
         }
+        const submittedVersion = inputVersion.current;
         setLoading(true);
         setError(null);
         try {
             setProjection(await getSavingsProjection({ monthly: amount, years, currency, dividendYield: yieldPct / 100, inflation: inflationPct / 100 }));
-            setDirty(false);
+            // Inputs remain editable while the request is in flight. A late
+            // result belongs to the submitted fields, not subsequent edits.
+            setDirty(inputVersion.current !== submittedVersion);
         } catch {
             setError('No se pudo calcular la proyección. Conservamos el resultado anterior, si lo hay.');
         } finally { setLoading(false); }
@@ -71,7 +75,7 @@ export default function SavingsProjection() {
     const selected = projection?.scenarios.find((item) => Math.abs(item.annual_total_return - rate) < 1e-8);
     const unit = projection?.currency;
     const money = (n: number) => formatMoney(n, unit ?? 'EUR');
-    const edit = () => setDirty(true);
+    const edit = () => { inputVersion.current += 1; setDirty(true); };
     return (
         <section className="mb-6 grid min-w-0 gap-4" aria-labelledby="savings-title" aria-busy={loading}>
             <div><h2 id="savings-title" className="text-xl font-semibold text-gray-100">Tu ahorro a largo plazo</h2>

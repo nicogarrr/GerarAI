@@ -54,4 +54,17 @@ describe('SavingsProjection',()=>{
   expect(await screen.findByRole('alert')).toHaveTextContent('Conservamos el resultado anterior');
   expect(screen.getAllByText(/405.804,49/).length).toBeGreaterThan(0);
  });
+ it('editar durante una simulación no marca el resultado anterior como actualizado',async()=>{
+  render(<SavingsProjection/>);await screen.findAllByText(/405.804,49/);
+  let resolve!: (value: typeof projection) => void;
+  getSavingsProjection.mockReturnValueOnce(new Promise(r=>{resolve=r}));
+  fireEvent.change(screen.getByLabelText('Aportación mensual'),{target:{value:'500'}});
+  fireEvent.click(screen.getByRole('button',{name:'Simular sin guardar'}));
+  fireEvent.change(screen.getByLabelText('Divisa de la aportación'),{target:{value:'USD'}});
+  resolve({...projection,monthly_contribution:500});
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Simular sin guardar'})).toBeEnabled());
+  expect(screen.getByLabelText('Divisa de la aportación')).toHaveValue('USD');
+  expect(screen.getByRole('status')).toHaveTextContent('Has cambiado los campos');
+ });
+
 });
