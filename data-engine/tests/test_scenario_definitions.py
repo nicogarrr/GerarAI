@@ -138,9 +138,9 @@ def test_quema_de_caja_dispersa_solo_por_margen():
     assert base.assumptions["fcf_margin"] == pytest.approx(-0.02)
 
 
-def test_techo_margen_bull():
+def test_techo_margen_bull_respeta_base_alta():
     _, _, bull = mechanical_dcf_scenarios(0.10, 0.50, 0.10, 0.02, 0.0)
-    assert bull.assumptions["fcf_margin"] == pytest.approx(0.45)
+    assert bull.assumptions["fcf_margin"] == pytest.approx(0.50)
 
 
 def test_wacc_bull_nunca_baja_del_crecimiento_terminal_mas_margen():
