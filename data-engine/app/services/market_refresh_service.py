@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
+from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, MarketPrice, Position, SavedScreen
 from app.services.alert_rule_service import AlertRuleService
 from app.services.connectors.base import UpstreamRateLimited
@@ -501,7 +502,7 @@ class MarketRefreshService:
         if held_ids:
             fact_units = db.scalars(
                 select(FinancialFact.unit)
-                .where(FinancialFact.company_id.in_(held_ids))
+                .where(FinancialFact.company_id.in_(held_ids), *tenant_filters(db, FinancialFact))
                 .distinct()
             ).all()
             quote_currencies |= reporting_currencies(fact_units)

@@ -19,6 +19,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import (
     Company,
     DecisionJournalEntry,
@@ -352,6 +353,7 @@ def auto_link_journal_trades(
         tid
         for tid in db.scalars(
             select(DecisionJournalEntry.transaction_id).where(
+                *tenant_filters(db, DecisionJournalEntry),
                 DecisionJournalEntry.transaction_id.is_not(None),
                 DecisionJournalEntry.decision.notin_(list(DECISION_TRADE_ACTION)),
             )
