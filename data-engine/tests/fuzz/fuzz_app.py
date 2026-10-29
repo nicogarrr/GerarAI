@@ -123,6 +123,21 @@ def _record_unhandled(app) -> None:
     app.exception_handlers[Exception] = handler
 
 
+def _disable_rate_limits() -> None:
+    """Sin límite de peticiones durante el fuzzing.
+
+    Todas las peticiones salen del mismo tenant y de la misma IP: con el
+    límite activo, a los pocos segundos casi todo respondía 429 (o el 429 del
+    middleware de fallos de auth tras 30 respuestas 401) y la mayoría de las
+    operaciones no llegaban nunca al handler. El límite tiene sus propios tests.
+    """
+    from app.core import rate_limit
+    from app.core.config import get_settings
+
+    relaxed = get_settings().model_copy(update={"rate_limit_enabled": False})
+    rate_limit.get_settings = lambda: relaxed  # type: ignore[assignment]
+
+
 def _build_app():
     import main
     from app.core import auth as auth_module
@@ -130,12 +145,101 @@ def _build_app():
     from app.seed import seed
 
     auth_module.get_settings = _auth_settings  # type: ignore[assignment]
+    _disable_rate_limits()
     _stub_task_queue()
     _record_unhandled(main.app)
     init_db()
     seed()
-    return SigningASGI(main.app)
+    app = SigningASGI(main.app)
+    _seed_tenant_data(app)
+    return app
+
+
+# Tickers del maestro sembrado. Sin ellos, cada {ticker}/{symbol} generado al
+# azar respondía 404 y el handler de verdad no se ejecutaba nunca.
+KNOWN_TICKERS = ["MSFT", "NVDA", "ASTS", "TSLA", "AMZN", "NVO", "BABA", "KRKNF"]
+
+
+def _seed_tenant_data(app) -> None:
+    """Datos reales para el tenant del fuzzing: cartera, plan, watchlist y tesis.
+
+    Con la base vacía casi todos los handlers devolvían la rama «sin datos»;
+    con esto el fuzzing recorre los cálculos (FIFO, divisas, fiscalidad, DCA,
+    tesis ancladas). Solo se usa la API firmada y escrituras con el tenant fijado.
+    """
+    from datetime import UTC, datetime
+    from decimal import Decimal
+
+    from fastapi.testclient import TestClient
+    from sqlalchemy import select
+
+    from app.core.database import SessionLocal
+    from app.models import Company, Tenant
+    from app.models.entities import ThesisVersion
+    from app.models.paper_trading import PaperTrade
+
+    client = TestClient(app)
+    trades = [
+        ("MSFT", "buy", 10, 300, "USD", "2024-01-15"),
+        ("MSFT", "sell", 4, 410, "USD", "2025-03-10"),
+        ("NVDA", "buy", 20, 45.5, "USD", "2024-06-03"),
+        ("ASTS", "buy", 100, 9.25, "EUR", "2025-02-11"),
+        ("ASTS", "sell", 100, 7.1, "EUR", "2025-05-02"),
+        ("ASTS", "buy", 50, 7.0, "EUR", "2025-05-20"),
+    ]
+    for ticker, action, qty, price, currency, day in trades:
+        client.post("/api/portfolio/transactions", json={
+            "ticker": ticker, "action": action, "quantity": qty, "price": price,
+            "currency": currency, "trade_date": day,
+        })
+    client.put("/api/plan", json={"monthly_contribution": 500, "start_date": "2025-01-01",
+                                  "horizon_years": 20})
+    client.put("/api/settings/dca", json={"up_min_level": 3, "down_max_level": 1})
+    with SessionLocal() as db:
+        tenant_id = db.scalar(select(Tenant.id).where(Tenant.external_id == DEFAULT_TENANT))
+        if tenant_id is None:
+            return
+        db.info["tenant_id"] = tenant_id
+        companies = {c.ticker: c.id for c in db.scalars(select(Company).where(Company.ticker.in_(KNOWN_TICKERS)))}
+        now = datetime(2026, 10, 1, tzinfo=UTC)
+        for ticker in ("MSFT", "NVDA"):
+            if ticker not in companies:
+                continue
+            versions = [
+                ThesisVersion(
+                    tenant_id=tenant_id, company_id=companies[ticker], version=v, status="draft",
+                    thesis_markdown=f"# Tesis {ticker} v{v}", executive_summary=f"Resumen {ticker} v{v}",
+                    rating="watch", created_at=now, current_price=Decimal("100"), bear_value=Decimal("80"),
+                    base_value=Decimal("120"), bull_value=Decimal("160"), expected_value=Decimal("125"),
+                    invalidation_criteria=["Margen bruto < 60%"],
+                )
+                for v in (1, 2)
+            ]
+            db.add_all(versions)
+            db.flush()
+            db.add(PaperTrade(
+                tenant_id=tenant_id, proposal_key=f"fuzz-{ticker}", ticker=ticker, direction="long",
+                horizon="short", thesis="tesis de prueba", conviction=Decimal("0.5"),
+                proposed_entry=Decimal("100"), stop=Decimal("90"), target=Decimal("120"),
+                quantity=Decimal("1"), inference_basis="Inferencia: prueba", status="pending",
+                thesis_version_id=versions[0].id,
+            ))
+        db.commit()
 
 
 APP = _build_app()
 schema = schemathesis.openapi.from_asgi("/openapi.json", APP)
+
+
+@schema.hook
+def flatmap_path_parameters(context, path_parameters):  # noqa: ARG001
+    """La mitad de las veces, {ticker}/{symbol} es un ticker sembrado (ver KNOWN_TICKERS)."""
+    from hypothesis import strategies as st
+
+    keys = [key for key in (path_parameters or {}) if key in ("ticker", "symbol")]
+    if not keys:
+        return st.just(path_parameters)
+    known = st.sampled_from(KNOWN_TICKERS).map(
+        lambda ticker: {**path_parameters, **dict.fromkeys(keys, ticker)}
+    )
+    return st.one_of(st.just(path_parameters), known)
