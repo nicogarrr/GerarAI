@@ -16,7 +16,7 @@ export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDa
                 {' '}Importa el fichero del bróker para conciliar antes de añadir compras o ventas de esas posiciones.
             </p>}
             <details className="mt-2">
-                <summary className="cursor-pointer">Caja por divisa e historial disponible</summary>
+                <summary className="cursor-pointer">Fechas, caja por divisa e historial</summary>
                 <p className="mt-2">Datos de cartera: posiciones a {quality.position_dates.map((d) => formatDate(d)).join(', ') || 'fecha no disponible'};
                     {' '}caja a {quality.cash_dates.map((d) => formatDate(d)).join(', ') || 'fecha no disponible'}.</p>
                 <p className="mt-2">{Object.entries(quality.cash_native).map(([currency, balance]) => formatMoney(balance, currency)).join(' · ') || 'Sin saldos registrados'}.
