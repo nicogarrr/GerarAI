@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 // Capturas REALES de la app para los mockups de la landing (hero multi-dispositivo),
 // y verificacion visual de la propia landing. Se apoya en el fixture E2E determinista
 // (misma semilla que company-header-quote): la cabecera de la ficha SIEMPRE llega a
-// $336.56; esperar un timeout fijo capturaba estados a medio cargar (N/D), asi que
+// 336,56 US$; esperar un timeout fijo capturaba estados a medio cargar (N/D), asi que
 // cada captura espera el dato, no el reloj.
 test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1 to run browser tests.");
 
@@ -14,7 +14,7 @@ async function fichaLista(page: import("@playwright/test").Page, width: number, 
   await page.goto("/research/MSFT");
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   // Dato determinista del fixture: si no llega, la captura no es valida.
-  await expect(header(page).getByText("$336.56")).toBeVisible();
+  await expect(header(page).getByText(/^336,56\sUS\$$/)).toBeVisible();
   await expect(page.getByTestId("company-technical-chart").getByRole("figure", { name: /Evolución del precio/ })).toBeVisible();
   // Sin desbordamiento horizontal: el layout debe caber en su viewport.
   const overflow = await page.evaluate(
@@ -26,7 +26,7 @@ async function fichaLista(page: import("@playwright/test").Page, width: number, 
 test("landing shots: ficha MSFT desktop", async ({ page }) => {
   await fichaLista(page, 1440, 900);
   await page.goto("/research/MSFT?view=thesis");
-  await expect(header(page).getByText("$336.56")).toBeVisible();
+  await expect(header(page).getByText(/^336,56\sUS\$$/)).toBeVisible();
   await page.screenshot({ path: "test-results/landing-desktop.png" });
 });
 

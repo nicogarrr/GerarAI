@@ -2790,12 +2790,16 @@ class FinancialIngestionService:
             )
         )
         if document:
+            # A normalized snapshot has no verified filing URL. Keep its LEI,
+            # filing id and hash in metadata, never fabricate a clickable URL.
+            if document.source_url and "api/filings (fxo_id=" in document.source_url:
+                document.source_url = None
             return document
         document = Document(
             company_id=company.id,
             title=title,
             source_type="ESEF",
-            source_url=f"https://filings.xbrl.org/api/filings (fxo_id={snapshot.get('fxo_id')})",
+            source_url=None,
             metadata_={"provider": "ESEF", "normalized": True},
         )
         db.add(document)

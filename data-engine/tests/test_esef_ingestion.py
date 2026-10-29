@@ -408,3 +408,15 @@ def test_new_package_presentation_cannot_delete_existing_history(db, monkeypatch
         asyncio.run(service.refresh_from_esef(db, company))
     assert db.scalar(select(FinancialFact.value).where(FinancialFact.id == existing.id)) == Decimal('123')
     assert len(db.scalars(select(FinancialFact)).all()) == 1
+
+
+def test_normalized_esef_document_has_no_fabricated_link(db):
+    company = _company(db)
+    service = FinancialIngestionService()
+    document = service._source_document_esef(db, company, "ITX", SNAPSHOT)
+    assert document.source_url is None
+    document.source_url = "https://filings.xbrl.org/api/filings (fxo_id=old)"
+    db.flush()
+    same = service._source_document_esef(db, company, "ITX", SNAPSHOT)
+    assert same.id == document.id
+    assert same.source_url is None

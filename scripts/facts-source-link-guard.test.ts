@@ -13,7 +13,8 @@ describe('cifras de la ficha enlazadas a su fuente', () => {
     });
     it('la fuente solo enlaza con URL real del backend y lleva fecha', () => {
         assert.ok(page.includes('function FactSource({ fact }: { fact: ResearchFact })'));
-        assert.ok(page.includes('if (!fact.source_url) return <>{text}</>;'));
+        assert.ok(page.includes('if (!fact.source_url) return <>{text}<FactCalculatedLabel fact={fact} /></>;'));
+        assert.ok(page.includes("import { FactCalculatedLabel }"));
         assert.ok(page.includes('formatUserDate(fact.source_published_at)'));
         assert.ok(page.includes('rel="noopener noreferrer"'));
         assert.ok(page.includes('target="_blank"'));
@@ -24,7 +25,7 @@ describe('cifras de la ficha enlazadas a su fuente', () => {
         assert.ok(page.includes('<FactSource fact={fact} />'));
     });
     it('sin documento de origen la fuente queda como texto plano', () => {
-        // La rama sin URL existe y devuelve solo la etiqueta
+        // Sin URL solo texto y etiqueta Calculado; nunca un enlace.
         const factSource = page.slice(page.indexOf('function FactSource'), page.indexOf('function FactValueLink'));
         assert.ok(factSource.includes('label(fact.source_type)'));
         assert.ok(!factSource.includes('sec.gov/cgi-bin'), 'sin URLs construidas a mano');

@@ -98,7 +98,7 @@ test.describe("company research workspace", () => {
     await expect(page).toHaveURL(/\/research\/MSFT$/);
     await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
     const quote = page.getByTestId('company-header-quote');
-    await expect(quote.getByText('$336.56', { exact: true })).toBeVisible();
+    await expect(quote.getByText(/^336,56\sUS\$$/)).toBeVisible();
     await expect(quote.getByTestId('company-metric-strip')).toBeVisible();
     await expect(quote.getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toBeVisible();
     await quote.getByText('Más detalle', { exact: true }).click();
