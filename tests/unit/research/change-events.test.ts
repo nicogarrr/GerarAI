@@ -10,7 +10,7 @@ const change = (id: number, over: Partial<ResearchThesisChange> = {}): ResearchT
 const review = (id: number, over: Partial<{ thesis_change_id: number | null; news_event_id: number | null; status: string }> = {}) => ({
   id, title: `rev ${id}`, summary: '', status: 'open', thesis_change_id: null, news_event_id: null, created_at: `2026-10-${10 + id}T11:00:00Z`, ...over,
 });
-const alert = (id: number, review_id: number | null) => ({ id, review_id, severity: 'high', message: `alerta ${id}`, created_at: '2026-10-20T00:00:00Z', source_url: null });
+const alert = (id: number, review_id: number | null, source_url: string | null = null) => ({ id, review_id, severity: 'high', message: `alerta ${id}`, created_at: '2026-10-20T00:00:00Z', source_url });
 
 describe('buildChangeEvents', () => {
   it('une cambio, revisión y alerta solo por vínculos persistidos y no pierde registros', () => {
@@ -37,6 +37,29 @@ describe('buildChangeEvents', () => {
     const events = buildChangeEvents({ changes: [change(1)], reviews: [review(3, { thesis_change_id: 99 })], alerts: [] });
     expect(events).toHaveLength(2);
     expect(events.flatMap((e) => e.reviews).map((r) => r.id)).toEqual([3]);
+  });
+  it('dos alertas de la misma noticia (misma source_url) forman UN suceso con ambas originales', () => {
+    const events = buildChangeEvents({
+      changes: [],
+      reviews: [],
+      alerts: [
+        alert(1, null, 'https://www.ejemplo.com/noticia-asts?utm_source=rss&utm_campaign=x'),
+        alert(2, null, 'https://www.ejemplo.com/noticia-asts'),
+        alert(3, null, 'https://www.ejemplo.com/otra-noticia'),
+      ],
+    });
+    expect(events).toHaveLength(2);
+    const deduped = events.find((e) => e.alerts.length === 2)!;
+    expect(deduped.alerts.map((a) => a.id).sort()).toEqual([1, 2]);
+    expect(deduped.sourceUrls).toHaveLength(1);
+  });
+  it('alertas sin source_url o con URL distinta NO se fusionan', () => {
+    const events = buildChangeEvents({
+      changes: [],
+      reviews: [],
+      alerts: [alert(1, null), alert(2, null, ''), alert(3, null, 'https://a.com/x'), alert(4, null, 'https://b.com/x')],
+    });
+    expect(events).toHaveLength(4);
   });
   it('ordena por fecha más reciente y marca revisión abierta solo con estado abierto', () => {
     const events = buildChangeEvents({ changes: [change(1), change(5)], reviews: [review(1, { thesis_change_id: 1, status: 'resolved' })], alerts: [] });
