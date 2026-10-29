@@ -315,7 +315,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                     <div className="flex items-center gap-3">
                         <Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />
                         <div>
-                            <CardTitle className="text-lg font-semibold text-gray-100">
+                            <CardTitle as="h2" className="text-lg font-semibold text-gray-100">
                                 Alertas de concentración y liquidez
                             </CardTitle>
                             {highAlerts > 0 ? <p className="mt-1 text-sm text-amber-300">{highAlerts} {highAlerts === 1 ? 'alerta alta' : 'alertas altas'}</p> : null}
@@ -347,6 +347,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
 
             <RecordDetail
                 title="Exposiciones de cartera"
+                titleAs="h2"
                 icon={<Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />}
                 record={humanizeRiskDashboard(headlineRecord(dashboard))}
                 fetchRecord={refreshDashboard}
@@ -360,7 +361,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                     <div className="flex items-center gap-3">
                         <Briefcase className="h-5 w-5 text-teal-400" aria-hidden="true" />
                         <div>
-                            <CardTitle className="text-lg font-semibold text-gray-100">
+                            <CardTitle as="h2" className="text-lg font-semibold text-gray-100">
                                 Exposición por posición
                             </CardTitle>
                         </div>

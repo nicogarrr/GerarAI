@@ -340,7 +340,7 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
             <CardHeader className="shrink-0 p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
-                    <CardTitle id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
+                    <CardTitle as="h2" id="global-brain-title" className="text-sm font-medium">Cerebro GerarAI</CardTitle>
                     {showGuideInput || guideTicker ? (
                         <TickerSearchInput
                             value={guideTicker}

@@ -22,6 +22,8 @@ import { seedMarketPrices } from "./fixtures/market-prices";
 // - /temas: etiqueta «Caliente» blanco sobre red-500, 3,76:1 (color-contrast).
 // - /portfolio y /taxes: h1 -> h3 sin h2 (heading-order, moderada; visto con
 //   Lighthouse). En esas dos pantallas el presupuesto incluye esa regla.
+// - /plan, /knowledge, /propicks, /risk y /corporate-actions: mismo salto
+//   h1 -> h3 (CardTitle es h3 por defecto); ahora h2 y presupuesto 0.
 test.skip(!process.env.E2E_UI_RUN || !process.env.E2E_A11Y_RUN, "Set E2E_UI_RUN=1 E2E_A11Y_RUN=1 to run the a11y sweep.");
 test.describe.configure({ mode: "serial" });
 
@@ -110,6 +112,10 @@ const ROUTES = [
   "/screener",
   "/temas",
   "/calendar",
+  "/knowledge",
+  "/propicks",
+  "/risk",
+  "/corporate-actions",
 ];
 const VIEWPORTS = [
   { name: "escritorio", width: 1366, height: 768 },
@@ -119,6 +125,12 @@ const VIEWPORTS = [
 const EXTRA_RULES: Record<string, string[]> = {
   "/portfolio": ["heading-order"],
   "/taxes": ["heading-order"],
+  // h1 -> h3 (CardTitle por defecto) arreglado el 29-oct-2026: presupuesto 0.
+  "/plan": ["heading-order"],
+  "/knowledge": ["heading-order"],
+  "/propicks": ["heading-order"],
+  "/risk": ["heading-order"],
+  "/corporate-actions": ["heading-order"],
 };
 const HYDRATION = /hydrat|did not match|server rendered (html|text)|text content does not match/i;
 

@@ -20,7 +20,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                 <div className="flex items-center gap-3">
                     <Coins className="h-5 w-5 text-teal-400" />
                     <div>
-                        <CardTitle className="text-lg font-semibold text-gray-100">Aportación de este mes</CardTitle>
+                        <CardTitle as="h2" className="text-lg font-semibold text-gray-100">Aportación de este mes</CardTitle>
                         <CardDescription className="mt-0.5 text-sm text-gray-500">
                             {split?.basis ? BASIS_LABELS[split.basis] ?? split.basis : 'Reparto de la cuota mensual por nivel DCA'}
                         </CardDescription>
