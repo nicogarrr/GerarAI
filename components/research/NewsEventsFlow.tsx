@@ -288,6 +288,9 @@ export function NewsEventsFlow({
         {/* Movil: una tarjeta por noticia (titular completo, fecha, fuente). La
             tabla de 5 columnas solo se usa desde md; en pantallas estrechas
             cortaba titulares y partia el layout. */}
+        {events.length === 0 ? <div className="rounded-lg border border-gray-800 p-4 md:hidden">
+          <EmptyState title="Sin eventos de noticias todavía." description="Este carril todavía no tiene noticias disponibles." action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>} />
+        </div> : null}
         <ul aria-label="Eventos de noticias" className="flex flex-col gap-3 md:hidden">
           {events.map((event) => (
             <li className="rounded-lg border border-gray-800 bg-black/20 p-3" key={`card-${event.id}`}>
