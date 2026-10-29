@@ -167,7 +167,9 @@ def test_compose_dedicated_queues_and_fixed_connection_pool():
     root = Path(__file__).resolve().parents[2]
     services = yaml.load((root / "docker-compose.prod.yml").read_text(), Loader=_ComposeLoader)["services"]
     expected = {"worker": ["default", "prices"], "worker-kpis": ["kpis"],
-                "worker-thesis": ["thesis"], "worker-alerts": ["alerts"],
+                # #3028: el carril "computed" (ProPicks, calculos cortos) lo
+                # consume worker-alerts en vez de anadir un contenedor nuevo.
+                "worker-thesis": ["thesis"], "worker-alerts": ["alerts", "computed"],
                 "worker-gdelt": ["gdelt"]}
     for name, queues in expected.items():
         command = services[name]["command"]
