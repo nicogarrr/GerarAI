@@ -645,6 +645,14 @@ def collect_raw_rows(root: ElementTree.Element) -> list[dict]:
     return rows
 
 
+def _flex_ticker(symbol: str, element: ElementTree.Element | None) -> str:
+    """Company.ticker a Flex row maps to: the ISIN-verified listing, else the symbol."""
+    from app.services.listing_identity import reviewed_listing
+
+    listing = reviewed_listing(_attr(element, "isin") if element is not None else None)
+    return listing.ticker if listing else symbol.upper().strip()
+
+
 def _attr(element: ElementTree.Element, *names: str) -> str | None:
     lowered = {key.lower(): value for key, value in element.attrib.items()}
     for name in names:
@@ -1156,7 +1164,7 @@ class IBKRImportService:
                     trades_already_present += 1
                     continue
                 if _is_cancel_trade(element):
-                    cancel_company = self._company_by_symbol(db, symbol)
+                    cancel_company = self._company_by_symbol(db, symbol, element)
                     original = (
                         _find_cancelled_trade(db, element, cancel_company, file_trades)
                         if cancel_company is not None
@@ -1191,13 +1199,14 @@ class IBKRImportService:
                         existing_ids.add(external_id)
                     trades_cancelled += 1
                     continue
+                lookup_ticker = _flex_ticker(symbol, element)
                 if (
                     trades_only
                     and only_existing_companies
-                    and symbol.upper().strip() not in companies
-                    and db.scalar(select(Company.id).where(Company.ticker == symbol.upper().strip())) is None
+                    and lookup_ticker not in companies
+                    and db.scalar(select(Company.id).where(Company.ticker == lookup_ticker)) is None
                 ):
-                    unknown_tickers[symbol.upper().strip()] = unknown_tickers.get(symbol.upper().strip(), 0) + 1
+                    unknown_tickers[lookup_ticker] = unknown_tickers.get(lookup_ticker, 0) + 1
                     continue
                 company = self._company(db, companies, symbol, element)
                 self._capture_isin(company, element)
@@ -1276,7 +1285,7 @@ class IBKRImportService:
                 cash_symbol = _attr(
                     element, "symbol", "underlyingSymbol", "description"
                 )
-                cash_company = self._company_by_symbol(db, cash_symbol)
+                cash_company = self._company_by_symbol(db, cash_symbol, element)
                 if cash_company is None and cash_symbol:
                     unattributed += 1
                 transaction = Transaction(
@@ -1480,12 +1489,22 @@ class IBKRImportService:
         }
 
     @staticmethod
-    def _company_by_symbol(db: Session, symbol: str | None) -> Company | None:
+    def _company_by_symbol(
+        db: Session, symbol: str | None, element: ElementTree.Element | None = None,
+    ) -> Company | None:
         """Resolve a Flex symbol to a Company, tolerating broker suffixes.
 
         Flex reports ``AAPL``, ``AAPL.US``, ``SAN.MC`` or a free-text
         ``description``; only the bare local ticker is a Company.ticker.
         """
+        from app.services.listing_identity import reviewed_listing
+
+        isin = ((_attr(element, "isin") if element is not None else None) or "").strip().upper()
+        listing = reviewed_listing(isin)
+        if listing is not None:
+            # An ISIN-verified listing (Basic-Fit BFIT -> BFIT.AS) never falls
+            # back to its bare homonym (the US ticker BFIT).
+            return db.scalar(select(Company).where(Company.ticker == listing.ticker))
         if not symbol:
             return None
         text = str(symbol).strip()
@@ -1498,8 +1517,17 @@ class IBKRImportService:
         upper = {candidate.upper() for candidate in candidates if candidate}
         if not upper:
             return None
-        return db.scalar(
-            select(Company).where(Company.ticker.in_(sorted(upper))).limit(1)
+        rows = db.scalars(select(Company).where(Company.ticker.in_(sorted(upper)))).all()
+        if not rows:
+            return None
+        # Same ISIN first, then the exact symbol, then the bare-prefix fallback.
+        return min(
+            rows,
+            key=lambda c: (
+                0 if isin and (c.isin or "").upper() == isin else 1,
+                0 if c.ticker == text.upper() else 1,
+                c.ticker,
+            ),
         )
 
     def import_ibkr_csv(self, db: Session, csv_text: str) -> dict:
