@@ -26,6 +26,23 @@ def reviewed_listing(isin: str | None) -> ListingIdentity | None:
     return BY_ISIN.get((isin or "").strip().upper())
 
 
+def ambiguous_bare_symbol(symbol: str | None, currency: str | None) -> ListingIdentity | None:
+    """Listado verificado al que podría referirse un símbolo «a secas» sin ISIN.
+
+    «BFIT» en EUR sin ISIN puede ser Basic-Fit (BFIT.AS) o el BFIT de EE. UU.:
+    ni el símbolo ni la divisa bastan para decidirlo, así que la fila va a
+    revisión en vez de asignarse en silencio al homónimo de EE. UU.
+    """
+    bare = (symbol or "").strip().upper()
+    money = (currency or "").strip().upper()
+    if not bare or not money:
+        return None
+    for listing in BY_ISIN.values():
+        if listing.ticker.split(".", 1)[0] == bare and listing.currency == money:
+            return listing
+    return None
+
+
 # Names the app already uses for Euronext Amsterdam: IBKR Flex venue codes
 # (AEB, XAMS), our canonical label and Finnhub's labels (see
 # propicks_price_service._EXCHANGE_YAHOO_SUFFIX and wacc_input_service).

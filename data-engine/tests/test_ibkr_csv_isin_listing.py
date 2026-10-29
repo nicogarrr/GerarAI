@@ -87,3 +87,26 @@ def test_csv_without_isin_column_is_unchanged(db):
     )
     trade = db.query(Transaction).one()
     assert db.get(Company, trade.company_id).ticker == "BFIT"
+
+
+NO_ISIN_HEADER = "Symbol,Buy/Sell,Quantity,TradePrice,TradeDate,Currency,IBCommission\n"
+
+
+@pytest.mark.parametrize("header,row", [
+    (NO_ISIN_HEADER, "BFIT,BUY,10,25.5,2026-03-10,EUR,-1.2\n"),
+    (HEADER, "BFIT,,BUY,10,25.5,2026-03-10,EUR,-1.2\n"),
+])
+def test_bfit_in_eur_without_isin_goes_to_review_not_to_us_bfit(db, header, row):
+    us = _us_bfit(db)
+    result = IBKRImportService().import_ibkr_csv(db, header + row)
+    assert result["trades_imported"] == 0, result
+    assert db.query(Transaction).filter_by(company_id=us.id).count() == 0
+    assert db.query(Company).filter_by(ticker="BFIT.AS").count() == 0
+    assert any("pendiente de revisión" in error and "BFIT.AS" in error for error in result["row_errors"])
+
+
+def test_bfit_in_usd_without_isin_still_imports_as_us_bfit(db):
+    us = _us_bfit(db)
+    result = IBKRImportService().import_ibkr_csv(db, NO_ISIN_HEADER + "BFIT,BUY,3,31,2026-03-11,USD,-1\n")
+    assert result["trades_imported"] == 1, result
+    assert db.query(Transaction).filter_by(company_id=us.id).count() == 1

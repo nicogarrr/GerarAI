@@ -1562,7 +1562,7 @@ class IBKRImportService:
         los errores fatales (cabecera ausente, fichero vacío) lanzan
         :class:`IBKRImportError`.
         """
-        from app.services.listing_identity import reviewed_listing
+        from app.services.listing_identity import ambiguous_bare_symbol, reviewed_listing
         from app.services.portfolio_ledger_service import PortfolioLedgerService
 
         errors = validate_ibkr_csv(csv_text)
@@ -1700,6 +1700,19 @@ class IBKRImportService:
             # BFIT.AS) to its own company, never to the bare US homonym. The
             # fingerprint above keeps the broker symbol so re-imports dedupe.
             listing = reviewed_listing(_cell("isin"))
+            if listing is None and not _cell("isin"):
+                homonym = ambiguous_bare_symbol(symbol, _cell("currency"))
+                if homonym is not None:
+                    # «BFIT» en EUR sin ISIN: Basic-Fit o el BFIT de EE. UU.
+                    # No se adivina; la fila queda para revisión.
+                    rows_skipped += 1
+                    row_errors.append(
+                        f"Fila {line_number} del CSV: «{symbol}» en {homonym.currency} sin ISIN, "
+                        f"pendiente de revisión: puede ser {homonym.name} ({homonym.ticker}) o "
+                        f"el {symbol} de EE. UU. Añade la columna ISIN ({homonym.isin} para "
+                        f"{homonym.name}) o usa el símbolo {homonym.ticker}."
+                    )
+                    continue
             try:
                 with db.begin_nested():
                     if listing is not None:
