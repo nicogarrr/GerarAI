@@ -249,3 +249,17 @@ def test_descuento_cero_y_extremo_no_rompen():
         assert all(isinstance(s, ScenarioDefinition) for s in scenarios)
         assert all(math.isfinite(s.probability) for s in scenarios)
         assert sum(s.probability for s in scenarios) == pytest.approx(1.0)
+
+
+@pytest.mark.parametrize("margin", [0.45, 0.469359, 0.472190, 0.494225, 0.50])
+def test_high_margin_bull_never_reduces_base_margin(margin):
+    # Live SEC-derived FY2025 examples: PLTR .469359, ANET .472190,
+    # MSCI .494225. The old .45 bull cap was below their base input.
+    rows = {s.name: s for s in mechanical_dcf_scenarios(.08, margin, .10, .03, .8)}
+    assert rows["bear"].assumptions["fcf_margin"] < margin
+    assert rows["bull"].assumptions["fcf_margin"] >= rows["base"].assumptions["fcf_margin"]
+
+
+def test_normal_margin_bull_cap_unchanged():
+    rows = mechanical_dcf_scenarios(.08, .42, .10, .03, .8)
+    assert rows[2].assumptions["fcf_margin"] == .45

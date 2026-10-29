@@ -92,7 +92,7 @@ def mechanical_dcf_scenarios(
             probability=probabilities["bull"],
             assumptions={
                 "revenue_growth": growth if burn else growth + 0.08,
-                "fcf_margin": min(margin + 0.06, 0.45),
+                "fcf_margin": min(margin + 0.06, max(0.45, margin)),
                 "wacc": wacc if burn else max(wacc - 0.01, terminal + 0.01),
                 "terminal_growth": terminal,
             },
