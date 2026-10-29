@@ -15,7 +15,10 @@ describe('SavingsProjection',()=>{
   expect((await screen.findAllByText(/405.804,49/)).length).toBeGreaterThan(0);
   expect(screen.getByText('Editar mi plan')).toBeInTheDocument();
   expect(screen.getByRole('link',{name:/reparto de la aportación/})).toHaveAttribute('href','/plan');
-  expect(screen.getByText(/no modifica tu aportación guardada/)).toBeInTheDocument();
+  expect(screen.queryByText(/no modifica tu aportación guardada/)).not.toBeInTheDocument();
+  expect(screen.getByRole('button', {name:'Simular sin guardar'})).toBeInTheDocument();
+  expect(getPlan).toHaveBeenCalledTimes(1);
+  expect(getSavingsProjection).toHaveBeenCalledTimes(1);
  });
  it('preview explícito no guarda y marca cambios aún no recalculados',async()=>{
   render(<SavingsProjection/>);await screen.findAllByText(/405.804,49/);
