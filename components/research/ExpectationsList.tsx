@@ -57,7 +57,6 @@ export function ExpectationsList({ rows }: { rows: ExpectationRow[] }) {
   }, [pending]);
   return (
     <div>
-      <p className="mb-3 text-xs leading-5 text-gray-500">N/D significa que falta el dato esperado o real: no hay una comparación verificable, ni un acierto medido.</p>
       {main.length ? (
         <>
           <Rows rows={view.items} />

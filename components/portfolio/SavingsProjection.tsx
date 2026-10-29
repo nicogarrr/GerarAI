@@ -78,8 +78,7 @@ export default function SavingsProjection() {
     const edit = () => { inputVersion.current += 1; setDirty(true); };
     return (
         <section className="mb-6 grid min-w-0 gap-4" aria-labelledby="savings-title" aria-busy={loading}>
-            <div><h2 id="savings-title" className="text-xl font-semibold text-gray-100">Tu ahorro a largo plazo</h2>
-                <p className="mt-1 text-sm text-gray-400">Simula aportaciones futuras sin necesitar una tesis publicada. No es una valoración de tu cartera.</p></div>
+            <div><h2 id="savings-title" className="text-xl font-semibold text-gray-100">Tu ahorro a largo plazo</h2></div>
             <form onSubmit={simulate} className={`${panel} grid gap-4`}>
                 <p className="text-sm text-teal-300">{plan ? 'Conectado a tu plan de inversión' : 'Ejemplo editable · no guardado'}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -110,7 +109,6 @@ export default function SavingsProjection() {
             </div> : null}
             <div className={`${panel} grid gap-3 text-sm`}>
                 <h3 className="font-semibold">El mismo plan para Cartera, Cerebro y DCA</h3>
-                <p className="text-gray-400">La proyección no modifica tu aportación guardada. Para cambiarla usa el plan existente; el reparto DCA y el Cerebro leerán ese mismo plan. No se realizan compras.</p>
                 <PlanSetupDialog triggerLabel={plan ? 'Editar mi plan' : 'Configurar mi plan'} initial={plan} onSaved={() => { setLoading(true); setDirty(false); setPlanVersion((v) => v + 1); }} />
                 <Link className="inline-flex min-h-[44px] items-center text-teal-300" href="/plan">Ver reparto de la aportación por nivel DCA →</Link>
             </div>
