@@ -117,8 +117,13 @@ def reconcile_ibkr_costs(db: Session, positions: list[Position]) -> dict[int, di
         *tenant_filters(db, Transaction),
     )):
         by_company[trade.company_id].append(trade)
+    # Las filas crudas se guardan todas (prueba fiscal) y crecen con cada sync:
+    # solo se leen las del dia y ticker de cada posicion candidata (indice
+    # ix_ibkr_raw_rows_snapshot), no el historico entero del tenant.
     raw_rows = list(db.scalars(select(IbkrRawRow).where(
         IbkrRawRow.path.in_(["OpenPosition", "OpenPositions/OpenPosition"]),
+        IbkrRawRow.report_date.in_({p.as_of for p in candidates}),
+        IbkrRawRow.symbol.in_({p.company.ticker for p in candidates}),
         *tenant_filters(db, IbkrRawRow),
     )))
     result = {}

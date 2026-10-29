@@ -388,6 +388,7 @@ class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "row_hash", name="uq_ibkr_raw_row_tenant_hash"),
         Index("ix_ibkr_raw_rows_section", "section"),
+        Index("ix_ibkr_raw_rows_snapshot", "tenant_id", "report_date", "symbol"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -396,6 +397,33 @@ class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
     path: Mapped[str] = mapped_column(String(200))
     row_hash: Mapped[str] = mapped_column(String(64))
     payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Copias indexadas de payload (symbol, reportDate/asOfDate) para leer solo
+    # el extracto del dia de cada posicion; el payload sigue intacto.
+    symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    report_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+def ibkr_raw_row_keys(payload: dict | None) -> tuple[str | None, date | None]:
+    """(symbol, fecha de informe) de una fila cruda, con el mismo parseo que la
+    conciliacion de costes; lo que no se puede leer queda en None."""
+    payload = payload or {}
+    symbol = payload.get("symbol")
+    symbol = symbol if isinstance(symbol, str) and 0 < len(symbol) <= 64 else None
+    day = str(payload.get("reportDate") or payload.get("asOfDate") or "").split(";", 1)[0]
+    try:
+        report_date = datetime.strptime(day.replace("-", ""), "%Y%m%d").date()
+    except ValueError:
+        report_date = None
+    return symbol, report_date
+
+
+@event.listens_for(IbkrRawRow, "before_insert")
+def _fill_ibkr_raw_row_keys(_mapper, _connection, row: IbkrRawRow) -> None:
+    symbol, report_date = ibkr_raw_row_keys(row.payload)
+    if row.symbol is None:
+        row.symbol = symbol
+    if row.report_date is None:
+        row.report_date = report_date
 
 
 class FxConversion(TenantOwnedMixin, Base, TimestampMixin):
