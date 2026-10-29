@@ -32,7 +32,7 @@ for (const vp of VIEWPORTS) {
       await expectHealthyPage(page, "impuestos (ejercicio actual)");
 
       await page.getByRole("combobox", { name: "Ejercicio" }).selectOption("2025");
-      await expect(page.getByRole("heading", { name: "Reporte Fiscal 2025" })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole("heading", { name: "Informe fiscal 2025" })).toBeVisible({ timeout: 30_000 });
       const main = page.locator("main");
       await expect(main.getByText("Plusvalías/minusvalías realizadas")).toBeVisible();
 

@@ -278,7 +278,7 @@ function csvExportCell(value: unknown): string {
     return csvCell(text);
 }
 
-/** Descarga un resumen fiscal (reporte + posiciones) como CSV generado en cliente */
+/** Descarga un resumen fiscal (informe + posiciones) como CSV generado en cliente */
 function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, year: number) {
     const lines: string[] = [`reporte_fiscal,${year}`, ''];
     lines.push('seccion,clave,valor');
@@ -287,7 +287,7 @@ function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, y
             lines.push(`reporte,${csvExportCell(key)},${csvExportCell(value)}`);
         }
     } else {
-        lines.push('reporte,sin_reporte,Sin reporte fiscal disponible');
+        lines.push('reporte,sin_reporte,Sin informe fiscal disponible');
     }
     lines.push('');
     if (holdings.length > 0) {
@@ -319,7 +319,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
     // se copia a un estado espejo. Un useState(initialReport) + useEffect de
     // resync dejaba un render intermedio con el informe viejo: RecordDetail se
     // remontaba (key con year) capturando ese informe viejo, y el título
-    // decía «Reporte Fiscal 2025» con el contenido de 2026. Solo se guarda el
+    // decía «Informe fiscal 2025» con el contenido de 2026. Solo se guarda el
     // override de «Regenerar», etiquetado con su ejercicio.
     const [override, setOverride] = useState<ReportOverride | null>(null);
     const [reportKey, setReportKey] = useState(0);
@@ -350,7 +350,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                 setOverride(null);
                 router.refresh();
             }
-            toast.success(`Reporte fiscal ${year} regenerado`);
+            toast.success(`Informe fiscal ${year} regenerado`);
         } catch (error) {
             showErrorToast(error, { onRetry: handleRegenerate });
         } finally {
@@ -407,7 +407,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
             ) : null}
             <RecordDetail
                 key={recordDetailKey(year, reportKey)}
-                title={`Reporte Fiscal ${year}`}
+                title={`Informe fiscal ${year}`}
                 titleAs="h2"
                 description="Resumen orientativo del ejercicio"
                 icon={<FileText className="h-5 w-5 text-teal-400" />}

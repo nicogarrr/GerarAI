@@ -70,7 +70,7 @@ describe('TaxesView aviso de informe desactualizado', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Regenerar ahora' }));
         await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
         expect(regen).toHaveBeenCalledWith(2025);
-        expect(toastSuccess).toHaveBeenCalledWith('Reporte fiscal 2025 regenerado');
+        expect(toastSuccess).toHaveBeenCalledWith('Informe fiscal 2025 regenerado');
     });
 
     it('si tras regenerar el informe sigue viejo, el aviso se mantiene', async () => {

@@ -42,7 +42,7 @@ const PRODUCT_TYPES: Array<{ value: WorkProductType; label: string }> = [
     { value: 'capital_allocation_analysis', label: 'Análisis de asignación de capital' },
     { value: 'comparables', label: 'Comparables' },
     { value: 'portfolio_review', label: 'Revisión de cartera' },
-    { value: 'risk_report', label: 'Reporte de riesgo' },
+    { value: 'risk_report', label: 'Informe de riesgo' },
 ];
 
 /**

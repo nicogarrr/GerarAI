@@ -11,7 +11,7 @@ export type ReportOverride = {
  *
  * La fuente de verdad es el informe que el servidor trajo para ESE año
  * (`initialReport`): año e informe llegan juntos en el mismo render, asi que
- * nunca se puede mostrar el informe de 2026 bajo el titulo «Reporte Fiscal
+ * nunca se puede mostrar el informe de 2026 bajo el titulo «Informe fiscal
  * 2025» (F260). El override local solo existe tras pulsar «Regenerar», y solo
  * aplica si su ejercicio etiquetado coincide con el de la vista; al cambiar de
  * año se descarta solo, sin efectos ni estados espejo que puedan quedarse
