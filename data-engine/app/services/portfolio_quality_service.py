@@ -38,9 +38,13 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
     # PortfolioSnapshotService). Una cadena rota es la causa observable de que
     # las bandas de Factores salgan SIN DATOS aun existiendo snapshots: se
     # diagnostica aqui con su primera fecha para no adivinarla en produccion.
+    # La primera foto real tras una serie reconstruida solo-posiciones es base
+    # nueva declarada (twr_base_after_scope_change, ver #2890): sin retorno por
+    # diseño, no es un eslabón roto.
     unlinked = [
         s for s in snapshots[1:]
-        if s.daily_return is None or s.cumulative_twr is None
+        if (s.daily_return is None or s.cumulative_twr is None)
+        and not (s.metadata_ or {}).get("twr_base_after_scope_change")
     ]
     twr_chain = {
         "status": (
