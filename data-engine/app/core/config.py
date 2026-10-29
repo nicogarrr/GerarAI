@@ -385,6 +385,15 @@ class Settings(BaseSettings):
     # snapshots/<LEI>.json normalizados desde filings.xbrl.org). Mismo motivo
     # que SEC: los datos viajan con la app, nunca se piden en caliente.
     esef_snapshot_dir: str | None = None
+    # Web Push (PWA): claves VAPID propias, gratis, sin proveedor de pago.
+    # Apagado por defecto. Env: WEB_PUSH_ENABLED, VAPID_PUBLIC_KEY,
+    # VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto: o https:). La clave publica la
+    # lee el navegador para suscribirse; la privada firma cada envio.
+    web_push_enabled: bool = False
+    vapid_public_key: str | None = None
+    vapid_private_key: str | None = Field(default=None, repr=False)
+    vapid_subject: str | None = None
+    web_push_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
     telegram_link_secret: str | None = Field(default=None, repr=False)
     telegram_enabled: bool = False
     telegram_bot_token: str | None = Field(default=None, repr=False)
@@ -776,6 +785,7 @@ class Settings(BaseSettings):
         for field_name, value in (
             ("TELEGRAM_BOT_TOKEN", self.telegram_bot_token),
             ("TELEGRAM_LINK_SECRET", self.telegram_link_secret),
+            ("VAPID_PRIVATE_KEY", self.vapid_private_key),
             ("SMTP_PASSWORD", self.smtp_password),
         ):
             if value:
