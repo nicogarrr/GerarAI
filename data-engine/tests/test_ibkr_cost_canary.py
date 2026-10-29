@@ -10,8 +10,8 @@ from app.models import Position, Tenant, Transaction
 from app.services.ibkr_import_service import IBKRImportService
 
 
-def xml(*, cost="108.396746", quantity="6.0572", trades_first=False, currency="USD"):
-    position = f'<OpenPosition accountId="U1" costBasisCurrency="USD" symbol="BABA" position="{quantity}" markPrice="130" costBasisPrice="{cost}" currency="USD" reportDate="2026-10-27"/>'
+def xml(*, cost="108.396746", quantity="6.0572", trades_first=False, currency="USD", report_date="2026-10-27"):
+    position = f'<OpenPosition accountId="U1" costBasisCurrency="USD" symbol="BABA" position="{quantity}" markPrice="130" costBasisPrice="{cost}" currency="USD" reportDate="{report_date}"/>'
     trades = f'<Trade accountId="U1" symbol="BABA" tradeID="B1" buySell="BUY" quantity="6.0572" tradePrice="125.56" ibCommission="0.047968" currency="{currency}" tradeDate="2026-10-01"/>'
     body = trades + position if trades_first else position + trades
     return f'<FlexQueryResponse><FlexStatements><FlexStatement>{body}</FlexStatement></FlexStatements></FlexQueryResponse>'
@@ -336,3 +336,142 @@ def test_dry_run_commit_is_never_called(db, monkeypatch):
     # y sin dry_run si confirma: el contrato no rompe el import normal.
     IBKRImportService().import_flex_xml(db, xml())
     assert calls and set(calls) == {"commit"}
+
+
+def _refreshed_position(db):
+    """Posicion importada del 27 y luego refrescada de precio al 29 (caso prod)."""
+    from datetime import date
+
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57"))
+    p = db.query(Position).one()
+    assert p.statement_as_of == date(2026, 10, 27)
+    p.as_of = date(2026, 10, 29)
+    p.market_price = Decimal("140")
+    p.market_value_native = Decimal("848.008")
+    p.market_value_base = Decimal("761.9")
+    db.flush()
+    return p
+
+
+def test_older_cotization_date_is_kept_and_statement_date_advances(db):
+    from datetime import date
+
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+
+    p = _refreshed_position(db)
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57", report_date="2026-10-28"))
+    db.refresh(p)
+    assert (p.as_of, p.market_price) == (date(2026, 10, 29), Decimal("140"))
+    assert p.market_value_base == Decimal("761.9")
+    assert p.statement_as_of == date(2026, 10, 28)
+    assert reconcile_ibkr_costs(db, [p])[p.id]["status"] == "ok"
+
+
+def test_canary_still_requires_raw_row_of_the_statement_date(db):
+    """Separar fechas no debilita el canario: ni la fecha de cotizacion ni otra
+    fecha de extracto valen como evidencia."""
+    from app.models import IbkrRawRow
+    from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
+
+    p = _refreshed_position(db)
+    # Solo existe la fila del 27; la posicion declara coste del 28 => N/D.
+    p.statement_as_of = __import__("datetime").date(2026, 10, 28)
+    db.flush()
+    review = reconcile_ibkr_costs(db, [p])[p.id]
+    assert review["status"] == "not_comparable" and review["reason"] == "missing_snapshot_evidence"
+    # Una fila cruda con la fecha de COTIZACION (29) tampoco sirve.
+    assert db.query(IbkrRawRow).filter(IbkrRawRow.report_date == p.as_of).count() == 0
+
+
+def test_older_statement_never_rolls_back_quantity_or_cost(db):
+    from datetime import date
+
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57", report_date="2026-10-28"))
+    p = db.query(Position).one()
+    result = IBKRImportService().import_flex_xml(db, xml(cost="1", quantity="99", report_date="2026-10-27"))
+    db.refresh(p)
+    assert result["rows_skipped"] >= 1
+    assert (p.quantity, p.statement_as_of) == (Decimal("6.0572"), date(2026, 10, 28))
+    assert p.average_cost == Decimal("125.57")
+
+
+def test_changed_quantity_with_newer_quotation_recomputes_value_not_old_value(db):
+    from datetime import date
+
+    p = _refreshed_position(db)
+    p.fx_rate = Decimal("0.9")
+    db.flush()
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57", quantity="7", report_date="2026-10-28"))
+    db.refresh(p)
+    assert (p.as_of, p.market_price, p.quantity) == (date(2026, 10, 29), Decimal("140"), Decimal("7"))
+    assert p.market_value_native == Decimal("980")
+    assert p.market_value == Decimal("980")
+    assert p.market_value_base == Decimal("882.0")
+    # PyG nativo con la cantidad y el valor nuevos (el PyG base no existe sin FX de coste).
+    assert p.unrealized_pnl == Decimal("980") - p.cost_basis_native
+
+
+def test_changed_quantity_without_fx_leaves_base_value_unknown(db):
+    p = _refreshed_position(db)
+    p.fx_rate = None
+    db.flush()
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57", quantity="7", report_date="2026-10-28"))
+    db.refresh(p)
+    assert p.market_value_native == Decimal("980")
+    assert p.market_value_base is None and p.unrealized_pnl_base is None
+
+
+def _legacy(db):
+    """Fila con coste sin fecha propia (anterior a statement_as_of)."""
+    from app.models import IbkrRawRow
+
+    p = _refreshed_position(db)
+    p.statement_as_of = None
+    db.query(IbkrRawRow).delete()
+    db.flush()
+    return p
+
+
+def test_legacy_row_rejects_older_statement_when_a_later_trade_exists(db):
+    from datetime import date
+
+    p = _legacy(db)
+    db.add(Transaction(
+        portfolio_id=p.portfolio_id, company_id=p.company_id, trade_date=date(2026, 10, 28),
+        action="buy", quantity=Decimal("1"), price=Decimal("100"), currency="USD", external_id="t-later",
+    ))
+    db.flush()
+    result = IBKRImportService().import_flex_xml(db, xml(cost="1", quantity="99", report_date="2026-10-26"))
+    db.refresh(p)
+    assert result["rows_skipped"] >= 1
+    assert p.quantity == Decimal("6.0572") and p.average_cost == Decimal("125.57")
+    assert p.statement_as_of is None
+
+
+def test_legacy_row_rejects_older_statement_when_a_later_raw_row_exists(db):
+    from datetime import date
+
+    from app.models import IbkrRawRow
+
+    p = _legacy(db)
+    db.add(IbkrRawRow(
+        account_id="U1", section="OpenPositions", path="OpenPosition", row_hash="h" * 64,
+        payload={"symbol": "BABA", "reportDate": "2026-10-28"}, symbol="BABA", report_date=date(2026, 10, 28),
+    ))
+    db.flush()
+    IBKRImportService().import_flex_xml(db, xml(cost="1", quantity="99", report_date="2026-10-27"))
+    db.refresh(p)
+    assert p.quantity == Decimal("6.0572") and p.average_cost == Decimal("125.57")
+
+
+def test_legacy_row_accepts_newer_statement_and_gets_dated(db):
+    from datetime import date
+
+    p = _legacy(db)
+    IBKRImportService().import_flex_xml(db, xml(cost="130", quantity="8", report_date="2026-10-28"))
+    db.refresh(p)
+    assert (p.quantity, p.average_cost, p.statement_as_of) == (Decimal("8"), Decimal("130"), date(2026, 10, 28))
+    # y ya con fecha propia, uno anterior nunca lo baja.
+    IBKRImportService().import_flex_xml(db, xml(cost="1", quantity="99", report_date="2026-10-27"))
+    db.refresh(p)
+    assert p.quantity == Decimal("8")
