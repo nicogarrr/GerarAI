@@ -1620,7 +1620,7 @@ class IBKRImportService:
         self, db: Session, cache: dict[str, Company], symbol: str,
         element: ElementTree.Element | None = None,
     ) -> Company:
-        from app.services.listing_identity import reviewed_listing
+        from app.services.listing_identity import reviewed_listing, same_venue
 
         isin = ((_attr(element, "isin") if element is not None else None) or "").strip().upper()
         listing = reviewed_listing(isin)
@@ -1629,7 +1629,7 @@ class IBKRImportService:
         # must not be collapsed by ISIN alone.
         currency = ((_attr(element, "currency") if element is not None else None) or "").strip().upper()
         exchange = ((_attr(element, "listingExchange") if element is not None else None) or "UNKNOWN").strip()
-        if listing and exchange.upper() not in {"AEB", "XAMS", "EURONEXT AMSTERDAM"}:
+        if listing and not same_venue(listing, exchange):
             raise IBKRImportError("La plaza Flex es distinta o ambigua para el ISIN verificado.")
         if listing and currency and currency != listing.currency:
             raise IBKRImportError("La divisa Flex contradice el listado verificado por ISIN.")
@@ -1663,8 +1663,7 @@ class IBKRImportService:
         cache[ticker] = company
         # A verified listing must never be enriched using its bare US homonym.
         if listing:
-            if company.currency != listing.currency or company.exchange != listing.exchange:
-                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            self._reconcile_reviewed_listing(company, listing)
             return company
         # Enriquecer el placeholder con el nombre real desde las APIs de datos.
         # nosemgrep: gerarai-broad-except-pass -- enriquecimiento opcional; nunca bloquea el import
@@ -1675,6 +1674,32 @@ class IBKRImportService:
         except Exception:  # noqa: BLE001 — nunca bloquear el import por el enriquecimiento
             pass
         return company
+
+    @staticmethod
+    def _reconcile_reviewed_listing(company: Company, listing) -> None:
+        """Align an existing row with the ISIN-verified listing, or fail.
+
+        The ficha, the search box and thesis generation create ``BFIT.AS`` as a
+        stub (exchange UNKNOWN, currency USD) and Finnhub later labels it
+        «NYSE EURONEXT - EURONEXT AMSTERDAM». Such a placeholder row (no ISIN,
+        placeholder or Amsterdam exchange, USD/EUR) is corrected to the verified
+        identity instead of rejecting the whole Flex file. A row that names
+        another venue or currency is a real conflict and still fails.
+        """
+        from app.services.listing_identity import PLACEHOLDER_EXCHANGES, same_venue
+
+        exchange = (company.exchange or "").strip().upper()
+        currency = (company.currency or "").strip().upper()
+        venue_ok = same_venue(listing, exchange)
+        if not company.isin:
+            placeholder = exchange in PLACEHOLDER_EXCHANGES or venue_ok
+            if not placeholder or currency not in {"", "USD", listing.currency}:
+                raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+            company.isin = listing.isin
+        elif not venue_ok or currency != listing.currency:
+            raise IBKRImportError("El listado existente contradice la identidad verificada; revisión manual.")
+        company.exchange = listing.exchange
+        company.currency = listing.currency
 
     @staticmethod
     def _capture_isin(company: Company, element: ElementTree.Element) -> None:
