@@ -2099,7 +2099,21 @@ class FinancialIngestionService:
                     "no se escriben hechos de una entidad bajo otra"
                 )
 
-        facts_data = snapshot.get("facts", {})
+        from app.services.esef_fact_quarantine import reviewed_eps_conflict
+
+        # Reviewed issuer conflicts stay in the source snapshot, but are not
+        # eligible inputs for new facts or derivatives. No guessed rescaling.
+        facts_data = {
+            concept: {
+                unit: [entry for entry in entries if not reviewed_eps_conflict(
+                    str(snapshot.get("lei") or ""),
+                    str(entry.get("end") or entry.get("instant") or ""),
+                    concept, entry.get("val"),
+                )]
+                for unit, entries in units.items()
+            }
+            for concept, units in snapshot.get("facts", {}).items()
+        }
         document = self._source_document_esef(db, company, ticker, snapshot)
         self._replace_esef_data(db, company, document)
         facts_imported = 0

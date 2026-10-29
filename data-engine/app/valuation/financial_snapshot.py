@@ -15,9 +15,10 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import desc, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Company, FinancialFact
+from app.services.esef_fact_quarantine import fact_quarantine_reason
 
 # Income-statement style metrics: flows over a period. They must share the
 # anchor's period, otherwise a 12-month revenue gets divided by a 9-month OCF.
@@ -111,16 +112,14 @@ def _period_type(period: str | None, fiscal_quarter: str | None) -> str:
 
 
 def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[FinancialFact]:
-    return list(
-        db.scalars(
-            select(FinancialFact)
+    return [fact for fact in db.scalars(
+            select(FinancialFact).options(selectinload(FinancialFact.source))
             .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
             .order_by(
                 FinancialFact.fiscal_year.desc().nullslast(),
                 desc(FinancialFact.created_at),
             )
-        ).all()
-    )
+        ).all() if not fact_quarantine_reason(fact)]
 
 
 def _available_at(

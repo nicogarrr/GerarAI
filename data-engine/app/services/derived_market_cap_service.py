@@ -45,7 +45,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import FinancialFact, MarketPrice
 from app.models.entities import Company
@@ -97,8 +97,8 @@ def _latest_price(db: Session, company: Company, *, today: date) -> MarketPrice 
 
 
 def _latest_fact(db: Session, company: Company, metric: str) -> FinancialFact | None:
-    return db.scalars(
-        select(FinancialFact)
+    row = db.scalars(
+        select(FinancialFact).options(selectinload(FinancialFact.source))
         .where(
             FinancialFact.company_id == company.id,
             FinancialFact.metric == metric,
@@ -107,6 +107,10 @@ def _latest_fact(db: Session, company: Company, metric: str) -> FinancialFact | 
         .order_by(FinancialFact.period.desc(), FinancialFact.id.desc())
         .limit(1)
     ).first()
+
+    from app.services.esef_fact_quarantine import fact_quarantine_reason
+
+    return row if row is None or not fact_quarantine_reason(row) else None
 
 
 def _vendor_market_cap_fresh(db: Session, company: Company, price_date: date) -> bool:
