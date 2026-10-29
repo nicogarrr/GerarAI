@@ -83,11 +83,6 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                             </div>
                         </>
                         <div>
-                            <h3 className="mb-2 font-medium text-gray-200">Pivotes de referencia de la última vela{last ? ` · ${formatMarketDate(last.date)}` : ''}</h3>
-                            {levels.length ? <dl className="space-y-2">{levels.map((level) => <div key={level.label} className="flex justify-between border-b border-gray-800 pb-1.5"><dt className={level.kind === 'support' ? 'text-teal-300' : 'text-red-300'}>{level.label}</dt><dd className="tabular-nums text-gray-200">{price(level.price, daily.currency)}</dd></div>)}</dl> : <p>Sin datos OHLC para calcular niveles.</p>}
-                            <p className="mt-2 text-[11px] text-gray-500">Calculados con máximo, mínimo y último precio de la vela; pueden cambiar si sigue en curso. No son giros confirmados.</p>
-                        </div>
-                        <div>
                             <h3 className="mb-2 font-medium text-gray-200">Niveles de retroceso ({range})</h3>
                             {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{formatNumber(level.ratio * 100)} %</dt><dd className="tabular-nums text-gray-200">{price(level.price, visibleCurrency)}</dd></div>)}</dl> : <p>Sin datos OHLC para Fibonacci.</p>}
                             <p className="mt-3 text-[11px] text-gray-500">Desde el máximo al mínimo del tramo visible.</p>

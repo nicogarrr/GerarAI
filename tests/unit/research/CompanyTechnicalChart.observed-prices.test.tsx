@@ -28,10 +28,10 @@ describe('daily price finality is not provided by the candle contract', () => {
             expect(reading).toHaveTextContent('Último precio diario');
             expect(reading).toHaveTextContent('no confirma el cierre de la última vela');
             expect(reading).toHaveTextContent('La lectura técnica y los niveles son provisionales');
-            expect(reading).toHaveTextContent('Pivotes de referencia de la última vela');
+            expect(reading).not.toHaveTextContent('Pivotes de referencia de la última vela');
             expect(reading).not.toHaveTextContent('Cierres diarios hasta');
             expect(reading).not.toHaveTextContent('Niveles clave del día');
-            expect(reading).toHaveTextContent('pueden cambiar si sigue en curso');
+            expect(reading).toHaveTextContent('Niveles de retroceso');
         },
     );
     it('does not claim an observed last price or provisional bar when there are no bars', () => {
