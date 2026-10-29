@@ -524,3 +524,23 @@ def test_two_consecutive_refreshes_second_is_skipped(db):
     assert first["status"] == "ok"
     second = refresh_derived_market_cap(db, company, today=TODAY)
     assert second["status"] == "skipped" and second["reason"] == "fresh_derived"
+
+
+def test_ebro_reviewed_eps_conflict_blocks_per_and_derivation(db):
+    from app.api.routes.watchlist import watchlist_metrics
+    from app.models import Document
+    from app.services.esef_fact_quarantine import EBRO_LEI
+    from app.valuation.financial_snapshot import _facts_for_metric
+
+    company = _company(db, ticker="EBRO")
+    source = Document(company_id=company.id, title="ESEF EBRO", source_type="ESEF", metadata_={"lei": EBRO_LEI})
+    db.add(source)
+    db.flush()
+    _price(db, company, Decimal("17.74"), date.today())
+    db.add(FinancialFact(company_id=company.id, metric="eps_diluted", value=Decimal("1351"), unit="EUR/share", period="2025-01-01:FY", fiscal_year=2025, fiscal_quarter="FY", source_id=source.id, source_type="ESEF", is_reported=True))
+    db.commit()
+    payload = watchlist_metrics("EBRO", db)
+    assert payload["per"] is None
+    assert any("cuarentena" in reason for reason in payload["sources"])
+    assert _facts_for_metric(db, company.id, "eps_diluted") == []
+    assert db.scalar(select(FinancialFact.value).where(FinancialFact.company_id==company.id, FinancialFact.metric=="eps_diluted")) == Decimal("1351")

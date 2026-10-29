@@ -21,6 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Company, FinancialFact
+from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.financial_ingestion_service import SOURCE_PRIORITY
 from app.services.ttm_fundamentals import (
     FLOW_METRICS,
@@ -82,6 +83,8 @@ def _best_by_period(
 ) -> dict[str, tuple[list[PeriodValue], list[PeriodValue]]]:
     best: dict[tuple[str, str, date], tuple[tuple[float, float], FinancialFact]] = {}
     for fact in facts:
+        if fact_quarantine_reason(fact):
+            continue
         quarter = (fact.fiscal_quarter or "").upper()
         if quarter not in _QUARTERS and quarter != "FY":
             continue

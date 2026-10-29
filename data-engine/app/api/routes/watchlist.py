@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.core.tenancy import tenant_filters
@@ -292,13 +292,19 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         .order_by(desc(MarketPrice.date)).limit(1)
     ).scalar_one_or_none()
     eps_row = db.execute(
-        select(FinancialFact)
+        select(FinancialFact).options(selectinload(FinancialFact.source))
         .where(FinancialFact.company_id == company.id,
                FinancialFact.metric.in_(["eps_diluted", "eps_basic"]),
                FinancialFact.fiscal_quarter == "FY",
                FinancialFact.value > 0)
         .order_by(desc(FinancialFact.fiscal_year)).limit(1)
     ).scalar_one_or_none()
+    from app.services.esef_fact_quarantine import fact_quarantine_reason
+
+    if eps_row is not None and (reason := fact_quarantine_reason(eps_row)):
+        sources.append(f"PER: N/D: {reason}")
+        return {"market_cap": market_cap, "per": None,
+                "currency": company.currency, "sources": sources}
     per = None
     if price_row is not None and eps_row is not None:
         # Divisa del EPS vs divisa del listado: el cierre almacenado es el

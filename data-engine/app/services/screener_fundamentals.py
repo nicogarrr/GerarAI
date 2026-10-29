@@ -13,9 +13,10 @@ from decimal import Decimal, InvalidOperation
 from math import isfinite
 
 from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Company, FinancialFact, MarketPrice
+from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
     cumulative_split_factor_after,
@@ -85,7 +86,7 @@ def load_screener_ratios(
         .order_by(MarketPrice.date.desc(), MarketPrice.id.desc())
     ).all()
     facts = db.scalars(
-        select(FinancialFact)
+        select(FinancialFact).options(selectinload(FinancialFact.source))
         .where(
             FinancialFact.company_id.in_(ids),
             FinancialFact.tenant_id == db.info.get("tenant_id"),
@@ -104,6 +105,8 @@ def load_screener_ratios(
     splits_by_company = split_events_by_company(db, ids)
     by_company: dict[int, dict[tuple[int, str], FinancialFact]] = {}
     for fact in facts:
+        if fact_quarantine_reason(fact):
+            continue
         # La ingesta SEC/ESEF guarda el periodo como "<end>:FY" (p.ej.
         # "2025-09-27:FY"); "FY"/"ANNUAL" a pelo es la forma legada.
         period = (fact.period or "").upper()

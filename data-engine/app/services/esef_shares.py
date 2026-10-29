@@ -101,6 +101,11 @@ def _derive_period(
     period: str, profit_entry: dict, eps_entry: dict, lane: str,
     *, max_rel_error: Decimal,
 ) -> ShareDerivation | ShareSkip:
+    from app.services.esef_fact_quarantine import reviewed_eps_conflict
+
+    concept = DILUTED_EPS_CONCEPT if lane == "diluted" else BASIC_EPS_CONCEPT
+    if reviewed_eps_conflict(str(eps_entry.get("lei") or ""), period, concept, eps_entry.get("val")):
+        return ShareSkip(period, lane, "bpa_esef_conflicto_escala_fuente_primaria")
     profit = _dec(profit_entry.get("val"))
     eps = _dec(eps_entry.get("val"))
     if profit is None:
