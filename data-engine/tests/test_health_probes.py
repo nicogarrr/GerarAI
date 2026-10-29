@@ -201,7 +201,8 @@ def test_health_reports_degraded_with_schema_migration_issues(monkeypatch):
     result = asyncio.run(health_module.health())
 
     assert result["status"] == "degraded"
-    assert result["schema"] == issues
+    assert result["schema"] == [{"error": "OperationalError"}]
+    assert "ALTER TABLE" not in str(result)
 
 
 def test_health_ok_when_schema_clean(monkeypatch):
@@ -212,3 +213,22 @@ def test_health_ok_when_schema_clean(monkeypatch):
 
     assert result["status"] == "ok"
     assert result["schema"] == []
+
+
+def test_public_health_never_serializes_migration_sql_or_labels(monkeypatch):
+    import json
+
+    monkeypatch.setattr(health_module, "_probe_database", lambda: "ok")
+    monkeypatch.setattr(health_module, "_scheduler_status", lambda: {})
+    monkeypatch.setattr(health_module, "_git_version", lambda: "main-test")
+    issues = [
+        {"statement": "ALTER TABLE private_table ADD sensitive_column TEXT", "error": "OperationalError"},
+        {"statement": "/srv/private/migration.py: internal repair label", "error": "ProgrammingError"},
+    ]
+    monkeypatch.setattr(health_module, "schema_migration_issues", lambda: issues)
+    result = asyncio.run(health_module.health())
+    assert result["status"] == "degraded"
+    assert result["schema"] == [{"error": "OperationalError"}, {"error": "ProgrammingError"}]
+    assert "private" not in json.dumps(result)
+    # Diagnostics remain available to internal callers, unchanged.
+    assert health_module.schema_migration_issues() == issues

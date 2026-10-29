@@ -149,5 +149,5 @@ async def health() -> dict:
         "database": database,
         "scheduler": scheduler,
         "version": version,
-        "schema": schema_issues,
+        "schema": [{"error": issue.get("error", "MigrationError")} for issue in schema_issues],
     }
