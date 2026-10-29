@@ -109,10 +109,20 @@ class PortfolioSnapshotService:
             base_currency=portfolio.base_currency,
             as_of=snapshot_date,
         )
+        cash_carried_forward: list[dict[str, Any]] = []
         for cash in cash_rows:
             rate = cash_rates.get(currency_key(cash.currency))
             base = cash.balance * rate if rate is not None else None
-            if base is None or cash.as_of != snapshot_date:
+            carried = (
+                base is not None
+                and cash.as_of < snapshot_date
+                and self._cash_unchanged_since(db, portfolio.id, cash.as_of, snapshot_date)
+            )
+            if carried:
+                cash_carried_forward.append(
+                    {"cash_currency": cash.currency, "valuation_date": cash.as_of.isoformat()}
+                )
+            if base is None or (cash.as_of != snapshot_date and not carried):
                 missing_pricing.append(
                     {
                         "cash_currency": cash.currency,
@@ -181,6 +191,8 @@ class PortfolioSnapshotService:
                 )
                 is None
             )
+        if previous is not None and not previous_is_base:
+            previous_is_base = self._restart_base(db, portfolio.id, previous)
         previous_positions_only = previous is not None and bool(
             (previous.metadata_ or {}).get("positions_only")
         )
@@ -215,6 +227,7 @@ class PortfolioSnapshotService:
         snapshot.source = source
         snapshot.metadata_ = {
             "missing_pricing": missing_pricing,
+            "cash_carried_forward": cash_carried_forward,
             "ambiguous_external_flows": ambiguous_flows,
             "flow_timing": "end_of_day",
             "interval_days": interval_days,
@@ -282,6 +295,60 @@ class PortfolioSnapshotService:
         self._relink_following(db, portfolio.id, snapshot_date)
         return snapshot
 
+    @staticmethod
+    def _restart_base(db: Session, portfolio_id: int, previous: PortfolioDailySnapshot) -> bool:
+        """``previous`` abre un tramo nuevo tras un tramo no valorable.
+
+        La foto esta completa pero sin acumulado porque la suya anterior no se
+        podia valorar (cobertura < 1 o valor <= 0). Sirve de base del tramo
+        nuevo; NO se une con el tramo roto (no hay retorno entre ambos).
+        """
+        if (
+            previous.cumulative_twr is not None
+            or previous.pricing_coverage != Decimal("1")
+            or previous.total_value_base <= 0
+        ):
+            return False
+        before = db.scalar(
+            select(PortfolioDailySnapshot)
+            .where(
+                PortfolioDailySnapshot.portfolio_id == portfolio_id,
+                PortfolioDailySnapshot.snapshot_date < previous.snapshot_date,
+                *tenant_filters(db, PortfolioDailySnapshot),
+            )
+            .order_by(desc(PortfolioDailySnapshot.snapshot_date))
+            .limit(1)
+        )
+        return before is not None and (
+            before.pricing_coverage != Decimal("1") or before.total_value_base <= 0
+        )
+
+    @staticmethod
+    def _cash_unchanged_since(
+        db: Session, portfolio_id: int, cash_as_of: date, snapshot_date: date
+    ) -> bool:
+        """True si el saldo de caja sigue siendo valido en ``snapshot_date``.
+
+        Un saldo es un stock: el extracto de IBKR (Flex, diario, no en tiempo
+        real) lo fecha en su ultimo cierre y vale hasta que algo lo mueva.
+        Exigir ``as_of == dia`` dejaba la caja fuera de toda foto tomada otro
+        dia (valor 0, cobertura < 1) y bloqueaba el retorno encadenado. Se
+        arrastra solo si no hay ninguna operacion (compra, venta, deposito,
+        retirada, divisa...) posterior a la fecha del saldo; si la hay, el
+        saldo es dudoso y la foto sigue marcandolo como sin valorar.
+        """
+        later = db.scalar(
+            select(Transaction.id)
+            .where(
+                Transaction.portfolio_id == portfolio_id,
+                Transaction.trade_date > cash_as_of,
+                Transaction.trade_date <= snapshot_date,
+                *tenant_filters(db, Transaction),
+            )
+            .limit(1)
+        )
+        return later is None
+
     def _relink_following(self, db: Session, portfolio_id: int, after: date) -> None:
         following = list(
             db.scalars(
@@ -323,7 +390,7 @@ class PortfolioSnapshotService:
                     .limit(1)
                 )
                 is None
-            )
+            ) or self._restart_base(db, portfolio_id, previous)
             # Only snapshots with an explicit interval-flow contract may
             # have their window recomputed. A legacy snapshot without that
             # evidence never proves zero flow and stays unlinked.

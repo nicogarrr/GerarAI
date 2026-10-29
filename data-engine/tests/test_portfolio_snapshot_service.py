@@ -183,3 +183,84 @@ def test_positive_cash_keeps_nav_weight_basis(db):
     db.commit()
     snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
     assert snapshot.metadata_["weight_basis"] == "total_with_cash"
+
+
+def test_cash_dated_before_the_day_is_carried_forward_when_nothing_moved_it(db):
+    """Flex dates cash at its last close; a same-day snapshot must still count it."""
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=TODAY)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=YESTERDAY))
+    db.commit()
+
+    snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
+
+    assert snapshot.cash_value_base == Decimal("500")
+    assert snapshot.total_value_base == Decimal("1500")
+    assert snapshot.pricing_coverage == Decimal("1")
+    assert snapshot.metadata_["missing_pricing"] == []
+    assert snapshot.metadata_["cash_carried_forward"] == [
+        {"cash_currency": "EUR", "valuation_date": YESTERDAY.isoformat()}
+    ]
+
+
+def test_cash_is_not_carried_forward_across_a_later_transaction(db):
+    company = _company(db)
+    portfolio, _ = _portfolio_positions(db, company, as_of=TODAY)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=YESTERDAY))
+    db.add(
+        Transaction(
+            portfolio_id=portfolio.id, trade_date=TODAY, action="buy",
+            quantity=Decimal("1"), price=Decimal("10"), currency="EUR",
+            external_id="buy-1",
+        )
+    )
+    db.commit()
+
+    snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
+
+    assert snapshot.cash_value_base == Decimal("0")
+    assert snapshot.pricing_coverage < Decimal("1")
+    assert snapshot.metadata_["cash_carried_forward"] == []
+    assert snapshot.daily_return is None
+
+
+def test_future_dated_cash_is_never_used_for_an_earlier_day(db):
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=YESTERDAY)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=TODAY))
+    db.commit()
+
+    snapshot = PortfolioSnapshotService().capture(db, as_of=YESTERDAY)
+
+    assert snapshot.cash_value_base == Decimal("0")
+    assert snapshot.metadata_["cash_carried_forward"] == []
+
+
+def test_series_restarts_after_unvaluable_stretch_without_stitching(db):
+    """Broken days stay null; the first complete day becomes the new base.
+
+    d0, d1: positions stale => coverage < 1, no returns (the real 35-snapshot case).
+    d2: complete, no return (previous unusable) -> new base.
+    d3: complete, return chains from d2 only.
+    """
+    company = _company(db)
+    portfolio, position = _portfolio_positions(db, company, as_of=TODAY - timedelta(days=9))
+    service = PortfolioSnapshotService()
+    d = [TODAY - timedelta(days=n) for n in (3, 2, 1, 0)]
+    service.capture(db, as_of=d[0])  # position as_of far in the past: stale
+    service.capture(db, as_of=d[1])
+    position.as_of = d[2]
+    db.commit()
+    s2 = service.capture(db, as_of=d[2])
+    position.as_of = d[3]
+    position.market_price = Decimal("110")
+    db.commit()
+    s3 = service.capture(db, as_of=d[3])
+
+    rows = db.scalars(
+        select(PortfolioDailySnapshot).order_by(PortfolioDailySnapshot.snapshot_date)
+    ).all()
+    assert [r.daily_return for r in rows[:3]] == [None, None, None]
+    assert s2.pricing_coverage == Decimal("1")
+    assert s3.daily_return == pytest.approx(Decimal("0.1"))
+    assert s3.cumulative_twr == pytest.approx(Decimal("0.1"))
