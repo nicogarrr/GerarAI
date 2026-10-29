@@ -38,7 +38,11 @@ test.describe("hardening frontend estático", () => {
 
     expect(errorBoundary).toContain('role="alert"');
     expect(errorBoundary).toContain("Se produjo un error inesperado");
-    expect(errorBoundary).not.toMatch(/error\.message\s*\|\|/);
+    // Leer el mensaje para clasificar no equivale a mostrarlo. En el JSX
+    // sigue prohibida cualquier interpolación directa o fallback interno.
+    const rendered = errorBoundary.slice(errorBoundary.indexOf('export default function RootError'));
+    expect(rendered).not.toMatch(/error\.message/);
+    expect(errorBoundary).toContain('isBackendUnavailable(error)');
   });
 
   test("MutationForm y SelectField exponen estado pending y validación", () => {
