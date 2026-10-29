@@ -8179,7 +8179,7 @@
           "fees": {
             "anyOf": [
               {
-                "maximum": 1e+18,
+                "maximum": 1e+16,
                 "minimum": 0.0,
                 "type": "number"
               },
@@ -42917,7 +42917,7 @@
     },
     "/api/news": {
       "get": {
-        "description": "Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:\n``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT.\n``ticker`` limita a los eventos de esa empresa (ficha de accion).\nLas filas etiquetadas con un ticker que no citan a la empresa se omiten.\nEn portada (sin ``ticker``) la misma historia publicada por varios medios\nse agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran\nlas fuentes absorbidas (regla determinista, ver news_story_cluster).\n``tickers`` (csv, max 50) limita a esas empresas: carril \u00abPara ti\u00bb\n(cartera + watchlist del usuario, que el cliente ya conoce).",
+        "description": "Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:\n``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT;\n``gobierno`` = fuentes oficiales (Fed, BCE, Casa Blanca...); ``social`` =\nconversaci\u00f3n StockTwits sin verificar.\n``ticker`` limita a los eventos de esa empresa (ficha de accion).\nLas filas etiquetadas con un ticker que no citan a la empresa se omiten.\nEn portada (sin ``ticker``) la misma historia publicada por varios medios\nse agrupa en la fila mas reciente: ``coverage_count``/``coverage`` declaran\nlas fuentes absorbidas (regla determinista, ver news_story_cluster).\n``tickers`` (csv, max 50) limita a esas empresas: carril \u00abPara ti\u00bb\n(cartera + watchlist del usuario, que el cliente ya conoce).",
         "operationId": "news_events_api_news_get",
         "parameters": [
           {
@@ -42952,7 +42952,9 @@
                 {
                   "enum": [
                     "empresa",
-                    "macro"
+                    "macro",
+                    "gobierno",
+                    "social"
                   ],
                   "type": "string"
                 },

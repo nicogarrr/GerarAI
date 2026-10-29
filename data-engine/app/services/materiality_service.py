@@ -144,6 +144,7 @@ _NAME_NOISE = {
 # notas del usuario nunca se degradan.
 _GENERIC_SOURCE_TIERS = {"tier_4_reputable_media", "tier_5_data_provider", "tier_unknown"}
 UNRELATED_NEWS_MAX_MATERIALITY = 6
+SOCIAL_NEWS_MAX_MATERIALITY = 2
 
 
 def mentions_company(text: str, company: Company | None) -> bool:
@@ -284,6 +285,12 @@ class MaterialityService:
             except Exception:  # noqa: BLE001 — Jev es best-effort, nunca rompe ingesta
                 pass
 
+        # Redes sociales (tier_8_social, p. ej. StockTwits): conversación sin
+        # verificar. Nunca material: techo duro por debajo del umbral de
+        # revisión, fuera de cualquier conteo de fuentes verificadas.
+        if source_tier.key == "tier_8_social" and materiality > SOCIAL_NEWS_MAX_MATERIALITY:
+            materiality = SOCIAL_NEWS_MAX_MATERIALITY
+            reasons.append(f"fuente social sin verificar => max {SOCIAL_NEWS_MAX_MATERIALITY}")
         # Relevancia conservadora: nunca se descarta, solo se baja por debajo del
         # umbral de revisión (7) si la fuente es genérica y el texto no cita a la
         # empresa (QA: titulares de CoreWeave/HOOD con materialidad 10 en AAPL).

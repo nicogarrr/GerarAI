@@ -26,6 +26,9 @@ class RSSFeed:
     # canal como `source` del evento («All News Releases» no dice nada; la
     # agencia sí). El <title> original queda en metadata del poll.
     label: str | None = None
+    # Carril opcional («gobierno»): eventos sin empresa detectada
+    # (fail-closed, como el carril macro), etiquetados en metadata.
+    lane: str | None = None
 
 
 def configured_rss_feeds(value: str | None = None) -> list[RSSFeed]:
@@ -103,10 +106,44 @@ PRESS_WIRE_SOURCES: frozenset[str] = frozenset(
 )
 
 
-def all_rss_feeds(value: str | None = None) -> list[RSSFeed]:
-    """Agencias de notas de prensa incluidas + RSS_FEEDS configurados, sin duplicados."""
+# Fuentes oficiales de gobierno y bancos centrales (RSS público, gratis, sin
+# clave). URLs verificadas una a una el 29-oct-2026 (200 + application/rss+xml
+# o text/xml con <rss>): whitehouse.gov/feed/ devuelve 404, el feed vivo es
+# /news/feed/. Van al carril «gobierno»: news_lane en metadata, company_id
+# NULL siempre (fail-closed, misma regla que el carril macro: un comunicado
+# oficial no se vincula a una empresa sin evidencia primaria) y nunca
+# disparan alertas de noticias seguidas.
+GOV_NEWS_LANE = "gobierno"
 
-    return _unique_feeds([*PRESS_WIRE_RSS_FEEDS, *configured_rss_feeds(value)])
+# Carril «social»: publicaciones de StockTwits por ticker (conector dedicado,
+# app/services/connectors/stocktwits.py). Con empresa vinculada por el propio
+# stream, pero conversación sin verificar: tier_8_social, sin materialidad,
+# sin alertas (conector fuera del allowlist) y sin clústeres de historia.
+SOCIAL_NEWS_LANE = "social"
+
+GOV_RSS_FEEDS: tuple[RSSFeed, ...] = (
+    RSSFeed("https://www.federalreserve.gov/feeds/press_all.xml", label="Reserva Federal (oficial)", lane=GOV_NEWS_LANE),
+    RSSFeed("https://www.ecb.europa.eu/rss/press.html", label="BCE (oficial)", lane=GOV_NEWS_LANE),
+    RSSFeed("https://www.whitehouse.gov/news/feed/", label="Casa Blanca (oficial)", lane=GOV_NEWS_LANE),
+    RSSFeed("https://www.bankofengland.co.uk/rss/news", label="Banco de Inglaterra (oficial)", lane=GOV_NEWS_LANE),
+    RSSFeed(
+        "https://ec.europa.eu/commission/presscorner/api/rss?language=en",
+        label="Comisión Europea (oficial)",
+        lane=GOV_NEWS_LANE,
+    ),
+    RSSFeed(
+        "https://www.bde.es/wbe/es/inicio/rss/rss-noticias/",
+        label="Banco de España (oficial)",
+        lane=GOV_NEWS_LANE,
+    ),
+    RSSFeed("https://www.lamoncloa.gob.es/Paginas/RSS.aspx", label="La Moncloa (oficial)", lane=GOV_NEWS_LANE),
+)
+
+
+def all_rss_feeds(value: str | None = None) -> list[RSSFeed]:
+    """Agencias + fuentes oficiales de gobierno incluidas + RSS_FEEDS, sin duplicados."""
+
+    return _unique_feeds([*PRESS_WIRE_RSS_FEEDS, *GOV_RSS_FEEDS, *configured_rss_feeds(value)])
 
 
 def _unique_feeds(feeds: list[RSSFeed]) -> list[RSSFeed]:

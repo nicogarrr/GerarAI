@@ -131,3 +131,18 @@ def test_assess_news_scores_celebrity_noise_low():
 )
 def test_market_verbs_and_spanish_direction(text, expected):
     assert _direction(text) == expected
+
+
+def test_social_source_materiality_is_capped():
+    # Un mensaje social con término crítico («bankruptcy») nunca es material:
+    # techo duro por debajo del umbral de revisión (7).
+    assessment = MaterialityService().assess_news(
+        None,
+        None,
+        "$ACME bankruptcy filing imminent, trust me",
+        "StockTwits (social)",
+        "https://stocktwits.com/user/message/1",
+    )
+    assert assessment.source_tier == "tier_8_social"
+    assert assessment.materiality_score <= 2
+    assert assessment.requires_update is False
