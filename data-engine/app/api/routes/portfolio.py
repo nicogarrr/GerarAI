@@ -40,7 +40,11 @@ from app.services.portfolio_ledger_service import (
 )
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 from app.services.risk_service import RiskService
-from app.services.tax_report_service import CASH_UNIT_QUANTITIES
+from app.services.tax_report_service import (
+    CASH_UNIT_QUANTITIES,
+    ZERO_COST_REVIEW_LABEL,
+    is_zero_cost_buy,
+)
 from app.services.tearsheet_service import TearsheetService
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 from app.valuation.currency import canonical_currency_code
@@ -235,6 +239,8 @@ def _transaction_payload(transaction: Transaction, company: Company) -> dict:
         "currency": transaction.currency,
         "trade_date": transaction.trade_date.isoformat(),
         "notes": (transaction.raw_payload or {}).get("notes"),
+        # Compra a precio 0 aceptada pero marcada para revisión (regalo / spin-off).
+        "review_flag": ZERO_COST_REVIEW_LABEL if is_zero_cost_buy(transaction) else None,
         "created_at": transaction.created_at.isoformat(),
         "updated_at": transaction.updated_at.isoformat(),
     }
