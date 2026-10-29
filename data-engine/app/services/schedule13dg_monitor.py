@@ -28,6 +28,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.errors import redact_secrets
 from app.models.entities import ConnectorState, Schedule13DGFiling
 from app.services import schedule13dg_persistence
 from app.services.connectors import form13dg as form13dg_connector
@@ -207,7 +208,10 @@ def scan(
         return stats
     except Exception as exc:  # noqa: BLE001 - el actor jamas recibe una excepcion
         stats["status"] = "error"
-        stats["errors"].append(f"fatal: {type(exc).__name__}: {exc}")
+        # last_error y last_run se guardan y se ven en la API de estado del
+        # conector: un fallo de red de httpx trae la URL con su token tal cual.
+        fatal_error = redact_secrets(f"{type(exc).__name__}: {exc}")[:1000]
+        stats["errors"].append(f"fatal: {fatal_error}")
         # Si el fallo vino de la sesion (p. ej. un commit roto), hay que hacer
         # rollback ANTES de tocar nada mas; commitear sobre una sesion
         # envenenada lanzaria PendingRollbackError y perderia el estado.
@@ -216,7 +220,7 @@ def scan(
         # rollback; se relee (o recrea) desde la base.
         state = _connector_state(db, tenant_id)
         state.consecutive_errors = (state.consecutive_errors or 0) + 1
-        state.last_error = f"{type(exc).__name__}: {exc}"[:1000]
+        state.last_error = fatal_error
         meta = dict(state.metadata_ or {})
         meta["runs"] = int(meta.get("runs", 0)) + 1
         meta["last_run"] = stats
