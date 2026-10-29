@@ -1,3 +1,4 @@
+import { FactCalculatedLabel } from '@/components/research/FactCalculatedLabel';
 import BlockedValuation from '@/components/research/BlockedValuation';
 import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
@@ -315,9 +316,10 @@ function metricValue(value: number | string | null | undefined, unit: string) {
 /** Fuente de una cifra: enlace real al documento de origen (filing SEC/ESEF o pagina del proveedor) con su fecha, o texto plano cuando no hay documento. Nunca un enlace inventado. */
 function FactSource({ fact }: { fact: ResearchFact }) {
   const text = label(fact.source_type);
-  if (!fact.source_url) return <>{text}</>;
+  if (!fact.source_url) return <>{text}<FactCalculatedLabel fact={fact} /></>;
   const date = fact.source_published_at ? formatUserDate(fact.source_published_at) : null;
   return (
+    <>
     <a
       className="text-teal-300 underline-offset-2 transition hover:text-teal-200 hover:underline"
       href={fact.source_url}
@@ -327,6 +329,8 @@ function FactSource({ fact }: { fact: ResearchFact }) {
     >
       {text}{date ? ` · ${date}` : ''}
     </a>
+    <FactCalculatedLabel fact={fact} />
+    </>
   );
 }
 
