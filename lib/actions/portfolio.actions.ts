@@ -354,7 +354,9 @@ export async function getCompanyHolding(ticker: string): Promise<CompanyHoldingC
         const symbol = ticker.trim().toUpperCase();
         const holding = summary.holdings.find((item) => item.symbol.toUpperCase() === symbol);
         if (!holding) return { status: 'not_held' };
-        const known = summary.holdings.filter((item) => !item.valueMissing && !item.fxMissing);
+        // Misma regla que el donut de cartera: el coste pendiente de
+        // conciliación no excluye del peso; la valoración suspendida sí.
+        const known = summary.holdings.filter((item) => !item.valueMissing && !item.valuationHold);
         const slice = known.includes(holding)
             ? buildAllocationSlices(known).find((item) => item.symbol === holding.symbol)
             : undefined;

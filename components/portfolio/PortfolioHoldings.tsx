@@ -89,8 +89,10 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   const showCash = typeof cash === 'number' && cash !== 0;
 
   // Same valued-position subset and denominator as Resumen's allocation.
+  // El coste ausente (conciliación IBKR) no excluye del peso: se pesa el
+  // valor de mercado; valuation_hold sí excluye (valor suspendido).
   const weights = new Map(buildAllocationSlices(currentHoldings.filter(
-    (holding) => !holding.valueMissing && !holding.fxMissing,
+    (holding) => !holding.valueMissing && !holding.valuationHold,
   )).map((slice) => [slice.symbol, slice.percentage]));
   const weight = (symbol: string) => formatPercent(weights.get(symbol), { fromRatio: false, digits: 1 }, NA);
   // Nivel DCA de tu fórmula + valor justo único (tesis o motor), una sola petición.

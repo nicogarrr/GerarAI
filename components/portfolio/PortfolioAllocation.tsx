@@ -49,11 +49,17 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
         );
     }
 
-    // Datos del donut: SOLO posiciones CON valor conocido; los pesos
-    // suman 100% entre ellas. Una posicion sin valor (FX o precio ausente)
-    // NO entra mudamente con 0%: queda fuera del donut y se avisa — nunca
-    // presentamos como completo un reparto que no lo es (regla de veracidad).
-    const knownHoldings = holdings.filter((holding) => !holding.valueMissing && !holding.fxMissing);
+    // Datos del donut: SOLO posiciones CON valor conocido; los pesos (sobre
+    // el valor bruto de mercado) suman 100% entre ellas. Una posicion sin
+    // valor (precio ausente) o con valoración suspendida NO entra mudamente
+    // con 0%: queda fuera del donut y se avisa — nunca presentamos como
+    // completo un reparto que no lo es (regla de veracidad).
+    // El COSTE ausente (conciliación IBKR pendiente) NO excluye: el donut
+    // pesa valores de mercado, no costes. Antes se usaba fxMissing, que
+    // también cubre el coste, y una cartera entera con coste pendiente
+    // mostraba «ninguna posición tiene valor disponible» con el valor bruto
+    // a la vista (visto en prod, 2026-10-29).
+    const knownHoldings = holdings.filter((holding) => !holding.valueMissing && !holding.valuationHold);
     const missingCount = holdings.length - knownHoldings.length;
     const chartData: AllocationSlice[] = buildAllocationSlices(knownHoldings);
 
@@ -62,7 +68,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
                 <span className="text-gray-400 text-sm font-medium">Distribución</span>
-                <span className="text-xs text-gray-500">Pesos sobre las posiciones</span>
+                <span className="text-xs text-gray-500">Pesos sobre el valor bruto de las posiciones</span>
             </div>
 
             {/* Contenido: Pie Chart + Leyenda */}
