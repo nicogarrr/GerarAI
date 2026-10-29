@@ -387,6 +387,48 @@ def backward_repurchase_quantity(prior_buys, prior_sells, lots, sale_date, quant
     return min(quantity, eligible, sum((qty for _, qty in buys), Decimal("0")))
 
 
+ZERO_COST_REVIEW_LABEL = "Coste 0 (regalo / spin-off): revisar"
+
+
+def is_zero_cost_buy(transaction) -> bool:
+    """Compra con cantidad positiva a precio 0 (regalo, spin-off, liberadas)."""
+    return (
+        (transaction.action or "").lower() in BUY_ACTIONS
+        and transaction.quantity is not None
+        and transaction.quantity > 0
+        and transaction.price is not None
+        and transaction.price == 0
+    )
+
+
+def zero_cost_buys_for_review(events_by_ticker, start, end) -> list[dict]:
+    """Compras a coste 0 relevantes para el ejercicio, para revisión manual.
+
+    Relevantes: las del propio ejercicio y las anteriores de tickers con
+    ventas en el ejercicio (su lote a coste 0 puede estar en esas ventas).
+    No altera el FIFO ni ningún importe: solo las lista con su etiqueta.
+    """
+    rows: list[dict] = []
+    for ticker, events in events_by_ticker.items():
+        sold_in_year = any(
+            (t.action or "").lower() in SELL_ACTIONS and start <= t.trade_date <= end
+            for t in events
+        )
+        for transaction in events:
+            if not is_zero_cost_buy(transaction) or transaction.trade_date > end:
+                continue
+            if transaction.trade_date >= start or sold_in_year:
+                rows.append(
+                    {
+                        "ticker": ticker,
+                        "date": transaction.trade_date.isoformat(),
+                        "quantity": float(transaction.quantity),
+                        "label": ZERO_COST_REVIEW_LABEL,
+                    }
+                )
+    return sorted(rows, key=lambda r: (r["date"], r["ticker"]))
+
+
 def replay_tax_fifo(events, resolve_rate, start, end):
     """Pure annual FIFO/recompra replay, also used by read-only sale estimates.
 
@@ -912,6 +954,8 @@ class TaxReportService:
         for transaction, company in tx_rows:
             events_by_ticker.setdefault(company.ticker, []).append(transaction)
 
+        zero_cost_buys = zero_cost_buys_for_review(events_by_ticker, start, end)
+
         realized_by_company = {}
         for ticker, events in events_by_ticker.items():
             lots, year_sales = replay_tax_fifo(events, resolve_rate, start, end)
@@ -1209,6 +1253,10 @@ class TaxReportService:
                 b["ticker"] for b in dividends if b["ambiguous_cash"]
             ),
             "manual_review": dividend_ambiguous or any(b.get("cancelled_lot") for b in realized),
+            # Compras a precio 0 (regalo, spin-off, acciones liberadas...): se
+            # aceptan y entran al FIFO con coste 0 como siempre, pero se listan
+            # para revisión. Solo aviso visible: no cambia ningún cálculo.
+            "zero_cost_buys": zero_cost_buys,
         }
 
         data = {

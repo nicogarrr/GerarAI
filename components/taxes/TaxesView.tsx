@@ -98,6 +98,7 @@ const TAX_LABELS: Record<string, string> = {
     unattributed_tickers: 'Tickers sin atribuir',
     unattributed_dividends_base: 'Dividendos sin atribuir',
     inconsistent_cash_rows: 'Filas de caja inconsistentes',
+    zero_cost_buys: 'Compras a coste 0',
     ambiguous_cash: 'Tickers con caja ambigua',
     manual_review: 'Revisión manual',
 };
@@ -206,6 +207,12 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
                 : 'Ninguno';
         } else if (key === 'inconsistent_cash_rows') {
             display[label] = formatInconsistentCashRows(value);
+        } else if (key === 'zero_cost_buys') {
+            // Compras a precio 0 (regalo / spin-off): aceptadas, pero a revisar.
+            const rows = Array.isArray(value) ? (value as DataRecord[]) : [];
+            display[label] = rows.length > 0
+                ? rows.map((row) => `${String(row.ticker)} ${String(row.date)} · ${String(row.label ?? 'Coste 0 (regalo / spin-off): revisar')}`).join(' · ')
+                : 'Ninguna';
         } else if (key === 'wash_sale_rule') {
             display[label] = WASH_RULE_LABELS[String(value)] ?? String(value);
         } else if (key === 'wash_sale_basis') {
