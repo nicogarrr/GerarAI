@@ -130,3 +130,25 @@ def test_solo_anual_cae_a_fy_etiquetado(db):
     assert revenue["basis"] == "FY"
     assert revenue["label"] == "FY (último ejercicio)"
     assert revenue["value"] == Decimal("416161")
+
+
+def test_stale_asts_operating_income_not_current(db):
+    company = _company(db, ticker="ASTS")
+    _fact(db, company, "revenue", "2026-06-30:FY", 115300000, "FY")
+    _fact(db, company, "operating_income", "2021-03-31:FY", -2370000, "FY")
+    db.commit()
+    payload = build_company_ttm(db, company)
+    old = _metric(payload, "operating_income")
+    assert old["value"] is None
+    assert old["basis"] == "SIN_DATOS"
+    assert "2021-03-31" in old["note"]
+    assert "2026-06-30" in old["note"]
+    assert _metric(payload, "revenue")["value"] == Decimal("115300000")
+
+
+def test_recent_annual_fallback_remains_available(db):
+    company = _company(db)
+    _fact(db, company, "revenue", "2026-06-30:FY", 100, "FY")
+    _fact(db, company, "operating_income", "2025-12-31:FY", 20, "FY")
+    db.commit()
+    assert _metric(build_company_ttm(db, company), "operating_income")["value"] == Decimal("20")

@@ -12,6 +12,7 @@ segmento (documento con ``metadata_.segment``) no entran en el consolidado.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -131,6 +132,21 @@ def compute_company_ttm(facts: list[FinancialFact]) -> dict[str, TtmValue]:
     results["net_debt"] = combine_ttm(
         "net_debt", results["total_debt"], results["cash_and_equivalents"], op="sub"
     )
+    # Current fundamentals cannot combine a recent reporting window with a
+    # metric from years ago. Allow 18 months for annual-only reporters and
+    # normal publication lags; this is a display policy, not a revised fact.
+    latest_end = max((v.period_end for v in results.values() if v.period_end), default=None)
+    if latest_end is not None:
+        for metric, value in results.items():
+            if value.period_end is not None and (latest_end - value.period_end).days > 550:
+                results[metric] = replace(
+                    value, value=None, basis="SIN_DATOS", provenance="SIN_DATOS",
+                    quarters=[],
+                    note=(
+                        f"Dato histórico hasta {value.period_end.isoformat()}; no se presenta como actual: "
+                        f"más de 18 meses respecto al último periodo disponible ({latest_end.isoformat()})."
+                    ),
+                )
     return results
 
 
