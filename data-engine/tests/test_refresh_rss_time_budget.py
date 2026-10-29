@@ -17,6 +17,24 @@ from app.workers import dramatiq_app
 
 
 class _FakeDB:
+    """Sesion minima: guarda los ConnectorState en memoria (entre ticks)."""
+
+    def __init__(self, states=None):
+        self.states = states if states is not None else []
+
+    def scalars(self, _query):
+        return SimpleNamespace(all=lambda: list(self.states))
+
+    def add(self, obj):
+        if obj not in self.states:
+            self.states.append(obj)
+
+    def flush(self):
+        pass
+
+    def commit(self):
+        pass
+
     def close(self):
         pass
 
@@ -25,9 +43,11 @@ class _FakeService:
     def __init__(self, results):
         self._results = results
         self.polls = 0
+        self.polled_urls = []
 
     async def poll_rss(self, url, *, ticker=None, source_label=None):
         self.polls += 1
+        self.polled_urls.append(url)
         return self._results[url]
 
     def ingest_news_result(self, db, result, **kwargs):
@@ -60,7 +80,9 @@ def rss_env(monkeypatch):
     monkeypatch.setattr(fis, "all_rss_feeds", lambda: feeds)
     monkeypatch.setattr(fis, "FeedIngestionService", lambda: service)
     monkeypatch.setattr(fis, "RSSFeed", SimpleNamespace)
-    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: _FakeDB())
+    db = _FakeDB()
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: db)
+    service.db = db
     return service
 
 
@@ -102,3 +124,30 @@ def test_within_budget_processes_every_feed(rss_env, monkeypatch):
     assert result["status"] == "ok"
     assert result["feeds_processed"] == 4
     assert result["errors"] == []
+
+
+def test_deferred_feeds_run_first_on_next_tick(rss_env, monkeypatch):
+    """Hallazgo del piloto en #3029: sin cursor, cada tick empezaba por el
+    feed 0 y bajo lentitud sostenida los ultimos feeds no corrian nunca.
+    Con el orden por ultima sondeada (ConnectorState), los diferidos del
+    tick 1 abren el tick 2."""
+    feeds = rss_env.polled_urls  # se rellena al sondear
+
+    # Tick 1: solo entra el primer feed; 3 diferidos.
+    monkeypatch.setattr(dramatiq_app, "time", _Clock([0.0, 10.0, 999.0]))
+    monkeypatch.setattr(dramatiq_app, "_RSS_TIME_BUDGET_SECONDS", 480.0, raising=False)
+    r1 = dramatiq_app.refresh_rss_feeds(tenant_id=10, user_id="u1")
+    assert r1["status"] == "partial"
+    assert feeds == ["https://feed0.example/rss"]
+
+    # Tick 2 (misma "BD"): entran dos mas y DEBEN ser los diferidos, no el 0.
+    monkeypatch.setattr(dramatiq_app, "time", _Clock([0.0, 10.0, 20.0, 999.0]))
+    r2 = dramatiq_app.refresh_rss_feeds(tenant_id=10, user_id="u1")
+    assert r2["status"] == "partial"
+    assert feeds[1:] == ["https://feed1.example/rss", "https://feed2.example/rss"]
+
+    # Tick 3: el unico pendiente es el ultimo; el feed0 ya quedo a la cola.
+    monkeypatch.setattr(dramatiq_app, "time", _Clock([0.0, 10.0, 999.0]))
+    r3 = dramatiq_app.refresh_rss_feeds(tenant_id=10, user_id="u1")
+    assert r3["status"] == "partial"
+    assert feeds[3:] == ["https://feed3.example/rss"]
