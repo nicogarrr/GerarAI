@@ -41,18 +41,22 @@ function defaultCurrencyFor(symbol: string): string | null {
 type DialogProps = {
   userId: string;
   onClose: () => void;
+  /** Alta desde una ficha concreta (p. ej. watchlist): la acción ya va
+      seleccionada y el usuario solo añade cantidad, precio y fecha. */
+  initialSymbol?: string;
+  initialCompanyName?: string;
 };
 
-export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
+export default function AddTransactionDialog({ userId, onClose, initialSymbol, initialCompanyName }: DialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(initialSymbol ?? '');
 
   const [formData, setFormData] = useState({
-    symbol: '',
-    companyName: '',
+    symbol: initialSymbol ?? '',
+    companyName: initialCompanyName ?? '',
     type: 'buy' as 'buy' | 'sell',
-    currency: 'USD',
+    currency: (initialSymbol ? defaultCurrencyFor(initialSymbol) : null) ?? 'USD',
     quantity: '',
     price: '',
     fees: '',
