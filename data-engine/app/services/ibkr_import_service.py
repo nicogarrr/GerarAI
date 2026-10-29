@@ -1442,6 +1442,24 @@ class IBKRImportService:
                     "cash_in_statement": cash_imported,
                 }
 
+        if dry_run:
+            # Contrato: dry_run NUNCA confirma. Antes solo lo respetaban trades_only
+            # y reconcile=True; la ruta normal (reconcile=False) seguia hasta
+            # capture() y db.commit(), escribiendo posiciones, caja y foto.
+            db.flush()
+            db.rollback()
+            return {
+                "status": "dry_run",
+                "would_close_positions": [],
+                "would_remove_cash": [],
+                "reconcile_blocked": reconcile_blocked,
+                "positions_in_statement": positions_imported,
+                "cash_in_statement": cash_imported,
+                "trades_in_statement": trades_imported,
+                "raw_rows_would_store": raw_rows_stored,
+                "row_errors": row_errors,
+            }
+
         from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 
         # SessionLocal usa autoflush=False: sin flush las filas importadas no se ven.
