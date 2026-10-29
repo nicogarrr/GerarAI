@@ -88,7 +88,7 @@ def test_breaker_expires_and_probes_again():
     assert provider.calls == 1
     # Cooldown expirado: la siguiente llamada es una sonda real.
     key = ("opencode-go", "deepseek-v1.1-flash")
-    getattr(llm_base, "_free_quota_breaker")[key] = time.monotonic() - 1
+    llm_base._free_quota_breaker[key] = time.monotonic() - 1
     with pytest.raises(ProviderHTTPError):
         asyncio.run(provider.complete(_request()))
     assert provider.calls == 2
