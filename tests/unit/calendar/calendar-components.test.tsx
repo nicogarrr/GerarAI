@@ -216,7 +216,7 @@ describe('MaterialsLine', () => {
         expect(link).toHaveAttribute('href', 'https://sec.gov/a');
         expect(link).toHaveAttribute('target', '_blank');
         expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
-        expect(screen.getByText('SEC · 2026-10-20')).toBeInTheDocument();
+        expect(screen.getByText('SEC · 20 oct 2026')).toBeInTheDocument();
     });
     it('EventMaterialsLine toma solo la fila de su clave', async () => {
         const promise = Promise.resolve({ 'KO#1': { ...base, status: 'no_disponible' as const } });

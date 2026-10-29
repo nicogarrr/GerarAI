@@ -20,6 +20,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.services.date_format import format_date_es
 from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import Company, CorporateAction, Position
@@ -230,7 +231,7 @@ class SplitIngestionService(ProviderIngestionService):
         else:
             tipo = f"Agrupación de acciones 1 por {1 / ratio:g}"
         return (
-            f"{tipo}. Dato de {proveedor}, importado el {fetched_at.date()}. "
+            f"{tipo}. Dato de {proveedor}, importado el {format_date_es(fetched_at.date())}. "
             "Aplicar ajusta tus acciones y el precio medio; el valor de la posición no cambia."
         )
 

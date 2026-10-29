@@ -76,9 +76,9 @@ describe('ProPicksTabs', () => {
         expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual([
             'Selección IA',
             'Joyas',
-            'Deep value',
+            'Valor profundo',
             'Estrategia y rebalanceo',
-            'Backtesting',
+            'Backtest',
             'Resultados simulados de la IA',
             'Radar global',
         ]);
@@ -104,9 +104,9 @@ describe('ProPicksTabs', () => {
         expect(await screen.findByText('vista-paper')).toBeInTheDocument();
     });
 
-    it('Backtesting lanza el walk-forward una sola vez al abrirse y enseña el resultado', async () => {
+    it('La pestaña Backtest lanza el walk-forward una sola vez al abrirse y enseña el resultado', async () => {
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Backtesting');
+        openTab('Backtest');
         expect(await screen.findByText('walk-forward:12')).toBeInTheDocument();
         expect(runWalkForwardBacktest).toHaveBeenCalledTimes(1);
         expect(await screen.findByText('vista-track-record')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('ProPicksTabs', () => {
         expect(screen.getByRole('button', { name: 'Ejecutar backtest' })).toBeEnabled();
         // Cambiar de pestaña y volver no relanza la corrida.
         openTab('Joyas');
-        openTab('Backtesting');
+        openTab('Backtest');
         await screen.findByText('walk-forward:12');
         expect(runWalkForwardBacktest).toHaveBeenCalledTimes(1);
     });
@@ -123,7 +123,7 @@ describe('ProPicksTabs', () => {
         let resolve!: (v: unknown) => void;
         runWalkForwardBacktest.mockReturnValueOnce(new Promise((r) => (resolve = r)));
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Backtesting');
+        openTab('Backtest');
         const busy = await screen.findByRole('button', { name: 'Calculando...' });
         expect(busy).toBeDisabled();
         expect(screen.getByText(/Calculando backtest walk-forward/)).toBeInTheDocument();
@@ -138,14 +138,14 @@ describe('ProPicksTabs', () => {
     it('si el servidor devuelve un valor inesperado (null) se muestra el error en vez de romper', async () => {
         runWalkForwardBacktest.mockResolvedValue(null as never);
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Backtesting');
+        openTab('Backtest');
         expect(await screen.findByText(/No se pudo calcular el backtest/)).toBeInTheDocument();
     });
 
     it('un error devuelto por el servidor se muestra y Reintentar vuelve a llamar', async () => {
         runWalkForwardBacktest.mockResolvedValueOnce({ error: 'Sin datos de precios' });
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Backtesting');
+        openTab('Backtest');
         expect(await screen.findByText('Sin datos de precios')).toBeInTheDocument();
         expect(screen.getByText(/No se pudo calcular el backtest/)).toBeInTheDocument();
         expect(screen.queryByText(/walk-forward:/)).not.toBeInTheDocument();
@@ -158,12 +158,12 @@ describe('ProPicksTabs', () => {
     it('una excepción (Error o valor suelto) también se muestra como error', async () => {
         runWalkForwardBacktest.mockRejectedValueOnce(new Error('Red caída'));
         const { unmount } = render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Backtesting');
+        openTab('Backtest');
         expect(await screen.findByText('Red caída')).toBeInTheDocument();
         unmount();
         runWalkForwardBacktest.mockRejectedValueOnce('texto suelto');
         render(<ProPicksTabs strategies={strategies} initialPicks={[]} />);
-        openTab('Backtesting');
+        openTab('Backtest');
         expect(await screen.findByText('texto suelto')).toBeInTheDocument();
     });
 

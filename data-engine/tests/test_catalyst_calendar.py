@@ -232,7 +232,7 @@ def test_filing_deadline_10k_after_third_quarter_52_53_weeks():
     assert event["type"] == "filing_deadline" and event["ticker"] == "AAPL"
     assert event["date"] == "2026-11-25"
     assert event["title"] == "Plazo para presentar el 10-K"
-    assert "60 días" in event["detail"] and "Large accelerated filer" in event["detail"]
+    assert "60 días" in event["detail"] and "emisor acelerado grande" in event["detail"]
     assert "52/53 semanas" in event["detail"]
     assert event["source"] == svc.SOURCE_SEC_RULE
 

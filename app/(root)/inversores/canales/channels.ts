@@ -14,8 +14,8 @@ export type InvestorChannel = {
 };
 
 export const CHANNELS_CHECKED_AT = '2026-10-06';
-const SUBS = 'Capturas, 2026-10-06';
-const CHECKED = 'Página del canal cargada el 2026-10-06';
+const SUBS = 'Capturas del 6 oct 2026';
+const CHECKED = 'Página del canal cargada el 6 oct 2026';
 const VERIFIED_PICK = 'Verificado en YouTube, 2026-10-11';
 
 export const INVESTOR_CHANNELS: InvestorChannel[] = [

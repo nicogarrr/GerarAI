@@ -149,7 +149,8 @@ def test_tax_clamp_basis_redondeada_y_en_espanol():
         basis = result["assumptions"]["effective_tax_rate"]["basis"]
         assert "acotado al rango [0 %, 60 %]" in basis
         assert "clamped from" not in basis
-        assert "-0.60%" in basis
+        assert "-0,60 %" in basis
+        assert "-0.60%" not in basis
         assert not re.search(r"\d\.\d{6,}", basis), basis
     finally:
         company = db.scalar(select(Company).where(Company.ticker == "TAXES"))

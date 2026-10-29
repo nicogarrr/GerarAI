@@ -18,13 +18,17 @@ import { formatDate, formatNumber, NA } from '@/lib/format';
 import { firstSearchParam, normalizeSourcesQuery, normalizeSourcesScope, normalizeSourcesTicker, normalizeSourcesType, sourcesHref } from '@/lib/research/sources-inventory';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
 import { auditFixLabel } from '@/lib/audit-status-copy';
-import { sourceDisplay } from '@/lib/research/source-display';
+import { sourceDisplay, sourceTierDisplay } from '@/lib/research/source-display';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 
 /** F323: tipo y nivel de fuente llegan como ids internos en ingles
  *  (manual_upload, tier_1_regulatory...) y se pintaban en crudo en la tabla.
- *  Mapas con el catalogo del backend y fallback que humaniza sin ocultar. */
+ *  Catálogo compartido en lib/research/source-display.ts (lo usa también la
+ *  búsqueda universal): fallback que humaniza sin ocultar. */
+/* Catálogo curado de la página: los selects de subida solo ofrecen tipos que
+ * el usuario puede elegir; etiquetas nuevas del catálogo compartido se añaden
+ * aquí a propósito, nunca por arrastre. */
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   sec: 'SEC EDGAR',
   esef: 'ESEF',
@@ -44,27 +48,12 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   transcript: 'Transcripción',
 };
 
-const SOURCE_TIER_LABELS: Record<string, string> = {
-  tier_1_regulatory: 'Regulador (T1)',
-  tier_2_company: 'Compañía (T2)',
-  tier_3_transcript: 'Transcripción (T3)',
-  tier_4_reputable_media: 'Medio reputado (T4)',
-  tier_5_data_provider: 'Proveedor de datos (T5)',
-  tier_6_bootstrap: 'Semilla inicial (T6)',
-  tier_7_user_input: 'Entrada del usuario (T7)',
-  // classify_source devuelve tier_unknown cuando nada clasifica la fuente;
-  // sin esta clave el fallback la humanizaba en crudo.
-  tier_unknown: 'Fuente desconocida',
-  primary: 'Primaria',
-  secondary: 'Secundaria',
-};
-
 function sourceTypeLabel(value: string): string {
   return SOURCE_TYPE_LABELS[value] ?? sourceDisplay(value);
 }
 
 function sourceTierLabel(value: string): string {
-  return SOURCE_TIER_LABELS[value] ?? sourceDisplay(value);
+  return sourceTierDisplay(value);
 }
 
 const SOURCE_SCOPE_LABELS = {

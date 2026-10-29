@@ -42,14 +42,14 @@ export function MaterialsLine({ materials }: { materials: EventMaterials | undef
                     href={doc.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Documento de la SEC (${doc.exhibit}), presentado el ${materials.filed_at}`}
+                    title={`Documento de la SEC (${doc.exhibit}), presentado el ${formatMarketDate(materials.filed_at)}`}
                     className="inline-flex items-center gap-1 rounded-md border border-teal-800/60 px-1.5 py-0.5 font-medium text-teal-300 hover:bg-gray-800"
                 >
                     {doc.label}
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             ))}
-            <span className="text-gray-500">SEC · {materials.filed_at}</span>
+            <span className="text-gray-500">SEC · {formatMarketDate(materials.filed_at)}</span>
         </p>
     );
 }

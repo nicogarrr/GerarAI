@@ -40,6 +40,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.services.date_format import format_date_es
 from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact, MarketPrice, NewsEvent, Transcript
@@ -716,7 +717,7 @@ class ThesisEvidenceService:
             db.add(
                 Document(
                     company_id=company.id,
-                    title=f"{company.ticker} {form} filed {filed}",
+                    title=f"{form} presentado ante la SEC el {format_date_es(filed)}",
                     source_type="SEC",
                     source_url=url,
                     # Sin published_at la UI de Fuentes (orden por fecha de
