@@ -98,6 +98,8 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
             // la columna se pintaba siempre a «—».
             columns={['ticker', 'action_type', 'description', 'effective_date', 'ratio', 'applied']}
             columnLabels={CORPORATE_ACTION_LABELS}
+            // Sin «fuente yahoo_finance» por dato (regla de Nico, 2026-10-28):
+            // solo queda el matiz sustantivo de ajuste por splits.
             formatColumns={{
                 action_type: (value) =>
                     typeof value === 'string'
@@ -105,11 +107,13 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                         : String(value ?? '—'),
                 effective_date: (value) => formatMarketDate(value as string | null),
                 description: (value, record) => record.action_type === 'dividend' && typeof record.amount_per_share === 'number' && typeof record.currency === 'string'
-                    ? `Dividendo de ${formatMoney(record.amount_per_share, record.currency)} por acción${record.pay_date ? ` · pago ${formatMarketDate(record.pay_date as string)}` : ''} · fuente ${record.source ?? 'N/D'}${record.source === 'yahoo_finance' ? ' (importe ajustado por splits)' : ''}`
+                    ? `Dividendo de ${formatMoney(record.amount_per_share, record.currency)} por acción${record.pay_date ? ` · pago ${formatMarketDate(record.pay_date as string)}` : ''}${record.source === 'yahoo_finance' ? ' · importe ajustado por splits' : ''}`
                     : String(value ?? 'N/D'),
                 ratio: (value) => formatNumber(value as number | string | null, { maximumFractionDigits: 4 }),
             }}
             emptyMessage={emptyMessage ?? (ticker ? `Sin eventos pendientes de ${ticker}.` : 'Sin eventos pendientes.')}
+            pageSize={25}
+            paginationLabel="eventos"
             linkColumns={{ ticker: (record) => researchHrefFor(record) }}
             rowActions={(record, _index, replace) => {
                 const actionId = recordActionId(record);
