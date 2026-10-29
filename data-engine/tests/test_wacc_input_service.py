@@ -452,3 +452,23 @@ def test_unsupported_currency_keeps_honest_missing(db, monkeypatch):
     ) is None
     assert "risk_free_rate" in result["missing"]
     assert result["risk_free_unavailable_for_currency"] == "GBP"
+
+
+def test_upsert_refreshes_legacy_monetary_unit_without_new_row(db):
+    company = _company(db)
+    source = Document(company_id=company.id, title="Yahoo dated market inputs", source_type="yfinance")
+    db.add(source)
+    db.flush()
+    service = WaccInputService()
+    legacy = service._upsert_fact(db, company, metric="market_cap", value=Decimal("11492166656"),
+        period="2026-09-25", source=source, source_type="yfinance", confidence=Decimal("0.75"))
+    assert legacy.unit == "decimal"
+    original_id = legacy.id
+    refreshed = service._upsert_fact(db, company, metric="market_cap", value=Decimal("11492166656"),
+        period="2026-09-25", source=source, source_type="yfinance", confidence=Decimal("0.75"), unit="EUR")
+    db.flush()
+    assert refreshed.id == original_id
+    assert refreshed.unit == "EUR"
+    assert refreshed.value == Decimal("11492166656")
+    assert refreshed.source_id == source.id
+    assert db.scalar(select(func.count()).select_from(FinancialFact).where(FinancialFact.metric == "market_cap")) == 1
