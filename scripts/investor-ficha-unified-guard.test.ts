@@ -12,7 +12,10 @@ test('ficha: selector de inversor y contenido propio sin otra barra', () => {
     assert.match(page, /<InvestorViewSelector/);
     assert.match(page, /view === "cartas" \? <InvestorLetters/);
     assert.match(page, /view === "videos" \? <InvestorVideos videos=\{investor.videos\}/);
-    assert.doesNotMatch(page, /<nav|<InvestorConcepts/);
+    // #2971 (Nico) añadió a propósito los conceptos al pie de la ficha; lo
+    // que sigue prohibido es una segunda barra de navegación.
+    assert.doesNotMatch(page, /<nav/);
+    assert.match(page, /<InvestorConcepts slug=\{investor.slug\} \/>/);
     const letters = read('app/(root)/inversores/_components/InvestorLetters.tsx');
     assert.match(letters, /paginate\(letters, pagina, 12\)/);
     assert.match(letters, /letter.source_url/);
