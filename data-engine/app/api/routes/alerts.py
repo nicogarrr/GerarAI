@@ -482,6 +482,25 @@ class PushConfigOut(BaseModel):
     public_key: str | None = None
 
 
+class PushKeys(BaseModel):
+    p256dh: str = Field(min_length=20, max_length=200, pattern=r"^[A-Za-z0-9_\-=]+$")
+    auth: str = Field(min_length=8, max_length=100, pattern=r"^[A-Za-z0-9_\-=]+$")
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str = Field(min_length=20, max_length=1000)
+    keys: PushKeys
+    user_agent: str | None = Field(default=None, max_length=200)
+
+
+class PushEndpointIn(BaseModel):
+    endpoint: str = Field(min_length=20, max_length=1000)
+
+
+class PushPreferenceIn(BaseModel):
+    enabled: bool = False
+
+
 class PushPreferenceOut(BaseModel):
     event_type: PushEventType
     enabled: bool
@@ -524,3 +543,71 @@ def push_status(db: Session = Depends(get_db)) -> dict:
     return {"enabled": ready, "public_key": settings.vapid_public_key if ready else None,
             "devices": len(devices_for(db, tenant, user)),
             "preferences": [{"event_type": kind, "enabled": rows.get(kind, False)} for kind in EVENT_TYPES]}
+
+
+@router.post("/push/subscriptions", status_code=201)
+def register_push_device(payload: PushSubscriptionIn, db: Session = Depends(get_db)) -> dict:
+    from app.models import PushSubscription
+    from app.services.web_push import endpoint_hash, endpoint_is_allowed, is_configured
+
+    tenant, user = _push_identity(db)
+    if not is_configured(get_settings()):
+        raise HTTPException(status_code=409, detail="Las notificaciones push no están configuradas en el servidor")
+    if not endpoint_is_allowed(payload.endpoint):
+        raise HTTPException(status_code=422, detail="Endpoint de notificaciones no admitido")
+    digest = endpoint_hash(payload.endpoint)
+    row = db.scalar(select(PushSubscription).where(
+        PushSubscription.tenant_id == tenant, PushSubscription.endpoint_hash == digest))
+    if row is not None and row.user_id != user:
+        raise HTTPException(status_code=403, detail="Este dispositivo pertenece a otro usuario")
+    if row is None:
+        db.add(PushSubscription(tenant_id=tenant, user_id=user, endpoint=payload.endpoint,
+                                endpoint_hash=digest, p256dh=payload.keys.p256dh,
+                                auth_secret=payload.keys.auth, user_agent=payload.user_agent))
+    else:
+        row.p256dh, row.auth_secret, row.user_agent = payload.keys.p256dh, payload.keys.auth, payload.user_agent
+    db.commit()
+    return {"registered": True}
+
+
+@router.post("/push/subscriptions/remove")
+def remove_push_device(payload: PushEndpointIn, db: Session = Depends(get_db)) -> dict:
+    from app.models import PushSubscription
+    from app.services.web_push import endpoint_hash
+
+    tenant, user = _push_identity(db)
+    row = db.scalar(select(PushSubscription).where(
+        PushSubscription.tenant_id == tenant, PushSubscription.user_id == user,
+        PushSubscription.endpoint_hash == endpoint_hash(payload.endpoint)))
+    if row is not None:
+        db.delete(row)
+        db.commit()
+    return {"removed": row is not None}
+
+
+@router.put("/push/preferences/{event_type}", response_model=PushPreferenceOut)
+def set_push_preference(event_type: PushEventType, payload: PushPreferenceIn,
+                        db: Session = Depends(get_db)) -> dict:
+    from app.models import PushPreference
+    from app.services.web_push import devices_for, is_configured
+
+    tenant, user = _push_identity(db)
+    if payload.enabled:
+        if not is_configured(get_settings()):
+            raise HTTPException(status_code=409, detail="Las notificaciones push no están configuradas en el servidor")
+        if not devices_for(db, tenant, user):
+            raise HTTPException(status_code=403, detail="Activa las notificaciones en este dispositivo antes de elegir tipos")
+    row = db.scalar(select(PushPreference).where(
+        PushPreference.tenant_id == tenant, PushPreference.user_id == user,
+        PushPreference.event_type == event_type))
+    now = datetime.now(UTC)
+    if row is None:
+        row = PushPreference(tenant_id=tenant, user_id=user, event_type=event_type,
+                             enabled=payload.enabled, enabled_at=now)
+        db.add(row)
+    else:
+        if payload.enabled and not row.enabled:
+            row.enabled_at = now
+        row.enabled = payload.enabled
+    db.commit()
+    return {"event_type": event_type, "enabled": row.enabled}
