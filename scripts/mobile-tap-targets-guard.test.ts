@@ -43,8 +43,10 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
         }
     });
     it('historial de versiones de supuestos con area tactil', () => {
-        const page = readFileSync('app/(root)/research/[ticker]/driver-assumptions/page.tsx', 'utf8');
-        assert.ok(page.includes('<summary className="cursor-pointer py-2.5'), 'summary con padding tactil en movil');
+        // Los supuestos viven extraidos en su seccion (PR A de la fila de
+        // seis pestañas, 29-oct-2026); la pagina legacy los renderiza desde alli.
+        const section = readFileSync('components/research/sections/DriverAssumptionsSection.tsx', 'utf8');
+        assert.ok(section.includes('<summary className="cursor-pointer py-2.5'), 'summary con padding tactil en movil');
     });
 });
 

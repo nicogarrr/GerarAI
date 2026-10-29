@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const tickerPage = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-const credibility = readFileSync('app/(root)/research/[ticker]/management-credibility/page.tsx', 'utf8');
+// La credibilidad de la directiva es una sección de Seguimiento desde el 29-oct-2026.
+const credibility = readFileSync('components/research/sections/ManagementCredibilitySection.tsx', 'utf8');
 const modelPanels = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
 
 // F344/F354/F355 (QA 28/09, viewport 360px): un grid cuyas columnas solo se
