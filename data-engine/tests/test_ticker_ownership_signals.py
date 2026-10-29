@@ -445,3 +445,40 @@ def test_change_labels_for_cusip_equivale_al_diff_completo():
     for cusip in ("037833100", "OTHER0000", "NEW00000A", "SAME00000"):
         assert service.change_labels_for_cusip(db, cik=inv.cik, cusip=cusip) == [full[cusip]]
     assert service.change_labels_for_cusip(db, cik=inv.cik, cusip="NOPE00000") == []
+
+
+def test_change_labels_for_cusip_enmienda_que_omite_el_cusip():
+    """Una enmienda vigente que omite el cusip marca la posicion cerrada.
+
+    Regresion del PR #3025: elegir el accession solo entre los filings que
+    contienen el cusip servia el filing base (mas viejo) y resucitaba una
+    posicion que la enmienda mas reciente ya habia retirado; el diff
+    completo de changes() la daba por cerrada. Repro del piloto: Q2 AAPL
+    100, Q3 base AAPL 150, enmienda Q3 mas nueva con OTHER sin AAPL.
+    """
+    db = _db()
+    from app.services.manager_holding_ingestion_service import ManagerHoldingIngestionService
+
+    q2, q3 = date(2026, 6, 30), date(2026, 9, 30)
+    manager = _manager(db, "0000000001", "Example", q3)
+    _holding(db, manager, q2, "037833100", 100, 100)
+    _holding(db, manager, q3, "037833100", 150, 150)
+    db.add(
+        ManagerHolding(
+            manager_id=manager.id,
+            accession_number="amended-latest",
+            report_date=q3,
+            filing_date=date(2026, 10, 15),
+            cusip="OTHER0000",
+            name_of_issuer="Other",
+            shares=Decimal(10),
+            value_usd_thousands=Decimal(10),
+        )
+    )
+    db.commit()
+
+    service = ManagerHoldingIngestionService()
+    full = [row["change"] for row in service.changes(db, cik=manager.cik)["changes"] if row["cusip"] == "037833100"]
+    narrow = service.change_labels_for_cusip(db, cik=manager.cik, cusip="037833100")
+    assert full == ["closed"]  # la enmienda vigente ya no lista AAPL
+    assert narrow == full

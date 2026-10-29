@@ -375,7 +375,9 @@ class ManagerHoldingIngestionService:
         llamaba una vez por gestor revisado (~32) solo para quedarse con un
         cusip, y para valores muy cubiertos (AAPL) la suma superaba el
         presupuesto de lectura de la ficha y el panel 13F fallaba al cargar.
-        Aqui solo se leen las filas de ese cusip. Devuelve las etiquetas por
+        Aqui solo se cargan las filas de ese cusip dentro del accession
+        vigente de cada periodo (elegido sobre todos los filings del
+        gestor, como en ``changes()``). Devuelve las etiquetas por
         fila (puede haber varias clases del mismo cusip); [] si no aplica
         (sin gestor, sin dos periodos o sin ese cusip).
         """
@@ -402,20 +404,40 @@ class ManagerHoldingIngestionService:
         latest_date, previous_date = report_dates[0], report_dates[1]
 
         def period_view(period: date) -> dict:
+            # Misma regla que changes(): el accession vigente del periodo se
+            # elige sobre TODOS los filings del gestor (la enmienda mas
+            # reciente sustituye al filing base). Elegirlo solo entre los
+            # filings que contienen el cusip serviria uno viejo y resucitaria
+            # una posicion que la enmienda vigente ya retiro. El agregado
+            # (accession, filing_date) es ligero: un gestor tiene pocos
+            # filings por periodo, no hace falta cargar sus filas.
+            filings = db.execute(
+                select(
+                    ManagerHolding.accession_number,
+                    func.max(ManagerHolding.filing_date),
+                )
+                .where(
+                    ManagerHolding.manager_id == manager.id,
+                    ManagerHolding.report_date == period,
+                    *tenant_filters(db, ManagerHolding),
+                )
+                .group_by(ManagerHolding.accession_number)
+            ).all()
+            if not filings:
+                return {}
+            accession = max(filings, key=lambda pair: (pair[1] or date.min, pair[0]))[0]
             rows = db.scalars(
                 select(ManagerHolding).where(
                     ManagerHolding.manager_id == manager.id,
                     ManagerHolding.report_date == period,
+                    ManagerHolding.accession_number == accession,
                     ManagerHolding.cusip == cusip,
+                    *tenant_filters(db, ManagerHolding),
                 )
             ).all()
-            if not rows:
-                return {}
-            accession = _latest_accession(rows)
             return {
                 (row.cusip, row.title_of_class, row.put_call): row
                 for row in rows
-                if row.accession_number == accession
             }
 
         latest = period_view(latest_date)
