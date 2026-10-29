@@ -45,6 +45,7 @@ from app.services.portfolio_reconstruction_service import (
     SCOPE,
     PortfolioReconstructionService,
 )
+from app.services.portfolio_snapshot_service import PortfolioSnapshotService
 
 REBUILD_SOURCE = "twr_rebuild"
 TOOL_VERSION = "1"
@@ -254,6 +255,10 @@ class TwrRebuildService:
             )
             inserted += 1
         db.flush()
+        # Fotos reales posteriores al rango: la del día siguiente estaba
+        # enlazada a una foto que ya no existe. Se relinkean con la regla de
+        # capture() (base nueva tras solo-posiciones).
+        PortfolioSnapshotService()._relink_following(db, portfolio_id, last)
         return {
             **plan,
             "applied": True,
