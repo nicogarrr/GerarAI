@@ -111,6 +111,23 @@ KNOWN_MARKET_SUFFIXES = frozenset({
 })
 
 
+def _base_contradicts_listing(requested: str, company: Company | None) -> bool:
+    """True when ``requested`` is a reviewed listing and ``company`` is another issuer.
+
+    BFIT.AS is Basic-Fit (ISIN NL0011872650); its bare base ticker BFIT is a
+    US homonym. The suffix fallback must not hand a Basic-Fit request the US
+    row: only a base row carrying the listing's own ISIN is the same issuer.
+    """
+    if company is None:
+        return False
+    from app.services.listing_identity import BY_ISIN
+
+    for listing in BY_ISIN.values():
+        if listing.ticker == requested:
+            return (company.isin or "").strip().upper() != listing.isin
+    return False
+
+
 def resolve_company(db: Session, ticker: str) -> Company | None:
     """Devuelve la Company por ticker exacto o, si falla y hay sufijo de
     mercado conocido, por ticker base. None si no existe.
@@ -136,7 +153,10 @@ def resolve_company(db: Session, ticker: str) -> Company | None:
     base, _, suffix = normalized.rpartition(".")
     if not base or suffix not in KNOWN_MARKET_SUFFIXES:
         return None
-    return db.scalar(select(Company).where(Company.ticker == base))
+    company = db.scalar(select(Company).where(Company.ticker == base))
+    if _base_contradicts_listing(normalized, company):
+        return None
+    return company
 
 
 def resolve_companies(
@@ -256,11 +276,10 @@ def resolve_companies(
     resolved_ids: set[int] = set()
     missing: list[str] = []
     for ticker in normalized:
-        company = (
-            exact.get(ticker)
-            or reference_hit.get(ticker)
-            or bases.get(alias_bases.get(ticker, ""))
-        )
+        base_company = bases.get(alias_bases.get(ticker, ""))
+        if _base_contradicts_listing(ticker, base_company):
+            base_company = None
+        company = exact.get(ticker) or reference_hit.get(ticker) or base_company
         if company is None:
             missing.append(ticker)
         elif company.id not in resolved_ids:
