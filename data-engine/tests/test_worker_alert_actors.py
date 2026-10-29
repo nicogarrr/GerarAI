@@ -160,3 +160,124 @@ def test_dispatch_failure_rolls_back_and_releases(env, monkeypatch):
     assert out["status"] == "error"
     assert env.rolled == [env.db] and env.released
     env.db.close.assert_called_once()
+
+
+# --- dedup del re-encolado de dispatch_tracked_news_alerts ------------------
+
+class FakeRedis:
+    """SET NX EX + delete minimos para la marca de analisis encolado."""
+
+    def __init__(self):
+        self.store = {}
+
+    def set(self, key, value, nx=False, ex=None):
+        if nx and key in self.store:
+            return False
+        self.store[key] = value
+        return True
+
+    def delete(self, key):
+        self.store.pop(key, None)
+
+
+def _patch_dispatch_ok(monkeypatch, pending):
+    from app.services import asts_spacex_signal, tracked_news_alerts
+
+    monkeypatch.setattr(tracked_news_alerts, "evaluate", lambda db: {"status": "ok", "created": 0})
+    monkeypatch.setattr(asts_spacex_signal, "evaluate", lambda db: {"fired": False})
+    env_db_rows = [SimpleNamespace(alert_id=a) for a in pending]
+    return env_db_rows
+
+
+def test_dispatch_dedups_requeue_while_mark_is_fresh(env, monkeypatch):
+    """29-oct: sin marca, cada ciclo de 15 min re-encolaba las mismas filas
+    pending bajo starvation (5.534 mensajes para ~20 analisis reales)."""
+    redis = FakeRedis()
+    monkeypatch.setattr(worker, "_redis_client", lambda: redis)
+    rows = _patch_dispatch_ok(monkeypatch, [11, 12])
+    env.db.scalars.return_value.all.return_value = rows
+    sent = []
+    monkeypatch.setattr(worker.analyze_tracked_news_alert, "send",
+                        lambda alert_id, **kw: sent.append((alert_id, kw)))
+
+    out = worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    assert out["analysis_enqueued"] == 2 and out["analysis_deduped"] == 0
+    assert [a for a, _ in sent] == [11, 12]
+
+    # Segundo ciclo con las mismas filas pending: no se duplica el encolado.
+    out = worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    assert out["analysis_enqueued"] == 0 and out["analysis_deduped"] == 2
+    assert len(sent) == 2
+    assert set(redis.store) == {"analysis_enqueued:1:11", "analysis_enqueued:1:12"}
+
+
+def test_dispatch_requeues_after_mark_expires(env, monkeypatch):
+    """Si el mensaje murio sin consumirse, la marca caduca y se reintenta."""
+    redis = FakeRedis()
+    monkeypatch.setattr(worker, "_redis_client", lambda: redis)
+    env.db.scalars.return_value.all.return_value = _patch_dispatch_ok(monkeypatch, [11])
+    sent = []
+    monkeypatch.setattr(worker.analyze_tracked_news_alert, "send",
+                        lambda alert_id, **kw: sent.append(alert_id))
+
+    worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    redis.store.clear()  # TTL expirado
+    out = worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    assert out["analysis_enqueued"] == 1 and sent == [11, 11]
+
+
+def test_dispatch_requeue_fails_open_without_redis(env, monkeypatch):
+    """Sin Redis se envia igual: el lease y el gate de estado absorben el
+    duplicado; perder el analisis seria peor."""
+    monkeypatch.setattr(worker, "_redis_client", lambda: None)
+    env.db.scalars.return_value.all.return_value = _patch_dispatch_ok(monkeypatch, [11])
+    sent = []
+    monkeypatch.setattr(worker.analyze_tracked_news_alert, "send",
+                        lambda alert_id, **kw: sent.append(alert_id))
+    out = worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    assert out["analysis_enqueued"] == 1 and out["analysis_deduped"] == 0 and sent == [11]
+
+
+def test_dispatch_requeue_fails_open_when_redis_raises(env, monkeypatch):
+    class BrokenRedis:
+        def set(self, *a, **kw):
+            raise ConnectionError("redis caido")
+
+    monkeypatch.setattr(worker, "_redis_client", lambda: BrokenRedis())
+    env.db.scalars.return_value.all.return_value = _patch_dispatch_ok(monkeypatch, [11])
+    sent = []
+    monkeypatch.setattr(worker.analyze_tracked_news_alert, "send",
+                        lambda alert_id, **kw: sent.append(alert_id))
+    out = worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    assert out["analysis_enqueued"] == 1 and sent == [11]
+
+
+def test_dispatch_clears_mark_when_send_fails(env, monkeypatch):
+    """Broker caido tras reclamar la marca: se libera para no esperar el TTL
+    entero con la alerta sin mensaje en cola."""
+    redis = FakeRedis()
+    monkeypatch.setattr(worker, "_redis_client", lambda: redis)
+    env.db.scalars.return_value.all.return_value = _patch_dispatch_ok(monkeypatch, [11])
+
+    # Error no transitorio: un ConnectionError se re-lanzaria para reintento
+    # dramatiq (_handle_actor_error) y no devolveria payload de error.
+    def boom(alert_id, **kw):
+        raise ValueError("broker roto")
+
+    monkeypatch.setattr(worker.analyze_tracked_news_alert, "send", boom)
+    out = worker.dispatch_tracked_news_alerts.fn(tenant_id=1, user_id="u")
+    assert out["status"] == "error"
+    assert redis.store == {}
+    assert env.released == [("dispatch_tracked_news_alerts:1", "LEASE")]
+
+
+def test_clear_mark_tolerates_redis_down(monkeypatch):
+    monkeypatch.setattr(worker, "_redis_client", lambda: None)
+    worker._clear_analysis_enqueue_mark(1, 11)  # no lanza
+
+    class BrokenRedis:
+        def delete(self, *a):
+            raise ConnectionError("redis caido")
+
+    monkeypatch.setattr(worker, "_redis_client", lambda: BrokenRedis())
+    worker._clear_analysis_enqueue_mark(1, 11)  # no lanza
