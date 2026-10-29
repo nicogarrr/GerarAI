@@ -110,11 +110,8 @@ def test_ir_prefix_requires_host_not_substring() -> None:
     assert classify_source(url="https://acme.com/investor-relations").key == "tier_2_company"
 
 
-def test_stocktwits_social_label_is_tier_8_not_data_provider() -> None:
-    # La etiqueta exacta del conector social gana a «stocktwits» a secas
-    # (medio agregado vía Google News, que sí es tier 5).
-    assert classify_source(source_type="StockTwits (social)").key == "tier_8_social"
-    assert classify_source(source_type="Stocktwits").key == "tier_5_data_provider"
+def test_social_conversation_is_unverified() -> None:
+    assert classify_source(source_type="Social conversation").key == "tier_8_social"
 
 
 def test_social_tier_is_lowest_trust() -> None:

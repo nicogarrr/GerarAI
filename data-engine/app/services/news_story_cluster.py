@@ -1,6 +1,6 @@
 """Agrupación de la misma historia entre medios (portada de /api/news).
 
-Una misma noticia llega por varios agregadores (Yahoo, Stocktwits, Moomoo,
+Una misma noticia llega por varios agregadores (Yahoo, Moomoo,
 MarketScreener...) con titulares reescritos y a veces en distinto idioma. La
 deduplicación literal (mismo titular normalizado) no los detecta y la portada
 repetía la misma historia dos o tres veces.

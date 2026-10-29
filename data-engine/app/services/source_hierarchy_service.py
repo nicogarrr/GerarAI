@@ -113,10 +113,7 @@ SOURCE_TIER_BY_TYPE = {
     "fmp": "tier_5_data_provider",
     "finnhub": "tier_5_data_provider",
     "yahoo": "tier_5_data_provider",
-    # Redes sociales ingeridas por el conector dedicado (etiqueta exacta
-    # «StockTwits (social)»): ANTES de «stocktwits» a secas, que es el medio
-    # agregado que llega vía Google News RSS y sí es proveedor de datos.
-    "stocktwits social": "tier_8_social",
+    "social conversation": "tier_8_social",
     # Medios financieros y agregadores habituales en la ingesta real (vía RSS
     # de Google News la URL es news.google.com, así que la cadena de la fuente
     # es la única señal). Auditoría 28-oct-2026: el 59 % de los eventos en
@@ -145,7 +142,6 @@ SOURCE_TIER_BY_TYPE = {
     "gurufocus": "tier_5_data_provider",
     "motley fool": "tier_5_data_provider",
     "fool.com": "tier_5_data_provider",
-    "stocktwits": "tier_5_data_provider",
     "24/7 wall st": "tier_5_data_provider",
     "barchart": "tier_5_data_provider",
     "quiver quantitative": "tier_5_data_provider",

@@ -99,14 +99,13 @@ def news_events(
     db: Session = Depends(get_db),
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
     offset: Annotated[int, Query(ge=0)] = 0,
-    lane: Literal["empresa", "macro", "gobierno", "social"] | None = None,
+    lane: Literal["empresa", "macro", "gobierno"] | None = None,
     ticker: Annotated[str | None, Query(max_length=20)] = None,
     tickers: Annotated[str | None, Query(max_length=1000)] = None,
 ) -> list[dict]:
     """Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:
     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT;
-    ``gobierno`` = fuentes oficiales (Fed, BCE, Casa Blanca...); ``social`` =
-    conversación StockTwits sin verificar.
+    ``gobierno`` = fuentes oficiales (Fed, BCE, Casa Blanca...).
     ``ticker`` limita a los eventos de esa empresa (ficha de accion).
     Las filas etiquetadas con un ticker que no citan a la empresa se omiten.
     En portada (sin ``ticker``) la misma historia publicada por varios medios
@@ -115,6 +114,9 @@ def news_events(
     ``tickers`` (csv, max 50) limita a esas empresas: carril «Para ti»
     (cartera + watchlist del usuario, que el cliente ya conoce)."""
     stmt = select(NewsEvent, Company).outerjoin(Company, NewsEvent.company_id == Company.id)
+    # Retired social stream: preserve stored rows but never serve them as news.
+    retired_lane = NewsEvent.metadata_["news_lane"].as_string()
+    stmt = stmt.where((retired_lane.is_(None)) | (retired_lane != "social"))
     if ticker:
         stmt = stmt.where(Company.ticker == ticker.strip().upper())
     elif tickers:
@@ -129,9 +131,8 @@ def news_events(
         stmt = stmt.where(Company.ticker.in_(wanted)) if wanted else stmt.where(false())
     if lane == "empresa":
         stmt = stmt.where(NewsEvent.company_id.is_not(None))
-    elif lane in ("gobierno", "social"):
-        # Carriles etiquetados en metadata en la ingesta: gobierno (fuentes
-        # oficiales RSS, sin empresa) y social (StockTwits, sin verificar).
+    elif lane == "gobierno":
+        # Fuentes oficiales RSS, sin empresa.
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == lane)
     elif lane == "macro":
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")

@@ -3050,8 +3050,7 @@ export interface paths {
          * News Events
          * @description Eventos por pagina (scroll infinito). ``lane`` filtra en SQL:
          *     ``empresa`` = atribuido a una empresa real; ``macro`` = carril macro GDELT;
-         *     ``gobierno`` = fuentes oficiales (Fed, BCE, Casa Blanca...); ``social`` =
-         *     conversación StockTwits sin verificar.
+         *     ``gobierno`` = fuentes oficiales (Fed, BCE, Casa Blanca...).
          *     ``ticker`` limita a los eventos de esa empresa (ficha de accion).
          *     Las filas etiquetadas con un ticker que no citan a la empresa se omiten.
          *     En portada (sin ``ticker``) la misma historia publicada por varios medios
@@ -17471,7 +17470,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
-                lane?: ("empresa" | "macro" | "gobierno" | "social") | null;
+                lane?: ("empresa" | "macro" | "gobierno") | null;
                 ticker?: string | null;
                 tickers?: string | null;
             };
