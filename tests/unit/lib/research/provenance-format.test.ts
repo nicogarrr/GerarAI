@@ -21,9 +21,9 @@ describe('formatProvenanceValue', () => {
         expect(formatProvenanceValue('1,234.5', '')).toBe('1234,5');
     });
     it('divisa declarada: respeta la divisa, nunca la cambia', () => {
-        expect(formatProvenanceValue(14.4, 'EUR')).toBe('€14.40');
-        expect(formatProvenanceValue(1234, 'USD')).toBe('$1,234');
-        expect(formatProvenanceValue(4_870_000_000, 'EUR')).toBe('€4.87B');
+        expect(formatProvenanceValue(14.4, 'EUR')).toBe('14,40\u00a0€');
+        expect(formatProvenanceValue(1234, 'USD')).toBe('1.234\u00a0US$');
+        expect(formatProvenanceValue(4_870_000_000, 'EUR')).toBe('4,87 mil M\u00a0€');
     });
     it('un código de 3 letras que no es divisa no se trata como dinero', () => {
         const out = formatProvenanceValue(5, 'ZZZ');
@@ -47,17 +47,17 @@ describe('formatProvenanceValue', () => {
 
 describe('formatMoneyShort', () => {
     it('USD >= 1e6 usa la escala de capitalización', () => {
-        expect(formatMoneyShort(4_870_000_000, 'USD')).toBe('$4.87B');
+        expect(formatMoneyShort(4_870_000_000, 'USD')).toBe('4,87 mil M\u00a0US$');
     });
     it('menos de 100: 2 decimales; 100 o más: sin decimales', () => {
-        expect(formatMoneyShort(14.4, 'EUR')).toBe('€14.40');
-        expect(formatMoneyShort(150.6, 'EUR')).toBe('€151');
+        expect(formatMoneyShort(14.4, 'EUR')).toBe('14,40\u00a0€');
+        expect(formatMoneyShort(150.6, 'EUR')).toBe('151\u00a0€');
     });
     it('negativos conservan el signo', () => {
-        expect(formatMoneyShort(-14.4, 'EUR')).toBe('-€14.40');
+        expect(formatMoneyShort(-14.4, 'EUR')).toBe('-14,40\u00a0€');
     });
     it('millones en otra divisa: compacto con 2 decimales', () => {
-        expect(formatMoneyShort(2_000_000, 'EUR')).toBe('€2.00M');
+        expect(formatMoneyShort(2_000_000, 'EUR')).toBe('2,00 M\u00a0€');
     });
 });
 

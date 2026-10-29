@@ -107,8 +107,8 @@ describe('scenario-format', () => {
         expect(formatScenarioMoney(null, { code: 'USD' }, 2)).toBeNull();
         expect(formatScenarioMoney(5, null, 2)).toBeNull();
         expect(formatScenarioMoney(NaN, { code: 'USD' }, 2)).toBeNull();
-        expect(formatScenarioMoney(12.5, { code: 'USD' }, 2)).toBe('$12.50');
-        expect(formatScenarioMoney(2_500_000_000, { code: 'USD' }, 1)).toBe('$2.5B');
+        expect(formatScenarioMoney(12.5, { code: 'USD' }, 2)).toBe('12,50\u00a0US$');
+        expect(formatScenarioMoney(2_500_000_000, { code: 'USD' }, 1)).toBe('2,5 mil M\u00a0US$');
         expect(formatScenarioMoney(12.5, { code: 'EUR' }, 2)).toMatch(/12,50/);
     });
 });

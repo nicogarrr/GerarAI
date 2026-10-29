@@ -142,9 +142,9 @@ describe('InsiderSignalsView', () => {
         expect(within(rows[1]).getByText('Enmienda 4/A')).toBeInTheDocument();
         expect(within(rows[1]).getByText('filing conjunto')).toBeInTheDocument();
         expect(within(rows[1]).getByRole('link', { name: /Ver filing SEC/ })).toHaveAttribute('href', 'https://sec.gov/f1');
-        expect(within(rows[1]).getByText('$500,000')).toBeInTheDocument();
+        expect(within(rows[1]).getByText('500.000 US$')).toBeInTheDocument();
         expect(within(rows[2]).getByText('Form 4')).toBeInTheDocument();
-        expect(within(rows[2]).getByText('$2,000,000')).toBeInTheDocument();
+        expect(within(rows[2]).getByText('2.000.000 US$')).toBeInTheDocument();
         // http:// no se enlaza
         expect(within(rows[2]).queryByRole('link')).not.toBeInTheDocument();
         expect(within(rows[3]).getByText('raro')).toBeInTheDocument();

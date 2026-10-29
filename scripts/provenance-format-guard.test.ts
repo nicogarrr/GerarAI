@@ -19,9 +19,9 @@ describe("formatProvenanceValue", () => {
         assert.match(formatProvenanceValue(1.5, "%"), /^1,5\s?%$/)
     })
     it("importe en la divisa declarada (USD y no USD)", () => {
-        assert.equal(formatProvenanceValue(4869930000, "USD"), "$4.87B")
-        assert.equal(formatProvenanceValue(14.4, "USD"), "$14.40")
-        assert.match(formatProvenanceValue(2500000000, "EUR"), /^€2\.50B$/)
+        assert.equal(formatProvenanceValue(4869930000, "USD"), "4,87 mil M\u00a0US$")
+        assert.equal(formatProvenanceValue(14.4, "USD"), "14,40\u00a0US$")
+        assert.match(formatProvenanceValue(2500000000, "EUR"), /^2,50 mil M\u00a0€$/)
     })
     it("sin unidad declarada: número sin símbolo ni %, también para shares_* y penetration", () => {
         const shares = formatProvenanceValue(255982592, null)

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 import { metricLabel } from '@/lib/research/metric-labels';
-import { formatDate, formatMarketCapUsd, formatNumber } from '@/lib/format';
+import { formatCompact, formatDate, formatMarketCapUsd, formatNumber } from '@/lib/format';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/ui/page-header';
 import { Panel } from '@/components/ui/panel';
@@ -29,10 +29,10 @@ const PER_PAGE_NOTE = 'Cada página es un informe distinto, del más reciente al
 
 function money(value: string, unit: string, metric: string, outflow = false): string {
   const n = outflow ? Math.abs(Number(value)) : Number(value);
-  // Misma convencion en toda la tabla: dolares en estilo ingles compacto ($4.87B).
-  if (metric === 'eps_diluted') return `${new Intl.NumberFormat('en-US', { style: 'currency', currency: /^[A-Z]{3}(\/|$)/.test(unit) ? unit.slice(0, 3) : 'USD' }).format(n)} por acción`;
+  // Misma convencion en toda la tabla: es-ES para todas las divisas (4,87 mil M US$).
+  if (metric === 'eps_diluted') return `${new Intl.NumberFormat('es-ES', { style: 'currency', currency: /^[A-Z]{3}(\/|$)/.test(unit) ? unit.slice(0, 3) : 'USD' }).format(n)} por acción`;
   if (unit === 'USD') return formatMarketCapUsd(n);
-  if (unit === 'shares') return `${new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(n)} acciones`;
+  if (unit === 'shares') return `${formatCompact(n, { maximumFractionDigits: 2 })} acciones`;
   return formatNumber(n, { maximumFractionDigits: 2 }) + (unit ? ` ${unit}` : '');
 }
 

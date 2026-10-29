@@ -4,6 +4,9 @@
  * los estados financieros pueden estar en la divisa del emisor, que no
  * conocemos), en cuyo caso la cifra no se muestra.
  */
+// @ts-expect-error explicit extension is needed by node strip-types tests.
+import { formatMoneyCompact } from '../format.ts';
+
 export type ScenarioCurrency = { code: string } | null;
 
 export function scenarioCurrency(
@@ -22,9 +25,10 @@ export function formatScenarioMoney(
   digits: number,
 ): string | null {
   if (value == null || !Number.isFinite(value) || !currency) return null;
-  // USD: escala inglesa (K/M/B/T); resto de divisas: escala española.
-  const locale = currency.code === 'USD' ? 'en-US' : 'es-ES';
-  return new Intl.NumberFormat(locale, {
+  // Todas las divisas en es-ES (USD incluido, Nico 29-oct-2026). Millones con
+  // la escala fija de formatCompact: Intl es-ES pinta 2,5e9 como «2500 M».
+  if (Math.abs(value) >= 1e6) return formatMoneyCompact(value, currency.code, { maximumFractionDigits: digits });
+  return new Intl.NumberFormat('es-ES', {
     style: 'currency',
     currency: currency.code,
     notation: 'compact',

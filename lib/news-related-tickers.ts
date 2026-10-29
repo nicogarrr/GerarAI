@@ -68,7 +68,7 @@ export function relatedTickerView(item: RelatedTicker): RelatedTickerView {
     if (hasPrice) {
         const value = item.price as number;
         priceText = validCurrency(item.currency)
-            ? new Intl.NumberFormat(item.currency === 'USD' ? 'en-US' : 'es-ES', { style: 'currency', currency: item.currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+            ? new Intl.NumberFormat('es-ES', { style: 'currency', currency: item.currency, useGrouping: 'always', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
             : `${new Intl.NumberFormat('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}${item.currency ? ` ${item.currency}` : ''}`;
     }
     const hasChange = typeof item.change_pct === 'number' && Number.isFinite(item.change_pct);

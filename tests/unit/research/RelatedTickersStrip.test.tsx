@@ -16,7 +16,7 @@ describe('Related ticker strip presentation', () => {
         expect(screen.getByRole('link', { name: 'A/B' })).toHaveAttribute('href', '/research/A%2FB');
         const first = screen.getByRole('link', { name: 'A/B' }).closest('li')!;
         expect(first).toHaveAttribute('title', 'Synthetic · cierre 2026-01-31');
-        expect(within(first).getByText('$100.00')).toBeVisible();
+        expect(within(first).getByText('100,00 US$')).toBeVisible();
         expect(within(first).getByText('+2,50 %')).toHaveClass('text-emerald-300');
         expect(screen.getByText('-1,50 %')).toHaveClass('text-red-300');
         expect(screen.getByText('0,00 %')).toHaveClass('text-gray-300');

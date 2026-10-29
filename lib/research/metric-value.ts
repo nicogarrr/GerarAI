@@ -7,8 +7,8 @@ export function formatResearchMetric(value: number | string | null | undefined, 
   const parsed = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(parsed)) return 'N/D';
   const perShare = /^([A-Z]{3})\/(?:share|shares)$/.exec(unit);
-  const fixedMoney = (currency: string) => new Intl.NumberFormat('en-US', {
-    style: 'currency', currency, minimumFractionDigits: 2, maximumFractionDigits: 2,
+  const fixedMoney = (currency: string) => new Intl.NumberFormat('es-ES', {
+    style: 'currency', currency, useGrouping: 'always', minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(parsed);
   if (perShare) return `${fixedMoney(perShare[1])}/acción`;
   if (/^[A-Z]{3}$/.test(unit) && Math.abs(parsed) < 1e6) return fixedMoney(unit);

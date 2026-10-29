@@ -15,9 +15,8 @@ const usdCompact = (value: number) => formatMarketCapUsd(value);
 const usdPrice = (value: number | null) =>
     value === null ? '—' : formatPrice(value, 'USD', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const sharesText = (side: InsiderOperationsSide) =>
-    // Misma convención en-US que el importe ($86.74M · 300,000 acc. · $289.14):
-    // antes la cifra de acciones salía con separador es-ES (300.000) en la misma línea.
-    side.trades === 0 ? '—' : side.shares.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    // Misma convención es-ES que el importe (86,74 M US$ · 300.000 acc. · 289,14 US$).
+    side.trades === 0 ? '—' : formatNumber(side.shares, { maximumFractionDigits: 0 });
 /** Con filas sin importe el medio no se calcula: se declara N/D (convención N/D del repo), nunca «—» a secas. */
 const avgText = (side: InsiderOperationsSide) =>
     side.rows_without_value > 0 ? 'precio medio N/D' : usdPrice(side.avg_price);

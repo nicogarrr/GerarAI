@@ -203,7 +203,11 @@ export function formatConfidence(value: NumericInput, fallback: string = NA): st
 }
 
 /**
- * Importe monetario: USD en inglés ($1,234.56, como el resto de la app); otras divisas en es-ES (1.234,56 €).
+ * Importe monetario en es-ES para TODAS las divisas: 1.234,56 € · 1.234,56 US$.
+ *
+ * Antes el USD salía en inglés ($1,234.56) por una decisión deliberada de
+ * Instinct; Nico la revocó (WhatsApp, 29-oct-2026: «Soluciona esos 5») para no
+ * mezclar «$1,500.00» con porcentajes es-ES («+1,69 %») en la misma pantalla.
  */
 export function formatMoney(
   value: NumericInput,
@@ -213,7 +217,7 @@ export function formatMoney(
 ): string {
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
-  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : FORMAT_LOCALE, {
+  return new Intl.NumberFormat(FORMAT_LOCALE, {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
@@ -223,7 +227,7 @@ export function formatMoney(
 }
 
 /**
- * Precio: USD en inglés ($93.90), otras divisas con su locale español.
+ * Precio en es-ES para todas las divisas (93,90 US$ · 93,90 €).
  * Decimales dinámicos: los valores muy pequeños (microcaps,
  * abs < 0,01) necesitan más de 2 decimales para no salir como "0,00 US$"
  * cuando el precio real es distinto de cero (F35, SANW 0,0011 US$).
@@ -238,7 +242,7 @@ export function formatPrice(
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
   const small = parsed !== 0 && Math.abs(parsed) < 0.01;
-  return new Intl.NumberFormat(currency === 'USD' ? 'en-US' : FORMAT_LOCALE, {
+  return new Intl.NumberFormat(FORMAT_LOCALE, {
     style: 'currency',
     currency,
     useGrouping: 'always',
@@ -284,21 +288,41 @@ export function formatCompact(
   }).format(parsed);
 }
 
+/** Símbolo es-ES de una divisa («US$», «€», «GBP»); el código si Intl no la conoce. */
+export function currencySymbolEs(currency: string): string {
+  try {
+    const part = new Intl.NumberFormat(FORMAT_LOCALE, { style: 'currency', currency })
+      .formatToParts(1)
+      .find((p) => p.type === 'currency');
+    return part?.value ?? currency;
+  } catch {
+    return currency;
+  }
+}
+
 /**
- * Capitalización en USD, con la escala inglesa elegida por el usuario ($4.87B).
+ * Importe compacto en es-ES con la escala fija de formatCompact y el símbolo
+ * detrás: «4,87 mil M US$», «35,7 M €». Sustituye a la escala inglesa
+ * ($4.87B) que usaba el USD (decisión revocada por Nico el 29-oct-2026).
+ */
+export function formatMoneyCompact(
+  value: NumericInput,
+  currency: string,
+  options: Intl.NumberFormatOptions = {},
+  fallback: string = NA,
+): string {
+  const parsed = toFinite(value);
+  if (parsed === null) return fallback;
+  return `${formatCompact(parsed, { maximumFractionDigits: 2, ...options }, fallback)}\u00a0${currencySymbolEs(currency)}`;
+}
+
+/**
+ * Capitalización en USD, compacta en es-ES («4,87 mil M US$»).
  * Solo presentación: el llamante garantiza que el importe ya está en dólares.
  * No usar para volúmenes o cantidades de acciones.
  */
 export function formatMarketCapUsd(value: NumericInput, fallback: string = NA): string {
-  const parsed = toFinite(value);
-  if (parsed === null) return fallback;
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    notation: 'compact',
-    maximumFractionDigits: 2,
-  }).format(parsed);
+  return formatMoneyCompact(value, 'USD', {}, fallback);
 }
 
 /**
@@ -319,10 +343,10 @@ export function formatMarketCap(value: NumericInput, currency: string | null, fa
       maximumFractionDigits: 2,
     }).format(parsed);
   }
-  // Locale segun divisa: EUR en es-ES (25,7 mil M EUR), USD en en-US.
-  const locale = currency.toUpperCase() === 'USD' ? 'en-US' : 'es-ES';
+  // USD con la misma escala es-ES fija que formatMarketCapUsd («4,87 mil M US$»).
+  if (currency.toUpperCase() === 'USD') return formatMoneyCompact(parsed, 'USD', {}, fallback);
   try {
-    return new Intl.NumberFormat(locale, {
+    return new Intl.NumberFormat('es-ES', {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
