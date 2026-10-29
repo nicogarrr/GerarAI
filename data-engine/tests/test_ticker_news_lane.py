@@ -232,8 +232,13 @@ def test_law_firm_solicitation_is_detected_but_real_news_is_not():
     assert is_law_firm_solicitation(
         "Pomerantz Law Firms Investigates Claims On Behalf of Investors of AST SpaceMobile"
     )
+    assert is_law_firm_solicitation(
+        "UPCOMING DEADLINE: SueWallSt Alerts AST SpaceMobile, Inc. Stockholders of Securities Class Action"
+    )
     assert not is_law_firm_solicitation("AST SpaceMobile launches BlueBird 6 satellite")
     assert not is_law_firm_solicitation("AST SpaceMobile signs contract with AT&T")
+    assert not is_law_firm_solicitation("AST SpaceMobile faces securities lawsuit, Reuters reports")
+    assert not is_law_firm_solicitation("Deadline looms for AST SpaceMobile earnings report")
 
 def test_impact_direction_whole_words_and_valuation_phrases():
     from app.services.materiality_service import MaterialityService
