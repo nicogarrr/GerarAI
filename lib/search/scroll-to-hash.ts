@@ -30,6 +30,10 @@ interface ScrollToHashDeps {
     getElementById?: (id: string) => ScrollTarget | null;
     getCurrentHash?: () => string;
     setTimeoutFn?: (callback: () => void, ms: number) => void;
+    /** Ritmo de reintento; por defecto RETRY_INTERVAL_MS. */
+    intervalMs?: number;
+    /** Reintentos máximos; por defecto MAX_ATTEMPTS. */
+    maxAttempts?: number;
 }
 
 /** Normaliza un hash de URL para compararlo con un id ya decodificado. */
@@ -63,6 +67,11 @@ export function scrollToHashAnchor(hash: string, deps: ScrollToHashDeps = {}): v
     const getElementById = deps.getElementById ?? ((id: string) => document.getElementById(id));
     const getCurrentHash = deps.getCurrentHash ?? (() => window.location.hash);
     const setTimeoutFn = deps.setTimeoutFn ?? ((callback: () => void, ms: number) => { setTimeout(callback, ms); });
+    // La ventana por defecto (~1,5 s) cubre la navegación interna; quien
+    // llega a una página servida por Suspense (ancla en la URL inicial)
+    // necesita una ventana más larga: la pasa por parámetro.
+    const intervalMs = deps.intervalMs ?? RETRY_INTERVAL_MS;
+    const maxAttempts = deps.maxAttempts ?? MAX_ATTEMPTS;
     // Hash visible al invocar, ANTES de que router.push comprometa la nueva
     // URL: mientras la barra siga en él, la navegación sigue pendiente.
     const pendingFrom = normalizeHash(getCurrentHash());
@@ -79,7 +88,7 @@ export function scrollToHashAnchor(hash: string, deps: ScrollToHashDeps = {}): v
                 setTimeoutFn(() => {
                     if (normalizeHash(getCurrentHash()) !== hash) return;
                     getElementById(hash)?.scrollIntoView({ block: 'start' });
-                }, RETRY_INTERVAL_MS * 4);
+                }, intervalMs * 4);
                 return;
             }
             // Hash comprometido pero el elemento aún no existe: reintentar.
@@ -89,7 +98,7 @@ export function scrollToHashAnchor(hash: string, deps: ScrollToHashDeps = {}): v
         }
         // current === pendingFrom: el push aún no compromete; seguir.
         attempts += 1;
-        if (attempts < MAX_ATTEMPTS) setTimeoutFn(attempt, RETRY_INTERVAL_MS);
+        if (attempts < maxAttempts) setTimeoutFn(attempt, intervalMs);
     };
     setTimeoutFn(attempt, 0);
 }

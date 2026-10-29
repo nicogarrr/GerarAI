@@ -99,6 +99,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
     'useSyncExternalStore retrasa el slot hasta hidratar la pagina; evita insertar el portal del layout en HTML SSR aun sin hidratar',
   'components/research/DecisionJournalEntryLink.tsx':
     'Client boundary for onClick and browser hash scrolling via scrollToHashAnchor; imported from server CompanyNavigation.',
+  'components/research/ResearchHashScroll.tsx':
+    'useEffect + window (location.hash, hashchange) para el scroll al ancla al llegar a la ficha; montado desde la página server dentro de Suspense.',
     'components/proPicks/DeepValueView.tsx':
         'filtros controlados con useState/useEffect/useCallback y server actions al cambiar criterios',
     'components/proPicks/RadarGlobalView.tsx':

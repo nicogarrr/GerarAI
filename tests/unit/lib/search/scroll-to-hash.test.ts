@@ -83,3 +83,43 @@ describe('scrollToHashAnchor', () => {
         expect(d.el.scrollIntoView).toHaveBeenCalled();
     });
 });
+
+describe('scrollToHashAnchor con ventana configurable', () => {
+    function harness(initialHash: string) {
+        const hash = initialHash;
+        const timers: Array<{ cb: () => void; ms: number }> = [];
+        const el = { scrollIntoView: vi.fn() };
+        return {
+            getCurrentHash: () => hash,
+            getElementById: vi.fn(() => el as unknown as HTMLElement),
+            setTimeoutFn: (cb: () => void, ms: number) => { timers.push({ cb, ms }); },
+            run: (n: number) => { for (let i = 0; i < n; i++) timers.shift()?.cb(); },
+            el,
+            timers,
+        };
+    }
+
+    it('respeta intervalMs y maxAttempts de quien llama', () => {
+        const d = harness('#diario-decisiones');
+        d.getElementById.mockReturnValue(null as never);
+        scrollToHashAnchor('diario-decisiones', { ...d, intervalMs: 150, maxAttempts: 80 });
+        // Primer intento en el tick 0 y reintentos al ritmo pedido.
+        expect(d.timers[0]?.ms).toBe(0);
+        d.run(1);
+        expect(d.timers[0]?.ms).toBe(150);
+        d.run(80);
+        // 80 reintentos agotados: para en silencio, sin más temporizadores.
+        expect(d.timers).toHaveLength(0);
+        expect(d.el.scrollIntoView).not.toHaveBeenCalled();
+    });
+
+    it('sin opciones mantiene la ventana corta original (100 ms × 15)', () => {
+        const d = harness('#grafico');
+        d.getElementById.mockReturnValue(null as never);
+        scrollToHashAnchor('grafico', d);
+        d.run(1);
+        expect(d.timers[0]?.ms).toBe(100);
+        d.run(14);
+        expect(d.timers).toHaveLength(0);
+    });
+});
