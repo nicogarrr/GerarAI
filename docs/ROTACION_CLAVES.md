@@ -8,38 +8,40 @@
 **Qué protege de verdad: rotar.** Purgar el historial es opcional (sección 4),
 no sustituye a la rotación y es decisión tuya. Este documento **no** reescribe
 nada. Complementa a `docs/seguridad/rotacion-de-claves.md` (PR #2269, que
-añade gitleaks a CI y pre-commit); aquí está la lista concreta y verificada.
+añade gitleaks a CI y pre-commit); aqui se separan las comprobaciones actuales de las referencias historicas.
 
-## 0. Cómo se ha obtenido la lista
+## 0. Estado comprobado y limites (29-oct-2026, 16:48 CET)
 
-- Historial completo (5.954 commits, todas las ramas) escaneado con **gitleaks**
-  (reglas por defecto) y además con una búsqueda propia de asignaciones
-  `*_SECRET / *_TOKEN / *_PASSWORD / *_API_KEY` y de URLs con usuario y
-  contraseña (`mongodb+srv://`, `postgresql://`, `redis://`…), porque gitleaks
-  **no detectó** dos de ellas (el secreto de Better Auth y la URI de MongoDB).
-- Árbol de trabajo actual de `main` (27-oct-2026): **ninguna clave real**. Los 17
-  avisos de gitleaks son falsos positivos (secretos de prueba en `data-engine/tests`,
-  claves de diccionario en `MarketRegime.tsx` y `source_hierarchy_service.py`,
-  el marcador de `GARAGE_ACCESS_KEY` en `.env.production.example`).
-- **No se ha comprobado** si cada clave antigua sigue activa (probarla sería usarla).
-  Trátalas todas como comprometidas.
+La lista anterior mezclaba posibles hallazgos historicos con credenciales
+vigentes. **No es un inventario confirmado de nueve credenciales expuestas.**
+No se deben rotar todas por rutina ni invalidar sesiones sin comprobar primero
+el valor afectado, sus consumidores y el reemplazo.
 
-## 1. Claves que hay que rotar (9 credenciales, 11 valores)
+| Elemento | Evidencia disponible | Que queda pendiente |
+|---|---|---|
+| Better Auth | Comparacion privada de tres asignaciones historicas de `docker.env.example` (`e7e5597b`) y `.env.bak` (`70098ea9`) con `BETTER_AUTH_SECRET` en la configuracion Production actual de Vercel: ninguna coincide. No se imprimieron valores ni se intentaron falsificar sesiones. | La configuracion de proyecto no acredita por si sola cada despliegue antiguo, Preview, copia local o consumidor externo. No se ha hecho rotacion en esta revision. |
+| Marketstack | `MARKETSTACK_API_KEY` no figura en las variables actuales del proyecto Vercel. Quitar una variable no revoca la clave del proveedor. | Revocacion en el proveedor sin acreditar. No hay login utilizable disponible; el intento de abrir el panel termino en timeout. No se ha reseteado ninguna clave. |
+| MongoDB Atlas | La consola redirige a login; no hay sesion de administrador accesible en la comprobacion de hoy. | No se ha revisado Database Access ni Activity Feed ni cambiado usuarios. Una URI de conexion no sustituye el acceso al panel. |
+| Gemini y otros proveedores | El informe operativo del 28-oct indicaba tres claves historicas Gemini rechazadas y la contraseña historica Atlas rechazada; no encontro valores reales de Finnhub/FMP/Twelve Data/Alpha Vantage/Polygon en su barrido. | Es un informe previo, no una nueva prueba de validez ni un inventario exhaustivo reproducido el 29-oct. No presentar esos proveedores como exposiciones confirmadas sin recuperar evidencia concreta. |
 
-| # | Proveedor | Variable | Valores distintos | Dónde aparece en el historial |
-|---|---|---|---|---|
-| 1 | **MongoDB Atlas** (usuario y contraseña de la base de datos, cluster `JLCavaAI`) | `MONGODB_URI` | 1 | `INSTRUCCIONES_DESPLIEGUE.md` (commit `97cf1049`, 1-nov-2025) |
-| 2 | **Better Auth** (firma las sesiones de login) | `BETTER_AUTH_SECRET` | 1 | `docker.env.example` (`e7e5597b`, 21-dic-2025) y `.env.bak` (`70098ea9`, 22-dic-2025) |
-| 3 | **Google / Gemini** | `GEMINI_API_KEY` | **3** claves distintas | (a) `RESUMEN_FINAL.md` e `INSTRUCCIONES_DESPLIEGUE.md` (`574df4ec`, 1-nov-2025); (b) `docker.env.example` (`e7e5597b`); (c) `.env.bak` (`70098ea9`) |
-| 4 | **Finnhub** | `FINNHUB_API_KEY` | 1 | `RESUMEN_FINAL.md` (`574df4ec`), `docker.env.example` (`e7e5597b`), `.env.bak` (`70098ea9`) |
-| 5 | **Financial Modeling Prep** | `FMP_API_KEY` | 1 | `docker.env.example` (`e7e5597b`), `.env.bak` (`70098ea9`) |
-| 6 | **Twelve Data** | `TWELVE_DATA_API_KEY` | 1 | ídem |
-| 7 | **Alpha Vantage** | `ALPHA_VANTAGE_API_KEY` | 1 | ídem |
-| 8 | **Polygon.io** (hoy Massive) | `POLYGON_API_KEY` | 1 | ídem |
-| 9 | **Marketstack** | `MARKETSTACK_API_KEY` | 1 | ídem |
+No se han cambiado ni revocado credenciales en esta revision. Nunca guardar
+valores en este documento, capturas, logs o mensajes. Los secretos nuevos se
+recogen y guardan en el gestor de secretos.
 
-Prioridad: **1 y 2 primero** (dan acceso a datos y cuentas de usuarios), luego 3
-(Gemini puede generar coste si la clave tiene facturación) y 4, después el resto.
+## 1. Referencias historicas por revisar
+
+Estas referencias sirven para localizar evidencia, no prueban que el valor
+siga activo ni que todos los proveedores listados hayan tenido una clave real:
+
+- MongoDB: `INSTRUCCIONES_DESPLIEGUE.md`, commit `97cf1049`.
+- Better Auth: `docker.env.example`, `e7e5597b`; `.env.bak`, `70098ea9`.
+- Gemini y posibles asignaciones de proveedores: `RESUMEN_FINAL.md`,
+  `574df4ec`; `docker.env.example`, `e7e5597b`; `.env.bak`, `70098ea9`.
+
+Si se confirma una credencial expuesta activa, primero inventariar consumidores.
+Crear y probar su reemplazo en ellos antes de revocar la anterior. Si ya esta
+rechazada, registrar la evidencia y revisar el acceso del proveedor cuando sea
+posible; no rotar otra credencial distinta solo por compartir nombre de variable.
 
 **No hace falta rotar** (revisados, son valores ficticios o de desarrollo local):
 `RESEARCH_AUTH_SECRET` de `ci.yml` y `playwright.config.ts` (secreto de tests de CI),
@@ -60,15 +62,15 @@ redespliega → comprueba que funciona → revoca la antigua.**
 3. *Security → Network Access*: quita `0.0.0.0/0` si está; deja solo las IPs de
    Render/Vercel/tu servidor (o usa el acceso por integración de Vercel).
 4. Revisa *Project → Activity Feed* / logs de acceso por si hubo conexiones raras.
-5. Si ese cluster ya no se usa (era del nombre antiguo, CavaAI), lo más limpio
-   es **borrar el usuario o el cluster** entero.
+5. No borres usuarios ni clusters por su nombre antiguo. Verifica consumidores,
+   dependencias y backup; cualquier retirada requiere un plan propio.
 
 ### 2. Better Auth (`BETTER_AUTH_SECRET`)
-1. Genera uno nuevo: `openssl rand -base64 32`.
+1. Si se confirma que el secreto activo esta expuesto, genera y guarda uno nuevo en el gestor de secretos.
 2. Ponlo en Vercel (y en tu `.env` local). **Efecto:** todas las sesiones abiertas
    se invalidan y hay que volver a iniciar sesión. Es lo esperado.
-3. Si producción ya usaba otro valor distinto del filtrado, rótalo igualmente:
-   no cuesta nada y elimina la duda.
+3. Si produccion usa otro valor, no invalides sesiones por rutina. Comprueba
+   que el valor historico no sigue en despliegues accesibles u otros consumidores.
 
 ### 3. Google / Gemini (`GEMINI_API_KEY`, 3 claves)
 1. aistudio.google.com → *API keys* (o console.cloud.google.com → *APIs y

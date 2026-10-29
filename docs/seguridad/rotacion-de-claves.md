@@ -1,32 +1,25 @@
 # Rotación de claves filtradas en el historial de Git
 
-**Estado:** el repositorio es público y el historial de Git (commits de
-noviembre–diciembre de 2025) contiene claves de API con aspecto real en
-ficheros que hoy ya no existen en `main` (`.env.bak`, `docker.env.example`,
-`RESUMEN_FINAL.md`, `INSTRUCCIONES_DESPLIEGUE.md`). Borrar el fichero no las
-borra: cualquiera puede leerlas con `git log -p` o en GitHub.
+**Estado actualizado (29-oct-2026):** el documento original no acreditaba
+la exposicion de todos los proveedores enumerados. El inventario y sus limites
+estan en [ROTACION_CLAVES.md](../ROTACION_CLAVES.md#0-estado-comprobado-y-limites-29-oct-2026-1648-cet).
+No contiene valores de secretos.
 
-**Lo que de verdad protege es rotar.** Purgar el historial es opcional y no
-sustituye a la rotación (cualquier clon o fork anterior conserva las claves).
+## 1. Verificar antes de rotar
 
-## 1. Rotar cada proveedor (hoy)
+- Confirmar que existe un valor real expuesto y distinguirlo del secreto activo.
+- Inventariar consumidores antes de cambiar o revocar nada.
+- Crear y probar un reemplazo en todos los consumidores antes de revocar el
+  anterior. No invalidar sesiones ni borrar usuarios o clusters por rutina.
+- Recoger y guardar secretos en el gestor de secretos, nunca en chat o logs.
+- Registrar fecha, alcance y resultado. Una variable eliminada no prueba la
+  revocacion del proveedor; una configuracion actual no prueba cada despliegue.
 
-Para cada uno: genera una clave nueva, sustitúyela en todos los entornos y
-**revoca la antigua**. No se ha comprobado si las claves antiguas siguen activas;
-trátalas como comprometidas igualmente.
-
-| Proveedor | Dónde se rota (a alto nivel) | Variable(s) en GerarAI |
-|---|---|---|
-| Finnhub | finnhub.io → Dashboard → API key → regenerar | `FINNHUB_API_KEY` |
-| Financial Modeling Prep | site.financialmodelingprep.com → Dashboard → API Keys → regenerar | `FMP_API_KEY` |
-| Twelve Data | twelvedata.com → Account → API Keys → regenerar/revocar | `TWELVE_DATA_API_KEY` (o equivalente en tu `.env`) |
-| Alpha Vantage | No hay panel: solicita una clave nueva en alphavantage.co/support y deja de usar la antigua | `ALPHA_VANTAGE_API_KEY` (o equivalente) |
-| Polygon (Massive) | polygon.io → Dashboard → Keys → crear nueva y borrar la antigua | `POLYGON_API_KEY` (o equivalente) |
-| Marketstack | marketstack.com → Dashboard → Reset API access key | `MARKETSTACK_API_KEY` (o equivalente) |
-| Google (Gemini / Cloud) | console.cloud.google.com → APIs y servicios → Credenciales (o aistudio.google.com → API keys) → borrar la clave y crear otra **con restricciones** de API | `GEMINI_API_KEY` / `GOOGLE_API_KEY` (según tu `.env`) |
-
-Los nombres de variable exactos están en `.env.production.example` y
-`docker.env.example`; si alguna variable ya no se usa, basta con revocar la clave.
+La comparacion privada del 29-oct no encontro coincidencias entre el secreto
+Better Auth de Production en Vercel y tres asignaciones historicas revisadas.
+Marketstack no esta en las variables actuales de Vercel; falta acreditar su
+revocacion. La consola Atlas requiere login. No se rotaron credenciales en esta
+revision. Los detalles y limites estan en el inventario enlazado.
 
 ## 2. Actualizar los entornos
 
