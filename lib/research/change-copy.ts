@@ -54,3 +54,14 @@ export function changeSummaryText(summary: string): string {
         return prefix + labels.split(', ').map((label) => nodes[label] ?? label).join(', ');
     });
 }
+
+/** Render old persisted wrappers without changing the original evidence. */
+export function changeHeadlineCopy(summary: string): { text: string; note: string | null } {
+    let text = (summary ?? '').trim();
+    text = text.replace(/^Noticia material que requiere revisión de la tesis:\s*/i, '');
+    text = text.replace(/^Artículo de [\s\S]*?,\s*(?:fechad[ao] el \d{4}-\d{2}-\d{2} por [^:]+|detectad[ao] por GDELT el \d{4}-\d{2}-\d{2}):\s*/i, '');
+    const warning = text.search(/Revisa la fuente;\s*(?:la fecha de GDELT|el titular no confirma)/i);
+    const note = warning >= 0 ? text.slice(warning).trim() : null;
+    if (warning >= 0) text = text.slice(0, warning).trim();
+    return { text: changeSummaryText(text), note };
+}

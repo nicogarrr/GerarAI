@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { formatUserDateTime } from '@/lib/format';
-import { changeSummaryText } from '@/lib/research/change-copy';
+import { changeHeadlineCopy } from '@/lib/research/change-copy';
 import type { ResearchThesisChange } from '@/lib/actions/research.actions';
 
 /**
@@ -25,7 +25,8 @@ export function ChangeImpactCard({ change, ticker, directionLabel, typeLabel }: 
         <Badge variant="outline">materialidad {change.materiality_score}</Badge>
         {change.requires_review ? <Badge>revisión pendiente</Badge> : null}
       </div>
-      <p className="mt-3 text-sm text-gray-300">{changeSummaryText(change.summary)}</p>
+      <p className="mt-3 text-sm text-gray-300">{changeHeadlineCopy(change.summary).text}</p>
+      {changeHeadlineCopy(change.summary).note ? <p className="mt-1 text-xs text-amber-300">{changeHeadlineCopy(change.summary).note}</p> : null}
       <p className="mt-2 text-xs text-gray-500">Registrado el {formatUserDateTime(change.created_at)} (Madrid)</p>
       {change.affected_metrics.length || change.affected_claim_ids.length ? (
         <p className="mt-2 text-xs text-gray-500">

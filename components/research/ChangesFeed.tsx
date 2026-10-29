@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
 import { formatUserDateTime } from '@/lib/format';
 import { metricLabel } from '@/lib/research/metric-labels';
-import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
+import { changeHeadlineCopy, changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { groupReviews } from '@/lib/research/review-groups';
 import { safeAssistantSourceUrl } from '@/lib/research/assistant-contract';
 import { buildChangeEvents, isOpenReview, paginate, type ChangeDirection, type ChangeEvent, type EventAlert, type EventReview } from '@/lib/research/change-events';
@@ -35,7 +35,7 @@ function hostOf(url: string): string {
 function EventCard({ event, ticker }: { event: ChangeEvent; ticker: string }) {
   const lead = event.changes[0];
   const openReview = event.reviews.find((r) => isOpenReview(r.status));
-  const title = lead ? changeSummaryText(lead.summary) : (openReview?.title ?? event.alerts[0]?.message ?? 'Registro sin resumen');
+  const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? 'Registro sin resumen');
   const sources = event.sourceUrls.map((u) => ({ url: safeAssistantSourceUrl(u), host: hostOf(u) })).filter((s): s is { url: string; host: string } => !!s.url);
   const records = event.changes.length + event.reviews.length + event.alerts.length;
   const touches = [
@@ -50,7 +50,8 @@ function EventCard({ event, ticker }: { event: ChangeEvent; ticker: string }) {
         {event.hasOpenReview || event.requiresReview ? <Badge>revisión pendiente</Badge> : <Badge variant="outline">sin revisión abierta</Badge>}
         {event.alerts.length ? <Badge variant="outline">{event.alerts.length === 1 ? '1 alerta' : `${event.alerts.length} alertas`}</Badge> : null}
       </div>
-      <p className="mt-3 break-words text-sm text-gray-300">{title}</p>
+      <p className="mt-3 break-words text-sm text-gray-300">{title.text}</p>
+      {title.note ? <p className="mt-2 text-xs text-amber-300">{title.note}</p> : null}
       <p className="mt-2 text-xs text-gray-500">{event.latest ? `${formatUserDateTime(event.latest)} (Madrid)` : 'Fecha desconocida'}</p>
       {touches.length ? <p className="mt-1 text-xs text-gray-500">Supuesto afectado: {touches.join(' · ')}</p> : null}
       {sources.length ? (
