@@ -52,9 +52,6 @@ export default async function CalendarSubscriptionPage() {
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col gap-6">
             <header className="flex flex-col gap-1">
                 <h1 className="text-2xl font-bold text-gray-100">Suscripción al calendario</h1>
-                <p className="text-sm text-gray-400">
-                    Resultados de tus empresas directamente en Apple, Google u Outlook Calendar.
-                </p>
             </header>
             <SubscriptionManager initialState={state ?? EMPTY} origin={origin} />
         </main>

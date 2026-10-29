@@ -21,7 +21,6 @@ export default function BlockedValuation({ valuation, ticker }: { valuation: Res
                 {' '}Periodos: {periods.length ? periods.map(([metric, period]) => `${termLabel(metric)}: ${period}`).join(' · ') : 'no registrados'}.
                 {factIds.length ? ` Hechos registrados: ${factIds.map(([metric, id]) => `${termLabel(metric)} #${id}`).join(' · ')}.` : null}
             </p>
-            <p className="text-xs text-gray-400">Contrasta los hechos y sus fuentes antes de cambiar supuestos. El modelo a largo plazo es un cálculo distinto y también puede necesitar evidencia.</p>
             <nav aria-label="Revisar valoración bloqueada" className="flex flex-wrap gap-x-4 gap-y-1">
                 <Link className="inline-flex min-h-11 items-center text-teal-300 hover:underline" href={href('financials')}>Revisar datos y fuentes</Link>
                 <Link className="inline-flex min-h-11 items-center text-teal-300 hover:underline" href={href('supuestos')}>Revisar supuestos</Link>

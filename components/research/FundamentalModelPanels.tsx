@@ -284,8 +284,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
                 : `No disponible: ${(model.reverse_dcf.missing_inputs ?? []).map(termLabel).join(', ') || 'faltan inputs de mercado o financieros'}.`}
             </p>
             <p className="mt-2 text-xs leading-5 text-gray-500">
-              El reverse DCF invierte el modelo: parte del precio de mercado y calcula qué crecimiento está descontando ya.
-              Compáralo con tu escenario base para juzgar si el precio exige demasiado (o poco).
+              El reverse DCF parte del precio de mercado y calcula qué crecimiento está descontando ya.
             </p>
           </div>
         </div>
