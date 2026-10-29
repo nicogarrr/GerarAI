@@ -65,9 +65,11 @@ def test_failed_run_marks_symbols_without_state_as_job_failed(client, monkeypatc
         run_manual_batch()
     body, item = _item(client)
     assert body["last_run"]["status"] == "error"
-    assert "yahoo down" in body["last_run"]["error"]
+    # Decision de Nico (29-oct): mensaje generico; el detalle solo en el log.
+    assert body["last_run"]["error"] == dca_run_log.PUBLIC_RUN_ERROR
+    assert "yahoo down" not in body["last_run"]["error"]
     assert item["evaluation_status"] == "job_failed"
-    assert "yahoo down" in item["evaluation_reason"]
+    assert item["evaluation_reason"] == dca_run_log.PUBLIC_RUN_ERROR
 
 
 def test_per_symbol_errors_and_skips_are_visible(client, monkeypatch):

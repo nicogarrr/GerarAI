@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 STALE_RUNNING_AFTER = timedelta(minutes=40)
 KEEP_RUNS = 60
 _DETAIL_LIMIT = 500
+# Lo unico que ve el usuario de un fallo de la ejecucion (decision de Nico,
+# 29-oct): el detalle tecnico, redactado, va solo al log del servidor.
+PUBLIC_RUN_ERROR = "No se pudo completar la evaluación DCA. Reintenta más tarde."
 
 
 def _trim(items: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -65,11 +68,13 @@ def finish_run(
         summary = summary or {}
         row.finished_at = datetime.now(UTC)
         row.status = "error" if error else "ok"
-        # El texto del error se muestra en la watchlist (last_run.error y el
-        # motivo por ticker). Una excepcion de httpx o de la base de datos trae
-        # la URL con ?apikey= o el DSN con la password: se redacta ANTES de
-        # recortar a 300, para que el recorte no deje medio secreto sin tapar.
-        row.error = (error or None) and redact_secrets(error)[:300]
+        # La watchlist ensena row.error (last_run.error, motivo por ticker y
+        # /manual-runs): solo el mensaje generico. El detalle (una excepcion de
+        # httpx o de la BD trae ?apikey= o el DSN con password) va al log,
+        # redactado ANTES de recortar para no dejar medio secreto sin tapar.
+        if error:
+            logger.error("dca run %s (%s) fallo: %s", row.id, row.trigger, redact_secrets(error)[:300])
+        row.error = PUBLIC_RUN_ERROR if error else None
         row.tracked = int(summary.get("tracked", 0))
         row.evaluated = int(summary.get("evaluated", 0))
         row.skipped_count = len(summary.get("skipped", []))
@@ -144,8 +149,8 @@ def run_payload(row: DcaEvaluationRun | None, now: datetime | None = None) -> di
         "skipped": row.skipped_count,
         "errors": row.errors_count,
         "alerted": row.alerted_count,
-        # Filas guardadas antes de redactar al escribir: se redacta tambien al leer.
-        "error": redact_secrets(row.error) if row.error else row.error,
+        # Filas guardadas antes del mensaje generico: tampoco se ensena su texto.
+        "error": PUBLIC_RUN_ERROR if row.error else None,
         "skipped_detail": (row.detail or {}).get("skipped", []),
         "errors_detail": (row.detail or {}).get("errors", []),
     }

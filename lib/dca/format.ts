@@ -69,7 +69,7 @@ export function dcaMissingBadge(item: DcaSignalItem | undefined): { text: string
     if (status === 'job_failed') {
         return {
             text: 'Evaluación fallida',
-            title: `La última evaluación falló para este ticker${item?.evaluation_reason ? `: ${item.evaluation_reason}` : ''}.`,
+            title: `La última evaluación falló para este ticker${item?.evaluation_reason ? `: ${item.evaluation_reason.replace(/\.+$/, '')}` : ''}.`,
             tone: 'error',
         };
     }
