@@ -69,15 +69,14 @@ class DecisionJournalService:
             entry.decision_date = trade.trade_date
             entry.price = trade.price
         db.add(entry)
+        # Una decision ya ejecutada tambien consume una candidata de las otras
+        # entradas. Guardar decision y sugerencias juntas, sin confirmar heuristicas.
+        from app.services.journal_trade_link import auto_link_journal_trades
+
+        db.flush()
+        auto_link_journal_trades(db, {company.id})
         db.commit()
         db.refresh(entry)
-        if trade is None:
-            # Decision de compra/venta sin operacion indicada: si ya existe UNA
-            # operacion inequivoca (p. ej. importada de IBKR), se enlaza sola.
-            from app.services.journal_trade_link import auto_link_journal_trades_best_effort
-
-            auto_link_journal_trades_best_effort(db, {company.id})
-            db.refresh(entry)
         return entry
 
     def link_transaction(
@@ -116,6 +115,13 @@ class DecisionJournalService:
             meta = dict(entry.metadata_ or {})
             meta.pop("auto_link", None)
             entry.metadata_ = meta
+        # Confirmar, cambiar o rechazar un enlace cambia las candidatas de las
+        # otras decisiones. Recalcular en la misma transaccion evita dejar una
+        # sugerencia consumida o una ambiguedad ya resuelta hasta otra importacion.
+        from app.services.journal_trade_link import auto_link_journal_trades
+
+        db.flush()
+        auto_link_journal_trades(db, {company.id})
         db.commit()
         db.refresh(entry)
         return entry
