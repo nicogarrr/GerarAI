@@ -48,11 +48,16 @@ export default function DcaEvaluateButton() {
                 return;
             }
             if (res.success && res.summary) {
-                const { evaluated, alerted, skipped } = res.summary;
+                const { evaluated, alerted, skipped, errors = [] } = res.summary;
                 const parts = [formatCountEs(evaluated, 'evaluado', 'evaluados'), formatCountEs(alerted.length, 'aviso nuevo', 'avisos nuevos')];
                 if (skipped.length > 0) parts.push(`${skipped.length} sin datos suficientes`);
                 if (res.summary.pending_remaining) parts.push(`${res.summary.pending_remaining} pendientes de otra tanda`);
-                toast.success(`Señales DCA actualizadas: ${parts.join(' · ')}`);
+                if (errors.length > 0) {
+                    parts.push(formatCountEs(errors.length, 'empresa con errores', 'empresas con errores'));
+                    toast.warning(`Evaluación DCA parcial: ${parts.join(' · ')}`);
+                } else {
+                    toast.success(`Señales DCA actualizadas: ${parts.join(' · ')}`);
+                }
                 setStatus(null);
                 router.refresh();
             } else {
