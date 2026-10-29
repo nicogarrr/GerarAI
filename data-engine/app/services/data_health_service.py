@@ -30,9 +30,16 @@ def _eligible_total(db: Session, label: str, source_name: str | None) -> int | N
     denominador sigue siendo el universo."""
     if label == "Fundamentales" and source_name == "ESEF":
         from app.services.cnmv_mapping import REVIEWED_ISSUERS
+        from app.services.esef_issuer_mapping import (
+            REVIEWED_ISSUERS_IE,
+            REVIEWED_ISSUERS_NL,
+        )
 
         tickers = {issuer.ticker.upper() for issuer in REVIEWED_ISSUERS}
         tickers |= {f"{t}.MC" for t in tickers}
+        # Emisores ESEF reviewed fuera de ES (NL/IE): tambien son elegibles
+        # de esta fuente; sin ellos el ratio sobre elegibles podia pasar de 100.
+        tickers |= {i.ticker.upper() for i in REVIEWED_ISSUERS_NL + REVIEWED_ISSUERS_IE}
         return db.scalar(
             select(func.count(Company.id)).where(func.upper(Company.ticker).in_(tickers))
         ) or 0
