@@ -146,3 +146,22 @@ def test_social_source_materiality_is_capped():
     assert assessment.source_tier == "tier_8_social"
     assert assessment.materiality_score <= 2
     assert assessment.requires_update is False
+
+
+@pytest.mark.parametrize("text", [
+    "ASTS Could Be Entering Its Biggest Growth Phase Yet. The selloff may have punished the stock far beyond what the fundamentals warrant.",
+    "The sell-off could have punished the stock beyond fundamentals.",
+    "The selloff may be overdone.",
+])
+def test_contested_selloff_is_not_categorical_deterioration(text):
+    assert _direction(text) == "neutral"
+
+
+@pytest.mark.parametrize("text", [
+    "The selloff may be overdone, but the company cuts guidance.",
+    "The selloff may be overdone following a fraud investigation.",
+    "The stock plunges in a selloff.",
+    "The company could face a fraud investigation.",
+])
+def test_contested_price_opinion_does_not_erase_independent_negative_evidence(text):
+    assert _direction(text) == "negative"

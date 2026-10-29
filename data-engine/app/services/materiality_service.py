@@ -125,6 +125,17 @@ def _has_phrase(lower_text: str, phrase: str) -> bool:
 
 
 
+def _contested_selloff(text: str) -> bool:
+    """Opinión explícita sobre una venta excesiva, no un hecho de la tesis."""
+    folded = _fold(text)
+    return re.search(
+        r"\bsell[ -]?off\b[^.!?]{0,140}(?:"
+        r"(?:may|might|could) have punished[^.!?]{0,100}beyond[^.!?]{0,50}fundamentals"
+        r"|(?:is|was|seems|looks|may be|might be|could be) (?:the )?overdone)",
+        folded,
+    ) is not None
+
+
 def _has_resumption(lower_text: str) -> bool:
     """El texto anuncia la reanudación de la cotización tras un halt."""
     return (
@@ -368,6 +379,10 @@ class MaterialityService:
             # La reanudación de cotización no es el halt: «Trade Resumption»
             # vuelve a neutral en vez de heredar el negativo de «halt».
             if not (word == "halt" and _has_resumption(lower_text))
+            # Una caída que el autor considera excesiva no afirma deterioro.
+            # Solo se suprime la señal de precio selloff, nunca fraude, recorte
+            # de guidance ni otros hechos negativos del mismo texto.
+            and not (word in {"selloff", "sell-off"} and _contested_selloff(lower_text))
         ]
         negative = any(_has_term(lower_text, word) for word in negative_terms) or any(
             _has_phrase(lower_text, phrase) for phrase in NEGATIVE_PATTERNS
