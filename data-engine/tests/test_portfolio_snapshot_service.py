@@ -16,6 +16,7 @@ from app.models.entities import (
     Base,
     CashBalance,
     CashDailySnapshot,
+    FxConversion,
     Company,
     PortfolioDailySnapshot,
     Position,
@@ -264,3 +265,18 @@ def test_series_restarts_after_unvaluable_stretch_without_stitching(db):
     assert s2.pricing_coverage == Decimal("1")
     assert s3.daily_return == pytest.approx(Decimal("0.1"))
     assert s3.cumulative_twr == pytest.approx(Decimal("0.1"))
+
+
+def test_cash_is_not_carried_forward_across_an_fx_conversion(db):
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=TODAY)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=YESTERDAY))
+    db.add(FxConversion(
+        trade_date=TODAY, disposed_currency="EUR", disposed_amount=Decimal("100"),
+        acquired_currency="USD", acquired_amount=Decimal("110"), external_id="fx-later",
+    ))
+    db.commit()
+    snapshot = PortfolioSnapshotService().capture(db, as_of=TODAY)
+    assert snapshot.cash_value_base == Decimal("0")
+    assert snapshot.pricing_coverage < Decimal("1")
+    assert snapshot.metadata_["cash_carried_forward"] == []

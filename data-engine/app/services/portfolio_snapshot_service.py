@@ -11,6 +11,7 @@ from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
     CashDailySnapshot,
+    FxConversion,
     PortfolioDailySnapshot,
     Position,
     PositionDailySnapshot,
@@ -347,7 +348,16 @@ class PortfolioSnapshotService:
             )
             .limit(1)
         )
-        return later is None
+        later_fx = db.scalar(
+            select(FxConversion.id)
+            .where(
+                FxConversion.trade_date > cash_as_of,
+                FxConversion.trade_date <= snapshot_date,
+                *tenant_filters(db, FxConversion),
+            )
+            .limit(1)
+        )
+        return later is None and later_fx is None
 
     def _relink_following(self, db: Session, portfolio_id: int, after: date) -> None:
         following = list(
