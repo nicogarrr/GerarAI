@@ -1085,9 +1085,8 @@ class IBKRImportService:
                 statement_day = _date(_attr(element, "reportDate", "asOfDate"))
                 if (
                     position is not None
-                    and position.statement_as_of is not None
-                    and position.statement_as_of > statement_day
                     and position.source == "ibkr_flex"
+                    and self._statement_is_older(db, position, company, statement_day)
                 ):
                     # Extracto mas antiguo que el que ya fijo cantidad y coste:
                     # nunca retrocede.
@@ -1105,7 +1104,7 @@ class IBKRImportService:
                         field: getattr(position, field)
                         for field in (
                             "market_price", "market_value", "market_value_native",
-                            "market_value_base", "fx_rate", "as_of",
+                            "market_value_base", "fx_rate", "as_of", "quantity",
                         )
                     }
                 position.quantity = quantity
@@ -1139,8 +1138,19 @@ class IBKRImportService:
                 position.source = "ibkr_flex"
                 position.statement_as_of = statement_day
                 if kept_valuation is not None:
+                    previous_quantity = kept_valuation.pop("quantity")
                     for field, value in kept_valuation.items():
                         setattr(position, field, value)
+                    if position.quantity != previous_quantity:
+                        # El valor conservado era de la cantidad vieja: se
+                        # recalcula con la cantidad del extracto y la cotizacion
+                        # y el FX conservados (nunca cantidad nueva x valor viejo).
+                        value_native = position.quantity * position.market_price
+                        position.market_value_native = value_native
+                        position.market_value = value_native
+                        position.market_value_base = (
+                            value_native * position.fx_rate if position.fx_rate is not None else None
+                        )
                     # El PyG se recalcula con la cotizacion conservada y el coste
                     # nuevo; el unrealized del extracto es de su propia fecha.
                     if position.market_value_native is not None and position.cost_basis_native is not None:
@@ -1565,6 +1575,44 @@ class IBKRImportService:
             "reconcile_blocked": reconcile_blocked,
             "portfolio_snapshot_id": snapshot.id,
         }
+
+    @staticmethod
+    def _statement_is_older(db: Session, position: Position, company: Company, statement_day: date) -> bool:
+        """True si el extracto es anterior al que ya fijo cantidad y coste.
+
+        Con ``statement_as_of`` se compara directamente. Las filas heredadas
+        (NULL) no tienen fecha propia y ``as_of`` es la de la COTIZACION (puede
+        ir por delante del extracto), asi que no se usa. Se busca evidencia
+        independiente de que los datos ya son posteriores al extracto: una
+        operacion de esa empresa con fecha posterior (la cantidad del extracto
+        no la incluye) o una fila cruda OpenPosition de un extracto posterior.
+        Sin esa evidencia no se puede probar que sea mas antiguo y se importa;
+        la fila queda fechada y desde entonces la guarda es exacta.
+        """
+        if position.statement_as_of is not None:
+            return position.statement_as_of > statement_day
+        later_trade = db.scalar(
+            select(Transaction.id)
+            .where(
+                Transaction.company_id == company.id,
+                Transaction.trade_date > statement_day,
+                *tenant_filters(db, Transaction),
+            )
+            .limit(1)
+        )
+        if later_trade is not None:
+            return True
+        later_raw = db.scalar(
+            select(IbkrRawRow.id)
+            .where(
+                IbkrRawRow.symbol == company.ticker,
+                IbkrRawRow.path.in_(["OpenPosition", "OpenPositions/OpenPosition"]),
+                IbkrRawRow.report_date > statement_day,
+                *tenant_filters(db, IbkrRawRow),
+            )
+            .limit(1)
+        )
+        return later_raw is not None
 
     @staticmethod
     def _company_by_symbol(
