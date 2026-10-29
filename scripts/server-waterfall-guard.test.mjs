@@ -9,7 +9,7 @@ test('watchlist starts dated changes, monitor and per-symbol reads together (no 
     assert.doesNotMatch(watchlist, /await fetchDatedChanges/);
     assert.doesNotMatch(watchlist, /await getWatchlistMonitor/);
     assert.match(watchlist, /Promise\.all\(\[getWatchlistState\(\), searchParams\]\)/);
-    assert.match(watchlist, /Promise\.all\(\[datedChangesPromise, monitorPromise, Promise\.all\(basicsPromises\)\]\)/);
+    assert.match(watchlist, /Promise\.all\(\[datedChangesPromise, monitorPromise, Promise\.all\(basicsPromises\)(, Promise\.all\(notFoundPromises\))?\]\)/);
 });
 
 test('research starts user context before awaiting the dashboard', () => {

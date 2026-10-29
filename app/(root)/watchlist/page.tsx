@@ -5,6 +5,8 @@ import type { Metadata } from 'next';
 import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
 import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
+import { getProfile } from '@/lib/actions/finnhub.actions';
+import { isTickerNotFound, NOT_FOUND_LABEL, NOT_FOUND_TITLE } from '@/lib/watchlist/lookup-status';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
 import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
@@ -60,6 +62,8 @@ interface WatchlistStock {
     /** true = la cadena de cotización agotó su presupuesto (3 s): las celdas
         sin dato lo dicen como espera, nunca como fallo de la fuente. */
     timedOut: boolean;
+    /** true = fuera del master y el proveedor no conoce el símbolo («No encontrado»). */
+    notFound: boolean;
     addedAt: Date;
 }
 
@@ -142,7 +146,27 @@ export default async function WatchlistPage({
             },
         );
     });
-    const [datedChanges, monitorData, basicsList] = await Promise.all([datedChangesPromise, monitorPromise, Promise.all(basicsPromises)]);
+    // «No encontrado»: solo para filas fuera del master, con el mismo criterio
+    // que la ficha (perfil del proveedor sin nombre propio). Presupuesto
+    // propio; si el proveedor tarda o falla, sin etiqueta.
+    const notFoundPromises = basicsPromises.map((basicsPromise, index) =>
+        basicsPromise
+            .then((basics) => {
+                if (basics) return false;
+                const symbol = pageItems[index].symbol.trim().toUpperCase();
+                let timer: ReturnType<typeof setTimeout> | undefined;
+                return Promise.race([
+                    getProfile(symbol).then((profile) => isTickerNotFound(basics, profile, symbol)),
+                    new Promise<boolean>((resolve) => {
+                        timer = setTimeout(() => resolve(false), ENTRY_DATA_BUDGET_MS);
+                    }),
+                ]).finally(() => {
+                    if (timer) clearTimeout(timer);
+                });
+            })
+            .catch(() => false),
+    );
+    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([datedChangesPromise, monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item, index) => {
             try {
@@ -205,6 +229,7 @@ export default async function WatchlistPage({
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
                     timedOut,
+                    notFound: notFoundList[index] === true && data.price === null,
                     addedAt: item.addedAt
                 };
             } catch {
@@ -228,6 +253,7 @@ export default async function WatchlistPage({
                     analysis: item.analysis,
                     monitor: null,
                     timedOut: false,
+                    notFound: notFoundList[index] === true,
                     addedAt: item.addedAt
                 };
             }
@@ -419,7 +445,11 @@ export default async function WatchlistPage({
                                             {stock.symbol}
                                         </Link>
                                         {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />
-                                        {stock.price === null ? (
+                                        {stock.notFound ? (
+                                            <Badge variant="outline" className="mt-1 border-amber-800/60 text-amber-300/90" title={NOT_FOUND_TITLE}>
+                                                {NOT_FOUND_LABEL}
+                                            </Badge>
+                                        ) : stock.price === null ? (
                                             <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
                                                 {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
                                             </Badge>
@@ -515,7 +545,11 @@ export default async function WatchlistPage({
                                                 <div>
                                                     <div className="flex items-center gap-2 font-bold text-gray-200 transition-colors group-hover:text-blue-400">
                                                         {stock.symbol}
-                                                        {stock.price === null ? (
+                                                        {stock.notFound ? (
+                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={NOT_FOUND_TITLE}>
+                                                                {NOT_FOUND_LABEL}
+                                                            </Badge>
+                                                        ) : stock.price === null ? (
                                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">
                                                                 {stock.timedOut ? 'sin datos: la lectura tardó más de 3 s, recarga' : 'sin datos'}
                                                             </Badge>
