@@ -225,3 +225,49 @@ def test_salto_huerfano_se_detecta(tmp_path):
     _migracion_sintetica(tmp_path, "0002_beta", "0002_beta", "0001_alpha")
     problemas = violaciones_cadena(tmp_path)
     assert any("no existe (salto o huerfano)" in p for p in problemas), problemas
+
+
+def test_web_push_0101_round_trip_on_ci_postgres():
+    """Real Postgres round trip in an isolated schema; CI migration job runs this file."""
+    import importlib.util
+    import os
+    import uuid
+
+    import pytest
+    import sqlalchemy as sa
+    from alembic.migration import MigrationContext
+    from alembic.operations import Operations
+
+    url = os.environ.get('DATABASE_URL', '')
+    if os.environ.get('CI') != 'true' or not url.startswith('postgresql'):
+        pytest.skip('Runs only on the CI Postgres migration service')
+    schema = 'push_0101_test_' + uuid.uuid4().hex
+    path = VERSIONS_DIR / '0101_web_push.py'
+    spec = importlib.util.spec_from_file_location('push_0101_ci', path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    engine = sa.create_engine(url)
+    try:
+        with engine.connect() as conn:
+            transaction = conn.begin()
+            try:
+                conn.execute(sa.text(f'CREATE SCHEMA {schema}'))
+                conn.execute(sa.text(f'SET LOCAL search_path TO {schema}'))
+                conn.execute(sa.text('CREATE TABLE tenants (id INTEGER PRIMARY KEY)'))
+                module.op = Operations(MigrationContext.configure(conn))
+                module.upgrade()
+                for table in ('push_subscriptions', 'push_preferences'):
+                    inspector = sa.inspect(conn)
+                    assert table in inspector.get_table_names(schema=schema)
+                    assert inspector.get_foreign_keys(table, schema=schema)
+                    assert inspector.get_unique_constraints(table, schema=schema)
+                module.upgrade()
+                module.downgrade()
+                assert not {'push_subscriptions', 'push_preferences'} & set(sa.inspect(conn).get_table_names(schema=schema))
+                module.upgrade()
+                assert {'push_subscriptions', 'push_preferences'} <= set(sa.inspect(conn).get_table_names(schema=schema))
+            finally:
+                transaction.rollback()  # Removes only this test's temporary schema.
+    finally:
+        engine.dispose()

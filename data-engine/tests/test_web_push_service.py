@@ -253,4 +253,3 @@ def test_payload_truncates_long_messages():
     alert = SimpleNamespace(id=9, title="T" * 300, message="palabra " * 100)
     data = json.loads(web_push.build_payload(alert))
     assert len(data["title"]) == 120 and data["body"].endswith("…") and len(data["body"]) <= 180
-
