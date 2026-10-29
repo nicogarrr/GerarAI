@@ -61,8 +61,9 @@ REVIEWED_ISSUERS_IE: tuple[ReviewedEsefIssuer, ...] = (
 )
 
 
-def _normalize(name: str) -> str:
-    return " ".join(name.upper().replace(",", " ").split())
+# Misma clave que cnmv_mapping (acentos y puntos plegados): una sola
+# implementacion para que las formas societarias se normalicen igual en ES/NL/IE.
+from app.services.cnmv_mapping import _normalize
 
 
 def resolve_issuer_nl(query: str) -> ReviewedEsefIssuer | None:

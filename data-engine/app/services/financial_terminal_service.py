@@ -157,7 +157,8 @@ class FinancialTerminalService:
                         "url": document.source_url if document else None,
                     },
                     "confidence": fact.confidence,
-                    "status": "reported" if fact.is_reported else "normalized",
+                    "status": "reported" if fact.is_reported else "calculated",  # no-reportado = cifra derivada/calculada (FCF, margenes, acciones
+                    # derivadas): la UI la marca "Calculado", nunca como publicada
                     "formula": None,
                     "definition_version": None,
                 }

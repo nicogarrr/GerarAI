@@ -32,6 +32,7 @@ export const METRIC_LABELS: Record<string, string> = {
     ebitda: 'EBITDA',
     eps_diluted: 'BPA diluido',
     shares_diluted: 'Acciones diluidas (media)',
+    shares_basic_derived: 'Acciones básicas medias (derivadas, aprox.)',
     shares_outstanding: 'Acciones en circulación',
     'shares outstanding': 'Acciones en circulación',
     total_assets: 'Activos totales',

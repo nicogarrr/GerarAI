@@ -2134,6 +2134,7 @@ class FinancialIngestionService:
         # la sesion de ingestion usa autoflush=False: drop_shadowed_facts hace flush antes de derivar
         drop_shadowed_facts(db, company.id, document.id, tenant_condition(db))
         facts_imported += self._derive_esef_metrics(db, company, document)
+        facts_imported += self._import_esef_shares(db, company, document, facts_data)
 
         document.metadata_ = {
             **(document.metadata_ or {}),
@@ -2503,6 +2504,107 @@ class FinancialIngestionService:
             }
         db.flush()
         return derived
+
+    def _import_esef_shares(
+        self, db: Session, company: Company, document: Document, facts_data: dict[str, Any]
+    ) -> int:
+        """Acciones medias derivadas del propio filing ESEF (app.services.esef_shares).
+
+        Sin esta derivacion NINGUN emisor ESEF tiene acciones medias (0/105
+        etiquetan WeightedAverageNumberOf*Shares en base scope, medido
+        2026-10-29) y el DCF queda bloqueado en el input requerido
+        ``shares_diluted``. Dos vias separadas (revision del piloto):
+        ``shares_diluted`` SOLO desde BPA diluido (con senal
+        ``numerator_adjustment_risk`` cuando el basico difiere mas alla del
+        redondeo: posibles convertibles/preferentes en el numerador), y el
+        fallback con BPA basico bajo la metrica informativa
+        ``shares_basic_derived``, que el DCF NO acepta porque la
+        equivalencia con acciones diluidas no se puede acreditar sin un BPA
+        diluido igual. Formula, cotas y descartes quedan en metadata del
+        documento fuente; toda cifra es is_reported=False (derivada y
+        aproximada, nunca oficial).
+        """
+        from app.services import esef_shares
+
+        profit_periods, _ = _merge_esef_periods(
+            facts_data, [esef_shares.ATTRIBUTABLE_PROFIT_CONCEPT],
+            esef_shares.PROFIT_UNIT, "net_income_attributable",
+        )
+        diluted_periods, _ = _merge_esef_periods(
+            facts_data, [esef_shares.DILUTED_EPS_CONCEPT],
+            esef_shares.EPS_UNIT, "eps_diluted",
+        )
+        basic_periods, _ = _merge_esef_periods(
+            facts_data, [esef_shares.BASIC_EPS_CONCEPT],
+            esef_shares.EPS_UNIT, "eps_basic",
+        )
+        diluted, basic, skipped = esef_shares.derive_shares(
+            profit_periods, diluted_periods, basic_periods
+        )
+        imported = 0
+        for item in diluted:
+            db.add(
+                FinancialFact(
+                    company_id=company.id,
+                    metric=esef_shares.DILUTED_METRIC,
+                    value=item.shares,
+                    unit="shares",
+                    period=f"{item.period}:FY",
+                    fiscal_year=_annual_fiscal_year(item.period, None),
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.6") if item.numerator_adjustment_risk else Decimal("0.7"),
+                )
+            )
+            imported += 1
+        for item in basic:
+            db.add(
+                FinancialFact(
+                    company_id=company.id,
+                    metric=esef_shares.BASIC_METRIC,
+                    value=item.shares,
+                    unit="shares",
+                    period=f"{item.period}:FY",
+                    fiscal_year=_annual_fiscal_year(item.period, None),
+                    fiscal_quarter="FY",
+                    source_id=document.id,
+                    source_type="ESEF",
+                    is_reported=False,
+                    confidence=Decimal("0.6"),
+                )
+            )
+            imported += 1
+        document.metadata_ = {
+            **(document.metadata_ or {}),
+            "esef_shares": {
+                "formula": esef_shares.DERIVATION_FORMULA,
+                "diluted_metric": esef_shares.DILUTED_METRIC,
+                "basic_metric": esef_shares.BASIC_METRIC,
+                "dcf_accepts": esef_shares.DILUTED_METRIC,
+                "approximate": True,
+                "derived": [
+                    {
+                        "period": d.period,
+                        "lane": d.lane,
+                        "shares": str(d.shares),
+                        "profit": str(d.profit),
+                        "eps": str(d.eps),
+                        "eps_decimals": d.eps_decimals,
+                        "rel_error_bound": f"{d.rel_error_bound:.4%}",
+                        "numerator_adjustment_risk": d.numerator_adjustment_risk,
+                    }
+                    for d in diluted + basic
+                ],
+                "skipped": [
+                    {"period": s.period, "lane": s.lane, "reason": s.reason}
+                    for s in skipped
+                ],
+            },
+        }
+        db.flush()
+        return imported
 
     def _derive_esef_metrics(self, db: Session, company: Company, document: Document) -> int:
         """Metricas derivadas de los hechos ESEF, mismo contrato que

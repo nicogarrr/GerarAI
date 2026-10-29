@@ -34,3 +34,27 @@ def test_seed_table_is_complete_and_consistent():
         # Every alias resolves back to its own issuer.
         for alias in issuer.aliases:
             assert resolve_issuer(alias) is issuer
+
+
+def test_esef_registry_forms_resolve():
+    """Formas societarias EXACTAS observadas en filings.xbrl.org (medido
+    2026-10-29): tilde, punto final ausente y «SA» sin puntos no pueden
+    dejar al emisor sin snapshot."""
+    # «COMPAÑÍA ... S.A.» con tilde (CEV).
+    assert resolve_issuer("COMPAÑÍA ESPAÑOLA DE VIVIENDAS EN ALQUILER S.A.").ticker == "CEV"
+    # «S.A» sin punto final (GAM).
+    assert resolve_issuer("GENERAL DE ALQUILER DE MAQUINARIA, S.A").ticker == "GAM"
+    # «SA» sin puntos (COL, forma declarada en el filing).
+    assert resolve_issuer("COLONIAL SFL SOCIMI SA").ticker == "COL"
+    # LIB: forma larga declarada en el filing (alias reviewed anadido).
+    assert resolve_issuer("LIBERTAS 7 SOCIEDAD ANONIMA").ticker == "LIB"
+
+
+def test_normalization_folding_never_merges_distinct_issuers():
+    # Toda clave de la tabla (legal, ticker, ISIN, NIF, alias) sigue
+    # resolviendo SOLO a su emisor tras plegar acentos y puntos.
+    for issuer in REVIEWED_ISSUERS:
+        for key in [issuer.legal_name, issuer.ticker, issuer.isin, issuer.nif, *issuer.aliases]:
+            resolved = resolve_issuer(key)
+            assert resolved is not None, key
+            assert resolved.ticker == issuer.ticker, key

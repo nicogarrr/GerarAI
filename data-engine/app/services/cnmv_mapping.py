@@ -152,7 +152,7 @@ REVIEWED_ISSUERS: tuple[CNMVIssuer, ...] = (
     # (opa de exclusion, Sociedades Rectoras) - exclusiones honestas aunque
     # sigan presentando ESEF. Tickers cortos no presentes en el FISN confirmados en
     # BME/Yahoo/Morningstar (documentado en el PR).
-    CNMVIssuer("LIB", "LIBERTAS 7, S.A.", "A-46007449", "ES0137998A12", ("LIBERTAS 7", "LIB.MC", "LIBERTAS 7 SA")),
+    CNMVIssuer("LIB", "LIBERTAS 7, S.A.", "A-46007449", "ES0137998A12", ("LIBERTAS 7", "LIB.MC", "LIBERTAS 7 SA", "LIBERTAS 7 SOCIEDAD ANONIMA")),
     CNMVIssuer("UNC", "UNION CATALANA DE VALORES, S.A.", "A-08483257", "ES0181222011", ("UNION CATALANA DE VALORES", "UNC.MC", "UNION CATALANA DE VALORES SA")),
     CNMVIssuer("AYC", "AYCO GRUPO INMOBILIARIO, S.A.", "A-28004240", "ES0152960045", ("AYCO", "AYC.MC", "AYCO GRUPO INMOBILIARIO SA")),
     CNMVIssuer("MON", "MOBILIARIA MONESA, S.A.", "A-08348740", "ES0164228019", ("MOBILIARIA MONESA", "MON.MC", "MOBILIARIA MONESA SA")),
@@ -174,7 +174,21 @@ REVIEWED_ISSUERS: tuple[CNMVIssuer, ...] = (
 
 
 def _normalize(name: str) -> str:
-    return " ".join(name.upper().replace(",", " ").split())
+    """Clave de comparacion exacta: mayusculas, SIN ACENTOS y SIN PUNTOS.
+
+    El registro ESEF no normaliza las formas societarias: medido 2026-10-29
+    en filings.xbrl.org, «COMPAÑÍA ESPAÑOLA DE VIVIENDAS EN ALQUILER S.A.»
+    (tilde) y «GENERAL DE ALQUILER DE MAQUINARIA, S.A» (punto final ausente)
+    no resolvian contra la tabla y sus emisores quedaban sin snapshot. Ambas
+    direcciones se pliegan igual, asi que solo se fusionan formas del MISMO
+    nombre; la resolucion sigue siendo por clave exacta, nunca parcial."""
+    import unicodedata
+
+    folded = "".join(
+        c for c in unicodedata.normalize("NFKD", name.upper())
+        if not unicodedata.combining(c)
+    )
+    return " ".join(folded.replace(",", " ").replace(".", "").split())
 
 
 def resolve_issuer(query: str) -> CNMVIssuer | None:
