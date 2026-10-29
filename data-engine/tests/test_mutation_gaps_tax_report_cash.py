@@ -168,3 +168,13 @@ def test_ambiguous_dividend_candidate_keeps_its_currency(db):
     assert candidate["currency"] == "USD"
     assert candidate["candidate"] is True
     assert candidate["date"] == "2026-03-15"
+
+
+def test_unattributed_non_income_row_does_not_stop_later_rows(db):
+    _fx(db, when=date(2026, 3, 9))
+    _cash(db, action="transfer", amount="10.00", symbol="XYZ", when=date(2026, 3, 10))
+    _cash(db, action="div", amount="100.00", symbol="MSFT")
+    report = _report(db)
+    [bucket] = report["dividends"]
+    assert bucket["ticker"] == "UNATTRIBUTED:MSFT"
+    assert report["summary"]["total_dividends_base"] == pytest.approx(90.0)
