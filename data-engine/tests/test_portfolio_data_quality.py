@@ -122,3 +122,44 @@ def test_twr_chain_break_keeps_first_date_after_base():
         assert result['twr_chain']['status'] == 'broken'
         assert result['twr_chain']['first_unlinked_date'] == '2026-10-16'
         assert 'twr_chain_broken' in result['reasons']
+
+
+def test_scope_change_base_is_not_a_broken_link():
+    """#2890 declara base nueva la primera foto real tras una serie
+    reconstruida solo-posiciones (twr_base_after_scope_change): sin retorno
+    por diseño, no es un eslabón roto. Antes el diagnóstico la contaba como
+    rota y pedía otra reconstrucción."""
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        tenant = Tenant(external_id='quality-scope-base', name='QA')
+        db.add(tenant); db.flush()
+        db.info['tenant_id'] = tenant.id
+        p = Portfolio(name='Main', base_currency='EUR', is_default=True)
+        c = Company(ticker='QS', name='QS', exchange='X', currency='EUR', sector='S', industry='I', company_type='holding', valuation_model='unassigned')
+        db.add_all([p, c]); db.flush()
+        db.add(Position(portfolio_id=p.id, company_id=c.id, quantity=10, average_cost=100,
+                        cost_basis_base=1000, currency='EUR', as_of=date(2026, 10, 18), source='ibkr_flex'))
+        # Serie reconstruida solo-posiciones: base + un eslabón.
+        db.add(PortfolioDailySnapshot(portfolio_id=p.id, snapshot_date=date(2026, 10, 15),
+               base_currency='EUR', positions_value_base=1000, cash_value_base=0,
+               total_value_base=1000, pricing_coverage=Decimal('1'),
+               source='twr_rebuild', metadata_={'positions_only': True}))
+        db.add(PortfolioDailySnapshot(portfolio_id=p.id, snapshot_date=date(2026, 10, 16),
+               base_currency='EUR', positions_value_base=1010, cash_value_base=0,
+               total_value_base=1010, pricing_coverage=Decimal('1'),
+               daily_return=Decimal('0.01'), cumulative_twr=Decimal('0.01'),
+               source='twr_rebuild', metadata_={'positions_only': True}))
+        # Primera foto real tras el cambio de alcance: base nueva declarada.
+        db.add(PortfolioDailySnapshot(portfolio_id=p.id, snapshot_date=date(2026, 10, 17),
+               base_currency='EUR', positions_value_base=1010, cash_value_base=0,
+               total_value_base=1010, pricing_coverage=Decimal('1'),
+               metadata_={'twr_blocked_by_scope_change': True, 'twr_base_after_scope_change': True}))
+        db.add(PortfolioDailySnapshot(portfolio_id=p.id, snapshot_date=date(2026, 10, 18),
+               base_currency='EUR', positions_value_base=1020, cash_value_base=0,
+               total_value_base=1020, pricing_coverage=Decimal('1'),
+               daily_return=Decimal('0.0099'), cumulative_twr=Decimal('0.0099')))
+        db.commit()
+        result = portfolio_quality(db)
+        assert result['twr_chain'] == {'status': 'linked', 'unlinked_snapshots': 0, 'first_unlinked_date': None}
+        assert 'twr_chain_broken' not in result['reasons']
