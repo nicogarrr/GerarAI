@@ -6,7 +6,7 @@ import { buildAllocationSlices } from '../lib/portfolio-allocation.ts';
 test('position weights use the same valued subset and helper as Resumen', () => {
  const src=readFileSync('components/portfolio/PortfolioHoldings.tsx','utf8');
  assert.match(src,/buildAllocationSlices\(currentHoldings.filter/);
- assert.match(src,/!holding.valueMissing && !holding.fxMissing/);
+ assert.match(src,/!holding.valueMissing && !holding.valuationHold/);
  assert.match(src,/>Peso<\/dt>/);
  assert.match(src,/>Peso<\/TableHead>/);
  assert.equal((src.match(/weight\(holding.symbol\)/g) ?? []).length,2);

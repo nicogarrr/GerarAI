@@ -99,7 +99,7 @@ describe('buildAllocationSlices: datos del donut', () => {
 
     it('la etiqueta declara la base y el panel no se esconde con cartera solo-caja', () => {
         const allocation = source('components/portfolio/PortfolioAllocation.tsx');
-        assert.ok(allocation.includes('Pesos sobre las posiciones'), 'etiqueta que declara la base (pesos sobre RV)');
+        assert.ok(allocation.includes('Pesos sobre el valor bruto de las posiciones'), 'etiqueta que declara la base (pesos sobre RV)');
         assert.ok(allocation.includes('holdings.length === 0 && !hasCash'), 'estado vacío solo cuando tampoco hay caja');
         assert.ok(allocation.includes('buildAllocationSlices(knownHoldings)'), 'datos vía el helper probado');
     });
@@ -110,11 +110,12 @@ describe('buildAllocationSlices: datos del donut', () => {
     });
 
     it('una posición sin valor no certifica un 100% falso: fuera del donut y con aviso', () => {
-        // Regresión (auditor, 11 oct): valueMissing/fxMissing mapeaba a 0 y el
+        // Regresión: valor ausente o suspendido no entra como cero; coste pendiente sí entra.
+        // El criterio anterior valueMissing/fxMissing mapeaba a 0 y el
         // reparto normalizaba lo conocido al 100% sin decirlo.
         const allocation = source('components/portfolio/PortfolioAllocation.tsx');
         assert.ok(
-            allocation.includes('!holding.valueMissing && !holding.fxMissing'),
+            allocation.includes('!holding.valueMissing && !holding.valuationHold'),
             'el panel filtra posiciones sin valor conocido antes de repartir',
         );
         assert.ok(allocation.includes('Distribución incompleta'), 'aviso visible cuando falta alguna');
