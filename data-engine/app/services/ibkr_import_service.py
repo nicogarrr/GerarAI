@@ -646,6 +646,11 @@ def collect_raw_rows(root: ElementTree.Element) -> list[dict]:
     return rows
 
 
+# IBKR Flex corporate-action codes that change the share count: forward split,
+# reverse split, stock dividend and spin-off.
+_SHARE_COUNT_CORPORATE_ACTIONS = frozenset({"FS", "RS", "SD", "SO"})
+
+
 def _flex_ticker(symbol: str, element: ElementTree.Element | None) -> str:
     """Company.ticker a Flex row maps to: the ISIN-verified listing, else the symbol."""
     from app.services.listing_identity import reviewed_listing
@@ -1023,6 +1028,23 @@ class IBKRImportService:
                     fx_conversions_imported += 1
                 if trades_only:
                     non_stock_skipped += 1  # contrato del backfill: no es una accion
+                continue
+            if tag == "CorporateAction" and (
+                (_attr(element, "type", "activityType") or "").upper() in _SHARE_COUNT_CORPORATE_ACTIONS
+            ):
+                # Split, contrasplit, dividendo en acciones o escisión: cambian
+                # el número de acciones y el libro no los aplica solo. Antes se
+                # descartaban sin aviso y el FIFO fiscal acababa en sobreventa.
+                ca_symbol = _attr(element, "symbol", "underlyingSymbol") or "?"
+                ca_type = (_attr(element, "type", "activityType") or "").upper()
+                ca_date = _attr(element, "reportDate", "dateTime", "date") or "?"
+                notice = (
+                    f"Acción corporativa {ca_type} de {ca_symbol} ({ca_date}) no se aplica al "
+                    "libro de operaciones: regístrala en Acciones corporativas para que "
+                    "el coste y el FIFO fiscal cuadren."
+                )
+                if notice not in row_errors:
+                    row_errors.append(notice)
                 continue
             if trades_only and tag != "Trade" and not (include_cash_income and tag == "CashTransaction"):
                 continue
