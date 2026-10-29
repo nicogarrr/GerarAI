@@ -177,3 +177,36 @@ def test_negative_missing_currency_creates_nothing(monkeypatch):
         assert db.scalar(select(Company).where(Company.ticker == TICKER)) is None
     finally:
         db.close()
+
+
+def test_double_click_race_returns_existing_company_not_500(monkeypatch):
+    """Doble clic en «Abrir ficha»: el segundo POST ya no da 500."""
+    from app.api.routes import companies as companies_route
+
+    _clean()
+    _mock_sources(monkeypatch, SEC_ENTRY, PROVIDER_PROFILE)
+    client = TestClient(main.app, raise_server_exceptions=False)
+    first = client.post("/api/companies/verify-identity", json={"ticker": TICKER})
+    assert first.status_code == 200 and first.json()["company"]["ticker"] == TICKER
+
+    # Simula la carrera: la 2.ª petición leyó el maestro antes de que la 1.ª
+    # confirmara, así que su comprobación inicial no ve la ficha.
+    real_resolve = companies_route.resolve_company
+    calls = {"n": 0}
+
+    def stale_then_real(db, ticker):
+        calls["n"] += 1
+        return None if calls["n"] == 1 else real_resolve(db, ticker)
+
+    monkeypatch.setattr(companies_route, "resolve_company", stale_then_real)
+    second = client.post("/api/companies/verify-identity", json={"ticker": TICKER})
+    assert second.status_code == 200
+    payload = second.json()
+    assert payload["already_in_master"] is True
+    assert payload["company"]["ticker"] == TICKER
+    db = SessionLocal()
+    try:
+        assert db.query(Company).filter(Company.ticker == TICKER).count() == 1
+    finally:
+        db.close()
+    _clean()

@@ -7,6 +7,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import desc, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
@@ -568,7 +569,21 @@ def verify_identity(payload: IdentityVerificationRequest, db: Session = Depends(
         factor_tags=[],
     )
     db.add(company)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # Doble clic en «Abrir ficha»: dos POST pasan la comprobación a la vez y
+        # el segundo choca con el UNIQUE de ticker. La ficha ya existe: se
+        # responde igual que si hubiera estado en el maestro (idempotente).
+        db.rollback()
+        winner = resolve_company(db, ticker)
+        if winner is None:
+            raise
+        return IdentityVerificationResponse(
+            ticker=ticker, verified=True, already_in_master=True,
+            reasons=["ya_en_maestro: la ficha ya existía"],
+            company=CompanyOut.model_validate(winner),
+        )
     db.refresh(company)
     response.company = CompanyOut.model_validate(company)
     return response
