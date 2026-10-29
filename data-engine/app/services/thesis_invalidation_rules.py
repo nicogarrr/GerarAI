@@ -41,6 +41,7 @@ from app.models import (
     ThesisVersion,
 )
 from app.services.claim_scope import latest_thesis_version
+from app.services.price_freshness import market_price_is_stale
 
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
@@ -250,7 +251,7 @@ def _latest_price(db: Session, company_id: int) -> tuple[Decimal | None, dict[st
         "price": str(price.close),
         "date": price.date.isoformat(),
         "age_days": age_days,
-        "status": "stale" if age_days >= min(get_settings().market_price_max_age_days, 1) else "fresh",
+        "status": "stale" if market_price_is_stale(age_days, get_settings().market_price_max_age_days) else "fresh",
     }
 
 

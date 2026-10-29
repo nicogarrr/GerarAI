@@ -19,6 +19,7 @@ from app.models import (
     ResearchAlert,
 )
 from app.services.notification_service import NotificationService
+from app.services.price_freshness import market_price_is_stale
 from app.services.review_alert_service import ReviewAlertService
 
 # Operators the evaluator understands. `create()` did not validate the operator,
@@ -298,7 +299,7 @@ class AlertRuleService:
                     "age_days": age_days,
                     "status": (
                         "stale"
-                        if age_days >= min(get_settings().market_price_max_age_days, 1)
+                        if market_price_is_stale(age_days, get_settings().market_price_max_age_days)
                         else "fresh"
                     ),
                 }
@@ -321,8 +322,10 @@ class AlertRuleService:
                         "age_days": (date.today() - position.as_of).days,
                         "status": (
                             "stale"
-                            if (date.today() - position.as_of).days
-                            >= min(get_settings().market_price_max_age_days, 1)
+                            if market_price_is_stale(
+                                (date.today() - position.as_of).days,
+                                get_settings().market_price_max_age_days,
+                            )
                             else "fresh"
                         ),
                     },
@@ -370,7 +373,7 @@ class AlertRuleService:
                 "age_days": age_days,
                 "status": (
                     "stale"
-                    if age_days >= min(get_settings().market_price_max_age_days, 1)
+                    if market_price_is_stale(age_days, get_settings().market_price_max_age_days)
                     else "fresh"
                 ),
             }

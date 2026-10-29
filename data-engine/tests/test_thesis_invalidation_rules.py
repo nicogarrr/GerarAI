@@ -272,3 +272,16 @@ def test_legacy_three_day_setting_cannot_mark_yesterday_thesis_price_fresh(db, m
     monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=3))
     _, observation = module._latest_price(db, company.id)
     assert observation["status"] == "stale"
+
+
+def test_max_age_zero_keeps_today_thesis_price_fresh(db, monkeypatch):
+    """MARKET_PRICE_MAX_AGE_DAYS=0 significa «solo hoy», no «nunca actual»."""
+    from types import SimpleNamespace
+
+    from app.services import thesis_invalidation_rules as module
+
+    company = _company(db)
+    _price(db, company, "210", day=date.today())
+    monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=0))
+    _, observation = module._latest_price(db, company.id)
+    assert observation["status"] == "fresh"
