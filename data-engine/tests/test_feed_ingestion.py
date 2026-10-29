@@ -308,3 +308,28 @@ def test_poll_rss_keeps_channel_title_without_source_label():
 
     result = run_async(run())
     assert [item.source for item in result.items] == ["Apple Newsroom"]
+
+
+def test_gov_feeds_are_builtin_with_gobierno_lane():
+    from app.services.feed_ingestion_service import GOV_NEWS_LANE, GOV_RSS_FEEDS, all_rss_feeds
+
+    assert GOV_NEWS_LANE == "gobierno"
+    assert len(GOV_RSS_FEEDS) >= 3  # Fed, BCE y Casa Blanca como mínimo
+    for feed in GOV_RSS_FEEDS:
+        assert feed.lane == GOV_NEWS_LANE
+        assert feed.ticker is None
+        assert feed.label and "(oficial)" in feed.label
+        assert feed.url.startswith("https://")
+    feeds = all_rss_feeds("")
+    urls = {feed.url for feed in feeds}
+    for feed in GOV_RSS_FEEDS:
+        assert feed.url in urls
+
+
+def test_gov_feeds_do_not_duplicate_env_feeds():
+    from app.services.feed_ingestion_service import GOV_RSS_FEEDS, all_rss_feeds
+
+    env_value = GOV_RSS_FEEDS[0].url
+    feeds = all_rss_feeds(env_value)
+    matching = [feed for feed in feeds if feed.url == GOV_RSS_FEEDS[0].url]
+    assert len(matching) == 1

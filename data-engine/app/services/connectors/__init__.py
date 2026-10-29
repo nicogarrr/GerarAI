@@ -6,6 +6,7 @@ from app.services.connectors.gdelt import GDELTClient, GDELTConnector
 from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.connectors.ir import IRConnector
 from app.services.connectors.rss import RSSConnector
+from app.services.connectors.stocktwits import StockTwitsConnector
 from app.services.connectors.sec import SECClient
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "IBKRFlexClient",
     "IRConnector",
     "RSSConnector",
+    "StockTwitsConnector",
     "SECClient",
     "sec_edgar",
 ]
