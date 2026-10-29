@@ -17,11 +17,14 @@ build correcto.
    aplique. No desplegar automáticamente por CI ni por merge.
 2. En el proyecto `gerarai` de Vercel, comprobar Production Current y los
    deployments recientes. Si ya existe un READY del SHA, no reconstruir.
-3. Con el repositorio conectado, usar Deployments > Create Deployment,
-   seleccionar el SHA del lote y Production. Comprobar el SHA y el destino
-   antes del botón final. Si el dashboard no permite ese flujo, usar la CLI
-   oficial con el checkout limpio del SHA, proyecto vinculado y
+3. Ruta directa a producción: usar la CLI oficial con checkout limpio del
+   SHA aprobado y proyecto `gerarai` vinculado, y ejecutar
    `vercel deploy --prod`. No añadir hooks automáticos ni workflows de push.
+   La alternativa del dashboard es Deployments > menú > Create Deployment:
+   acepta Branch, Commit, or URL y muestra inicialmente Create Preview
+   Deployment. No confundirlo con producción ni enviar sin verificar destino.
+   Si se usa esa ruta, verificar el READY del SHA y promover a producción;
+   la promoción no reconstruye. No crear un preview de prueba sin necesitarlo.
 4. El control Git solo desactiva disparadores automáticos, no la CLI ni el
    despliegue manual. Comprobar el Ignored Build Step si el lote no cambia
    frontend. No forzar un build que no hace falta.
