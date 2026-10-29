@@ -103,12 +103,20 @@ TREATY_DIVIDEND_RATES = {
     # 2014, BOE-A-2015-10793, art. X.2.b): 15% "en todos los demás casos"
     # (el 5% del art. X.2.a exige sociedad con >=10% del capital).
     "CA": Decimal("0.15"),
+    # España-Hong Kong 2011 (BOE-A-2012-5039, art. 10.2.b): 10% "en todos los
+    # demás casos" (el 0% del art. 10.2.a exige sociedad con >=25% del capital,
+    # no una persona física minorista). Hong Kong no retiene en origen sobre
+    # dividendos ordinarios, así que lo normal es retención 0 y deducción 0;
+    # el tope solo acota una retención aplicada por error del bróker. Ojo: los
+    # ADR/acciones chinas tipo BABA son sociedades de Caimán (KY), no HK.
+    "HK": Decimal("0.10"),
 }
 TREATY_RATE_SOURCES = {
     "US": "BOE-A-1990-30940 art. 10.2.b (convenio España-EE.UU.)",
     "CN": "BOE-A-2021-4911 art. 10.2.b (convenio España-China 2018)",
     "GB": "BOE-A-2014-5171 art. 10.2.a.i (convenio España-Reino Unido)",
     "CA": "BOE-A-1981-2731 art. X.2.b (convenio España-Canadá)",
+    "HK": "BOE-A-2012-5039 art. 10.2.b (convenio España-Hong Kong 2011)",
 }
 
 UNKNOWN_COUNTRY = "??"
