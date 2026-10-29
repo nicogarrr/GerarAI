@@ -20,14 +20,11 @@ const LEARN_PREFIXES = [
   "/inversores/cartas",
   "/inversores/videos",
   "/inversores/conceptos",
+  "/inversores/canales",
 ];
 
 export function HubNav() {
   const pathname = usePathname();
-  // /inversores/canales pertenece al hub Biblioteca: alli manda el subnav
-  // contextual (SectionNav) y pintar tambien esta barra apilaba dos subnavs
-  // con activos contradictorios ("Aprender" vs "Canales").
-  if (pathname.startsWith("/inversores/canales")) return null;
   const active = LEARN_PREFIXES.some((prefix) => pathname.startsWith(prefix))
     ? "/inversores/aprender"
     : (SECTIONS.find(
