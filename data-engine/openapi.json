@@ -10437,7 +10437,8 @@
               "insiders",
               "shorts_rising",
               "daily_digest",
-              "dca_levels"
+              "dca_levels",
+              "macro_event"
             ],
             "title": "Event Type",
             "type": "string"
@@ -13807,7 +13808,8 @@
                 "insiders",
                 "shorts_rising",
                 "daily_digest",
-                "dca_levels"
+                "dca_levels",
+                "macro_event"
               ],
               "title": "Event Type",
               "type": "string"
