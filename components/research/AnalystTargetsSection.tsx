@@ -11,7 +11,7 @@ type AnalystTargets = components['schemas']['AnalystTargets'];
  * cabecera la hora de obtención. Sin datos o con fallo se dice, nunca se
  * rellena. Nunca rechaza: un fallo de la fuente no rompe la ficha.
  */
-export async function AnalystTargetsSection({ symbol }: { symbol: string; currency?: string | null }) {
+export async function AnalystTargetsSection({ symbol, currency }: { symbol: string; currency?: string | null }) {
     let data: AnalystTargets | null = null;
     try {
         data = await researchRequest<AnalystTargets>(`/api/companies/${encodeURIComponent(symbol)}/analyst-targets`, { timeoutMs: 14000 });
@@ -37,6 +37,11 @@ export async function AnalystTargetsSection({ symbol }: { symbol: string; curren
             ) : (
                 <>
                     {!cur ? <p className="mt-2 text-xs text-gray-400">Divisa no declarada por Yahoo: importes sin unidad verificada y recorrido N/D.</p> : null}
+                    {cur && currency && cur.toUpperCase() !== currency.trim().toUpperCase() ? (
+                        <p className="mt-2 text-xs text-gray-400" data-testid="analyst-targets-currency-note">
+                            Objetivos {cur.toUpperCase() === 'USD' ? '(ADR, USD)' : `en ${cur.toUpperCase()}`}: la ficha cotiza en {currency.trim().toUpperCase()}.
+                        </p>
+                    ) : null}
                     {data.consensus ? (
                         <div className="mt-1 text-sm text-gray-300">
                             <p>

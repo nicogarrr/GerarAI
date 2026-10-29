@@ -339,7 +339,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 </TabsContent>
 
                 <TabsContent value="posiciones" className="mt-0">
-                    <PortfolioHoldings holdings={summary.holdings} userId={userId} cash={summary.cash} baseCurrency={summary.baseCurrency} />
+                    <PortfolioHoldings holdings={summary.holdings} userId={userId} cash={summary.cash} baseCurrency={summary.baseCurrency} fxRates={summary.fxRates} />
                 </TabsContent>
 
                 {/* Tab: Movimientos */}
