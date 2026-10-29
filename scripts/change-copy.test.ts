@@ -37,5 +37,8 @@ test('el banner «Desde tu última visita» aplica la misma reescritura de copy 
   // honesto): sin esta reescritura mostraba «Afecta a 0 afirmaciones y nodos»
   // mientras la tarjeta «Últimos cambios» ya decía la forma honesta.
   const banner = readFileSync(new URL('../components/research/ChangesSinceVisit.tsx', import.meta.url), 'utf8');
-  assert.match(banner, /changeSummaryText\(change\.resumen\)/);
+  // #3001: changeHeadlineCopy limpia envoltorios y delega en changeSummaryText.
+  assert.match(banner, /changeHeadlineCopy\(change\.resumen\)/);
+  const copy = readFileSync(new URL('../lib/research/change-copy.ts', import.meta.url), 'utf8');
+  assert.match(copy, /return \{ text: changeSummaryText\(text\), note \}/);
 });

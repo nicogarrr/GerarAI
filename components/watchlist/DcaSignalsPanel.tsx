@@ -35,6 +35,7 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
             </summary>
             <div className="space-y-3 px-4 pb-4">
                 <Link href="/settings#dca" className="inline-flex min-h-11 items-center text-sm text-teal-300 underline">Configurar avisos DCA en Ajustes →</Link>
+                <p className="text-xs text-gray-400">No cambia el veredicto ni realiza órdenes.</p>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
                         <p className="text-xs text-gray-500">
