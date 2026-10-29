@@ -1,8 +1,8 @@
 from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 
+from app.models import Document, FinancialFact
 from app.services.reviewed_eps_adjustments import (
     REVIEW_ID,
     REVIEWED,
@@ -13,7 +13,9 @@ from app.services.reviewed_eps_adjustments import (
 
 def make(lei, period, value):
     url, checksum, page = REVIEWED[(lei, period, Decimal(value))]
-    return SimpleNamespace(
+    # Modelos ORM reales (transitorios, sin sesión): el gate lee los mismos
+    # atributos mapeados que en producción, no un falso SimpleNamespace.
+    return FinancialFact(
         source_type=SOURCE_TYPE,
         metric="eps_diluted",
         value=Decimal(value),
@@ -25,7 +27,7 @@ def make(lei, period, value):
         unit="EUR/share",
         company_id=1,
         tenant_id=1,
-        source=SimpleNamespace(
+        source=Document(
             company_id=1,
             tenant_id=1,
             source_type=SOURCE_TYPE,
