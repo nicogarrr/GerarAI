@@ -90,6 +90,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/DocumentsList.tsx': 'useState y useMemo, onChange para búsqueda y página actual',
   'components/research/ExpectationsList.tsx': 'useState para paginación de comparaciones y previsiones',
   'components/research/Pager.tsx': 'jsx-onClick para avanzar y retroceder páginas',
+  'components/insider/PagedInsiderCompanies.tsx': 'useState para la página actual del paginador de empresas insider',
   'components/HomeAttention.tsx':
     'useEffect loads independent attention sources; useState controls retries and bounded pagination',
   'app/(root)/inversores/_components/LibraryChat.tsx':

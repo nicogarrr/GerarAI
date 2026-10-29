@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { InsiderOperationsCompany, InsiderOperationsResult, InsiderOperationsSide } from '@/lib/actions/insider.actions';
 import { insiderName, insiderRole } from '@/lib/insider/format';
+import { PagedInsiderCompanies } from '@/components/insider/PagedInsiderCompanies';
 
 /** Vista de operaciones insider (P/S) de cartera + watchlist, del agregado
  *  backend /api/insider/operations. Solo datos Form 4 persistidos: el
@@ -42,7 +43,7 @@ function SideCells({ side, empty }: { side: InsiderOperationsSide; empty?: strin
     );
 }
 
-function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
+export function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
     const { totals } = company;
     return (
         <Card className="min-w-0 rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-5">
@@ -185,7 +186,7 @@ export default function InsiderOperationsView({ result, days }: { result: Inside
                     para las empresas de tu cartera y watchlist.
                 </Card>
             ) : (
-                result.companies.map((company) => <CompanyCard key={company.ticker} company={company} />)
+                <PagedInsiderCompanies companies={result.companies} />
             )}
             {result.companies_without_data.length > 0 ? (
                 <p className="text-xs text-gray-500">
