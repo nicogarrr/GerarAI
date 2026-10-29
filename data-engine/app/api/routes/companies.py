@@ -397,6 +397,183 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
     return company
 
 
+class IdentityVerificationRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
+
+
+class IdentityVerificationResponse(BaseModel):
+    ticker: str
+    verified: bool
+    already_in_master: bool = False
+    reasons: list[str] = []
+    sec: dict | None = None
+    provider: dict | None = None
+    company: CompanyOut | None = None
+
+
+def _homonym_conflict(db: Session, ticker: str, verified_name: str) -> str | None:
+    """Homónimo con otra identidad en el maestro -> motivo de rechazo, o None.
+
+    La doble coincidencia SEC+proveedor solo contrasta el símbolo en EE. UU.;
+    sin ancla al emisor esperado confirmaría ALM como Almonty aunque el
+    usuario busque Almirall (ALM.MC). Si el maestro ya conoce el ticker base
+    (con o sin sufijo de mercado) con un nombre INCOMPATIBLE, el símbolo es
+    ambiguo y no se verifica nada automáticamente.
+    """
+    from app.services.company_identity_verification import names_compatible
+
+    candidates = list(
+        db.scalars(
+            select(Company).where(
+                (Company.ticker == ticker) | (Company.ticker.like(f"{ticker}.%"))
+            )
+        ).all()
+    )
+    for company in candidates:
+        if not names_compatible(company.name, verified_name):
+            return (
+                f"ticker_ambiguo: el maestro conoce {company.ticker} "
+                f"«{company.name}», que no coincide con la identidad SEC/proveedor"
+            )
+    return None
+
+
+async def _identity_lookup(ticker: str) -> tuple[dict | None, dict | None, str | None]:
+    """Las dos lecturas externas (SEC company_tickers, Finnhub profile2).
+
+    Sin efectos secundarios. Devuelve (entrada SEC, perfil proveedor, error de
+    proveedor); cualquier fuente caída deja su evidencia en None (fail closed).
+    """
+    from app.services.connectors.finnhub import FinnhubClient
+    from app.services.connectors.sec import SECClient
+
+    entry = None
+    try:
+        mapping = await SECClient().ticker_map()
+        for item in mapping.values():
+            if isinstance(item, dict) and str(item.get("ticker", "")).upper() == ticker:
+                entry = item
+                break
+    except Exception:  # noqa: BLE001 - la SEC caída no puede verificar: fail closed
+        logger.warning("identity-verification: SEC no disponible para %s", ticker, exc_info=True)
+    profile = None
+    error = None
+    finnhub = FinnhubClient()
+    if not finnhub.configured():
+        error = "proveedor_no_configurado"
+    else:
+        try:
+            profile = await finnhub.profile(ticker)
+        except Exception:  # noqa: BLE001 - proveedor caído: fail closed
+            error = "proveedor_no_disponible"
+            logger.warning("identity-verification: Finnhub no disponible para %s", ticker, exc_info=True)
+    return entry, profile, error
+
+
+def _identity_verdict(db: Session, ticker: str) -> tuple[IdentityVerificationResponse, Company | None]:
+    """Veredicto de doble coincidencia + homónimos. SOLO LECTURA: nunca escribe.
+
+    Devuelve (respuesta, compañía existente o None). La creación queda para
+    el POST explícito.
+    """
+    from app.services.company_identity_verification import compare_identities
+
+    existing = resolve_company(db, ticker)
+    if existing is not None:
+        return (
+            IdentityVerificationResponse(
+                ticker=ticker, verified=True, already_in_master=True,
+                reasons=["ya_en_maestro: la ficha ya existía"],
+                company=CompanyOut.model_validate(existing),
+            ),
+            existing,
+        )
+
+    sec_entry, provider_profile, provider_error = run_from_any_context(_identity_lookup(ticker))
+    verdict = compare_identities(ticker, sec_entry, provider_profile)
+    reasons = list(verdict.reasons)
+    if provider_error and provider_profile is None:
+        reasons = [provider_error if r.startswith("proveedor_sin_perfil") else r for r in reasons]
+
+    if verdict.verified and verdict.sec is not None:
+        conflict = _homonym_conflict(db, ticker, verdict.sec["name"])
+        if conflict is not None:
+            reasons.append(conflict)
+            return (
+                IdentityVerificationResponse(
+                    ticker=ticker, verified=False, reasons=reasons,
+                    sec=verdict.sec, provider=verdict.provider,
+                ),
+                None,
+            )
+
+    return (
+        IdentityVerificationResponse(
+            ticker=ticker, verified=verdict.verified, reasons=reasons,
+            sec=verdict.sec, provider=verdict.provider,
+        ),
+        None,
+    )
+
+
+@router.get("/identity-verification", response_model=IdentityVerificationResponse)
+def get_identity_verification(
+    ticker: Annotated[str, Query(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")],
+    db: Session = Depends(get_db),
+) -> IdentityVerificationResponse:
+    """Veredicto de identidad de un ticker fuera del maestro. SOLO LECTURA.
+
+    Lo usa el render de /research/<ticker>: una petición GET de página jamás
+    crea una ficha; la creación exige el POST (acción explícita del usuario).
+    """
+    response, _ = _identity_verdict(db, ticker.strip().upper())
+    return response
+
+
+@router.post("/verify-identity", response_model=IdentityVerificationResponse)
+def verify_identity(payload: IdentityVerificationRequest, db: Session = Depends(get_db)) -> IdentityVerificationResponse:
+    """Crea la ficha stub SOLO con doble coincidencia SEC + proveedor verificada.
+
+    Repite la comprobación completa (nunca confía en una verificación previa):
+    ticker exacto y razón social compatible en SEC y proveedor, bolsa de
+    EE. UU. y divisa declaradas por el proveedor, y sin homónimo con otra
+    identidad en el maestro. La ficha creada lleva la procedencia etiquetada
+    («identity:sec+finnhub»). Sin doble coincidencia no crea nada.
+    """
+    from app.services.company_identity_verification import compare_identities  # noqa: F401 - documenta la regla
+
+    ticker = payload.ticker.strip().upper()
+    response, existing = _identity_verdict(db, ticker)
+    if not response.verified or existing is not None:
+        return response
+
+    # Doble coincidencia verificada: la identidad se crea con procedencia
+    # etiquetada. Nombre = razón social SEC (registro oficial); bolsa, divisa
+    # y país salen SIEMPRE de la evidencia del proveedor (sin valores por
+    # defecto: el comparador ya rechazó el veredicto si faltan).
+    assert response.sec is not None and response.provider is not None
+    company = Company(
+        ticker=ticker,
+        name=response.sec["name"].strip() or response.provider["name"].strip(),
+        exchange=response.provider["exchange"].strip().upper(),
+        currency=response.provider["currency"].strip().upper(),
+        sector="Unknown",
+        industry="Unknown",
+        cik=str(response.sec["cik"]).zfill(10),
+        domicile_country=response.provider["country"] or None,
+        company_type="research_candidate",
+        valuation_model="unassigned",
+        special_sources=["identity:sec+finnhub"],
+        special_risks=[],
+        factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    db.refresh(company)
+    response.company = CompanyOut.model_validate(company)
+    return response
+
+
 @router.get("", response_model=list[CompanyOut])
 def list_companies(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,

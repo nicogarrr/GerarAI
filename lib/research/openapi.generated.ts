@@ -555,6 +555,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/identity-verification": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Identity Verification
+         * @description Veredicto de identidad de un ticker fuera del maestro. SOLO LECTURA.
+         *
+         *     Lo usa el render de /research/<ticker>: una petición GET de página jamás
+         *     crea una ficha; la creación exige el POST (acción explícita del usuario).
+         */
+        get: operations["get_identity_verification_api_companies_identity_verification_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/snapshots": {
         parameters: {
             query?: never;
@@ -603,6 +626,32 @@ export interface paths {
         get: operations["thesis_tickers_api_companies_thesis_tickers_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/verify-identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Identity
+         * @description Crea la ficha stub SOLO con doble coincidencia SEC + proveedor verificada.
+         *
+         *     Repite la comprobación completa (nunca confía en una verificación previa):
+         *     ticker exacto y razón social compatible en SEC y proveedor, bolsa de
+         *     EE. UU. y divisa declaradas por el proveedor, y sin homónimo con otra
+         *     identidad en el maestro. La ficha creada lleva la procedencia etiquetada
+         *     («identity:sec+finnhub»). Sin doble coincidencia no crea nada.
+         */
+        post: operations["verify_identity_api_companies_verify_identity_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7847,6 +7896,37 @@ export interface components {
             /** Xml */
             xml: string;
         };
+        /** IdentityVerificationRequest */
+        IdentityVerificationRequest: {
+            /** Ticker */
+            ticker: string;
+        };
+        /** IdentityVerificationResponse */
+        IdentityVerificationResponse: {
+            /**
+             * Already In Master
+             * @default false
+             */
+            already_in_master: boolean;
+            company?: components["schemas"]["CompanyOut"] | null;
+            /** Provider */
+            provider?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Reasons
+             * @default []
+             */
+            reasons: string[];
+            /** Sec */
+            sec?: {
+                [key: string]: unknown;
+            } | null;
+            /** Ticker */
+            ticker: string;
+            /** Verified */
+            verified: boolean;
+        };
         /** ImageInput */
         ImageInput: {
             /** Image Base64 */
@@ -11056,6 +11136,46 @@ export interface operations {
             };
         };
     };
+    get_identity_verification_api_companies_identity_verification_get: {
+        parameters: {
+            query: {
+                ticker: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityVerificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     company_snapshots_batch_api_companies_snapshots_get: {
         parameters: {
             query: {
@@ -11121,6 +11241,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ThesisTickersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_identity_api_companies_verify_identity_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IdentityVerificationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityVerificationResponse"];
                 };
             };
             /** @description Validation Error */
