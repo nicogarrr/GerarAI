@@ -8,6 +8,8 @@ import type { HomeAttentionState } from '@/lib/overview/home-attention';
 import { formatMarketDate } from '@/lib/format';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
+import { changeHeadlineCopy } from '@/lib/research/change-copy';
+
 const PAGE_SIZE = 5;
 const DIRECTIONS: Record<string, string> = { positive: 'Mejora de tesis', negative: 'Deterioro de tesis', neutral: 'Cambio de tesis' };
 
@@ -24,10 +26,10 @@ export default function HomeAttention() {
     }, [retry]);
     const items = [
         ...(data?.thesis.items ?? []).map(item => ({ key: `thesis-${item.id}`, symbol: item.symbol,
-            title: DIRECTIONS[item.direction] ?? 'Cambio de tesis', detail: item.summary,
+            title: DIRECTIONS[item.direction] ?? 'Cambio de tesis', detail: changeHeadlineCopy(item.summary).text, detailNote: changeHeadlineCopy(item.summary).note,
             note: `Revisión pendiente · ${formatMarketDate(item.createdAt)}`, href: `/research/${encodeURIComponent(item.symbol)}?view=changes#thesis-change-${item.id}`, cta: 'Revisar cambio' })),
         ...(data?.dca.items ?? []).map(item => ({ key: item.id, symbol: item.symbol, title: `Nivel DCA ${item.level}X`,
-            detail: item.inPortfolio ? 'Revisar la aportación a tu posición.' : 'Valorar una entrada, después de revisar la tesis.',
+            detailNote: null, detail: item.inPortfolio ? 'Revisar la aportación a tu posición.' : 'Valorar una entrada, después de revisar la tesis.',
             note: `Desde ${item.threshold}X · Cierre ${formatMarketDate(item.signalDate)}${item.forming ? ' · Mes en formación' : ' · Confirmado'}`,
             href: `/research/${encodeURIComponent(item.symbol)}?view=thesis`, cta: 'Revisar tesis' })),
     ];
@@ -54,6 +56,7 @@ export default function HomeAttention() {
                     {items.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE).map(item => <li key={item.key} className="rounded-lg border border-gray-700 bg-gray-900/40 p-3">
                         <div className="flex flex-wrap items-center gap-2"><span className="font-semibold text-white">{item.symbol}</span><span className="rounded border border-teal-800 px-2 py-0.5 text-xs text-teal-200">{item.title}</span></div>
                         <p className="mt-2 break-words text-sm leading-relaxed text-gray-300">{item.detail}</p>
+                        {item.detailNote ? <p className="mt-1 text-xs text-amber-300">{item.detailNote}</p> : null}
                         <p className="mt-2 text-xs text-gray-400">{item.note}</p>
                         <Link aria-label={`${item.cta} de ${item.symbol}`} href={item.href} className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm text-teal-300 hover:underline">{item.cta}<span className="sr-only">{' '}de {item.symbol}</span><ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
                     </li>)}
