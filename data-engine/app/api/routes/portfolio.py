@@ -162,19 +162,21 @@ def _holding_as_of(db: Session, rows) -> dict[int, date]:
 
 MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
 MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+MAX_NUMERIC_20_4 = Decimal("9999999999999999.9999")
+MIN_NUMERIC_20_4 = Decimal("0.0001")
 MIN_NUMERIC_20_6 = Decimal("0.000001")
 
 
 class PortfolioTransactionInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
     action: Literal["buy", "sell", "dividend", "interest", "fee", "cash_misc"]
-    # Topes = lo que cabe en Transaction (Numeric(20, 6) / Numeric(20, 2)).
+    # Topes = lo que cabe en Transaction (Numeric(20, 6) / Numeric(20, 4) en fees).
     # Sin ellos, "1e400" pasaba la validación, se guardaba como precio nulo y
     # cada transacción posterior del ticker daba 500 al recalcular la posición.
     quantity: Decimal = Field(ge=0, le=MAX_NUMERIC_20_6)
     price: Decimal = Field(ge=0, le=MAX_NUMERIC_20_6)
     trade_date: date
-    fees: Decimal = Field(default=Decimal("0"), ge=0, le=MAX_NUMERIC_20_2)
+    fees: Decimal = Field(default=Decimal("0"), ge=0, le=MAX_NUMERIC_20_4)
     currency: str = Field(default="USD", min_length=3, max_length=10)
     notes: str | None = Field(default=None, max_length=2000)
 
@@ -185,6 +187,15 @@ class PortfolioTransactionInput(BaseModel):
         # el libro como 0, una compra de cero acciones o a precio cero.
         if value > 0 and value.quantize(MIN_NUMERIC_20_6, rounding=ROUND_HALF_EVEN) == 0:
             raise ValueError("must be at least 0.000001 (6 decimal places)")
+        return value
+
+    @field_validator("fees")
+    @classmethod
+    def _fees_fit_four_decimals(cls, value: Decimal) -> Decimal:
+        # La columna guarda 4 decimales (comisiones IBKR tipo 0,355): mas
+        # decimales se redondearian en silencio al guardar.
+        if value != value.quantize(MIN_NUMERIC_20_4, rounding=ROUND_HALF_EVEN):
+            raise ValueError("fees allow at most 4 decimal places")
         return value
 
     @field_validator("trade_date")
