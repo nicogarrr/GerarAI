@@ -72,3 +72,33 @@ def test_filter_covers_existing_httpx_handler_path() -> None:
         logger.setLevel(previous)
     assert FAKE not in stream.getvalue()
     assert "apikey=[REDACTED]" in stream.getvalue()
+
+
+def test_query_param_provider_variants_are_redacted() -> None:
+    """Regresion: params frecuentes de proveedores que antes quedaban en claro.
+
+    ``access_key`` (p. ej. marketstack/ipstack) y ``api_token`` (p. ej. eodhd)
+    contienen ``key``/``token`` tras ``_``, y ``\\b`` no corta entre dos
+    caracteres de palabra, asi que el patron generico no los alcanzaba y la
+    clave quedaba legible en la URL que imprime httpx.
+    """
+    logger, out = _logger()
+    logger.info("GET https://m.test/v1/quotes?access_key=%s&symbols=AAPL", FAKE)
+    logger.info("GET https://e.test/api/fundamentals/AAPL?api_token=%s&fmt=json", FAKE)
+    logger.info("GET https://a.test/v2?auth_token=%s", FAKE)
+    logger.info("GET https://p.test/v3?private_token=%s", FAKE)
+    logger.info("GET https://k.test/v4?app_key=%s", FAKE)
+    text = out.getvalue()
+    assert FAKE not in text
+    assert "access_key=[REDACTED]" in text
+    assert "api_token=[REDACTED]" in text
+    assert "symbols=AAPL" in text and "fmt=json" in text
+
+
+def test_redact_plain_covers_provider_variants() -> None:
+    for param in ("access_key", "api_token", "auth_token", "private_token", "app_key"):
+        leaked = f"https://x.test/q?{param}={FAKE}&limit=5"
+        out = redact(leaked)
+        assert FAKE not in out, param
+        assert f"{param}=[REDACTED]" in out, param
+        assert "limit=5" in out, param

@@ -13,7 +13,8 @@ import logging
 import re
 
 _SECRET_KEYS = (
-    "apikey", "api_key", "api-key", "key", "token", "access_token", "refresh_token",
+    "apikey", "api_key", "api-key", "api_token", "key", "token", "access_token",
+    "access_key", "auth_token", "refresh_token", "private_token", "app_key",
     "auth", "authorization", "secret", "client_secret", "password", "passwd", "pwd",
     "signature", "sig", "x-api-key", "x-auth-token",
 )
