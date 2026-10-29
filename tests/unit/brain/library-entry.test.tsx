@@ -24,5 +24,7 @@ it('one embedded region, no modal, close, trigger, focus trap or body lock',asyn
 });
 
 it('does not emit a portal target in SSR before the page has hydrated',()=>{
- expect(renderToString(<LibraryChat scope="library"/>)).toBe('');
+ // El SSR trae solo el contenedor con el alto reservado y el esqueleto (CLS),
+ // nunca el hueco del portal.
+ expect(renderToString(<LibraryChat scope="library"/>)).not.toContain('brain-library-slot');
 });
