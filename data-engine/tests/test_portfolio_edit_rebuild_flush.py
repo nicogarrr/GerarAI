@@ -69,7 +69,8 @@ def test_cambiar_ticker_de_una_compra_ya_vendida_se_rechaza(monkeypatch):
     assert r.status_code == 201, r.text
 
     r = _req(client, tenant, user, "PUT", f"/api/portfolio/transactions/{tid}", {**buy, "ticker": new})
-    assert r.status_code == 400, r.text
+    # Vender mas de lo comprado: 409 como en POST (3f6ad58 alineo PUT con POST).
+    assert r.status_code == 409, r.text
 
     positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()
     assert {p["ticker"]: p["quantity"] for p in positions} == {old: 4.0}
@@ -89,7 +90,7 @@ def test_mover_la_compra_despues_de_su_venta_se_rechaza(monkeypatch):
 
     r = _req(client, tenant, user, "PUT", f"/api/portfolio/transactions/{tid}",
              {**buy, "trade_date": "2025-07-10"})
-    assert r.status_code == 400, r.text
+    assert r.status_code == 409, r.text
 
     transactions = _req(client, tenant, user, "GET", "/api/portfolio/transactions").json()
     stored = next(t for t in transactions if t["id"] == tid)
