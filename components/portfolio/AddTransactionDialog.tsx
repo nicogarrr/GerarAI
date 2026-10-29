@@ -142,6 +142,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
                   setFormData({ ...formData, symbol: '', companyName: '' });
                 }
               }}
+              initialSelectedValue={initialSymbol}
               onSelect={(stock) => {
                 setFormData((prev) => ({
                   ...prev,

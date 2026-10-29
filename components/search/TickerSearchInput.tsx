@@ -30,6 +30,10 @@ interface TickerSearchInputProps {
     maxLength?: number;
     ariaLabel?: string;
     onBlur?: () => void;
+    /** Valor ya seleccionado al montar (p. ej. alta con acción predefinida
+     *  desde la watchlist): evita disparar una búsqueda inicial con el
+     *  valor prefijado; al editar el input la búsqueda funciona igual. */
+    initialSelectedValue?: string;
     /** Dirección fija del desplegable. Con 'bottom' la lista abre SIEMPRE
      *  hacia abajo (Nico, 21-oct-2026: la vio abrirse hacia arriba con el
      *  teclado del iPhone) y su altura se mide contra el espacio real bajo
@@ -49,12 +53,12 @@ interface TickerSearchInputProps {
  *  (F215), debounce de 300 ms y deadline de 6 s (patrón de la watchlist).
  *  El dropdown usa el Popover existente con portal y colisiones: se superpone
  *  al contenido sin quedar recortado por el scroll de un diálogo. */
-export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide }: TickerSearchInputProps) {
+export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide, initialSelectedValue }: TickerSearchInputProps) {
     const [localValue, setLocalValue] = useState(defaultValue);
     const value = controlledValue ?? localValue;
     const update = (next: string) => { setLocalValue(next); onValueChange?.(next); };
     const listId = useId();
-    const selected = useRef<string | null>(null);
+    const selected = useRef<string | null>(initialSelectedValue ?? null);
     const focused = useRef(false);
     const root = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState(-1);
