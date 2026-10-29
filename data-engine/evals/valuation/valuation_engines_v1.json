@@ -620,8 +620,8 @@
         "closed_form": {
           "bear_value": 47.8809646122,
           "base_value": 104.287894612,
-          "bull_value": 158.532771088,
-          "expected_value": 110.416285563
+          "bull_value": 176.36974565379788,
+          "expected_value": 114.8957920077723
         }
       },
       "applies_to": [
@@ -640,7 +640,7 @@
       ],
       "price": 60,
       "wacc": 0.09,
-      "hand_calculation": "margen 0.62 > techo 0.50: el motor acota a 0.50 y lo deja escrito en trace.fcf_margin_clamped_from. base=104.287895 con margen 0.50, no 0.62."
+      "hand_calculation": "margen 0.62 > techo 0.50: el motor acota a 0.50 y lo deja escrito en trace.fcf_margin_clamped_from. base=104.287895 con margen 0.50, no 0.62. Contrato monotono corregido #3008: bull conserva margen 0.50 (nunca baja al antiguo techo0.45), crecimiento0.16/WACC0.08/g terminal0.03. Forma cerrada independiente: EV=sum(2000*1.16^t*0.50/1.08^t,t=1..5)+(2000*1.16^5*0.50*1.03/(0.08-0.03))/1.08^5; (EV-400)/200=176.369745653. Pesos bear/base/bull0.132864/0.616/0.251136: esperado114.895792008."
     },
     {
       "id": "evdcf13_negative_control_wrong_status",
