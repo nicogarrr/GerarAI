@@ -21,7 +21,9 @@ export function alertCardCopy(alert: TriggeredAlertDelivery): { heading: string;
       heading: `${title}${suffix}`,
       summary: alert.alert_type === 'daily_digest'
         ? 'Resumen diario de tu cartera; abre el detalle para ver la cobertura de datos.'
-        : 'Alerta sin empresa asociada.',
+        : alert.alert_type === 'macro_event'
+          ? 'Recordatorio del calendario macro oficial; el detalle indica la fuente y la hora.'
+          : 'Alerta sin empresa asociada.',
       technical: `${alert.title}\n${alert.message}`,
     };
   }

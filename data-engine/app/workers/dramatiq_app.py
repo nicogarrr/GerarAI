@@ -3490,6 +3490,53 @@ def dispatch_insider_alerts(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
+def dispatch_macro_reminders(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Recordatorios T-24 h / T-1 h del calendario macro oficial (FOMC, BLS).
+
+    Persiste la alerta una vez por evento y ventana y la despacha por los
+    canales con consentimiento. Fuente caida: no emite nada, nunca inventa.
+    """
+    actor_name = "dispatch_macro_reminders"
+    db = None
+    lease = None
+    try:
+        from datetime import timedelta
+
+        from app.services import macro_calendar_service
+        from app.services.macro_reminders import emit_macro_reminders
+        from app.services.outbound_alerts import dispatch_pending
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(
+            f"dispatch_macro_reminders:{tenant_id}", ttl_seconds=300, redis_url=_lease_redis_url(),
+        )
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        today = datetime.now(UTC).date()
+        calendar = _run(macro_calendar_service.get_macro_events(today - timedelta(days=1),
+                                                               today + timedelta(days=3)))
+        if calendar["status"] == "unavailable":
+            return {"status": "skipped", "actor": actor_name, "reason": "source_unavailable"}
+        stats = emit_macro_reminders(db, calendar["events"])
+        pending = dispatch_pending(db)
+        return {"status": "ok", "actor": actor_name, "calendar_status": calendar["status"],
+                "created": stats["created"], "existing": stats["existing"],
+                "redispatched": pending["redispatched"], "errors": pending["errors"][:20]}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(f"dispatch_macro_reminders:{tenant_id}", lease, redis_url=_lease_redis_url())
+        if db is not None:
+            db.close()
+
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name=ALERT_QUEUE_NAME)
 def reconcile_alert_deliveries(
     tenant_id: int | None = None,

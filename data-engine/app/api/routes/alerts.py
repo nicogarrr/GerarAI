@@ -418,7 +418,7 @@ class TelegramSubscriptionIn(BaseModel):
 
 
 class TelegramSubscriptionOut(BaseModel):
-    event_type: Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels"]
+    event_type: Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event"]
     enabled: bool
     chat_id: str | None = None
 
@@ -440,7 +440,7 @@ def list_telegram_subscriptions(db: Session = Depends(get_db)) -> list[dict]:
 
 @router.put("/telegram-subscriptions/{event_type}", response_model=TelegramSubscriptionOut)
 def set_telegram_subscription(
-    event_type: Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels"],
+    event_type: Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event"],
     payload: TelegramSubscriptionIn,
     db: Session = Depends(get_db),
 ) -> dict:
