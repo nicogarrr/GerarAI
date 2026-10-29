@@ -4,6 +4,7 @@ import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
 import BrainAskForm from '@/components/research/BrainAskForm';
 import LegacyChatRedirect from '@/components/research/LegacyChatRedirect';
+import { ResearchHashScroll } from '@/components/research/ResearchHashScroll';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText } from '@/lib/research/change-copy';
@@ -1742,6 +1743,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
 
   return (
     <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
+      {/* Llegar con ancla (#thesis-change-… desde Inicio, #diario-decisiones):
+          el App Router no reintenta el scroll cuando el destino aún no existe
+          (Suspense/datos async); este componente sí. */}
+      <Suspense fallback={null}><ResearchHashScroll /></Suspense>
       <div className="mx-auto max-w-[1600px]">
         {/* Desde md las migas ya llevan a Research: la flecha solo queda en movil. */}
         <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
