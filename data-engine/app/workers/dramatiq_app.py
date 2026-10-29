@@ -2434,6 +2434,10 @@ def refresh_rss_feeds(
                         db,
                         result,
                         ticker=feed.ticker,
+                        news_lane=feed.lane,
+                        # Feeds de carril (gobierno): sin vínculo a empresa,
+                        # fail-closed como el carril macro.
+                        detect_company=feed.lane is None,
                     )
                     if result.status != "error":
                         processed += 1
@@ -2687,7 +2691,11 @@ def refresh_ticker_news(
     """
     actor_name = "refresh_ticker_news"
     try:
-        from app.services.feed_ingestion_service import FeedIngestionService
+        from app.services.connectors import StockTwitsConnector
+        from app.services.feed_ingestion_service import (
+            SOCIAL_NEWS_LANE,
+            FeedIngestionService,
+        )
         from app.services.news_service import _ticker_evidence_level
         from app.services.ticker_news_lane import (
             PRIORITY_TICKERS,
@@ -2726,19 +2734,36 @@ def refresh_ticker_news(
                     lanes.append(("google-en", google_feed_url(company, lang="en")))
                     if company.ticker.upper() in PRIORITY_TICKERS:
                         lanes.append(("google-es", google_feed_url(company, lang="es")))
+                    # Conversación social (StockTwits, gratis sin clave): solo
+                    # empresas seguidas — el API pública limita por IP y el
+                    # universo completo agotaría la cuota. Mismo pacing 1,5 s.
+                    lanes.append(("stocktwits", ""))
                 return lanes
 
             def _fetch(company, lane, url):
+                if lane == "stocktwits":
+                    result = _run(StockTwitsConnector().poll(company.ticker, max_items=30))
+                    # La ingesta etiqueta el carril desde metadata del result.
+                    result.metadata["news_lane"] = SOCIAL_NEWS_LANE
+                    return result
                 result = _run(service.poll_rss(url, ticker=company.ticker, max_items=30))
                 if lane == "yahoo":
                     return label_yahoo(result, company, _ticker_evidence_level)
                 return label_google(result, company, _ticker_evidence_level)
 
+            def _ingest(company, part):
+                return service.ingest_news_result(
+                    db,
+                    part,
+                    ticker=company.ticker,
+                    news_lane=part.metadata.get("news_lane"),
+                )
+
             outcome = sweep(
                 companies,
                 _lanes,
                 _fetch,
-                lambda company, part: service.ingest_news_result(db, part, ticker=company.ticker),
+                _ingest,
                 deadline,
                 pause=lambda: time.sleep(1.5),
                 on_error=lambda: _rollback(db),

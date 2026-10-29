@@ -62,6 +62,14 @@ SOURCE_TIERS: dict[str, SourceTier] = {
         trust_score=0.38,
         policy="User-provided evidence or assumption. Keep it visible and confirm before material model changes.",
     ),
+    "tier_8_social": SourceTier(
+        key="tier_8_social",
+        label="Social media (unverified)",
+        rank=8,
+        trust_score=0.05,
+        policy="Social chatter, unverified. Context only: never feeds alerts, "
+        "story clusters, verified-source counts or materiality.",
+    ),
     "tier_unknown": SourceTier(
         key="tier_unknown",
         label="Unknown source",
@@ -105,6 +113,10 @@ SOURCE_TIER_BY_TYPE = {
     "fmp": "tier_5_data_provider",
     "finnhub": "tier_5_data_provider",
     "yahoo": "tier_5_data_provider",
+    # Redes sociales ingeridas por el conector dedicado (etiqueta exacta
+    # «StockTwits (social)»): ANTES de «stocktwits» a secas, que es el medio
+    # agregado que llega vía Google News RSS y sí es proveedor de datos.
+    "stocktwits social": "tier_8_social",
     # Medios financieros y agregadores habituales en la ingesta real (vía RSS
     # de Google News la URL es news.google.com, así que la cadena de la fuente
     # es la única señal). Auditoría 28-oct-2026: el 59 % de los eventos en
