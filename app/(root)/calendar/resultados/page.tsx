@@ -26,16 +26,16 @@ function todayInMadrid(): string {
 }
 
 export default async function FollowedEarningsPage() {
+    const today = todayInMadrid();
     let calendar: FollowedEarningsCalendar;
     try {
-        calendar = await getFollowedEarnings({ desde: addDays(todayInMadrid(), -HISTORY_DAYS), hasta: addDays(todayInMadrid(), 60) });
+        calendar = await getFollowedEarnings({ desde: addDays(today, -HISTORY_DAYS), hasta: addDays(today, 60) });
     } catch (error) {
         if (isBackendUnavailableError(error)) {
             return <BackendOffline feature="Calendario de resultados" retryHref="/calendar/resultados" />;
         }
         throw error;
     }
-    const today = todayInMadrid();
     // Material de la SEC de resultados ya publicados: promesa que nunca rechaza (la acción traga fallos); cada fila la espera
     // dentro de Suspense, asi la pagina sale al instante y un fallo de tercero no la rompe.
     const materialsPromise: Promise<Record<string, EventMaterials>> = getEarningsMaterials();

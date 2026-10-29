@@ -44,7 +44,12 @@ export default async function InsiderPage({ searchParams }: PageProps) {
     const side = lado === 'buy' || lado === 'sell' ? lado : 'all';
     const days = [30, 365].includes(Number(dias)) ? Number(dias) : 90;
     const ticker = rawTicker?.trim().toUpperCase() || null;
-    const retryHref = ticker ? `/insider?ticker=${encodeURIComponent(ticker)}` : '/insider';
+    const params = new URLSearchParams();
+    if (ticker) params.set('ticker', ticker);
+    if (lado) params.set('lado', lado);
+    if (dias) params.set('dias', dias);
+    const queryString = params.toString();
+    const retryHref = queryString ? `/insider?${queryString}` : '/insider';
     let signals: InsiderSignalsResult | null = null;
     let filings: InsiderFilingsResult | null = null;
     let feed: InsiderFeedResult | null = null;
@@ -65,16 +70,23 @@ export default async function InsiderPage({ searchParams }: PageProps) {
     if (!ticker) {
         // Feed y agregado por empresa son lecturas independientes: que una
         // falle no puede tumbar la otra (estado honesto por seccion).
+        let feedError: unknown = null;
+        let opsError: unknown = null;
         [feed, operations] = await Promise.all([
             getInsiderFeed(side, days).catch((error) => {
                 if (isAuthError(error)) throw error;
+                feedError = error;
                 return null;
             }),
             getInsiderOperations(365).catch((error) => {
                 if (isAuthError(error)) throw error;
+                opsError = error;
                 return null;
             }),
         ]);
+        if (isBackendUnavailableError(feedError) && isBackendUnavailableError(opsError)) {
+            return <BackendOffline feature="Señales Insider" retryHref={retryHref} />;
+        }
     }
 
     return (
