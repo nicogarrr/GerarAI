@@ -87,8 +87,8 @@ def test_breaker_expires_and_probes_again():
         asyncio.run(provider.complete(_request()))
     assert provider.calls == 1
     # Cooldown expirado: la siguiente llamada es una sonda real.
-    key = ("opencode-go", "deepseek-v1.1-flash")
-    llm_base._free_quota_breaker[key] = time.monotonic() - 1
+    for key in list(llm_base._free_quota_breaker):
+        llm_base._free_quota_breaker[key] = time.monotonic() - 1
     with pytest.raises(ProviderHTTPError):
         asyncio.run(provider.complete(_request()))
     assert provider.calls == 2
@@ -105,3 +105,42 @@ def test_plain_429_rate_limit_keeps_retries_and_sets_no_breaker():
     with pytest.raises(ProviderHTTPError):
         asyncio.run(provider.complete(_request()))
     assert provider.calls == 2 * (1 + 2)
+
+
+
+class _KeyedStubProvider(_StubProvider):
+    """Mismo proveedor y modelo, distinta credencial (clave del tenant vs plataforma)."""
+
+    def __init__(self, body: str, api_key: str, status: int = 429):
+        super().__init__(body, status)
+        self._auth = {"Authorization": f"Bearer {api_key}"}
+
+    async def complete(self, request: LLMRequest):
+        return await self._post_json(
+            "https://opencode.test/v1/chat/completions",
+            headers=self._auth,
+            payload={"model": "deepseek-v1.1-flash"},
+        )
+
+
+def test_quota_breaker_is_per_credential_not_shared_across_keys():
+    """La cuota agotada es de UNA clave: no puede bloquear otra clave del mismo proveedor.
+
+    Un tenant con su propia clave (billing_scope tenant) agotada no debe
+    dejar 120 s sin LLM a la plataforma ni a otros tenants con el mismo
+    proveedor y modelo, ni al reves.
+    """
+    exhausted = _KeyedStubProvider("weekly exhausted", api_key="sk-tenant-a-000000")
+    with pytest.raises(ProviderHTTPError):
+        asyncio.run(exhausted.complete(_request()))
+    assert exhausted.calls == 1
+    healthy = _KeyedStubProvider("ok", api_key="sk-platform-111111", status=200)
+    response = asyncio.run(healthy.complete(_request()))
+    assert response.status_code == 200
+    assert healthy.calls == 1
+    # La clave agotada sigue en cooldown.
+    with pytest.raises(ProviderHTTPError):
+        asyncio.run(exhausted.complete(_request()))
+    assert exhausted.calls == 1
+    # Ninguna clave en claro en el estado del breaker.
+    assert "sk-tenant-a" not in repr(llm_base._free_quota_breaker)
