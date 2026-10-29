@@ -126,6 +126,40 @@ def _fiscal_info_batch(
     return result
 
 
+def _holding_as_of(db: Session, rows) -> dict[int, date]:
+    """Fecha hasta la que se cuenta la antigüedad de cada posición.
+
+    Abierta (cantidad > 0): hasta HOY (Europe/Madrid), no hasta el último
+    precio/snapshot: sin cotización reciente ``as_of`` quedaba en la fecha de
+    compra y una posición de 2 años salía «Corto plazo · 0d». Cerrada
+    (cantidad <= 0): hasta la última venta (fecha de cierre), o ``as_of`` si
+    no hay ventas registradas.
+    """
+    today = local_today()
+    result: dict[int, date] = {}
+    closed: dict[int, date] = {}
+    for position, company in rows:
+        if position.quantity is not None and position.quantity > 0:
+            result[company.id] = today
+        else:
+            closed[company.id] = position.as_of
+    if closed:
+        last_sells = dict(
+            db.execute(
+                select(Transaction.company_id, func.max(Transaction.trade_date))
+                .where(
+                    Transaction.company_id.in_(set(closed)),
+                    Transaction.action == "sell",
+                    *tenant_filters(db, Transaction),
+                )
+                .group_by(Transaction.company_id)
+            ).all()
+        )
+        for company_id, as_of in closed.items():
+            result[company_id] = last_sells.get(company_id) or as_of
+    return result
+
+
 MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
 MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
 MIN_NUMERIC_20_6 = Decimal("0.000001")
@@ -475,16 +509,14 @@ def positions(
         .limit(limit)
         .offset(offset)
     ).all()
-    fiscal = _fiscal_info_batch(
-        db, {company.id: position.as_of for position, company in rows}
-    )
+    fiscal = _fiscal_info_batch(db, _holding_as_of(db, rows))
     analysis_states = tracked_statuses(db, [company.ticker for _, company in rows])
     from app.services.ibkr_cost_reconciliation import mask_cost_under_review, reconcile_ibkr_costs
 
     cost_checks = reconcile_ibkr_costs(db, [position for position, _ in rows])
     payloads = []
     for position, company in rows:
-        fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, position.as_of)
+        fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, local_today())
         # nosemgrep: gerarai-money-none-to-zero -- comparacion booleana: None no es coste conocido, igual que 0
         has_cost = position.average_cost > 0 and (position.cost_basis_base or 0) > 0
         held = bool(position.valuation_hold_reason)
