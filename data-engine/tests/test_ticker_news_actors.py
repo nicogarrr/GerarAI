@@ -44,17 +44,6 @@ class _FakeService:
         return {"created": 0}
 
 
-class _FakeStockTwits:
-    """Carril social de #2975: nunca red real en tests."""
-
-    def __init__(self, service: _FakeService) -> None:
-        self.service = service
-
-    async def poll(self, ticker, max_items=30):
-        self.service.polled.append((ticker, "stocktwits"))
-        return ConnectorResult(source="stocktwits", items=[])
-
-
 def _co(cid, ticker, exchange="NASDAQ", name=None):
     return SimpleNamespace(id=cid, ticker=ticker, exchange=exchange, name=name or f"{ticker} Inc")
 
@@ -69,9 +58,6 @@ def env(monkeypatch):
     monkeypatch.setattr(dramatiq_app.time, "sleep", lambda s: None)
     monkeypatch.setattr(
         "app.services.feed_ingestion_service.FeedIngestionService", lambda: service
-    )
-    monkeypatch.setattr(
-        "app.services.connectors.StockTwitsConnector", lambda: _FakeStockTwits(service)
     )
     return service
 
@@ -92,10 +78,10 @@ def test_refresh_ticker_news_tracked_prioritises_and_uses_lanes(env, monkeypatch
     tickers = [t for t, _ in env.polled]
     assert tickers[0] == "ASTS"  # prioritaria primero
     urls = [u for t, u in env.polled if t == "ASTS"]
-    assert len(urls) == 4  # yahoo + google en + google es + stocktwits
-    assert len([u for t, u in env.polled if t == "ZZZ"]) == 3  # sin es
-    assert out["feeds_processed"] == 7
-    assert [t for t, u in env.polled if u == "stocktwits"] == ["ASTS", "ZZZ"]
+    assert len(urls) == 3  # yahoo + google en + google es
+    assert len([u for t, u in env.polled if t == "ZZZ"]) == 2  # sin es
+    assert out["feeds_processed"] == 5
+    assert all("stocktwits" not in url for _, url in env.polled)
 
 
 def test_refresh_ticker_news_all_is_yahoo_us_only(env, monkeypatch):
@@ -111,8 +97,8 @@ def test_refresh_ticker_news_single_ticker_adds_google(env, monkeypatch):
         dramatiq_app, "_companies", lambda db, ticker=None: [_co(1, "SPCX")]
     )
     out = _fn("refresh_ticker_news")(tenant_id=1, user_id="u", ticker="SPCX")
-    assert len(env.polled) == 4  # yahoo + google en + google es + stocktwits
-    assert out["feeds_processed"] == 4
+    assert len(env.polled) == 3  # yahoo + google en + google es
+    assert out["feeds_processed"] == 3
     assert out["status"] == "ok"
 
 

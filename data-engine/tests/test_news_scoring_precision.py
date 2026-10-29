@@ -140,8 +140,8 @@ def test_social_source_materiality_is_capped():
         None,
         None,
         "$ACME bankruptcy filing imminent, trust me",
-        "StockTwits (social)",
-        "https://stocktwits.com/user/message/1",
+        "Social conversation",
+        "https://social.example/user/message/1",
     )
     assert assessment.source_tier == "tier_8_social"
     assert assessment.materiality_score <= 2

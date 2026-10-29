@@ -296,7 +296,7 @@ class MaterialityService:
             except Exception:  # noqa: BLE001 — Jev es best-effort, nunca rompe ingesta
                 pass
 
-        # Redes sociales (tier_8_social, p. ej. StockTwits): conversación sin
+        # Redes sociales (tier_8_social, conversación pública): conversación sin
         # verificar. Nunca material: techo duro por debajo del umbral de
         # revisión, fuera de cualquier conteo de fuentes verificadas.
         if source_tier.key == "tier_8_social" and materiality > SOCIAL_NEWS_MAX_MATERIALITY:

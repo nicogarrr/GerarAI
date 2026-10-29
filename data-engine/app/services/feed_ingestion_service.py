@@ -115,12 +115,6 @@ PRESS_WIRE_SOURCES: frozenset[str] = frozenset(
 # disparan alertas de noticias seguidas.
 GOV_NEWS_LANE = "gobierno"
 
-# Carril «social»: publicaciones de StockTwits por ticker (conector dedicado,
-# app/services/connectors/stocktwits.py). Con empresa vinculada por el propio
-# stream, pero conversación sin verificar: tier_8_social, sin materialidad,
-# sin alertas (conector fuera del allowlist) y sin clústeres de historia.
-SOCIAL_NEWS_LANE = "social"
-
 GOV_RSS_FEEDS: tuple[RSSFeed, ...] = (
     RSSFeed("https://www.federalreserve.gov/feeds/press_all.xml", label="Reserva Federal (oficial)", lane=GOV_NEWS_LANE),
     RSSFeed("https://www.ecb.europa.eu/rss/press.html", label="BCE (oficial)", lane=GOV_NEWS_LANE),

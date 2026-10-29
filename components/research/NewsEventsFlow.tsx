@@ -16,7 +16,6 @@ const CARRILES = [
   { key: 'empresa', label: 'Empresas' },
   { key: 'gobierno', label: 'Gobierno' },
   { key: 'macro', label: 'Macro' },
-  { key: 'social', label: 'Social' },
 ] as const;
 
 function carrilHref(lane: NewsLane, ticker?: string | null): string {
@@ -185,18 +184,6 @@ function GobiernoChip({ event }: { event: ResearchNewsEvent }) {
   );
 }
 
-function SocialChip({ event }: { event: ResearchNewsEvent }) {
-  if (event.news_lane !== 'social') return null;
-  return (
-    <span
-      className="rounded-full bg-fuchsia-950/60 px-2 py-0.5 text-xs font-semibold text-fuchsia-300"
-      title="Conversación de redes sociales (StockTwits). Sin verificar: no es una fuente contrastada."
-    >
-      social · sin verificar
-    </span>
-  );
-}
-
 function DateNotes({ event, inline = false }: { event: ResearchNewsEvent; inline?: boolean }) {
   const className = inline ? 'text-gray-500' : 'mt-1 text-xs text-gray-500';
   const Tag = inline ? 'span' : 'div';
@@ -319,7 +306,7 @@ export function NewsEventsFlow({
                 ) : null}
                 <MacroChip event={event} />
                 <GobiernoChip event={event} />
-                <SocialChip event={event} />
+
                 <CoverageChip event={event} />
                 <ImpactBadge direction={event.impact_direction} />
                 {event.requires_update ? (
@@ -374,11 +361,11 @@ export function NewsEventsFlow({
                         watchlistTickers={watchlistSet}
                       />
                     ) : null}
-                    {event.news_lane === 'macro' || event.news_lane === 'gobierno' || event.news_lane === 'social' ? (
+                    {event.news_lane === 'macro' || event.news_lane === 'gobierno' ? (
                       <div className="mt-1">
                         <MacroChip event={event} />
                         <GobiernoChip event={event} />
-                        <SocialChip event={event} />
+
                       </div>
                     ) : null}
                     <div className="mt-1">

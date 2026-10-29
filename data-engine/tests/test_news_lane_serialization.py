@@ -35,6 +35,14 @@ def test_news_events_serialize_macro_lane_and_theme():
                       metadata_={"connector": "gdelt", "date_source": "gdelt_first_seen",
                                  "news_lane": "macro", "macro_theme": "ormuz"}),
         ])
+        db.add_all([
+            NewsEvent(tenant_id=1, company_id=company.id, title="retired social post", source="Social conversation",
+                      url="https://social.example/message/1", date=NOW,
+                      metadata_={"news_lane": "social"}),
+            NewsEvent(tenant_id=1, company_id=None, title="official government release", source="Fed official",
+                      url="https://official.example/release/1", date=NOW,
+                      metadata_={"news_lane": "gobierno"}),
+        ])
         db.commit()
 
         app = FastAPI()
@@ -48,6 +56,12 @@ def test_news_events_serialize_macro_lane_and_theme():
         response = client.get("/api/news")
         assert response.status_code == 200, response.text
         rows = {row["title"]: row for row in response.json()}
+        assert "retired social post" not in rows
+        assert client.get("/api/news?lane=social").status_code == 422
+        assert {row["title"] for row in client.get("/api/news?lane=gobierno").json()} == {"official government release"}
+        assert "retired social post" not in {row["title"] for row in client.get("/api/news?ticker=ASTS").json()}
+        # Stored history is preserved, not deleted by the read path.
+        assert db.query(NewsEvent).filter(NewsEvent.title == "retired social post").count() == 1
         # evento de empresa: sin carril macro
         assert rows["company news"]["news_lane"] is None
         assert rows["company news"]["macro_theme"] is None

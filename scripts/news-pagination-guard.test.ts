@@ -29,11 +29,19 @@ test('el carril cambia de pagina conservando lane y la API acota limit/offset en
   assert.match(flow, /query\.set\('lane', lane\)/);
   assert.match(route, /Annotated\[int, Query\(ge=1, le=100\)\] = 100/);
   assert.match(route, /offset: Annotated\[int, Query\(ge=0\)\] = 0/);
-  assert.match(route, /lane: Literal\["empresa", "macro", "gobierno", "social"\]/);
+  assert.match(route, /lane: Literal\["empresa", "macro", "gobierno"\]/);
 });
 
 test('el móvil alcanza la siguiente página sin bajar treinta tarjetas',()=>{
  assert.match(readFileSync('lib/news-paging.ts','utf8'),/NEWS_PAGE_SIZE = 10/);
  assert.ok(flow.indexOf('<NewsPager label="Paginación"')<flow.indexOf('Filtrar por carril'));
  assert.match(flow,/label="Paginación inferior"/);
+});
+
+test('solo quedan carriles de fuentes: Gobierno se conserva y Social desaparece', () => {
+  assert.doesNotMatch(flow, /SocialChip|key: 'social'|StockTwits/);
+  assert.doesNotMatch(page, /query\.lane === 'social'/);
+  assert.doesNotMatch(actions, /lane === 'social'/);
+  assert.match(flow, /key: 'gobierno', label: 'Gobierno'/);
+  assert.match(route, /retired_lane != "social"/);
 });

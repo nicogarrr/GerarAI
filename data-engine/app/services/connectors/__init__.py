@@ -7,7 +7,6 @@ from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.connectors.ir import IRConnector
 from app.services.connectors.rss import RSSConnector
 from app.services.connectors.sec import SECClient
-from app.services.connectors.stocktwits import StockTwitsConnector
 
 __all__ = [
     "ConnectorItem",
@@ -19,7 +18,6 @@ __all__ = [
     "IBKRFlexClient",
     "IRConnector",
     "RSSConnector",
-    "StockTwitsConnector",
     "SECClient",
     "sec_edgar",
 ]
