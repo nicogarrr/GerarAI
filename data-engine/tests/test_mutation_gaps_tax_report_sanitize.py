@@ -154,3 +154,15 @@ def test_summary_sale_level_over_sell_alone_flags_the_ticker():
 def test_summary_over_sell_list_dedupes():
     out = sanitize_summary_over_sells({"over_sell": ["AAA"]}, [_bucket("AAA", over_sell=True)])
     assert out["over_sell"] == ["AAA"]
+
+
+def test_summary_bucket_level_flag_alone_nulls_the_totals():
+    out = sanitize_summary_over_sells({"net_taxable_base": 5}, [_bucket("AAA", over_sell=True)])
+    assert out["net_taxable_base"] is None
+    assert out["over_sell"] == ["AAA"]
+
+
+def test_summary_and_realized_tolerate_buckets_without_sales():
+    realized = [{"ticker": "AAA", "gain_base": 1}]
+    assert sanitize_summary_over_sells({"net_taxable_base": 5}, realized) == {"net_taxable_base": 5}
+    assert sanitize_realized_over_sells(realized) == realized

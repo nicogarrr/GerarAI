@@ -99,3 +99,26 @@ suites que ya lo ejercitaban; ahora están.
 Pendiente: los supervivientes de `compute_report` en dividendos, pagos especiales y retenciones,
 los tramos de valores de `check_thresholds` (720) y repetir `portfolio_fx_service` sin carga
 para separar los timeouts.
+
+## Ronda 3 (29-oct-2026)
+
+Base: main del 28-oct por la noche, con mucha carga en la máquina (los timeouts cuentan como no matados).
+
+| Módulo | Antes | Después |
+|---|---|---|
+| `tax_report_service` (23 tramos) | 79,3 % (2436/3071) | **85,2 %** (2615/3071) |
+| `tax_modelo720_service` | 71,8 % (966/1346); 76,7 % sin `_notas()` | **75,3 %**; **80,5 %** sin `_notas()` |
+| `sale_simulation` (nuevo) | 79,4 % | **93,6 %** |
+| `paper_cost_service` (nuevo) | 87,5 % | **95,3 %** |
+| `paper_trading_service` (nuevo) | 73,6 % | **91,4 %** |
+| `portfolio_fx_service` (sin timeouts esta vez) | 89,9 % | **94,2 %** |
+| Frontend `CompanyPositionPanel.tsx` (mutación manual, 21 mutantes) | 10/21 | **21/21** |
+
+En `tax_report_service` parte de la subida en los tramos 559–897 son timeouts del "antes"
+por carga; contando solo supervivientes, en los tramos repasados bajan de 173 a 79.
+Muchos supervivientes que quedan en el 720 son textos de `reason`, no lógica.
+
+Supervivientes equivalentes conocidos: el filtro explícito por tenant de `simulate_fifo_sale`
+(la sesión ya filtra por tenant), el desempate por `Transaction.id` del `order_by` y la ventana
+del 4T en la consulta del 720 (`q4_average_detail` aplica el mismo límite).
+
