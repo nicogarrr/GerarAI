@@ -460,6 +460,8 @@ export type PortfolioPerformanceHistory = {
     twr: number;
     start_date: string;
     end_date: string;
+    /** Fecha de la base nueva tras una reconstrucción del TWR (la serie se reinicia ahí); null si no hay corte. */
+    rebuild_reset_date?: string | null;
 };
 
 /**

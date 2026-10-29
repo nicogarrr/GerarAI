@@ -180,3 +180,15 @@ describe('Cartera: jerarquía y periodos honestos', () => {
         expect(screen.getByText('G/P desde compra:').closest('p')).toHaveTextContent(/25,00/);
     });
 });
+
+
+describe('Cartera: corte de la reconstrucción del TWR', () => {
+    it('marca «Reconstrucción: serie reiniciada» cuando la serie empieza en la base nueva', () => {
+        renderTabs({ scores: { history: { dates: ['2026-10-04', '2026-10-05'], nav: [100, 101], rebuild_reset_date: '2026-10-03' } } });
+        expect(screen.getByTestId('twr-rebuild-reset')).toHaveTextContent(/Reconstrucción: serie reiniciada el/);
+    });
+    it('sin corte no hay aviso', () => {
+        renderTabs({ scores: { history: { dates: ['2026-10-04', '2026-10-05'], nav: [100, 101], rebuild_reset_date: null } } });
+        expect(screen.queryByTestId('twr-rebuild-reset')).not.toBeInTheDocument();
+    });
+});
