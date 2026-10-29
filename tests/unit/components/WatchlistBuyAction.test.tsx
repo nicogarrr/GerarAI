@@ -27,7 +27,7 @@ async function flush(ms = 0) {
 }
 
 async function openDialog() {
-    render(<WatchlistBuyAction userId="user-1" symbol="SAN.MC" companyName="Banco Santander SA" />);
+    render(<WatchlistBuyAction userId="user-1" symbol="SAN.MC" companyName="Banco Santander SA" variant="menu-item" />);
     fireEvent.click(screen.getByRole('button', { name: 'Registrar compra' }));
     for (let i = 0; i < 50 && !screen.queryByRole('dialog'); i++) await flush(100);
     return screen.getByRole('dialog');

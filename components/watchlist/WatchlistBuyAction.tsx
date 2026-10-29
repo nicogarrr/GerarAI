@@ -13,6 +13,8 @@ type Props = {
   userId: string;
   symbol: string;
   companyName: string;
+  /** Estilo del gatillo: opción de menú (tabla desktop) o botón (tarjeta móvil). */
+  variant: 'menu-item' | 'button';
 };
 
 /**
@@ -21,7 +23,14 @@ type Props = {
  * seleccionada. Registra la operación igual que en Cartera; no ejecuta
  * ninguna orden en el bróker.
  */
-export default function WatchlistBuyAction({ userId, symbol, companyName }: Props) {
+const TRIGGER_CLASS: Record<Props['variant'], string> = {
+  'menu-item':
+    'flex min-h-11 w-full items-center px-3 py-2 text-left text-xs text-teal-300 hover:text-teal-200',
+  button:
+    'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-teal-800 bg-teal-950/40 px-3 text-sm font-medium text-teal-300 transition-colors hover:bg-teal-900/50 hover:text-teal-200',
+};
+
+export default function WatchlistBuyAction({ userId, symbol, companyName, variant }: Props) {
   const [open, setOpen] = useState(false);
   // Una vez abierto, el diálogo queda montado (oculto por Radix al cerrar)
   // para conservar lo escrito si se cierra sin enviar.
@@ -38,7 +47,7 @@ export default function WatchlistBuyAction({ userId, symbol, companyName }: Prop
       <DialogTrigger asChild>
         <button
           type="button"
-          className="flex min-h-11 w-full items-center px-3 py-2 text-left text-xs text-teal-300 hover:text-teal-200"
+          className={TRIGGER_CLASS[variant]}
           onPointerDown={() => void loadAddTransactionDialog()}
           onFocus={() => void loadAddTransactionDialog()}
         >
