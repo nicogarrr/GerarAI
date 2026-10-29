@@ -75,6 +75,8 @@ TARGETS: dict[str, tuple[str, list[str]]] = {
             "tests/test_tax_modelo720_service.py",
             "tests/test_tax_modelo720_file.py",
             "tests/test_mutation_gaps_modelo720_cash.py",
+            "tests/test_tax_modelo720_cash_zero_flag.py",
+            "tests/test_tax_spanish_filing.py",
         ],
     ),
     "tax_report_service": (
@@ -106,6 +108,15 @@ TARGETS: dict[str, tuple[str, list[str]]] = {
             "tests/test_taxes_routes.py",
             "tests/test_mutation_gaps_tax_report_helpers.py",
             "tests/test_mutation_gaps_tax_filing.py",
+            # Ronda 3: suites nuevas desde el 28-oct que ejercitan el modulo.
+            "tests/test_currency_ledger.py",
+            "tests/test_currency_ledger_by_currency.py",
+            "tests/test_ibkr_fx_conversions.py",
+            "tests/test_tax_cancelled_lot_review.py",
+            "tests/test_tax_report_versioning.py",
+            "tests/test_tax_sale_fx_cost_characterization.py",
+            "tests/test_mutation_gaps_tax_report_r3.py",
+            "tests/test_mutation_gaps_sale_simulation.py",
         ],
     ),
     "price_units": (
@@ -184,6 +195,42 @@ TARGETS: dict[str, tuple[str, list[str]]] = {
             "tests/test_quote_unit_consumers.py",
             "tests/test_portfolio_minor_currency_unit.py",
             "tests/test_mutation_gaps_portfolio_fx.py",
+            "tests/test_mutation_gaps_portfolio_fx_r3.py",
+        ],
+    ),
+    "sale_simulation": (
+        "app/services/sale_simulation.py",
+        [
+            "tests/test_chat_sale_audit_regressions.py",
+            "tests/test_tax_sale_fx_cost_characterization.py",
+            "tests/test_mutation_gaps_sale_simulation.py",
+        ],
+    ),
+    "paper_cost_service": (
+        "app/services/paper_cost_service.py",
+        [
+            "tests/test_paper_costs.py",
+            "tests/test_paper_costs_calibration_edges.py",
+            "tests/test_paper_corporate_actions.py",
+            "tests/test_paper_corporate_actions_edges.py",
+            "tests/test_paper_trading_service_edges.py",
+            "tests/test_mutation_gaps_paper_costs.py",
+            "tests/test_mutation_gaps_paper_trading.py",
+        ],
+    ),
+    "paper_trading_service": (
+        "app/services/paper_trading_service.py",
+        [
+            "tests/test_paper_trading.py",
+            "tests/test_paper_trading_service_edges.py",
+            "tests/test_paper_costs.py",
+            "tests/test_paper_corporate_actions.py",
+            "tests/test_paper_corporate_actions_edges.py",
+            "tests/test_paper_api_limit_messages.py",
+            "tests/test_paper_thesis_anchor.py",
+            "tests/test_llm_proposal_service.py",
+            "tests/test_paper_scoreboard_bins_corporate_action.py",
+            "tests/test_mutation_gaps_paper_trading.py",
         ],
     ),
 }
