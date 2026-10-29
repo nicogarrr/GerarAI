@@ -333,3 +333,44 @@ def test_nunca_registra_prompt_ni_respuesta(caplog):
     line = _call_lines(caplog)[0].getMessage()
     assert "riesgo" not in line
     assert "hola" not in line
+
+
+# --- El modelo que se PERSISTE (budget_usage, telemetria, ChatResponse) -------
+# El registro `llm.call` ya redactaba; el mismo valor viajaba sin tocar a la
+# respuesta y de ahi a Postgres (String(160)) y al frontend.
+
+
+@pytest.mark.parametrize(
+    "returned_model,leak",
+    [
+        (FAKE_KEY, FAKE_KEY),
+        (f"deepseek {HEADER_SECRET}", HEADER_SECRET),
+        ("sk-proj-OTRACLAVEFILTRADA123", "OTRACLAVEFILTRADA123"),
+        ("api_key=zzTOPSECRET99", "zzTOPSECRET99"),
+    ],
+)
+def test_modelo_persistido_de_la_respuesta_se_redacta(returned_model, leak):
+    """LLMResponse.model se persiste y se muestra: mismas reglas que el log."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion(returned_model))
+
+    response = _run(_provider(handler), _request())
+    assert leak not in response.model
+    assert "[REDACTED]" in response.model
+
+
+def test_modelo_persistido_acotado_a_la_columna():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion("x" * 5000))
+
+    response = _run(_provider(handler), _request())
+    assert len(response.model) <= 160
+
+
+def test_modelo_persistido_vacio_conserva_el_pedido():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_completion(""))
+
+    response = _run(_provider(handler), _request())
+    assert response.model == "deepseek-v4.1-flash"
