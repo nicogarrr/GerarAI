@@ -237,10 +237,14 @@ async def review_gems(
     budget = BudgetController()
     models: list[str] = []
 
+    bind = db.get_bind()
+    tenant_id = db.info.get("tenant_id")
+
     def _record(resp) -> None:
         models.append(resp.model)
-        cost = budget.estimate_cost_eur(resp.model, resp.usage.input_tokens, resp.usage.output_tokens)
-        budget.record(db, resp.model, "propicks_review", cost, resp.usage.total_tokens)
+        with Session(bind=bind, info={"tenant_id": tenant_id}) as usage_db:
+            cost = budget.estimate_cost_eur(resp.model, resp.usage.input_tokens, resp.usage.output_tokens)
+            budget.record(usage_db, resp.model, "propicks_review", cost, resp.usage.total_tokens)
 
     if usable and cands and budget.can_spend(db, 0.05):
         db.commit()

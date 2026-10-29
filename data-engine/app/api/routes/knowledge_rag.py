@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.models.knowledge_rag import KnowledgeRagSource
 from app.services.knowledge_rag import query_translation, runtime
 from app.services.knowledge_rag.domain import DocType, SourceMetadata, SourceMetadataError
@@ -180,6 +180,8 @@ def _dispatch(db: Session, source: KnowledgeRagSource) -> KnowledgeRagSource:
 async def query(payload: QueryRequest, db: Session = Depends(get_db)) -> dict:
     settings = _enabled()
     tenant_id = db.info.get("tenant_id")
+    tenant_info = dict(db.info)
+    worker_bind = db.get_bind()
     db.rollback()  # libera la conexion (lookup de tenant de get_db) antes de embeddings/Qdrant
     filters = SearchFilters(
         corpus=payload.corpus,
@@ -205,21 +207,23 @@ async def query(payload: QueryRequest, db: Session = Depends(get_db)) -> dict:
             translation_notes.append(note)
 
     def run():
-        return search_knowledge(
-            payload.query,
-            tenant_id=tenant_id,
-            store=runtime.make_store(settings),
-            embedder=runtime.make_embedder(settings),
-            resolve_parents=parent_resolver(db),
-            filters=filters,
-            top_k=payload.top_k,
-            candidates=settings.knowledge_rag_candidates,
-            postprocessors=runtime.make_postprocessors(settings, payload.top_k * 2),
-            rrf_k=settings.rag_rrf_k,
-            dense_weight=settings.rag_dense_weight,
-            sparse_weight=settings.rag_sparse_weight,
-            query_variants=query_variants,
-        )
+        with SessionLocal(bind=worker_bind) as worker_db:
+            worker_db.info.update(tenant_info)
+            return search_knowledge(
+                payload.query,
+                tenant_id=tenant_id,
+                store=runtime.make_store(settings),
+                embedder=runtime.make_embedder(settings),
+                resolve_parents=parent_resolver(worker_db),
+                filters=filters,
+                top_k=payload.top_k,
+                candidates=settings.knowledge_rag_candidates,
+                postprocessors=runtime.make_postprocessors(settings, payload.top_k * 2),
+                rrf_k=settings.rag_rrf_k,
+                dense_weight=settings.rag_dense_weight,
+                sparse_weight=settings.rag_sparse_weight,
+                query_variants=query_variants,
+            )
 
     try:
         result = await run_in_threadpool(run)

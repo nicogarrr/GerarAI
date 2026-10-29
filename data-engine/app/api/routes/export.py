@@ -109,12 +109,10 @@ def export_year(
     ]
 
     journal_rows = []
-    # created_at es DateTime con tz: "<= date(12,31)" corta a medianoche y
-    # pierde los asientos creados durante el 31 de diciembre. Rango semiabierto.
     entries = db.scalars(
         select(DecisionJournalEntry).where(
-            DecisionJournalEntry.created_at >= start,
-            DecisionJournalEntry.created_at < date(year + 1, 1, 1),
+            DecisionJournalEntry.decision_date >= start,
+            DecisionJournalEntry.decision_date <= end,
         )
     ).all()
     for entry in entries:

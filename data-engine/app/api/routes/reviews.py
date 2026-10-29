@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import (
-    Company,
     Document,
     NewsEvent,
     ResearchReview,
@@ -69,9 +68,7 @@ def scan_contradictions(
     payload: ContradictionScanRequest,
     db: Session = Depends(get_db),
 ) -> dict:
-    company = db.scalar(
-        select(Company).where(Company.ticker == payload.ticker.upper())
-    )
+    company = resolve_company(db, payload.ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     intelligence = ClaimIntelligenceService()

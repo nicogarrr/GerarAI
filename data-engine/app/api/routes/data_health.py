@@ -1,12 +1,12 @@
 """Authenticated data inventory and public short-position snapshots."""
 from fastapi import APIRouter, Depends, HTTPException, Path
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.models import Company
 from app.services.async_bridge import run_from_any_context
+from app.services.company_resolver import resolve_company
 from app.services.data_health_service import read_inventory
 from app.services.short_positions_service import read_shorts, refresh_shorts
 
@@ -19,7 +19,7 @@ def data_health(db: Session = Depends(get_db)) -> dict:
 
 
 def _company(db: Session, ticker: str) -> Company:
-    company = db.scalar(select(Company).where(Company.ticker == ticker.upper()))
+    company = resolve_company(db, ticker)
     if company is None:
         raise HTTPException(status_code=404, detail="Empresa no registrada")
     return company

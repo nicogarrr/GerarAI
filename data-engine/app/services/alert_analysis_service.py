@@ -285,8 +285,10 @@ def read_analysis(db: Session, alert_id: int) -> dict:
         event = db.scalar(select(NewsEvent).where(NewsEvent.id == row.news_event_id))
         citations = result.get("citations", [])
         headline = (event.metadata_ or {}).get("source_headline") if event else None
-        valid = (isinstance(headline, str) and bool(headline.strip()) and
-                 isinstance(citations, list) and event.company_id == alert.company_id and
+        valid = (event is not None and
+                 isinstance(headline, str) and bool(headline.strip()) and
+                 isinstance(citations, list) and bool(citations) and
+                 event.company_id == alert.company_id and
                  (alert.metadata_ or {}).get("news_event_id") == event.id and
                  all(c.get("id") == f"news_event:{event.id}" and
                      c.get("url") == event.url and

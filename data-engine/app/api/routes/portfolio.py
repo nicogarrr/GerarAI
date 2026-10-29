@@ -790,6 +790,16 @@ def update_transaction(
         db.commit()
         db.refresh(transaction)
         return _transaction_payload(transaction, company)
+    except PortfolioOversellError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="Insufficient shares for sale"
+        ) from exc
+    except PortfolioMixedCurrencyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=422, detail="Position cannot mix transaction currencies"
+        ) from exc
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -833,7 +843,7 @@ def delete_holding(ticker: str, db: Session = Depends(get_db)) -> None:
 
 @router.patch("/prices")
 def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) -> dict:
-    company = db.scalar(select(Company).where(Company.ticker == payload.ticker.upper()))
+    company = resolve_company(db, payload.ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Holding not found")
     try:

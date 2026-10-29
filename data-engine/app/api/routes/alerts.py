@@ -67,9 +67,7 @@ def _is_unverified_stub(company: Company) -> bool:
 def create_alert(
     payload: ManualAlertCreate, db: Session = Depends(get_db)
 ) -> AlertRule:
-    company = db.scalar(
-        select(Company).where(Company.ticker == payload.ticker.upper())
-    )
+    company = resolve_company(db, payload.ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
     if _is_unverified_stub(company):
