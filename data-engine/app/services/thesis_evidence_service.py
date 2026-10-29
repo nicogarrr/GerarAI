@@ -31,6 +31,7 @@ existente no se vuelve lenta ni flaky por EDGAR/NASDAQ/IR reales.
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -39,6 +40,7 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact, MarketPrice, NewsEvent, Transcript
 from app.services.connectors import earnings_calendar as earnings_calendar_connector
@@ -46,6 +48,8 @@ from app.services.connectors import sec_edgar as sec_edgar_connector
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.ir import IRConnector
 from app.services.fact_deletion import delete_financial_facts
+
+logger = logging.getLogger(__name__)
 
 # Metrica -> (tags us-gaap por preferencia, unidad). Nunca se suman
 # tags. Gana el tag con el dato mas reciente: un tag preferido puede
@@ -132,6 +136,21 @@ def _decimal(value: Any) -> Decimal | None:
         return Decimal(str(value))
     except (InvalidOperation, ValueError):
         return None
+
+
+def _log_source_failure(source: str, ticker: str | None, exc: BaseException) -> None:
+    """Deja el detalle del fallo de una fuente solo en el log del servidor.
+
+    El ``detail`` de ``_pending`` acaba en el texto de la tesis y en el memo:
+    ahí va un mensaje fijo en español, nunca el nombre de la clase de
+    excepción ni su texto crudo (que puede traer URLs con token).
+    """
+    logger.warning(
+        "thesis evidence: fuente %s fallo para %s: %s",
+        source,
+        (ticker or "").upper(),
+        redact_secrets(f"{type(exc).__name__}: {exc}")[:500],
+    )
 
 
 def _pending(source: str, detail: str, action: str | None = None) -> dict[str, Any]:
@@ -235,8 +254,9 @@ class ThesisEvidenceService:
                 cik = self._fetch_cik(ticker)
             except Exception as exc:  # noqa: BLE001 - best-effort
                 cik = None
+                _log_source_failure("SEC EDGAR ticker map", ticker, exc)
                 bundle["sources"]["cik"] = _pending(
-                    "SEC EDGAR ticker map", f"CIK no resuelto: {exc}"[:200]
+                    "SEC EDGAR ticker map", "CIK no resuelto (SEC EDGAR no respondió)."
                 )
         if cik:
             bundle["sources"]["cik"] = {"status": "ok", "source": "SEC EDGAR", "cik": cik}
@@ -305,7 +325,8 @@ class ThesisEvidenceService:
         try:
             facts_payload = self._fetch_company_facts(cik)
         except Exception as exc:  # noqa: BLE001 - best-effort
-            return _pending("SEC EDGAR companyfacts", f"EDGAR inaccesible: {exc}"[:200])
+            _log_source_failure("SEC EDGAR companyfacts", company.ticker, exc)
+            return _pending("SEC EDGAR companyfacts", "EDGAR inaccesible ahora mismo.")
         us_gaap = ((facts_payload or {}).get("facts") or {}).get("us-gaap") or {}
         extracted = self._extract_recent_annuals(us_gaap)
         if not extracted:
@@ -549,7 +570,8 @@ class ThesisEvidenceService:
         try:
             quote = self._fetch_quote(ticker)
         except Exception as exc:  # noqa: BLE001 - best-effort
-            result["detail"] = f"Quote inaccesible: {exc}"[:200]
+            _log_source_failure("Finnhub quote", ticker, exc)
+            result["detail"] = "Cotización inaccesible ahora mismo."
             quote = None
         price = _decimal((quote or {}).get("c")) if quote else None
         # Fallar cerrado ante payload malformado: timestamp o volumen invalidos
@@ -611,7 +633,8 @@ class ThesisEvidenceService:
         try:
             profile = self._fetch_profile(ticker)
         except Exception as exc:  # noqa: BLE001 - best-effort
-            result["profile_detail"] = f"Perfil inaccesible: {exc}"[:200]
+            _log_source_failure("Finnhub profile", ticker, exc)
+            result["profile_detail"] = "Perfil inaccesible ahora mismo."
             profile = None
         if profile:
             name = str(profile.get("name") or "").strip()
@@ -669,7 +692,8 @@ class ThesisEvidenceService:
         try:
             filings = self._fetch_filings(cik) or []
         except Exception as exc:  # noqa: BLE001 - best-effort
-            return _pending("SEC EDGAR submissions", f"Submissions inaccesible: {exc}"[:200])
+            _log_source_failure("SEC EDGAR submissions", company.ticker, exc)
+            return _pending("SEC EDGAR submissions", "Filings de SEC EDGAR inaccesibles ahora mismo.")
         created = 0
         items: list[dict[str, Any]] = []
         for filing in filings[:MAX_FILING_DOCUMENTS]:
@@ -782,9 +806,10 @@ class ThesisEvidenceService:
         try:
             payload = self._fetch_earnings() or {}
         except Exception as exc:  # noqa: BLE001 - best-effort
+            _log_source_failure("NASDAQ earnings calendar", company.ticker, exc)
             return _pending(
                 "NASDAQ earnings calendar",
-                f"Calendario inaccesible ({type(exc).__name__}).",
+                "Calendario de resultados inaccesible ahora mismo.",
             )
         wanted = company.ticker.upper()
         coming = sorted(
@@ -842,9 +867,10 @@ class ThesisEvidenceService:
         try:
             result = self._fetch_ir(ir_url, company.ticker.upper())
         except Exception as exc:  # noqa: BLE001 - best-effort
+            _log_source_failure("IR de la empresa", company.ticker, exc)
             return _pending(
                 "IR de la empresa",
-                f"IR inaccesible ({ir_url}): {exc}"[:200],
+                "Web de relación con inversores inaccesible ahora mismo.",
                 action="Puede añadirse manualmente desde Fuentes.",
             )
         items = getattr(result, "items", None) or []
