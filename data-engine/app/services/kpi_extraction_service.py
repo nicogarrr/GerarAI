@@ -134,6 +134,12 @@ class CompanyKPIRegistryService:
         active_keys: set[str] = set()
         for label in labels:
             metric_key = _key(label)
+            # Dos etiquetas del marco pueden normalizar a la misma clave
+            # («ARR» y «arr»): una sola fila por clave. Sin esto la segunda
+            # creaba otra CompanyKPI pendiente (sin autoflush la búsqueda no
+            # ve la primera) y el flush rompía el UNIQUE con un 500.
+            if metric_key in active_keys:
+                continue
             active_keys.add(metric_key)
             row = db.scalar(
                 select(CompanyKPI).where(
