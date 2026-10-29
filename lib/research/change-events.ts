@@ -6,6 +6,9 @@ import type { ResearchThesisChange } from '@/lib/actions/research.actions';
  *  - revisión.thesis_change_id -> cambio
  *  - revisión.news_event_id comun -> mismo suceso de noticia
  *  - alerta.review_id -> revisión
+ *  - alerta.source_url comun -> la misma noticia (dedup: una noticia que
+ *    generó varias alertas sin revisión dejaba de repetirse una tarjeta por
+ *    alerta; la URL es un vínculo persistido, no una inferencia por texto)
  * Sin vínculo no se agrupa nada (no se infiere identidad por texto): cada
  * registro suelto es su propio suceso. Todos los originales quedan dentro del
  * suceso; esta función no descarta ninguno.
@@ -41,6 +44,29 @@ export type ChangeEvent = {
   requiresReview: boolean;
   sourceUrls: string[];
 };
+
+/**
+ * Forma canónica de la URL de fuente de una alerta para compararla: mismo
+ * artículo aunque cambien mayúsculas del host, el fragmento o los parámetros
+ * de tracking (utm_*, fbclid...). Sin URL válida, la cadena recortada tal cual.
+ */
+export function normalizeAlertSourceUrl(url: string | null | undefined): string | null {
+  const trimmed = (url ?? '').trim();
+  if (!trimmed) return null;
+  try {
+    const u = new URL(trimmed);
+    u.hash = '';
+    u.hostname = u.hostname.toLowerCase();
+    for (const key of [...u.searchParams.keys()]) {
+      if (/^(utm_|fbclid$|gclid$|ocid$)/i.test(key)) u.searchParams.delete(key);
+    }
+    let canonical = u.toString();
+    if (canonical.endsWith('/')) canonical = canonical.slice(0, -1);
+    return canonical;
+  } catch {
+    return trimmed;
+  }
+}
 
 const CLOSED = new Set(['approved', 'closed', 'resolved', 'dismissed', 'done', 'cerrada', 'cerrado']);
 export function isOpenReview(status: string): boolean {
@@ -84,6 +110,8 @@ export function buildChangeEvents(input: {
   for (const alert of input.alerts) {
     add(`a:${alert.id}`);
     if (alert.review_id != null && reviewIds.has(alert.review_id)) union(`a:${alert.id}`, `r:${alert.review_id}`);
+    const sourceUrl = normalizeAlertSourceUrl(alert.source_url);
+    if (sourceUrl) union(`a:${alert.id}`, `u:${sourceUrl}`);
   }
 
   const buckets = new Map<string, { changes: ResearchThesisChange[]; reviews: EventReview[]; alerts: EventAlert[] }>();
@@ -100,7 +128,9 @@ export function buildChangeEvents(input: {
   const events: ChangeEvent[] = [];
   for (const [key, b] of buckets) {
     const dates = [...b.changes.map((x) => x.created_at), ...b.reviews.map((x) => x.created_at), ...b.alerts.map((x) => x.created_at)].filter(Boolean);
-    const urls = [...new Set(b.alerts.map((a) => a.source_url).filter((u): u is string => !!u))];
+    // Fuentes del suceso, ya canónicas: la misma noticia con y sin tracking
+    // no sale dos veces en «Fuentes:».
+    const urls = [...new Set(b.alerts.map((a) => normalizeAlertSourceUrl(a.source_url)).filter((u): u is string => !!u))];
     const claims = new Set(b.changes.flatMap((x) => x.affected_claim_ids));
     events.push({
       key,
