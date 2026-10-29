@@ -232,3 +232,51 @@ def test_capture_does_not_chain_real_day_over_positions_only_rebuild(db, tmp_pat
     nxt = service.capture(db, as_of=D0 + timedelta(days=5))
     assert nxt.daily_return == pytest.approx(Decimal("0.04"))
     assert nxt.cumulative_twr == pytest.approx(Decimal("0.04"))
+
+
+
+def test_backfill_capture_does_not_wipe_rebuilt_chain(db, tmp_path):
+    """Una captura con fecha pasada relinkea las fotos siguientes. Las fotos
+    reconstruidas no tienen contrato de flujos y su previa es solo-posiciones:
+    antes el relink les ponía daily_return/cumulative_twr a None y borraba
+    toda la cadena TWR reconstruida."""
+    _world(db)
+    TwrRebuildService().apply(db, backup_path=tmp_path / "b.json")
+    PortfolioSnapshotService().capture(db, as_of=D0 - timedelta(days=1), source="manual_capture")
+    db.commit()
+    rebuilt = list(
+        db.scalars(
+            select(PortfolioDailySnapshot)
+            .where(PortfolioDailySnapshot.source == REBUILD_SOURCE)
+            .order_by(PortfolioDailySnapshot.snapshot_date)
+        ).all()
+    )
+    assert len(rebuilt) == 4
+    assert rebuilt[2].daily_return == pytest.approx(Decimal("0.10"))
+    assert rebuilt[3].cumulative_twr == pytest.approx(Decimal("0.20"))
+
+
+def test_apply_does_not_leave_later_real_snapshot_chained_to_replaced_day(db, tmp_path):
+    """Una foto real POSTERIOR al rango reconstruido estaba enlazada a la foto
+    real del último día, que apply() sustituye por una solo-posiciones. Debe
+    quedar como base nueva (misma regla que capture(), #2890), no conservar
+    un retorno calculado contra una foto que ya no existe."""
+    company = _world(db)
+    service = PortfolioSnapshotService()
+    position = db.scalars(select(Position)).one()
+    service.capture(db, as_of=D0 + timedelta(days=3))
+    db.commit()
+    position.market_price = Decimal("12.5")
+    position.as_of = D0 + timedelta(days=4)
+    db.commit()
+    later = service.capture(db, as_of=D0 + timedelta(days=4))
+    db.commit()
+    assert later.daily_return is not None  # enlazada a la foto real del día 3
+    assert company is not None
+
+    TwrRebuildService().apply(db, backup_path=tmp_path / "b.json")
+    db.commit()
+    db.refresh(later)
+    assert later.daily_return is None
+    assert later.cumulative_twr is None
+    assert later.metadata_["twr_base_after_scope_change"] is True

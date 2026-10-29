@@ -295,6 +295,21 @@ class PortfolioSnapshotService:
         )
         for previous, current in zip(following, following[1:], strict=False):
             meta = current.metadata_ or {}
+            if meta.get("positions_only"):
+                # Foto reconstruida (twr_rebuild): su cadena la calcula la
+                # herramienta desde operaciones y cierres; no tiene contrato de
+                # flujos y relinkearla aquí la borraría entera.
+                continue
+            # Misma regla que capture() (#2890): un día real tras una foto
+            # solo-posiciones no encadena y queda como base nueva declarada.
+            previous_positions_only = bool((previous.metadata_ or {}).get("positions_only"))
+            if bool(meta.get("twr_base_after_scope_change")) != previous_positions_only:
+                meta = {
+                    **meta,
+                    "twr_blocked_by_scope_change": previous_positions_only,
+                    "twr_base_after_scope_change": previous_positions_only,
+                }
+                current.metadata_ = meta
             previous_is_base = bool(
                 (previous.metadata_ or {}).get("twr_base_after_scope_change")
             ) or previous.cumulative_twr is None and (
@@ -349,7 +364,7 @@ class PortfolioSnapshotService:
             linkable = (
                 window_proven
                 and intermediate == 0
-                and not (previous.metadata_ or {}).get("positions_only")
+                and not previous_positions_only
                 and previous.total_value_base > 0
                 and previous.pricing_coverage == Decimal("1")
                 and previous.base_currency == current.base_currency
