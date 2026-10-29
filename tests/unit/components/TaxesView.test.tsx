@@ -144,7 +144,7 @@ describe('TaxesView posiciones y exportacion', () => {
         view({ initialHoldings: [{ ticker: '=HYPERLINK("x")', cost_basis: -10, currency: 'EUR' }] });
         fireEvent.click(screen.getByRole('button', { name: /Exportar resumen/ }));
         const text = await new Promise<string>((res) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsText(blob!); });
-        expect(text.startsWith('reporte_fiscal,2025')).toBe(true);
+        expect(text.startsWith('informe_fiscal,2025')).toBe(true);
         expect(text).toContain(`"'=HYPERLINK(""x"")"`);
         expect(text).toContain('"-10"');
         expect(text).not.toContain(`"'-10"`);

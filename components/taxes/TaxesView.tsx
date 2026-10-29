@@ -280,14 +280,14 @@ function csvExportCell(value: unknown): string {
 
 /** Descarga un resumen fiscal (informe + posiciones) como CSV generado en cliente */
 function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, year: number) {
-    const lines: string[] = [`reporte_fiscal,${year}`, ''];
+    const lines: string[] = [`informe_fiscal,${year}`, ''];
     lines.push('seccion,clave,valor');
     if (report) {
         for (const [key, value] of Object.entries(report)) {
-            lines.push(`reporte,${csvExportCell(key)},${csvExportCell(value)}`);
+            lines.push(`informe,${csvExportCell(key)},${csvExportCell(value)}`);
         }
     } else {
-        lines.push('reporte,sin_reporte,Sin informe fiscal disponible');
+        lines.push('informe,sin_informe,Sin informe fiscal disponible');
     }
     lines.push('');
     if (holdings.length > 0) {
