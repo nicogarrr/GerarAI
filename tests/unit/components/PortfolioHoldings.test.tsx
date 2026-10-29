@@ -45,7 +45,7 @@ describe('PortfolioHoldings estados y numeros', () => {
     it('sin posiciones ni caja: mensaje vacio y boton de actualizar desactivado', () => {
         render(<PortfolioHoldings holdings={[]} userId="u" />);
         expect(screen.getByText('No tienes posiciones abiertas')).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Actualizar Precios/ })).toBeDisabled();
+        expect(screen.getByRole('button', { name: /Actualizar precios/ })).toBeDisabled();
     });
 
     it('solo caja: se muestra la fila Caja con su importe y N/D en peso y G/P', () => {
@@ -160,7 +160,7 @@ describe('PortfolioHoldings eliminar', () => {
 
 describe('PortfolioHoldings actualizar precios (el toast dice lo que se escribio)', () => {
     beforeEach(() => vi.clearAllMocks());
-    const click = () => fireEvent.click(screen.getByRole('button', { name: /Actualizar Precios/ }));
+    const click = () => fireEvent.click(screen.getByRole('button', { name: /Actualizar precios/ }));
     const base = { ok: true, updated: ['AAPL'], skipped: [] as string[], failed: [] as string[], holdings: [holding()] };
 
     it('ok=false: error "Ningun precio escrito" con causas, sin toast verde', async () => {
@@ -231,5 +231,17 @@ describe('PortfolioHoldings actualizar precios (el toast dice lo que se escribio
         render(<PortfolioHoldings holdings={[holding()]} userId="u" />);
         click();
         await waitFor(() => expect(desktop().getByText('NEWCO')).toBeInTheDocument());
+    });
+});
+
+describe('PortfolioHoldings cabecera', () => {
+    it('el título de la tarjeta es solo «Posiciones actuales» y la nota de divisa va aparte', () => {
+        render(<PortfolioHoldings holdings={[holding()]} userId="u" baseCurrency="EUR" />);
+        // Antes la nota larga vivía DENTRO del <h3>: el lector de pantalla
+        // anunciaba un título de 30 palabras y en móvil se apretujaba al lado.
+        const heading = screen.getByRole('heading', { name: 'Posiciones actuales' });
+        const note = screen.getByText(/La G\/P va en EUR \(divisa base\)/);
+        expect(heading).not.toContainElement(note);
+        expect(note.tagName).toBe('P');
     });
 });
