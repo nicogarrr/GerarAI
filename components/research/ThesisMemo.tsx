@@ -56,6 +56,7 @@ const STATUS_LABELS: Record<string, string> = {
   stale: 'desactualizada',
   draft_failed_audit: 'borrador (auditoría no superada)',
   changes_requested: 'cambios solicitados',
+  insufficient_data: 'datos insuficientes',
 };
 
 /** Franjas horarias conocidas del calendario de resultados (misma convencion
@@ -224,6 +225,8 @@ export default function ThesisMemo({
     thesis.valuation_basis,
   );
   const generatedLabel = formatGeneratedDate(thesis.created_at);
+  const ratingBadge = modelBlocked ? 'datos insuficientes' : enumLabel(RATING_LABELS, thesis.rating);
+  const statusBadge = enumLabel(STATUS_LABELS, thesis.status);
 
   return (
     <div className="min-w-0 max-w-full space-y-5 [overflow-wrap:anywhere]">
@@ -234,8 +237,10 @@ export default function ThesisMemo({
         </aside>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Badge>{modelBlocked ? 'datos insuficientes' : enumLabel(RATING_LABELS, thesis.rating)}</Badge>
-        <Badge variant="outline">{enumLabel(STATUS_LABELS, thesis.status)}</Badge>
+        <Badge>{ratingBadge}</Badge>
+        {/* Estado y rating son ejes distintos, pero su etiqueta puede coincidir
+            («datos insuficientes» en ambos): en ese caso se pinta una sola. */}
+        {statusBadge !== ratingBadge ? <Badge variant="outline">{statusBadge}</Badge> : null}
         <Badge variant="outline">v{thesis.version}</Badge>
         {generatedLabel ? (
           <span className="text-xs text-gray-500">generada el {generatedLabel}</span>
