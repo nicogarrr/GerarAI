@@ -30,6 +30,16 @@ describe('HomeAttention', () => {
         expect(await screen.findByText(/los cambios de tesis ni los niveles DCA/)).toBeInTheDocument();
         expect(screen.queryByText(/^Sin cambios de tesis pendientes/)).not.toBeInTheDocument();
     });
+    it('el aviso de truncado cuenta solo los cambios de tesis (no tesis + DCA)', async () => {
+        get.mockResolvedValue({
+            thesis: { unavailable: false, truncated: true, items: Array.from({ length: 99 }, (_, i) => ({ id: i, symbol: `T${i}`, summary: 'Cambio', direction: 'neutral', createdAt: '2026-10-28' })) },
+            dca: { unavailable: false, items: [{ id: 'dca-UBER', symbol: 'UBER', level: 4, threshold: 3, signalDate: '2026-10-27', forming: true }] },
+        });
+        render(<HomeAttention />);
+        expect(await screen.findByText(/Se muestran los 99 cambios de tesis pendientes más recientes/)).toBeInTheDocument();
+        // El paginador cuenta la lista combinada (tesis + DCA) sin contradicción.
+        expect(screen.getByText(/100 elementos/)).toBeInTheDocument();
+    });
     it('paginates with no hidden remainder', async () => {
         get.mockResolvedValue({ ...empty, thesis: { unavailable: false, items: Array.from({length: 7}, (_,i) => ({ id:i, symbol:`TEST${i}`, summary:`Cambio ${i}`, direction:'neutral', createdAt:'2026-10-28' })) } });
         render(<HomeAttention />); await screen.findByText('TEST0');

@@ -58,7 +58,10 @@ export default function HomeAttention() {
                         <Link aria-label={`${item.cta} de ${item.symbol}`} href={item.href} className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm text-teal-300 hover:underline">{item.cta}<span className="sr-only">{' '}de {item.symbol}</span><ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
                     </li>)}
                 </ul>
-                {data?.thesis.truncated ? <p className="text-xs text-amber-200">Se muestran los 99 cambios pendientes más recientes. Revisa también las fichas de tus empresas.</p> : null}
+                {/* La lista mezcla tesis y niveles DCA: el recuento del aviso
+                    nombra solo los cambios de tesis para no contradecir el
+                    total del paginador (tesis + DCA). */}
+                {data?.thesis.truncated ? <p className="text-xs text-amber-200">Se muestran los {data.thesis.items.length} cambios de tesis pendientes más recientes. Revisa también las fichas de tus empresas.</p> : null}
                 {pages > 1 ? <nav aria-label="Paginación de atención" className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-300">
                     <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current === 0} onClick={() => setPage(current - 1)}>Anterior</button>
                     <span role="status">{current + 1} / {pages} · {items.length} elementos</span>
