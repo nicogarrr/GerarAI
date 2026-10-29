@@ -3,7 +3,7 @@
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 
-export type CatalystType = 'earnings' | 'dividend_ex' | 'filing_deadline' | 'corporate_action';
+export type CatalystType = 'earnings' | 'dividend_ex' | 'dividend_payment' | 'filing_deadline' | 'corporate_action';
 
 export type CatalystEvent = {
     date: string;
@@ -12,7 +12,7 @@ export type CatalystEvent = {
     title: string;
     detail: string | null;
     source: string;
-    /** Solo en resultados: 'cartera' si es posición abierta, 'watchlist' si viene de la watchlist (US). */
+    /** 'cartera' si es posición abierta, 'watchlist' si viene de la watchlist. */
     origin?: 'cartera' | 'watchlist';
 };
 
@@ -28,7 +28,7 @@ export type CatalystCalendar = {
     errors: string[];
 };
 
-/** GET /api/calendar/catalysts — catalizadores de las posiciones abiertas (14 días por defecto). */
+/** GET /api/calendar/catalysts — catalizadores de posiciones y watchlist (14 días por defecto). */
 export async function getCatalystCalendar(): Promise<CatalystCalendar> {
     await requireAuthenticatedUser();
     return researchRequest<CatalystCalendar>('/api/calendar/catalysts');
@@ -69,4 +69,34 @@ export async function getFollowedEarnings(options?: { desde?: string; hasta?: st
     if (options?.hasta && isoDay.test(options.hasta)) params.set('hasta', options.hasta);
     const query = params.size > 0 ? `?${params.toString()}` : '';
     return researchRequest<FollowedEarningsCalendar>(`/api/calendar/followed${query}`);
+}
+
+export type IpoEvent = {
+    /** Ticker propuesto; null si la fuente aún no lo publica. */
+    symbol: string | null;
+    company: string | null;
+    exchange: string | null;
+    /** Fecha de salida (fijada) o prevista; null si la fuente no la da. */
+    date: string | null;
+    /** Precio o rango tal cual lo publica la fuente ("15.00-17.00"). */
+    price: string | null;
+    shares: string | null;
+    offer_amount: string | null;
+    /** 'upcoming' = prevista, 'priced' = precio fijado en el periodo. */
+    status: 'upcoming' | 'priced';
+    source: string;
+};
+
+export type IpoCalendar = {
+    status: 'ok' | 'partial' | 'unavailable';
+    months: string[];
+    count: number;
+    events: IpoEvent[];
+    errors: string[];
+};
+
+/** GET /api/calendar/ipos — salidas a bolsa US del mes en curso y el siguiente (NASDAQ público). */
+export async function getIpoCalendar(): Promise<IpoCalendar> {
+    await requireAuthenticatedUser();
+    return researchRequest<IpoCalendar>('/api/calendar/ipos');
 }

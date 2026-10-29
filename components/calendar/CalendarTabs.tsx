@@ -9,6 +9,7 @@ const TABS = [
   ["/calendar/resultados", "Resultados"],
   ["/calendar/suscripcion", "Suscribir"],
   ["/calendar", "Catalizadores"],
+  ["/calendar/ipos", "IPOs"],
   ["/macro-calendar", "Macro y 8-K"],
   ["/corporate-actions", "Acciones corp."],
 ] as const;
