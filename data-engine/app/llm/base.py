@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import re
 import time
@@ -41,7 +42,8 @@ _interactive_quota_breaker: dict[tuple[str, str], float] = {}
 # desde jev_fallback). Mismo patron que el breaker de origen 502: cooldown
 # por (proveedor, modelo) y una sonda real al expirar. Los proveedores
 # interactivos (chat/debate) usan su propio breaker de arriba.
-_free_quota_breaker: dict[tuple[str, str], float] = {}
+# Clave: (proveedor, modelo, huella de la credencial) - la cuota es de UNA clave.
+_free_quota_breaker: dict[tuple[str, str, str], float] = {}
 _QUOTA_429_BODY_MARKERS = ("exhausted", "quota", "insufficient credit", "billing")
 
 
@@ -53,6 +55,24 @@ def _is_free_tier_origin_error(response: httpx.Response) -> bool:
         return any(marker in text for marker in _FREE_TIER_ORIGIN_MARKERS)
     except Exception:
         return False
+
+_CREDENTIAL_HEADERS = ("authorization", "x-api-key", "api-key", "x-goog-api-key")
+
+
+def _credential_fingerprint(headers: Mapping[str, str]) -> str:
+    """Huella corta (sha256) de la credencial de la peticion, nunca la clave.
+
+    La cuota agotada es de UNA clave: el breaker de cuota se indexa tambien
+    por esta huella para que la clave propia de un tenant agotada no deje sin
+    LLM a la plataforma ni a otros tenants con el mismo proveedor y modelo.
+    """
+    values = sorted(
+        f"{name.lower()}={value}"
+        for name, value in headers.items()
+        if name.lower() in _CREDENTIAL_HEADERS and value
+    )
+    return hashlib.sha256("\n".join(values).encode()).hexdigest()[:16]
+
 
 def _is_quota_exhausted_429(response: httpx.Response) -> bool:
     """429 con senal explicita de cuota agotada en el cuerpo (no rate limit).
@@ -188,7 +208,8 @@ class LLMProvider(ABC):
         breaker_key = (str(self.name), str(payload.get("model")))
         if _free_tier_breaker.get(breaker_key, 0.0) > time.monotonic():
             raise ProviderHTTPError(self.name, _free_tier_breaker_status.get(breaker_key, 502))
-        if _free_quota_breaker.get(breaker_key, 0.0) > time.monotonic():
+        quota_key = (*breaker_key, _credential_fingerprint(headers))
+        if _free_quota_breaker.get(quota_key, 0.0) > time.monotonic():
             raise ProviderHTTPError(self.name, 429)
         interactive_quota = getattr(self, "interactive_quota_breaker", False)
         if interactive_quota and _interactive_quota_breaker.get(breaker_key, 0.0) > time.monotonic():
@@ -216,7 +237,7 @@ class LLMProvider(ABC):
                 _interactive_quota_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
                 raise ProviderHTTPError(self.name, 429)
             if _is_quota_exhausted_429(response):
-                _free_quota_breaker[breaker_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
+                _free_quota_breaker[quota_key] = time.monotonic() + _FREE_TIER_BREAKER_SECONDS
                 raise ProviderHTTPError(self.name, 429)
             if _is_free_tier_origin_error(response):
                 _free_tier_breaker_status[breaker_key] = 502
