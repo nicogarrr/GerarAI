@@ -2390,6 +2390,14 @@ def refresh_ir_pages(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id, ticker=ticker)
 
 
+# Presupuesto total de la corrida por debajo del time_limit de dramatiq
+# (600 s): los feeds se sondean en serie con hasta 20 s por feed y la ingesta
+# de cada lote suma; sin tope, una corrida lenta moria por TimeLimitExceeded
+# (prod: tenant 10, 601 s) y el tick siguiente repetia el barrido entero.
+# Al agotarse, los feeds restantes quedan diferidos al siguiente tick y el
+# resultado lo declara ("partial" + time_budget_exceeded), nada se silencia.
+_RSS_TIME_BUDGET_SECONDS = 480.0
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 @_coalesce_on_success("refresh_rss_feeds", 12 * 60, ("tenant_id", "feed_url", "ticker"))
 def refresh_rss_feeds(
@@ -2420,7 +2428,22 @@ def refresh_rss_feeds(
             service = FeedIngestionService()
             processed = ingested = 0
             errors: list[dict] = []
-            for feed in feeds:
+            started_at = time.monotonic()
+            for index, feed in enumerate(feeds):
+                if time.monotonic() - started_at >= _RSS_TIME_BUDGET_SECONDS:
+                    errors.append(
+                        {
+                            "url": None,
+                            "source": "rss",
+                            "type": "time_budget_exceeded",
+                            "message": (
+                                f"presupuesto de {_RSS_TIME_BUDGET_SECONDS:.0f}s "
+                                f"agotado; {len(feeds) - index} feeds diferidos "
+                                "al siguiente tick"
+                            ),
+                        }
+                    )
+                    break
                 try:
                     result = _run(
                         service.poll_rss(feed.url, ticker=feed.ticker, source_label=feed.label)
