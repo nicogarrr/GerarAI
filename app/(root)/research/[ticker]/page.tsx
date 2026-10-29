@@ -10,7 +10,7 @@ import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
 import { collapseVersionHistory, versionHistoryBadges } from '@/lib/research/version-history';
-import { listingStatus } from '@/lib/research/listing-status';
+import { ListingStaleBanner } from '@/components/research/ListingStaleBanner';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
@@ -1713,10 +1713,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
           </div>
           <CompanyNavigation ticker={ticker} activeView={activeView} />
-          {(() => {
-            const listing = listingStatus(company.exchange, headerMarket?.quote?.priceAsOf ?? null, new Date());
-            return listing.stale ? <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200" role="status">{listing.message}</p> : null;
-          })()}
+          <Suspense fallback={null}><ListingStaleBanner exchange={company.exchange} priceAsOf={headerMarket?.quote?.priceAsOf ?? null} quote={headerQuotePromise} /></Suspense>
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
