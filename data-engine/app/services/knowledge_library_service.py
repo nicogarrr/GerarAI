@@ -115,7 +115,11 @@ def extraction_error_message(exc: Exception) -> str:
             "El modelo de lenguaje no respondió o no está disponible ahora mismo. "
             "Vuelve a intentarlo en unos minutos."
         )
-    return f"{type(exc).__name__}: {exc}"
+    # Se guarda en el documento y la UI lo enseña: sin redactar, un error de
+    # httpx traía la URL del proveedor con ?apikey= tal cual.
+    from app.core.errors import redact_secrets
+
+    return redact_secrets(f"{type(exc).__name__}: {exc}")[:500]
 
 
 class KnowledgeLibraryService:
