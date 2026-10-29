@@ -408,3 +408,77 @@ def test_api_ownership_signals_resume_por_tenant(monkeypatch):
     other = signed_request(client, secret, tenant_b, "user-b", "GET", "/api/insider/ownership-signals", params={"ticker": ticker})
     assert other.status_code == 200
     assert other.json()["insider"]["status"] == "sin_datos"
+
+
+def test_change_labels_for_cusip_equivale_al_diff_completo():
+    """La lectura acotada por cusip da las mismas etiquetas que changes().
+
+    La ficha solo necesita un cusip por gestor; cargar la cartera entera de
+    cada gestor revisado (~32) superaba el presupuesto de lectura de la ficha
+    en valores muy cubiertos (AAPL) y el panel 13F fallaba al cargar.
+    """
+    db = _db()
+    from app.services.investors import INVESTORS
+    from app.services.manager_holding_ingestion_service import (
+        REVIEWED_MANAGERS,
+        ManagerHoldingIngestionService,
+    )
+
+    inv = next(i for i in INVESTORS if i.cik and i.cik in REVIEWED_MANAGERS)
+    q2, q3 = date(2026, 6, 30), date(2026, 9, 30)
+    manager = _manager(db, inv.cik, inv.name, q3)
+    _holding(db, manager, q2, "037833100", 100, 7000)  # AAPL: aumenta
+    _holding(db, manager, q3, "037833100", 150, 11000)
+    _holding(db, manager, q2, "OTHER0000", 10, 10)  # sale
+    _holding(db, manager, q3, "NEW00000A", 5, 5)  # nueva
+    _holding(db, manager, q2, "SAME00000", 20, 20)  # mantiene
+    _holding(db, manager, q3, "SAME00000", 20, 21)
+    # Ruido: filas de otros cusips que el diff completo cargaria una a una.
+    for n in range(50):
+        _holding(db, manager, q2, f"FILL{n:05d}", 1, 1)
+        _holding(db, manager, q3, f"FILL{n:05d}", 1, 1)
+    db.commit()
+
+    service = ManagerHoldingIngestionService()
+    full = {row["cusip"]: row["change"] for row in service.changes(db, cik=inv.cik)["changes"]}
+    assert full["037833100"] == "increased"  # el diff completo sigue igual
+    for cusip in ("037833100", "OTHER0000", "NEW00000A", "SAME00000"):
+        assert service.change_labels_for_cusip(db, cik=inv.cik, cusip=cusip) == [full[cusip]]
+    assert service.change_labels_for_cusip(db, cik=inv.cik, cusip="NOPE00000") == []
+
+
+def test_change_labels_for_cusip_enmienda_que_omite_el_cusip():
+    """Una enmienda vigente que omite el cusip marca la posicion cerrada.
+
+    Regresion del PR #3025: elegir el accession solo entre los filings que
+    contienen el cusip servia el filing base (mas viejo) y resucitaba una
+    posicion que la enmienda mas reciente ya habia retirado; el diff
+    completo de changes() la daba por cerrada. Repro del piloto: Q2 AAPL
+    100, Q3 base AAPL 150, enmienda Q3 mas nueva con OTHER sin AAPL.
+    """
+    db = _db()
+    from app.services.manager_holding_ingestion_service import ManagerHoldingIngestionService
+
+    q2, q3 = date(2026, 6, 30), date(2026, 9, 30)
+    manager = _manager(db, "0000000001", "Example", q3)
+    _holding(db, manager, q2, "037833100", 100, 100)
+    _holding(db, manager, q3, "037833100", 150, 150)
+    db.add(
+        ManagerHolding(
+            manager_id=manager.id,
+            accession_number="amended-latest",
+            report_date=q3,
+            filing_date=date(2026, 10, 15),
+            cusip="OTHER0000",
+            name_of_issuer="Other",
+            shares=Decimal(10),
+            value_usd_thousands=Decimal(10),
+        )
+    )
+    db.commit()
+
+    service = ManagerHoldingIngestionService()
+    full = [row["change"] for row in service.changes(db, cik=manager.cik)["changes"] if row["cusip"] == "037833100"]
+    narrow = service.change_labels_for_cusip(db, cik=manager.cik, cusip="037833100")
+    assert full == ["closed"]  # la enmienda vigente ya no lista AAPL
+    assert narrow == full

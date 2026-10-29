@@ -365,6 +365,108 @@ class ManagerHoldingIngestionService:
             "limitations": LIMITATIONS,
         }
 
+    def change_labels_for_cusip(self, db: Session, *, cik: str, cusip: str) -> list[str]:
+        """Cambios trimestrales de UN cusip para un gestor, sin cargar su cartera entera.
+
+        Misma regla que ``changes()``: dos ultimos periodos guardados, ultimo
+        accession por periodo (las enmiendas sustituyen al filing base),
+        comparacion por acciones. ``changes()`` lee TODAS las posiciones de
+        ambos trimestres (cientos o miles de filas por gestor); la ficha lo
+        llamaba una vez por gestor revisado (~32) solo para quedarse con un
+        cusip, y para valores muy cubiertos (AAPL) la suma superaba el
+        presupuesto de lectura de la ficha y el panel 13F fallaba al cargar.
+        Aqui solo se cargan las filas de ese cusip dentro del accession
+        vigente de cada periodo (elegido sobre todos los filings del
+        gestor, como en ``changes()``). Devuelve las etiquetas por
+        fila (puede haber varias clases del mismo cusip); [] si no aplica
+        (sin gestor, sin dos periodos o sin ese cusip).
+        """
+        cik = str(cik).strip().zfill(10)
+        manager = db.scalar(select(FundManager).where(FundManager.cik == cik))
+        if manager is None:
+            return []
+        report_dates = [
+            row[0]
+            for row in db.execute(
+                select(ManagerHolding.report_date)
+                .where(
+                    ManagerHolding.manager_id == manager.id,
+                    *tenant_filters(db, ManagerHolding),
+                )
+                .group_by(ManagerHolding.report_date)
+                .order_by(ManagerHolding.report_date.desc())
+                .limit(2)
+            )
+            if row[0] is not None
+        ]
+        if len(report_dates) < 2:
+            return []
+        latest_date, previous_date = report_dates[0], report_dates[1]
+
+        def period_view(period: date) -> dict:
+            # Misma regla que changes(): el accession vigente del periodo se
+            # elige sobre TODOS los filings del gestor (la enmienda mas
+            # reciente sustituye al filing base). Elegirlo solo entre los
+            # filings que contienen el cusip serviria uno viejo y resucitaria
+            # una posicion que la enmienda vigente ya retiro. El agregado
+            # (accession, filing_date) es ligero: un gestor tiene pocos
+            # filings por periodo, no hace falta cargar sus filas.
+            filings = db.execute(
+                select(
+                    ManagerHolding.accession_number,
+                    func.max(ManagerHolding.filing_date),
+                )
+                .where(
+                    ManagerHolding.manager_id == manager.id,
+                    ManagerHolding.report_date == period,
+                    *tenant_filters(db, ManagerHolding),
+                )
+                .group_by(ManagerHolding.accession_number)
+            ).all()
+            if not filings:
+                return {}
+            accession = max(filings, key=lambda pair: (pair[1] or date.min, pair[0]))[0]
+            rows = db.scalars(
+                select(ManagerHolding).where(
+                    ManagerHolding.manager_id == manager.id,
+                    ManagerHolding.report_date == period,
+                    ManagerHolding.accession_number == accession,
+                    ManagerHolding.cusip == cusip,
+                    *tenant_filters(db, ManagerHolding),
+                )
+            ).all()
+            return {
+                (row.cusip, row.title_of_class, row.put_call): row
+                for row in rows
+            }
+
+        latest = period_view(latest_date)
+        previous = period_view(previous_date)
+        labels: list[str] = []
+        for key in sorted(set(latest) | set(previous)):
+            if key[2]:
+                # Puts/calls no cuentan: el resumen 13F es de posiciones largas
+                # (mismo filtro que aplicaba el llamador sobre changes()).
+                continue
+            now, before = latest.get(key), previous.get(key)
+            if now is not None and before is None:
+                labels.append("new")
+            elif now is None and before is not None:
+                labels.append("closed")
+            else:
+                assert now is not None and before is not None
+                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
+                now_shares = now.shares or Decimal(0)
+                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
+                before_shares = before.shares or Decimal(0)
+                if now_shares > before_shares:
+                    labels.append("increased")
+                elif now_shares < before_shares:
+                    labels.append("decreased")
+                else:
+                    labels.append("unchanged")
+        return labels
+
     def changes(self, db: Session, *, cik: str) -> dict[str, Any]:
         """Quarter-over-quarter position changes for a reviewed manager.
 

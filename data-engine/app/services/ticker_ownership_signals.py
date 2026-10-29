@@ -155,17 +155,17 @@ def insider_signal(
 
 
 def _manager_changes_for_cusip(db: Session, inv: Investor, cusip: str) -> str | None:
-    """Cambio del gestor en ese CUSIP frente a su 13F anterior (o None si no aplica)."""
+    """Cambio del gestor en ese CUSIP frente a su 13F anterior (o None si no aplica).
+
+    Lee solo las filas de ese CUSIP (``change_labels_for_cusip``), no la
+    cartera entera del gestor: la ficha llama a esto una vez por gestor
+    revisado y el diff completo superaba su presupuesto de lectura.
+    """
     if inv.cik is None or _manager(db, inv) is None:
         return None
-    result = ManagerHoldingIngestionService().changes(db, cik=inv.cik)
-    if result.get("status") != "ok":
-        return None
-    found = {
-        row["change"]
-        for row in result.get("changes") or []
-        if row.get("cusip") == cusip and not row.get("put_call")
-    }
+    found = set(
+        ManagerHoldingIngestionService().change_labels_for_cusip(db, cik=inv.cik, cusip=cusip)
+    )
     return next((change for change in _CHANGE_PRIORITY if change in found), None)
 
 
