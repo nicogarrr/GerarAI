@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import AlertsManager from '@/components/alerts/AlertsManager';
+import PushNotifications from '@/components/alerts/PushNotifications';
 import { PageHeader } from '@/components/ui/page-header';
 
 export const dynamic = 'force-dynamic';
@@ -19,6 +20,8 @@ export default async function AlertsPage() {
                 title="Alertas"
                 actions={<Link href="/calendar/resultados" className="inline-flex min-h-11 items-center text-sm text-gray-400 transition-colors hover:text-teal-200">Resultados</Link>}
             />
+
+            <PushNotifications />
 
             <AlertsManager />
         </main>
