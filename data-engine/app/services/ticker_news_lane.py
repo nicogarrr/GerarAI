@@ -177,6 +177,13 @@ _LAW_FIRM_SOLICITATION = re.compile(
             r"\bopportunity to lead\b.{0,120}\b(?:lawsuit|class action)\b",
             r"\b(?:lawsuit|class action)\b[^.]{0,40}\bwith [A-Z][\w&.,' -]{1,40}\b(?:law|llp|pllc|p\.c\.)\b",
             r"\b(?:law (?:firm|offices?|group)|llp|pllc)\b[^.]{0,60}\b(?:investors?|shareholders?)\b[^.]{0,60}\b(?:lawsuit|class action|claims?)\b",
+            # Captacion sin despacho de la lista, vista en prod (2026-10-29):
+            # «SueWallSt Alerts ... Stockholders of Securities Class Action» y
+            # «UPCOMING DEADLINE: ... Class Action». Verbo «alerts» + destinatario
+            # accionista + demanda: ningun patron anterior cubria esa forma.
+            r"\bsuewallst\b",
+            r"\bupcoming deadline\b[^.]{0,180}\b(?:class action|stockholders?|shareholders?)\b",
+            r"\balerts?\b[^.]{0,120}\b(?:stockholders?|shareholders?|investors?)\b[^.]{0,80}\b(?:class action|securities (?:fraud|lawsuit))\b",
         )
     ),
     re.IGNORECASE,
