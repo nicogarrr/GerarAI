@@ -12,7 +12,8 @@ import { getKnowledgeLetters } from "@/lib/actions/research-tools.actions";
 import { Portfolio } from "../_components/Portfolio";
 import { InvestorLetters } from "../_components/InvestorLetters";
 import { InvestorSelector } from "../_components/InvestorSelector";
-import { InvestorViewSelector } from "../_components/InvestorViewSelector";
+import { InvestorViewSelector, VIEWS } from "../_components/InvestorViewSelector";
+import { InvestorConcepts } from "../_components/InvestorConcepts";
 
 import { InvestorVideos } from "../_components/InvestorVideos";
 import { InvestorAvatar } from "../_components/Avatar";
@@ -27,14 +28,6 @@ type PageProps = {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ vista?: string; pagina?: string }>;
 };
-
-const VIEWS = [
-  { id: "posiciones", label: "Posiciones" },
-  { id: "distribucion", label: "Distribución" },
-  { id: "cambios", label: "Cambios" },
-  { id: "cartas", label: "Cartas" },
-  { id: "videos", label: "Vídeos" },
-] as const;
 
 export async function generateMetadata({
   params,
@@ -58,18 +51,21 @@ export default async function InvestorPage({
 
   let choices: Awaited<ReturnType<typeof getInvestors>>;
   let investor: Awaited<ReturnType<typeof getInvestor>>;
-  let portfolio: Awaited<ReturnType<typeof getInvestorPortfolio>>;
+  let portfolio: Awaited<ReturnType<typeof getInvestorPortfolio>> | null = null;
   let documents: Awaited<ReturnType<typeof getKnowledgeLetters>> = [];
   let lettersUnavailable = false;
   try {
     [investor, choices] = await Promise.all([getInvestor(slug), getInvestors()]);
     if (!investor) notFound();
-    portfolio = await getInvestorPortfolio(slug);
-    try {
-      if (view === "cartas") documents = await getKnowledgeLetters();
-    } catch (error) {
-      if (!isBackendUnavailableError(error)) throw error;
-      lettersUnavailable = true;
+    if (view !== "cartas" && view !== "videos") {
+      portfolio = await getInvestorPortfolio(slug);
+    } else if (view === "cartas") {
+      try {
+        documents = await getKnowledgeLetters();
+      } catch (error) {
+        if (!isBackendUnavailableError(error)) throw error;
+        lettersUnavailable = true;
+      }
     }
   } catch (error) {
     if (isBackendUnavailableError(error)) {
@@ -82,7 +78,6 @@ export default async function InvestorPage({
     }
     throw error;
   }
-  if (!investor) notFound();
 
   const photo = INVESTOR_PHOTOS[investor.slug];
 
@@ -127,7 +122,7 @@ export default async function InvestorPage({
       </header>
 
       <InvestorViewSelector slug={investor.slug} view={view ?? "posiciones"} />
-      {view !== "cartas" && view !== "videos" ? <>
+      {view !== "cartas" && view !== "videos" && portfolio ? <>
       {investor.has_13f && portfolio.positions.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
           <p className="text-gray-300">Aún no hay carteras descargadas en esta cuenta.</p>
@@ -152,6 +147,8 @@ export default async function InvestorPage({
         publicLetters={investor.public_profile?.letters}
       /> : null}
       {view === "videos" ? <InvestorVideos videos={investor.videos} /> : null}
+
+      <InvestorConcepts slug={investor.slug} />
     </main>
   );
 }

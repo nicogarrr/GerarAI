@@ -10,6 +10,41 @@ export type InvestorConcept = {
   source: { title: string; url: string };
 };
 
+export const INVESTOR_NAMES: Record<string, string> = {
+  buffett: "Warren Buffett",
+  ackman: "Bill Ackman",
+  "terry-smith": "Terry Smith",
+  "li-lu": "Li Lu",
+  "daily-journal": "Daily Journal",
+  pabrai: "Mohnish Pabrai",
+  akre: "Chuck Akre",
+  klarman: "Seth Klarman",
+  druckenmiller: "Stanley Druckenmiller",
+  tepper: "David Tepper",
+  loeb: "Daniel Loeb",
+  berkowitz: "Bruce Berkowitz",
+  "tweedy-browne": "Tweedy, Browne",
+  oakmark: "Harris Associates (Oakmark)",
+  peltz: "Nelson Peltz",
+  "lone-pine": "Lone Pine Capital",
+  southeastern: "Southeastern Asset Management",
+  "tiger-global": "Tiger Global",
+  polen: "Polen Capital",
+  markel: "Markel",
+  "gates-foundation": "Gates Foundation Trust",
+  "abrams-bison": "Abrams Bison",
+  ako: "AKO Capital",
+  roepers: "Alex Roepers",
+  "mark-leonard": "Mark Leonard",
+  bezos: "Jeff Bezos",
+  quintana: "Emérito Quintana",
+  munger: "Charlie Munger",
+  "nick-sleep": "Nick Sleep",
+  lynch: "Peter Lynch",
+  trump: "Donald Trump",
+  "barron-trump": "Barron Trump",
+};
+
 
 const BERKSHIRE_1986 = {
   title: "Berkshire Hathaway · Carta de 1986",

@@ -21,7 +21,6 @@ import { GlossaryTerm } from '@/components/GlossaryTerm';
 import { Button } from '@/components/ui/button';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 3600;
 
 /**
  * Página pública: la metodología es el mejor argumento de confianza del
