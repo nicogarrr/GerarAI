@@ -1,15 +1,16 @@
 """Lista 13.2: el export anual no puede perder los asientos del 31 de diciembre.
 
-created_at es DateTime con tz: filtrar con "<= date(year,12,31)" corta a
-medianoche y excluye cualquier asiento creado durante el dia 31. El filtro
-correcto es el rango semiabierto [< 1 de enero del ano siguiente].
+Desde 3f6ad58 (commit directo en main) el export anual filtra por
+``decision_date`` (Date, el dia de la decision) y no por ``created_at``: un
+asiento decidido el 31 de diciembre entra en ese ano aunque se registre
+despues, y uno decidido el 1 de enero del ano siguiente no entra.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 from sqlalchemy import create_engine
@@ -39,7 +40,7 @@ def _payload(response) -> dict:
     return json.loads(asyncio.run(_collect()))
 
 
-def _entry(db, created_at: datetime) -> DecisionJournalEntry:
+def _entry(db, created_at: datetime, decision_date: date | None = None) -> DecisionJournalEntry:
     company = Company(
         ticker="TSTX31", name="TSTX31", exchange="NASDAQ", currency="USD",
         sector="Technology", industry="Software", company_type="holding",
@@ -52,6 +53,7 @@ def _entry(db, created_at: datetime) -> DecisionJournalEntry:
         decision="buy",
         rationale="test",
         created_at=created_at,
+        decision_date=decision_date or created_at.date(),
     )
     db.add(entry)
     db.commit()
@@ -72,3 +74,11 @@ def test_journal_entry_from_next_year_is_not_exported(db):
     payload = _payload(response)
     ids = [row["id"] for row in payload["journal_entries"]]
     assert entry.id not in ids
+
+
+def test_journal_entry_decided_dec_31_and_logged_later_is_exported_in_that_year(db):
+    entry = _entry(db, datetime(2027, 1, 2, 9, 0, tzinfo=UTC), decision_date=date(2026, 12, 31))
+    ids = [row["id"] for row in _payload(export_year(2026, format="json", db=db))["journal_entries"]]
+    assert entry.id in ids
+    ids_2027 = [row["id"] for row in _payload(export_year(2027, format="json", db=db))["journal_entries"]]
+    assert entry.id not in ids_2027
