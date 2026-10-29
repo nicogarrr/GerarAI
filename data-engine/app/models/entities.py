@@ -802,7 +802,9 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
 
     @property
     def source_url(self) -> str | None:
-        return self.source.source_url if self.source is not None else None
+        from app.core.source_urls import linkable_source_url
+
+        return linkable_source_url(self.source.source_url) if self.source is not None else None
 
     @property
     def source_title(self) -> str | None:
