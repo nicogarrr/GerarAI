@@ -252,8 +252,8 @@ def test_web_push_0101_round_trip_on_ci_postgres():
         with engine.connect() as conn:
             transaction = conn.begin()
             try:
-                conn.execute(sa.text(f'CREATE SCHEMA {schema}'))
-                conn.execute(sa.text(f'SET LOCAL search_path TO {schema}'))
+                conn.execute(sa.schema.CreateSchema(schema))
+                conn.execute(sa.text("SELECT set_config('search_path', :schema, true)"), {'schema': schema})
                 conn.execute(sa.text('CREATE TABLE tenants (id INTEGER PRIMARY KEY)'))
                 module.op = Operations(MigrationContext.configure(conn))
                 module.upgrade()
