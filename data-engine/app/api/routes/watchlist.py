@@ -758,60 +758,6 @@ def manual_dca_status(run_id: int, db: Session = Depends(get_db)) -> dict:
         "summary": (row.detail or {}).get("summary"), "error": row.error}
 
 
-@router.post("/dca-signals/evaluate", response_model=DcaEvaluateOut)
-async def evaluate_dca_signals_now(db: Session = Depends(get_db)) -> dict:
-    """Refresh at most ten missing/stale states, shared lease and 5min cooldown."""
-    import redis
-    from fastapi.concurrency import run_in_threadpool
-
-    from app.core.config import get_settings
-    from app.core.redis_retry import no_retry
-    from app.services import dca_manual, dca_run_log
-    from app.services.dca_signal_service import evaluate_watchlist
-
-    tenant = str(db.info.get("tenant_id") or "legacy")
-
-    def _evaluate() -> dict:
-        client = redis.Redis.from_url(get_settings().redis_url,
-            socket_connect_timeout=1, socket_timeout=2, retry=no_retry())
-        token = None
-        try:
-            try:
-                token, wait = dca_manual.acquire_manual_gate(client, tenant)
-            except redis.RedisError as exc:
-                raise HTTPException(status_code=503, detail="No se puede asegurar una ejecución única ahora; reintenta más tarde.") from exc
-            if token is None:
-                if wait == -1:
-                    raise HTTPException(status_code=409, detail="Ya hay una evaluación DCA en curso en tu cuenta.")
-                raise HTTPException(status_code=429,
-                    detail=f"Espera {wait} s antes de ejecutar otra tanda.",
-                    headers={"Retry-After": str(wait)})
-            pending = dca_manual.pending_symbols(db)
-            requested = pending[:dca_manual.MAX_SYMBOLS]
-            run = dca_run_log.start_run(db, "manual")
-            try:
-                summary = evaluate_watchlist(db, symbols=set(requested))
-                summary.update(requested=len(requested), pending_remaining=max(0, len(pending) - len(requested)),
-                    cooldown_seconds=dca_manual.COOLDOWN_SECONDS)
-                dca_run_log.finish_run(db, run, summary=summary)
-                if run is not None:
-                    run.detail = {**(run.detail or {}), "requested_symbols": requested}
-                    db.commit()
-                return summary
-            except Exception as exc:
-                db.rollback()
-                dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
-                raise
-        finally:
-            try:
-                if token is not None:
-                    dca_manual.release_manual_gate(client, tenant, token)
-            finally:
-                client.close()
-
-    return await run_in_threadpool(_evaluate)
-
-
 @router.get("/dca-signals/{symbol}/hit-rates", response_model=DcaHitRatesOut)
 def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
     """"¿Cuántas veces estaba más arriba?" por nivel (3/6/12/24/36 meses).

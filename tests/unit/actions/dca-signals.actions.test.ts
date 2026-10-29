@@ -10,8 +10,8 @@ vi.mock('@/lib/research/client', () => ({ researchRequest: m.researchRequest, js
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser: m.requireAuthenticatedUser }));
 
 import { AppError } from '@/lib/types/errors';
+import * as dcaActions from '@/lib/actions/dca-signals.actions';
 import {
-    evaluateDcaSignalsNow,
     getDcaBacktest,
     getDcaHitRates,
     getDcaHitRatesState,
@@ -42,20 +42,10 @@ describe('getDcaSignals', () => {
     });
 });
 
-describe('evaluateDcaSignalsNow', () => {
-    it('POST al evaluador, revalida /watchlist y devuelve el resumen', async () => {
-        m.researchRequest.mockResolvedValueOnce({ evaluated: 3 });
-        expect(await evaluateDcaSignalsNow()).toEqual({ success: true, summary: { evaluated: 3 } });
-        expect(m.researchRequest).toHaveBeenCalledWith('/api/watchlist/dca-signals/evaluate', { method: 'POST' });
-        expect(m.revalidatePath).toHaveBeenCalledWith('/watchlist');
-    });
-
-    it('el límite de una por minuto llega como fallo con mensaje, sin revalidar', async () => {
-        m.researchRequest.mockRejectedValueOnce(new AppError('Rate limit exceeded', 'RESEARCH_API_ERROR', 429));
-        const result = await evaluateDcaSignalsNow();
-        expect(result.success).toBe(false);
-        expect(result.message).toBe('Demasiadas peticiones. Espera un momento y reintenta.');
-        expect(m.revalidatePath).not.toHaveBeenCalled();
+describe('evaluación manual DCA', () => {
+    it('solo existe el camino asíncrono: el POST síncrono retirado no tiene action', () => {
+        expect(Object.keys(dcaActions)).not.toContain('evaluateDcaSignalsNow');
+        expect(Object.keys(dcaActions)).toContain('startDcaManualJob');
     });
 });
 
