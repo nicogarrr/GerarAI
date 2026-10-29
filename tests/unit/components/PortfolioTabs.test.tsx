@@ -82,6 +82,11 @@ describe('PortfolioTabs pestana desde la URL', () => {
 });
 
 describe('PortfolioTabs contenido', () => {
+    it('no repite el aviso genérico de proveedor y retardo en la cabecera', () => {
+        renderTabs();
+        expect(screen.queryByText(/15 min de retardo|Yahoo Finance/i)).not.toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument();
+    });
     it('previsión y dividendos no cargados: aviso, no un panel vacio', () => {
         nav.params = new URLSearchParams({ tab: 'prevision' });
         const { unmount } = renderTabs();
