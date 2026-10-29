@@ -308,3 +308,31 @@ def test_baba_nine_purchase_synthetic_matches_reported_historical_base_total(db)
     assert review["status"] == "ok" and result["cost_review_required"] == []
     assert review["trade_cost_native"] == pytest.approx(float(eur_total), abs=.00001)
     assert p.cost_basis_native == Decimal("656.580770")
+
+
+@pytest.mark.parametrize("reconcile", [False, True])
+def test_dry_run_never_commits_or_writes(db, reconcile):
+    """dry_run es solo lectura en TODAS las rutas (antes reconcile=False hacia commit)."""
+    from sqlalchemy import func, select
+
+    from app.models import CashBalance, IbkrRawRow, PortfolioDailySnapshot
+
+    options = {"reconcile": True, "expected_account_id": "U1", "max_statement_age_days": 36500} if reconcile else {}
+    statement = xml().replace(
+        "<FlexStatement>", '<FlexStatement accountId="U1" fromDate="20261001" toDate="20261027">'
+    )
+    result = IBKRImportService().import_flex_xml(db, statement, dry_run=True, **options)
+    assert result["status"] == "dry_run"
+    db.expire_all()
+    for model in (Position, Transaction, CashBalance, IbkrRawRow, PortfolioDailySnapshot):
+        assert db.scalar(select(func.count()).select_from(model)) == 0, model.__name__
+
+
+def test_dry_run_commit_is_never_called(db, monkeypatch):
+    calls = []
+    monkeypatch.setattr(db, "commit", lambda: calls.append("commit"))
+    IBKRImportService().import_flex_xml(db, xml(), dry_run=True)
+    assert calls == []
+    # y sin dry_run si confirma: el contrato no rompe el import normal.
+    IBKRImportService().import_flex_xml(db, xml())
+    assert calls and set(calls) == {"commit"}
