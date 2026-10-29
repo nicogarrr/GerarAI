@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { getWatchlistEntryData, getWatchlistState, fetchDatedChanges, getFairValueReading, getScreenerStocksReal } = vi.hoisted(() => ({
-    getWatchlistEntryData: vi.fn<(...args: any[]) => any>(),
-    getWatchlistState: vi.fn<(...args: any[]) => any>(),
-    fetchDatedChanges: vi.fn<(...args: any[]) => any>(async () => ({})),
-    getFairValueReading: vi.fn<(...args: any[]) => any>(),
-    getScreenerStocksReal: vi.fn<(...args: any[]) => any>(async () => []),
+    getWatchlistEntryData: vi.fn<(symbol: string) => Promise<unknown>>(),
+    getWatchlistState: vi.fn<() => Promise<unknown>>(),
+    fetchDatedChanges: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => ({})),
+    getFairValueReading: vi.fn<(symbol: string) => Promise<unknown>>(),
+    getScreenerStocksReal: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => []),
 }));
 vi.mock('@/lib/actions/watchlist.actions', () => ({ getWatchlistEntryData, getWatchlistState }));
 vi.mock('@/lib/market/dated-change', () => ({ fetchDatedChanges }));
