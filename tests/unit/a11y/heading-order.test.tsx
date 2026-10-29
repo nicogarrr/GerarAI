@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 // axe heading-order (WCAG 1.3.1 / 2.4.6) en las dos pantallas donde Lighthouse
 // CI (build de producción, sesión con datos) bajaba la nota de accesibilidad:
 // /portfolio saltaba de h1 «Resumen» a h3 «Valor de la cartera» y /taxes de h1
-// «Impuestos» a h3 «Reporte Fiscal 2026». Un lector de pantalla que navega por
+// «Impuestos» a h3 «Informe fiscal 2026». Un lector de pantalla que navega por
 // titulares ve un nivel que falta y cree que se ha perdido una sección.
 
 vi.mock('next/navigation', () => ({
@@ -55,7 +55,7 @@ describe('a11y: titulares sin saltos de nivel (heading-order)', () => {
         expect(await headingOrder(container)).toEqual([]);
     });
 
-    it('/taxes: «Reporte Fiscal» y «Posiciones Fiscales» son h2 bajo el h1 «Impuestos»', async () => {
+    it('/taxes: «Informe fiscal» y «Posiciones Fiscales» son h2 bajo el h1 «Impuestos»', async () => {
         const { container } = render(
             <main>
                 <h1>Impuestos</h1>
@@ -63,7 +63,7 @@ describe('a11y: titulares sin saltos de nivel (heading-order)', () => {
             </main>,
         );
         const found = levels(container);
-        expect(found).toContain('h2 Reporte Fiscal 2026');
+        expect(found).toContain('h2 Informe fiscal 2026');
         expect(found).toContain('h2 Posiciones Fiscales');
         expect(await headingOrder(container)).toEqual([]);
     });

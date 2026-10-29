@@ -85,7 +85,7 @@ describe('TaxesView informe', () => {
         getReport.mockResolvedValue({ summary: { fiscal_year: 2025, total_dividends_base: 999, base_currency: 'EUR' } });
         view();
         fireEvent.click(screen.getByRole('button', { name: /regenerar/i }));
-        await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Reporte fiscal 2025 regenerado'));
+        await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith('Informe fiscal 2025 regenerado'));
         expect(regen).toHaveBeenCalledWith(2025);
         expect(document.body.textContent).toMatch(/999,00/);
     });

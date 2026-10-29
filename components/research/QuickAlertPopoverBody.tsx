@@ -24,7 +24,7 @@ const ALERT_TYPES: Array<{ value: AlertType; label: string; needsValue: boolean;
   { value: 'price_below', label: 'Precio por debajo de', needsValue: true, valuePlaceholder: 'Precio objetivo' },
   { value: 'price_change', label: 'Cambio de precio %', needsValue: true, valuePlaceholder: 'Variación objetivo %' },
   { value: 'news', label: 'Nueva noticia', needsValue: false, valuePlaceholder: '' },
-  { value: 'earnings', label: 'Reporte de ganancias', needsValue: false, valuePlaceholder: '' },
+  { value: 'earnings', label: 'Informe de ganancias', needsValue: false, valuePlaceholder: '' },
 ];
 
 // Símbolo visible junto al precio objetivo: la alerta es sobre el precio

@@ -24,7 +24,7 @@ describe('quick research alert',()=>{
   m.create.mockResolvedValue({ok:true});render(<QuickAlertButton ticker="TEST"/>);await open();await type('Cambio de precio %');fireEvent.click(screen.getByRole('button',{name:'+ Alerta'}));expect(m.error).toHaveBeenCalledWith('Introduce una variación objetivo válida');
   fireEvent.change(screen.getByRole('textbox',{name:'Variación objetivo en porcentaje'}),{target:{value:'5'}});fireEvent.click(screen.getByRole('button',{name:'+ Alerta'}));await waitFor(()=>expect(m.success).toHaveBeenCalledWith('Alerta creada: TEST cambio de precio % 5%'));
  });
- it.each(['Nueva noticia','Reporte de ganancias'])('nonprice alert %s has no value field',async label=>{
+ it.each(['Nueva noticia','Informe de ganancias'])('nonprice alert %s has no value field',async label=>{
   m.create.mockResolvedValue({ok:true});render(<QuickAlertButton ticker="TEST"/>);await open();await type(label);expect(screen.queryByRole('textbox')).not.toBeInTheDocument();fireEvent.click(screen.getByRole('button',{name:'+ Alerta'}));await waitFor(()=>expect(m.success).toHaveBeenCalledWith(`Alerta creada: TEST · ${label}`));expect(m.create.mock.calls[0][0].condition.value).toBe('');
  });
  it.each(['duplicate','invalid_symbol'])('business rejection %s retains input without retry suggestion',async cause=>{
