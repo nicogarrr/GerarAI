@@ -87,6 +87,7 @@ dependencies = [
     # queda el default duckdb_path en config como ruta historica). El
     # analytics local vive en Postgres + ficheros; no reintroducir sin uso.
     "minio>=7.2.7,<8",
+    "pywebpush>=2.0.0,<3",
     "dramatiq[redis]>=1.17.0,<3",
     "apscheduler>=3.10.4,<4",
     "langfuse>=3.0.0,<5",

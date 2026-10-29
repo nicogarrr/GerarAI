@@ -1769,6 +1769,36 @@ class AlertSubscription(TenantOwnedMixin, Base, TimestampMixin):
     enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class PushSubscription(TenantOwnedMixin, Base, TimestampMixin):
+    """Dispositivo con Web Push (PWA) de un usuario. El endpoint es una
+    capacidad: quien lo conoce puede enviar al dispositivo, por eso no se
+    exporta ni se registra."""
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (UniqueConstraint("tenant_id", "endpoint_hash", name="uq_push_subscription_endpoint"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(160))
+    endpoint: Mapped[str] = mapped_column(Text)
+    endpoint_hash: Mapped[str] = mapped_column(String(64))
+    p256dh: Mapped[str] = mapped_column(String(200))
+    auth_secret: Mapped[str] = mapped_column(String(100))
+    user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class PushPreference(TenantOwnedMixin, Base, TimestampMixin):
+    """Opt-in de Web Push por usuario y tipo de evento (como Telegram)."""
+
+    __tablename__ = "push_preferences"
+    __table_args__ = (UniqueConstraint("tenant_id", "user_id", "event_type", name="uq_push_preference_type"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(160))
+    event_type: Mapped[str] = mapped_column(String(40))
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    enabled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class AlertDelivery(TenantOwnedMixin, Base, TimestampMixin):
     """Outbox de entrega por canal con claim atomico.
 
