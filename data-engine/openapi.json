@@ -8179,7 +8179,7 @@
           "fees": {
             "anyOf": [
               {
-                "maximum": 1e+18,
+                "maximum": 1e+16,
                 "minimum": 0.0,
                 "type": "number"
               },
