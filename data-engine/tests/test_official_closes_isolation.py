@@ -84,7 +84,7 @@ def test_holiday_full_download_attempts_capped_across_tenants(setup,monkeypatch)
         return {'status':'partial','target_date':'2026-10-27','target_coverage':0.0}
     monkeypatch.setattr('app.services.market_close_sync.sync_official_closes',sync)
     for i in range(3):app.sync_official_closes.fn(i,'a')
-    assert app.sync_official_closes.fn(4,'b')['reason']=='session_attempt_cap'
+    assert app.sync_official_closes.fn(4,'b')['reason']=='session_attempt_cooldown'
     assert len(calls)==3
 
 def test_existing_marker_requires_explicit_operator_cleanup(setup):
@@ -92,3 +92,46 @@ def test_existing_marker_requires_explicit_operator_cleanup(setup):
     r.values['cavaai:official-closes:done:2026-10-27']='1'
     app.sync_official_closes.fn(1,'a')
     assert calls==[]
+
+
+def test_partial_session_recovers_after_bounded_cooldown(setup, monkeypatch):
+    r, calls = setup
+    clock = [100000]
+    monkeypatch.setattr('time.time', lambda: clock[0])
+    def sync(db):
+        calls.append(1)
+        return {'status': 'partial', 'target_date': '2026-10-27', 'target_coverage': 0.01}
+    monkeypatch.setattr('app.services.market_close_sync.sync_official_closes', sync)
+    for _ in range(3):
+        app.sync_official_closes.fn(1, 'a')
+    for _ in range(20):
+        out = app.sync_official_closes.fn(2, 'b')
+        assert out['reason'] == 'session_attempt_cooldown'
+        assert out['retry_after_seconds'] == 21600
+    assert len(calls) == 3
+    clock[0] += 21600
+    app.sync_official_closes.fn(2, 'b')
+    assert len(calls) == 4
+    assert r.values['cavaai:official-closes:attempts:2026-10-27'] == '1'
+    assert not any(':done:' in key for key in r.values)
+
+
+def test_legacy_exhausted_cap_starts_cooldown_without_download(setup, monkeypatch):
+    r, calls = setup
+    monkeypatch.setattr('time.time', lambda: 100000)
+    r.values['cavaai:official-closes:attempts:2026-10-27'] = '3'
+    out = app.sync_official_closes.fn(1, 'a')
+    assert out['reason'] == 'session_attempt_cooldown'
+    assert out['retry_after_seconds'] == 21600
+    assert calls == []
+    assert r.values['cavaai:official-closes:cooldown-start:2026-10-27'] == '100000'
+
+
+def test_success_after_cooldown_preserves_global_done_gate(setup, monkeypatch):
+    r, calls = setup
+    monkeypatch.setattr('time.time', lambda: 121600)
+    r.values['cavaai:official-closes:attempts:2026-10-27'] = '3'
+    r.values['cavaai:official-closes:cooldown-start:2026-10-27'] = '100000'
+    assert app.sync_official_closes.fn(1, 'a')['status'] == 'ok'
+    assert app.sync_official_closes.fn(2, 'b')['reason'] == 'session_already_synced'
+    assert len(calls) == 1
