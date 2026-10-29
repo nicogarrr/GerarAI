@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.database import get_db
 from app.services import catalyst_calendar_service as catalyst_service
 from app.services.connectors import earnings_calendar as calendar_connector
+from app.services.connectors import ipo_calendar as ipo_connector
 
 router = APIRouter()
 # Feed ICS publico: se monta en main.py FUERA de private_dependencies (los
@@ -128,14 +129,16 @@ async def catalysts_calendar(
 ) -> dict:
     """Calendario unico de catalizadores de la cartera (por defecto, 14 dias).
 
-    Une resultados y fecha ex-dividendo (NASDAQ publico, solo posiciones
-    abiertas en bolsa US y USD) y acciones corporativas registradas sin
-    aplicar. No incluye la fecha de pago: NASDAQ solo devuelve cada dividendo
-    el dia de su ex-date, asi que un pago con ex-date anterior al rango
-    quedaria fuera sin avisar. Si NASDAQ no
+    Une resultados y fecha ex-dividendo (NASDAQ publico, posiciones y
+    watchlist en bolsa US y USD), acciones corporativas registradas sin
+    aplicar y, desde el historial de dividendos ya ingerido (posiciones y
+    watchlist de cualquier mercado), las fechas de PAGO declaradas y los
+    ex-dividendos no-US que NASDAQ no cubre. Cuando la fila de NASDAQ trae
+    fecha de pago se muestra en el detalle del evento ex. Nada se estima:
+    si la fuente no trae fecha de pago, no hay evento de pago. Si NASDAQ no
     responde, ``status`` lo declara (``partial``/``unavailable``) y las
-    acciones corporativas propias se siguen mostrando; nunca devuelve 5xx
-    por un fallo del proveedor.
+    acciones corporativas propias y los dividendos ingeridos se siguen
+    mostrando; nunca devuelve 5xx por un fallo del proveedor.
     """
     start = desde or _madrid_today()
     end = hasta or (start + timedelta(days=14))
@@ -145,7 +148,8 @@ async def catalysts_calendar(
     # Pieza 5: el calendario de resultados tambien cubre la watchlist (lineas
     # US), etiquetadas con origin="watchlist"; la cartera gana el origen.
     watch_us = await run_in_threadpool(catalyst_service.watchlist_us_tickers, db, held_us)
-    if not held and not watch_us:
+    watch_all = await run_in_threadpool(catalyst_service.watchlist_tickers, db, held)
+    if not held and not watch_all:
         return {
             "status": "ok",
             "desde": start.isoformat(),
@@ -169,6 +173,11 @@ async def catalysts_calendar(
     pending_actions = await run_in_threadpool(
         catalyst_service.pending_actions, db, start, end
     )
+    # Historial de dividendos ingerido: cubre pagos (cualquier mercado) y
+    # ex-dividendos no-US; es local, sin llamadas extra a proveedores.
+    dividend_records = await run_in_threadpool(
+        catalyst_service.upcoming_dividend_records, db, held | watch_all, start, end
+    )
     events = catalyst_service.build_catalysts(
         held=held,
         held_us=held_us,
@@ -178,6 +187,8 @@ async def catalysts_calendar(
         dividends=dividends["events"],
         actions=pending_actions,
         watchlist_us=watch_us,
+        watchlist=watch_all,
+        records=dividend_records,
     )
     events = sorted(
         [*events, *filings["events"]],
@@ -190,11 +201,27 @@ async def catalysts_calendar(
         "desde": start.isoformat(),
         "hasta": end.isoformat(),
         "held_count": len(held),
-        "watchlist_count": len(watch_us),
+        "watchlist_count": len(watch_all),
         "count": len(events),
         "events": events,
         "errors": earnings["errors"] + dividends["errors"] + filings["errors"],
     }
+
+
+@router.get("/ipos")
+async def ipo_calendar() -> dict:
+    """Salidas a bolsa en EE. UU. del mes en curso y el siguiente (NASDAQ publico).
+
+    Incluye las proximas (fecha prevista por la fuente) y las ya fijadas del
+    periodo. Cobertura declarada: solo mercados US que publica NASDAQ (datos
+    de EDGAR Online); el resto de mercados no aparece. Si NASDAQ no responde,
+    ``status`` lo declara; nunca devuelve 5xx por un fallo del proveedor.
+    """
+    today = _madrid_today()
+    months = [
+        ipo_connector.add_months(today, offset) for offset in range(ipo_connector.DEFAULT_MONTHS)
+    ]
+    return await ipo_connector.fetch_ipo_calendar(months)
 
 
 class FeedCreate(BaseModel):

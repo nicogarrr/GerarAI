@@ -15196,7 +15196,7 @@
     },
     "/api/calendar/catalysts": {
       "get": {
-        "description": "Calendario unico de catalizadores de la cartera (por defecto, 14 dias).\n\nUne resultados y fecha ex-dividendo (NASDAQ publico, solo posiciones\nabiertas en bolsa US y USD) y acciones corporativas registradas sin\naplicar. No incluye la fecha de pago: NASDAQ solo devuelve cada dividendo\nel dia de su ex-date, asi que un pago con ex-date anterior al rango\nquedaria fuera sin avisar. Si NASDAQ no\nresponde, ``status`` lo declara (``partial``/``unavailable``) y las\nacciones corporativas propias se siguen mostrando; nunca devuelve 5xx\npor un fallo del proveedor.",
+        "description": "Calendario unico de catalizadores de la cartera (por defecto, 14 dias).\n\nUne resultados y fecha ex-dividendo (NASDAQ publico, posiciones y\nwatchlist en bolsa US y USD), acciones corporativas registradas sin\naplicar y, desde el historial de dividendos ya ingerido (posiciones y\nwatchlist de cualquier mercado), las fechas de PAGO declaradas y los\nex-dividendos no-US que NASDAQ no cubre. Cuando la fila de NASDAQ trae\nfecha de pago se muestra en el detalle del evento ex. Nada se estima:\nsi la fuente no trae fecha de pago, no hay evento de pago. Si NASDAQ no\nresponde, ``status`` lo declara (``partial``/``unavailable``) y las\nacciones corporativas propias y los dividendos ingeridos se siguen\nmostrando; nunca devuelve 5xx por un fallo del proveedor.",
         "operationId": "catalysts_calendar_api_calendar_catalysts_get",
         "parameters": [
           {
@@ -16684,6 +16684,170 @@
           }
         },
         "summary": "Followed Materials",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/ipos": {
+      "get": {
+        "description": "Salidas a bolsa en EE. UU. del mes en curso y el siguiente (NASDAQ publico).\n\nIncluye las proximas (fecha prevista por la fuente) y las ya fijadas del\nperiodo. Cobertura declarada: solo mercados US que publica NASDAQ (datos\nde EDGAR Online); el resto de mercados no aparece. Si NASDAQ no responde,\n``status`` lo declara; nunca devuelve 5xx por un fallo del proveedor.",
+        "operationId": "ipo_calendar_api_calendar_ipos_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Ipo Calendar Api Calendar Ipos Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ipo Calendar",
         "tags": [
           "calendar"
         ]
