@@ -472,6 +472,9 @@ class NotificationService:
         if payload.get("type") == "dca_level":
             # El mensaje DCA ya va redactado en espanol con titular y metricas.
             return str(payload.get("message") or payload.get("title") or "")[:4090]
+        if payload.get("type") == "macro_event":
+            # Redactado en espanol con hora, fuente y etiqueta; sin ids tecnicos.
+            return f"{payload.get('title') or ''}\n{payload.get('message') or ''}"[:4090]
         # Non-filing/non-news alerts retain their established delivery format.
         text = (
             f"[{payload['severity'].upper()}] {payload['title']}\n"

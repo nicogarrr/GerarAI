@@ -17,6 +17,7 @@ from app.workers.dramatiq_app import (
     backfill_sec_fundamentals,
     consolidate_memory,
     dispatch_insider_alerts,
+    dispatch_macro_reminders,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
     evaluate_dca_signals,
@@ -428,6 +429,9 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         minutes=20,
         jitter=180,
     )
+    # Recordatorios macro T-24 h / T-1 h: idempotentes por evento y ventana.
+    _register(scheduler, partial(enqueue_for_all_tenants, dispatch_macro_reminders),
+              "interval", job_id="macro_event_reminders", minutes=10)
     _register(scheduler, partial(enqueue_for_all_tenants, dispatch_tracked_news_alerts),
               "interval", job_id="tracked_news_in_app", minutes=15)
     _register(

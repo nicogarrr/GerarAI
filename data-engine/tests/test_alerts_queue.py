@@ -10,6 +10,7 @@ def test_alert_rail_actors_use_dedicated_queue():
         dramatiq_app.dispatch_tracked_news_alerts,
         dramatiq_app.reconcile_alert_analyses,
         dramatiq_app.dispatch_insider_alerts,
+        dramatiq_app.dispatch_macro_reminders,
         dramatiq_app.reconcile_alert_deliveries,
     ):
         assert actor.queue_name == dramatiq_app.ALERT_QUEUE_NAME == "alerts"

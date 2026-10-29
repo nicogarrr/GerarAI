@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.models import AlertDelivery, AlertSubscription, NewsEvent, ResearchAlert
 
-EVENT_TYPES = ("thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels")
+ALERT_TYPE_MACRO = "macro_event"
+EVENT_TYPES = ("thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event")
 
 
 def event_type(db: Session, alert: ResearchAlert) -> str | None:
@@ -15,6 +16,8 @@ def event_type(db: Session, alert: ResearchAlert) -> str | None:
         return "daily_digest"
     if kind == "dca_level":
         return "dca_levels"
+    if kind == ALERT_TYPE_MACRO:
+        return "macro_event"
     if kind in {"thesis_broken", "claim_contradicted"}:
         return "thesis_broken"
     if kind.startswith("insider_"):
@@ -83,6 +86,8 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         categories.append(ResearchAlert.alert_type == "daily_digest")
     if "dca_levels" in types:
         categories.append(ResearchAlert.alert_type == "dca_level")
+    if "macro_event" in types:
+        categories.append(ResearchAlert.alert_type == ALERT_TYPE_MACRO)
     oldest = db.scalar(select(AlertSubscription.enabled_at).where(
         AlertSubscription.tenant_id == tenant,
         AlertSubscription.enabled.is_(True),
