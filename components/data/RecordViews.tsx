@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Inbox, Loader2, RefreshCw } from 'lucide-react';
 import { showErrorToast } from '@/lib/toast';
+import { Pager } from '@/components/research/Pager';
 
 export type DataRecord = Record<string, unknown>;
 
@@ -150,6 +151,14 @@ export interface RecordListProps {
     /** Etiquetas de cabecera por columna; las no mapeadas muestran la clave cruda (nunca se ocultan) */
     columnLabels?: Record<string, string>;
     footer?: ReactNode;
+    /**
+     * Filas por página. Sin esta prop la lista se pinta entera (una sola
+     * página): con cientos de filas el scroll móvil era interminable. Con
+     * paginador arriba y abajo, como manda la regla de listas largas.
+     */
+    pageSize?: number;
+    /** Etiqueta singular del paginador («registros» por defecto). */
+    paginationLabel?: string;
 }
 
 export function RecordList({
@@ -168,6 +177,8 @@ export function RecordList({
     formatColumns,
     columnLabels,
     footer,
+    pageSize,
+    paginationLabel = 'registros',
 }: RecordListProps) {
     const [records, setRecords] = useState<DataRecord[]>(initialRecords);
     const [loading, setLoading] = useState(false);
@@ -183,6 +194,18 @@ export function RecordList({
             setLoading(false);
         }
     };
+
+    // La página se acota a las filas visibles; los índices que reciben
+    // `rowActions` y `replaceRecord` siguen siendo los de la lista completa,
+    // o un «Aplicar» en página 2 parchearía la fila equivocada.
+    const [page, setPage] = useState(1);
+    const pages = pageSize ? Math.max(1, Math.ceil(records.length / pageSize)) : 1;
+    const currentPage = Math.min(page, pages);
+    const pageStart = pageSize ? (currentPage - 1) * pageSize : 0;
+    const visibleRecords = pageSize ? records.slice(pageStart, pageStart + pageSize) : records;
+    const pager = pages > 1 ? (
+        <Pager label={paginationLabel} onPage={setPage} page={currentPage} pages={pages} total={records.length} />
+    ) : null;
 
     const visibleColumns = pickColumns(records, columns);
     const cellText = (record: DataRecord, column: string) => {
@@ -238,6 +261,7 @@ export function RecordList({
                     </div>
                 ) : (
                     <>
+                        {pager}
                         {/* Escritorio: tabla completa, con la region de scroll enfocada por teclado */}
                         <div className="hidden overflow-x-auto md:block">
                             <Table regionLabel={title}>
@@ -253,7 +277,9 @@ export function RecordList({
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {records.map((record, index) => (
+                                    {visibleRecords.map((record, localIndex) => {
+                                        const index = pageStart + localIndex;
+                                        return (
                                         <TableRow key={index} className="border-gray-700/50">
                                             {visibleColumns.map((column) => {
                                                 const href = cellHref(record, index, column);
@@ -278,13 +304,16 @@ export function RecordList({
                                                 </TableCell>
                                             )}
                                         </TableRow>
-                                    ))}
+                                        );
+                                    })}
                                 </TableBody>
                             </Table>
                         </div>
                         {/* Móvil: cards equivalentes, sin scroll horizontal */}
                         <ul className="space-y-3 md:hidden">
-                            {records.map((record, index) => (
+                            {visibleRecords.map((record, localIndex) => {
+                                const index = pageStart + localIndex;
+                                return (
                                 <li className="min-w-0 rounded-xl border border-gray-700/50 bg-gray-800/40 p-4" key={index}>
                                     <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
                                         {visibleColumns.map((column) => {
@@ -314,8 +343,10 @@ export function RecordList({
                                         </div>
                                     ) : null}
                                 </li>
-                            ))}
+                                );
+                            })}
                         </ul>
+                        {pager}
                     </>
                 )}
                 {footer && <div className="mt-4">{footer}</div>}
