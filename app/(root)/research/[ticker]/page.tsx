@@ -20,6 +20,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { resolveUnknownListingIdentity } from '@/lib/research/unknown-listing';
+import { checkCompanyIdentity, openVerifiedFicha } from '@/lib/actions/company-identity.actions';
 import { drainRejection } from '@/lib/research/drain-rejection';
 import { cache, Suspense } from 'react';
 import { redirect } from 'next/navigation';
@@ -841,12 +842,50 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // perfil del ticker desnudo solo prueba que el símbolo existe en alguna
     // bolsa, no que sea ese emisor (ALM -> Almonty US, no Almirall/BME) ->
     // NUNCA CTA «Generar tesis» aquí. Tres estados honestos sin CTA.
+    // Doble coincidencia SEC + proveedor (BWMX): comprobación de SOLO
+    // LECTURA durante el render. Con identidad verificada se ofrece el CTA
+    // explícito «Abrir ficha» (POST): crear la ficha durante un GET de
+    // página crearía fichas sin acción del usuario. null = comprobación no
+    // disponible: se sigue con los tres estados honestos de siempre.
+    const verification = await checkCompanyIdentity(ticker);
+    if (verification?.verified && !verification.already_in_master && verification.sec && verification.provider) {
+      return (
+        <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
+          <div className="mx-auto max-w-[1600px] space-y-6">
+            <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+            <EmptyState
+              description={`La identidad de ${ticker} está verificada por doble coincidencia SEC + proveedor de mercado: «${verification.sec.name}» (${verification.provider.exchange}${verification.provider.currency ? `, ${verification.provider.currency}` : ', divisa N/D'}). La ficha aún no existe en GerarAI: se crea solo si la abres, y nacerá sin research generado.`}
+              icon={ShieldAlert}
+              title="Identidad verificada por dos fuentes"
+              titleAs="h1"
+              action={
+                <form action={openVerifiedFicha.bind(null, ticker)}>
+                  <button
+                    className="inline-flex min-h-11 items-center rounded-md border border-teal-700 bg-teal-950/60 px-4 py-2 text-sm font-medium text-teal-100 transition hover:border-teal-500"
+                    type="submit"
+                  >
+                    Abrir ficha
+                  </button>
+                </form>
+              }
+            />
+          </div>
+        </main>
+      );
+    }
+    if (verification?.verified && verification.already_in_master) {
+      // Carrera: la ficha se creó entre el snapshot y esta comprobación.
+      redirect(`/research/${encodeURIComponent(ticker)}`);
+    }
     const identity = resolveUnknownListingIdentity(await getProfile(ticker), ticker);
+    const doubleCheckNote = verification
+      ? ' Se comprobó la doble coincidencia SEC + proveedor de mercado y no se cumplió, así que la identidad sigue sin verificar.'
+      : '';
     const state =
       identity.kind === 'unverified'
         ? {
             title: 'Identidad del ticker no verificada',
-            description: `${ticker} no tiene identidad de listado verificada en GerarAI: el proveedor de mercado conoce este símbolo como «${identity.providerName}», que puede no ser el emisor que buscas. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo.`,
+            description: `${ticker} no tiene identidad de listado verificada en GerarAI: el proveedor de mercado conoce este símbolo como «${identity.providerName}», que puede no ser el emisor que buscas. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo.${doubleCheckNote}`,
           }
         : identity.kind === 'not-in-sources'
           ? {
