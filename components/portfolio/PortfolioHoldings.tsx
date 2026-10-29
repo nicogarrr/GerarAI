@@ -170,12 +170,12 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   return (
     <Card className="bg-gray-800/50 border-gray-700">
       <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle className="text-gray-100 flex items-center gap-2">
-          Posiciones Actuales
-          <span className="text-xs font-normal text-gray-500">
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="text-gray-100">Posiciones actuales</CardTitle>
+          <p className="text-xs font-normal text-gray-500">
             La G/P va en {cashCurrency} (divisa base) con el tipo de cambio de cada compra: no coincide con la variación del precio en la divisa de la acción.
-          </span>
-        </CardTitle>
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
         <AddTransactionButton userId={userId} />
         <ImportIBKRButton userId={userId} />
@@ -189,7 +189,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
           className="h-11 border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white sm:h-8"
         >
           <RefreshCw aria-hidden="true" className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
-          Actualizar Precios
+          Actualizar precios
         </Button>
         </div>
       </CardHeader>
