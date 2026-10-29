@@ -1,11 +1,9 @@
-import { researchRequest } from '@/lib/research/client';
-import type { components } from '@/lib/research/openapi.generated';
+import { getAnalystTargets } from '@/lib/research/analyst-targets';
 import { AnalystTargetsView } from './AnalystTargetsView';
-type AnalystTargets = components['schemas']['AnalystTargets'];
+
 export async function AnalystTargetsSection({ symbol, currency }: { symbol: string; currency?: string | null }) {
-    let data: AnalystTargets | null = null;
-    try {
-        data = await researchRequest<AnalystTargets>(`/api/companies/${encodeURIComponent(symbol)}/analyst-targets`, { timeoutMs: 14000 });
-    } catch { data = null; }
+    // Lectura compartida con el panel de vistazo rápido (React cache):
+    // una sola llamada al motor por render aunque lo pidan dos secciones.
+    const data = await getAnalystTargets(symbol);
     return <AnalystTargetsView data={data} currency={currency} />;
 }

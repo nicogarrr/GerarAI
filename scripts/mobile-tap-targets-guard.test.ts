@@ -32,19 +32,21 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
         const group = panel.slice(panel.indexOf('aria-label="Tipo de historial"'), panel.indexOf('aria-label="Tipo de historial"') + 900);
         assert.ok((group.match(new RegExp(AREA.replace(/[[\]]/g, '\\$&'), 'g')) ?? []).length === 2, 'ambos botones del conmutador con area tactil');
     });
-    it('enlaces de retorno de las subrutas', () => {
-        for (const p of ['financial-terminal', 'driver-assumptions', 'management-credibility', 'decision-lessons']) {
+    it('las subrutas históricas redirigen a su sección; la navegación es la fila de pestañas (29-oct-2026)', () => {
+        // Ya no hay enlaces de retorno: las subrutas llevan a su sección de
+        // la pestaña y la fila de seis pestañas (44px por pestaña) es toda
+        // la navegación de la ficha.
+        for (const p of ['financial-terminal', 'driver-assumptions', 'management-credibility', 'decision-lessons', 'share-capital']) {
             const page = readFileSync(`app/(root)/research/[ticker]/${p}/page.tsx`, 'utf8');
-            assert.ok(page.includes(`className="${AREA} sm:min-h-0" size="sm"`), `${p}: boton de retorno con area tactil`);
+            assert.ok(page.includes('redirect('), `${p}: conserva su URL con redirect a la sección`);
         }
-        for (const p of ['share-capital', 'shorts']) {
-            const page = readFileSync(`app/(root)/research/[ticker]/${p}/page.tsx`, 'utf8');
-            assert.ok(page.includes(`inline-flex ${AREA} items-center text-teal-300 sm:min-h-0`), `${p}: enlace de retorno con area tactil`);
-        }
+        const shorts = readFileSync('app/(root)/research/[ticker]/shorts/page.tsx', 'utf8');
+        assert.ok(shorts.includes(`inline-flex ${AREA} items-center text-teal-300 sm:min-h-0`), 'shorts: enlace de retorno con area tactil');
+        const nav = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
+        assert.ok(nav.includes(`min-h-[44px]`), 'pestañas con area tactil');
     });
     it('historial de versiones de supuestos con area tactil', () => {
-        // Los supuestos viven extraidos en su seccion (PR A de la fila de
-        // seis pestañas, 29-oct-2026); la pagina legacy los renderiza desde alli.
+        // Los supuestos son una sección de la pestaña Valoración desde el 29-oct-2026.
         const section = readFileSync('components/research/sections/DriverAssumptionsSection.tsx', 'utf8');
         assert.ok(section.includes('<summary className="cursor-pointer py-2.5'), 'summary con padding tactil en movil');
     });

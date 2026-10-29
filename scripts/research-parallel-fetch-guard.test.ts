@@ -259,7 +259,7 @@ describe('la ficha real no serializa sus lecturas', () => {
     // Si esto cambia, alguien ha convertido un widget lateral en bloqueante.
     const hardReads = PAGE.match(/throw error;/g) ?? [];
     assert.ok(hardReads.length <= 2, 'solo el snapshot y el market de overview pueden propagar');
-    assert.match(PAGE, /settleResearchBatch\(\[viewTask\], RESEARCH_RENDER_BUDGET_MS\)/);
+    assert.match(PAGE, /settleResearchBatch\(viewTasks, RESEARCH_RENDER_BUDGET_MS\)/);
     // El watchlist nunca tumba la ficha, pero tampoco miente: degrada a
     // "estado desconocido" (null, boton deshabilitado), no a una lista vacia
     // que pintaria "Seguir" aunque el usuario ya siga el ticker.

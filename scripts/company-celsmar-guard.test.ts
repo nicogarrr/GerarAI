@@ -24,11 +24,14 @@ describe('ficha: cifra grande y métricas compactas', () => {
         assert.match(quote, /isValidCurrencyCode\(currency\)/);
     });
     it('pestañas limpias sin borrar rutas ni módulos', () => {
-        assert.match(navigation, /primary === group \? 'border-teal-300 text-gray-100'/);
+        // Una fila de seis pestañas (29-oct-2026): la activa lleva la marca teal.
+        assert.match(navigation, /activeTab === tab\.key \? 'border-teal-300 text-gray-100'/);
         const views = readFileSync('lib/research/research-views.ts', 'utf8');
-        for (const view of ['resumen', 'numeros', 'fuentes', 'mas']) assert.ok(views.includes(`key: '${view}'`));
-        // Las 6 claves de grupo antiguas siguen abriendo su módulo (compat ?view=), en un Map (sin prototipo).
-        for (const legacy of ['resumen', 'tesis', 'financieros', 'modelo', 'evidencia', 'seguimiento']) assert.ok(views.includes(`['${legacy}',`));
+        for (const view of ['resumen', 'tesis', 'finanzas', 'valoracion', 'seguimiento', 'fuentes']) assert.ok(views.includes(`key: '${view}'`));
+        // Las claves de grupo antiguas siguen abriendo su módulo (compat ?view=), en un Map (sin prototipo).
+        for (const legacy of ['resumen', 'numeros', 'mas', 'financieros', 'modelo', 'evidencia', 'entender', 'valorar', 'seguir']) assert.ok(views.includes(`['${legacy}',`));
+        // Ninguna ruta borrada: las subrutas históricas redirigen a su sección.
+        for (const sub of ['financial-terminal', 'share-capital', 'driver-assumptions', 'management-credibility', 'decision-lessons']) assert.ok(views.includes(`path: '${sub}'`));
         assert.doesNotMatch(page, /captura de solo lectura/);
     });
 });
