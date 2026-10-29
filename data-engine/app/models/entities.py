@@ -376,7 +376,8 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
     action: Mapped[str] = mapped_column(String(40))
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), default=0)
     price: Mapped[Decimal] = mapped_column(Numeric(20, 6), default=0)
-    fees: Mapped[Decimal] = mapped_column(Numeric(20, 2), default=0)
+    # 4 decimales: IBKR cobra fracciones de céntimo (0,355 USD); con 2 se redondeaban.
+    fees: Mapped[Decimal] = mapped_column(Numeric(20, 4), default=0)
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
