@@ -210,3 +210,16 @@ def test_manual_alert_payload_rejects_non_finite_value():
             ManualAlertCreate(ticker="AAPL", alert_type="price_above", operator=">", value=bad)
     assert ManualAlertCreate(ticker="AAPL", alert_type="price_above", operator=">", value="1.5").value == "1.5"
     assert ManualAlertCreate(ticker="AAPL", alert_type="price_above", operator=">", value=200).value == 200
+
+
+def test_legacy_three_day_setting_cannot_mark_yesterday_price_fresh(db, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services import alert_rule_service as module
+
+    company = _company(db)
+    _price(db, company, day=date.today() - timedelta(days=1), close="210")
+    monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=3))
+    rule = module.AlertRule(company_id=company.id, target={"kind": "market_price"})
+    _, observation = AlertRuleService()._observe(db, rule)
+    assert observation["status"] == "stale"

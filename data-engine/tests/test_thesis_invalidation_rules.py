@@ -260,3 +260,15 @@ def test_route_saves_rules_and_creates_alert_rules(db):
     assert thesis.invalidation_rules is None
     assert db.query(AlertRule).filter(AlertRule.active.is_(True)).count() == 0
 
+
+
+def test_legacy_three_day_setting_cannot_mark_yesterday_thesis_price_fresh(db, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services import thesis_invalidation_rules as module
+
+    company = _company(db)
+    _price(db, company, "210", day=date.today() - timedelta(days=1))
+    monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=3))
+    _, observation = module._latest_price(db, company.id)
+    assert observation["status"] == "stale"

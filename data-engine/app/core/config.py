@@ -200,7 +200,8 @@ class Settings(BaseSettings):
     retention_job_enabled: bool = False
     retention_dry_run: bool = True
     retention_batch_limit: int = Field(default=500, ge=1, le=10000)
-    market_price_max_age_days: int = Field(default=3, ge=0, le=30)
+    # Legacy setting remains parse-compatible; consumers cap freshness at 24h.
+    market_price_max_age_days: int = Field(default=1, ge=0, le=30)
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
     # Pool SQLAlchemy SOLO para Postgres (database.py ignora estos valores con

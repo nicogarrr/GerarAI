@@ -95,6 +95,8 @@ function lastCompletedSessionOpenMs(now: EtParts): number {
 export function classifyQuoteKind(tSeconds: number, nowMs: number = Date.now()): QuoteKind {
     if (!Number.isFinite(tSeconds) || tSeconds <= 0) return 'stale';
     const tMs = tSeconds * 1000;
+    // Owner policy: no weekend exception to the strict 24-hour ceiling.
+    if (nowMs - tMs > 24 * 60 * 60 * 1000) return 'stale';
     // Timestamp en el futuro (margen 15 min de skew) = dato roto, no fresco.
     if (tMs > nowMs + 15 * 60 * 1000) return 'stale';
     const now = etParts(nowMs);

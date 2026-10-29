@@ -250,7 +250,7 @@ def _latest_price(db: Session, company_id: int) -> tuple[Decimal | None, dict[st
         "price": str(price.close),
         "date": price.date.isoformat(),
         "age_days": age_days,
-        "status": "stale" if age_days > get_settings().market_price_max_age_days else "fresh",
+        "status": "stale" if age_days >= min(get_settings().market_price_max_age_days, 1) else "fresh",
     }
 
 
