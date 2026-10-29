@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Crosshair, Landmark, PiggyBank, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
 import { RecordDetail, RecordList, type DataRecord } from '@/components/data/RecordViews';
 import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
@@ -209,6 +210,25 @@ function extractPlanTickers(drift: DataRecord | null, plan: DataRecord | null): 
 
 export default function PlanView({ initialPlan, initialContributions, initialDrift, initialSplit = null }: PlanViewProps) {
     const tickers = extractPlanTickers(initialDrift, initialPlan);
+
+    // Sin plan la página es UNA guía de creación, no cuatro secciones que
+    // repiten cada una su «sin datos» («No hay plan configurado», «sin
+    // posiciones», «sin desviación», «sin aportaciones»): superficie a medias
+    // medida en prod (auditoría 29-oct-2026) contra la regla «nada a medias».
+    // Se guía la creación en vez de ocultar la pestaña porque escondiéndola
+    // el alta quedaría indescubrible. `getPlan` normaliza {plan_exists:false}
+    // a null y un backend caído sale antes por BackendOffline, así que
+    // null aquí significa exactamente «todavía no tienes plan».
+    if (initialPlan === null) {
+        return (
+            <EmptyState
+                icon={Target}
+                title={t('plan.empty')}
+                description="Configura tu objetivo a largo plazo: aportación mensual, horizonte y asignación por empresa, sector o clase de activo. Con el plan creado, aquí verás las aportaciones y la desviación de tu cartera frente a ese objetivo."
+                action={<PlanSetupDialog />}
+            />
+        );
+    }
 
     return (
         <div className="grid gap-6">

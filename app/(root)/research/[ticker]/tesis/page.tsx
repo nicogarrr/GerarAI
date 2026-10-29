@@ -18,6 +18,7 @@ import { thesisMoney } from '@/lib/research/thesis-number-format';
 import { cleanThesisText } from '@/lib/research/thesis-text';
 import { isValidCurrencyCode } from '@/lib/format';
 import PrintButton from '@/components/research/PrintButton';
+import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
 import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
@@ -247,6 +248,17 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           <h1 className="mt-8 text-3xl text-gray-50">{ticker} · {name}</h1>
           <WithheldThesisText thesis={displayedVersion} model={snapshot?.model_summary} />
           <p className="mt-4 text-sm leading-6 text-gray-400">Sin valoración ni texto de inversión verificables para esta vista. Revisa las fuentes y los datos pendientes en la ficha antes de publicar una nueva versión.</p>
+          {/*
+              Salida del callejón (auditoría 29-oct-2026): la nota de archivo
+              sin acción dejaba la página sin ruta a seguir. Acción principal:
+              la ficha, donde están las fuentes y los datos pendientes que
+              cita el párrafo. Secundaria: regenerar, el mismo botón y estados
+              honestos de job que ofrece la ficha.
+          */}
+          <div className="mt-6 flex flex-wrap items-center gap-2">
+            <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la tesis en la ficha</EmptyLink>
+            <ThesisGenerateButton ticker={ticker} label="Regenerar tesis" />
+          </div>
         </div>
       </main>
     );
