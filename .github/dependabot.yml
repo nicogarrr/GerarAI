@@ -46,7 +46,7 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: pip
+  - package-ecosystem: uv
     directory: /data-engine
     schedule:
       interval: weekly
@@ -55,11 +55,11 @@ updates:
       timezone: Europe/Madrid
     open-pull-requests-limit: 10
     groups:
-      pip-security:
+      uv-security:
         applies-to: security-updates
         patterns:
           - "*"
-      pip-routine:
+      uv-routine:
         applies-to: version-updates
         patterns:
           - "*"

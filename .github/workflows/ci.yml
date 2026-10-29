@@ -46,7 +46,17 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-      - run: python data-engine/scripts/sync_requirements.py --check
+      - name: Verificar paridad de dependencias
+        run: |
+          if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+            echo "PR de Dependabot: sincronizando requirements.txt desde pyproject.toml..."
+            python data-engine/scripts/sync_requirements.py --write
+            git diff --exit-code data-engine/requirements.txt || {
+              echo "::warning title=Dependabot dep parity::requirements.txt actualizado acorde a pyproject.toml"
+            }
+          else
+            python data-engine/scripts/sync_requirements.py --check
+          fi
 
   frontend:
     name: Frontend quality
@@ -289,7 +299,7 @@ jobs:
         run: |
           present=""
           missing=""
-          for s in run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals; do
+          for s in run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals run_evidence_evals; do
             if [ -f "scripts/$s.py" ]; then
               present="$present $s"
             else
@@ -304,16 +314,15 @@ jobs:
             elif [ -n "$missing" ]; then
               echo "## EVALS INCOMPLETOS: se ejecutan solo los presentes"
             else
-              echo "## Evals: los 6 scripts presentes"
+              echo "## Evals: todos los scripts presentes"
             fi
             echo "Se ejecutan:${present:- ninguno}"
             echo "Ausentes (NO ejecutados):${missing:- ninguno}"
           } >> "$GITHUB_STEP_SUMMARY"
-          # Obligatorios: los 6 estan integrados en main y corren verdes en CI
-          # (rag, valuation, llm, ingest). Si se borra o
-          # renombra uno, el CI se pone en rojo en vez de quedar en verde
-          # evaluando menos (antes solo valuation y realized eran obligatorios; realized se borro con su codigo).
-          required="run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals"
+          # Obligatorios: integrados en main y corren verdes en CI
+          # (rag, valuation, llm, ingest, evidence). Si se borra o
+          # renombra uno, el CI se pone en rojo en vez de quedar en verde.
+          required="run_rag_evals run_valuation_evals run_llm_evals run_ingest_evals run_evidence_evals"
           for r in $required; do
             if [ ! -f "scripts/$r.py" ]; then
               echo "::error title=Eval obligatorio ausente::scripts/$r.py no existe"

@@ -5,6 +5,7 @@ import { ArrowLeft, FileText, ShieldCheck, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import { Input } from '@/components/ui/input';
+import { FileUploadInputLazy as FileUploadInput } from '@/components/forms/FileUploadInputLazy';
 import { Textarea } from '@/components/ui/textarea';
 import { MutationForm } from '@/components/forms/MutationForm';
 import {
@@ -343,7 +344,7 @@ export default async function ResearchSourcesPage({
             {!audits.length ? (
               <div className="rounded-md border border-dashed border-gray-800 p-4 text-center text-sm text-gray-500">
                 <p>Sin auditorías todavía.</p>
-                <Link className="mt-3 inline-flex items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/research/MSFT?view=thesis">
+                <Link className="mt-3 inline-flex items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href={ticker ? `/research/${encodeURIComponent(ticker)}?view=thesis` : '/research'}>
                   Genera una tesis para disparar la primera auditoría
                 </Link>
               </div>
@@ -424,7 +425,7 @@ export default async function ResearchSourcesPage({
               </div>
               <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
                 <label className="text-sm font-semibold text-gray-400" htmlFor="file">Archivo</label>
-                <Input className="min-h-11" accept=".txt,.md,.html,.htm,.pdf,.docx,.xlsx,.csv,.tsv" id="file" name="file" required type="file" />
+                <FileUploadInput accept=".txt,.md,.html,.htm,.pdf,.docx,.xlsx,.csv,.tsv" id="file" name="file" required />
               </div>
               <Button className="w-full sm:w-fit" type="submit">
               <UploadCloud aria-hidden="true" className="h-4 w-4" />

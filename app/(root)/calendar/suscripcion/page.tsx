@@ -32,10 +32,21 @@ export default async function CalendarSubscriptionPage() {
         throw error;
     }
 
-    const headerList = await headers();
-    const host = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? 'gerarai.vercel.app';
-    const proto = headerList.get('x-forwarded-proto') ?? 'https';
-    const origin = `${proto}://${host}`;
+    const envOrigin = process.env.NEXT_PUBLIC_SITE_URL || process.env.BETTER_AUTH_URL;
+    let origin: string;
+    if (envOrigin) {
+        origin = envOrigin.replace(/\/+$/, '');
+    } else {
+        const headerList = await headers();
+        const rawHost = headerList.get('x-forwarded-host') ?? headerList.get('host') ?? 'gerarai.vercel.app';
+        const hostFirst = rawHost.split(',')[0].trim();
+        const host = /^[a-zA-Z0-9.-]+(:\d+)?$/.test(hostFirst) ? hostFirst : 'gerarai.vercel.app';
+
+        const rawProto = headerList.get('x-forwarded-proto') ?? 'https';
+        const protoFirst = rawProto.split(',')[0].trim().toLowerCase();
+        const proto = protoFirst === 'http' || protoFirst === 'https' ? protoFirst : 'https';
+        origin = `${proto}://${host}`;
+    }
 
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col gap-6">

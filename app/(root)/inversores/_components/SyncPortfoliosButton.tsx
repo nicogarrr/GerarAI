@@ -23,7 +23,14 @@ export function SyncPortfoliosButton({
         let success = false;
         try {
             const result = await syncInvestorPortfoliosNow();
-            success = result.success;
+            success = Boolean(result.success);
+            if (success) {
+                try {
+                    window.localStorage.setItem('sync-13f-last-auto', String(Date.now()));
+                } catch {
+                    // Ignorar error al acceder a localStorage (ej. modo incógnito)
+                }
+            }
         } catch {
             success = false;
         } finally {
@@ -41,7 +48,6 @@ export function SyncPortfoliosButton({
         try {
             const last = Number(window.localStorage.getItem(key));
             if (Number.isFinite(last) && Date.now() - last < AUTO_SYNC_MIN_INTERVAL_MS) return;
-            window.localStorage.setItem(key, String(Date.now()));
         } catch {
             return;
         }

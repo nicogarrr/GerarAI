@@ -39,8 +39,14 @@ export default async function CorporateActionsPage({ searchParams }: PageProps) 
         ? actions.filter((action) => String(action.ticker ?? '').toUpperCase() === ticker).length
         : actions.length;
 
-    const emptyMessage = actions.length === 0
-        ? corporateActionsEmptyMessage(await getCorporateActionsSyncStatus())
+    const syncStatus = visibleCount === 0
+        ? await getCorporateActionsSyncStatus().catch(() => null)
+        : null;
+
+    const emptyMessage = visibleCount === 0
+        ? (ticker
+            ? `Sin eventos pendientes de ${ticker}.`
+            : corporateActionsEmptyMessage(syncStatus))
         : undefined;
 
     return (

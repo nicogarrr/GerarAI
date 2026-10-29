@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
 
 import { INVESTOR_CHANNELS, type ChannelCategory } from './channels';
 
@@ -16,7 +18,14 @@ const SECTIONS: { category: ChannelCategory; title: string }[] = [
 
 export default function ChannelsPage() {
     return (
-        <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-12 overflow-x-clip py-6">
+        <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-8 overflow-x-clip py-6">
+            <Link
+                className="inline-flex items-center gap-2 text-sm text-teal-300 hover:underline"
+                href="/inversores/aprender"
+            >
+                <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                Volver a Aprender
+            </Link>
             <header className="flex flex-col gap-3">
                 <h1 className="text-3xl font-semibold text-gray-100">Canales de inversión</h1>
             </header>

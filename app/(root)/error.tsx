@@ -5,11 +5,22 @@ import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 
-// En producción, un fallo de renderizado de Server Components llega como
-// "Minified React error #441" sin mensaje útil. La causa más común es que el
-// backend FastAPI (FMP_BACKEND_URL) no es alcanzable desde Vercel.
+// Comprueba si el error corresponde a una indisponibilidad de red / backend
+// sin clasificar erróneamente fallos de hidratación de React 19 (#441, #418, etc.).
 function isBackendUnavailable(error: Error): boolean {
-  return error.message.includes('Minified React error #441');
+  const msg = (error.message || '').toLowerCase();
+  if (msg.includes('minified react error') || msg.includes('hydration')) {
+    return false;
+  }
+  return (
+    msg.includes('fetch failed') ||
+    msg.includes('econnrefused') ||
+    msg.includes('backend_unavailable') ||
+    msg.includes('external_api_error') ||
+    msg.includes('networkerror') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('etimedout')
+  );
 }
 
 export default function RootError({

@@ -203,11 +203,13 @@ def _write_backup_durable(path: str, payload: list[dict]) -> None:
         os.unlink(tmp)
         raise FileExistsError(f"el backup {path} ya existe: no se sobrescribe")
     os.replace(tmp, path)
-    dir_fd = os.open(os.path.dirname(os.path.abspath(path)), os.O_DIRECTORY)
-    try:
-        os.fsync(dir_fd)
-    finally:
-        os.close(dir_fd)
+    dir_flag = getattr(os, "O_DIRECTORY", 0)
+    if dir_flag:
+        dir_fd = os.open(os.path.dirname(os.path.abspath(path)), dir_flag)
+        try:
+            os.fsync(dir_fd)
+        finally:
+            os.close(dir_fd)
 
 
 _ACCESSION_DIR = re.compile(r"^/Archives/edgar/data/\d+/(\d{10,24})(?:/|$)")
