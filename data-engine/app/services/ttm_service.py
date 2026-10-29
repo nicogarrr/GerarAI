@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Company, FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.financial_ingestion_service import SOURCE_PRIORITY
+from app.services.reviewed_eps_adjustments import NOTE, SOURCE_TYPE, is_reviewed_eps_adjustment
 from app.services.ttm_fundamentals import (
     FLOW_METRICS,
     POINT_METRICS,
@@ -83,6 +84,8 @@ def _best_by_period(
 ) -> dict[str, tuple[list[PeriodValue], list[PeriodValue]]]:
     best: dict[tuple[str, str, date], tuple[tuple[float, float], FinancialFact]] = {}
     for fact in facts:
+        if fact.source_type == SOURCE_TYPE and not is_reviewed_eps_adjustment(fact):
+            continue
         if fact_quarantine_reason(fact):
             continue
         quarter = (fact.fiscal_quarter or "").upper()
@@ -190,6 +193,10 @@ def build_company_ttm(db: Session, company: Company) -> dict[str, Any]:
         ).all()
     )
     results = compute_company_ttm(facts)
+    reviewed_ids = {f.id for f in facts if is_reviewed_eps_adjustment(f)}
+    for value in results.values():
+        if reviewed_ids.intersection(value.fact_ids):
+            value.note = NOTE + ((" " + value.note) if value.note else "")
     ttm_ends = [v.period_end for v in results.values() if v.basis == "TTM" and v.period_end]
     return {
         "ticker": company.ticker,

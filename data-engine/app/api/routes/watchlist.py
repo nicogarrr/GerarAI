@@ -291,15 +291,18 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
                MarketPrice.close.isnot(None), MarketPrice.close > 0)
         .order_by(desc(MarketPrice.date)).limit(1)
     ).scalar_one_or_none()
-    eps_row = db.execute(
+    eps_candidates = db.execute(
         select(FinancialFact).options(selectinload(FinancialFact.source))
         .where(FinancialFact.company_id == company.id,
                FinancialFact.metric.in_(["eps_diluted", "eps_basic"]),
                FinancialFact.fiscal_quarter == "FY",
                FinancialFact.value > 0)
-        .order_by(desc(FinancialFact.fiscal_year)).limit(1)
-    ).scalar_one_or_none()
+        .order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at))
+    ).scalars().all()
     from app.services.esef_fact_quarantine import fact_quarantine_reason
+    from app.services.reviewed_eps_adjustments import is_reviewed_eps_adjustment, select_watchlist_eps
+
+    eps_row = select_watchlist_eps(eps_candidates)
 
     if eps_row is not None and (reason := fact_quarantine_reason(eps_row)):
         sources.append(f"PER: N/D: {reason}")
@@ -358,6 +361,8 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         if split_factor != 1:
             source += (", EPS ajustado por split acumulado x"
                   f"{format(split_factor.normalize(), "f")}")
+        if is_reviewed_eps_adjustment(eps_row):
+            source += "; dato ajustado, PDF anual revisado: " + eps_row.source.source_url
         sources.append(source)
 
     return {"market_cap": market_cap, "per": per,
