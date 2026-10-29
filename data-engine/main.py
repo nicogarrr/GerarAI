@@ -1,10 +1,13 @@
 """FastAPI bootstrap for the GerarAI data engine."""
 
 import asyncio
+import math
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import DataError as SQLAlchemyDataError
@@ -214,6 +217,29 @@ async def db_value_out_of_range_handler(request: Request, exc: Exception) -> JSO
     return await unhandled_exception_handler(request, exc)
 
 
+def _finite_json(value):
+    """NaN/±Infinity -> texto, recursivo: JSON estricto no los admite."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: _finite_json(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_finite_json(item) for item in value]
+    return value
+
+
+async def request_validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """422 de validación que siempre se puede serializar.
+
+    El cuerpo JSON admite ``NaN``/``Infinity`` (``json.loads`` los acepta) y el
+    422 por defecto de FastAPI devuelve el ``input`` rechazado: al serializarlo
+    con ``allow_nan=False`` reventaba con ValueError y la petición acababa en
+    500. Mismo contenido que el 422 por defecto, con esos valores como texto.
+    """
+    return JSONResponse(status_code=422, content={"detail": _finite_json(jsonable_encoder(exc.errors()))})
+
+
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)
 app.add_exception_handler(OverflowError, db_value_out_of_range_handler)
 app.add_exception_handler(SQLAlchemyDataError, db_value_out_of_range_handler)
 
