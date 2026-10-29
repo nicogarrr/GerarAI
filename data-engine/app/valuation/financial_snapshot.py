@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Company, FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
+from app.services.reviewed_eps_adjustments import eligible_fact
 
 # Income-statement style metrics: flows over a period. They must share the
 # anchor's period, otherwise a 12-month revenue gets divided by a 9-month OCF.
@@ -119,7 +120,7 @@ def _facts_for_metric(db: Session, company_id: int, metric: str) -> list[Financi
                 FinancialFact.fiscal_year.desc().nullslast(),
                 desc(FinancialFact.created_at),
             )
-        ).all() if not fact_quarantine_reason(fact)]
+        ).all() if not fact_quarantine_reason(fact) and eligible_fact(fact)]
 
 
 def _available_at(
