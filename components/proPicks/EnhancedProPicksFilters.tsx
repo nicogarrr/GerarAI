@@ -78,7 +78,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-teal-400" />
-              <CardTitle className="text-sm font-semibold">Filtros</CardTitle>
+              <CardTitle as="h2" className="text-sm font-semibold">Filtros</CardTitle>
             </div>
             <div className="flex items-center gap-1">
               {activeFilterCount > 0 && (

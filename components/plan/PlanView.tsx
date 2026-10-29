@@ -214,6 +214,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
         <div className="grid gap-6">
             <RecordDetail
                 title="Objetivo y asignación"
+                titleAs="h2"
                 description="Objetivo a largo plazo, aportación mensual y asignación objetivo"
                 icon={<Target className="h-5 w-5 text-teal-400" />}
                 record={initialPlan}
@@ -234,7 +235,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                     <div className="flex items-center gap-3">
                         <Crosshair className="h-5 w-5 text-teal-400" />
                         <div>
-                            <CardTitle className="text-lg font-semibold text-gray-100">
+                            <CardTitle as="h2" className="text-lg font-semibold text-gray-100">
                                 Posiciones del plan
                             </CardTitle>
                             <CardDescription className="mt-0.5 text-sm text-gray-500">
@@ -269,6 +270,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
 
             <RecordDetail
                 title="Desviación de la cartera"
+                titleAs="h2"
                 description="Desviación de la cartera actual frente a la asignación objetivo"
                 icon={<PiggyBank className="h-5 w-5 text-teal-400" />}
                 record={initialDrift}
@@ -284,6 +286,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
 
             <RecordList
                 title="Aportaciones"
+                titleAs="h2"
                 description="Historial de contribuciones al plan"
                 icon={<Landmark className="h-5 w-5 text-teal-400" />}
                 records={initialContributions}

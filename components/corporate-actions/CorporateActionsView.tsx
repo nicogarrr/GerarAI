@@ -88,6 +88,7 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
         <div className="[&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:min-w-11 [&_a.font-mono]:items-center">
         <RecordList
             title="Acciones corporativas"
+            titleAs="h2"
             // La página ya muestra título, descripción y recuento: no se repiten en la tarjeta.
             hideTitle
             records={visibleActions}
