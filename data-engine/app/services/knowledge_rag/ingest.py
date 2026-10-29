@@ -158,7 +158,11 @@ def mark_failed(db: Session, source_id: int, message: str) -> None:
     source = db.get(KnowledgeRagSource, source_id)
     if source is not None:
         source.status = SOURCE_STATUS_FAILED
-        source.error = message[:2000]
+        # source.error sale tal cual en la API de fuentes: los llamadores pasan
+        # f"{type(exc).__name__}: {exc}" y eso puede llevar una URL con key.
+        from app.core.errors import redact_secrets
+
+        source.error = redact_secrets(message)[:2000]
         db.commit()
     db.rollback()
 
