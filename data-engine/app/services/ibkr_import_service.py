@@ -1097,9 +1097,16 @@ class IBKRImportService:
                 if position is None:
                     position = Position(company_id=company.id, portfolio_id=portfolio.id)
                     db.add(position)
-                elif position.as_of > statement_day and not position.valuation_hold_reason:
+                elif (
+                    position.as_of > statement_day
+                    and not position.valuation_hold_reason
+                    and position.market_price is not None
+                    and position.market_price > 0
+                ):
                     # Cotizacion mas reciente que el extracto (refresco de precios):
                     # se conserva; el extracto solo aporta cantidad, coste y caja.
+                    # market_price 0 es el centinela «sin valoracion», no una
+                    # cotizacion: entonces vale el precio del extracto.
                     kept_valuation = {
                         field: getattr(position, field)
                         for field in (
