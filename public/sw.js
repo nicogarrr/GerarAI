@@ -19,10 +19,12 @@ const OFFLINE_HTML =
   '<meta name="viewport" content="width=device-width, initial-scale=1">' +
   '<title>GerarAI — sin conexión</title>' +
   '<body style="background:#101010;color:#d1d5db;font-family:system-ui,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0">' +
-  '<div style="text-align:center;padding:24px">' +
+  // <main>: el aviso es el contenido de la página y debe estar dentro de un
+  // landmark (axe «region», visto en el barrido móvil de la ronda 3).
+  '<main style="text-align:center;padding:24px">' +
   '<h1 style="font-size:20px;color:#f3f4f6">Sin conexión</h1>' +
   '<p style="font-size:14px;color:#9ca3af">GerarAI necesita red para leer tus tesis y datos de mercado.<br>Sin lectura offline: reconecta y vuelve a intentarlo.</p>' +
-  '</div></body></html>';
+  '</main></body></html>';
 
 self.addEventListener('install', (event) => {
   // Sin precache: nada que preinstalar. Activación inmediata.
