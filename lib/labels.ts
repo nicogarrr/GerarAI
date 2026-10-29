@@ -122,6 +122,7 @@ const TIERS_FUENTE: Record<string, string> = {
   tier_5_data_provider: 'Proveedor de datos · T5',
   tier_6_bootstrap: 'Datos iniciales · T6',
   tier_7_user_input: 'Aportado por el usuario · T7',
+  tier_8_social: 'Redes sociales · sin verificar',
   tier_unknown: 'Fuente sin clasificar',
 };
 

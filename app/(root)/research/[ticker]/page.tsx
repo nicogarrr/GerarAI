@@ -123,6 +123,9 @@ import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
+import { ImpactBadge, NewsEventsFlow } from '@/components/research/NewsEventsFlow';
+import { NEWS_PAGE_SIZE } from '@/lib/news-paging';
+import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { SourceAuditDetail } from '@/components/research/SourceAuditDetail';
 import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
@@ -158,7 +161,7 @@ const readSnapshot = cache((ticker: string) => getResearchCompanySnapshot(ticker
 
 type PageProps = {
   params: Promise<{ ticker: string }>;
-  searchParams: Promise<{ view?: string; chat?: string }>;
+  searchParams: Promise<{ view?: string; chat?: string; pagina?: string }>;
 };
 
 
@@ -797,6 +800,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         RESEARCH_RENDER_BUDGET_MS,
       )
     : Promise.resolve<ResearchSettled<Awaited<ReturnType<typeof getResearchNews>>>[]>([]);
+  // Noticias de la vista Noticias: mismo lote con presupuesto que el resto
+  // (guard D2a). Su fallo degrada a aviso en la vista, nunca rompe la página.
+  const fichaNewsPageNumber = (() => {
+    const parsed = Number.parseInt(query.pagina ?? '1', 10);
+    return Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;
+  })();
+  const fichaNewsPromise = activeView === 'noticias'
+    ? settleResearchBatch(
+        [{ key: 'ficha-news', promise: getResearchNews(null, (fichaNewsPageNumber - 1) * NEWS_PAGE_SIZE, NEWS_PAGE_SIZE + 1, ticker) }],
+        RESEARCH_RENDER_BUDGET_MS,
+      )
+    : Promise.resolve<ResearchSettled<Awaited<ReturnType<typeof getResearchNews>>>[]>([]);
   // "Estado seguido" real del usuario. Antes esperaba al snapshot para pedirlo,
   // y no hay NINGÚN motivo: el watchlist es del tenant, no depende del ticker.
   const watchlistPromise = withResearchTelemetry('watchlist', () => getWatchlist()).catch(() => null);
@@ -814,6 +829,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   drainRejection(marketPromise);
   drainRejection(moatPromise);
   drainRejection(newsPromise);
+  drainRejection(fichaNewsPromise);
   drainRejection(viewPromise);
   let snapshot: Awaited<typeof snapshotPromise>;
   try {
@@ -1086,7 +1102,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           actions={
             <Link
               className="inline-flex min-h-[44px] items-center sm:min-h-0 text-sm text-teal-300 hover:text-teal-200"
-              href={`/research/news?ticker=${encodeURIComponent(ticker)}`}
+              href={`/research/${encodeURIComponent(ticker)}?view=noticias`}
             >
               Ver todas
             </Link>
@@ -1105,8 +1121,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               {overviewNews.map((event) => (
                 <li className="text-sm" key={event.id}>
                   <NewsHeadline event={event} />
-                  <p className="mt-1 text-xs text-gray-500">
-                    {event.source} · {newsDateLabel(event)}
+                  <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                    <ImpactBadge direction={event.impact_direction} />
+                    <span>{event.source} · {newsDateLabel(event)}</span>
                   </p>
                 </li>
               ))}
@@ -1239,6 +1256,38 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </p>
         {/* Price chart lives once in the company header, across all views. */}
       </div>
+    );
+  } else if (activeView === 'noticias') {
+    // Noticias de la empresa dentro de su ficha (cohesión: sin salir a
+    // /research/news). Mismo componente y misma paginación que la portada de
+    // noticias, filtrado por ticker en la API. La lectura sale del lote con
+    // presupuesto lanzado arriba; su fallo degrada a aviso, nunca tumba la ficha.
+    const newsPage = fichaNewsPageNumber;
+    const tickerContext = await getTickerContext().catch(() => ({ portfolioTickers: [] as string[], watchlistTickers: [] as string[] }));
+    const fichaNewsEntry = (await fichaNewsPromise).find((entry) => entry.key === 'ficha-news');
+    const fichaNewsError = !fichaNewsEntry || !fichaNewsEntry.ok;
+    const fetchedNews: Awaited<ReturnType<typeof getResearchNews>> = fichaNewsEntry && fichaNewsEntry.ok ? fichaNewsEntry.value : [];
+    const newsHasMore = fetchedNews.length > NEWS_PAGE_SIZE;
+    const newsEvents = dedupeNewsEvents(fetchedNews.slice(0, NEWS_PAGE_SIZE));
+    // El flujo ya trae su propia sección con cabecera; sin Panel extra.
+    content = fichaNewsError ? (
+      <Panel title="Noticias de la empresa">
+        <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
+          No se pudieron cargar las noticias. Reintenta en unos segundos.
+        </p>
+      </Panel>
+    ) : (
+      <NewsEventsFlow
+        events={newsEvents}
+        hasMore={newsHasMore}
+        inFicha
+        key={`ficha-noticias-${ticker}-${newsPage}`}
+        lane={null}
+        page={newsPage}
+        ticker={ticker}
+        portfolioTickers={tickerContext.portfolioTickers}
+        watchlistTickers={tickerContext.watchlistTickers}
+      />
     );
   } else if (activeView === 'thesis') {
     const data = await viewData('thesis');

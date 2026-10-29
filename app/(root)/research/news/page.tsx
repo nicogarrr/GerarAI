@@ -33,7 +33,7 @@ export const metadata: Metadata = { title: 'Noticias' };
 
 export default async function ResearchNewsPage({ searchParams }: PageProps) {
   const query = await searchParams;
-  const lane = query.lane === 'macro' || query.lane === 'empresa' || query.lane === 'para-ti' ? query.lane : null;
+  const lane = query.lane === 'macro' || query.lane === 'empresa' || query.lane === 'para-ti' || query.lane === 'gobierno' || query.lane === 'social' ? query.lane : null;
   const ticker = query.ticker?.trim().toUpperCase() || null;
   const parsed = Number.parseInt(query.pagina ?? '1', 10);
   const page = Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;

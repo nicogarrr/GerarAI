@@ -20,7 +20,7 @@ describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
     });
     it('cada módulo cuelga de la pestaña acordada', () => {
         const groupOf = (key: string) => MODULES.find((m) => m.key === key)?.group;
-        for (const key of ['overview', 'thesis']) assert.equal(groupOf(key), 'resumen');
+        for (const key of ['overview', 'thesis', 'noticias']) assert.equal(groupOf(key), 'resumen');
         for (const key of ['financials', 'valuation', 'model', 'peers', 'moat', 'capital', 'terminal']) assert.equal(groupOf(key), 'numeros');
         for (const key of ['documents', 'sources', 'chat']) assert.equal(groupOf(key), 'fuentes');
         for (const key of ['changes', 'holders', 'lecciones', 'directiva', 'satellites', 'supuestos', 'market-opportunity']) assert.equal(groupOf(key), 'mas');
@@ -37,7 +37,7 @@ describe('ficha en 3 pestañas + Más: mapeo de vistas', () => {
     it('cada módulo ?view= se abre a sí mismo y las subrutas caen a overview', () => {
         const views = MODULES.filter((m) => !('path' in m));
         const subs = MODULES.filter((m) => 'path' in m);
-        assert.equal(views.length, 14);
+        assert.equal(views.length, 15);
         assert.equal(subs.length, 5);
         for (const m of views) assert.equal(asView(m.key), m.key);
         for (const m of subs) assert.equal(asView(m.key), 'overview');

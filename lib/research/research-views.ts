@@ -21,6 +21,7 @@ export const GROUPS = [
 export const MODULES = [
   { key: 'overview', label: 'Vista general', group: 'resumen' },
   { key: 'thesis', label: 'Tesis', group: 'resumen' },
+  { key: 'noticias', label: 'Noticias', group: 'resumen' },
   { key: 'financials', label: 'Financieros', group: 'numeros' },
   { key: 'valuation', label: 'Valoración', group: 'numeros' },
   { key: 'model', label: 'Modelo a largo plazo', group: 'numeros' },
