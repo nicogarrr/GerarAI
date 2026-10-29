@@ -13,8 +13,20 @@ from app.services.fair_value_service import (
 )
 from app.services.historical_valuation_service import HistoricalValuationService
 from app.services.valuation_service import ValuationService
+from app.services.valuation_summary import build_summaries
 
 router = APIRouter()
+
+
+@router.get("/summary")
+def valuation_summaries(
+    tickers: str = Query(..., max_length=1500, description="CSV de tickers, máximo 60"),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Una lectura por lotes; sin recálculos, llamadas a proveedores ni escrituras."""
+    wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
+    companies = list(db.scalars(select(Company).where(Company.ticker.in_(wanted))).all())
+    return {"items": build_summaries(db, companies)}
 
 
 # Va ANTES de "/{ticker}": si no, «fair-value» se resolvería como ticker.

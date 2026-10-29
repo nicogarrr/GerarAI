@@ -5372,6 +5372,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/valuation/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Valuation Summaries
+         * @description Una lectura por lotes; sin recálculos, llamadas a proveedores ni escrituras.
+         */
+        get: operations["valuation_summaries_api_valuation_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/valuation/{ticker}": {
         parameters: {
             query?: never;
@@ -23014,6 +23034,49 @@ export interface operations {
         parameters: {
             query: {
                 /** @description CSV de tickers, máx. 60 */
+                tickers: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    valuation_summaries_api_valuation_summary_get: {
+        parameters: {
+            query: {
+                /** @description CSV de tickers, máximo 60 */
                 tickers: string;
             };
             header?: {

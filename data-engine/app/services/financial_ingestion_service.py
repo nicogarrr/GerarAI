@@ -265,6 +265,11 @@ SEC_METRIC_MAP: list[tuple[str, list[str], str]] = [
     # ganador lo decide el `filed` mas reciente del MISMO periodo, de modo que el
     # orden solo desempata cuando el emisor nunca presenta el tag combinado.
     ("total_debt",        list(TOTAL_DEBT_CONCEPTS), "USD"),
+    # Annual health-screen inputs: keep current balances and noncurrent debt distinct.
+    ("current_assets", ["AssetsCurrent"], "USD"),
+    ("current_liabilities", ["LiabilitiesCurrent"], "USD"),
+    ("long_term_debt", ["LongTermDebtNoncurrent"], "USD"),
+    ("retained_earnings", ["RetainedEarningsAccumulatedDeficit"], "USD"),
     ("total_assets",      ["Assets"],                                                                               "USD"),
     ("total_liabilities", ["Liabilities"],                                                                          "USD"),
     # StockholdersEquity = patrimonio atribuible a la matriz; la variante

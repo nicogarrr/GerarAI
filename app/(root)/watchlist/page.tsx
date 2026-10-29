@@ -1,3 +1,4 @@
+import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
@@ -627,6 +628,7 @@ export default async function WatchlistPage({
             )}
 
             <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} />
+        <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
         </main>
         </WatchlistMembership>
     );
