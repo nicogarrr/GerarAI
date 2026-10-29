@@ -150,13 +150,14 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
             ) : (
                 <section className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {managers.map((manager) => (
-                        <a
+                        <Link
                             className={`max-w-full rounded-lg border px-3 py-2 text-sm ${manager.cik === activeCik ? 'border-teal-700 bg-teal-950/30 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-300 hover:border-gray-700'}`}
                             href={`/ownership?cik=${manager.cik}`}
                             key={manager.cik}
+                            scroll={false}
                         >
                             {ownershipManagerName(manager.cik, manager.name)}
-                        </a>
+                        </Link>
                     ))}
                 </section>
             )}
