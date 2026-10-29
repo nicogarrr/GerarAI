@@ -2071,14 +2071,36 @@ def sync_official_closes(
             return {"status": "skipped", "reason": "lease_held"}
         if client.get(done):
             return {"status": "skipped", "reason": "session_already_synced"}
-        # Global lease serializes counters too. Cap full downloads at three
-        # per session, including holidays and swallowed per-symbol failures.
+        # Three full downloads per six-hour window, shared across tenants.
+        # Old capped counters start a cooldown without downloading immediately.
+        # A partial session can recover later, but queued duplicates cannot
+        # turn a holiday/provider failure into an unbounded bulk-download loop.
+        import time
+
+        cooldown_key = "cavaai:official-closes:cooldown-start:" + session_key
+        now_seconds = int(time.time())
         tried = int(client.get(attempts) or 0)
         if tried >= 3:
-            return {"status": "skipped", "reason": "session_attempt_cap", "attempts": tried}
+            started = client.get(cooldown_key)
+            if started is None:
+                client.set(cooldown_key, str(now_seconds), ex=7 * 86400)
+                started = str(now_seconds)
+            remaining = max(0, 6 * 3600 - (now_seconds - int(started)))
+            if remaining:
+                return {"status": "skipped", "reason": "session_attempt_cooldown",
+                        "attempts": tried, "target_date": session_key,
+                        "retry_after_seconds": remaining}
+            tried = 0
         client.set(attempts, str(tried + 1), ex=7 * 86400)
+        if tried + 1 >= 3:
+            client.set(cooldown_key, str(now_seconds), ex=7 * 86400)
         db = _session(tenant_id, user_id)
         result = _sync(db)
+        logger.info("official_closes_result session=%s status=%s target_covered=%s "
+                    "with_symbol=%s target_coverage=%s failed_chunks=%s target_missing=%s",
+                    session_key, result.get("status"), result.get("target_covered"),
+                    result.get("with_symbol"), result.get("target_coverage"),
+                    result.get("failed_chunks"), result.get("target_missing"))
         if result.get("status") == "ok" and result.get("target_coverage", 0) >= MIN_TARGET_COVERAGE and result.get("target_date") == session_key:
             client.set(done, "1", ex=7 * 86400)
         return {"actor": "sync_official_closes", **result}

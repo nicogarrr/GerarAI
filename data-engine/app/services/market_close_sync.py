@@ -115,6 +115,7 @@ def sync_official_closes(
         "target_date": target_date.isoformat(),
         "target_covered": target_covered,
         "target_coverage": target_coverage,
+        "target_missing": max(0, len(symbols) - target_covered),
         "minimum_target_coverage": MIN_TARGET_COVERAGE,
         "failed_chunks": failed_chunks,
         "failed_symbols": failed_symbols,
