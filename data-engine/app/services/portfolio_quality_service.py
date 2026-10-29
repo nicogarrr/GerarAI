@@ -18,6 +18,7 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
                 "position_dates": [], "cash_dates": [], "position_sources": [], "cash_sources": [], "cash_native": {},
                 "snapshots": 0, "complete_snapshots": 0, "return_observations": 0,
                 "latest_snapshot_date": None, "latest_pricing_coverage": None,
+                "twr_chain": {"status": "no_snapshots", "unlinked_snapshots": 0, "first_unlinked_date": None},
                 "reasons": ["no_portfolio"]}
     positions = list(db.scalars(select(Position).where(Position.portfolio_id == portfolio.id)))
     cash = list(db.scalars(select(CashBalance)))
@@ -31,6 +32,23 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
     cdates = sorted({c.as_of.isoformat() for c in cash})
     complete = [s for s in snapshots if s.pricing_coverage == Decimal("1")]
     returns = [s for s in snapshots if s.daily_return is not None and s.cumulative_twr is not None and s.pricing_coverage == Decimal("1")]
+    # Cadena TWR: la primera foto de la serie es la base (sin retorno por
+    # definicion); cualquier foto posterior sin daily_return/cumulative_twr es
+    # un eslabon roto y, por diseno, la cadena no se reinicia sola (ver
+    # PortfolioSnapshotService). Una cadena rota es la causa observable de que
+    # las bandas de Factores salgan SIN DATOS aun existiendo snapshots: se
+    # diagnostica aqui con su primera fecha para no adivinarla en produccion.
+    unlinked = [
+        s for s in snapshots[1:]
+        if s.daily_return is None or s.cumulative_twr is None
+    ]
+    twr_chain = {
+        "status": (
+            "no_snapshots" if not snapshots else "broken" if unlinked else "linked"
+        ),
+        "unlinked_snapshots": len(unlinked),
+        "first_unlinked_date": unlinked[0].snapshot_date.isoformat() if unlinked else None,
+    }
     cash_native: dict[str, float] = {}
     for row in cash:
         cash_native[row.currency] = cash_native.get(row.currency, 0.0) + float(row.balance)
@@ -53,6 +71,8 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
         reasons.append("latest_snapshot_incomplete")
     if len(returns) < 2:
         reasons.append("insufficient_verified_returns")
+    if unlinked:
+        reasons.append("twr_chain_broken")
     return {
         "status": "incomplete" if reasons else "ok", "positions": len(positions),
         "missing_cost_positions": missing_cost, "cost_review_positions": cost_reviews, "cost_unverified_positions": cost_unverified, "position_dates": pdates, "cash_dates": cdates,
@@ -63,5 +83,6 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
         "return_observations": len(returns),
         "latest_snapshot_date": snapshots[-1].snapshot_date.isoformat() if snapshots else None,
         "latest_pricing_coverage": float(snapshots[-1].pricing_coverage) if snapshots else None,
+        "twr_chain": twr_chain,
         "reasons": reasons,
     }
