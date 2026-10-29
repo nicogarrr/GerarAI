@@ -14,7 +14,8 @@ describe('analyst target heading inside mobile accordion', () => {
     const heading = screen.getByRole('heading', { name: 'Precios objetivo de analistas' });
     expect(heading).toHaveClass('sr-only', 'md:not-sr-only');
     expect(screen.getByRole('region', { name: 'Precios objetivo de analistas' })).toBeInTheDocument();
-    expect(screen.getByTestId('analyst-consensus-note')).toHaveTextContent('Cifra publicada por Yahoo');
+    expect(screen.queryByTestId('analyst-consensus-note')).not.toBeInTheDocument();
+    expect(screen.getByText(/Consenso agregado de Yahoo: mediana/)).toBeInTheDocument();
     expect(screen.getAllByText('Scotiabank')).toHaveLength(2); // mobile list + desktop table unchanged
   });
 });
