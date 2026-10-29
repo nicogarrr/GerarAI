@@ -469,3 +469,58 @@ def set_telegram_subscription(
         row.enabled, row.chat_id = payload.enabled, payload.chat_id
     db.commit()
     return {"event_type": event_type, "enabled": row.enabled, "chat_id": row.chat_id}
+
+
+# --- Web Push (PWA) -------------------------------------------------------
+
+PushEventType = Literal["thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest",
+                        "dca_levels", "macro_event"]
+
+
+class PushConfigOut(BaseModel):
+    enabled: bool
+    public_key: str | None = None
+
+
+class PushPreferenceOut(BaseModel):
+    event_type: PushEventType
+    enabled: bool
+
+
+class PushStatusOut(BaseModel):
+    enabled: bool
+    public_key: str | None = None
+    devices: int
+    preferences: list[PushPreferenceOut]
+
+
+def _push_identity(db: Session) -> tuple[int, str]:
+    tenant, user = db.info.get("tenant_id"), db.info.get("user_id")
+    if not tenant or not user:
+        raise HTTPException(status_code=401, detail="Se requiere una identidad verificada")
+    return tenant, user
+
+
+@router.get("/push/config", response_model=PushConfigOut)
+def push_config() -> dict:
+    from app.services.web_push import is_configured
+
+    settings = get_settings()
+    ready = is_configured(settings)
+    return {"enabled": ready, "public_key": settings.vapid_public_key if ready else None}
+
+
+@router.get("/push/status", response_model=PushStatusOut)
+def push_status(db: Session = Depends(get_db)) -> dict:
+    from app.models import PushPreference
+    from app.services.outbound_alerts import EVENT_TYPES
+    from app.services.web_push import devices_for, is_configured
+
+    tenant, user = _push_identity(db)
+    settings = get_settings()
+    ready = is_configured(settings)
+    rows = {row.event_type: row.enabled for row in db.scalars(select(PushPreference).where(
+        PushPreference.tenant_id == tenant, PushPreference.user_id == user))}
+    return {"enabled": ready, "public_key": settings.vapid_public_key if ready else None,
+            "devices": len(devices_for(db, tenant, user)),
+            "preferences": [{"event_type": kind, "enabled": rows.get(kind, False)} for kind in EVENT_TYPES]}
