@@ -338,14 +338,16 @@ export interface paths {
          * Catalysts Calendar
          * @description Calendario unico de catalizadores de la cartera (por defecto, 14 dias).
          *
-         *     Une resultados y fecha ex-dividendo (NASDAQ publico, solo posiciones
-         *     abiertas en bolsa US y USD) y acciones corporativas registradas sin
-         *     aplicar. No incluye la fecha de pago: NASDAQ solo devuelve cada dividendo
-         *     el dia de su ex-date, asi que un pago con ex-date anterior al rango
-         *     quedaria fuera sin avisar. Si NASDAQ no
+         *     Une resultados y fecha ex-dividendo (NASDAQ publico, posiciones y
+         *     watchlist en bolsa US y USD), acciones corporativas registradas sin
+         *     aplicar y, desde el historial de dividendos ya ingerido (posiciones y
+         *     watchlist de cualquier mercado), las fechas de PAGO declaradas y los
+         *     ex-dividendos no-US que NASDAQ no cubre. Cuando la fila de NASDAQ trae
+         *     fecha de pago se muestra en el detalle del evento ex. Nada se estima:
+         *     si la fuente no trae fecha de pago, no hay evento de pago. Si NASDAQ no
          *     responde, ``status`` lo declara (``partial``/``unavailable``) y las
-         *     acciones corporativas propias se siguen mostrando; nunca devuelve 5xx
-         *     por un fallo del proveedor.
+         *     acciones corporativas propias y los dividendos ingeridos se siguen
+         *     mostrando; nunca devuelve 5xx por un fallo del proveedor.
          */
         get: operations["catalysts_calendar_api_calendar_catalysts_get"];
         put?: never;
@@ -496,6 +498,31 @@ export interface paths {
          *     evento y nunca rompe el calendario. Clave: ``TICKER|YYYY-MM-DD``.
          */
         get: operations["followed_materials_api_calendar_followed_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/ipos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ipo Calendar
+         * @description Salidas a bolsa en EE. UU. del mes en curso y el siguiente (NASDAQ publico).
+         *
+         *     Incluye las proximas (fecha prevista por la fuente) y las ya fijadas del
+         *     periodo. Cobertura declarada: solo mercados US que publica NASDAQ (datos
+         *     de EDGAR Online); el resto de mercados no aparece. Si NASDAQ no responde,
+         *     ``status`` lo declara; nunca devuelve 5xx por un fallo del proveedor.
+         */
+        get: operations["ipo_calendar_api_calendar_ipos_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -10952,6 +10979,46 @@ export interface operations {
         };
     };
     followed_materials_api_calendar_followed_materials_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ipo_calendar_api_calendar_ipos_get: {
         parameters: {
             query?: never;
             header?: {

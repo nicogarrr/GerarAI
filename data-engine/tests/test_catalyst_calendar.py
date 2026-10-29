@@ -7,7 +7,7 @@ su fecha ex.
 """
 
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -125,7 +125,7 @@ def test_build_real_nasdaq_formats_and_us_only():
     )
     got = [(e["date"], e["ticker"], e["type"], e["detail"]) for e in events]
     assert got == [
-        ("2026-10-16", "KO", "dividend_ex", "0,5100 por acción"),
+        ("2026-10-16", "KO", "dividend_ex", "0,5100 por acción · pago el 30/10/2026"),
         ("2026-10-22", "LOOP", "earnings", "antes de la apertura, BPA estimado -0,05"),
         ("2026-10-22", "ALM", "corporate_action", "ratio 2"),
         ("2026-10-23", "KO", "earnings", "hora por confirmar"),
@@ -394,3 +394,92 @@ def test_build_catalysts_tags_watchlist_origin_on_earnings():
     assert set(by_ticker) == {"KO", "WUS"}
     assert by_ticker["KO"]["origin"] == "cartera"
     assert by_ticker["WUS"]["origin"] == "watchlist"
+
+
+
+def test_nasdaq_dividends_extend_to_watchlist_with_origin():
+    events = svc.build_catalysts(
+        held={"KO"}, held_us={"KO"}, desde=D0, hasta=D1,
+        earnings=[],
+        dividends=[
+            connector.normalize_dividend_row(
+                {"symbol": "WUS", "dividend_Ex_Date": "10/20/2026",
+                 "payment_Date": "11/05/2026", "dividend_Rate": 0.25},
+                date(2026, 10, 20),
+            ),
+            connector.normalize_dividend_row(
+                {"symbol": "FUERA", "dividend_Ex_Date": "10/20/2026",
+                 "dividend_Rate": 0.25},
+                date(2026, 10, 20),
+            ),
+        ],
+        actions=[],
+        watchlist_us={"WUS"},
+    )
+    assert len(events) == 1
+    event = events[0]
+    assert event["ticker"] == "WUS" and event["type"] == "dividend_ex"
+    assert event["origin"] == "watchlist"
+    assert event["detail"] == "0,2500 por acción · pago el 5/11/2026"
+
+
+def test_dividend_records_add_payments_any_market_and_non_us_ex(db):
+    from app.models import DividendRecord
+
+    us = _company(db, "KO", 5)  # US: su ex ya lo cubre NASDAQ en vivo
+    eu = _company(db, "SAN", 5, exchange="BME", currency="EUR")
+    watch = _company(db, "IBE", 0, exchange="BME", currency="EUR")
+    from app.models import WatchItem
+    db.add(WatchItem(symbol="IBE"))
+    for company, ex, pay, source in (
+        (us, date(2026, 10, 15), date(2026, 11, 2), "fmp"),
+        (eu, date(2026, 10, 30), date(2026, 11, 3), "yahoo_finance"),
+        (watch, date(2026, 11, 2), None, "yahoo_finance"),
+    ):
+        db.add(DividendRecord(company_id=company.id, ex_date=ex, pay_date=pay,
+                              amount=Decimal("0.5"), currency="EUR", source=source))
+    db.commit()
+    held, held_us = svc.held_tickers(db)
+    watch_us = svc.watchlist_us_tickers(db, held_us)
+    watch_all = svc.watchlist_tickers(db, held)
+    records = svc.upcoming_dividend_records(db, held | watch_all, D0, D1 + timedelta(days=10))
+    events = svc.build_catalysts(
+        held=held, held_us=held_us, desde=D0, hasta=D1 + timedelta(days=10),
+        earnings=[], dividends=[], actions=[],
+        watchlist_us=watch_us, watchlist=watch_all, records=records,
+    )
+    got = {(e["date"], e["ticker"], e["type"]): e for e in events}
+    # Pago de KO (US) desde el registro ingerido, con etiqueta FMP
+    pago_ko = got[("2026-11-02", "KO", "dividend_payment")]
+    assert pago_ko["source"] == svc.record_source_label("fmp")
+    assert pago_ko["origin"] == "cartera"
+    assert "EUR" in pago_ko["detail"]
+    # SAN (no-US): ex y pago desde el historial ingerido
+    assert ("2026-10-30", "SAN", "dividend_ex") in got
+    assert ("2026-11-03", "SAN", "dividend_payment") in got
+    assert got[("2026-10-30", "SAN", "dividend_ex")]["source"] == svc.record_source_label("yahoo_finance")
+    # IBE (watchlist, no-US): ex con origen watchlist; sin pay_date NO hay pago (nada inventado)
+    ex_ibe = got[("2026-11-02", "IBE", "dividend_ex")]
+    assert ex_ibe["origin"] == "watchlist"
+    assert not any(e["type"] == "dividend_payment" and e["ticker"] == "IBE" for e in events)
+    # KO (US) NO genera ex desde el registro: lo cubre NASDAQ en vivo
+    assert not any(e["type"] == "dividend_ex" and e["ticker"] == "KO" for e in events)
+
+
+def test_dividend_records_respect_range_and_followed(db):
+    from app.models import DividendRecord
+
+    c = _company(db, "SAN", 5, exchange="BME", currency="EUR")
+    db.add(DividendRecord(company_id=c.id, ex_date=date(2026, 12, 25),
+                          pay_date=date(2027, 1, 10), amount=Decimal("0.5"),
+                          currency="EUR", source="fmp"))
+    db.commit()
+    assert svc.upcoming_dividend_records(db, {"SAN"}, D0, D1) == []
+    assert svc.upcoming_dividend_records(db, set(), D0, D1) == []
+    rows = svc.upcoming_dividend_records(db, {"SAN"}, date(2026, 12, 1), date(2027, 1, 31))
+    assert len(rows) == 1 and rows[0]["pay_date"] == "2027-01-10"
+
+
+def test_record_source_label_fallback():
+    assert svc.record_source_label("fmp") == "Historial de dividendos ingerido de FMP"
+    assert svc.record_source_label("otro") == "Historial de dividendos ingerido (otro)"
