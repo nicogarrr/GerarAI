@@ -394,6 +394,7 @@ def _claim_analysis_enqueue(tenant_id: int | None, alert_id: int) -> bool:
 def _clear_analysis_enqueue_mark(tenant_id: int | None, alert_id: int) -> None:
     """Libera la marca si el send fallo tras reclamarla (broker caido): sin
     esto la alerta esperaria el TTL entero pese a no tener mensaje en cola."""
+    # nosemgrep: gerarai-broad-except-pass -- lock/cola Redis best-effort con caducidad por TTL o fallback local documentado
     try:
         client = _redis_client()
         if client is not None:
