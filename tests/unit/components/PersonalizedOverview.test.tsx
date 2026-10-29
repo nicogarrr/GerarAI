@@ -318,7 +318,7 @@ describe('PersonalizedOverview', () => {
             },
         });
         await renderHome();
-        expect(screen.getByText('$100.00', { exact: false, selector: 'div' })).toBeInTheDocument();
+        expect(screen.getByText('100,00 US$', { exact: false, selector: 'div' })).toBeInTheDocument();
         expect(screen.getByText('-2,00 %')).toBeInTheDocument();
         expect(screen.getByText(/^Cierre 23/)).toBeInTheDocument();
         expect(screen.getByText('Cierre sin fecha de la fuente')).toBeInTheDocument();

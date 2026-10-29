@@ -135,11 +135,6 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         why: "Mismo bloque Form 4 que InsiderSignalsView/InsiderFeed: las operaciones insider se declaran y liquidan en USD ante la SEC; el precio medio lleva 2 decimales.",
     },
     {
-        file: 'lib/market/flows.ts',
-        snippet: "`$${scaled.toLocaleString('en-US', { maximumFractionDigits: digits })}${suffix}`",
-        why: "Flujos de dinero: la regla de Nico para USD es en-US con $ delante («$35.7B») y solo se aplica en la rama unit === 'USD'; la divisa llega de cada fila del backend y el resto va en es-ES con código explícito.",
-    },
-    {
         file: 'components/portfolio/EditTransactionDialog.tsx',
         snippet: "transaction.currency || 'USD'",
         why: "Semilla del SELECTOR de moneda del formulario de edición (editable por el usuario entre 9 divisas), no un importe pintado.",

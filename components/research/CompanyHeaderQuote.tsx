@@ -9,11 +9,12 @@ import { isClosedCandle } from '@/lib/market/candle-close';
 import { CompanyTechnicalWorkspace } from './CompanyTechnicalWorkspace';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 
-/** USD prices follow the user's English style; other listings keep their own currency. */
+/**
+ * Precio de cabecera en es-ES para todas las divisas («349,64 US$»). Antes el
+ * USD seguía el estilo inglés por decisión de Instinct; Nico la revocó el
+ * 29-oct-2026 para no mezclar formatos en la misma ficha.
+ */
 function headerMoney(value: number | null | undefined, currency: string): string {
-    if (currency === 'USD' && value != null && Number.isFinite(value)) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-    }
     return formatMoney(value, currency);
 }
 

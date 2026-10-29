@@ -24,8 +24,8 @@ describe('Insider operaciones: vista del agregado por empresa', () => {
     for (const columna of ['Insider', 'Rol', 'Ventas', 'Compras', 'Ops', 'Última']) {
       assert.ok(vista.includes(columna), `falta la columna ${columna}`);
     }
-    assert.match(vista, /formatPrice\([^,]+, 'USD'/, 'los importes USD siguen la convención en-US');
-    assert.match(vista, /shares\.toLocaleString\('en-US'/, 'acciones con la misma convención en-US que los importes de la línea');
+    assert.match(vista, /formatPrice\([^,]+, 'USD'/, 'importes USD con el formateador común (es-ES)');
+    assert.match(vista, /formatNumber\(side\.shares/, 'acciones en es-ES, como los importes de la línea');
     assert.match(vista, /formatMarketCapUsd\(/, 'totales con formato compacto USD');
     assert.match(vista, /insiderRole\(row\.role, row\.officer_title\)/, 'el cargo pasa por insiderRole');
     assert.match(vista, /insiderName\(row\.insider\)/, 'el nombre SEC pasa por insiderName');

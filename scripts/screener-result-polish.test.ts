@@ -34,6 +34,6 @@ test('small delta never rounds to a bare 0 and keeps its currency sign (F35)',()
  assert.ok(eur.includes('0,002'),`EUR con dígitos significativos, salió: ${eur}`);
  assert.ok(!/^-?0\s*€$/.test(eur),'no es un 0 redondeado');
  const usd=formatPrice(-0.002,'USD',{signDisplay:'exceptZero'});
- assert.ok(usd.includes('$'),'USD conserva el signo de divisa');
- assert.ok(usd.includes('0.002'),`USD en-US con dígitos significativos, salió: ${usd}`);
+ assert.ok(usd.includes('US$'),'USD conserva el signo de divisa');
+ assert.ok(usd.includes('0,002'),`USD es-ES con dígitos significativos, salió: ${usd}`);
 });

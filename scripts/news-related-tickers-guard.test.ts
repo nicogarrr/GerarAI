@@ -17,7 +17,7 @@ void test('variacion medible: signo, color y cierre datado', () => {
   const view = relatedTickerView({ ticker: 'VOD', name: 'Vodafone Group Plc', currency: 'USD', price: 15.955, date: '2026-10-16', change_pct: -0.96 });
   assert.equal(view.tone, 'down');
   assert.match(view.changeText, /0,96/);
-  assert.match(view.priceText, /15\.9[56]/);
+  assert.match(view.priceText, /15,9[56]\u00a0US\$/);
   assert.match(view.title, /cierre 2026-10-16/);
   assert.equal(view.href, '/research/VOD');
 });

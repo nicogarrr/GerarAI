@@ -25,15 +25,15 @@ describe('formato numérico es-ES', () => {
     assert.equal(formatCompact(4869930000000), '4.869,93 mil M');
   });
 
-  it('formatMarketCapUsd: dólares con escala inglesa, sin cambiar el importe', () => {
-    assert.equal(formatMarketCapUsd(4869930000000), '$4.87T');
-    assert.equal(formatMarketCapUsd(404010000000), '$404.01B');
-    assert.equal(formatMarketCapUsd(9447000000), '$9.45B');
-    assert.equal(formatMarketCapUsd(9447000), '$9.45M');
-    assert.equal(formatMarketCapUsd(4870000000), '$4.87B');
-    assert.equal(formatMarketCapUsd(1250), '$1.25K');
-    assert.equal(formatMarketCapUsd(0), '$0');
-    assert.equal(formatMarketCapUsd(-4870000000), '-$4.87B');
+  it('formatMarketCapUsd: dólares en es-ES con la escala fija, sin cambiar el importe', () => {
+    assert.equal(formatMarketCapUsd(4869930000000), '4.869,93 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(404010000000), '404,01 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(9447000000), '9,45 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(9447000), '9,45 M\u00a0US$');
+    assert.equal(formatMarketCapUsd(4870000000), '4,87 mil M\u00a0US$');
+    assert.equal(formatMarketCapUsd(1250), '1,25\u00a0mil\u00a0US$');
+    assert.equal(formatMarketCapUsd(0), '0\u00a0US$');
+    assert.equal(formatMarketCapUsd(-4870000000), '-4,87 mil M\u00a0US$');
     assert.equal(formatMarketCapUsd(Infinity), 'N/D');
     assert.equal(formatMarketCapUsd(null), 'N/D');
     assert.equal(formatMarketCapUsd('abc'), 'N/D');
@@ -50,7 +50,7 @@ describe('formato numérico es-ES', () => {
   it('usa coma decimal en números, porcentajes e importes', () => {
     assert.equal(formatNumber(-0.8), '-0,8');
     assert.equal(formatPercent(-0.008, { digits: 2 }), '-0,80\u00a0%');
-    assert.equal(formatMoney(1234.5), '$1,234.50');
+    assert.equal(formatMoney(1234.5), '1.234,50\u00a0US$');
     assert.equal(formatMoney(3127.58, 'EUR'), '3.127,58\u00a0€');
     assert.equal(formatMoney(1477.2, 'EUR'), '1.477,20\u00a0€');
   });

@@ -59,7 +59,7 @@ describe('TtmPanel', () => {
               quarters: [{ period_end: '2025-12-31', value: 1, reported: false, origin: 'FY-9M' }] },
             { metric: 'net_income', value: null, unit: 'USD', basis: 'FY', label: 'x', provenance: 'SIN_DATOS', period_end: null },
         ])} />);
-        expect(screen.getByText('€12.50')).toBeInTheDocument();
+        expect(screen.getByText('12,50 €')).toBeInTheDocument();
         expect(screen.getByText('INFERIDO')).toBeInTheDocument();
         expect(screen.getByText(/hasta 30\/06\/2026/)).toBeInTheDocument();
         expect(screen.getByText(/Q4 = FY − 9 meses, inferido/)).toBeInTheDocument();
@@ -102,14 +102,14 @@ describe('ThesisScenariosPanel', () => {
     it('importes en la divisa declarada, N/D sin dato, y el motivo se anuncia al lector de pantalla', () => {
         render(<ThesisScenariosPanel adrRatio={null} currency="USD" data={scenarios()} />);
         const table = screen.getAllByRole('table')[0];
-        expect(within(table).getByText('$100.0')).toBeInTheDocument();
-        expect(within(table).getByText('$300.0')).toBeInTheDocument();
+        expect(within(table).getByText('100,0 US$')).toBeInTheDocument();
+        expect(within(table).getByText('300,0 US$')).toBeInTheDocument();
         expect(within(table).getByText(/Sin dato de ingresos/)).toBeInTheDocument();
         expect(screen.getByText(/Proyección del modelo DCF v3, corte 2026-10-01/)).toBeInTheDocument();
     });
     it('ADR o divisa desconocida: NO se muestra un importe con divisa inventada, y se avisa', () => {
         render(<ThesisScenariosPanel adrRatio={2} currency="USD" data={scenarios()} />);
-        expect(screen.queryByText('$100.0')).toBeNull();
+        expect(screen.queryByText('100,0 US$')).toBeNull();
         expect(screen.getAllByText(/Divisa del emisor no verificada/).length).toBeGreaterThan(0);
     });
     it('aviso de coherencia se muestra', () => {

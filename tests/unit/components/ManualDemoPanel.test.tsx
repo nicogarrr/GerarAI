@@ -151,7 +151,7 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         expect(screen.getByText('Rechazada')).toBeInTheDocument();
         expect(screen.getByText(/fondos insuficientes/)).toBeInTheDocument();
         expect(screen.getByText('N/D')).toBeInTheDocument();
-        expect(screen.getByText(formatMoney(40, 'USD'))).toBeInTheDocument();
+        expect(screen.getByText(formatMoney(40, 'USD').replace(/\u00a0/g, ' '))).toBeInTheDocument();
     });
 
     it('«Siguiente» pide el bloque siguiente con el cursor y acumula sin duplicar filas', async () => {

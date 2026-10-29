@@ -109,14 +109,14 @@ describe('canarios de render: declarados futuros', () => {
   });
 
   it('un importe por acción diminuto no se pinta como 0,00', () => {
-    // Regla de producto: USD se pinta en locale en-US ("$0.000001").
+    // USD en es-ES como el resto (Nico 29-oct-2026): «0,000001 US$».
     const rendered = formatPrice(0.000001, 'USD').replace(/\u00a0/g, ' ');
-    assert.notEqual(rendered, '$0.00');
-    assert.ok(rendered.includes('0.000001'), `esperaba decimales reales, salió: ${rendered}`);
+    assert.notEqual(rendered, '0,00 US$');
+    assert.ok(rendered.includes('0,000001'), `esperaba decimales reales, salió: ${rendered}`);
     // El componente usa formatPrice (adaptativo), no formatMoney (2 decimales).
     const view = source('components/portfolio/PortfolioDividends.tsx');
     assert.ok(view.includes('formatPrice(item.amount_per_share'), 'amount_per_share usa formato adaptativo');
-    assert.equal(formatMoney(0.000001, 'USD').replace(/\u00a0/g, ' '), '$0.00', 'formatMoney a 2 decimales sí inventaría el cero (canario del riesgo)');
+    assert.equal(formatMoney(0.000001, 'USD').replace(/\u00a0/g, ' '), '0,00 US$', 'formatMoney a 2 decimales sí inventaría el cero (canario del riesgo)');
   });
 });
 

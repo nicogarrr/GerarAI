@@ -1,5 +1,5 @@
 // @ts-expect-error TS5097: explicit extension for node strip-types guards.
-import { formatMarketCapUsd } from '../format.ts';
+import { formatMoneyCompact } from '../format.ts';
 
 /**
  * Fichas «etiqueta / valor» para los inputs inferidos de una tesis (F4).
@@ -33,18 +33,21 @@ function isCurrencyCode(unit: string): boolean {
     }
 }
 
-/** Dinero en la divisa DECLARADA, escala inglesa: "$4.87B", "EUR 14.40" segun Intl en-US. */
+/**
+ * Dinero en la divisa DECLARADA, en es-ES para todas las divisas
+ * («4,87 mil M US$», «14,40 €»; Nico 29-oct-2026, antes USD en inglés).
+ */
 export function formatMoneyShort(value: number, currency: string): string {
     const abs = Math.abs(value);
-    if (currency === "USD" && abs >= 1e6) return formatMarketCapUsd(value);
-    return new Intl.NumberFormat("en-US", {
+    // Escala compacta SIEMPRE con 2 decimales (4,87 mil M, no 4,9 mil M).
+    // USD como la capitalización (4,87 mil M US$; 148,4 mil M US$).
+    if (abs >= 1e6) return formatMoneyCompact(value, currency, currency === "USD" ? {} : { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return new Intl.NumberFormat("es-ES", {
         style: "currency",
         currency,
-        notation: abs >= 1e6 ? "compact" : "standard",
-        maximumFractionDigits: abs >= 1e6 ? 2 : abs >= 100 ? 0 : 2,
-        // Estilo ingles: escala compacta SIEMPRE con 2 decimales
-        // ($4.87B, no $4.8B ni $4.5B). Sin minimum, Intl recorta ceros.
-        minimumFractionDigits: abs >= 1e6 ? 2 : abs >= 100 ? 0 : 2,
+        useGrouping: "always",
+        maximumFractionDigits: abs >= 100 ? 0 : 2,
+        minimumFractionDigits: abs >= 100 ? 0 : 2,
     }).format(value);
 }
 

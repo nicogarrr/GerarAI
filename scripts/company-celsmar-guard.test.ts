@@ -17,7 +17,8 @@ describe('ficha: cifra grande y métricas compactas', () => {
         assert.match(quote, /company-metric-strip/);
         for (const label of ['Apertura', 'Máximo', 'Mínimo', 'Cierre anterior']) assert.ok(quote.includes(label));
         assert.match(quote, /value == null \|\| !isValidCurrencyCode\(currency\) \? NA : headerMoney/);
-        assert.match(quote, /if \(currency === 'USD' && value != null && Number.isFinite\(value\)\)/);
+        // Nico (29-oct-2026): el USD de cabecera va en es-ES como el resto de divisas.
+        assert.match(quote, /function headerMoney[\s\S]*?return formatMoney\(value, currency/);
         assert.match(quote, /return formatMoney\(value, currency\)/);
         assert.match(quote, /divide-gray-800/);
         assert.match(quote, /isValidCurrencyCode\(currency\)/);

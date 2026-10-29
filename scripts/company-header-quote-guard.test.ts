@@ -67,7 +67,7 @@ test('sin divisa verificada no se muestra precio (nunca USD asumido)', () => {
     assert.equal(isValidCurrencyCode('US DOLLAR'), false);
     assert.match(component, /isValidCurrencyCode\(currency\)/);
     assert.ok(!/currency\s*=\s*'USD'|currency\s*\?\?\s*'USD'/.test(component), 'la cabecera no debe asumir USD como fallback');
-    assert.ok(component.includes("if (currency === 'USD'"));
+    assert.ok(!component.includes("'en-US'"), 'el USD va en es-ES (Nico 29-oct-2026)');
     assert.match(actions, /researchCompany\?\.currency \|\| profile\?\.currency \|\| null/);
 });
 

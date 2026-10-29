@@ -23,10 +23,10 @@ describe('Company position panel with the same figures as the portfolio', () => 
         expect(screen.getByRole('heading', { name: 'Tu posición' })).toBeVisible();
         expect(screen.getByText(/Datos de tu cartera a 27 oct 2026/)).toBeVisible();
         expect(value('Acciones')).toHaveTextContent('10');
-        expect(value('Coste medio')).toHaveTextContent('$100.00');
+        expect(value('Coste medio')).toHaveTextContent('100,00 US$');
         expect(value('Valor')).toHaveTextContent('1.350,00 €');
         expect(value('Plusvalía latente')).toHaveTextContent('450,00 € (+50,0 %)');
-        expect(value('Plusvalía latente')).toHaveTextContent('$500.00 en USD');
+        expect(value('Plusvalía latente')).toHaveTextContent('500,00 US$ en USD');
         expect(value('Peso')).toHaveTextContent('39,7 %de las posiciones con valor');
         expect(screen.getByRole('link', { name: 'Ver en la cartera' })).toHaveAttribute('href', '/portfolio');
     });
@@ -53,17 +53,17 @@ describe('Company position panel with the same figures as the portfolio', () => 
         expect(value('Plusvalía latente')).toHaveTextContent('N/D');
         expect(screen.getByRole('status')).toHaveTextContent('Coste de adquisición desconocido');
         expect(screen.queryByText(/falta el precio o el tipo de cambio/)).not.toBeInTheDocument();
-        expect(screen.queryByText('$0.00')).not.toBeInTheDocument();
+        expect(screen.queryByText('0,00 US$')).not.toBeInTheDocument();
     });
     it('keeps a known native average cost when only the historical FX of the base cost is missing', () => {
         // Ledger con una compra sin cambio BCE de su fecha: cost_basis_base null
         // (cost 0 en la acción) pero precio medio nativo y valor actual conocidos.
         render(<CompanyPositionPanel context={held({ avgPrice: 100, cost: 0, gain: 0, nativeCost: 1000,
             nativeGain: 500, costReviewMessage: null, fxMissing: true, valueMissing: false })} />);
-        expect(value('Coste medio')).toHaveTextContent('$100.00');
+        expect(value('Coste medio')).toHaveTextContent('100,00 US$');
         expect(value('Valor')).toHaveTextContent('1.350,00 €');
         expect(value('Plusvalía latente')).toHaveTextContent('N/D');
-        expect(value('Plusvalía latente')).toHaveTextContent('$500.00 en USD');
+        expect(value('Plusvalía latente')).toHaveTextContent('500,00 US$ en USD');
         expect(screen.getByRole('status')).toHaveTextContent('Sin coste en EUR: falta el tipo de cambio de alguna compra.');
         expect(screen.queryByText(/Coste de adquisición desconocido/)).not.toBeInTheDocument();
     });

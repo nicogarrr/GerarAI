@@ -79,8 +79,9 @@ export function flowSupplierKey(
 
 /**
  * Importe de un flujo respetando la divisa de la fila (regla de Nico):
- * USD siempre en-US con $ delante → «$35.7B»; otras divisas en es-ES con el
- * código explícito (nunca se asume USD cuando la fila dice otra cosa).
+ * USD en es-ES con su símbolo → «35,7 mil M US$» (Nico 29-oct-2026: todo en
+ * formato español); otras divisas en es-ES con el código explícito (nunca se
+ * asume USD cuando la fila dice otra cosa).
  */
 export function formatFlowAmount(value: number | null, unit = 'USD', fallback = 'N/D'): string {
   if (value === null || !Number.isFinite(value)) return fallback;
@@ -89,7 +90,8 @@ export function formatFlowAmount(value: number | null, unit = 'USD', fallback = 
   const suffix = abs >= 1e9 ? 'B' : abs >= 1e6 ? 'M' : '';
   const digits = abs >= 1e6 ? 1 : 0;
   if (unit === 'USD') {
-    return `$${scaled.toLocaleString('en-US', { maximumFractionDigits: digits })}${suffix}`;
+    const usdSuffix = abs >= 1e9 ? ' mil M' : abs >= 1e6 ? ' M' : '';
+    return `${scaled.toLocaleString('es-ES', { maximumFractionDigits: digits, useGrouping: 'always' } as Intl.NumberFormatOptions)}${usdSuffix}\u00a0US$`;
   }
   const number = scaled.toLocaleString('es-ES', { maximumFractionDigits: digits });
   return suffix ? `${number} ${suffix} ${unit}` : `${number} ${unit}`;

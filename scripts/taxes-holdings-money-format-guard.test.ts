@@ -16,7 +16,7 @@ void test('comportamiento: importes es-ES con divisa de la fila', () => {
     assert.equal(formatHoldingMoney(3589.265983, 'EUR'), '3.589,27 €');
     assert.equal(formatHoldingMoney(123456.789, 'EUR'), '123.456,79 €');
     assert.equal(formatHoldingMoney(-92.927388, 'EUR'), '-92,93 €');
-    assert.equal(formatHoldingMoney('2159.73', 'USD'), '$2,159.73');
+    assert.equal(formatHoldingMoney('2159.73', 'USD'), '2.159,73 US$');
     assert.equal(formatHoldingMoney(null, 'EUR'), 'N/D');
     assert.equal(formatHoldingMoney(10, 'euro'), '10,00 €', 'divisa inválida cae a EUR, nunca rompe el formato');
     assert.deepEqual([...TAX_HOLDING_MONEY_COLUMNS].sort(), ['cost_basis', 'market_value', 'unrealized_pnl']);

@@ -96,7 +96,7 @@ describe('InsiderFeed', () => {
         const table = screen.getByRole('table');
         const rows = within(table).getAllByRole('row');
         expect(rows).toHaveLength(5);
-        expect(within(rows[1]).getByRole('link', { name: /12,500/ })).toHaveAttribute('href', 'https://sec.gov/x');
+        expect(within(rows[1]).getByRole('link', { name: /12\.500/ })).toHaveAttribute('href', 'https://sec.gov/x');
         expect(within(rows[1]).getByText('3 tramos · precio medio')).toBeInTheDocument();
         expect(within(rows[1]).getByText('Plan 10b5-1')).toBeInTheDocument();
         expect(within(rows[2]).getByText('PDMR (Reino Unido)')).toBeInTheDocument();
@@ -107,6 +107,6 @@ describe('InsiderFeed', () => {
         expect(screen.getAllByText('Divisa no informada').length).toBeGreaterThanOrEqual(2);
         expect(screen.getByText(/Fuente: tracefour/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'SEDI' })).toHaveAttribute('href', 'https://www.sedi.ca');
-        expect(screen.getAllByRole('link', { name: /12,500/ })).toHaveLength(2);
+        expect(screen.getAllByRole('link', { name: /12\.500/ })).toHaveLength(2);
     });
 });

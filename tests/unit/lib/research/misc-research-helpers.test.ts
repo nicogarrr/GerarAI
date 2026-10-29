@@ -141,13 +141,13 @@ describe('thesisCodeLabel', () => {
 
 describe('thesisMoney / thesisEps', () => {
     it('USD en inglés, otras en es-ES, siempre 2 decimales', () => {
-        expect(thesisMoney(1234.5, 'USD')).toBe('$1,234.50');
+        expect(thesisMoney(1234.5, 'USD')).toBe('1.234,50\u00a0US$');
         expect(thesisMoney(1234.5, 'EUR')).toMatch(/^1\.234,50\s€$/);
     });
     it('BPA: N/D sin dato o no finito (nunca 0.00)', () => {
         for (const v of [null, undefined, NaN, Infinity]) expect(thesisEps(v)).toBe('N/D');
-        expect(thesisEps(0)).toBe('0.00');
-        expect(thesisEps(-1.234)).toBe('-1.23');
+        expect(thesisEps(0)).toBe('0,00');
+        expect(thesisEps(-1.234)).toBe('-1,23');
     });
 });
 

@@ -9,10 +9,10 @@ import assert from 'node:assert/strict';
 import { formatScenarioMoney, scenarioCurrency } from '../lib/research/scenario-format.ts';
 
 describe('formato de escenarios', () => {
-  it('USD usa escala inglesa con símbolo', () => {
+  it('USD en es-ES con la escala fija y su símbolo (Nico 29-oct-2026)', () => {
     const usd = scenarioCurrency('USD', null);
-    assert.equal(formatScenarioMoney(4.87e9, usd, 2), '$4.87B');
-    assert.equal(formatScenarioMoney(2.5, usd, 2), '$2.50');
+    assert.equal(formatScenarioMoney(4.87e9, usd, 2), '4,87 mil M\u00a0US$');
+    assert.equal(formatScenarioMoney(2.5, usd, 2), '2,50\u00a0US$');
   });
   it('otra divisa de cotización conserva su código', () => {
     const out = formatScenarioMoney(1.2e9, scenarioCurrency('EUR', null), 1);
