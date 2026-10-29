@@ -72,15 +72,29 @@ describe('PortfolioAllocation', () => {
         expect(screen.getByText('Añade posiciones para ver la distribución')).toBeInTheDocument();
     });
 
-    it('pesos suman 100 entre las valoradas; sin valor queda fuera y se avisa', () => {
-        render(<PortfolioAllocation holdings={[holding('AAA', 300), holding('BBB', 100), holding('CCC', 0, { valueMissing: true }), holding('DDD', 50, { fxMissing: true })]} baseCurrency="EUR" />);
+    it('pesos suman 100 entre las valoradas; sin valor o valoración suspendida queda fuera y se avisa', () => {
+        render(<PortfolioAllocation holdings={[holding('AAA', 300), holding('BBB', 100), holding('CCC', 0, { valueMissing: true }), holding('DDD', 50, { valuationHold: { reason: 'suspensión', effectiveDate: '2026-10-01' } })]} baseCurrency="EUR" />);
         const legend = document.getElementById('portfolio-allocation-legend')!;
         expect(legend.textContent).toMatch(/AAA.*75,0\s?%/);
         expect(legend.textContent).toMatch(/BBB.*25,0\s?%/);
         expect(legend.textContent).not.toContain('CCC');
+        expect(legend.textContent).not.toContain('DDD');
         expect(screen.getByText(/Distribución incompleta: 2 posiciones sin valor/)).toBeInTheDocument();
         expect(screen.getByTestId('donut')).toHaveAttribute('data-currency', 'EUR');
         expect(screen.getByText('Posiciones').previousSibling!.textContent).toBe('2');
+    });
+
+    it('coste pendiente de conciliación (fxMissing) NO excluye del donut: pesos sobre valor de mercado', () => {
+        // Estado real de prod 2026-10-29: base de coste IBKR pendiente en toda
+        // la cartera; el donut decía «ninguna posición tiene valor disponible»
+        // con el valor bruto a la vista.
+        render(<PortfolioAllocation holdings={[holding('AAA', 300, { cost: 0, fxMissing: true }), holding('BBB', 100, { cost: 0, fxMissing: true })]} />);
+        const legend = document.getElementById('portfolio-allocation-legend')!;
+        expect(legend.textContent).toMatch(/AAA.*75,0\s?%/);
+        expect(legend.textContent).toMatch(/BBB.*25,0\s?%/);
+        expect(screen.queryByText(/Distribución N\/D/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/sin valor/)).not.toBeInTheDocument();
+        expect(screen.getByText('Pesos sobre el valor bruto de las posiciones')).toBeInTheDocument();
     });
 
     it('una sola sin valor: singular', () => {
