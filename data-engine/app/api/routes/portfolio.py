@@ -350,6 +350,7 @@ def _fx_source(db: Session, base_currency: str) -> dict:
     """Etiqueta de la fuente FX: de donde salen los tipos y de que fecha."""
     row = db.execute(
         select(FXRate.source, FXRate.rate_date)
+        .where(*tenant_filters(db, FXRate))
         .order_by(desc(FXRate.rate_date), desc(FXRate.id))
         .limit(1)
     ).first()
