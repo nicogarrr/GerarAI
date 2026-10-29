@@ -287,6 +287,31 @@ def test_wash_sale_window_boundary_is_inclusive(db):
     assert sale_out["gain_native"] == -200.0
 
 
+def test_wash_sale_backward_window_boundary_is_inclusive(db):
+    """Espejo backward de test_wash_sale_window_boundary_is_inclusive: un
+    remanente comprado EXACTAMENTE 2 meses antes de la venta en perdida es
+    recompra (Manual AEAT 2025: "dentro de los dos meses anteriores"). La
+    excepcion de compra inicial unica no aplica: hay saldo previo a la
+    ventana. Se vende solo la mitad para que quede remanente en cartera
+    (recompra = min(remanente, comprado en la ventana))."""
+    _eur_portfolio(db)
+    inside = _company(db, "WBA")
+    _tx(db, inside, date(2026, 1, 5), "buy", 100, 10)
+    _tx(db, inside, date(2026, 1, 10), "buy", 100, 10)  # exactly 2 months
+    _tx(db, inside, date(2026, 3, 10), "sell", 100, 8)  # FIFO consume el lote de ene-05
+    outside = _company(db, "WBB")
+    _tx(db, outside, date(2026, 1, 5), "buy", 100, 10)
+    _tx(db, outside, date(2026, 1, 9), "buy", 100, 10)  # 2 months - 1 day
+    _tx(db, outside, date(2026, 3, 10), "sell", 100, 8)
+    report = TaxReportService().compute_report(db, 2026)
+    sale_in = next(r for r in report["realized"] if r["ticker"] == "WBA")["sales"][0]
+    sale_out = next(r for r in report["realized"] if r["ticker"] == "WBB")["sales"][0]
+    assert sale_in["wash_sale_blocked"] is True
+    assert sale_in["gain_native"] == 0.0
+    assert sale_out["wash_sale_blocked"] is False
+    assert sale_out["gain_native"] == -200.0
+
+
 def test_wash_sale_open_window_flagged_when_data_runs_out(db):
     """A loss sale whose 2-month forward window extends past the latest
     available data stays provisionally computable but must be flagged."""
