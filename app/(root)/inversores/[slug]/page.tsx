@@ -12,7 +12,8 @@ import { getKnowledgeLetters } from "@/lib/actions/research-tools.actions";
 import { Portfolio } from "../_components/Portfolio";
 import { InvestorLetters } from "../_components/InvestorLetters";
 import { InvestorSelector } from "../_components/InvestorSelector";
-import { InvestorViewSelector, VIEWS } from "../_components/InvestorViewSelector";
+import { InvestorViewSelector } from "../_components/InvestorViewSelector";
+import { VIEWS } from "../_components/investor-views";
 import { InvestorConcepts } from "../_components/InvestorConcepts";
 
 import { InvestorVideos } from "../_components/InvestorVideos";
