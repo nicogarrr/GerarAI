@@ -475,3 +475,24 @@ def test_legacy_row_accepts_newer_statement_and_gets_dated(db):
     IBKRImportService().import_flex_xml(db, xml(cost="1", quantity="99", report_date="2026-10-27"))
     db.refresh(p)
     assert p.quantity == Decimal("8")
+
+
+def test_unpriced_newer_position_takes_the_statement_price(db):
+    """Una posicion con as_of posterior al extracto pero SIN cotizacion
+    (centinela market_price=0) no conserva el 0: el precio del extracto es la
+    unica valoracion disponible (auditoria #2956)."""
+    from datetime import date
+
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57"))
+    p = db.query(Position).one()
+    p.as_of = date(2026, 10, 29)
+    p.market_price = Decimal("0")
+    p.market_value = Decimal("0")
+    p.market_value_native = None
+    p.market_value_base = None
+    db.flush()
+    IBKRImportService().import_flex_xml(db, xml(cost="125.57", report_date="2026-10-28"))
+    db.refresh(p)
+    assert p.market_price == Decimal("130")
+    assert p.market_value_native == Decimal("787.436")
+    assert (p.as_of, p.statement_as_of) == (date(2026, 10, 28), date(2026, 10, 28))
