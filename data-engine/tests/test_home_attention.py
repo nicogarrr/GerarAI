@@ -110,3 +110,50 @@ def test_attention_summary_untouched_without_translation_or_verbatim_match():
         assert rows[10] == summary_plain
         assert rows[11] == summary_other
     engine.dispose()
+
+
+def _translated_setup(db, *, event_tenant: int, translated: str):
+    from app.models import NewsEvent
+    from app.services.news_headline_translation import fingerprint
+
+    headline = "Meta Stock Could Be a Winner Through 2030"
+    db.add(Company(id=1, ticker="META", name="Meta", exchange="NASDAQ", company_type="equity", valuation_model="dcf"))
+    db.add(WatchItem(tenant_id=1, symbol="META"))
+    db.add(NewsEvent(
+        id=1, tenant_id=event_tenant, company_id=1, title=headline, source="manual",
+        metadata_={"headline_translation": {"fingerprint": fingerprint(headline), "status": "translated", "text": translated}},
+    ))
+    db.add(ThesisChange(id=10, tenant_id=1, company_id=1, created_at=datetime(2026, 10, 1, tzinfo=UTC),
+                        summary=f"Noticia material que requiere revisión de la tesis: {headline}. Refuerza la tesis."))
+    db.add(ResearchReview(tenant_id=1, company_id=1, thesis_change_id=10, news_event_id=1,
+                          status="open", review_type="thesis", title="Review"))
+    db.flush()
+    db.info["tenant_id"] = 1
+
+
+def _engine():
+    from app.models import NewsEvent
+
+    engine = create_engine("sqlite://")
+    tables = [Company.__table__, Position.__table__, ResearchReview.__table__, ThesisChange.__table__, WatchItem.__table__, NewsEvent.__table__]
+    Base.metadata.create_all(engine, tables=tables)
+    return engine
+
+
+def test_attention_never_reads_another_tenants_news_event():
+    """Auditoría #2955: el NewsEvent origen se lee con filtro de tenant."""
+    engine = _engine()
+    with Session(engine) as db:
+        _translated_setup(db, event_tenant=2, translated="Traducción de otro tenant")
+        summary = pending_thesis_changes(db)[0]["summary"]
+        assert "otro tenant" not in summary
+    engine.dispose()
+
+
+def test_attention_translation_with_final_period_does_not_double_it():
+    engine = _engine()
+    with Session(engine) as db:
+        _translated_setup(db, event_tenant=1, translated="Meta podría ganar hasta 2030.")
+        summary = pending_thesis_changes(db)[0]["summary"]
+        assert "hasta 2030. Refuerza" in summary and ".." not in summary
+    engine.dispose()

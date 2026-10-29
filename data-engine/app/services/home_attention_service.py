@@ -61,7 +61,10 @@ def _news_events_by_change(db: Session, change_ids: list[int]) -> dict[int, News
     events = {
         event.id: event
         for event in db.scalars(
-            select(NewsEvent).where(NewsEvent.id.in_(set(event_id_by_change.values())))
+            select(NewsEvent).where(
+                NewsEvent.id.in_(set(event_id_by_change.values())),
+                *tenant_filters(db, NewsEvent),
+            )
         ).all()
     }
     return {cid: events[eid] for cid, eid in event_id_by_change.items() if eid in events}
@@ -88,5 +91,6 @@ def _summary_en_castellano(change: ThesisChange, event: NewsEvent | None) -> str
         return change.summary
     original = original_headline(event).strip().rstrip(".")
     if original and original in change.summary:
-        return change.summary.replace(original, text.strip())
+        # Sin punto final: la plantilla ya pone «. » tras el titular.
+        return change.summary.replace(original, text.strip().rstrip("."))
     return change.summary
