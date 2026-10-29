@@ -10,6 +10,7 @@ from sqlalchemy import delete, or_, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
+from app.core.source_urls import linkable_source_url
 from app.models import Company, Document, FinancialFact, FinancialStatement, MarketPrice
 from app.services.connectors import esef as esef_connector
 from app.services.connectors import fred as fred_connector
@@ -2792,7 +2793,7 @@ class FinancialIngestionService:
         if document:
             # A normalized snapshot has no verified filing URL. Keep its LEI,
             # filing id and hash in metadata, never fabricate a clickable URL.
-            if document.source_url and "api/filings (fxo_id=" in document.source_url:
+            if document.source_url and linkable_source_url(document.source_url) is None:
                 document.source_url = None
             return document
         document = Document(

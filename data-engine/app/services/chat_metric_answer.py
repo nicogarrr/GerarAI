@@ -5,6 +5,7 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.source_urls import linkable_source_url
 from app.models import Company, Document, FinancialFact
 from app.schemas import ChatResponse
 
@@ -49,7 +50,7 @@ def metric_question_answer(db: Session, question: str, company: Company | None) 
                       f"({money(fcf.value, fcf.unit)}) / ingresos ({money(revenue.value, revenue.unit)}) × 100.")
             for fact, title in [(fcf, "Flujo de caja libre"), (revenue, "Ingresos")]:
                 document = db.scalar(select(Document).where(Document.id == fact.source_id, Document.tenant_id == tenant)) if fact.source_id else None
-                url = document.source_url if document and document.source_url else f"/research/{quote(company.ticker, safe='')}?view=financials"
+                url = (linkable_source_url(document.source_url) if document else None) or f"/research/{quote(company.ticker, safe='')}?view=financials"
                 sources.append({"type": "financial_fact", "id": fact.id, "title": f"{title} · {fact.period} · {fact.source_type}", "url": url})
     return ChatResponse(answer=answer, sources=sources, model="deterministic", confidence=0.9,
                         prompt_version="specific-metric-v1", llm_trace={"path": "specific_metric", "provider_calls": 0})

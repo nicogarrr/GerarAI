@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.source_urls import linkable_source_url
 from app.core.tenancy import tenant_filters
 from app.llm.errors import LLMError
 from app.models import (
@@ -195,7 +196,7 @@ def documents(
             "title": document.title,
             "source_type": document.source_type,
             "source_tier": classify_source(document.source_type, document.source_url).key,
-            "source_url": document.source_url,
+            "source_url": linkable_source_url(document.source_url),
             "storage_uri": document.storage_uri,
             "checksum": document.checksum,
             "metadata": document.metadata_,
