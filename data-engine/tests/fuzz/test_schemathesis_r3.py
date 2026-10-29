@@ -6,6 +6,7 @@ excepción de Python/SQLAlchemy/drivers ni SQL. Ver docs/testing/api-fuzzing.md.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 
@@ -71,6 +72,51 @@ def test_api_operation_negative_and_leaks(case):
     LAST_SERVER_ERRORS.clear()
     try:
         case.call_and_validate(checks=[no_server_error_or_leak])
+    except BaseException as exc:
+        _report(case, exc)
+        raise
+
+
+def _non_finite(value, marker):
+    """Cada número del cuerpo (no los booleanos) pasa a ``marker`` (inf/-inf/nan)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return marker
+    if isinstance(value, dict):
+        return {key: _non_finite(item, marker) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_non_finite(item, marker) for item in value]
+    return value
+
+
+infinity_schema = schema.clone()
+infinity_schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+
+@infinity_schema.include(method=["POST", "PUT", "PATCH"]).parametrize()
+@settings(
+    max_examples=max(2, MAX // 2),
+    deadline=None,
+    suppress_health_check=list(HealthCheck),
+    derandomize=os.environ.get("FUZZ_DERANDOMIZE", "1") == "1",
+)
+def test_api_body_with_non_finite_numbers(case):
+    """JSON admite NaN/Infinity: ningún endpoint puede responder 500 por ellos (#2904)."""
+    if not isinstance(case.body, dict | list):
+        return
+    case.body = _non_finite(case.body, float(os.environ.get("FUZZ_NON_FINITE", "inf")))
+    # El cliente HTTP serializa con JSON estricto y se niega a enviar inf/nan:
+    # mandamos los bytes tal cual (``Infinity``/``NaN``, lo que json.loads acepta).
+    raw = json.dumps(case.body).encode()
+    LAST_SERVER_ERRORS.clear()
+    try:
+        kwargs = case.as_transport_kwargs()
+        kwargs.pop("json", None)
+        kwargs["data"] = raw
+        kwargs.setdefault("headers", {})["content-type"] = "application/json"
+        response = case.operation.schema.transport.send(case, **{k: v for k, v in kwargs.items() if k in ("headers", "data")})
+        no_server_error_or_leak(None, response, case)
     except BaseException as exc:
         _report(case, exc)
         raise
