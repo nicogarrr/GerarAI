@@ -14,7 +14,12 @@ async function resetWatchlist() {
 
 function rowsFor(page: Page) {
   const mobile = (page.viewportSize()?.width ?? 1280) < 768;
-  return page.locator(mobile ? "main article" : "main table tbody tr");
+  // En móvil la página tiene otros <article> legítimos (p. ej. «Valoración y
+  // salud financiera»): solo cuentan las filas de membresía, las que llevan
+  // el botón «Quitar … de la watchlist».
+  return mobile
+    ? page.locator("main article").filter({ has: page.locator("button[aria-label^='Quitar '][aria-label$=' de la watchlist']") })
+    : page.locator("main table tbody tr");
 }
 
 async function addBySymbol(page: Page, symbol: string) {

@@ -123,9 +123,10 @@ for (const vp of VIEWPORTS) {
         await expect(main.getByRole("heading", { name: title }).first()).toBeVisible();
       }
       await expect(main.getByText(/Azure mantiene crecimientos superiores al 20/).first()).toBeVisible();
-      // Escenarios en dólares tal cual (sin ×100): 280 / 420 / 520 por acción.
-      for (const value of ["$280.00", "$420.00", "$520.00"]) {
-        await expect(main.getByText(value, { exact: true }).first()).toBeVisible();
+      // Escenarios en dólares tal cual (sin ×100): 280 / 420 / 520 por acción,
+      // con el formato es-ES de la app («280,00 US$»; el espacio puede ser NBSP).
+      for (const value of ["280,00", "420,00", "520,00"]) {
+        await expect(main.getByText(new RegExp(`^${value}\\s*US\\$$`)).first()).toBeVisible();
       }
 
       await page.emulateMedia({ media: "print" });
