@@ -389,3 +389,144 @@ def test_user_confirmed_suggestion_is_preserved_when_second_fill_arrives():
     db.refresh(entry)
     assert entry.transaction_id == first.id
     assert "auto_link" not in (entry.metadata_ or {})
+
+
+def test_confirming_one_decision_clears_consumed_candidate_from_another():
+    db = _db()
+    company = _company(db)
+    first = _entry(db, company)
+    second = _entry(db, company)
+    trade = _trade(db, company, date(2026, 3, 10))
+    auto_link_journal_trades(db)
+    db.commit()
+    assert second.metadata_["auto_link"]["status"] == "ambiguous"
+
+    DecisionJournalService().link_transaction(db, company, first.id, trade.id)
+
+    db.refresh(second)
+    assert first.transaction_id == trade.id
+    assert second.transaction_id is None
+    assert "auto_link" not in (second.metadata_ or {})
+
+
+def test_unlinking_releases_trade_for_other_decision_without_overriding_opt_out():
+    db = _db()
+    company = _company(db)
+    first = _entry(db, company)
+    second = _entry(db, company)
+    trade = _trade(db, company, date(2026, 3, 10))
+    service = DecisionJournalService()
+    service.link_transaction(db, company, first.id, trade.id)
+    auto_link_journal_trades(db)
+    db.commit()
+    assert "auto_link" not in (second.metadata_ or {})
+
+    service.link_transaction(db, company, first.id, None)
+
+    db.refresh(second)
+    assert first.metadata_["auto_link"]["status"] == "user_unlinked"
+    assert second.transaction_id is None
+    assert second.metadata_["auto_link"]["candidate_transaction_id"] == trade.id
+    assert second.metadata_["auto_link"]["status"] == "suggested"
+
+
+def test_declining_ambiguous_match_leaves_remaining_decision_a_suggestion():
+    db = _db()
+    company = _company(db)
+    first = _entry(db, company)
+    second = _entry(db, company)
+    trade = _trade(db, company, date(2026, 3, 10))
+    auto_link_journal_trades(db)
+    db.commit()
+
+    DecisionJournalService().link_transaction(db, company, first.id, None)
+
+    db.refresh(second)
+    assert first.metadata_["auto_link"]["status"] == "user_unlinked"
+    assert second.metadata_["auto_link"]["status"] == "suggested"
+    assert second.metadata_["auto_link"]["candidate_transaction_id"] == trade.id
+    assert second.transaction_id is None
+
+
+def test_changing_confirmed_trade_releases_old_and_reserves_new_candidate():
+    db = _db()
+    company = _company(db)
+    first = _entry(db, company)
+    second = _entry(db, company)
+    old = _trade(db, company, date(2026, 3, 10))
+    new = _trade(db, company, date(2026, 3, 11))
+    service = DecisionJournalService()
+    service.link_transaction(db, company, first.id, old.id)
+    auto_link_journal_trades(db)
+    db.commit()
+    assert second.metadata_["auto_link"]["candidate_transaction_id"] == new.id
+
+    service.link_transaction(db, company, first.id, new.id)
+
+    db.refresh(second)
+    assert first.transaction_id == new.id
+    assert second.metadata_["auto_link"]["status"] == "suggested"
+    assert second.metadata_["auto_link"]["candidate_transaction_id"] == old.id
+    assert second.transaction_id is None
+
+
+def test_creating_executed_decision_clears_existing_suggestion():
+    db = _db()
+    company = _company(db)
+    pending = _entry(db, company)
+    trade = _trade(db, company, date(2026, 3, 10))
+    auto_link_journal_trades(db)
+    db.commit()
+    assert pending.metadata_["auto_link"]["candidate_transaction_id"] == trade.id
+
+    executed = DecisionJournalService().create(
+        db, company, decision="buy", rationale="ejecucion confirmada",
+        what_must_be_true=[], transaction_id=trade.id,
+    )
+
+    db.refresh(pending)
+    assert executed.transaction_id == trade.id
+    assert pending.transaction_id is None
+    assert "auto_link" not in (pending.metadata_ or {})
+
+
+def test_link_and_suggestion_changes_share_one_commit(monkeypatch):
+    import pytest
+
+    from app.services import journal_trade_link
+
+    db = _db()
+    company = _company(db)
+    entry = _entry(db, company)
+    trade = _trade(db, company, date(2026, 3, 10))
+    auto_link_journal_trades(db)
+    db.commit()
+    previous = dict(entry.metadata_)
+
+    def fail_recalculation(*args, **kwargs):
+        raise RuntimeError("recalculo no disponible")
+
+    monkeypatch.setattr(journal_trade_link, "auto_link_journal_trades", fail_recalculation)
+    with pytest.raises(RuntimeError, match="recalculo no disponible"):
+        DecisionJournalService().link_transaction(db, company, entry.id, trade.id)
+    db.rollback()
+    db.refresh(entry)
+    assert entry.transaction_id is None
+    assert entry.metadata_ == previous
+
+
+def test_recalculation_after_link_does_not_touch_other_company_metadata():
+    db = _db()
+    company = _company(db)
+    other = _company(db, "OTHER")
+    first = _entry(db, company)
+    trade = _trade(db, company, date(2026, 3, 10))
+    unrelated = _entry(db, other)
+    unrelated.metadata_ = {"auto_link": {"status": "suggested", "candidate_transaction_id": 999999}}
+    db.commit()
+
+    DecisionJournalService().link_transaction(db, company, first.id, trade.id)
+
+    db.refresh(unrelated)
+    assert unrelated.metadata_["auto_link"]["candidate_transaction_id"] == 999999
+    assert unrelated.transaction_id is None
