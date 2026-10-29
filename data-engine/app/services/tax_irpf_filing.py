@@ -110,6 +110,23 @@ TREATY_DIVIDEND_RATES = {
     # el tope solo acota una retención aplicada por error del bróker. Ojo: los
     # ADR/acciones chinas tipo BABA son sociedades de Caimán (KY), no HK.
     "HK": Decimal("0.10"),
+    # España-Países Bajos 1971 (BOE-A-1972-1469, texto consolidado, art. 10.2):
+    # "el impuesto así exigido no puede exceder del 15 por 100 del importe bruto
+    # de los dividendos" (el 5 % del art. 10.3.a y el punto VII del Protocolo
+    # solo valen para sociedades). Basic-Fit (BFIT.AS) cae aquí.
+    "NL": Decimal("0.15"),
+    # España-Alemania 2011 (BOE-A-2012-10212, art. 10.2.b): 15 % "en todos los
+    # demás casos" (el 5 % del art. 10.2.a exige sociedad con >=10 % del capital).
+    "DE": Decimal("0.15"),
+    # España-Francia 1995 (BOE-A-1997-12729, art. 10.2.a): "no podrá exceder
+    # del 15 por 100 del importe bruto de los dividendos" (la exención del
+    # art. 10.2.b solo vale para sociedades con participación).
+    "FR": Decimal("0.15"),
+    # Irlanda (BOE-A-1994-28597, art. 10.1) NO está a propósito: el 15 % del
+    # art. 10.1.b se calcula sobre dividendo + crédito fiscal irlandés y solo
+    # aplica si existe ese crédito; si no, el art. 10.1.c declara exentos los
+    # dividendos en Irlanda. Qué letra aplica depende de la ley interna
+    # irlandesa, no del texto del convenio: sigue en revisión manual.
 }
 TREATY_RATE_SOURCES = {
     "US": "BOE-A-1990-30940 art. 10.2.b (convenio España-EE.UU.)",
@@ -117,6 +134,9 @@ TREATY_RATE_SOURCES = {
     "GB": "BOE-A-2014-5171 art. 10.2.a.i (convenio España-Reino Unido)",
     "CA": "BOE-A-1981-2731 art. X.2.b (convenio España-Canadá)",
     "HK": "BOE-A-2012-5039 art. 10.2.b (convenio España-Hong Kong 2011)",
+    "NL": "BOE-A-1972-1469 art. 10.2 (convenio España-Países Bajos 1971)",
+    "DE": "BOE-A-2012-10212 art. 10.2.b (convenio España-Alemania 2011)",
+    "FR": "BOE-A-1997-12729 art. 10.2.a (convenio España-Francia 1995)",
 }
 
 UNKNOWN_COUNTRY = "??"

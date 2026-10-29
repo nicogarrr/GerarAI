@@ -260,12 +260,14 @@ def test_double_taxation_with_manual_tme_computes_deduction():
 
 def test_double_taxation_country_without_verified_treaty_is_manual_review():
     dividends = [{
-        "ticker": "ASML", "dividends_base": 100.0, "withholding_base": 15.0,
+        "ticker": "KRZ", "dividends_base": 100.0, "withholding_base": 25.0,
         "missing_fx": False, "payments": [],
     }]
-    result = build_double_taxation(dividends, {"ASML": "NL"}, 2025)
+    # Irlanda: tipo no fijado por el texto del convenio (BOE-A-1994-28597
+    # art. 10.1.b/c) -> sigue en revisión manual. (NL ya está verificado.)
+    result = build_double_taxation(dividends, {"KRZ": "IE"}, 2025)
     assert result["countries"] == []
-    assert result["manual_review"][0]["ticker"] == "ASML"
+    assert result["manual_review"][0]["ticker"] == "KRZ"
     assert "convenio" in result["manual_review"][0]["reason"]
     assert result["partial"] is True
     assert result["total_deduction_base"] is None
