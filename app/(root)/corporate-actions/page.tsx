@@ -30,7 +30,7 @@ export default async function CorporateActionsPage({ searchParams }: PageProps) 
         // llegaba a la pantalla: el usuario leía "0 eventos" con el motor
         // apagado, indistinguible de "no tienes eventos pendientes".
         if (isBackendUnavailableError(error)) {
-            return <BackendOffline feature="Acciones Corporativas" retryHref="/corporate-actions" />;
+            return <BackendOffline feature="Acciones corporativas" retryHref="/corporate-actions" />;
         }
         throw error;
     }
@@ -57,7 +57,7 @@ export default async function CorporateActionsPage({ searchParams }: PageProps) 
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <p className="text-sm font-semibold uppercase text-teal-300">Eventos corporativos</p>
-                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Acciones Corporativas</h1>
+                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Acciones corporativas</h1>
                     <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
                         Dividendos, splits, spin-offs y fusiones: revisa los eventos pendientes y aplícalos a tu cartera.
                     </p>
