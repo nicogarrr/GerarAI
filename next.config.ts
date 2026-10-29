@@ -71,6 +71,9 @@ const nextConfig: NextConfig = {
         return [
             { source: '/research/settings', destination: '/settings', permanent: true },
             { source: '/movers', destination: '/screener?vista=subidas', permanent: true },
+            // /stocks/[symbol] ya redirige a /research/[symbol]; el índice /stocks daba 404.
+            // La lista principal de acciones es «Explorar acciones» (/screener).
+            { source: '/stocks', destination: '/screener', permanent: true },
             // Carteras se fusiona en Inversores (decisión de Nico, 2026-10-20): la ruta vieja redirige.
             { source: '/inversores/carteras', destination: '/inversores', permanent: true },
             // /inversores/mas-compradas y /inversores/solape pasan a ser vistas
