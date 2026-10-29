@@ -223,3 +223,17 @@ def test_legacy_three_day_setting_cannot_mark_yesterday_price_fresh(db, monkeypa
     rule = module.AlertRule(company_id=company.id, target={"kind": "market_price"})
     _, observation = AlertRuleService()._observe(db, rule)
     assert observation["status"] == "stale"
+
+
+def test_max_age_zero_keeps_today_price_fresh(db, monkeypatch):
+    """MARKET_PRICE_MAX_AGE_DAYS=0 significa «solo hoy», no «nunca actual»."""
+    from types import SimpleNamespace
+
+    from app.services import alert_rule_service as module
+
+    company = _company(db)
+    _price(db, company, day=date.today(), close="210")
+    monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=0))
+    rule = module.AlertRule(company_id=company.id, target={"kind": "market_price"})
+    _, observation = AlertRuleService()._observe(db, rule)
+    assert observation["status"] == "fresh"
