@@ -45,9 +45,12 @@ describe('PortfolioDataNotice', () => {
         expect(screen.getByText(/IBKR no entrega/)).toBeInTheDocument();
     });
 
-    it('fechas mixtas y captura de pantalla generan su aviso', () => {
+    it('fechas en detalle cerrado; conserva el aviso por captura de pantalla', () => {
         render(<PortfolioDataNotice quality={quality({ reasons: ['mixed_valuation_dates'], position_sources: ['screenshot_confirmed'] })} />);
-        expect(screen.getByText(/no es una foto conciliada del mismo día/)).toBeInTheDocument();
+        expect(screen.queryByText(/no es una foto conciliada del mismo día/)).not.toBeInTheDocument();
+        const details = screen.getByText(/Datos de cartera: posiciones a/).closest('details');
+        expect(details).not.toBeNull();
+        expect(details).not.toHaveAttribute('open');
         expect(screen.getByText(/posiciones importadas desde una captura/)).toBeInTheDocument();
     });
 
