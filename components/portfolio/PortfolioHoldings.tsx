@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus';
 import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import { valuationHoldLabel } from '@/lib/portfolio/holding-display';
-import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
+import type { PortfolioFxRate, PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { deleteHolding, refreshPortfolioHoldings } from '@/lib/actions/portfolio.actions';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -34,6 +34,8 @@ type Props = {
    *  Valor Total = posiciones + caja cuadre a simple vista. */
   cash?: number | null;
   baseCurrency?: string;
+  /** Tipos de cambio de la cartera: convierten el objetivo de analistas del ADR (USD) a la divisa de la fila. */
+  fxRates?: PortfolioFxRate[];
 };
 
 /** Lista corta de símbolos para un toast: como mucho 5 en crudo y el resto contado. */
@@ -78,7 +80,7 @@ function FxEffectLine({ holding, format }: { holding: PortfolioHolding; format: 
   );
 }
 
-export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency }: Props) {
+export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency, fxRates }: Props) {
   const router = useRouter();
   const [currentHoldings, setCurrentHoldings] = useState<PortfolioHolding[]>(holdings);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -282,7 +284,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">En cartera desde</dt><dd className="text-gray-200">{formatDate(holding.firstBuyDate)}</dd></div>
                       <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">Nivel DCA</dt><dd><DcaLevelChip symbol={holding.symbol} signals={signals} /></dd></div>
                       <div className="flex items-start justify-between gap-2"><dt className="text-gray-500">Valor justo</dt><dd><FairValueLine symbol={holding.symbol} price={holding.currentPrice} priceCurrency={holding.nativeCurrency} signals={signals} /></dd></div>
-                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} /></dd></div>
+                      <div className="flex items-center justify-between gap-2"><dt className="text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt><dd><AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} fxRates={fxRates} baseCurrency={holding.baseCurrency} /></dd></div>
                     </dl>
                   </div>
                 );
@@ -379,7 +381,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm">
-                        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} />
+                        <AnalystTargetLine symbol={holding.symbol} currency={holding.nativeCurrency} referencePrice={holding.currentPrice !== null && holding.currentPrice > 0 ? holding.currentPrice : null} fxRates={fxRates} baseCurrency={holding.baseCurrency} />
                       </TableCell>
                       <TableCell className="text-right text-sm">
                         <div className="flex flex-col items-end gap-1">
