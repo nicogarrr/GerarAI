@@ -166,7 +166,10 @@ class PortfolioSnapshotService:
         if previous is not None and previous.cumulative_twr is None:
             # Solo la primera foto de la serie es una base genuina; si hay fotos
             # anteriores y falta el acumulado, la serie esta rota y no se reinicia.
-            previous_is_base = (
+            # Excepcion declarada: la primera foto real tras una serie
+            # reconstruida solo-posiciones (twr_rebuild) es base nueva, porque
+            # encadenarla mezclaria posiciones+caja con solo-posiciones.
+            previous_is_base = bool((previous.metadata_ or {}).get("twr_base_after_scope_change")) or (
                 db.scalar(
                     select(PortfolioDailySnapshot.id)
                     .where(
@@ -178,8 +181,12 @@ class PortfolioSnapshotService:
                 )
                 is None
             )
+        previous_positions_only = previous is not None and bool(
+            (previous.metadata_ or {}).get("positions_only")
+        )
         if (
             previous
+            and not previous_positions_only
             and previous.total_value_base > 0
             and previous.pricing_coverage == Decimal("1")
             and previous.base_currency == portfolio.base_currency
@@ -213,6 +220,8 @@ class PortfolioSnapshotService:
             "interval_days": interval_days,
             "unvalued_intermediate_flows": intermediate_flows,
             "twr_blocked_by_gap_flows": bool(intermediate_flows),
+            "twr_blocked_by_scope_change": bool(previous_positions_only),
+            "twr_base_after_scope_change": bool(previous_positions_only),
             "flow_window": "after_previous_snapshot_through_as_of",
             "flow_fx_policy": "rate_at_as_of",
             "position_as_of_dates": sorted(
@@ -286,7 +295,9 @@ class PortfolioSnapshotService:
         )
         for previous, current in zip(following, following[1:], strict=False):
             meta = current.metadata_ or {}
-            previous_is_base = previous.cumulative_twr is None and (
+            previous_is_base = bool(
+                (previous.metadata_ or {}).get("twr_base_after_scope_change")
+            ) or previous.cumulative_twr is None and (
                 db.scalar(
                     select(PortfolioDailySnapshot.id)
                     .where(
@@ -338,6 +349,7 @@ class PortfolioSnapshotService:
             linkable = (
                 window_proven
                 and intermediate == 0
+                and not (previous.metadata_ or {}).get("positions_only")
                 and previous.total_value_base > 0
                 and previous.pricing_coverage == Decimal("1")
                 and previous.base_currency == current.base_currency
