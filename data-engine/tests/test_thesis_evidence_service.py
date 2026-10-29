@@ -595,7 +595,8 @@ def test_collect_earnings_error_no_expone_detalle_interno(db):
     service._fetch_earnings = boom
     result = service._collect_earnings(db, company)
     text = str(result)
-    assert "Calendario inaccesible (RuntimeError)" in text
+    assert "Calendario de resultados inaccesible ahora mismo." in text
+    assert "RuntimeError" not in text
     assert "_fetch_day_pooled" not in text
     assert "earnings_calendar.py" not in text
 
