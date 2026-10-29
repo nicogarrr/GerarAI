@@ -28,6 +28,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact
 
@@ -105,7 +106,7 @@ def ingest_with_fallback(
                 nested.rollback()
             yahoo_result = None
             logger.info("fuente Yahoo no disponible para %s: %s", ticker, type(exc).__name__)
-            chain.append({"source": YAHOO_LABEL, "status": "error", "detail": str(exc)[:200]})
+            chain.append({"source": YAHOO_LABEL, "status": "error", "detail": redact_secrets(str(exc))[:200]})
 
     if yahoo_result is not None:
         return {
