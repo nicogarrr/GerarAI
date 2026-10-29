@@ -31,7 +31,7 @@ export function TtmPanel({ ttm }: { ttm: ResearchTtm | null }) {
           return (
             <div className="rounded-lg border border-gray-800 p-4" key={metric.metric}>
               <div className="flex items-center justify-between gap-3">
-                <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric)}</span>
+                <span className="min-w-0 break-words font-medium text-gray-200">{metricLabel(metric.metric)}</span>
                 <Badge className="shrink-0" variant="outline">{metric.provenance === 'SIN_DATOS' ? 'Sin datos' : metric.provenance}</Badge>
               </div>
               <div className="mt-2 text-xl text-teal-300">

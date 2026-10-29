@@ -19,6 +19,10 @@ const WORDS: Record<string, string> = {
 };
 
 const PHRASES: [string, string][] = [
+  ['where change_in_working_capital is in cash-flow sign (negative = working capital absorbed cash)', 'donde change_in_working_capital sigue el signo del flujo de caja (negativo = el capital circulante absorbió efectivo)'],
+  ['change_in_working_capital in cash-flow sign', 'change_in_working_capital con el signo del flujo de caja'],
+  ['maintenance capex is not separately reported - declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)', 'la inversión de mantenimiento no se publica por separado: estimación conservadora declarada (beneficio del propietario de Buffett, carta de Berkshire Hathaway de 1986)'],
+  ['maintenance capex is a declared conservative estimate (Buffett owner earnings, Berkshire Hathaway 1986 letter)', 'la inversión de mantenimiento es una estimación conservadora declarada (beneficio del propietario de Buffett, carta de Berkshire Hathaway de 1986)'],
   ['the maintenance/growth split is not separately reported - declared estimate', 'la separación mantenimiento/crecimiento no se publica por separado: estimación declarada'],
   ['and maintenance_capex', 'y maintenance_capex'],
   ['inflation-adjusted internal rate of return on gross investment; no proxy calculation is permitted', 'Tasa interna de rentabilidad de la inversión bruta ajustada por inflación; no admite cálculos sustitutivos'],
