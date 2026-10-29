@@ -57,6 +57,15 @@ const envSchema = z.object({
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
 });
 
+// Una variable declarada pero vacía (p. ej. `ARG X` + `ENV X=$X` en el
+// Dockerfile sin --build-arg) llega como "" y haría fallar `.url()`/`.email()`
+// aunque el campo sea opcional. Vacía = no configurada.
+export function withoutEmptyEnv(source: NodeJS.ProcessEnv): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(source).filter((entry): entry is [string, string] => entry[1] !== undefined && entry[1] !== ''),
+  );
+}
+
 function isNextBuildTime(): boolean {
   return process.env.NEXT_PHASE === 'phase-production-build' ||
     process.env.NEXT_PHASE === 'phase-development-build' ||
@@ -66,6 +75,7 @@ function isNextBuildTime(): boolean {
 // Validar variables de entorno
 function validateEnv() {
   const isBuildTime = isNextBuildTime();
+  const source = withoutEmptyEnv(process.env);
 
   // En build time, algunas variables pueden faltar
   if (isBuildTime) {
@@ -75,18 +85,18 @@ function validateEnv() {
     });
 
     try {
-      return buildSchema.parse(process.env);
+      return buildSchema.parse(source);
     } catch (error) {
       if (error instanceof z.ZodError) {
         console.warn('⚠️ Algunas variables de entorno faltan durante el build:', error.issues.map(e => e.path.join('.')).join(', '));
       }
-      return buildSchema.parse(process.env);
+      return buildSchema.parse(source);
     }
   }
 
   // En runtime, validar completamente
   try {
-    return envSchema.parse(process.env);
+    return envSchema.parse(source);
   } catch (error) {
     if (error instanceof z.ZodError) {
       const missingVars = error.issues.map(e => `${e.path.join('.')}: ${e.message}`).join('\n');
