@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import dramatiq
 
 from app.core.config import get_settings
+from app.core.errors import redact_secrets
 from app.workers.bounded_broker import BoundedRedisBroker, QueueCapacityError, max_pending
 from app.workers.task_trace import TaskTraceMiddleware
 from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware
@@ -2448,6 +2449,14 @@ def refresh_ir_pages(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id, ticker=ticker)
 
 
+# Presupuesto total de la corrida por debajo del time_limit de dramatiq
+# (600 s): los feeds se sondean en serie con hasta 20 s por feed y la ingesta
+# de cada lote suma; sin tope, una corrida lenta moria por TimeLimitExceeded
+# (prod: tenant 10, 601 s) y el tick siguiente repetia el barrido entero.
+# Al agotarse, los feeds restantes quedan diferidos al siguiente tick y el
+# resultado lo declara ("partial" + time_budget_exceeded), nada se silencia.
+_RSS_TIME_BUDGET_SECONDS = 480.0
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 @_coalesce_on_success("refresh_rss_feeds", 12 * 60, ("tenant_id", "feed_url", "ticker"))
 def refresh_rss_feeds(
@@ -2475,10 +2484,71 @@ def refresh_rss_feeds(
 
         db = _session(tenant_id, user_id)
         try:
+            from sqlalchemy import select as _select
+
+            from app.models.entities import ConnectorState
+
+            # Orden por ultima sondeada (la mas antigua primero), persistida
+            # en ConnectorState: sin cursor, cada tick empezaba por el feed 0
+            # y bajo lentitud sostenida los ultimos feeds no corrian nunca
+            # (hallazgo del piloto en #3029). El estado se commitea ANTES de
+            # sondear: si el worker muere por time_limit, el tick siguiente
+            # retoma por donde quedo. Los feeds sin estado van primeros.
+            tenant_clause = (
+                ConnectorState.tenant_id.is_(tenant_id)
+                if tenant_id is None
+                else ConnectorState.tenant_id == tenant_id
+            )
+            states = db.scalars(
+                _select(ConnectorState).where(
+                    ConnectorState.connector == "rss",
+                    ConnectorState.feed_url.is_not(None),
+                    tenant_clause,
+                )
+            ).all()
+            state_by_url = {state.feed_url: state for state in states}
+            _never = datetime.min.replace(tzinfo=UTC)
+
+            def _last_polled(feed) -> datetime:
+                state = state_by_url.get(feed.url)
+                ts = state.last_started_at if state is not None else None
+                if ts is None:
+                    return _never
+                return ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
+
+            feeds = sorted(feeds, key=_last_polled)  # sorted es estable: empates conservan el orden de config
+
             service = FeedIngestionService()
             processed = ingested = 0
             errors: list[dict] = []
-            for feed in feeds:
+            started_at = time.monotonic()
+            for index, feed in enumerate(feeds):
+                if time.monotonic() - started_at >= _RSS_TIME_BUDGET_SECONDS:
+                    errors.append(
+                        {
+                            "url": None,
+                            "source": "rss",
+                            "type": "time_budget_exceeded",
+                            "message": (
+                                f"presupuesto de {_RSS_TIME_BUDGET_SECONDS:.0f}s "
+                                f"agotado; {len(feeds) - index} feeds diferidos "
+                                "al siguiente tick (retoman primero por orden "
+                                "de ultima sondeada)"
+                            ),
+                        }
+                    )
+                    break
+                state = state_by_url.get(feed.url)
+                if state is None:
+                    state = ConnectorState(
+                        tenant_id=tenant_id, connector="rss", feed_url=feed.url
+                    )
+                    db.add(state)
+                    state_by_url[feed.url] = state
+                state.last_started_at = datetime.now(UTC)
+                # Commit antes de sondear: si el worker muere a mitad, el tick
+                # siguiente no vuelve a empezar por este feed.
+                db.commit()
                 try:
                     result = _run(
                         service.poll_rss(feed.url, ticker=feed.ticker, source_label=feed.label)
@@ -2493,15 +2563,27 @@ def refresh_rss_feeds(
                         result,
                         ticker=feed.ticker,
                         news_lane=feed.lane,
+                        # Mismo presupuesto que abre feeds nuevos: agotado, la
+                        # ingesta sigue pero se omite el enriquecimiento Jev/LLM.
+                        llm_deadline=started_at + _RSS_TIME_BUDGET_SECONDS,
                         # Feeds de carril (gobierno): sin vínculo a empresa,
                         # fail-closed como el carril macro.
                         detect_company=feed.lane is None,
                     )
                     if result.status != "error":
                         processed += 1
+                        state.last_success_at = datetime.now(UTC)
+                        state.consecutive_errors = 0
                     ingested += int(ingestion.get("created", 0))
                 except Exception as exc:
                     _rollback(db)
+                    # Tras el rollback el estado queda expirado: reanexarlo
+                    # para registrar el error sin perder el last_started_at
+                    # ya commiteado antes de sondear.
+                    db.add(state)
+                    state.consecutive_errors = (state.consecutive_errors or 0) + 1
+                    state.last_error = redact_secrets(str(exc))[:500]
+                    db.commit()
                     errors.append(
                         {
                             "url": feed.url,

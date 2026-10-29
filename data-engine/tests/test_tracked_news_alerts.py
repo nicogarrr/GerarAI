@@ -160,7 +160,7 @@ def test_actual_feed_ingestion_preserves_headline_before_alert_gate(db, monkeypa
 
     def ingest_stub(self, session, items, default_source="feed", connector=None,
                     date_source_label=None, news_lane=None, macro_theme=None,
-                    detect_company=True):
+                    detect_company=True, llm_deadline=None):
         # Exercise actual FeedIngestionService mapping and creation-time
         # provenance/headline enrichment; isolate expensive thesis/LLM side
         # effects in NewsService.

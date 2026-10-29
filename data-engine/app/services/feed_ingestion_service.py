@@ -267,6 +267,7 @@ class FeedIngestionService:
         news_lane: str | None = None,
         macro_theme: str | None = None,
         detect_company: bool = True,
+        llm_deadline: float | None = None,
     ) -> dict:
         """Ingest connector items without importing model-dependent services at startup."""
 
@@ -311,6 +312,7 @@ class FeedIngestionService:
             news_lane=news_lane,
             macro_theme=macro_theme,
             detect_company=detect_company,
+            llm_deadline=llm_deadline,
         )
         payload = response.model_dump(mode="json")
         payload["source"] = result.source
