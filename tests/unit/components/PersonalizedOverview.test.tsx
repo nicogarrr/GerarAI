@@ -92,6 +92,20 @@ describe('PersonalizedOverview', () => {
         expect(screen.getByRole('heading', { level: 1, name: 'Qué ha cambiado' })).toBeInTheDocument();
     });
 
+    it('el esqueleto de «Tu cartera hoy» reserva la forma de la tarjeta con posiciones (CLS)', () => {
+        setup();
+        getPortfolioSummary.mockReturnValue(new Promise(() => {}));
+        render(<PersonalizedOverview userId="u1" />);
+        const skeleton = screen.getByTestId('portfolio-skeleton');
+        // Desglose con la misma rejilla que PortfolioValueBreakdown (4 cifras).
+        const breakdown = skeleton.querySelector('.min-\\[420px\\]\\:grid-cols-2');
+        expect(breakdown?.children).toHaveLength(4);
+        // Rejilla de hasta 4 posiciones, 1 columna en móvil y 2 desde sm.
+        const tiles = skeleton.querySelector('.grid-cols-1.sm\\:grid-cols-2');
+        expect(tiles?.children).toHaveLength(4);
+        expect(within(skeleton).getByText('Cargando…')).toHaveAttribute('role', 'status');
+    });
+
     it('cartera vacía: primeros pasos, con y sin watchlist', async () => {
         setup({ watch: { unavailable: false, total: 2, items: [watch('AAPL')] } });
         await renderHome();
