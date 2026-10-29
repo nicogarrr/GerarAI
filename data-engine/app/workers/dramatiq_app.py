@@ -2505,6 +2505,9 @@ def refresh_rss_feeds(
                         result,
                         ticker=feed.ticker,
                         news_lane=feed.lane,
+                        # Mismo presupuesto que abre feeds nuevos: agotado, la
+                        # ingesta sigue pero se omite el enriquecimiento Jev/LLM.
+                        llm_deadline=started_at + _RSS_TIME_BUDGET_SECONDS,
                         # Feeds de carril (gobierno): sin vínculo a empresa,
                         # fail-closed como el carril macro.
                         detect_company=feed.lane is None,

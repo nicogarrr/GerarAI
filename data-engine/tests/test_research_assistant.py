@@ -135,7 +135,8 @@ def test_connector_summary_cannot_become_attributed_headline(db, monkeypatch):
 
     def ingest_stub(self, session, items, default_source="feed", connector=None,
                     date_source_label=None, source_headline=None,
-                    news_lane=None, macro_theme=None, detect_company=True):
+                    news_lane=None, macro_theme=None, detect_company=True,
+                    llm_deadline=None):
         for item in items:
             metadata = {"date_source": date_source_label or "source"}
             if connector:
