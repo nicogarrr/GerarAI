@@ -46,6 +46,11 @@ from app.services.claim_scope import latest_thesis_version
 from app.services.fair_value_service import listed_value
 from app.services.price_freshness import close_is_stale
 from app.services.price_units import listing_price
+from app.services.split_adjustment import (
+    cumulative_split_factor_after,
+    split_after_price,
+    split_events_by_company,
+)
 
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
@@ -276,6 +281,25 @@ def _latest_price(db: Session, company_id: int) -> tuple[Decimal | None, dict[st
     }
 
 
+def _split_factor_since_thesis(
+    db: Session, company_id: int, thesis: ThesisVersion, price_day: Any
+) -> Decimal | None:
+    """Factor de splits entre la fecha de la tesis y el cierre; None si un split
+    ya efectivo es posterior al ultimo cierre (base del cierre desconocida)."""
+    events = split_events_by_company(db, [company_id]).get(company_id, [])
+    if not events:
+        return Decimal(1)
+    try:
+        close_day = date.fromisoformat(str(price_day)[:10])
+    except ValueError:
+        return None
+    if split_after_price(events, close_day, max(date.today(), close_day)):
+        return None
+    created = getattr(thesis, "created_at", None)
+    thesis_day = created.date() if created is not None else None
+    return cumulative_split_factor_after([e for e in events if e[0] <= close_day], thesis_day)
+
+
 def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any]]:
     """Valor actual de la metrica de un criterio de tesis, con su procedencia."""
     target = rule.target or {}
@@ -307,6 +331,15 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
         price, info = _latest_price(db, rule.company_id)
         if price is None or price <= 0:
             return None, {**base, **info}
+        # La tesis esta en la base de acciones de su fecha; el cierre, en la del
+        # dia. Un split posterior a la tesis cambia la base (10:1 -> precio de
+        # tesis 1000 = 100 hoy). Sin esto «variacion desde tesis» leia -90 % y
+        # disparaba el criterio. Con el ultimo cierre anterior a un split ya
+        # efectivo la base del cierre es desconocida: N/D, como en valoracion.
+        factor = _split_factor_since_thesis(db, rule.company_id, thesis, info.get("date"))
+        if factor is None:
+            return None, {**base, **info, "status": "missing", "missing": "precio_anterior_a_split"}
+        reference = Decimal(reference) / factor
         if metric == MARGIN_OF_SAFETY_PCT:
             # Convencion unica del producto (V - P) / V: el % que ve el usuario
             # en la tesis, la ficha, la cartera y el screener. V/P - 1 es el
