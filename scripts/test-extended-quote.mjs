@@ -14,6 +14,6 @@ export default async function Preview({ searchParams }: { searchParams: Promise<
  return <main className="mx-auto max-w-[1300px] p-4 sm:p-6"><h1 className="mb-4 text-2xl text-gray-100">Microsoft · MSFT</h1><CompanyHeaderQuote snapshot={snapshot}/></main>;
 }`);
 try {
-    const result = spawnSync('npx', ['playwright', 'test', '--config', 'e2e/fixtures/extended-quote.config.ts'], { stdio: 'inherit', env: { ...process.env, E2E_EXTENDED_QUOTE_RUN: '1' } });
+    const result = spawnSync('npx', ['playwright', 'test', '--config', 'e2e/fixtures/extended-quote.config.ts', ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, E2E_EXTENDED_QUOTE_RUN: '1' } });
     process.exitCode = result.status ?? 1;
 } finally { rmSync(directory, { recursive: true }); rmSync('.next-extended', { recursive: true, force: true }); }

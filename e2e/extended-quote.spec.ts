@@ -20,7 +20,7 @@ for (const width of [1440, 390]) {
         await page.clock.install();
         await page.goto('/extended-quote-preview');
         const header = page.getByTestId('company-header-quote');
-        await expect(header.getByText('Post-cierre · 00:05', { exact: true })).toBeVisible();
+        await expect(header.getByText('Post-cierre · 9 oct, 00:05 CEST', { exact: true })).toBeVisible();
         // Cabecera limpia (Nico, 30-oct-2026): la procedencia ya no se muestra.
         await expect(header.getByText('Yahoo Finance (no oficial), retraso posible · 00:05 (Madrid)', { exact: true })).toHaveCount(0);
         await expect(header.getByText('Cierre anterior', { exact: true }).locator('..').locator('dd')).toHaveText('N/D');
@@ -30,21 +30,21 @@ for (const width of [1440, 390]) {
         await page.screenshot({ path: `test-results/extended-quote-${width}.png`, fullPage: true });
         const initialCalls = calls;
         response = { ...quote, session: 'pre', price_session: 'pre', status: 'retrasado' };
-        await page.clock.fastForward(60000);
-        await expect(header.getByText('Premercado · 00:05 · Retrasado', { exact: true })).toBeVisible();
+        await page.clock.fastForward(300000);
+        await expect(header.getByText('Premercado · 9 oct, 00:05 CEST · Retrasado', { exact: true })).toBeVisible();
         response = { ...quote, session: 'cerrado', change: null, change_percent: null };
-        await page.clock.fastForward(60000);
-        await expect(header.getByText('Último post-cierre del 8 oct · 00:05', { exact: true })).toBeVisible();
+        await page.clock.fastForward(300000);
+        await expect(header.getByText('Último post-cierre · 9 oct, 00:05 CEST', { exact: true })).toBeVisible();
         await page.screenshot({ path: `test-results/extended-quote-closed-${width}.png`, fullPage: true });
         await expect(header.getByText('-1,28%', { exact: true })).not.toBeVisible();
         response = { status: 'unavailable' };
-        await page.clock.fastForward(60000);
+        await page.clock.fastForward(1800000);
         await expect(header.locator('.text-4xl')).toHaveText('N/D');
         expect(calls).toBe(initialCalls + 3);
         await page.screenshot({ path: `test-results/extended-quote-nd-${width}.png`, fullPage: true });
         const beforeHidden = calls;
         await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }));
-        await page.clock.fastForward(120000);
+        await page.clock.fastForward(1800000);
         expect(calls).toBe(beforeHidden);
         response = { ...quote, timestamp: null };
         await page.evaluate(() => {
@@ -81,7 +81,10 @@ for (const width of [1440, 390]) {
         await page.goto('/extended-quote-preview?missingIdentity=1');
         const header = page.getByTestId('company-header-quote');
         await expect(header.locator('.text-4xl')).toHaveText('523,00 US$');
-        expect(calls).toBe(1);
+        // En dev, React StrictMode monta el efecto dos veces y la primera lectura
+        // se aborta; con reactStrictMode desactivado (como en producción) es 1.
+        expect(calls).toBeGreaterThanOrEqual(1);
+        expect(calls).toBeLessThanOrEqual(2);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: `test-results/quote-recovered-${width}.png`, fullPage: true });
     });
