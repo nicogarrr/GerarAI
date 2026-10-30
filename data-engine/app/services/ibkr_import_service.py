@@ -885,6 +885,79 @@ def _csv_default_currency(symbol: str, listing_currency: str | None = None) -> s
     return unit
 
 
+_LOT_ONLY_ATTRS = ("openDateTime", "holdingPeriodDateTime", "originatingOrderID", "originatingTransactionID")
+
+
+def _is_lot_position(element: ElementTree.Element) -> bool:
+    return _tag_name(element) == "OpenPosition" and (_attr(element, "levelOfDetail") or "").upper() == "LOT"
+
+
+def _lot_key(element: ElementTree.Element) -> tuple[str, str, str, str]:
+    return (
+        _attr(element, "accountId") or "",
+        _attr(element, "conid") or _attr(element, "symbol", "underlyingSymbol") or "",
+        (_attr(element, "currency") or "").upper(),
+        (_attr(element, "reportDate", "asOfDate") or "").split(";", 1)[0],
+    )
+
+
+def _merge_lot_rows(rows: list[ElementTree.Element]) -> list[ElementTree.Element]:
+    """Suma los lotes de una posicion en una fila resumen (cantidad, valor, coste y P/L)."""
+    if len(rows) == 1:
+        return rows
+    fields = ("position", "positionValue", "costBasisPrice", "costBasisMoney", "fifoPnlUnrealized")
+    if any(row.get(f) is not None and not _is_number(row.get(f)) for row in rows for f in fields):
+        return rows  # la validacion las senala/omite una a una
+    quantity = sum((_decimal(_attr(row, "position", "quantity")) for row in rows), Decimal("0"))
+    cost = sum(
+        (
+            _decimal(row.get("costBasisMoney"))
+            if row.get("costBasisMoney") is not None
+            else _decimal(_attr(row, "position", "quantity")) * _decimal(row.get("costBasisPrice"))
+            for row in rows
+        ),
+        Decimal("0"),
+    )
+    attrib = {k: v for k, v in rows[0].attrib.items() if k not in _LOT_ONLY_ATTRS}
+    attrib["levelOfDetail"] = "SUMMARY"
+    attrib["position" if "position" in attrib else "quantity"] = str(quantity)
+    if all(row.get("positionValue") is not None for row in rows):
+        attrib["positionValue"] = str(sum((_decimal(row.get("positionValue")) for row in rows), Decimal("0")))
+    if "costBasisMoney" in attrib or "costBasisPrice" in attrib:
+        attrib["costBasisMoney"] = str(cost)
+        attrib["costBasisPrice"] = str(cost / quantity) if quantity else "0"
+    if all(row.get("fifoPnlUnrealized") is not None for row in rows):
+        attrib["fifoPnlUnrealized"] = str(
+            sum((_decimal(row.get("fifoPnlUnrealized")) for row in rows), Decimal("0"))
+        )
+    return [ElementTree.Element(rows[0].tag, attrib)]
+
+
+def _collapse_lot_positions(elements: list[ElementTree.Element]) -> list[ElementTree.Element]:
+    """Una Flex con «Open Positions: Lot» trae, por posicion, la fila SUMMARY y una
+    ``OpenPosition levelOfDetail="LOT"`` por lote. Cada fila sobrescribia la posicion,
+    asi que ganaba el ULTIMO lote (10 acciones en dos lotes 6+4 quedaban en 4, con el
+    coste de ese lote). Si hay fila resumen, los lotes se ignoran; si solo hay lotes,
+    se suman en una fila resumen."""
+    summary_keys = {
+        _lot_key(e) for e in elements if _tag_name(e) == "OpenPosition" and not _is_lot_position(e)
+    }
+    lots: dict[tuple[str, str, str, str], list[ElementTree.Element]] = {}
+    for element in elements:
+        if _is_lot_position(element) and _lot_key(element) not in summary_keys:
+            lots.setdefault(_lot_key(element), []).append(element)
+    collapsed: list[ElementTree.Element] = []
+    for element in elements:
+        if not _is_lot_position(element):
+            collapsed.append(element)
+            continue
+        key = _lot_key(element)
+        if key in summary_keys or key not in lots:
+            continue
+        collapsed.extend(_merge_lot_rows(lots.pop(key)))
+    return collapsed
+
+
 class IBKRImportService:
     def import_flex_xml(self, db: Session, xml_text: str, **options) -> dict:
         """Importa un Flex Query (ver ``_import_flex_xml``).
@@ -1048,7 +1121,7 @@ class IBKRImportService:
         trades_already_present = 0
         non_stock_skipped = 0
         unknown_tickers: dict[str, int] = {}
-        elements = list(root.iter())
+        elements = _collapse_lot_positions(list(root.iter()))
         if trades_only:
             # Primero los Trade: crean los emisores a los que luego se atribuyen
             # los dividendos (orden estable, el resto mantiene su orden).
