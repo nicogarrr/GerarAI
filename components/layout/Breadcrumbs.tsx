@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { ChevronRight } from 'lucide-react';
 import { buildCrumbs, type Crumb } from '@/lib/nav/build-crumbs';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Migas: la jerarquia se calcula en `lib/nav/build-crumbs.ts` (funcion pura
@@ -14,6 +15,7 @@ import { buildCrumbs, type Crumb } from '@/lib/nav/build-crumbs';
  */
 export default function Breadcrumbs() {
   const pathname = usePathname();
+  const t = useT();
   const [override, setOverride] = useState<{ path: string; name: string } | null>(null);
   useEffect(() => {
     const listener = (event: Event) => setOverride((event as CustomEvent).detail);
@@ -30,26 +32,27 @@ export default function Breadcrumbs() {
   const fichaMatch = /^\/research\/([^/]+)\/?$/.exec(pathname);
   if (fichaMatch && !['news', 'sources', 'assistant'].includes(fichaMatch[1])) return null;
   const crumbs: Crumb[] = buildCrumbs(pathname);
-  if (override?.path === pathname && crumbs.length) crumbs[crumbs.length - 1].label = override.name;
+  if (override?.path === pathname && crumbs.length) crumbs[crumbs.length - 1] = { ...crumbs[crumbs.length - 1], labelKey: undefined, rawLabel: override.name };
   if (crumbs.length < 2) return null;
 
   return (
-    <nav aria-label="Ruta de navegación" className="mb-4 hidden md:block">
+    <nav aria-label={t('shell.breadcrumbs.aria')} className="mb-4 hidden md:block">
       <ol className="flex flex-wrap items-center gap-1 text-sm text-gray-500">
         {crumbs.map((crumb, index) => {
           const isLast = index === crumbs.length - 1;
+          const text = crumb.labelKey ? t(crumb.labelKey) : crumb.rawLabel;
           return (
-            <li className="flex items-center gap-1" key={`${crumb.label}-${index}`}>
+            <li className="flex items-center gap-1" key={`${text}-${index}`}>
               {index > 0 && <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />}
               {isLast || !crumb.href ? (
                 <span
                   aria-current={isLast ? 'page' : undefined}
                   className="max-w-[24ch] truncate text-gray-300"
                 >
-                  {crumb.label}
+                  {text}
                 </span>
               ) : (
-                <Link href={crumb.href} className="max-w-[24ch] truncate hover:text-teal-300">{crumb.label}</Link>
+                <Link href={crumb.href} className="max-w-[24ch] truncate hover:text-teal-300">{text}</Link>
               )}
             </li>
           );

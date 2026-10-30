@@ -1,1 +1,18 @@
-{}
+{
+  "menu": {
+    "expand": "Expand menu",
+    "collapse": "Collapse menu"
+  },
+  "nav": {
+    "primaryAria": "Main navigation",
+    "bottomAria": "Bottom navigation"
+  },
+  "sectionNav": {
+    "sections": "Sections",
+    "ariaLabel": "Section tools",
+    "scrollHint": "Scroll to see more sections"
+  },
+  "breadcrumbs": {
+    "aria": "Breadcrumb"
+  }
+}

@@ -1,1 +1,18 @@
-{}
+{
+  "menu": {
+    "expand": "Expandir menú",
+    "collapse": "Plegar menú"
+  },
+  "nav": {
+    "primaryAria": "Navegación principal",
+    "bottomAria": "Navegación inferior"
+  },
+  "sectionNav": {
+    "sections": "Secciones",
+    "ariaLabel": "Herramientas de la sección",
+    "scrollHint": "Desliza para ver más secciones"
+  },
+  "breadcrumbs": {
+    "aria": "Ruta de navegación"
+  }
+}
