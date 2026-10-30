@@ -59,5 +59,6 @@ test('privacy auth paths go through the rate-limited HTTP pipeline', () => {
     assert.match(auth, /afterDelete/);
     assert.match(auth, /deleteAuthAccountResidue/);
     assert.match(auth, /verifyDeleteReauthToken/);
-    assert.match(auth, /'\/delete-user': \{ window: 60, max: 3 \}/);
+    const rateLimit = readFileSync('lib/better-auth/rate-limit.ts', 'utf8');
+    assert.match(rateLimit, /'\/delete-user': \{ window: 60, max: 3 \}/);
 });
