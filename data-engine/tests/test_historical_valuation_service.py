@@ -129,3 +129,37 @@ def test_percentile_interpolates_between_points():
     assert service._percentile(values, Decimal("0.5")) == Decimal("20")
     assert service._percentile(values, Decimal("0.25")) == pytest.approx(Decimal("15"))
     assert service._percentile([Decimal("7")], Decimal("0.9")) == Decimal("7")
+
+
+def test_negative_earnings_or_fcf_multiples_are_nd_and_stay_out_of_statistics(db):
+    """P/E y EV/FCF con denominador negativo son N/D, no un múltiplo negativo.
+    Esperado a mano (sin deuda ni caja, 10 acciones):
+      2022: precio 200, EPS 10  -> P/E 20; FCF 100 -> EV/FCF 2000/100 = 20
+      2023: precio 100, EPS -5  -> N/D;    FCF -50 -> N/D
+      2024: precio 80,  EPS 8   -> P/E 10; FCF 80  -> EV/FCF 800/80 = 10
+    Mediana P/E = (20 + 10) / 2 = 15 (antes entraba -20 y salía 10)."""
+    company = _company(db)
+    for year, close, eps, fcf in ((2022, 200, 10, 100), (2023, 100, -5, -50), (2024, 80, 8, 80)):
+        db.add(MarketPrice(
+            company_id=company.id, date=date(year, 12, 30), open=Decimal(close),
+            high=Decimal(close), low=Decimal(close), close=Decimal(close),
+            adj_close=Decimal(close), source="Finnhub",
+        ))
+        db.commit()
+        _fact(db, company, metric="eps", fiscal_year=year, value=eps)
+        _fact(db, company, metric="shares_diluted", fiscal_year=year, value=10)
+        _fact(db, company, metric="free_cash_flow", fiscal_year=year, value=fcf)
+        _fact(db, company, metric="revenue", fiscal_year=year, value=1000)
+        _fact(db, company, metric="total_debt", fiscal_year=year, value=0)
+        _fact(db, company, metric="cash_and_equivalents", fiscal_year=year, value=0)
+
+    result = HistoricalValuationService().build(db, company, as_of=date(2026, 9, 23))
+    points = {p["year"]: p for p in result["series"]}
+    assert points[2023]["pe"] is None
+    assert points[2023]["ev_to_fcf"] is None
+    assert points[2023]["fcf_per_share"] == pytest.approx(Decimal("-5"))
+    assert points[2022]["pe"] == pytest.approx(Decimal("20"))
+    assert points[2024]["ev_to_fcf"] == pytest.approx(Decimal("10"))
+    assert result["statistics"]["pe"]["median"] == pytest.approx(Decimal("15"))
+    assert result["statistics"]["ev_to_fcf"]["median"] == pytest.approx(Decimal("15"))
+    assert 2023 in result["coverage"]["missing_by_metric"]["pe"]

@@ -142,9 +142,9 @@ class HistoricalValuationService:
                     "eps": eps,
                     "fcf_per_share": self._divide(fcf, shares),
                     "revenue_per_share": self._divide(revenue, shares),
-                    "pe": self._divide(price, eps),
-                    "ev_to_fcf": self._divide(enterprise_value, fcf),
-                    "ev_to_revenue": self._divide(enterprise_value, revenue),
+                    "pe": self._multiple(price, eps),
+                    "ev_to_fcf": self._multiple(enterprise_value, fcf),
+                    "ev_to_revenue": self._multiple(enterprise_value, revenue),
                     "source_ids": {
                         "market_price": price_row.id if price_row else None,
                         **{key: row.id for key, row in year_facts.items()},
@@ -237,6 +237,15 @@ class HistoricalValuationService:
         if numerator is None or denominator is None or denominator == 0:
             return None
         return numerator / denominator
+
+    @classmethod
+    def _multiple(cls, numerator: Decimal | None, denominator: Decimal | None) -> Decimal | None:
+        """Múltiplo de valoración: con beneficio, FCF o EV <= 0 es N/D (None),
+        como en relative_multiples. Un P/E negativo no es «barato» y metido en
+        la mediana y los percentiles los desplaza hacia abajo."""
+        if numerator is None or denominator is None or numerator <= 0 or denominator <= 0:
+            return None
+        return cls._divide(numerator, denominator)
 
     def _statistics(self, values: list[Decimal]) -> dict[str, Decimal | None]:
         ordered = sorted(values)
