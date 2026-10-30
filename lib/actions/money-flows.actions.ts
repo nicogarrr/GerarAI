@@ -43,10 +43,12 @@ export async function getFlowHoldings(): Promise<{
   unavailable: boolean;
 }> {
   try {
-    const [positions, watchlist] = await Promise.all([
-      researchRequest<Array<{ ticker: string }>>('/api/portfolio/positions', { fast: true }),
-      researchRequest<Array<{ symbol: string }>>('/api/watchlist', { fast: true }),
+    const [rawPositions, rawWatchlist] = await Promise.all([
+      researchRequest<Array<{ ticker: string }> | { items: Array<{ ticker: string }> }>('/api/portfolio/positions', { fast: true }),
+      researchRequest<Array<{ symbol: string }> | { items: Array<{ symbol: string }> }>('/api/watchlist', { fast: true }),
     ]);
+    const positions = Array.isArray(rawPositions) ? rawPositions : rawPositions?.items;
+    const watchlist = Array.isArray(rawWatchlist) ? rawWatchlist : (rawWatchlist as { items?: Array<{ symbol: string }> })?.items;
     if (!Array.isArray(positions) || !Array.isArray(watchlist)) {
       return { portfolio: new Set(), watchlist: new Set(), unavailable: true };
     }

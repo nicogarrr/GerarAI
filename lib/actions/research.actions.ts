@@ -1438,9 +1438,12 @@ export async function submitThesisHumanInput(ticker: string, formData: FormData)
 export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: string; quantity: number }>> {
   await requireAuthenticatedUser();
   return paginateAll(
-    (offset) => researchRequest<Array<{ ticker: string; quantity: number }>>(
-      `/api/portfolio/positions?limit=2000&offset=${offset}`, { fast: true },
-    ),
+    async (offset) => {
+      const res = await researchRequest<Array<{ ticker: string; quantity: number }> | { items: Array<{ ticker: string; quantity: number }> }>(
+        `/api/portfolio/positions?limit=2000&offset=${offset}`, { fast: true },
+      );
+      return Array.isArray(res) ? res : (res as { items?: Array<{ ticker: string; quantity: number }> })?.items || [];
+    },
     2000,
     (position) => position.ticker,
   );

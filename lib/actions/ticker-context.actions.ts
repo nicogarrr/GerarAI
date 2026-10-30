@@ -19,14 +19,15 @@ export type TickerContext = {
  */
 export async function getTickerContext(): Promise<TickerContext> {
     const userId = (await requireAuthenticatedUser()).id;
-    const [positions, watchlist] = await Promise.all([
+    const [rawPositions, watchlist] = await Promise.all([
         cachedFetch(
             `portfolio:${userId}:positions`,
-            () => researchRequest<Array<{ ticker: string; quantity: number | null }>>('/api/portfolio/positions', { fast: true }),
+            () => researchRequest<Array<{ ticker: string; quantity: number | null }> | { items: Array<{ ticker: string; quantity: number | null }> }>('/api/portfolio/positions', { fast: true }),
             15,
         ).catch(() => [] as Array<{ ticker: string; quantity: number | null }>),
         getWatchlist().catch(() => [] as Array<{ symbol: string }>),
     ]);
+    const positions = Array.isArray(rawPositions) ? rawPositions : (rawPositions as { items?: Array<{ ticker: string; quantity: number | null }> })?.items || [];
     return {
         portfolioTickers: openPositionTickers(positions),
         watchlistTickers: watchlist.map((item) => item.symbol.toUpperCase()),

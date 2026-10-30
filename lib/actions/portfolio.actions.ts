@@ -33,6 +33,17 @@ function invalidatePortfolioReads(userId: string): void {
     }
 }
 
+type PaginatedOrArray<T> = T[] | { items: T[]; page_info?: unknown };
+
+function unwrapItems<T>(data: PaginatedOrArray<T> | null | undefined): T[] {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    if (Array.isArray((data as { items?: T[] }).items)) {
+        return (data as { items: T[] }).items;
+    }
+    return [];
+}
+
 async function getQuote(symbol: string): Promise<{ c: number } | null> {
     try {
         if (!FINNHUB_API_KEY) return null;
@@ -233,11 +244,12 @@ export async function addTransaction(
 
 export async function getPortfolioTransactions(userId: string) {
     const canonicalUserId = await resolveUserId(userId);
-    const transactions = await cachedFetch(
+    const raw = await cachedFetch(
         `portfolio:${canonicalUserId}:transactions`,
-        () => researchRequest<ResearchPortfolioTransaction[]>('/api/portfolio/transactions', { fast: true }),
+        () => researchRequest<PaginatedOrArray<ResearchPortfolioTransaction>>('/api/portfolio/transactions', { fast: true }),
         15,
     );
+    const transactions = unwrapItems(raw);
     return transactions.map((transaction) => ({
         _id: String(transaction.id),
         symbol: transaction.ticker,
@@ -302,10 +314,10 @@ export async function getPortfolioFxContext(userId: string): Promise<{ fxRates: 
 
 export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
     const canonicalUserId = await resolveUserId(userId);
-    const [positions, backendSummary, quality] = await Promise.all([
+    const [rawPositions, backendSummary, quality] = await Promise.all([
         cachedFetch(
             `portfolio:${canonicalUserId}:positions`,
-            () => researchRequest<ResearchPortfolioPosition[]>('/api/portfolio/positions', { fast: true }),
+            () => researchRequest<PaginatedOrArray<ResearchPortfolioPosition>>('/api/portfolio/positions', { fast: true }),
             15,
         ),
         cachedFetch(
@@ -315,6 +327,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         ),
         getPortfolioDataQuality(canonicalUserId),
     ]);
+    const positions = unwrapItems(rawPositions);
     const holdings = positions.map((position): PortfolioHolding => {
         const held = Boolean(position.valuation_hold);
         const currentPrice = held ? null : position.market_price;
@@ -570,11 +583,12 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
         // métrica que la alimenta no existe: un 0 seria una medición.
         const clamp100 = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
         const sheet = await getPortfolioTearsheet(canonicalUserId);
-        const snapshots = await cachedFetch(
+        const rawSnapshots = await cachedFetch(
             `portfolio:${canonicalUserId}:snapshots`,
-            () => researchRequest<PortfolioSnapshotPoint[]>('/api/portfolio/snapshots', { fast: true }),
+            () => researchRequest<PaginatedOrArray<PortfolioSnapshotPoint>>('/api/portfolio/snapshots', { fast: true }),
             15,
         ).catch(() => [] as PortfolioSnapshotPoint[]);
+        const snapshots = unwrapItems(rawSnapshots);
         const history = verifiedPortfolioHistory(snapshots, summary.baseCurrency);
         // Real dividend score: trailing-12M declared-dividend yield from
         // GET /api/portfolio/dividends (FMP-ingested records, provenance
