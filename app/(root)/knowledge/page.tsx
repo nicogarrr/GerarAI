@@ -137,6 +137,17 @@ function parserLabel(value: unknown): string {
   return PARSER_LABELS[key] ?? key.replaceAll('_', ' ');
 }
 
+/** Abre el explorador de un documento sin perder la página de la lista y
+ *  saltando directamente a él (#fragmentos). */
+function documentReaderHref(id: number, offset: number): string {
+  return `/knowledge?document=${id}${offset > 0 ? `&documentOffset=${offset}` : ''}#fragmentos`;
+}
+
+/** Vuelve a la lista de documentos en la misma página en la que se estaba. */
+function libraryListHref(offset: number): string {
+  return `${offset > 0 ? `/knowledge?documentOffset=${offset}` : '/knowledge'}#documentos`;
+}
+
 function statusTone(status: string) {
   if (status === 'approved' || status === 'ready') return 'border-teal-800 text-teal-300';
   if (status === 'rejected') return 'border-red-900 text-red-300';
@@ -244,6 +255,32 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         </TabsList>
 
         <TabsContent className="mt-2 space-y-6" value={TABS.biblioteca}>
+      {/*
+        Lectura primero: al abrir un documento («Fragmentos» o su título) el
+        explorador aparece arriba del todo (#fragmentos), no al final de la
+        pestaña tras cifras, colecciones y la lista entera, donde el enlace
+        parecía no hacer nada. La lista va antes que las colecciones; los
+        formularios de alta viven en «Subir».
+      */}
+      {selectedDocument ? (
+        <section aria-labelledby="fragmentos-titulo" className="min-w-0 scroll-mt-24 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5" id="fragmentos">
+          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100" id="fragmentos-titulo">{selectedDocument.title}</h2></div><Button asChild className="h-11" size="sm" variant="outline"><Link href={libraryListHref(documentOffset)}>Volver a la lista</Link></Button></div>
+          <ArchivedThesisNotice documentType={selectedDocument.document_type} />
+          {/* Conexión 10a: asociar el documento a una empresa lo muestra en su ficha. Vacío = quitar. */}
+          <MutationForm action={setKnowledgeDocumentTicker.bind(null, selectedDocument.id)} className="mb-4 flex flex-wrap items-end gap-2" successMessage="Ticker guardado">
+            <div className="min-w-[12rem] flex-1 sm:flex-none">
+              <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="kw-doc-ticker">Empresa (ticker)</label>
+              <Input autoCapitalize="characters" className="h-11 w-full uppercase" defaultValue={selectedDocument.ticker ?? ''} id="kw-doc-ticker" maxLength={32} name="ticker" placeholder="Sin empresa" />
+            </div>
+            <Button className="h-11" size="sm" type="submit" variant="outline">Guardar ticker</Button>
+            {selectedDocument.ticker ? <Link className="pb-3 text-xs text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(selectedDocument.ticker)}?view=documents`}>Ver en la ficha de {selectedDocument.ticker}</Link> : null}
+          </MutationForm>
+          <div className="grid gap-3 md:max-h-[620px] md:overflow-y-auto md:pr-2">
+            {chunks.map((chunk) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={chunk.id}><div className="mb-2 flex justify-between text-xs text-gray-500"><span>Fragmento {formatNumber(Number(chunk.chunk_index) + 1, { maximumFractionDigits: 0 })}</span><span>página {chunk.page_number === null || chunk.page_number === undefined ? NA : formatNumber(chunk.page_number, { maximumFractionDigits: 0 })} · {formatNumber(chunk.token_count, { maximumFractionDigits: 0 })} tokens</span></div><div className="text-sm leading-6 text-gray-300"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{chunk.content}</ReactMarkdown></div></article>)}
+            {!chunks.length ? <p className="text-sm text-gray-500">Este documento no tiene fragmentos.</p> : null}
+          </div>
+        </section>
+      ) : null}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         {[
           ['Colecciones', collections.length],
@@ -267,6 +304,62 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           </div>
         </section>
       ) : null}
+
+      <section className="min-w-0 scroll-mt-24 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5" id="documentos">
+        <div className="mb-4 flex items-center gap-2"><BookOpen aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">{t('knowledge.documents')}</h2></div>
+        <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
+        {!documents.length ? <div className="py-2 text-sm text-gray-500"><p>No hay documentos en esta página.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
+        <div aria-label="Documentos de conocimiento" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <caption className="sr-only">Documentos de conocimiento ingeridos, con colección, tipo, extractor, estado y acciones de extracción</caption>
+            <thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2 pr-4" scope="col">Documento</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Colección</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Tipo</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Extractor</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Estado</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Acciones</th></tr></thead>
+            <tbody>
+              {documents.map((document) => {
+                const job = latestJobByDocument.get(document.id);
+                const busy = job?.status === 'queued' || job?.status === 'running';
+                return (
+                <tr className="border-b border-gray-900" key={document.id}>
+                  <th className="py-3 pr-4 text-left text-sm font-normal" scope="row"><Link className="font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset)}>{document.title}</Link><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
+                  <td className="py-3 pr-4 text-gray-400">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</td>
+                  <td className="py-3 pr-4 text-gray-400">{documentTypeLabel(document.document_type)}</td>
+                  <td className="py-3 pr-4 text-gray-500">{parserLabel(document.metadata.parser)}</td>
+                  <td className="py-3 pr-4"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
+                  <td className="py-3"><div className="flex flex-wrap justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset)}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
+                </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:hidden">
+          {documents.map((document) => {
+            const job = latestJobByDocument.get(document.id);
+            const busy = job?.status === 'queued' || job?.status === 'running';
+            return (
+              <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={document.id}>
+                <Link className="block min-w-0 font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset)}>{document.title}</Link>
+                <div className="mt-1 text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</Badge>
+                  <Badge variant="outline">{documentTypeLabel(document.document_type)}</Badge>
+                  <Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge>
+                </div>
+                <div className="mt-2 text-xs text-gray-500">Extractor: {parserLabel(document.metadata.parser)}</div>
+                {extractionResultText(job) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}
+                <div className="mt-4 grid grid-cols-1 gap-2">
+                  <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset)}>Fragmentos</Link></Button>
+                  <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
+                    <Button className="h-11 w-full" disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button>
+                  </MutationForm>
+                  <DeleteDocumentButton className="h-11 w-full" documentId={document.id} title={document.title} />
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
         <h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>
@@ -307,100 +400,6 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           </>
         ) : <p className="text-sm text-gray-500">Sin colecciones.</p>}
       </section>
-
-      <section className="grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
-        <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
-          <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
-            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de colección</span><select className="h-11 w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 md:text-sm" name="collection_type" defaultValue="custom" required><option value="custom">Personalizada</option><option value="investor">Por inversor o autor</option><option value="theme">Por tema o sector</option></select></label>
-            <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 sm:col-span-2"><span>Descripción (opcional)</span><Textarea className="min-h-[88px] w-full" name="description" placeholder="Ámbito y uso previsto" /></label>
-            <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit">Crear colección</Button>
-          </div>
-        </MutationForm>
-
-        <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-          <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Colecciones por defecto</h2></div>
-          {hasDefaultCollections(collections) ? <p className="text-sm text-gray-400">Colecciones por defecto instaladas.</p> : <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
-            <Button className="h-11 w-full sm:w-fit" type="submit"><Library aria-hidden="true" className="h-4 w-4" />Instalar por defecto</Button>
-          </MutationForm>}
-        </div>
-      </section>
-
-      <section className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5">
-        <div className="mb-4 flex items-center gap-2">            <BookOpen aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">{t('knowledge.documents')}</h2></div>
-        <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
-        {!documents.length ? <div className="py-2 text-sm text-gray-500"><p>No hay documentos en esta página.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
-        <div aria-label="Documentos de conocimiento" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <caption className="sr-only">Documentos de conocimiento ingeridos, con colección, tipo, extractor, estado y acciones de extracción</caption>
-            <thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2 pr-4" scope="col">Documento</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Colección</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Tipo</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Extractor</th><th className="border-b border-gray-800 py-2 pr-4" scope="col">Estado</th><th className="border-b border-gray-800 py-2 text-right" scope="col">Acciones</th></tr></thead>
-            <tbody>
-              {documents.map((document) => {
-                const job = latestJobByDocument.get(document.id);
-                const busy = job?.status === 'queued' || job?.status === 'running';
-                return (
-                <tr className="border-b border-gray-900" key={document.id}>
-                  <th className="py-3 pr-4 text-left text-sm font-normal" scope="row"><div className="font-medium text-gray-200">{document.title}</div><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
-                  <td className="py-3 pr-4 text-gray-400">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</td>
-                  <td className="py-3 pr-4 text-gray-400">{documentTypeLabel(document.document_type)}</td>
-                  <td className="py-3 pr-4 text-gray-500">{parserLabel(document.metadata.parser)}</td>
-                  <td className="py-3 pr-4"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
-                  <td className="py-3"><div className="flex flex-wrap justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:hidden">
-          {documents.map((document) => {
-            const job = latestJobByDocument.get(document.id);
-            const busy = job?.status === 'queued' || job?.status === 'running';
-            return (
-              <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={document.id}>
-                <div className="min-w-0 font-medium text-gray-200">{document.title}</div>
-                <div className="mt-1 text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</Badge>
-                  <Badge variant="outline">{documentTypeLabel(document.document_type)}</Badge>
-                  <Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge>
-                </div>
-                <div className="mt-2 text-xs text-gray-500">Extractor: {parserLabel(document.metadata.parser)}</div>
-                {extractionResultText(job) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}
-                <div className="mt-4 grid grid-cols-1 gap-2">
-                  <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={`/knowledge?document=${document.id}`}>Fragmentos</Link></Button>
-                  <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
-                    <Button className="h-11 w-full" disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button>
-                  </MutationForm>
-                  <DeleteDocumentButton className="h-11 w-full" documentId={document.id} title={document.title} />
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
-      {selectedDocument ? (
-        <section className="min-w-0 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5">
-          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100">{selectedDocument.title}</h2></div><Button asChild size="sm" variant="ghost"><Link href="/knowledge">Cerrar</Link></Button></div>
-          <ArchivedThesisNotice documentType={selectedDocument.document_type} />
-          {/* Conexión 10a: asociar el documento a una empresa lo muestra en su ficha. Vacío = quitar. */}
-          <MutationForm action={setKnowledgeDocumentTicker.bind(null, selectedDocument.id)} className="mb-4 flex flex-wrap items-end gap-2" successMessage="Ticker guardado">
-            <div className="min-w-[12rem] flex-1 sm:flex-none">
-              <label className="mb-1 block text-xs font-medium text-gray-400" htmlFor="kw-doc-ticker">Empresa (ticker)</label>
-              <Input autoCapitalize="characters" className="h-11 w-full uppercase" defaultValue={selectedDocument.ticker ?? ''} id="kw-doc-ticker" maxLength={32} name="ticker" placeholder="Sin empresa" />
-            </div>
-            <Button className="h-11" size="sm" type="submit" variant="outline">Guardar ticker</Button>
-            {selectedDocument.ticker ? <Link className="pb-3 text-xs text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(selectedDocument.ticker)}?view=documents`}>Ver en la ficha de {selectedDocument.ticker}</Link> : null}
-          </MutationForm>
-          <div className="grid max-h-[620px] gap-3 overflow-y-auto pr-2">
-            {chunks.map((chunk) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={chunk.id}><div className="mb-2 flex justify-between text-xs text-gray-500"><span>Fragmento {formatNumber(Number(chunk.chunk_index) + 1, { maximumFractionDigits: 0 })}</span><span>página {chunk.page_number === null || chunk.page_number === undefined ? NA : formatNumber(chunk.page_number, { maximumFractionDigits: 0 })} · {formatNumber(chunk.token_count, { maximumFractionDigits: 0 })} tokens</span></div><div className="text-sm leading-6 text-gray-300"><ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{chunk.content}</ReactMarkdown></div></article>)}
-            {!chunks.length ? <p className="text-sm text-gray-500">Este documento no tiene fragmentos.</p> : null}
-          </div>
-        </section>
-      ) : null}
         </TabsContent>
 
         <TabsContent className="mt-2" value={TABS.subir}>
@@ -481,6 +480,24 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
               <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit"><UploadCloud aria-hidden="true" className="h-4 w-4" />Subir</Button>
             </div>
           </MutationForm>
+          <section className="mt-6 grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
+            <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
+              <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
+                <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Tipo de colección</span><select className="h-11 w-full rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 md:text-sm" name="collection_type" defaultValue="custom" required><option value="custom">Personalizada</option><option value="investor">Por inversor o autor</option><option value="theme">Por tema o sector</option></select></label>
+                <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 sm:col-span-2"><span>Descripción (opcional)</span><Textarea className="min-h-[88px] w-full" name="description" placeholder="Ámbito y uso previsto" /></label>
+                <Button className="h-11 w-full sm:col-span-2 sm:w-fit" type="submit">Crear colección</Button>
+              </div>
+            </MutationForm>
+
+            <div className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+              <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Colecciones por defecto</h2></div>
+              {hasDefaultCollections(collections) ? <p className="text-sm text-gray-400">Colecciones por defecto instaladas.</p> : <MutationForm action={installKnowledgeDefaults} successMessage="Colecciones por defecto listas">
+                <Button className="h-11 w-full sm:w-fit" type="submit"><Library aria-hidden="true" className="h-4 w-4" />Instalar por defecto</Button>
+              </MutationForm>}
+            </div>
+          </section>
         </TabsContent>
 
         <TabsContent className="mt-2" value={TABS.principios}>
