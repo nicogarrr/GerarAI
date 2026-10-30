@@ -36,7 +36,7 @@ numpy>=1.24.0,<3
 matplotlib>=3.7.0,<4
 seaborn>=0.13.0,<0.14
 tabulate>=0.9.0,<0.11
-python-dateutil>=2.8.0,<4
+python-dateutil>=2.8.0,<3
 arch>=6.0,<9
 
 # Knowledge base / RAG (embeddings locales all-MiniLM-L6-v2, gratis)
@@ -63,7 +63,7 @@ psycopg[binary]>=3.2.1,<4
 minio>=7.2.7,<8
 dramatiq[redis]>=1.17.0,<3
 apscheduler>=3.10.4,<4
-langfuse>=3.0.0,<6
+langfuse>=3.0.0,<5
 # LangGraph thesis lifecycle shadow pilot (stage 6): graph + durable checkpoints.
 # Control state only in a separate schema; business source of truth stays in Postgres domain tables.
 langgraph>=1.2.11,<2
