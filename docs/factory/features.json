@@ -756,10 +756,10 @@
         "VAL-DB-005"
       ],
       "milestone": "performance-scalability",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "optimize-database-schema",
@@ -780,10 +780,10 @@
         "VAL-DB-006"
       ],
       "milestone": "performance-scalability",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "fix-hardcoded-admin-credentials",
@@ -1271,10 +1271,10 @@
         "VAL-DB-004"
       ],
       "milestone": "test-coverage-docs",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "implement-transaction-isolation",
