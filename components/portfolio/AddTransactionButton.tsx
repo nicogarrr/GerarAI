@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState } from 'react';
+import { useOpenFromQuery } from '@/hooks/useOpenFromQuery';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
@@ -24,6 +25,11 @@ export default function AddTransactionButton({ userId }: Props) {
   // Radix al cerrar) para conservar lo escrito si se cierra sin enviar,
   // igual que antes del split.
   const [openedOnce, setOpenedOnce] = useState(false);
+  // Enlace directo «…?anadir=1» (Primeros pasos de Inicio): abre el alta al llegar.
+  useOpenFromQuery(() => {
+    setOpenedOnce(true);
+    setOpen(true);
+  });
 
   return (
     <Dialog
