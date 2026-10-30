@@ -25,7 +25,7 @@ describe('coverage label honesty guard (F147)', () => {
         // El copy vive en lib/audit-status-copy.ts (F243) y ambas páginas lo
         // componen con auditScoreText: las etiquetas se verifican en el helper.
         const label = 'puntuación de respaldo de afirmaciones';
-        const penalty = '(penaliza baja confianza)';
+        const penalty = '(penaliza baja confianza y una conciliación SEC/FMP ausente)';
         const helper = readSource('lib/audit-status-copy.ts');
         assert.ok(helper.includes(label), 'el helper debe nombrar la puntuación de respaldo');
         assert.ok(helper.includes(penalty), 'el helper debe declarar la penalización por baja confianza');

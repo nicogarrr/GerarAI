@@ -33,11 +33,16 @@ test('la cola gdelt la consume EXACTAMENTE UN proceso dedicado (pacing por IP in
     assert.ok(workerCmd && !workerCmd.includes('gdelt'), 'el worker general NO consume gdelt');
 });
 
-test('el worker default usa 3 hilos (6 agotaba el limite de 3G por OOM de cgroup)', () => {
+test('el worker default serializa evidencia en 1 hilo con 3G de memoria (mitigación OOM)', () => {
     assert.match(
         compose,
-        /worker:\n[\s\S]{0,200}"--processes", "1", "--threads", "3", "-Q", "default", "prices"/,
+        /worker:\n[\s\S]{0,200}"--processes", "1", "--threads", "1", "-Q", "default", "prices"/,
     );
+});
+
+test('el worker default conserva el margen de memoria de 3G', () => {
+    const block = compose.slice(compose.indexOf('  worker:'), compose.indexOf('  worker-gdelt:'));
+    assert.match(block, /memory: 3G/);
 });
 
 test('los jobs periodicos de ingesta llevan coalescencia contra re-encolados redundantes', () => {
