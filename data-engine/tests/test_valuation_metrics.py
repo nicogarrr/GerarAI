@@ -325,3 +325,40 @@ def test_pb_adr_etiquetado_sin_ratio_no_se_escribe():
     db.flush()
     _run(db, [company])
     assert _metric(db, company, METRIC_PB) is None
+
+
+
+def _split(db, company, ratio, effective):
+    from app.models import CorporateAction
+
+    db.add(CorporateAction(
+        company_id=company.id, action_type="split", ratio=Decimal(ratio),
+        effective_date=effective, description="test split",
+    ))
+    db.flush()
+
+
+def test_pb_ajusta_acciones_por_split_posterior_al_ejercicio():
+    """Libros FY2025 = 1000 / 100 acciones; split 10:1 en marzo de 2026.
+
+    Calculo independiente: acciones actuales 1000, libros/accion 1; cierre
+    post-split 2 -> P/B = 2 (en main 2 / 10 = 0,2).
+    """
+    db = _db()
+    company = _seed_pb(db, price="2")
+    _split(db, company, "10", date(2026, 3, 2))
+    _run(db, [company])
+    row = _metric(db, company, METRIC_PB)
+    assert row is not None
+    assert Decimal(row.value) == Decimal("2")
+    assert row.calculation_trace["split_factor"] == "10"
+
+
+def test_pb_ignora_split_anterior_al_cierre_o_posterior_al_precio():
+    db = _db()
+    company = _seed_pb(db)  # equity 1000, shares 100 (FY2025), cierre 20 -> P/B 2
+    _split(db, company, "4", date(2025, 6, 1))  # ya reflejado en las acciones FY2025
+    _split(db, company, "3", AS_OF + timedelta(days=5))  # posterior al precio usado
+    _run(db, [company])
+    row = _metric(db, company, METRIC_PB)
+    assert Decimal(row.value) == Decimal("2")

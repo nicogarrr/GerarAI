@@ -48,6 +48,11 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
 from app.services.propicks_price_service import yahoo_symbol
+from app.services.split_adjustment import (
+    cumulative_split_factor_after,
+    period_end_date,
+    split_events_by_company,
+)
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 
 METRIC_VERSION = "valuation-v1"
@@ -150,7 +155,7 @@ def _latest_price(
 
 
 def _book_value_per_share(
-    db: Session, company: Company, as_of: date
+    db: Session, company: Company, as_of: date, price_date: date | None = None
 ) -> dict[str, Any] | None:
     """total_equity / shares_diluted del mismo FY reciente, con control de divisa."""
     min_fy = as_of.year - MAX_FY_AGE_YEARS
@@ -161,6 +166,7 @@ def _book_value_per_share(
             FinancialFact.value,
             FinancialFact.unit,
             FinancialFact.source_type,
+            FinancialFact.period,
         )
         .where(
             FinancialFact.company_id == company.id,
@@ -172,13 +178,13 @@ def _book_value_per_share(
         )
         .order_by(FinancialFact.fiscal_year.desc(), FinancialFact.created_at.desc())
     ).all()
-    by_metric: dict[str, tuple[int, Decimal, str, str]] = {}
-    for metric, fy, value, unit, source_type in rows:
-        by_metric.setdefault(metric, (fy, Decimal(str(value)), unit or "", source_type or ""))
+    by_metric: dict[str, tuple[int, Decimal, str, str, str | None]] = {}
+    for metric, fy, value, unit, source_type, period in rows:
+        by_metric.setdefault(metric, (fy, Decimal(str(value)), unit or "", source_type or "", period))
     if "total_equity" not in by_metric or "shares_diluted" not in by_metric:
         return None
-    eq_fy, equity, eq_unit, eq_src = by_metric["total_equity"]
-    sh_fy, shares, sh_unit, sh_src = by_metric["shares_diluted"]
+    eq_fy, equity, eq_unit, eq_src, _eq_period = by_metric["total_equity"]
+    sh_fy, shares, sh_unit, sh_src, sh_period = by_metric["shares_diluted"]
     if eq_fy != sh_fy:
         return None  # equity y acciones de ejercicios distintos: no se mezclan
     if equity <= 0 or shares <= 0:
@@ -200,10 +206,21 @@ def _book_value_per_share(
     )
     if ratio is None and tagged_adr:
         return None
-    bvps = equity / shares * (Decimal(str(ratio)) if ratio else Decimal(1))
+    # El precio es del dia; las acciones, del cierre del ejercicio. Un split
+    # posterior (efectivo entre el cierre y la fecha del precio) cambia el
+    # recuento: acciones actuales = filing x factor acumulado. Sin ajuste un
+    # 10:1 dejaba el P/B dividido entre 10 (misma regla que el screener).
+    cutoff = price_date or as_of
+    events = [
+        event for event in split_events_by_company(db, [company.id]).get(company.id, [])
+        if event[0] <= cutoff
+    ]
+    split_factor = cumulative_split_factor_after(events, period_end_date(sh_period))
+    bvps = equity / (shares * split_factor) * (Decimal(str(ratio)) if ratio else Decimal(1))
     return {
         "bvps": bvps,
         "adr_ratio": ratio,
+        "split_factor": split_factor,
         "fiscal_year": eq_fy,
         "equity": equity,
         "shares": shares,
@@ -325,7 +342,7 @@ def compute_valuation_metrics(
             continue
         close, price_date, price_source = price
 
-        book = _book_value_per_share(db, company, as_of)
+        book = _book_value_per_share(db, company, as_of, price_date)
         if book is None:
             stats["skipped"]["sin_libros"] += 1
         else:
@@ -352,6 +369,7 @@ def compute_valuation_metrics(
                     "shares_diluted": str(book["shares"]),
                     "fact_unit": book["fact_unit"],
                     "adr_ratio": book["adr_ratio"],
+                    "split_factor": format(book["split_factor"].normalize(), "f"),
                     "equity_source": book["equity_source"],
                     "shares_source": book["shares_source"],
                 },
