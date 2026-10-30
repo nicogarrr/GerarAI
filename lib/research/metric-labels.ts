@@ -146,6 +146,7 @@ export const METRIC_LABELS: Record<string, string> = {
     // Entradas pendientes de los motores y del modelo a largo plazo que la
     // ficha pinta con termLabel (guard: scripts/missing-inputs-i18n-guard.test.ts)
     adr_ratio: 'ratio ADR (acciones ordinarias por ADR)',
+    price_basis_after_split: 'cierre posterior al split (el último guardado es anterior y su base no se puede saber)',
     fiscal_year: 'ejercicio fiscal',
     maintenance_capex_or_capital_expenditure: 'capex de mantenimiento o CapEx total',
     m_and_a_purchase_price_and_post_deal_returns: 'precio pagado en adquisiciones (M&A) y su rentabilidad posterior',

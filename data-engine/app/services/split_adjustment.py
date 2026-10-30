@@ -62,6 +62,21 @@ def cumulative_split_factor_after(
     return factor
 
 
+def split_after_price(
+    events: list[tuple[date, Decimal]], price_date: date | None, upto: date
+) -> bool:
+    """True si un split es efectivo despues del ultimo cierre y hasta ``upto``.
+
+    Ese cierre puede estar en la base vieja (no hubo refresco desde el split)
+    o ya ajustado por el proveedor (un refresco reescribio la serie antes de
+    la primera sesion nueva): ``MarketPrice`` no guarda cuando se leyo, asi
+    que la base no se puede saber y el precio no se compara (N/D).
+    """
+    if price_date is None:
+        return False
+    return any(price_date < effective <= upto for effective, _ratio in events)
+
+
 def period_end_date(period: str | None) -> date | None:
     """`"<end>:FY"` / `"<end>:DEI"` -> date; lo no parseable es None."""
     try:
