@@ -103,7 +103,11 @@ def list_alert_rules(
     if active is not None:
         statement = statement.where(AlertRule.active.is_(active))
     return list(
-        db.scalars(statement.order_by(desc(AlertRule.created_at)).limit(limit).offset(offset)).all()
+        # id como desempate: con created_at repetido (reglas creadas en lote) LIMIT/OFFSET
+        # sin orden total repetia o saltaba reglas entre paginas en Postgres.
+        db.scalars(
+            statement.order_by(desc(AlertRule.created_at), desc(AlertRule.id)).limit(limit).offset(offset)
+        ).all()
     )
 
 
@@ -231,7 +235,8 @@ def list_alerts(
     alerts = list(
         db.scalars(
             statement.order_by(
-                desc(func.coalesce(ResearchAlert.last_triggered_at, ResearchAlert.created_at))
+                desc(func.coalesce(ResearchAlert.last_triggered_at, ResearchAlert.created_at)),
+                desc(ResearchAlert.id),
             ).limit(limit)
         ).all()
     )
