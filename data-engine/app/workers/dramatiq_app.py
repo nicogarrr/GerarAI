@@ -2469,10 +2469,18 @@ def refresh_rss_feeds(
     actor_name = "refresh_rss_feeds"
     try:
         from app.services.feed_ingestion_service import (
+            GOV_NEWS_LANE,
             FeedIngestionService,
             RSSFeed,
             all_rss_feeds,
         )
+        from app.services.macro_news import MACRO_NEWS_LANE
+
+        # Carriles RSS sin vínculo a empresa (fail-closed): sus titulares
+        # NUNCA se enlazan a una Company ni disparan alertas de noticias
+        # seguidas, aunque nombren una empresa (NO-FAV auditoría #3114).
+        # Explícito: un carril nuevo no hereda el cierre por accidente.
+        lane_feeds_fail_closed = frozenset({GOV_NEWS_LANE, MACRO_NEWS_LANE})
 
         feeds = [RSSFeed(feed_url, ticker.upper() if ticker else None)] if feed_url else all_rss_feeds()
         if not feeds:
@@ -2567,9 +2575,11 @@ def refresh_rss_feeds(
                         # Mismo presupuesto que abre feeds nuevos: agotado, la
                         # ingesta sigue pero se omite el enriquecimiento Jev/LLM.
                         llm_deadline=started_at + _RSS_TIME_BUDGET_SECONDS,
-                        # Feeds de carril (gobierno): sin vínculo a empresa,
-                        # fail-closed como el carril macro.
-                        detect_company=feed.lane is None,
+                        # Feeds de carril (macro y gobierno): detect_company
+                        # False literal, fail-closed; un titular que nombra una
+                        # empresa NO la enlaza (test: BEA con «Apple» queda
+                        # company_id NULL).
+                        detect_company=feed.lane not in lane_feeds_fail_closed,
                     )
                     if result.status != "error":
                         processed += 1

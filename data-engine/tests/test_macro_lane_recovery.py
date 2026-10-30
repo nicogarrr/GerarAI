@@ -192,3 +192,65 @@ def test_archivo_no_aplica_a_otros_carriles():
     body = _client([old]).get("/api/news", params={"lane": "gobierno"}).json()
     assert len(body) == 1
     assert body[0]["archive"] is False
+
+
+# ---------- fail-closed: un item de feed macro con empresa NO se enlaza ----------
+
+def test_bea_item_con_nombre_de_empresa_queda_sin_company_id(monkeypatch):
+    """NO-FAV auditoría #3114: un comunicado BEA que nombra una empresa se
+    ingiere con company_id NULL (carril macro, fail-closed) y nunca entra en
+    alertas de noticias seguidas. Ingesta real (NewsService) sobre sqlite;
+    solo se falsifica la red (poll_rss), Redis y el lease."""
+    from sqlalchemy import select
+
+    from app.models.entities import Company
+    from app.services.feed_ingestion_service import FeedIngestionService, RSSFeed
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine, expire_on_commit=False)()
+    tenant = Tenant(external_id="t", name="T", metadata_={}, status="active")
+    db.add(tenant)
+    db.flush()
+    db.add(Company(ticker="AAPL", name="Apple", exchange="NASDAQ", currency="USD",
+                   company_type="tech", valuation_model="standard_dcf"))
+    db.commit()
+    db.info["tenant_id"] = tenant.id
+
+    class _FakePollService(FeedIngestionService):
+        async def poll_rss(self, url, *, ticker=None, source_label=None):
+            return ConnectorResult(
+                source="rss",
+                items=[
+                    ConnectorItem(
+                        source="BEA (oficial)",
+                        title="Apple lidera el gasto en equipamiento según el BEA",
+                        url="https://apps.bea.gov/rss/item-1",
+                        published_at=NOW,
+                    )
+                ],
+            )
+
+    import app.services.feed_ingestion_service as fis
+
+    monkeypatch.setattr(fis, "FeedIngestionService", _FakePollService)
+    monkeypatch.setattr(
+        fis,
+        "all_rss_feeds",
+        lambda: [RSSFeed("https://apps.bea.gov/rss/rss.xml", label="BEA (oficial)", lane="macro")],
+    )
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: db)
+    monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: None)
+
+    result = dramatiq_app.refresh_rss_feeds(tenant_id=tenant.id, user_id="u1")
+
+    assert result["status"] == "ok"
+    assert result["feeds_processed"] == 1
+    events = db.scalars(select(NewsEvent)).all()
+    assert len(events) == 1
+    event = events[0]
+    # Aunque el titular nombra «Apple» y AAPL existe: fail-closed.
+    assert event.company_id is None
+    assert (event.metadata_ or {}).get("news_lane") == "macro"
+    db.close()
+    engine.dispose()
