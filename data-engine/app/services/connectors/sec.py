@@ -15,7 +15,7 @@ import httpx
 from app.core.config import get_settings
 from app.services.connectors import sec_edgar
 from app.services.connectors.base import ConnectorItem, ConnectorResult, retry_after_seconds
-from app.services.sec_ticker import match_cik
+from app.services.sec_ticker import CikIndex
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,9 @@ _next_slot_at = 0.0
 _cache_lock = threading.Lock()
 # url -> (expira_monotonic, payload). Solo respuestas JSON correctas.
 _json_cache: dict[str, tuple[float, dict]] = {}
+# Indice ticker -> CIK ligado a la entrada de cache del mapa de la SEC de la
+# que salio: se reconstruye solo cuando esa entrada cambia o caduca.
+_cik_index: tuple[tuple[float, dict] | None, CikIndex] | None = None
 
 
 EFTS_FALLBACK_SOURCE = "efts-full-text-search"
@@ -82,7 +85,8 @@ def _efts_company_name(source: dict, cik: str) -> str | None:
 
 def reset_sec_client_state() -> None:
     """Solo para tests: vacia cache y reloj compartido."""
-    global _next_slot_at
+    global _next_slot_at, _cik_index
+    _cik_index = None
     with _pacing_lock:
         _next_slot_at = 0.0
     with _cache_lock:
@@ -100,6 +104,15 @@ def _cache_get(url: str) -> dict | None:
         # Copia: el llamador puede mutar el dict (p. ej. al normalizar) y eso
         # no debe contaminar a los siguientes lectores de la misma URL.
         return copy.deepcopy(hit[1])
+
+
+def _cache_entry(url: str) -> tuple[float, dict] | None:
+    """Entrada viva de la cache SIN copiar (solo para lectura interna)."""
+    with _cache_lock:
+        hit = _json_cache.get(url)
+        if hit is None or hit[0] <= time.monotonic():
+            return None
+        return hit
 
 
 def _cache_put(url: str, payload: dict, ttl: float) -> None:
@@ -235,19 +248,32 @@ class SECClient:
         manifest_cik = sec_edgar.manifest_cik(ticker)
         if manifest_cik:
             return manifest_cik
-        mapping = await self.ticker_map()
         # EDGAR nombra las clases con guion (BRK-B) y el master con punto
         # (BRK.B): el match exacto nunca casa para esos emisores. El
         # fallback normalizado exige match único (fail closed).
-        cik = match_cik(
-            (
-                (str(item.get("ticker", "")), str(item["cik_str"]).zfill(10))
-                for item in mapping.values()
-                if isinstance(item, dict) and item.get("cik_str") is not None
-            ),
-            ticker,
+        return (await self._ticker_index()).lookup(ticker)
+
+    async def _ticker_index(self) -> CikIndex:
+        """Indice del mapa de la SEC, uno por entrada de cache.
+
+        Antes cada ``cik_for_ticker`` hacia deepcopy del mapa (~10.000
+        emisores) y lo recorria entero: ~35 ms por ticker, ~0,9 s por carga
+        del calendario de catalizadores con la cache ya caliente.
+        """
+        global _cik_index
+        entry = _cache_entry(self.ticker_map_url) if self.use_cache else None
+        current = _cik_index
+        if entry is not None and current is not None and current[0] is entry:
+            return current[1]
+        mapping = await self.ticker_map()
+        index = CikIndex(
+            (str(item.get("ticker", "")), str(item["cik_str"]).zfill(10))
+            for item in mapping.values()
+            if isinstance(item, dict) and item.get("cik_str") is not None
         )
-        return cik
+        if self.use_cache:
+            _cik_index = (_cache_entry(self.ticker_map_url), index)
+        return index
 
     async def submissions(self, cik: str) -> dict:
         padded = str(cik).zfill(10)
