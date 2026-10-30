@@ -18,6 +18,7 @@ from app.services.extended_quote_service import extended_quote_service
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
 from app.services.price_units import price_in_currency
+from app.valuation.currency import normalize_currency
 
 WORKFLOW = "portfolio_image_import"
 
@@ -37,6 +38,19 @@ class ConfirmedImageRow(BaseModel):
     confirmed: bool
 
 
+def _same_money(company_currency: str | None, row_currency: str) -> bool:
+    """La fila puede ir en la divisa exacta o en la unidad principal de la misma moneda.
+
+    Londres cotiza en GBp y la fila solo admite tres mayusculas, asi que una
+    posicion en libras (GBP) es valida: ``price_in_currency`` convierte el
+    precio en peniques. Otra moneda u otra subunidad (GBX) se rechazan.
+    """
+    if company_currency == row_currency:
+        return True
+    major, divisor = normalize_currency(company_currency)
+    return bool(major) and divisor != 1 and row_currency == major
+
+
 def validate_rows(db: Session, rows: list[ConfirmedImageRow]) -> list[tuple[Company, ConfirmedImageRow]]:
     if not db.info.get("tenant_id"):
         raise ValueError("Falta la sesión de cartera")
@@ -50,7 +64,7 @@ def validate_rows(db: Session, rows: list[ConfirmedImageRow]) -> list[tuple[Comp
         company = db.scalar(select(Company).where(Company.ticker == row.ticker))
         if not company or company.exchange in {"UNKNOWN", ""} or company.name == company.ticker:
             raise ValueError(f"{row.ticker}: elige un instrumento identificado en el catálogo")
-        if company.currency != row.currency:
+        if not _same_money(company.currency, row.currency):
             raise ValueError(f"{row.ticker}: la divisa no coincide con el instrumento")
         existing = db.scalar(select(Position.id).where(Position.company_id == company.id, *tenant_filters(db, Position)))
         history = db.scalar(select(Transaction.id).where(Transaction.company_id == company.id, *tenant_filters(db, Transaction)).limit(1))
