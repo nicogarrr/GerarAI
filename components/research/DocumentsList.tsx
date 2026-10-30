@@ -6,17 +6,30 @@ import { Badge } from '@/components/ui/badge';
 import { paginate } from '@/lib/research/change-events';
 import { Pager } from './Pager';
 
-export type DocumentRow = { id: number | string; title: string; url: string | null; tier: string; type: string; published: string };
+export type DocumentRow = { id: number | string; title: string; url: string | null; tier: string; tierRank: number; type: string; published: string; publishedTs: string | null };
 
 const PAGE = 10;
 
-/** Documentos de la ficha: búsqueda por título/tipo y 10 por página. */
+/**
+ * Documentos de la ficha: fuentes primarias primero (tier), después por fecha
+ * (las más nuevas arriba, las sin fecha al final), con búsqueda por
+ * título/tipo y 10 por página. Sin el orden por tier, los artefactos internos
+ * diarios (inputs de mercado, supuestos del modelo) enterraban los filings
+ * oficiales por llegar más recientes.
+ */
 export function DocumentsList({ documents }: { documents: DocumentRow[] }) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? documents.filter((d) => `${d.title} ${d.type} ${d.tier}`.toLowerCase().includes(q)) : documents;
+    const matching = q ? documents.filter((d) => `${d.title} ${d.type} ${d.tier}`.toLowerCase().includes(q)) : [...documents];
+    return matching.sort((left, right) => {
+      if (left.tierRank !== right.tierRank) return left.tierRank - right.tierRank;
+      const leftTs = left.publishedTs ?? '';
+      const rightTs = right.publishedTs ?? '';
+      if (leftTs !== rightTs) return leftTs < rightTs ? 1 : -1;
+      return left.title.localeCompare(right.title, 'es');
+    });
   }, [documents, query]);
   const view = paginate(filtered, page, PAGE);
   return (

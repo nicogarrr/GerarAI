@@ -144,6 +144,27 @@ export function etiquetaTierFuente(value: string): string {
   return TIERS_FUENTE[value] ?? value;
 }
 
+/**
+ * Orden de presentación por tier: la fuente primaria (reguladora, empresa)
+ * primero; lo interno o sin clasificar al final. Clave desconocida: se muestra
+ * su etiqueta cruda (etiquetaTierFuente) y se ordena con las sin clasificar,
+ * nunca por delante de una fuente primaria.
+ */
+export function tierRankFuente(value: string): number {
+  const order = [
+    'tier_1_regulatory',
+    'tier_2_company',
+    'tier_3_transcript',
+    'tier_4_reputable_media',
+    'tier_5_data_provider',
+    'tier_6_bootstrap',
+    'tier_7_user_input',
+    'tier_8_social',
+  ];
+  const index = order.indexOf(value);
+  return index === -1 ? order.length : index;
+}
+
 /** Etiqueta ES del tipo de evento de noticias (F175). */
 const TIPOS_EVENTO: Record<string, string> = {
   regulatory: 'Regulatorio',
