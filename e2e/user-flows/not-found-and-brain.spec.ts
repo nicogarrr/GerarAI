@@ -34,6 +34,8 @@ for (const vp of VIEWPORTS) {
       await expect(input).toBeVisible({ timeout: 60_000 });
       await input.fill("msft");
       await expect(page.getByRole("option", { name: /Abrir la ficha de «MSFT»/ })).toBeVisible({ timeout: 20_000 });
+      // La ficha directa ya es un resultado: «Sin resultados» encima lo contradecía.
+      await expect(page.getByText("Sin resultados", { exact: true })).toHaveCount(0);
       await input.press("Enter");
       await expect(page).toHaveURL(/\/research\/MSFT(?:[?#].*)?$/, { timeout: 30_000 });
       await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible({ timeout: 30_000 });

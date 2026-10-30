@@ -297,23 +297,6 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                     </CommandItem>
                         </CommandGroup>
                     ) : null}
-                    {directSymbol && !loading ? (
-                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading="Ficha">
-                            <CommandItem
-                                value={`direct:${directSymbol}`}
-                                onSelect={() => handleSelectStock(directSymbol)}
-                                onMouseEnter={() => handlePrefetchStock(directSymbol)}
-                                className="search-item-link min-h-11 w-full text-left aria-selected:bg-teal-950/60 aria-selected:ring-1 aria-selected:ring-inset aria-selected:ring-teal-700"
-                            >
-                                <TrendingUp aria-hidden="true" className="h-4 w-4 text-teal-400" />
-                                <div className="min-w-0 flex-1">
-                                    <div className="search-item-name truncate">Abrir la ficha de «{directSymbol}»</div>
-                                    <div className="text-sm text-gray-500">Ir directo por símbolo</div>
-                                </div>
-                                <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
-                            </CommandItem>
-                        </CommandGroup>
-                    ) : null}
                     {loading ? (
                         <CommandEmpty className="search-list-empty">Cargando acciones...</CommandEmpty>
                     ) : searchError ? (
@@ -325,10 +308,14 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                             {/* Con un comando de ficha tecleado («ASTS FA») hay
                                 resultado valido aunque el texto no coincida con
                                 ninguna accion: «Sin resultados» mentiria. */}
+                            {/* Con «Abrir la ficha de X» debajo ya hay un resultado:
+                                «Sin resultados» encima lo contradecía. */}
                             {displayStocks?.length === 0 && !commandQuery ? (
-                                <div className="search-list-indicator">
-                                    {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
-                                </div>
+                                directSymbol ? null : (
+                                    <div className="search-list-indicator">
+                                        {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
+                                    </div>
+                                )
                             ) : (
                                 <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={isSearchMode ? `Resultados de búsqueda (${displayStocks.length})` : 'Acciones populares'}>
                                     {displayStocks.map(stock => (
@@ -400,6 +387,23 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
 
                         </>
                     )}
+                    {directSymbol && !loading ? (
+                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading="Ficha">
+                            <CommandItem
+                                value={`direct:${directSymbol}`}
+                                onSelect={() => handleSelectStock(directSymbol)}
+                                onMouseEnter={() => handlePrefetchStock(directSymbol)}
+                                className="search-item-link min-h-11 w-full text-left aria-selected:bg-teal-950/60 aria-selected:ring-1 aria-selected:ring-inset aria-selected:ring-teal-700"
+                            >
+                                <TrendingUp aria-hidden="true" className="h-4 w-4 text-teal-400" />
+                                <div className="min-w-0 flex-1">
+                                    <div className="search-item-name truncate">Abrir la ficha de «{directSymbol}»</div>
+                                    <div className="text-sm text-gray-500">Ir directo por símbolo</div>
+                                </div>
+                                <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
+                            </CommandItem>
+                        </CommandGroup>
+                    ) : null}
                 </CommandList>
             </CommandDialog>
 

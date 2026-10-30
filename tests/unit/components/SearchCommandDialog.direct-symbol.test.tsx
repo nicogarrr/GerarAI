@@ -48,4 +48,24 @@ describe('buscador global: ir a la ficha por símbolo', () => {
         await waitFor(() => expect(searchStocksWithStatus).toHaveBeenCalledWith('coca cola'));
         expect(screen.queryByRole('option', { name: /Abrir la ficha/ })).toBeNull();
     });
+
+    it('con la ficha directa como única salida no dice «Sin resultados» encima', async () => {
+        searchStocksWithStatus.mockResolvedValue({ status: 'ok', stocks: [] });
+        fireEvent.change(open(), { target: { value: 'ko' } });
+        await waitFor(() => expect(searchStocksWithStatus).toHaveBeenCalledWith('ko'));
+        await screen.findByRole('option', { name: /Abrir la ficha de «KO»/ });
+        await new Promise((r) => setTimeout(r, 50));
+        expect(screen.queryByText('Sin resultados')).toBeNull();
+    });
+
+    it('con sugerencias, las empresas van primero y la ficha directa queda debajo', async () => {
+        searchStocksWithStatus.mockResolvedValue({ status: 'ok', stocks: [stock('ITX', 'Itex Corp'), stock('ITXN', 'Otra')] });
+        fireEvent.change(open(), { target: { value: 'itx.mc' } });
+        await screen.findByRole('option', { name: /Itex Corp/ });
+        await screen.findByRole('option', { name: /Abrir la ficha de «ITX\.MC»/ });
+        const names = screen.getAllByRole('option').map((o) => o.textContent ?? '');
+        const direct = names.findIndex((n) => n.includes('Abrir la ficha'));
+        expect(names.findIndex((n) => n.includes('Itex Corp'))).toBeLessThan(direct);
+        expect(names.findIndex((n) => n.includes('Otra'))).toBeLessThan(direct);
+    });
 });
