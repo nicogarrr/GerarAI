@@ -280,3 +280,29 @@ def test_non_equity_label_names_known_types() -> None:
     assert svc.non_equity_label("etf") == "un ETF"
     assert svc.non_equity_label("MUTUALFUND") == "un fondo"
     assert "WEIRDKIND" in (svc.non_equity_label("WEIRDKIND") or "")
+
+
+def test_quote_type_failure_keeps_the_currency(monkeypatch) -> None:
+    """Si yfinance falla al leer quoteType, la divisa no se pierde (#3067)."""
+    import sys
+    import types
+
+    class FastInfo(dict):
+        def get(self, key, default=None):
+            if key == "quoteType":
+                raise KeyError(key)
+            return super().get(key, default)
+
+    class FakeTicker:
+        fast_info = FastInfo(currency="GBp")
+
+        def __init__(self, symbol):
+            pass
+
+    monkeypatch.setitem(sys.modules, "yfinance", types.SimpleNamespace(Ticker=FakeTicker))
+    assert svc._fetch_currency_and_type("CGEO.L") == {"currency": "GBX", "quote_type": None}
+
+
+def test_non_equity_labels_carry_spanish_accents() -> None:
+    assert svc.non_equity_label("INDEX") == "un índice"
+    assert svc.non_equity_label("OPTION") == "una opción"
