@@ -4,9 +4,14 @@ import test from 'node:test';
 
 const source = readFileSync('docker-compose.prod.yml', 'utf8');
 function limits(service: string): string {
-    const match = new RegExp(`^  ${service}:\\n([\\s\\S]*?)(?=^  [a-z][\\w-]*:|$)`, 'm').exec(source);
-    assert.ok(match, `production service ${service} must exist`);
-    return match[1].slice(match[1].indexOf('    deploy:'));
+    const start = source.indexOf(`\n  ${service}:\n`);
+    assert.ok(start >= 0, `production service ${service} must exist`);
+    const rest = source.slice(start + 1);
+    const nextService = /\n  [a-z][\w-]*:/.exec(rest);
+    const block = nextService ? rest.slice(0, nextService.index) : rest;
+    const deploy = block.indexOf('    deploy:');
+    assert.ok(deploy >= 0, 'deploy resource limits must exist');
+    return block.slice(deploy);
 }
 
 test('production backend and default worker preserve measured CPU caps and memory', () => {
