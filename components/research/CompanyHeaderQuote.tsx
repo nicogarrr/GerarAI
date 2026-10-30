@@ -119,8 +119,6 @@ export function CompanyHeaderQuote({
     const label = extendedQuoteLabel(quote);
     const showPrice = label !== NA && quote?.price != null && isValidCurrencyCode(quoteCurrency);
     const signBase = quote?.change ?? quote?.change_percent ?? 0;
-    // «Cierre regular» repite «Cierre anterior» cuando ambos son el mismo dato: se muestra una sola vez.
-    const duplicatedClose = quote?.regular_close != null && quote.regular_close === quote.previous_close;
     // Fallback honesto: último cierre de las velas del gráfico (mismo dato que
     // pinta el gráfico), rotulado con su fecha. Nunca se presenta como precio en
     // vivo ni se rellenan métricas que la vela no trae.
@@ -169,22 +167,9 @@ export function CompanyHeaderQuote({
                                 formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
                             ].filter(Boolean).join(' · ')}
                         </div>
-                        <p className="mt-1 text-xs text-gray-500">Último cierre vs anterior · {quoteSessionDate(quote.close_change_date)} vs {quoteSessionDate(quote.close_change_previous_date)}</p>
                     </div>
                 ) : null}
                 {useFallback ? <p className="mt-1 text-xs text-gray-500">Cotización en vivo no disponible ahora{snapshot.historySource ? ` · ${snapshot.historySource}` : ''}</p> : null}
-                {showPrice ? <p className="mt-1 text-xs text-gray-500">{quote!.source} · {quoteTime(quote!.timestamp)} (Madrid)</p> : null}
-                <details className="mt-1 text-gray-500" data-testid="quote-detail">
-                    <summary className="inline-flex min-h-[44px] cursor-pointer items-center text-xs text-gray-400 sm:min-h-0">Más detalle</summary>
-                    <div className="mt-1 space-y-1">
-                {duplicatedClose || useFallback ? null : (
-                    <p className="text-xs text-gray-500">
-                        Cierre regular: {loading ? <span aria-hidden="true" className="inline-block h-3 w-24 animate-pulse rounded bg-gray-800 align-middle" /> : showPrice && quote?.regular_close != null && (quote.regular_close_timestamp || quote.regular_close_date) ? `${headerMoney(quote.regular_close, currency)} · ${quote.regular_close_timestamp ? `${quoteDate(quote.regular_close_timestamp)} · ${quoteTime(quote.regular_close_timestamp)}` : quoteSessionDate(quote.regular_close_date)}` : NA}
-                    </p>
-                )}
-                {hasDatedMetrics ? <p className="text-xs text-gray-500">Sesión regular del {formatMarketDate(quote!.metrics_session)} · {quoteTime(quote!.metrics_timestamp)} (Madrid)</p> : null}
-                    </div>
-                </details>
             </div>
             {compact ? null : <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">

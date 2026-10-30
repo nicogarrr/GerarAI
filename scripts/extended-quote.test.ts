@@ -66,7 +66,7 @@ test('date-only closes never claim the daily opening timestamp as a closing hour
     assert.equal(quoteSessionDate('2026-10-15'), '15 oct 2026');
     assert.equal(quoteSessionDate(null), 'N/D');
     const ui = readFileSync('components/research/CompanyHeaderQuote.tsx', 'utf8');
-    assert.match(ui, /quoteSessionDate\(quote.regular_close_date\)/);
+    // «Cierre regular» salió de la cabecera con «Más detalle» (Nico, 30-oct-2026).
     assert.match(ui, /quoteSessionDate\(quote.previous_close_date\)/);
 });
 

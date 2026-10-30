@@ -21,14 +21,16 @@ describe('procedencia OHLC', () => {
         assert.equal(m.source, 'Finnhub'); assert.equal(m.timestamp, quote.t);
         assert.equal(m.previousClose, null);
     });
-    it('acción usa el filtro y UI exige metadata y muestra procedencia', () => {
+    it('acción usa el filtro y UI exige metadata fechada', () => {
         const action = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
         assert.match(action, /datedQuoteMetrics\(quote, quoteUsable\)/);
         assert.match(action, /metricsSession: metrics.timestamp \? sessionDateEt\(metrics.timestamp\)/);
         assert.doesNotMatch(action, /open: quote\?\.o/);
         const ui = readFileSync('components/research/CompanyHeaderQuote.tsx', 'utf8');
         assert.match(ui, /hasDatedMetrics \? quote!.open : null/);
-        assert.match(ui, /quote!\.source[\s\S]*Sesión regular del/);
+        // La línea de procedencia bajo el precio se quitó a petición de Nico (30-oct-2026);
+        // la fecha del cierre anterior sigue visible en la tira de métricas.
+        assert.match(ui, /quoteDate\(quote\.previous_close_timestamp\)/);
         assert.doesNotMatch(ui, /\['Cierre anterior', quote\?\.previous_close\]/);
         assert.match(ui, /\['Cierre anterior', quote\?\.previous_close_timestamp \|\| quote\?\.previous_close_date \? quote.previous_close : null\]/);
     });
