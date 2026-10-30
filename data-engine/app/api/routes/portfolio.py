@@ -4,7 +4,7 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
@@ -54,7 +54,13 @@ from app.services.tax_report_service import (
     is_zero_cost_buy,
 )
 from app.services.tearsheet_service import TearsheetService
+from app.services.thesis_pdf_service import export_portfolio_pdf_report
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
+from app.services.transaction_import_service import (
+    TransactionImportCommitRequest,
+    TransactionImportPreviewResponse,
+    TransactionImportService,
+)
 from app.valuation.currency import canonical_currency_code
 
 router = APIRouter()
@@ -347,6 +353,21 @@ def create_portfolio(
         "is_default": portfolio.is_default,
         "created_at": portfolio.created_at.isoformat() if portfolio.created_at else None,
     }
+
+
+@router.get("/{portfolio_id}/pdf")
+def portfolio_pdf_export(portfolio_id: int, db: Session = Depends(get_db)) -> Response:
+    """Exporta el informe consolidado de la cartera y sus posiciones a formato PDF."""
+    try:
+        content, filename = export_portfolio_pdf_report(db, portfolio_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/summary")
@@ -1343,6 +1364,57 @@ def import_ibkr_csv(payload: IBKRCsvImportRequest, db: Session = Depends(get_db)
     try:
         return IBKRImportService().import_ibkr_csv(db, payload.csv)
     except IBKRImportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class CsvPreviewRequest(BaseModel):
+    content: str
+    filename: str = "import.csv"
+    column_mapping: dict[str, str] | None = None
+
+
+@router.post("/import/preview", response_model=TransactionImportPreviewResponse)
+def preview_transaction_import(
+    payload: CsvPreviewRequest,
+) -> TransactionImportPreviewResponse:
+    """Valida un archivo CSV o texto tabular y devuelve informe previo con errores y mapeo detectado."""
+    try:
+        service = TransactionImportService()
+        return service.preview_import(
+            file_bytes=payload.content.encode("utf-8"),
+            filename=payload.filename,
+            custom_mapping=payload.column_mapping,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/import/commit")
+def commit_transaction_import(
+    payload: TransactionImportCommitRequest,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Inserta atómicamente el lote de transacciones validadas en la cartera."""
+    try:
+        service = TransactionImportService()
+        return service.commit_import(db, payload.transactions)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/import/file", response_model=TransactionImportPreviewResponse)
+async def upload_transaction_import_file(
+    file: UploadFile = File(...),
+) -> TransactionImportPreviewResponse:
+    """Sube un archivo CSV o Excel (.xlsx) y realiza la validación previa de transacciones."""
+    content = await file.read()
+    try:
+        service = TransactionImportService()
+        return service.preview_import(
+            file_bytes=content,
+            filename=file.filename or "uploaded.csv",
+        )
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

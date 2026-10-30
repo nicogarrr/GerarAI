@@ -49,10 +49,14 @@
       "status": "pending"
     },
     "VAL-CROSS-003": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_thesis_pdf_export.py (4 passed): complete thesis workflow from creation through PDF export"
     },
     "VAL-CROSS-004": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_transaction_import_csv.py (7 passed): complete flow from file upload through validation and atomic commit"
     },
     "VAL-CROSS-005": {
       "status": "pending"
@@ -67,28 +71,44 @@
       "status": "pending"
     },
     "VAL-DATA-001": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.065Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: YahooFinanceClient configured without key, symbol normalization (BRK.B -> BRK-B), quotes and charts"
     },
     "VAL-DATA-002": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: AlphaVantageClient with 5 req/min rate limiter, quote and overview fundamentals"
     },
     "VAL-DATA-003": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: ECBClient daily official EUR exchange rates XML parsing and conversion"
     },
     "VAL-DATA-004": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_source_health_and_connectors.py: DataSourceHealthRegistry circuit breaker, automatic fallback from yahoo to alpha vantage, GET /api/health/data-sources"
     },
     "VAL-DATA-005": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_thesis_pdf_export.py (4 passed): valid PDF-1.4, GerarAI branding, holdings table, <1.2s speed, filename sanitization"
     },
     "VAL-DATA-006": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_transaction_import_csv.py (7 passed): CSV/Excel import, flexible column mapping, multiple date formats, row validation reporting, preview mode, atomic commit"
     },
     "VAL-DATA-007": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_validation_layer.py (5 passed): ticker format validation, sanity checks, future date rejection, quantity validation, actionable spanish errors"
     },
     "VAL-DATA-008": {
-      "status": "pending"
+      "status": "passed",
+      "verified_at": "2026-10-30T23:20:56.079Z",
+      "evidence": "tests/test_data_provenance_tracking.py (4 passed): SourceKind, Coverage, freshness thresholds, and OFICIAL/INFERIDO/SIN_DATOS labeling"
     },
     "VAL-DB-001": {
       "status": "passed"

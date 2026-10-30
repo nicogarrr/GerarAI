@@ -30,6 +30,7 @@ from app.services.thesis_epub_service import (
 )
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.thesis_memo import build_memo_markdown
+from app.services.thesis_pdf_service import export_thesis_pdf_for_ticker
 from app.services.thesis_publication_gate import (
     archived_thesis_notice,
     thesis_withheld_reason,
@@ -212,6 +213,24 @@ def thesis_epub(ticker: str, db: Session = Depends(get_db)) -> Response:
     return Response(
         content=content,
         media_type="application/epub+zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/{ticker}/pdf")
+def thesis_pdf(ticker: str, db: Session = Depends(get_db)) -> Response:
+    """Descarga la última tesis como PDF con diseño profesional y branding GerarAI.
+
+    404 limpio cuando no hay tesis: nunca se genera un documento vacío.
+    """
+    try:
+        content, filename = export_thesis_pdf_for_ticker(db, ticker)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return Response(
+        content=content,
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 

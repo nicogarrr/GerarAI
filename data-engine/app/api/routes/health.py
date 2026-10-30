@@ -26,6 +26,7 @@ from sqlalchemy import text
 
 from app.core.config import get_settings
 from app.core.database import SessionLocal, schema_migration_issues
+from app.services.data_source_health import get_data_source_registry
 
 router = APIRouter(tags=["health"])
 
@@ -151,3 +152,11 @@ async def health() -> dict:
         "version": version,
         "schema": [{"error": issue.get("error", "MigrationError")} for issue in schema_issues],
     }
+
+
+@router.get("/health/data-sources")
+@router.get("/data-sources")
+def data_sources_health() -> dict:
+    """Estado, latencia y circuit breakers de las fuentes de datos externas."""
+    registry = get_data_source_registry()
+    return registry.summary()
