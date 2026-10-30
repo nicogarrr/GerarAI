@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "title": "Corporate actions",
+    "description": "Dividends, splits, spin-offs and mergers: review pending events and apply them to your portfolio.",
+    "backendFeature": "Corporate actions"
+  },
+  "header": {
+    "eyebrow": "Corporate events",
+    "title": "Corporate actions",
+    "count": "{n} events"
+  },
+  "backToTicker": "Back to {ticker}",
+  "view": { "title": "Corporate actions" },
+  "labels": {
+    "actionType": "Action type",
+    "description": "Description",
+    "effectiveDate": "Effective date",
+    "ratio": "Ratio",
+    "applied": "Applied",
+    "appliedAt": "Applied on"
+  },
+  "types": {
+    "split": "Split",
+    "reverseSplit": "Reverse split",
+    "tickerChange": "Ticker change",
+    "merger": "Merger",
+    "spinOff": "Spin-off",
+    "dividend": "Dividend"
+  },
+  "dividend": {
+    "base": "Dividend of {amount} per share",
+    "payDate": " · payment {date}",
+    "adjusted": " · amount adjusted for splits"
+  },
+  "toast": {
+    "invalidId": "The corporate action does not have a valid identifier",
+    "applied": "Corporate action applied to the portfolio"
+  },
+  "empty": "No pending events.",
+  "emptyForTicker": "No pending events for {ticker}.",
+  "paginationLabel": "events",
+  "row": {
+    "uncertainAmount": "Uncertain amount",
+    "fromProvider": "From the provider",
+    "applied": "Applied",
+    "historical": "Historical, already reflected",
+    "noPosition": "No position: nothing to adjust"
+  }
+}

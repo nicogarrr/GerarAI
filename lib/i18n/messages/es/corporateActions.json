@@ -1,0 +1,49 @@
+{
+  "meta": {
+    "title": "Acciones corporativas",
+    "description": "Dividendos, splits, spin-offs y fusiones: revisa los eventos pendientes y aplícalos a tu cartera.",
+    "backendFeature": "Acciones corporativas"
+  },
+  "header": {
+    "eyebrow": "Eventos corporativos",
+    "title": "Acciones corporativas",
+    "count": "{n} eventos"
+  },
+  "backToTicker": "Volver a {ticker}",
+  "view": { "title": "Acciones corporativas" },
+  "labels": {
+    "actionType": "Tipo de acción",
+    "description": "Descripción",
+    "effectiveDate": "Fecha de efecto",
+    "ratio": "Ratio",
+    "applied": "Aplicada",
+    "appliedAt": "Aplicada el"
+  },
+  "types": {
+    "split": "Split",
+    "reverseSplit": "Split inversa",
+    "tickerChange": "Cambio de ticker",
+    "merger": "Fusión",
+    "spinOff": "Spin-off",
+    "dividend": "Dividendo"
+  },
+  "dividend": {
+    "base": "Dividendo de {amount} por acción",
+    "payDate": " · pago {date}",
+    "adjusted": " · importe ajustado por splits"
+  },
+  "toast": {
+    "invalidId": "La acción corporativa no tiene un identificador válido",
+    "applied": "Acción corporativa aplicada a la cartera"
+  },
+  "empty": "Sin eventos pendientes.",
+  "emptyForTicker": "Sin eventos pendientes de {ticker}.",
+  "paginationLabel": "eventos",
+  "row": {
+    "uncertainAmount": "Importe incierto",
+    "fromProvider": "Del proveedor",
+    "applied": "Aplicada",
+    "historical": "Histórico, ya reflejado",
+    "noPosition": "Sin posición: nada que ajustar"
+  }
+}
