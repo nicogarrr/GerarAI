@@ -8,12 +8,14 @@ import {getAuth} from "@/lib/better-auth/auth";
 import {GerarAIWordmark} from "@/components/GerarAIWordmark";
 import {LineChart} from "lucide-react";
 import {productChain, productModules} from "@/lib/config/product";
+import {getT} from "@/lib/i18n/server";
 
 // Forzar renderizado dinámico porque usa headers() para verificar sesión
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 const Layout = async ({ children }: { children : React.ReactNode }) => {
+    const t = await getT();
     const browserTestBypass = process.env.E2E_AUTH_BYPASS === '1' && process.env.NODE_ENV !== 'production';
     if (!browserTestBypass) {
         const requestHeaders = await headers();
@@ -43,13 +45,13 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
                         este layout es independiente de `(public)`. */}
                     <nav aria-label="Privacidad y condiciones" className="flex flex-wrap gap-x-4 gap-y-2 pb-8 text-xs text-gray-500">
                         <Link className="inline-flex min-h-11 items-center hover:text-teal-300 hover:underline" href="/privacidad">
-                            Privacidad
+                            {t('auth.layout.navPrivacy')}
                         </Link>
                         <Link className="inline-flex min-h-11 items-center hover:text-teal-300 hover:underline" href="/terminos">
-                            Términos de uso
+                            {t('auth.layout.navTerms')}
                         </Link>
                         <Link className="inline-flex min-h-11 items-center hover:text-teal-300 hover:underline" href="/metodologia">
-                            Metodología
+                            {t('auth.layout.navMethodology')}
                         </Link>
                     </nav>
                 </div>
@@ -57,7 +59,7 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
             <section className="auth-right-section !hidden lg:!flex">
                 <div className="lg:mt-4 lg:mb-16">
                     <blockquote className="auth-blockquote">
-                        &ldquo;GerarAI convierte evidencia, memoria y modelos específicos de cada empresa en una tesis que puedes contrastar con la realidad.&rdquo;
+                        {t('auth.layout.quote')}
                     </blockquote>
                 </div>
                 {/* Escala gray del tema, no slate: hasta ahora esta pantalla era
@@ -65,7 +67,7 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
                 <div className="flex-1 rounded-xl border border-gray-700/50 bg-surface-overlay p-6 shadow-2xl shadow-teal-950/20">
                     <div className="mb-6 flex items-start justify-between gap-4">
                         <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-300">Espacio de trabajo de la empresa</p>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-300">{t('auth.layout.workspaceLabel')}</p>
                             <h2 className="mt-2 text-2xl font-semibold text-white">{productChain}</h2>
                         </div>
                         <LineChart aria-hidden="true" className="h-7 w-7 text-teal-300"/>

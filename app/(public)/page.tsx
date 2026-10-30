@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-import PublicLanding, { metadata as landingMetadata } from '@/components/landing/PublicLanding';
+import PublicLanding, { generateMetadata as landingGenerateMetadata } from '@/components/landing/PublicLanding';
 import { getAuth } from '@/lib/better-auth/auth';
 import { landingTargetForSession } from '@/lib/public/landing-target';
 
@@ -28,7 +28,7 @@ import { landingTargetForSession } from '@/lib/public/landing-target';
  * El resto de paginas publicas (`/metodologia`, `/help`) NO
  * redirigen: un usuario con sesion debe poder leerlas desde el menu.
  */
-export const metadata: Metadata = landingMetadata;
+export const generateMetadata: () => Promise<Metadata> = landingGenerateMetadata;
 
 // `headers()` en la comprobacion de sesion obliga a render dinamico.
 export const dynamic = 'force-dynamic';

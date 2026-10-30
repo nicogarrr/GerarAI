@@ -22,7 +22,9 @@ describe('selector de país: menú cmdk diferido', () => {
     it('el menú vive en su propio componente con la búsqueda y las opciones', () => {
         assert.match(menu, /^'use client';/m);
         assert.match(menu, /from\s+'@\/components\/ui\/command'/);
-        assert.match(menu, /Buscar países…/);
+        const esAuth = JSON.parse(readFileSync('lib/i18n/messages/es/auth.json', 'utf8'));
+        assert.equal(esAuth.signUp.countrySearchPlaceholder, 'Buscar países…', 'placeholder del buscador en el diccionario ES');
+        assert.ok(menu.includes("t('auth.signUp.countrySearchPlaceholder')"), 'el menú consume la clave i18n');
         assert.match(menu, /country-select-item/);
     });
 

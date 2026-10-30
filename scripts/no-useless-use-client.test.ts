@@ -92,6 +92,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
     'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
   'lib/i18n/client.tsx':
     'provider y hooks de locale (useT/useLocale/useFormat): contexto React de cliente por definición',
+  'components/forms/SelectField.tsx': 'usa useId, Controller (react-hook-form) y el hook useT de i18n',
   'components/research/ValuationSummaryGrid.tsx': 'useState y useEffect para carga batch asíncrona y descarte de respuestas de selección anterior',
   'components/alerts/PushNotifications.tsx': 'useState/useEffect para permiso Notification, registro serviceWorker, PushManager y preferencias opt-in del navegador',
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',

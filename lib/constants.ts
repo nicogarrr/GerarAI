@@ -302,6 +302,36 @@ export const RISK_TOLERANCE_OPTIONS = [
   { value: "very_aggressive", label: "Muy agresivo - Máximo potencial" }
 ] as const;
 
+// Mapas valor -> clave i18n (auth.goals/risk/industries) para las opciones de onboarding.
+export const INVESTMENT_GOAL_LABEL_KEYS = {
+  growth: 'auth.goals.growth',
+  income: 'auth.goals.income',
+  value: 'auth.goals.value',
+  speculation: 'auth.goals.speculation',
+  retirement: 'auth.goals.retirement',
+  education: 'auth.goals.education',
+} as const;
+
+export const RISK_TOLERANCE_LABEL_KEYS = {
+  conservative: 'auth.risk.conservative',
+  moderate: 'auth.risk.moderate',
+  aggressive: 'auth.risk.aggressive',
+  very_aggressive: 'auth.risk.very_aggressive',
+} as const;
+
+export const PREFERRED_INDUSTRY_LABEL_KEYS = {
+  technology: 'auth.industries.technology',
+  healthcare: 'auth.industries.healthcare',
+  finance: 'auth.industries.finance',
+  consumer: 'auth.industries.consumer',
+  energy: 'auth.industries.energy',
+  industrial: 'auth.industries.industrial',
+  real_estate: 'auth.industries.real_estate',
+  materials: 'auth.industries.materials',
+  utilities: 'auth.industries.utilities',
+  communication: 'auth.industries.communication',
+} as const;
+
 export const PREFERRED_INDUSTRIES = [
   { value: "technology", label: "Tecnología" },
   { value: "healthcare", label: "Salud" },

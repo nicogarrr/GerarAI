@@ -13,7 +13,10 @@ const { getAuth, callAuthEndpoint, authApi } = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/better-auth/auth', () => ({ getAuth }));
 vi.mock('@/lib/auth/endpoint', () => ({ callAuthEndpoint }));
-vi.mock('next/headers', () => ({ headers: vi.fn(async () => new Headers()) }));
+vi.mock('next/headers', () => ({
+    headers: vi.fn(async () => new Headers()),
+    cookies: vi.fn(async () => ({ get: () => undefined })),
+}));
 
 import { AppError } from '@/lib/types/errors';
 import {

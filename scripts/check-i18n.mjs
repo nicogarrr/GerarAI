@@ -208,6 +208,29 @@ const orphans = [...validKeys].filter((k) => !used.has(k));
  * queremos bloquear ese landing).
  */
 const KNOWN_ORPHANS = {
+  // global-error se monta sin provider: consume errors.globalError.* leyendo
+  // el diccionario del area directamente (no puede pasar por t()).
+  'errors.globalError.title': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.body': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.reference': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.retry': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.htmlLang': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  // Copy segura de errores del backend (bloque ERROR_MESSAGES trasladado de
+  // lib/constants.ts): el mapeo codigo -> clave vive en lib/types/errors.ts,
+  // fuera del carril que migro los diccionarios; se consume al adaptarlo.
+  'errors.backend.invalidSymbol': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.missingApiKey': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.rateLimitExceeded': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.databaseError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.externalApiError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.notFound': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.validationError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  // Consumidas via INVESTMENT_GOAL_LABEL_KEYS/RISK_TOLERANCE_LABEL_KEYS/
+  // PREFERRED_INDUSTRY_LABEL_KEYS (lib/constants.ts): el literal tiene
+  // guiones bajos y el detector de usos no cuenta segmentos con '_'.
+  'auth.risk.very_aggressive': 'consumida via RISK_TOLERANCE_LABEL_KEYS (literal con guion bajo no detectado)',
+  'auth.industries.real_estate': 'consumida via PREFERRED_INDUSTRY_LABEL_KEYS (literal con guion bajo no detectado)',
+
   // Vocabulario canonico del diseno (acciones, estados y etiquetas de tabla)
   // definido en el diccionario comun para que los componentes no reescriban
   // el copy uno a uno. Sin consumidor todavia: si acaba sin adoptarse, la

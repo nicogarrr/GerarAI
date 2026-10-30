@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const metodologia = readFileSync('app/(public)/metodologia/page.tsx', 'utf8');
+// El copy vive en el diccionario i18n (landing.json); el guard sigue
+// comprobando el texto exacto, ahora contra el diccionario + la página.
+const metodologia = readFileSync('app/(public)/metodologia/page.tsx', 'utf8')
+  + readFileSync('lib/i18n/messages/es/landing.json', 'utf8');
 const ficha = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
 test('F325: la metodología describe el uso real de FMP (solo US), no un retiro inexistente', () => {
