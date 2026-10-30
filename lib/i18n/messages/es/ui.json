@@ -18,7 +18,9 @@
     "unverifiedCoverage": "Cobertura de ficha no comprobada",
     "tickerCommands": "Comandos de {ticker}",
     "stockPage": "Ficha",
-    "directSymbol": "Ir directo por símbolo"
+    "directSymbol": "Ir directo por símbolo",
+    "paletteTitle": "Paleta de comandos",
+    "palettePlaceholder": "Busca un comando para ejecutar..."
   },
   "search": {
     "placeholder": "Buscar por nombre o símbolo",
@@ -26,5 +28,58 @@
     "addStock": "Añadir acción",
     "openAria": "Abrir buscador",
     "stocksPlaceholder": "Buscar acciones..."
+  },
+  "methodologyDisclosure": "Metodología y límites",
+  "nameAvatar": {
+    "photo": "Foto de {name}"
+  },
+  "scrollRegion": {
+    "hintColumns": "Desliza para ver más columnas"
+  },
+  "pagination": {
+    "aria": "Paginación: {label}",
+    "prevAria": "Página anterior: {label}",
+    "nextAria": "Página siguiente: {label}",
+    "prev": "Anterior",
+    "next": "Siguiente"
+  },
+  "panel": {
+    "collapse": "Contraer",
+    "expand": "Expandir"
+  },
+  "analystTargets": {
+    "loading": "Cargando precio objetivo de analistas de {symbol}",
+    "noData": "Sin precios objetivo por analista para este valor.",
+    "fetched": " · obtenido {date}",
+    "convertedNote": " · objetivos en {from} convertidos a {to} con el tipo de cambio de la cartera",
+    "unconvertedNote": " · objetivos en {from}, la fila cotiza en {to}: sin tipo de cambio, sin recorrido por no mezclar divisas",
+    "firmsOne": "{n} firma con objetivo en 12 meses",
+    "firmsOther": "{n} firmas con objetivo en 12 meses",
+    "firmsNone": "solo consenso agregado, sin detalle por firma",
+    "convertedFrom": "(convertido de {currency})"
+  },
+  "system": {
+    "badge": "Motor de análisis desconectado",
+    "unavailable": "{feature} no está disponible ahora mismo",
+    "needsServer": "Esta pantalla necesita el servidor de GerarAI.",
+    "failedDetail": "El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos."
+  },
+  "pwa": {
+    "title": "Instalar GerarAI",
+    "installed": "GerarAI ya está instalada en este dispositivo.",
+    "description": "Ábrela como una app, sin barra del navegador. Necesita conexión: no guarda tus tesis ni datos para leer sin red.",
+    "installButton": "Instalar la aplicación",
+    "iosPre": "En iPhone o iPad: toca",
+    "iosShare": "Compartir",
+    "iosMid": " y después",
+    "iosAddHome": "Añadir a pantalla de inicio",
+    "iosPost": ". Hazlo desde Safari.",
+    "manualInstructions": "Tu navegador no ofrece el botón de instalar aquí. En Chrome o Edge abre el menú y elige «Instalar GerarAI» (o «Añadir a la pantalla de inicio» en el móvil)."
+  },
+  "sectionError": {
+    "network": "No se pudo conectar con el servicio. Reintenta en unos segundos.",
+    "session": "Tu sesión ha caducado. Vuelve a entrar para ver esta sección.",
+    "server": "El servicio ha fallado. Reintenta en unos segundos.",
+    "generic": "No se pudieron cargar los datos. Reintenta en unos segundos."
   }
 }
