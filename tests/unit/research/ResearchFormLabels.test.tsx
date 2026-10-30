@@ -20,9 +20,10 @@ vi.mock('@/lib/actions/research.actions', () => ({getResearchNews: vi.fn(async (
 vi.mock('@/lib/actions/ticker-context.actions', () => ({getTickerContext: vi.fn(async () => ({portfolioTickers: [], watchlistTickers: []}))}));
 
 import Search from '@/app/(root)/search/page';
-import Terminal from '@/app/(root)/research/[ticker]/financial-terminal/page';
-import Management from '@/app/(root)/research/[ticker]/management-credibility/page';
-import Drivers from '@/app/(root)/research/[ticker]/driver-assumptions/page';
+import { FinancialTerminalSection } from '@/components/research/sections/FinancialTerminalSection';
+import { ManagementCredibilitySection } from '@/components/research/sections/ManagementCredibilitySection';
+import { DriverAssumptionsSection } from '@/components/research/sections/DriverAssumptionsSection';
+import { getFinancialTerminal, getManagementCredibility, getDriverAssumptions } from '@/lib/actions/research-tools.actions';
 import Knowledge from '@/app/(root)/knowledge/page';
 import Graph from '@/app/(root)/knowledge-graph/page';
 import News from '@/app/(root)/research/news/page';
@@ -31,10 +32,13 @@ const params = Promise.resolve({ticker: 'DEMO'});
 const searchParams = Promise.resolve({});
 const cases = [
  ['search', () => Search({searchParams}), {'Buscar en el research':'q', 'Tipos de entidad':'entity_types','Tipos de fuente':'source_types','Estados':'statuses','ID de colección':'collection_id','Fecha desde':'date_from','Fecha hasta':'date_to','Tipo de búsqueda':'vector'}],
- ['terminal', () => Terminal({params, searchParams}), {'Métricas':'metrics','Años de historial (1-20)':'years','Periodicidad':'periodicity'}],
- ['management', () => Management({params}), {'Promesa de la directiva':'promise','Fecha de la promesa':'promise_date','Periodo esperado':'expected_period','Métrica canónica (opcional)':'metric','Comparación con el objetivo':'operator','Valor objetivo (opcional)':'target_value','Unidad (opcional)':'unit','ID del documento fuente (opcional)':'source_document_id','Explicación de la directiva o contexto del analista':'explanation'}],
- ['drivers', () => Drivers({params}), {'Clave del driver':'driver_key','Año fiscal':'fiscal_year','Escenario':'scenario','Valor':'value','Confianza (0-1)':'confidence','Fuente o ajuste del analista':'source','Justificación':'rationale'}],
- ['knowledge', () => Knowledge({searchParams}), {'Nombre de la colección':'name','Tipo de colección':'collection_type','Descripción (opcional)':'description'}],
+ // Terminal, directiva y drivers son secciones de la ficha desde el
+ // 29-oct-2026 («Una fila, no tres menús»): se renderizan con sus datos.
+ ['terminal', async () => <FinancialTerminalSection metrics={undefined} periodicity="annual" terminal={await getFinancialTerminal('DEMO')} years={10} />, {'Métricas':'metrics','Años de historial (1-20)':'years','Periodicidad':'periodicity'}],
+ ['management', async () => <ManagementCredibilitySection dashboard={await getManagementCredibility('DEMO')} ticker="DEMO" />, {'Promesa de la directiva':'promise','Fecha de la promesa':'promise_date','Periodo esperado':'expected_period','Métrica canónica (opcional)':'metric','Comparación con el objetivo':'operator','Valor objetivo (opcional)':'target_value','Unidad (opcional)':'unit','ID del documento fuente (opcional)':'source_document_id','Explicación de la directiva o contexto del analista':'explanation'}],
+ ['drivers', async () => <DriverAssumptionsSection assumptions={await getDriverAssumptions('DEMO')} ticker="DEMO" />, {'Clave del driver':'driver_key','Año fiscal':'fiscal_year','Escenario':'scenario','Valor':'value','Confianza (0-1)':'confidence','Fuente o ajuste del analista':'source','Justificación':'rationale'}],
+ // «Nueva colección» vive en la pestaña Subir desde #3080.
+ ['knowledge', () => Knowledge({searchParams: Promise.resolve({tab: 'subir'})}), {'Nombre de la colección':'name','Tipo de colección':'collection_type','Descripción (opcional)':'description'}],
  ['graph', () => Graph({searchParams}), {'Tipos de nodo':'node_types'}],
  ['news', () => News({searchParams}), {'Noticias del lote (JSON)':'items'}],
 ] as const;

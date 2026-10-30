@@ -15,15 +15,19 @@ bootstrap). ``net_debt`` ausente nunca es 0: se declara como input faltante.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from app.services.inferred_input_service import InferredInputService
 from app.valuation.dcf_fcff import DCFInputs, run_dcf
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
     ValuationEngine,
+    adr_ratio,
     apply_publication_blockers,
     default_growth,
     insufficient_result,
+    is_adr_without_ratio,
     margin_of_safety,
     resolve_rates,
 )
@@ -47,6 +51,47 @@ class PreRevenueScenarioEngine(ValuationEngine):
     key = "pre_revenue"
 
     def value(self, context: ValuationContext) -> dict:
+        """ADR: el filing da acciones ORDINARIAS y el precio es del ADR (N
+        ordinarias). Todo el cálculo (margen, DCF inverso, rango indicativo) se
+        hace con el precio por ordinaria, como en standard_dcf; el resultado
+        conserva el precio cotizado y añade los valores por ADR."""
+        company = context.company
+        listed_price = context.current_price
+        if is_adr_without_ratio(company):
+            return insufficient_result(
+                ticker=company.ticker,
+                model_type=company.valuation_model,
+                engine_key=self.key,
+                current_price=listed_price,
+                missing_inputs=["adr_ratio"],
+                reason=(
+                    f"{company.ticker} is quoted as an ADR but the ordinary-shares-per-ADR "
+                    "ratio is unknown, so value per share and the quoted price are not on "
+                    "the same basis."
+                ),
+                snapshot=context.snapshot,
+            )
+        ratio = adr_ratio(company)
+        if not ratio:
+            return self._value_ordinary(context)
+        comparable = listed_price / ratio if listed_price else listed_price
+        result = self._value_ordinary(replace(context, current_price=comparable))
+        result["current_price"] = listed_price
+        result["adr_ratio"] = ratio
+        result["value_per_share_basis"] = "ordinary_share"
+        result["comparable_price_basis"] = "ordinary_share"
+        values = {
+            name: result.get(f"{name}_value")
+            for name in ("bear", "base", "bull", "expected")
+        }
+        result["listed_share_values"] = (
+            {name: value * ratio for name, value in values.items()}
+            if all(value is not None for value in values.values())
+            else None
+        )
+        return result
+
+    def _value_ordinary(self, context: ValuationContext) -> dict:
         company = context.company
         snapshot = context.snapshot
         current_price = context.current_price

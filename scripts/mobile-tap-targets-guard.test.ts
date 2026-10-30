@@ -43,8 +43,10 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
         }
     });
     it('historial de versiones de supuestos con area tactil', () => {
-        const page = readFileSync('app/(root)/research/[ticker]/driver-assumptions/page.tsx', 'utf8');
-        assert.ok(page.includes('<summary className="cursor-pointer py-2.5'), 'summary con padding tactil en movil');
+        // Los supuestos viven extraidos en su seccion (PR A de la fila de
+        // seis pestañas, 29-oct-2026); la pagina legacy los renderiza desde alli.
+        const section = readFileSync('components/research/sections/DriverAssumptionsSection.tsx', 'utf8');
+        assert.ok(section.includes('<summary className="cursor-pointer py-2.5'), 'summary con padding tactil en movil');
     });
 });
 
@@ -52,7 +54,7 @@ describe('móvil: 44 px en biblioteca, estados vacíos y enlaces de panel (audit
     it('biblioteca abre Cerebro y controles de doctrina tienen área táctil', () => {
         const entry = readFileSync('app/(root)/inversores/_components/LibraryChat.tsx', 'utf8');
         const chat = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
-        assert.ok(entry.includes('brain-library-slot'), 'entrada es el Cerebro integrado sin boton intermedio');
+        assert.ok(entry.includes('BRAIN_LIBRARY_CONTEXT_ID') && entry.includes('h-11'), 'entrada compacta táctil que abre el Cerebro flotante');
         assert.ok(chat.includes('className="flex min-h-11 items-center gap-2"'), 'casilla de análisis táctil');
         assert.ok(chat.includes('block min-h-11 w-full'), 'selector de autor táctil');
         assert.ok(chat.includes('mt-2 block min-h-11'), 'copiar táctil');

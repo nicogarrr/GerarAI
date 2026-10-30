@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { getFriendlyErrorMessage } from '@/lib/types/errors';
 import { saveDcaAlertSettings, type DcaAlertSettings } from '@/lib/actions/dca-settings.actions';
 
+/** Solo se menciona si hay alguno: «(0) se conservan» describía algo que no existe. */
+function legacyOverridesText(count: number): string {
+    return count === 1
+        ? 'Tienes 1 ajuste antiguo por empresa: se conserva, pero ya no se aplica.'
+        : `Tienes ${count} ajustes antiguos por empresa: se conservan, pero ya no se aplican.`;
+}
+
 export default function DcaAlertsForm({ initial }: { initial: DcaAlertSettings }) {
     const [up, setUp] = useState(initial.up_min_level);
     const [down, setDown] = useState(initial.down_max_level);
@@ -17,7 +24,9 @@ export default function DcaAlertsForm({ initial }: { initial: DcaAlertSettings }
         try {
             const result = await saveDcaAlertSettings(up, down);
             setSaved(result);
-            setMessage('Avisos DCA guardados para todas tus empresas. Los ajustes antiguos por empresa se conservan sin efecto.');
+            setMessage(result.legacy_override_count > 0
+                ? 'Avisos DCA guardados para todas tus empresas. Los ajustes antiguos por empresa se conservan sin efecto.'
+                : 'Avisos DCA guardados para todas tus empresas.');
         } catch (err) { setError(getFriendlyErrorMessage(err)); }
         finally { setSaving(false); }
     };
@@ -39,7 +48,7 @@ export default function DcaAlertsForm({ initial }: { initial: DcaAlertSettings }
             </label>
         </div>
         <p className="text-xs text-gray-400">Se usa el nivel nuevo: con 3X al subir y 1X al bajar, avisa en 2X → 3X y 2X → 1X. No avisa en 1X → 2X ni 3X → 2X. También avisa en 3X → 4X, pero no en 4X → 3X. Sin aviso en la primera evaluación ni si el nivel no cambia.</p>
-        <p className="text-xs text-gray-400">Los recortes tienen su propio control en el servidor y no se modifican aquí. Los ajustes antiguos por empresa ({saved.legacy_override_count}) se conservan, pero no se aplican.</p>
+        <p className="text-xs text-gray-400">Los recortes tienen su propio control en el servidor y no se modifican aquí.{saved.legacy_override_count > 0 ? ` ${legacyOverridesText(saved.legacy_override_count)}` : ''}</p>
         <button type="submit" disabled={saving} aria-busy={saving} className="min-h-11 rounded border border-teal-600 px-4 text-sm text-teal-300 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar avisos DCA'}</button>
         {message ? <p role="status" className="text-sm text-teal-300">{message}</p> : null}
         {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}

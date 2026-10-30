@@ -1,68 +1,54 @@
 'use client';
 
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
+import { BRAIN_LIBRARY_CONTEXT_ID, openBrain, type KnowledgeBrainContext } from '@/lib/brain/open-brain';
 
-const subscribe = () => () => {};
-const clientMounted = () => true;
-const serverMounted = () => false;
+type LibraryChatProps = {
+  scope?: KnowledgeBrainContext['scope'];
+  authors?: string[];
+  documentId?: number;
+  documentTitle?: string;
+  /** Texto del botón compacto; por defecto «Preguntar a la biblioteca». */
+  label?: string;
+  className?: string;
+};
 
 /**
- * Hueco del Cerebro embebido con su alto reservado. El panel que se porta aquí
- * mide `h-[min(780px,80dvh)] min-h-[520px]`; antes el hueco nacía vacío (0 px)
- * y, al llegar el panel, empujaba hacia abajo todo lo que hay debajo (la
- * pestaña Biblioteca de /knowledge: CLS 0,15 escritorio y 0,28 móvil). Ahora
- * el contenedor ya tiene ese alto desde el HTML del servidor y muestra un
- * esqueleto con la forma del panel hasta que el Cerebro lo ocupa.
+ * Acceso al Cerebro desde las páginas de doctrina (Biblioteca, cartas, lector).
+ *
+ * Antes el Cerebro se incrustaba aquí como un panel de 780 px en mitad de la
+ * página (entre las pestañas y el contenido de /knowledge): Nico lo quería
+ * como en el resto de la app, pequeño abajo a la derecha y plegado. Ahora la
+ * página solo declara su contexto en un marcador oculto (que el Cerebro
+ * global del layout lee para preguntar a esta biblioteca al abrirse) y ofrece
+ * un botón compacto que abre ese mismo Cerebro flotante. No hay un segundo
+ * asistente: es el mismo panel, con la misma conversación.
  */
-export const BRAIN_SLOT_SIZE = 'h-[min(780px,80dvh)] min-h-[520px] w-full';
-
-function BrainPanelSkeleton() {
+export function LibraryChat({ scope = 'letters', authors = [], documentId, documentTitle, label = 'Preguntar a la biblioteca', className = '' }: LibraryChatProps) {
+  const knowledge: KnowledgeBrainContext = {
+    scope,
+    authors,
+    ...(documentId ? { documentId } : {}),
+    ...(documentTitle ? { documentTitle } : {}),
+  };
   return (
-    <div aria-hidden="true" data-testid="brain-slot-skeleton" className="absolute inset-0 flex flex-col rounded-lg border border-indigo-500/30 bg-slate-950/95">
-      <div className="flex items-center gap-2 border-b border-indigo-500/20 px-4 py-3">
-        <div className="h-5 w-5 animate-pulse rounded-full bg-gray-700/70" />
-        <div className="h-4 w-32 animate-pulse rounded bg-gray-700/70" />
-        <div className="ml-auto h-6 w-16 animate-pulse rounded bg-gray-800" />
-      </div>
-      <div className="flex-1 space-y-3 p-4">
-        <div className="h-16 w-3/4 animate-pulse rounded-lg bg-gray-800/80" />
-        <div className="h-4 w-1/2 animate-pulse rounded bg-gray-800/60" />
-      </div>
-      <div className="border-t border-indigo-500/20 p-3">
-        <div className="h-11 w-full animate-pulse rounded-md bg-gray-800/80" />
-      </div>
-    </div>
-  );
-}
-
-/** Mount point for the single layout-owned Cerebro, not another assistant. */
-export function LibraryChat({ scope = 'letters', authors = [], documentId, documentTitle, placement = 'center' }: { documentId?: number; documentTitle?: string; placement?: 'center' | 'reader'; scope?: 'letters' | 'library'; authors?: string[] }) {
-  // El Cerebro del layout se porta a este hueco en cuanto existe en el DOM. Si
-  // el div viaja en el HTML del servidor, el portal puede inyectar el panel
-  // antes de que React hidrate la pagina (el layout hidrata primero que la
-  // pagina streameada) y dispara un mismatch de hidratacion en /knowledge y
-  // /inversores/cartas. Montandolo solo en cliente, React nunca lo compara
-  // con el SSR y el MutationObserver del Cerebro lo detecta igualmente. El
-  // contenedor con el alto reservado y el esqueleto SI viajan en el SSR.
-  const mounted = useSyncExternalStore(subscribe, clientMounted, serverMounted);
-  const [slot, setSlot] = useState<HTMLDivElement | null>(null);
-  const [filled, setFilled] = useState(false);
-
-  useEffect(() => {
-    if (!slot) return;
-    const sync = () => setFilled(slot.childElementCount > 0);
-    sync();
-    const observer = new MutationObserver(sync);
-    observer.observe(slot, { childList: true });
-    return () => observer.disconnect();
-  }, [slot]);
-
-  return (
-    <div className={`relative ${BRAIN_SLOT_SIZE}`} data-brain-slot-frame="">
-      {mounted ? (
-        <div ref={setSlot} className="relative z-10 h-full w-full" id="brain-library-slot" data-placement={placement} data-document-id={documentId} data-document-title={documentTitle} data-scope={scope} data-authors={JSON.stringify(authors)} />
-      ) : null}
-      {filled ? null : <BrainPanelSkeleton />}
-    </div>
+    <>
+      <span
+        hidden
+        id={BRAIN_LIBRARY_CONTEXT_ID}
+        data-scope={scope}
+        data-authors={JSON.stringify(authors)}
+        data-document-id={documentId}
+        data-document-title={documentTitle}
+      />
+      <button
+        type="button"
+        onClick={() => openBrain({ knowledge })}
+        className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-md border border-indigo-500/40 bg-indigo-950/30 px-4 text-sm font-medium text-indigo-200 transition hover:border-indigo-400/60 hover:text-white sm:w-auto ${className}`}
+      >
+        <BrainGlassesIcon aria-hidden="true" className="h-5 w-5 shrink-0 object-contain" />
+        {label}
+      </button>
+    </>
   );
 }

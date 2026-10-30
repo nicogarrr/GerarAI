@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from calendar import monthrange
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -121,8 +121,16 @@ class InvestmentPlanService:
         # Normalize before BOTH persistence and retry comparison. Letting the
         # DB/driver round a float first differs at half cents across backends.
         amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # Una divisa en minusculas es la misma divisa: se guarda normalizada
+        # para que el reintento con la misma referencia no sea un «conflicto».
+        currency = (currency or "").strip().upper()
         if amount <= 0:
             raise ValueError("El importe de la aportación debe ser positivo con precisión de céntimos.")
+        # Una aportación futura contaría hoy como dinero ya aportado («En camino»
+        # adelantado) y leería una tasa de cambio que aún no existe. Un día de
+        # margen: el usuario en Madrid puede ir por delante del reloj del servidor.
+        if date_ > date.today() + timedelta(days=1):
+            raise ValueError("La fecha de la aportación no puede ser futura.")
         plan = self.get_plan(db)
         if plan is None:
             raise ValueError("Investment plan does not exist yet; create it first")
@@ -327,14 +335,12 @@ class InvestmentPlanService:
             return total, total, [], periods
         total = Decimal("0")
         missing: list[dict] = []
-        pending = False
         for period in range(1, months_elapsed + 1):
             due_date = self._add_months_clamped(plan.start_date, period)
             if due_date > today:
                 # Cuota contada por el calendario pero aun no vencida: no se
                 # convierte (ni FX futura ni la tasa de hoy atribuida a una
                 # fecha futura). Estado propio, distinto de «falta tasa».
-                pending = True
                 periods.append(
                     {
                         "period": period,
@@ -389,8 +395,11 @@ class InvestmentPlanService:
                     "direction": found["direction"],
                 }
             )
-        if missing or pending:
+        if missing:
             return None, total, missing, periods
+        # Una cuota con aniversario futuro aun no es exigible (igual que la via
+        # sin FX, `_due_periods`): queda listada como pending_due_date pero no
+        # bloquea el total. Antes dejaba «En camino» en N/D casi todo el mes.
         return total, total, [], periods
 
     @staticmethod
@@ -496,6 +505,13 @@ class InvestmentPlanService:
         targets = plan.target_allocations or []
         suggestions = []
         deviations = []
+        # Un objetivo por ticker guardado en minusculas («nvda») tambien es NVDA:
+        # sin esto leia 0 % y sugeria comprar una posicion que ya existe.
+        ticker_weights_ci = {
+            "ticker:" + label.removeprefix("ticker:").upper(): weight
+            for label, weight in current_weights.items()
+            if label.startswith("ticker:")
+        }
         for target in targets:
             kind = target.get("kind", "sector")
             label = target.get("label", "")
@@ -505,7 +521,10 @@ class InvestmentPlanService:
             key = label if kind == "sector" else f"{kind}:{label}"
             target_pct = Decimal(str(target.get("target_pct", 0)))
             band_pct = Decimal(str(target.get("band_pct", DEFAULT_BAND)))
-            current = Decimal(str(current_weights.get(key, 0)))
+            weight = current_weights.get(key)
+            if weight is None and kind == "ticker":
+                weight = ticker_weights_ci.get(f"ticker:{str(label).strip().upper()}")
+            current = Decimal(str(weight if weight is not None else 0))
             deviation = current - target_pct
             lower = target_pct - band_pct
             upper = target_pct + band_pct
@@ -543,6 +562,12 @@ class InvestmentPlanService:
                     }
                 )
 
+        empty_portfolio = total <= 0 and not missing_fx
+        if empty_portfolio:
+            # Cartera vacia: no hay nada que reequilibrar y cada sugerencia
+            # saldria con importe 0. El reparto de la cuota del mes lo da
+            # /api/plan/contribution-split.
+            suggestions = []
         if missing_fx:
             # Con cobertura parcial los pesos y el total no son los de la cartera
             # real: no se publican importes de compra/venta calculados sobre ellos.
@@ -557,7 +582,7 @@ class InvestmentPlanService:
         )
         return {
             "plan_exists": True,
-            "status": "incomplete_fx" if missing_fx else "ok",
+            "status": "incomplete_fx" if missing_fx else "empty_portfolio" if empty_portfolio else "ok",
             "suggestions_blocked": bool(missing_fx),
             "base_currency": portfolio.base_currency,
             "portfolio_value_base": float(total.quantize(Decimal("0.01"))),

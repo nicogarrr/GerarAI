@@ -82,6 +82,11 @@ export const METRIC_LABELS: Record<string, string> = {
     capex_to_da_5y: 'CapEx / depreciación y amortización (5 años)',
     quality_moat_score: 'Marco de calidad',
     quality_moat_score_v2: 'Marco de calidad ampliado',
+    // Insumos de Piotroski / Altman (financial_health.py)
+    long_term_debt: 'Deuda a largo plazo',
+    current_assets: 'Activo corriente',
+    current_liabilities: 'Pasivo corriente',
+    retained_earnings: 'Beneficios retenidos',
     // Métricas calculadas (metric_calculation_service.py)
     roic: 'ROIC',
     roic_adjusted: 'ROIC ajustado',

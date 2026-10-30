@@ -6,10 +6,12 @@
 # que aqui NO va ni frontend ni MongoDB.
 #
 # Presupuesto de memoria: la suma de `memory` de TODOS los servicios es
-# 10.176 MiB (~9,94 GiB), por debajo de los 10 GiB reales que se reservan al
-# stack. El resto de la VM queda para el kernel, page cache y una swap de
+# 10.240 MiB (10 GiB justos; el comentario decia 10.176, deriva de 64 MiB ya
+# existente). El resto de la VM queda para el kernel, page cache y una swap de
 # 2-4 GB (ver docs/oracle-setup.md). Los `cpus` son techos por servicio, no
-# reservas: la VM tiene 2 OCPU y varios servicios pueden turnarse.
+# reservas: la VM tiene 2 OCPU y varios servicios pueden turnarse. No se
+# supera este techo: el carril "computed" lo consume el worker-alerts (jobs
+# cortos y diarios) en vez de anadir un contenedor nuevo.
 #
 # Uso: docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 # Requisitos: .env.production (ver docs/oracle-setup.md y scripts/deploy.sh)
@@ -57,8 +59,8 @@ x-app-env: &app-env
   FINANCIAL_DOCUMENT_RETENTION_DAYS: ${FINANCIAL_DOCUMENT_RETENTION_DAYS:-2555}
   CHAT_TELEMETRY_RETENTION_DAYS: ${CHAT_TELEMETRY_RETENTION_DAYS:-90}
 
-# Pool de BD de los workers: 4 conexiones + 2 de overflow por proceso. Con 7
-# workers + scheduler son ~48 conexiones, mas las 30 del backend (20+10): muy
+# Pool de BD de los workers: 4 conexiones + 2 de overflow por proceso. Con 8
+# workers + scheduler son ~54 conexiones, mas las 30 del backend (20+10): muy
 # por debajo de max_connections=200 de Postgres.
 x-worker-db-env: &worker-db-env
   DB_POOL_SIZE: ${WORKER_DB_POOL_SIZE:-4}
@@ -140,7 +142,7 @@ services:
     image: postgres:17
     container_name: cavaai-postgres
     restart: unless-stopped
-    # 200 conexiones: 30 del backend (20+10) + ~48 de los workers (4+2 cada
+    # 200 conexiones: 30 del backend (20+10) + ~54 de los workers (4+2 cada
     # uno) + salud/diagnostico. Sin subirlo, el pool por defecto (100) dejaba
     # a los workers esperando conexiones bajo fan-out.
     command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
@@ -651,12 +653,30 @@ services:
     image: cavaai-backend:prod
     container_name: cavaai-worker-alerts
     restart: unless-stopped
-    # Worker DEDICADO a la cola alerts (patron thesis/kpis): la evaluacion de
-    # reglas cada 5 min y las entregas se hambreaban detras de la ingesta
-    # larga de GDELT (~3 h) en la cola default compartida.
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "alerts"]
+    # Worker DEDICADO a las colas alerts y computed (patron thesis/kpis): la
+    # evaluacion de reglas cada 5 min, las entregas y los analisis de alertas
+    # se hambreaban detras de la ingesta larga de GDELT (~3 h) en la cola
+    # default compartida. Desde 29-oct analyze_tracked_news_alert se mueve
+    # aqui y el carril hereda *llm-env (su paso LLM de segundo orden para
+    # cartera/watchlist corria en default CON esas claves: sin ellas se
+    # degradaria en silencio al moverlo).
+    # La cola computed (run diario del embudo ProPicks, precios ProPicks, SPY
+    # y snapshot mensual - todo trabajos cortos y acreditados) la consume ESTE
+    # mismo worker:
+    # son jobs cortos y diarios, y el presupuesto de memoria del stack ya esta
+    # en su techo de 10 GiB (un contenedor nuevo lo romperia; hay test). Peor
+    # caso: una corrida del embudo (minutos, una vez al dia) retrasa un ciclo
+    # de alertas menos que su propia cadencia de 5-15 min; el otro hilo sigue
+    # libre. CPU compartida baja (0.20) porque en el mismo host corre spotdl.
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "2", "-Q", "alerts", "computed"]
     environment:
-      <<: [*app-env, *worker-db-env]
+      <<: [*app-env, *worker-db-env, *llm-env]
+      # Claves de mercado que usa el servicio de precios del carril computed
+      # (refresh_propicks_prices): sin ellas el contraste FMP/Finnhub degrada
+      # en silencio como en el worker default.
+      FMP_API_KEY: ${FMP_API_KEY:-}
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      SCREENER_QUOTE_VENDOR: ${SCREENER_QUOTE_VENDOR:-finnhub}
       TYPESAFE_API_KEY: ${TYPESAFE_API_KEY:-}
       TELEGRAM_ENABLED: ${TELEGRAM_ENABLED:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}

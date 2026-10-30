@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ImportImageButton from '@/components/portfolio/ImportImageButton';
-import { imageFileError } from '@/lib/portfolio/image-import';
+import { imageFileError, imageRowsPending, normalizeImageQuantity } from '@/lib/portfolio/image-import';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/lib/actions/portfolio-image.actions', () => ({
@@ -35,5 +35,31 @@ describe('captura de cartera', () => {
         expect(confirmPortfolioImage).not.toHaveBeenCalled();
         fireEvent.click(await screen.findByRole('button', {name:'Confirmar y guardar posiciones'}));
         await waitFor(() => expect(confirmPortfolioImage).toHaveBeenCalledWith(1));
+    });
+    it('cantidad con coma decimal (12,5) vale y se envía como 12.5; el motivo del bloqueo se ve', async () => {
+        vi.mocked(reviewPortfolioImage).mockClear();
+        render(<ImportImageButton />);
+        fireEvent.click(screen.getByRole('button', {name:'Importar captura'}));
+        fireEvent.change(screen.getByLabelText('Elegir captura'), {target:{files:[new File(['png'], 'test.png', {type:'image/png'})]}});
+        await screen.findByText('Leído: ASTS 12 USD');
+        expect(screen.getByText(/Falta: 1 fila sin instrumento elegido/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', {name:'Buscar instrumento'}));
+        fireEvent.click(await screen.findByRole('button', {name:/ASTS · AST SpaceMobile/}));
+        fireEvent.change(screen.getByPlaceholderText(/sin miles/), {target:{value:'12,5'}});
+        expect(screen.getByText('Se guardará como 12,5 acciones.')).toBeInTheDocument();
+        expect(screen.getByText(/Falta: 1 fila sin marcar como revisada/)).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('checkbox'));
+        await waitFor(() => expect(screen.getByRole('button', {name:'Consultar precios y revisar'})).toBeEnabled());
+        fireEvent.click(screen.getByRole('button', {name:'Consultar precios y revisar'}));
+        await waitFor(() => expect(reviewPortfolioImage).toHaveBeenCalledWith('a'.repeat(64), [{ticker:'ASTS',quantity:'12.5',currency:'USD',confirmed:true}]));
+    });
+    it('normaliza y explica cantidades', () => {
+        expect(normalizeImageQuantity('12,5')).toBe('12.5');
+        expect(normalizeImageQuantity(' 7 ')).toBe('7');
+        expect(normalizeImageQuantity('1.250,5')).toBeNull();
+        expect(normalizeImageQuantity('0')).toBeNull();
+        expect(normalizeImageQuantity('abc')).toBeNull();
+        expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '1,2,3' }])).toBe('Falta: 1 cantidad no válida.');
+        expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '3' }])).toBeNull();
     });
 });

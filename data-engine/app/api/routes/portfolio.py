@@ -210,10 +210,21 @@ class PortfolioTransactionInput(BaseModel):
         return value
 
 
+def _not_in_the_future(value: date | None) -> date | None:
+    # Un precio o un tipo de cambio fechado en el futuro (2062 por 2026) se
+    # guardaba sin aviso: la fila FX quedaba invisible hasta esa fecha y luego
+    # ganaba a las reales; el precio dejaba la posicion con fecha futura.
+    if value is not None and value > local_today():
+        raise ValueError("date cannot be in the future")
+    return value
+
+
 class PortfolioPriceInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
     price: Decimal = Field(gt=0)
     as_of: date | None = None
+
+    _as_of_not_future = field_validator("as_of")(_not_in_the_future)
 
 
 class PortfolioConfigurationInput(BaseModel):
@@ -226,6 +237,8 @@ class FXRateInput(BaseModel):
     rate: Decimal = Field(gt=0)
     rate_date: date
     source: str = Field(default="manual", min_length=1, max_length=80)
+
+    _rate_date_not_future = field_validator("rate_date")(_not_in_the_future)
 
 
 def _transaction_payload(transaction: Transaction, company: Company) -> dict:
@@ -618,16 +631,19 @@ def positions(
             for payload, (position, _) in zip(payloads, rows, strict=True)]
 
 
-@router.get("/transactions")
-def transactions(
-    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
-    offset: Annotated[int, Query(ge=0)] = 0,
-    db: Session = Depends(get_db),
-) -> list[dict]:
+def _trade_filters(ticker: str | None, action: str | None) -> list:
+    """Filtros de Movimientos: ticker exacto (sin distinguir mayúsculas) y tipo."""
+    conditions = [Transaction.action.in_([action] if action else ["buy", "sell"])]
+    if ticker and ticker.strip():
+        conditions.append(func.upper(Company.ticker) == ticker.strip().upper())
+    return conditions
+
+
+def _list_trades(db: Session, limit: int, offset: int, ticker: str | None = None, action: str | None = None) -> list[dict]:
     rows = db.execute(
         select(Transaction, Company)
         .join(Company, Transaction.company_id == Company.id)
-        .where(Transaction.action.in_(["buy", "sell"]))
+        .where(*_trade_filters(ticker, action))
         .order_by(desc(Transaction.trade_date), desc(Transaction.created_at), desc(Transaction.id))
         .limit(limit)
         .offset(offset)
@@ -635,18 +651,32 @@ def transactions(
     return [_transaction_payload(transaction, company) for transaction, company in rows]
 
 
+@router.get("/transactions")
+def transactions(
+    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    return _list_trades(db, limit, offset)
+
+
 @router.get("/transactions/page")
 def transactions_page(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
+    ticker: Annotated[str | None, Query(max_length=32)] = None,
+    action: Annotated[Literal["buy", "sell"] | None, Query()] = None,
     db: Session = Depends(get_db),
 ) -> dict:
     total = db.scalar(
         select(func.count()).select_from(Transaction)
         .join(Company, Transaction.company_id == Company.id)
-        .where(Transaction.action.in_(["buy", "sell"]), *tenant_filters(db, Transaction))
+        .where(*_trade_filters(ticker, action), *tenant_filters(db, Transaction))
     ) or 0
-    return {"items": transactions(limit=limit, offset=offset, db=db), "total": total}
+    return {
+        "items": _list_trades(db, limit, offset, ticker, action),
+        "total": total,
+    }
 
 
 @router.post("/transactions", status_code=201)

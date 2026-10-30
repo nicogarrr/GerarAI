@@ -164,3 +164,74 @@ def test_scrip_rows_are_not_counted_as_cash_dividends_and_are_flagged_for_review
     assert len(bucket["special_payments"]) == 1
     assert bucket["special_payments"][0]["raw_action"] == "Scrip Dividend"
     assert bucket["special_payments"][0]["type"] == "special"
+
+
+def test_net_base_caps_loss_offset_at_25pct_of_dividends(db):
+    """Base del ahorro del ejercicio, art. 49.1.b LIRPF (BOE-A-2006-20764).
+
+    "Si el resultado de la integración y compensación ... arrojase saldo
+    negativo, su importe se podrá compensar con el saldo positivo [de
+    rendimientos del capital mobiliario] ... con el límite del 25 por
+    ciento de dicho saldo positivo." Hand example (EUR, no FX):
+      dividends 1.000; GyP: buy 10 x 1.500, sell 10 x 500 -> -10.000.
+      Offset = min(10.000, 25 % x 1.000 = 250) -> base = 1.000 - 250 = 750.
+    Before the fix the summary showed 1.000 - 10.000 = -9.000.
+    """
+    _eur_portfolio(db)
+    div = _company(db, "DIV")
+    lose = _company(db, "LOSE")
+    _tx(db, div, date(2026, 3, 1), "dividend", 0, 1000, currency="EUR")
+    _tx(db, lose, date(2026, 1, 10), "buy", 10, 1500, currency="EUR")
+    _tx(db, lose, date(2026, 9, 1), "sell", 10, 500, currency="EUR")
+
+    summary = TaxReportService().compute_report(db, 2026)["summary"]
+    assert summary["total_dividends_base"] == pytest.approx(1000.0)
+    assert summary["total_realized_gain_base"] == pytest.approx(-10000.0)
+    assert summary["net_taxable_base"] == pytest.approx(750.0)
+
+
+def test_net_base_counts_interest_received_as_rcm(db):
+    """Interest received is capital-income of the savings base (art. 25.2 and
+    46.b LIRPF, BOE-A-2006-20764, casilla 0027), so it belongs in the RCM
+    balance that the art. 49.1.b 25 % cross-offset is measured against.
+    Hand example (EUR, no FX): dividends 1.000 + interest 200 = RCM 1.200;
+    GyP -10.000 -> offset min(10.000, 25 % x 1.200 = 300) -> base 900.
+    Before the fix the summary ignored the interest and showed 750.
+    """
+    _eur_portfolio(db)
+    div = _company(db, "DIV")
+    lose = _company(db, "LOSE")
+    _tx(db, div, date(2026, 3, 1), "dividend", 0, 1000, currency="EUR")
+    _tx(db, div, date(2026, 4, 1), "interest", 1, 200, currency="EUR")
+    _tx(db, lose, date(2026, 1, 10), "buy", 10, 1500, currency="EUR")
+    _tx(db, lose, date(2026, 9, 1), "sell", 10, 500, currency="EUR")
+
+    report = TaxReportService().compute_report(db, 2026)
+    assert report["filing"]["intereses"]["received"]["amount_base"] == pytest.approx(200.0)
+    assert report["summary"]["net_taxable_base"] == pytest.approx(900.0)
+
+
+def test_net_base_unknown_when_interest_has_no_eur_amount(db):
+    """A USD interest with no ECB rate leaves casilla 0027 unknown, so the
+    savings base cannot be published as exact (art. 46.b LIRPF)."""
+    _eur_portfolio(db)
+    div = _company(db, "DIV")
+    _tx(db, div, date(2026, 3, 1), "dividend", 0, 1000, currency="EUR")
+    _tx(db, div, date(2026, 4, 1), "interest", 1, 200, currency="USD")
+
+    summary = TaxReportService().compute_report(db, 2026)["summary"]
+    assert summary["net_taxable_base"] is None
+
+
+def test_integrate_savings_base_hand_cases():
+    """Art. 49.1.a/b LIRPF: each block nets alone; cross offset ≤ 25 %."""
+    from app.services.tax_irpf_filing import integrate_savings_base as f
+
+    D = Decimal
+    assert f(D("1000"), D("500")) == D("1500")       # both positive: plain sum
+    assert f(D("1000"), D("-100")) == D("900")       # loss under 25 %: fully offset
+    assert f(D("1000"), D("-250")) == D("750")       # exactly 25 %
+    assert f(D("1000"), D("-10000")) == D("750")     # capped at 25 % of 1.000
+    assert f(D("0"), D("-500")) == D("0")            # nothing to offset: never negative
+    assert f(D("-400"), D("1000")) == D("750")       # negative RCM vs gains, 25 % of 1.000
+    assert f(D("-100"), D("1000")) == D("900")

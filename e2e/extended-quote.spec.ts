@@ -21,10 +21,11 @@ for (const width of [1440, 390]) {
         await page.goto('/extended-quote-preview');
         const header = page.getByTestId('company-header-quote');
         await expect(header.getByText('Post-cierre · 00:05', { exact: true })).toBeVisible();
-        await expect(header.getByText('Yahoo Finance (no oficial), retraso posible · 00:05 (Madrid)', { exact: true })).toBeVisible();
+        // Cabecera limpia (Nico, 30-oct-2026): la procedencia ya no se muestra.
+        await expect(header.getByText('Yahoo Finance (no oficial), retraso posible · 00:05 (Madrid)', { exact: true })).toHaveCount(0);
         await expect(header.getByText('Cierre anterior', { exact: true }).locator('..').locator('dd')).toHaveText('N/D');
-        await header.getByText('Más detalle', { exact: true }).click();
-        await expect(header.getByText('Cierre regular:', { exact: false })).toContainText('522,61');
+        await expect(header.getByText('Más detalle', { exact: true })).toHaveCount(0);
+        await expect(header.getByText('Cierre regular:', { exact: false })).toHaveCount(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.screenshot({ path: `/downloads/extended-quote-${width}.png`, fullPage: true });
         const initialCalls = calls;
@@ -64,8 +65,8 @@ test('real authenticated proxy serves the gated E2E fixture without Yahoo', asyn
     const header = page.getByTestId('company-header-quote');
     await expect(header.getByText('336,56 US$', { exact: true })).toBeVisible();
     await expect(header.getByText('+2,34', { exact: false })).toBeVisible();
-    await header.getByText('Más detalle', { exact: true }).click();
-    await expect(header.getByText(/^Fixture local · Sesión regular del 9 sept\.? 2026 · 17:00 \(Madrid\)$/)).toBeVisible();
+    await expect(header.getByText('Más detalle', { exact: true })).toHaveCount(0);
+    await expect(header.getByText(/Sesión regular del/)).toHaveCount(0);
     await page.screenshot({ path: '/downloads/extended-quote-test-fixture.png', fullPage: true });
 });
 

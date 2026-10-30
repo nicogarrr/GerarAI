@@ -49,6 +49,9 @@ export const viewport: Viewport = {
   // globals.css). Antes decía #101010 y el chrome del móvil se veía distinto
   // del contenido.
   themeColor: '#0a0a0b',
+  // Mismo tema que `color-scheme: dark` en globals.css, ya en el <head>:
+  // el navegador no pinta un primer fotograma de controles claros.
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({

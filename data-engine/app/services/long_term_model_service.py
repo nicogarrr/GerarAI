@@ -41,7 +41,13 @@ from app.services.owner_earnings import (
     WORKING_CAPITAL_SIGN_CONVENTION,
     owner_earnings,
 )
-from app.valuation.engines.base import default_terminal_growth, default_wacc
+from app.valuation.currency import fact_currency, resolve_fx
+from app.valuation.engines.base import (
+    adr_ratio,
+    default_terminal_growth,
+    default_wacc,
+    is_adr_without_ratio,
+)
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 
 MODEL_VERSION = "long-term-fundamental-model-v2"
@@ -480,7 +486,7 @@ class LongTermModelService:
         )
         history = self._history_rows(fact_cache, years)
 
-        current_price, market_as_of, market_price_source = _current_price_with_date(db, company.id)
+        current_price, market_as_of, market_price_source = self._model_price(db, company)
         current = history[-1] if history else {
             "period": None,
             "fiscal_year": None,
@@ -577,13 +583,18 @@ class LongTermModelService:
                 )
                 scenarios[name]["driver_operating_model"] = driver_forecast
 
+        comparable_price, price_basis = self._reverse_dcf_price(
+            db, company, fact_cache=fact_cache, source_year=latest_year
+        )
         reverse_dcf = self._reverse_dcf(
-            current_price=current_price,
+            current_price=comparable_price,
             assumptions=assumptions,
             fact_cache=fact_cache,
             horizon=horizon,
             source_year=latest_year,
+            price_missing=price_basis.get("missing_inputs") or [],
         )
+        reverse_dcf["price_basis"] = price_basis
 
         market_opportunity = MarketOpportunityEngine().build(
             db,
@@ -1958,6 +1969,78 @@ class LongTermModelService:
             "unavailable_drivers": ["working_capital", "taxes_separately", "maintenance_capex", "growth_capex"],
         }
 
+    def _model_price(
+        self, db: Session, company: Company
+    ) -> tuple[float | None, str | None, str | None]:
+        """Precio del modelo en la divisa PRINCIPAL del listado, como ValuationService.
+
+        El cierre se guarda como lo da el proveedor (Londres en peniques): usarlo
+        crudo publicaba «precio del modelo 1.500 £» para una acción de 15 £.
+        """
+        from app.services.valuation_service import resolve_model_price
+
+        price = resolve_model_price(db, company.id)
+        if price is None:
+            return _current_price_with_date(db, company.id)
+        source = "market_price" if price.source == "market_close" else "position_mark"
+        return price.value, _date_value(price.as_of), source
+
+    def _reverse_dcf_price(
+        self,
+        db: Session,
+        company: Company,
+        *,
+        fact_cache: dict[str, list[FinancialFact]],
+        source_year: int | None,
+    ) -> tuple[float | None, dict[str, Any]]:
+        """Precio en la base de los hechos: divisa de reporte y acción ordinaria.
+
+        Ingresos, FCF y acciones vienen del filing (BABA: CNY y acciones
+        ordinarias) y el precio es el del listado (ADR en USD, 1 ADR = 8
+        ordinarias; Londres en peniques). Sin convertir, el DCF inverso resolvía
+        el crecimiento que justifica un precio en otra divisa y otra base de
+        acciones. Misma regla que ValuationService: precio en divisa principal
+        del listado, FX point-in-time a la de reporte y / ratio ADR.
+        """
+        from app.services.valuation_service import resolve_model_price
+
+        price = resolve_model_price(db, company.id)
+        if price is None:
+            return None, {"missing_inputs": []}
+        basis: dict[str, Any] = {
+            "listed_price": price.value,
+            "listed_currency": price.currency,
+            "price_as_of": price.as_of.isoformat() if price.as_of else None,
+        }
+        if is_adr_without_ratio(company):
+            return None, {**basis, "missing_inputs": ["adr_ratio"]}
+        revenue_fact = self._fact_for_year(fact_cache["revenue"], source_year) if source_year is not None else None
+        reporting = fact_currency(getattr(revenue_fact, "unit", None)) or price.currency
+        value = price.value
+        if reporting.upper() != price.currency.upper():
+            fx = resolve_fx(db, price.currency, reporting, price.as_of or date.today())
+            if fx is None:
+                return None, {
+                    **basis,
+                    "reporting_currency": reporting,
+                    "missing_inputs": [f"fx_rate:{reporting}/{price.currency.upper()}"],
+                }
+            value *= fx.rate
+            basis["fx"] = fx.as_trace()
+        ratio = adr_ratio(company)
+        if ratio:
+            value /= ratio
+        basis.update(
+            {
+                "reporting_currency": reporting,
+                "adr_ratio": ratio,
+                "comparable_price": value,
+                "comparable_price_basis": "ordinary_share_reporting_currency",
+                "missing_inputs": [],
+            }
+        )
+        return value, basis
+
     def _reverse_dcf(
         self,
         *,
@@ -1966,6 +2049,7 @@ class LongTermModelService:
         fact_cache: dict[str, list[FinancialFact]],
         horizon: int,
         source_year: int | None,
+        price_missing: list[str] | None = None,
     ) -> dict[str, Any]:
         revenue = self._value_for_year(fact_cache["revenue"], source_year)
         shares = self._value_for_year(fact_cache["shares_diluted"], source_year)
@@ -1987,7 +2071,7 @@ class LongTermModelService:
             # DCF refuses without it, the reverse DCF does the same.
             # Solo se declara lo que falta de verdad: la lista fija decia "falta el
             # precio de mercado" aunque el precio existiera (ASTS).
-            missing = [
+            missing = list(price_missing or []) + [
                 name
                 for name, value in (
                     ("market_price", current_price),
@@ -1998,7 +2082,7 @@ class LongTermModelService:
                     ("shares_diluted", shares),
                     ("net_debt", net_debt),
                 )
-                if value is None
+                if value is None and not (name == "market_price" and price_missing)
             ]
             return {"status": "insufficient_data", "market_price": current_price, "missing_inputs": missing, "trace": {"method": "binary_search_reverse_dcf", "source_fact_ids": assumptions["fcf_margin"].source_fact_ids}}
         solved = solve_required_growth(

@@ -23,9 +23,10 @@ test("cabecera de la ficha con precio, variación y gráfico técnico (desktop)"
   await expect(strip).toBeVisible();
   await expect(strip.getByText(/^334,20\sUS\$$/)).toBeVisible();
   await expect(strip.getByText('N/D', { exact: true })).toBeVisible();
-  await expect(header(page).getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toBeVisible();
-  await header(page).getByText('Más detalle', { exact: true }).click();
-  await expect(header(page).getByText(/^Sesión regular del 9 sept\.? 2026 · 17:00 \(Madrid\)$/)).toBeVisible();
+  // Cabecera limpia (Nico, 30-oct-2026): sin línea de procedencia ni «Más detalle».
+  await expect(header(page).getByText('Fixture local · 17:00 (Madrid)', { exact: true })).toHaveCount(0);
+  await expect(header(page).getByText('Más detalle', { exact: true })).toHaveCount(0);
+  await expect(header(page).getByText(/Sesión regular del/)).toHaveCount(0);
   await page.screenshot({ path: "test-results/header-quote-desktop.png" });
 });
 

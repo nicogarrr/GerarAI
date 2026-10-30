@@ -46,7 +46,7 @@ function GuideCitation({ citation, index, id }: { citation: AssistantResponse['c
             </div>
             <div className="mt-1 break-all">Fecha de referencia: {citation.as_of || t('signals.noDate')}</div>
             {citation.excerpt
-                ? <details className="mt-1"><summary className="cursor-pointer text-slate-500 hover:text-slate-300">Extracto original</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
+                ? <details className="mt-1"><summary className="cursor-pointer text-slate-400 hover:text-slate-200">Extracto original</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
                 : null}
         </li>
     );
@@ -62,7 +62,7 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
     const sourcePrefix = useId();
     return (
         <div className="space-y-3">
-            <p className="text-xs text-slate-500">Guía de {result.mode === 'guide' ? 'empresa' : 'exploración'} · Sin escritura: solo lectura, no modifica nada.</p>
+            <p className="text-xs text-slate-400">Guía de {result.mode === 'guide' ? 'empresa' : 'exploración'} · Sin escritura: solo lectura, no modifica nada.</p>
             {result.status === 'insufficient_data' ? (
                 <div role="status" className="rounded-lg border border-amber-800 bg-amber-950/20 p-3 text-sm text-amber-200">
                     <strong>Datos insuficientes</strong>
@@ -92,7 +92,7 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
                                             );
                                         })}
                                     </ul>
-                                ) : <p className="mt-1 text-xs text-slate-500">Sin citas para esta sección: comprueba sus afirmaciones antes de usarlas.</p>}
+                                ) : <p className="mt-1 text-xs text-slate-400">Sin citas para esta sección: comprueba sus afirmaciones antes de usarlas.</p>}
                             </div>
                         </details>
                     ))}
@@ -116,7 +116,7 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
                 <h4 className="text-sm font-semibold text-slate-200">Citas y fuentes ({result.citations.length})</h4>
                 {result.citations.length
                     ? <ul className="mt-2 grid min-w-0 gap-2">{result.citations.map((citation, index) => <GuideCitation key={`${citation.id}-${index}`} citation={citation} index={index} id={`${sourcePrefix}-source-${index}`} />)}</ul>
-                    : <p className="mt-1 text-sm text-slate-500">El asistente no ha adjuntado fuentes. No puedes comprobar esta respuesta desde aquí.</p>}
+                    : <p className="mt-1 text-sm text-slate-400">El asistente no ha adjuntado fuentes. No puedes comprobar esta respuesta desde aquí.</p>}
             </div>
         </div>
     );

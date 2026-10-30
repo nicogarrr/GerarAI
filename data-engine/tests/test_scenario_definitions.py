@@ -150,8 +150,12 @@ def test_wacc_bull_nunca_baja_del_crecimiento_terminal_mas_margen():
 
 
 def test_crecimiento_muy_negativo_se_recorta_al_suelo():
-    bear, _, _ = mechanical_dcf_scenarios(-0.30, 0.20, 0.10, 0.02, 0.0)
+    # El suelo -5% solo recorta el bear de quien crece; nunca lo sube por
+    # encima del base (un base de -30% deja el bear en -30%, no en -5%).
+    bear, _, _ = mechanical_dcf_scenarios(0.02, 0.20, 0.10, 0.02, 0.0)
     assert bear.assumptions["revenue_growth"] == pytest.approx(-0.05)
+    bear, _, _ = mechanical_dcf_scenarios(-0.30, 0.20, 0.10, 0.02, 0.0)
+    assert bear.assumptions["revenue_growth"] == pytest.approx(-0.30)
 
 
 # ---------------- speculative_causal_scenarios ----------------
@@ -211,8 +215,12 @@ def test_dilucion_extrema_se_recorta_en_riesgo():
 
 
 def test_terminal_bear_especulativo_tiene_suelo():
-    bear, _, bull = speculative_causal_scenarios(0.30, 0.05, 0.12, 0.001, 0.1, 0.0)
+    # El suelo del 1% recorta el bear de terminales altos (3% -> 2,5%) pero
+    # nunca sube el bear por encima del base: un base de 0,1% se queda en 0,1%.
+    bear, _, _ = speculative_causal_scenarios(0.30, 0.05, 0.12, 0.012, 0.1, 0.0)
     assert bear.assumptions["terminal_growth"] == pytest.approx(0.01)
+    bear, _, bull = speculative_causal_scenarios(0.30, 0.05, 0.12, 0.001, 0.1, 0.0)
+    assert bear.assumptions["terminal_growth"] == pytest.approx(0.001)
     assert bull.assumptions["wacc"] == pytest.approx(max(0.12 - 0.015, 0.001 + 0.015))
 
 
@@ -234,8 +242,12 @@ def test_escenarios_holding_descuentos_y_nav():
 
 
 def test_descuento_bear_con_techo_del_45_por_ciento():
-    bear, _, _ = holding_company_scenarios(50.0, 0.50, 0.0)
+    # El techo del 45% limita cuánto se ENSANCHA; nunca estrecha un base
+    # que ya está por encima (base 50% -> bear 50%, no 45%).
+    bear, _, _ = holding_company_scenarios(50.0, 0.35, 0.0)
     assert bear.assumptions["holding_discount"] == pytest.approx(0.45)
+    bear, _, _ = holding_company_scenarios(50.0, 0.50, 0.0)
+    assert bear.assumptions["holding_discount"] == pytest.approx(0.50)
 
 
 def test_descuento_bull_nunca_negativo():

@@ -276,6 +276,24 @@ def test_scenario_spread_and_burn_rule(db, valued):
     assert first["bear"]["etiqueta"] == "INFERIDO"
 
 
+def test_bull_margin_cap_never_below_a_high_base_margin(db, valued):
+    """Margen FCF base 50% (FCF 50 / ingresos 100): el techo del 45% del
+    bull no puede dejarlo por debajo del base. Esperado a mano: bull = 50%
+    (min(0,50 + 0,06; max(0,45; 0,50))); bear = 0,50 - 0,06 = 44%.
+    Un base del 40% sigue recortado al techo: min(0,46; 0,45) = 45%."""
+    fcf = db.scalar(select(FinancialFact).where(FinancialFact.metric == "free_cash_flow"))
+    fcf.value = Decimal("50")
+    db.commit()
+    first = {s: project(db)["escenarios"][s]["proyecciones"][0] for s in ("bear", "base", "bull")}
+    assert first["base"]["margen_fcf"]["valor"] == pytest.approx(0.50)
+    assert first["bull"]["margen_fcf"]["valor"] == pytest.approx(0.50)
+    assert first["bear"]["margen_fcf"]["valor"] == pytest.approx(0.44)
+    fcf.value = Decimal("40")
+    db.commit()
+    bull = project(db)["escenarios"]["bull"]["proyecciones"][0]
+    assert bull["margen_fcf"]["valor"] == pytest.approx(0.45)
+
+
 def test_target_price_uses_valuation_service_and_dated_price(db, valued):
     payload = project(db)
     targets = {
@@ -291,6 +309,25 @@ def test_target_price_uses_valuation_service_and_dated_price(db, valued):
     assert targets["base"]["mos"] == pytest.approx((fcf5_ps * 25.0 - 100.0) / (fcf5_ps * 25.0))
     assert payload["aviso_coherencia"] is None
     assert targets["bear"]["valor"] < targets["base"]["valor"] < targets["bull"]["valor"]
+
+
+def test_adr_target_and_mos_are_per_adr_not_per_ordinary(db, monkeypatch):
+    """ADR de 4 ordinarias, precio 100 por ADR. A mano, en base ADR:
+    FCF/ADR = 4 * 20/10 = 8; valor base/ADR = 4 * 50 = 200 -> múltiplo 25;
+    múltiplo de mercado = 100 / 8 = 12,5 -> tope 12,5.
+    FCF a 5 años/ADR = 4 * 100 * 1,25^5 * 0,20 / 10 = 24,414 -> objetivo 305,18.
+    Antes: objetivo por ordinaria (6,10 * 25 = 152,6) comparado con el precio ADR."""
+
+    def adr_valuation(self, db, company, *, as_of=None):  # noqa: ARG001
+        return {**FAKE_VALUATION, "adr_ratio": 4.0}
+
+    monkeypatch.setattr(ValuationService, "value_company", adr_valuation)
+    target = project(db)["escenarios"]["base"]["precio_objetivo_5y"]
+    fcf5_per_adr = 4 * 100.0 * 1.25**5 * 0.20 / 10.0
+    expected = fcf5_per_adr * 12.5
+    assert target["valor"] == pytest.approx(expected)
+    assert target["mos"] == pytest.approx((expected - 100.0) / expected)
+    assert "por ADR (4 acciones ordinarias)" in target["base"]
 
 
 def test_blocked_engine_is_never_rescaled_to_final(db, monkeypatch):

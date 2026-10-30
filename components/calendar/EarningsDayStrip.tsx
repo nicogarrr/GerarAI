@@ -90,7 +90,7 @@ export default async function EarningsDayStrip() {
         <section aria-label="Calendario de resultados" className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-3">
                 <h2 className="text-lg font-semibold text-gray-100">Calendario</h2>
-                <Link href="/calendar/resultados" className="text-sm text-teal-300 hover:text-teal-200">
+                <Link href="/calendar/resultados" className="inline-flex min-h-11 items-center text-sm text-teal-300 hover:text-teal-200">
                     Ver todo
                 </Link>
             </div>

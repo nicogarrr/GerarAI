@@ -156,6 +156,10 @@ export interface DcaBacktest {
     first_buy: string | null;
     last_buy: string | null;
     valued_at_period: string | null;
+    /** Fecha del cierre usado para valorar (ISO). */
+    valued_at_date?: string | null;
+    /** false = el mes de valoración aún no ha cerrado: es el último cierre disponible. */
+    valued_month_complete?: boolean | null;
     final_price: number | null;
     months: number;
     base_amount: number;

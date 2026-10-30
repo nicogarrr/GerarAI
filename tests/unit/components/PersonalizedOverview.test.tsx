@@ -122,6 +122,9 @@ describe('PersonalizedOverview', () => {
         setup();
         await renderHome();
         expect(screen.getByText(/Añádelas a la watchlist/)).toBeInTheDocument();
+        // «Añadir» abre directamente el alta en destino, sin un segundo clic.
+        expect(screen.getByRole('link', { name: /Añadir\s*empresas a la watchlist/ })).toHaveAttribute('href', '/watchlist?anadir=1');
+        expect(screen.getByRole('link', { name: /Añadir\s*inversión/ })).toHaveAttribute('href', '/portfolio?anadir=1');
         const listener = vi.fn();
         window.addEventListener('gerarai:open-brain', listener);
         fireEvent.click(screen.getByRole('button', { name: /Abrir\s*el Cerebro/ }));

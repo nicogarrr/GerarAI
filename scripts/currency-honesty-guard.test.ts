@@ -139,11 +139,7 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         snippet: "transaction.currency || 'USD'",
         why: "Semilla del SELECTOR de moneda del formulario de edición (editable por el usuario entre 9 divisas), no un importe pintado.",
     },
-    {
-        file: 'components/portfolio/AddTransactionDialog.tsx',
-        snippet: "(initialSymbol ? defaultCurrencyFor(initialSymbol) : null) ?? 'USD'",
-        why: "Semilla del SELECTOR de moneda del formulario de alta (editable por el usuario entre 9 divisas), no un importe pintado. Antes de este default ya pasaron dos fuentes verificadas: initialCurrency (la divisa que el backend muestra en la ficha de origen, p. ej. la watchlist) y el sufijo de mercado del ticker (B5); USD solo queda como opción visible que el usuario confirma o cambia antes de guardar.",
-    },
+
 ];
 
 /** El permiso cubre el fragmento, no el fichero entero: el hallazgo cae

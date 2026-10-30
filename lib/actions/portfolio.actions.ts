@@ -13,6 +13,7 @@ import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 import { importRejection } from '@/lib/portfolio/import-rejection';
+import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -92,6 +93,9 @@ export type PortfolioSummary = {
     totalCost: number;
     totalGain: number;
     totalGainPercent: number;
+    /** Posiciones fuera de coste/ganancia/rendimiento por no tener valor o coste en base
+     *  (sin precio, sin FX o en suspensión). Opcional: 0 si falta. */
+    totalsExcluded?: number;
     holdings: PortfolioHolding[];
     /** Valor en renta variable (suma de posiciones), sin caja. */
     equityValue: number;
@@ -236,14 +240,14 @@ export async function getPortfolioTransactions(userId: string) {
     }));
 }
 
-export async function getPortfolioTransactionPage(userId: string, offset = 0) {
+export async function getPortfolioTransactionPage(userId: string, offset = 0, filters: TransactionFilters = {}) {
     // Sin binding: la llamada es el control de autorización (lanza si la
     // cartera pedida no es la del usuario autenticado); la página la sirve el
     // backend con la sesión.
     await resolveUserId(userId);
     const safeOffset = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
     const page = await researchRequest<{ items: ResearchPortfolioTransaction[]; total: number }>(
-        `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}`, { fast: true },
+        `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}${transactionFiltersQuery(filters)}`, { fast: true },
     );
     const items = page.items.map((transaction) => ({
         _id: String(transaction.id),
@@ -258,7 +262,7 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0) {
         createdAt: transaction.created_at,
         updatedAt: transaction.updated_at,
     }));
-    return { items, total: page.total, offset: safeOffset };
+    return { items, total: page.total, offset: safeOffset, filters };
 }
 
 
@@ -311,13 +315,19 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         };
     });
     const totalValue = backendSummary.total_value;
-    const totalCost = holdings.reduce((sum, holding) => sum + holding.cost, 0);
-    const totalGain = holdings.reduce((sum, holding) => sum + holding.gain, 0);
+    // Coste y ganancia solo sobre las posiciones con valor Y coste en base conocidos:
+    // el backend ya deja fuera del valor RV las que no tienen precio, FX o están en
+    // suspensión (y un coste IBKR pendiente de revisión no es base fiable). Sumar su coste sin su ganancia diluía el rendimiento (coste 2.000,
+    // ganancia 500 → +25 % en vez de +50 %) y descuadraba Cartera con /inicio.
+    const valued = holdings.filter((holding) => !holding.fxMissing && holding.cost > 0 && !holding.costReviewMessage);
+    const totalCost = valued.reduce((sum, holding) => sum + holding.cost, 0);
+    const totalGain = valued.reduce((sum, holding) => sum + holding.gain, 0);
     return {
         totalValue,
         totalCost,
         totalGain,
         totalGainPercent: totalCost > 0 ? (totalGain / totalCost) * 100 : 0,
+        totalsExcluded: holdings.length - valued.length,
         holdings: holdings.sort((a, b) => b.value - a.value),
         equityValue: backendSummary.equity_value,
         cashAssets: backendSummary.cash_assets_base,

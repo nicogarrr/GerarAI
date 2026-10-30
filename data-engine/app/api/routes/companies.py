@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.core.tenancy import tenant_filters
@@ -342,9 +343,24 @@ class ManagementExplanationUpdate(BaseModel):
     explanation: str = Field(min_length=3, max_length=5000)
 
 
+def _trust_client_identity() -> bool:
+    """La ficha de empresa es global (sin tenant): la ven todos los usuarios.
+
+    En produccion nombre, bolsa, divisa, sector, industria y domicilio salen del
+    proveedor (CompanyEnrichmentService), nunca del cuerpo de la peticion: si no,
+    el primer usuario que asegura un ticker nuevo fijaba para todos su divisa
+    (con la que se valoran las posiciones de los demas) o su bolsa. La UI solo
+    manda el ticker. En local/test se aceptan para sembrar datos sin proveedor
+    (E2E y semillas).
+    """
+    return not get_settings().is_production
+
+
 @router.post("/ensure", response_model=CompanyOut)
 def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db)) -> Company:
     ticker = payload.ticker.strip().upper()
+    if not _trust_client_identity():
+        payload = CompanyEnsureRequest(ticker=payload.ticker)
     company = db.scalar(select(Company).where(Company.ticker == ticker))
     if company is None:
         company = Company(

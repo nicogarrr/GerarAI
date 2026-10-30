@@ -1,4 +1,5 @@
 import re
+import time
 from datetime import UTC, datetime
 
 from sqlalchemy import desc, select
@@ -171,6 +172,21 @@ def _ticker_evidence(ticker: str, name: str | None, text: str) -> bool:
     return _ticker_evidence_level(ticker, name, text) > 0
 
 
+class _LLMBudgetSkipped(Exception):
+    """Salta el bloque de enriquecimiento Jev/LLM al agotarse el presupuesto."""
+
+
+def _llm_budget_exceeded(deadline: float | None) -> bool:
+    """True si el presupuesto de tiempo para enriquecimiento LLM/Jev se agoto.
+
+    Los gates Jev y las marcas LLM son metadatos best-effort: cuando el actor
+    de ingesta agota su presupuesto (prod: refresh_rss_feeds murio a los 601 s
+    dentro de un gate Jev con la BD lenta), la ingesta DETERMINISTA continua y
+    solo se omite el enriquecimiento - mismo resultado que "sin key/fallo".
+    """
+    return deadline is not None and time.monotonic() >= deadline
+
+
 class NewsService:
     def __init__(self) -> None:
         self.materiality = MaterialityService()
@@ -267,6 +283,7 @@ class NewsService:
         news_lane: str | None = None,
         macro_theme: str | None = None,
         detect_company: bool = True,
+        llm_deadline: float | None = None,
     ) -> ManualNewsResponse:
         # detect_company=False: carriles sin ticker (p.ej. macro) nunca
         # vinculan empresa por coincidencia de texto.
@@ -277,23 +294,28 @@ class NewsService:
         # sin key o ante fallo, via completa como siempre.
         jev_light = False
         jev_light_marker = ""
-        try:
-            from app.services.jev_gates import NEWS_ACTION_THRESHOLD, jev_news_action_sync
+        # Presupuesto agotado: se omite el gate (metadata best-effort) y la
+        # ingesta determinista sigue - como cuando Jev no esta configurado.
+        if _llm_budget_exceeded(llm_deadline):
+            pass
+        else:
+            try:
+                from app.services.jev_gates import NEWS_ACTION_THRESHOLD, jev_news_action_sync
 
-            decision = jev_news_action_sync(text)
-            if (
-                decision is not None
-                and decision.label in {"duplicate", "noise"}
-                and decision.confidence >= NEWS_ACTION_THRESHOLD
-            ):
-                jev_light = True
-                jev_light_marker = (
-                    f"jev_news_action({decision.label}, "
-                    f"conf={decision.confidence:.2f}) -> analisis ligero "
-                    "(sin ThesisChange ni claim scan)"
-                )
-        except Exception:  # noqa: BLE001 — Jev nunca rompe ingesta
-            jev_light = False
+                decision = jev_news_action_sync(text)
+                if (
+                    decision is not None
+                    and decision.label in {"duplicate", "noise"}
+                    and decision.confidence >= NEWS_ACTION_THRESHOLD
+                ):
+                    jev_light = True
+                    jev_light_marker = (
+                        f"jev_news_action({decision.label}, "
+                        f"conf={decision.confidence:.2f}) -> analisis ligero "
+                        "(sin ThesisChange ni claim scan)"
+                    )
+            except Exception:  # noqa: BLE001 — Jev nunca rompe ingesta
+                jev_light = False
         assessment = self.materiality.assess_news(db, company, text, source, url, published_at=published_at)
         materiality_reasons = list(assessment.reasons)
         if jev_light_marker:
@@ -391,6 +413,8 @@ class NewsService:
             news_metadata["macro_theme"] = macro_theme
         # nosemgrep: gerarai-broad-except-pass -- paso opcional (Jev / relevancia); nunca bloquea la ingesta
         try:
+            if _llm_budget_exceeded(llm_deadline):
+                raise _LLMBudgetSkipped
             from app.services.jev_triage_service import (
                 classify_doc_type_sync,
                 jev_metadata,
@@ -602,6 +626,7 @@ class NewsService:
         news_lane: str | None = None,
         macro_theme: str | None = None,
         detect_company: bool = True,
+        llm_deadline: float | None = None,
     ) -> NewsIngestResponse:
         created_events: list[ManualNewsResponse] = []
         skipped_duplicates = 0
@@ -668,6 +693,7 @@ class NewsService:
                     ),
                     headline_from_source=item.headline_from_source,
                     news_lane=news_lane,
+                    llm_deadline=llm_deadline,
                     macro_theme=macro_theme,
                     detect_company=detect_company,
                 )

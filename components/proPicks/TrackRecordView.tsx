@@ -74,7 +74,7 @@ function PickRow({ pick }: { pick: TrackRecordPick }) {
             <td className="py-2">
                 <PctWithSpy value={pick.pct_90d} spy={pick.spy_pct_90d} />
                 {pick.horizon_date && pick.pct_90d === null && (
-                    <span className="block text-right text-xs text-gray-600">pendiente ({formatMarketDate(pick.horizon_date)})</span>
+                    <span className="block text-right text-xs text-gray-500">pendiente ({formatMarketDate(pick.horizon_date)})</span>
                 )}
             </td>
         </tr>
@@ -159,12 +159,12 @@ export default function TrackRecordView() {
                         </tbody>
                     </table>
                     {data.spy.available && data.spy.latest_date && (
-                        <p className="mt-2 text-xs text-gray-600">
+                        <p className="mt-2 text-xs text-gray-500">
                             SPY ({data.spy.source}) con datos hasta {formatMarketDate(data.spy.latest_date)}.
                         </p>
                     )}
                     {!data.spy.available && (
-                        <p className="mt-2 text-xs text-gray-600">Serie de SPY sin datos todavía: las columnas vs SPY saldrán cuando se ingiera.</p>
+                        <p className="mt-2 text-xs text-gray-500">Serie de SPY sin datos todavía: las columnas vs SPY saldrán cuando se ingiera.</p>
                     )}
                 </div>
             )}

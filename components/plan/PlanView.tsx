@@ -8,6 +8,8 @@ import { RecordDetail, RecordList, type DataRecord } from '@/components/data/Rec
 import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
 import ContributionSplitCard from '@/components/plan/ContributionSplitCard';
+import PlanContributionDialog from '@/components/plan/PlanContributionDialog';
+import DeleteContributionButton from '@/components/plan/DeleteContributionButton';
 import type { ContributionSplit } from '@/lib/plan/contribution-split';
 import { formatDate, formatMoney, formatNumber, formatPercent, formatMarketDate, NA } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
@@ -91,7 +93,7 @@ const linkCartera = (
 );
 const FIELD_LABELS: Record<string, string> = {
     kind: 'Tipo', label: 'Objetivo', target_pct: 'Peso objetivo', band_pct: 'Banda de tolerancia',
-    direction: 'Acción', detail: 'Detalle', within_band: 'Dentro de la banda', current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
+    direction: 'Operación', detail: 'Detalle', within_band: 'Dentro de la banda', current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
     // Claves de missing_fx (drift y contributions_missing_fx): antes caían al
     // fallback y el usuario leía «quote currency», «as of» y «position» en crudo.
     quote_currency: 'Divisa de cotización', base_currency: 'Divisa base', as_of: 'Fecha', ticker: 'Ticker',
@@ -109,6 +111,11 @@ function planValue(value: unknown, currency?: string, weights = false): string {
         const heading = typeof record.kind === 'string' && typeof record.label === 'string'
             ? `${PLAN_KIND[record.kind] ?? record.kind}: ${record.label === 'Cash' ? 'Caja' : etiquetaSector(record.label)}` : null;
         const lines = Object.entries(value).filter(([key]) => !heading || (key !== 'kind' && key !== 'label')).map(([key, item]) => {
+        // El detalle llega del backend con la etiqueta cruda («Technology está…»):
+        // se sustituye por la misma etiqueta traducida que la cabecera.
+        if (key === 'detail' && heading && typeof item === 'string' && typeof record.label === 'string' && item.startsWith(record.label)) {
+            item = (record.label === 'Cash' ? 'Caja' : etiquetaSector(record.label)) + item.slice(record.label.length);
+        }
         const text = (weights || key.endsWith('_pct') || key.startsWith('ticker:') || key.startsWith('asset_class:')) ? formatPercent(item as number, { fromRatio: false, digits: 2 })
             : key === 'amount_base' ? (currency ? formatMoney(item as number, currency) : NA)
             : key === 'kind' ? PLAN_KIND[String(item)] ?? DRIFT_KIND[String(item)] ?? String(item)
@@ -121,7 +128,7 @@ function planValue(value: unknown, currency?: string, weights = false): string {
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     const text = String(value);
     const cleanText = text.replace(/\besta\b/g, 'está').replace(/([+-]?\d+\.\d+) puntos/g, (_all, number) => `${number.startsWith('+') ? '+' : ''}${formatNumber(Number(number), {maximumFractionDigits: 2})} puntos`);
-    return ({ok: 'Completo', incomplete_fx: 'Faltan tipos de cambio', buy: 'Comprar', sell: 'Vender'} as Record<string, string>)[text] ?? etiquetaSector(cleanText.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja'));
+    return ({ok: 'Completo', incomplete_fx: 'Faltan tipos de cambio', empty_portfolio: 'Cartera vacía: nada que reequilibrar todavía', buy: 'Comprar', sell: 'Vender'} as Record<string, string>)[text] ?? etiquetaSector(cleanText.replace(/^ticker:/, 'Acción: ').replace(/^asset_class:Cash$/, 'Caja'));
 }
 const planMoney = (value: unknown, record: DataRecord) =>
     typeof record.base_currency === 'string' ? formatMoney(value as number | string | null, record.base_currency) : NA;
@@ -158,7 +165,9 @@ const planExpectedPeriods = (value: unknown, record: DataRecord) => {
     if (record.currency_contract_enabled === true && record.monthly_currency_recorded !== true) {
         return 'No calculables: divisa no registrada';
     }
-    if (!Array.isArray(value)) return NA;
+    // Plan legacy: el backend no desglosa cuotas (lista vacía); «0 convertidas,
+    // 0 pendientes» contradecía las «Aportaciones previstas» de arriba.
+    if (!Array.isArray(value) || value.length === 0) return NA;
     const count = (status: string) => value.filter((p) => p && typeof p === 'object' && (p as Record<string, unknown>).status === status).length;
     const parts = [`${count('converted')} convertidas`, `${count('pending_due_date')} pendientes de vencimiento`];
     const missing = count('missing_rate');
@@ -176,7 +185,19 @@ const planExpectedMissingFx = (value: unknown) => {
         ? ` (vencidas del ${formatMarketDate(first.due_date)} al ${formatMarketDate(last.due_date)})` : '';
     return `${rows.length} ${rows.length === 1 ? 'cuota' : 'cuotas'} sin tipo de cambio${pair} en o antes del vencimiento${range}`;
 };
-const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, expected_missing_fx: planExpectedMissingFx, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
+/** Aportaciones registradas que no se pueden convertir a la divisa base: resumen legible,
+ *  no «contribution id: 4 · quote currency: USD · as of: …». */
+const planContributionsMissingFx = (value: unknown) => {
+    if (!Array.isArray(value) || value.length === 0) return '—';
+    const rows = value.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object');
+    const pairs = [...new Set(rows
+        .filter((r) => typeof r.quote_currency === 'string' && typeof r.base_currency === 'string')
+        .map((r) => `${String(r.quote_currency).toUpperCase()}→${String(r.base_currency).toUpperCase()}`))];
+    const dates = rows.map((r) => (typeof r.as_of === 'string' ? formatMarketDate(r.as_of) : null)).filter(Boolean);
+    const shown = dates.length > 3 ? [...dates.slice(0, 3), `y ${dates.length - 3} más`] : dates;
+    return `${rows.length} ${rows.length === 1 ? 'aportación' : 'aportaciones'} sin tipo de cambio${pairs.length ? ` ${pairs.join(', ')}` : ''}${shown.length ? ` (${shown.join(', ')})` : ''}`;
+};
+const PLAN_FORMAT = {contributions_missing_fx: planContributionsMissingFx, start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, expected_missing_fx: planExpectedMissingFx, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
 const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, (value: unknown, record: DataRecord) => planValue(value, typeof record.base_currency === 'string' ? record.base_currency : undefined, key === 'current_weights')]));
 
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */
@@ -229,6 +250,17 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
             />
         );
     }
+
+    // Divisa por defecto de una aportación: la registrada en el plan; si no, la base.
+    const planCurrency = typeof initialPlan.monthly_contribution_currency === 'string' && initialPlan.monthly_contribution_currency
+        ? initialPlan.monthly_contribution_currency
+        : typeof initialPlan.base_currency === 'string' ? initialPlan.base_currency : 'EUR';
+    const contributionDialog = (
+        <PlanContributionDialog
+            defaultAmount={typeof initialPlan.monthly_contribution === 'number' ? initialPlan.monthly_contribution : null}
+            defaultCurrency={planCurrency}
+        />
+    );
 
     return (
         <div className="grid gap-6">
@@ -305,6 +337,9 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
             />
 
             <RecordList
+                // RecordList guarda sus filas en estado local: al alta/baja,
+                // router.refresh() trae props nuevas y la clave fuerza a pintarlas.
+                key={initialContributions.map((row) => String(row.id ?? '')).join(',')}
                 title="Aportaciones"
                 titleAs="h2"
                 description="Historial de contribuciones al plan"
@@ -314,10 +349,20 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 columns={['date', 'amount', 'currency', 'note']}
                 columnLabels={CONTRIBUTION_LABELS}
                 formatColumns={{
+                    date: (value) => formatMarketDate(value as string),
+                    currency: (value) => (typeof value === 'string' && value ? value.toUpperCase() : NA),
                     amount: (value, record) =>
                         formatMoney(value as number | string | null, typeof record.currency === 'string' ? record.currency : 'EUR'),
                 }}
                 emptyMessage="Todavía no has registrado aportaciones a tu plan."
+                emptyAction={contributionDialog}
+                footer={initialContributions.length > 0 ? <div className="flex justify-end">{contributionDialog}</div> : undefined}
+                rowActions={(record) => typeof record.id === 'number' ? (
+                    <DeleteContributionButton
+                        contributionId={record.id}
+                        label={`${formatMarketDate(String(record.date ?? ''))} · ${formatMoney(record.amount as number | string | null, typeof record.currency === 'string' && record.currency ? record.currency.toUpperCase() : 'EUR')}`}
+                    />
+                ) : null}
             />
         </div>
     );

@@ -269,23 +269,28 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
                 gain_base = None
             if gain_base is None or proceeds_base is None or cost_base is None:
                 incomplete = True
-            rows.append({
+            row = {
                 "ticker": bucket["ticker"],
                 "date": sale["date"],
                 "transmission_base": _money(Decimal(str(proceeds_base))) if proceeds_base is not None else None,
                 "acquisition_base": _money(Decimal(str(cost_base))) if cost_base is not None else None,
                 "gain_base": _money(Decimal(str(gain_base))) if gain_base is not None else None,
                 "over_sell": over_sell,
-            })
-            if proceeds_base is not None:
-                transmission += Decimal(str(proceeds_base))
-            if cost_base is not None:
-                acquisition += Decimal(str(cost_base))
-            if gain_base is not None:
-                if gain_base >= 0:
-                    gains += Decimal(str(gain_base))
+            }
+            rows.append(row)
+            # Las sumas 0328/0331/0339/0340 son la suma de las filas tal como
+            # se teclean en Renta Web (en céntimos), no del importe sin
+            # redondear: así el total cuadra con lo que calcula el programa.
+            if row["transmission_base"] is not None:
+                transmission += Decimal(str(row["transmission_base"]))
+            if row["acquisition_base"] is not None:
+                acquisition += Decimal(str(row["acquisition_base"]))
+            if row["gain_base"] is not None:
+                row_gain = Decimal(str(row["gain_base"]))
+                if row_gain >= 0:
+                    gains += row_gain
                 else:
-                    losses += abs(Decimal(str(gain_base)))
+                    losses += -row_gain
 
     dividends_total = sum(
         # nosemgrep: gerarai-money-none-to-zero -- el total se publica como None si algun bloque es incompleto (dividend_incomplete, abajo)
@@ -628,6 +633,21 @@ def build_double_taxation(
 CARRYFORWARD_WINDOW_YEARS = 4
 CROSS_COMPENSATION_LIMIT = Decimal("0.25")
 
+def integrate_savings_base(rcm_net: Decimal, gyp_net: Decimal) -> Decimal:
+    """Base del ahorro del PROPIO ejercicio (art. 49.1 LIRPF), sin arrastres.
+
+    RCM (dividendos) y ganancias/pérdidas patrimoniales se integran por
+    separado; el saldo negativo de uno solo compensa el positivo del otro
+    hasta el 25 % de ese positivo (art. 49.1.a y b). El resto negativo no
+    resta: se arrastra a los 4 ejercicios siguientes. Nunca negativa.
+    """
+    rcm_pos = max(rcm_net, Decimal("0"))
+    gyp_pos = max(gyp_net, Decimal("0"))
+    gyp_comp = min(max(-gyp_net, Decimal("0")), rcm_pos * CROSS_COMPENSATION_LIMIT)
+    rcm_comp = min(max(-rcm_net, Decimal("0")), gyp_pos * CROSS_COMPENSATION_LIMIT)
+    return (rcm_pos - gyp_comp) + (gyp_pos - rcm_comp)
+
+
 # Renta 2025: ejercicio de origen → (casilla integración en 0424, casilla
 # resto al 25% de 0429). Solo verificado para la declaración de 2025.
 _CASILLAS_PRIOR_2025 = {
@@ -703,11 +723,20 @@ def build_loss_compensation(
         # (primero su propia pérdida, casilla 0446). Arrastrar la pérdida
         # ENTERA, como si nada la hubiera consumido, sobrestimaba lo
         # pendiente y compensaba de más en el ejercicio actual.
+        #
+        # Los ejercicios ANTERIORES a la ventana también se simulan: su
+        # pérdida ya no se puede usar este año, pero mientras vivía tuvo que
+        # compensarse "en la cuantía máxima" en los ejercicios intermedios
+        # (art. 49.1.b LIRPF), antes que las más recientes. Ignorarlos dejaba
+        # que una ganancia intermedia se comiera una pérdida de la ventana que
+        # en realidad sigue pendiente. Al final solo quedan las de la ventana.
         for entry in sorted(prior_year_nets, key=lambda e: e["year"]):
             year = entry["year"]
-            if year < window_start or year >= fiscal_year:
-                continue  # fuera de la ventana de 4 ejercicios (expirado)
+            if year >= fiscal_year:
+                continue
             if entry.get("incomplete") or entry.get("net_gyp_base") is None:
+                if year < window_start:
+                    continue  # ya expirado: no es un saldo de este informe
                 excluded.append({
                     "year": year,
                     "reason": "Ejercicio con conversión de divisa incompleta: saldo no aprovechable en este informe.",
@@ -742,7 +771,10 @@ def build_loss_compensation(
                     "casilla_integracion": None,
                     "casilla_resto": None,
                 })
-        pending = [item for item in pending if item["pending"] > 0]
+        pending = [
+            item for item in pending
+            if item["pending"] > 0 and item["year"] >= window_start
+        ]
 
     incomplete = False
     saldo_gyp = None

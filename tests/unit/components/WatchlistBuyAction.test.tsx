@@ -88,10 +88,9 @@ describe('WatchlistBuyAction', () => {
         expect(within(dialog).getByText('Precio (EUR)')).toBeInTheDocument();
     });
 
-    it('una divisa verificada fuera del selector no siembra el alta', async () => {
-        // Si el backend mandara una divisa que el selector no admite, se
-        // ignora y manda la heurística de sufijo (SAN.MC -> EUR).
+    it('conserva SEK verificada, ahora admitida por el selector compartido', async () => {
+        // Las divisas nórdicas ya están en el selector compartido de main.
         const dialog = await openDialog('SEK');
-        expect(within(dialog).getByText('Precio (EUR)')).toBeInTheDocument();
+        expect(within(dialog).getByText('Precio (SEK)')).toBeInTheDocument();
     });
 });

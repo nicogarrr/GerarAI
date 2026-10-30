@@ -70,7 +70,9 @@ interface WatchlistStock {
     addedAt: Date;
 }
 
-const PAGE_SIZE = 20;
+// Página corta (móvil primero): 12 filas por página. Con 20 la lista se
+// hacía larga en pantallas pequeñas y cada carga cotizaba más símbolos.
+const PAGE_SIZE = 12;
 
 export default async function WatchlistPage({
     searchParams,

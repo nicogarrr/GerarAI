@@ -66,3 +66,20 @@ export function knowledgeHandoff(detail?: OpenBrainDetail | null): KnowledgeBrai
     if (!k || (k.scope !== 'letters' && k.scope !== 'library')) return null;
     return { scope: k.scope, ...(Number.isSafeInteger(k.documentId) && k.documentId! > 0 ? { documentId: k.documentId } : {}), ...(typeof k.documentTitle === 'string' ? { documentTitle: k.documentTitle.slice(0, 240) } : {}), authors: Array.isArray(k.authors) ? k.authors.filter((a): a is string => typeof a === 'string' && a.length <= 200).slice(0, 200) : [] };
 }
+
+/** Marcador oculto con el que una página de doctrina declara su contexto. */
+export const BRAIN_LIBRARY_CONTEXT_ID = 'brain-library-context';
+
+/** Lee (y sanea) el contexto de doctrina que deja una página en su marcador. */
+export function readLibraryContext(marker: HTMLElement | null): KnowledgeBrainContext | null {
+    if (!marker) return null;
+    let authors: unknown = [];
+    try { authors = JSON.parse(marker.dataset.authors ?? '[]'); } catch { /* sin filtro de autor */ }
+    const id = Number(marker.dataset.documentId);
+    return knowledgeHandoff({ knowledge: {
+        scope: marker.dataset.scope === 'letters' ? 'letters' : 'library',
+        authors: Array.isArray(authors) ? authors : [],
+        ...(Number.isSafeInteger(id) && id > 0 ? { documentId: id } : {}),
+        ...(marker.dataset.documentTitle ? { documentTitle: marker.dataset.documentTitle } : {}),
+    } });
+}

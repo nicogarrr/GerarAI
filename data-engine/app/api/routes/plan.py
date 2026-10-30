@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -27,6 +27,16 @@ class PlanTarget(BaseModel):
     target_pct: float = Field(ge=0, le=100)
     band_pct: float = Field(default=5, ge=0, le=50)
 
+    @model_validator(mode="after")
+    def _normalize_label(self) -> PlanTarget:
+        # «nvda» y «NVDA» son el mismo ticker: se guarda en mayusculas para que
+        # objetivos, desviacion, reparto y enlaces lo muestren igual.
+        label = self.label.strip()
+        if not label:
+            raise ValueError("La etiqueta del objetivo no puede estar vacía.")
+        self.label = label.upper() if self.kind == "ticker" else label
+        return self
+
 
 class PlanUpsertInput(BaseModel):
     monthly_contribution: float = Field(gt=0, le=1_000_000)
@@ -39,11 +49,29 @@ class PlanUpsertInput(BaseModel):
     horizon_years: int = Field(default=30, ge=1, le=80)
     target_allocations: list[PlanTarget] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def _targets_fit_in_each_dimension(self) -> PlanUpsertInput:
+        # Cada dimension (ticker, sector, clase de activo) describe la MISMA
+        # cartera: 60 % MSFT + 60 % NVDA no cabe. El formulario ya lo impide;
+        # la API no debe guardar un plan que el reparto y la desviacion leerian
+        # como pesos imposibles (espejo de lib/plan/target-totals.ts).
+        totals: dict[str, float] = {}
+        for target in self.target_allocations:
+            totals[target.kind] = totals.get(target.kind, 0.0) + target.target_pct
+        for kind, total in totals.items():
+            if total > 100 + 1e-9:
+                raise ValueError(
+                    f"Los objetivos de tipo {kind} suman {total:g} %: no pueden superar el 100 %."
+                )
+        return self
+
 
 class ContributionInput(BaseModel):
     date: date
     amount: float = Field(gt=0, le=10_000_000)
-    currency: str = Field(default="EUR", min_length=3, max_length=10)
+    # ISO 4217: «EURO» o «€» nunca tendrian tipo de cambio y dejarian el plan
+    # «incompleto» para siempre; «eur» se guarda como «EUR».
+    currency: str = Field(default="EUR", pattern=r"^[A-Za-z]{3}$")
     external_id: str | None = Field(default=None, max_length=120)
     note: str = Field(default="", max_length=500)
 

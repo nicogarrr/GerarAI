@@ -114,17 +114,31 @@ const IMPACTO_ESTILO: Record<string, string> = {
   mixed: 'bg-amber-950/60 text-amber-300',
 };
 
-export function ImpactBadge({ direction }: { direction?: string | null }) {
+export function ImpactBadge({
+  direction,
+  eventType,
+}: {
+  direction?: string | null;
+  eventType?: string | null;
+}) {
   if (!direction) return null;
   const estilo = IMPACTO_ESTILO[direction] ?? 'bg-gray-800/60 text-gray-400';
   const nota = 'Lectura automática del titular por reglas; no es un dato de la fuente.';
+  // Motivo en una línea: el tipo de evento casado por las reglas (dilución,
+  // resultados…). «Noticia general» y «Desconocido» no explican nada: se
+  // omiten en vez de añadir relleno.
+  const motivo =
+    eventType && eventType !== 'general_news' && eventType !== 'unknown'
+      ? etiquetaTipoEvento(eventType)
+      : null;
   return (
     <span
-      aria-label={`Impacto ${etiquetaDireccionImpacto(direction)}. ${nota}`}
+      aria-label={`Impacto ${etiquetaDireccionImpacto(direction)}${motivo ? `, motivo: ${motivo}` : ''}. ${nota}`}
       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilo}`}
       title={nota}
     >
       {etiquetaDireccionImpacto(direction)}
+      {motivo ? ` · ${motivo}` : ''}
     </span>
   );
 }
@@ -311,7 +325,7 @@ export function NewsEventsFlow({
                 <GobiernoChip event={event} />
 
                 <CoverageChip event={event} />
-                <ImpactBadge direction={event.impact_direction} />
+                <ImpactBadge direction={event.impact_direction} eventType={event.event_type} />
                 {event.requires_update ? (
                   <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">Revisar</span>
                 ) : null}
@@ -388,7 +402,7 @@ export function NewsEventsFlow({
                   <td className="px-3 py-2.5 text-center">
                     <MaterialityIndicator score={event.materiality_score} />
                     <div className="mt-1">
-                      <ImpactBadge direction={event.impact_direction} />
+                      <ImpactBadge direction={event.impact_direction} eventType={event.event_type} />
                     </div>
                   </td>
                   <td className="py-2.5 text-gray-300">

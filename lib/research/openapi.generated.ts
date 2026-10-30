@@ -1858,24 +1858,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/dca-settings": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Settings */
-        get: operations["read_settings_api_dca_settings_get"];
-        /** Update Settings */
-        put: operations["update_settings_api_dca_settings_put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/earnings/{ticker}/run": {
         parameters: {
             query?: never;
@@ -6931,8 +6913,12 @@ export interface components {
             reason?: string | null;
             /** Symbol */
             symbol: string;
+            /** Valued At Date */
+            valued_at_date?: string | null;
             /** Valued At Period */
             valued_at_period?: string | null;
+            /** Valued Month Complete */
+            valued_month_complete?: boolean | null;
         };
         /** DcaBacktestPlanOut */
         DcaBacktestPlanOut: {
@@ -14449,86 +14435,6 @@ export interface operations {
             };
         };
     };
-    read_settings_api_dca_settings_get: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DcaSettingsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    update_settings_api_dca_settings_put: {
-        parameters: {
-            query?: never;
-            header?: {
-                "x-cavaai-user"?: string | null;
-                "x-cavaai-tenant"?: string | null;
-                "x-cavaai-timestamp"?: string | null;
-                "x-cavaai-signature"?: string | null;
-                "x-cavaai-nonce"?: string | null;
-                "x-cavaai-method"?: string | null;
-                "x-cavaai-path"?: string | null;
-                "x-cavaai-body-hash"?: string | null;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DcaSettingsUpdate"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DcaSettingsOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     run_earnings_workflow_api_earnings__ticker__run_post: {
         parameters: {
             query?: never;
@@ -19945,6 +19851,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                ticker?: string | null;
+                action?: ("buy" | "sell") | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;

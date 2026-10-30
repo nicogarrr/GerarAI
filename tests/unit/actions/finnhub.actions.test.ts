@@ -120,6 +120,14 @@ describe('getNews', () => {
         expect(news[0].category).toBe('general');
     });
 
+    it('sin FINNHUB_API_KEY y sin noticias multi-fuente -> lista vacía, sin error ni console.error', async () => {
+        const { getNews } = await loadModule();
+        getNewsWithFallback.mockResolvedValue([]);
+        await expect(getNews(['AAPL'])).resolves.toEqual([]);
+        expect(fetchJSON).not.toHaveBeenCalled();
+        expect(console.error).not.toHaveBeenCalled();
+    });
+
     it('error total -> lanza "Failed to fetch news"', async () => {
         const { getNews } = await loadModule('key');
         getNewsWithFallback.mockRejectedValue(new Error('todo caído'));

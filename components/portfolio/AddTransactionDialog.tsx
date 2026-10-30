@@ -19,60 +19,44 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { parseLocalizedNumber, todayLocal } from '@/lib/format';
-
-// Divisa probable segun el sufijo de mercado del ticker (B5): al elegir
-// SAN.MC la moneda no puede quedarse en USD por defecto. El usuario puede
-// cambiarla despues; esto solo fija un default razonable.
-const SUFFIX_CURRENCY: Record<string, string> = {
-  MC: 'EUR', PA: 'EUR', AS: 'EUR', BR: 'EUR', LS: 'EUR', DE: 'EUR',
-  F: 'EUR', MI: 'EUR', VI: 'EUR', HE: 'EUR', ST: 'EUR', CO: 'EUR',
-  OL: 'EUR', AT: 'EUR', IR: 'EUR', DU: 'EUR', HM: 'EUR', MU: 'EUR',
-  L: 'GBP', IL: 'GBP', SW: 'CHF', VX: 'CHF', TO: 'CAD', V: 'CAD',
-  HK: 'HKD', T: 'JPY', AX: 'AUD', SS: 'CNY', SZ: 'CNY',
-};
-
-function defaultCurrencyFor(symbol: string): string | null {
-  const idx = symbol.lastIndexOf('.');
-  if (idx < 0) return null;
-  return SUFFIX_CURRENCY[symbol.slice(idx + 1).toUpperCase()] ?? null;
-}
-
-// Opciones del selector de moneda del alta (la misma lista que pinta el
-// Select de abajo). Una divisa verificada fuera de esta lista no puede
-// sembrar el selector: se ignora y manda la heurística de sufijo.
-const FORM_CURRENCIES: readonly string[] = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'];
-
+import { currencyForTicker, currencyOptions, NEW_TRANSACTION_CURRENCY } from './transactionCurrencies';
+import { SYMBOL_VALIDATION } from '@/lib/constants';
 
 type DialogProps = {
   userId: string;
   onClose: () => void;
-  /** Alta desde una ficha concreta (p. ej. watchlist): la acción ya va
-      seleccionada y el usuario solo añade cantidad, precio y fecha. */
-  initialSymbol?: string;
+  /** Símbolo ya elegido al abrir (enlace «Registrar compra o venta» de la ficha). */
+  initialSymbol?: string | null;
   initialCompanyName?: string;
-  /** Divisa VERIFICADA del listado tal como la muestra la ficha de origen
-      (p. ej. `stock.currency` de la watchlist, que viene del backend).
-      Tiene prioridad sobre la heurística de sufijo; si no hay dato, null. */
+  /** Verified listing currency from the source view, never an inferred display amount. */
   initialCurrency?: string | null;
 };
+
+function validSymbol(raw: string | null | undefined): string | null {
+  const symbol = (raw ?? '').trim().toUpperCase();
+  return symbol.length >= SYMBOL_VALIDATION.MIN_LENGTH &&
+    symbol.length <= SYMBOL_VALIDATION.MAX_LENGTH &&
+    SYMBOL_VALIDATION.PATTERN.test(symbol)
+    ? symbol
+    : null;
+}
 
 export default function AddTransactionDialog({ userId, onClose, initialSymbol, initialCompanyName, initialCurrency }: DialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(initialSymbol ?? '');
+  // Un símbolo de la URL con forma inválida se ignora (formulario vacío).
+  const [presetSymbol] = useState(() => validSymbol(initialSymbol));
+  const [searchQuery, setSearchQuery] = useState(presetSymbol ?? '');
+  // true cuando el usuario eligio la divisa a mano: entonces cambiar de ticker no la toca.
+  const [currencyChosen, setCurrencyChosen] = useState(false);
 
   const [formData, setFormData] = useState({
-    symbol: initialSymbol ?? '',
-    companyName: initialCompanyName ?? '',
+    symbol: presetSymbol ?? '',
+    companyName: presetSymbol ? initialCompanyName ?? '' : '',
     type: 'buy' as 'buy' | 'sell',
-    // Semilla del SELECTOR de moneda (editable por el usuario entre 9
-    // divisas), no un importe pintado: primero la divisa verificada de la
-    // ficha de origen, luego la heurística de sufijo de mercado (B5); USD
-    // es solo el default visible que el usuario confirma o cambia antes de
-    // guardar. Nunca se inventa la divisa de un importe ya guardado.
-    currency: initialCurrency && FORM_CURRENCIES.includes(initialCurrency)
-        ? initialCurrency
-        : (initialSymbol ? defaultCurrencyFor(initialSymbol) : null) ?? 'USD',
+    currency: (presetSymbol && initialCurrency?.trim())
+      ? initialCurrency.trim().toUpperCase()
+      : presetSymbol ? currencyForTicker(presetSymbol) : NEW_TRANSACTION_CURRENCY,
     quantity: '',
     price: '',
     fees: '',
@@ -83,6 +67,26 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
 
 
   const [fieldErrors, setFieldErrors] = useState<TransactionFormErrors>({});
+
+  // Alta por símbolo: si el buscador no encuentra la empresa (proveedor caído
+  // o sin cuota, ticker poco común, mercado no cubierto) el diálogo era un
+  // callejón sin salida, porque el símbolo solo se fijaba eligiendo una
+  // sugerencia. Igual que en la watchlist: el texto con forma de ticker se
+  // puede usar tal cual.
+  const manualSymbol = searchQuery.trim().toUpperCase();
+  const canUseManualSymbol = !formData.symbol && validSymbol(manualSymbol) !== null;
+
+  const selectSymbol = (symbol: string, companyName: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      symbol,
+      companyName,
+      // La divisa sigue al ticker (SAN.MC -> EUR, luego AAPL -> USD) salvo
+      // que el usuario la haya elegido a mano: esa eleccion se respeta.
+      currency: currencyChosen ? prev.currency : currencyForTicker(symbol),
+    }));
+    setSearchQuery(symbol);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +119,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
         symbol: '',
         companyName: '',
         type: 'buy',
-        currency: 'USD',
+        currency: NEW_TRANSACTION_CURRENCY,
         quantity: '',
         price: '',
         fees: '',
@@ -123,6 +127,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
         notes: '',
       });
       setSearchQuery('');
+      setCurrencyChosen(false);
       toast.success('Transacción registrada');
       router.refresh();
     } catch (error) {
@@ -158,23 +163,23 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
                   setFormData({ ...formData, symbol: '', companyName: '' });
                 }
               }}
-              initialSelectedValue={initialSymbol}
-              onSelect={(stock) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  symbol: stock.symbol,
-                  companyName: stock.name,
-                  // Solo se sobrescribe la divisa si el usuario aun tiene el default USD:
-                  // una eleccion manual previa se respeta.
-                  currency:
-                    prev.currency === 'USD'
-                      ? (defaultCurrencyFor(stock.symbol) ?? prev.currency)
-                      : prev.currency,
-                }));
-                setSearchQuery(stock.symbol);
-              }}
+              initialSelectedValue={presetSymbol ?? undefined}
+              onSelect={(stock) => selectSymbol(stock.symbol, stock.name)}
               className="bg-gray-800 border-gray-700 text-gray-100 w-full"
             />
+            {canUseManualSymbol && (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                <span>¿No aparece en la lista?</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => selectSymbol(manualSymbol, '')}
+                  className="min-h-[44px] px-2 text-teal-300 hover:bg-teal-950/40 hover:text-teal-200"
+                >
+                  Usar «{manualSymbol}» como símbolo
+                </Button>
+              </div>
+            )}
             {fieldErrors.symbol && (
               <p role="alert" className="text-sm text-red-400">{fieldErrors.symbol}</p>
             )}
@@ -184,17 +189,19 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
               <div className="flex items-center gap-2 p-2 bg-teal-900/30 rounded border border-teal-700">
                 <TrendingUp className="h-4 w-4 text-teal-400" />
                 <span className="text-teal-300 font-medium">{formData.symbol}</span>
-                <span className="text-gray-400 text-sm">- {formData.companyName}</span>
+                {formData.companyName ? (
+                  <span className="text-gray-400 text-sm">- {formData.companyName}</span>
+                ) : null}
               </div>
             )}
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="currency" className="text-gray-300">Moneda de la operación</Label>
-            <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
+            <Select value={formData.currency} onValueChange={(currency) => { setCurrencyChosen(true); setFormData({ ...formData, currency }); }}>
               <SelectTrigger id="currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
-                {FORM_CURRENCIES.map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
+                {currencyOptions(formData.currency).map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

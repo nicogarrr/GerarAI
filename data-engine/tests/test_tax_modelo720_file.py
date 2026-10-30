@@ -332,3 +332,25 @@ def test_unavailable_same_isin_in_two_portfolios(db):
     result = Modelo720FileService().generate(db, 2025)
     assert result["available"] is False
     assert "no representable" in result["reason"]
+
+
+def test_text_field_keeps_spanish_names_readable():
+    """Alphanumeric fields: uppercase, no accented vowels, Ñ/Ç kept.
+
+    AEAT "Modelo 720. Diseños físicos y lógicos" (Orden HAP/72/2013, anexo
+    II), normas generales: alphanumeric fields go in "mayúsculas, sin
+    caracteres especiales y sin vocales acentuadas"; Ñ and Ç are valid
+    ISO-8859-1 characters of the spec. "Muñoz Pérez José" must become
+    "MUÑOZ PEREZ JOSE", not "MU OZ P REZ JOS " (letters lost to blanks,
+    which no longer matches the declarant's census name).
+    """
+    from app.services.tax_modelo720_file import CODING, _text
+
+    assert _text("Muñoz Pérez José", 20) == "MUÑOZ PEREZ JOSE    "
+    assert _text("Peña Ibáñez Begoña", 18) == "PEÑA IBAÑEZ BEGOÑA"
+    assert _text("Àlex Gonçalves Lüdke", 20) == "ALEX GONÇALVES LUDKE"
+    assert _text("ÁNGEL", 5) == "ANGEL"
+    # Width is preserved in the 1-byte encoding of the file.
+    assert len(_text("Muñoz Pérez José", 40).encode(CODING)) == 40
+    # Control characters still become blanks without shifting columns.
+    assert _text("A\tB", 3) == "A B"

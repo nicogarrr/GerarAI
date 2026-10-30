@@ -29,6 +29,8 @@ describe('Company position panel with the same figures as the portfolio', () => 
         expect(value('Plusvalía latente')).toHaveTextContent('500,00 US$ en USD');
         expect(value('Peso')).toHaveTextContent('39,7 %de las posiciones con valor');
         expect(screen.getByRole('link', { name: 'Ver en la cartera' })).toHaveAttribute('href', '/portfolio');
+        // Comprar más o vender abre el alta con el símbolo ya elegido.
+        expect(screen.getByRole('link', { name: 'Registrar compra o venta' })).toHaveAttribute('href', '/portfolio?anadir=1&simbolo=TEST');
     });
     it('never fills a cost under review, a suspended valuation or a missing FX with zeros', () => {
         const { unmount } = render(<CompanyPositionPanel context={held({ costReviewMessage: 'Divisa del coste de IBKR sin verificar.' })} />);

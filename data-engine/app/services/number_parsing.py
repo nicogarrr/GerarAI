@@ -50,6 +50,21 @@ _NUMBER_RUN = re.compile(r"\(?\s*[-+]?\d[\d.,]*\)?")
 _SPACE_THOUSANDS = re.compile(r"(?<!\d[.,])[ \u00a0](?=\d{3}(?!\d))")
 
 
+def _not_a_thousands_group(raw: str, separator: str) -> bool:
+    """A SINGLE separator that cannot be thousands grouping, so it is decimal.
+
+    A thousands group is exactly three digits and the leading group has one to
+    three: "1,2345" (an es-ES FX rate or 4-decimal price) and "1234,567" (es-ES
+    without grouping) were read as 12345 and 1234567, errors of x10.000 and
+    x1.000. Only the one-separator case is decided here; repeated separators
+    keep their grouping reading.
+    """
+    if raw.count(separator) != 1:
+        return False
+    integer, fraction = raw.split(separator)
+    return len(fraction) != 3 or len(integer) > 3
+
+
 def find_number_tokens(text: object) -> list[str]:
     """Every numeric token in free text, in order of appearance.
 
@@ -102,7 +117,11 @@ def parse_localized_number(value: object) -> tuple[Decimal, bool] | None:
         # Parte entera 0 ("0,250"): un grupo de miles nunca empieza por 0, asi
         # que el separador unico es decimal aunque le sigan 3 cifras (antes
         # "0,125 EUR por accion" se leia como 125: error x1000).
-        if _DECIMAL_COMMA.match(f"0{raw}") or _ZERO_INTEGER.match(raw.replace(",", ".")):
+        if (
+            _DECIMAL_COMMA.match(f"0{raw}")
+            or _ZERO_INTEGER.match(raw.replace(",", "."))
+            or _not_a_thousands_group(raw, ",")
+        ):
             raw = raw.replace(",", ".")
         else:
             raw = raw.replace(",", "")
@@ -113,7 +132,11 @@ def parse_localized_number(value: object) -> tuple[Decimal, bool] | None:
         # "1.234.567" parseable at all instead of raising InvalidOperation.
         groups = raw.split(".")
         # "0.250" es 0,25, nunca 250 (mismo motivo que con la coma).
-        if not _ZERO_INTEGER.match(raw) and all(len(group) == 3 for group in groups[1:]):
+        if (
+            not _ZERO_INTEGER.match(raw)
+            and not _not_a_thousands_group(raw, ".")
+            and all(len(group) == 3 for group in groups[1:])
+        ):
             raw = "".join(groups)
     try:
         parsed = Decimal(f"{sign}{raw}")

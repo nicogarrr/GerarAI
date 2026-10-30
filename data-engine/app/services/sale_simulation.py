@@ -6,9 +6,11 @@ que con compras a precios distintos da otra ganancia: con 10 a 100 € y 10 a
 200 €, vender 10 a 180 € es una ganancia FIFO de 800 € y no de 300 €.
 
 Los lotes salen de las compras guardadas (fecha, cantidad, precio y
-comisiones), en euros al tipo del BCE de la FECHA DE COMPRA (el mismo criterio
-que el informe fiscal: último tipo publicado como mucho 7 días antes), y las
-ventas ya hechas consumen los lotes más antiguos antes de simular la nueva.
+comisiones) y las ventas ya hechas consumen los lotes más antiguos antes de
+simular la nueva. El coste en euros que muestra el Cerebro sigue el criterio
+del informe fiscal (DGT V0152-26): coste en la divisa del valor al cambio de
+la FECHA DE VENTA (``cost_eur_dgt``); ``cost_eur`` (cambio de compra) queda
+solo para lotes en una divisa distinta de la de venta.
 
 Regla de los dos meses (art. 33.5.f LIRPF): una pérdida no se computa si se
 compraron valores homogéneos en los dos meses anteriores a la venta y siguen
@@ -55,6 +57,21 @@ class ConsumedLot:
     def cost_eur(self) -> Decimal | None:
         return None if self.unit_cost_eur is None else self.unit_cost_eur * self.quantity
 
+    def cost_eur_dgt(self, sale_currency: str, sale_rate: Decimal | None) -> Decimal | None:
+        """Coste en euros con el criterio del informe fiscal (DGT V0152-26).
+
+        La ganancia se calcula en la divisa del valor y se pasa a euros al
+        cambio de la FECHA DE VENTA: el coste nativo (con su diferido) va al
+        cambio de la venta, no al de la compra. Un lote en otra divisa que la
+        de la venta (dato raro) conserva su coste al cambio de compra.
+        """
+        native = self.unit_cost_native * self.quantity
+        if (self.currency or TAX_CURRENCY) == TAX_CURRENCY:
+            return native
+        if self.currency == sale_currency:
+            return None if sale_rate is None else native * sale_rate
+        return self.cost_eur
+
 
 @dataclass
 class FifoSale:
@@ -72,6 +89,16 @@ class FifoSale:
             if lot.cost_eur is None:
                 return None
             total += lot.cost_eur
+        return total
+
+    def cost_eur_dgt(self, sale_currency: str, sale_rate: Decimal | None) -> Decimal | None:
+        """Suma de :meth:`ConsumedLot.cost_eur_dgt`; None si falta alguno."""
+        total = Decimal("0")
+        for lot in self.lots:
+            cost = lot.cost_eur_dgt(sale_currency, sale_rate)
+            if cost is None:
+                return None
+            total += cost
         return total
 
 

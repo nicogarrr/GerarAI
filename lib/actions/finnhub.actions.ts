@@ -125,7 +125,11 @@ export async function getNews(symbols?: string[]): Promise<MarketNewsArticle[]> 
         const range = getDateRange(5);
         const token = env.FINNHUB_API_KEY;
         if (!token) {
-            throw new Error('FINNHUB API key is not configured');
+            // Sin fuente de noticias configurada no es un fallo: es «no hay
+            // noticias». Antes se lanzaba, Inicio pintaba el aviso ámbar «No se
+            // pudieron cargar las noticias» con un «Reintentar» que no podía
+            // arreglar nada, y el error salía en la consola del navegador.
+            return [];
         }
         const cleanSymbols = (symbols || [])
             .map((s) => s?.trim().toUpperCase())

@@ -285,3 +285,77 @@ def test_max_age_zero_keeps_today_thesis_price_fresh(db, monkeypatch):
     monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=0))
     _, observation = module._latest_price(db, company.id)
     assert observation["status"] == "fresh"
+
+
+
+# --- unidades: peniques y ADR (cálculo independiente) ------------------------
+
+def _observe(db, company, thesis, metric):
+    from app.models import AlertRule
+    from app.services.thesis_invalidation_rules import observe
+
+    rule = AlertRule(company_id=company.id, name="criterio", rule_type=RULE_TYPE,
+                     target={"metric": metric, "thesis_version_id": thesis.id})
+    return observe(db, rule)
+
+
+def _london(db: Session) -> Company:
+    company = Company(
+        ticker="PENX.L", name="Pence", exchange="LSE", currency="GBP",
+        sector="x", industry="x", company_type="standard",
+        valuation_model="standard_dcf", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    db.add(MarketPrice(
+        company_id=company.id, date=date.today(), open=Decimal("1500"), high=Decimal("1500"),
+        low=Decimal("1500"), close=Decimal("1500"), adj_close=Decimal("1500"),
+        source="yfinance", quote_currency="GBp",
+    ))
+    db.commit()
+    return company
+
+
+def test_london_pence_close_is_compared_in_pounds(db):
+    company = _london(db)
+    # Tesis: precio 15 £, esperado 18 £. Hoy 1.500 GBp = 15 £.
+    # Variación = 15/15 - 1 = 0 %; margen = 18/15 - 1 = 20 %.
+    thesis = _thesis(db, company, price="15", expected="18")
+    change, info = _observe(db, company, thesis, "variacion_desde_tesis_pct")
+    assert change == Decimal("0")
+    assert info["currency"] == "GBP"
+    margin, _ = _observe(db, company, thesis, "margen_seguridad_pct")
+    assert margin.quantize(Decimal("0.01")) == Decimal("20.00")
+
+
+def test_adr_margin_uses_value_per_adr(db):
+    company = _company(db, "ADRX")
+    # Esperado 10 por ordinaria, ADR = 8 ordinarias -> 80 por ADR; ADR a 64.
+    # Margen = 80/64 - 1 = 25 % (no 10/64 - 1 = -84,375 %).
+    thesis = _thesis(db, company, expected="10", price="64")
+    thesis.valuation_basis = {"adr_ratio": 8.0, "listed_share_values": {"expected": 80.0}}
+    db.commit()
+    _price(db, company, "64")
+    margin, _ = _observe(db, company, thesis, "margen_seguridad_pct")
+    assert margin == Decimal("25")
+
+
+def test_adr_without_listed_values_has_no_margin(db):
+    company = _company(db, "ADRY")
+    thesis = _thesis(db, company, expected="10", price="64")
+    thesis.valuation_basis = {"adr_ratio": 8.0}
+    db.commit()
+    _price(db, company, "64")
+    margin, info = _observe(db, company, thesis, "margen_seguridad_pct")
+    assert margin is None
+    assert info["status"] == "missing"
+
+
+def test_minor_unit_listing_without_declared_unit_does_not_compare(db):
+    company = _london(db)
+    db.query(MarketPrice).update({MarketPrice.quote_currency: None})
+    db.commit()
+    thesis = _thesis(db, company, price="15", expected="18")
+    change, info = _observe(db, company, thesis, "variacion_desde_tesis_pct")
+    assert change is None
+    assert info["missing"] == "unidad_precio"

@@ -215,3 +215,29 @@ def test_edited_transaction_moved_to_snapshot_cannot_overwrite_it(db, quote):
     assert db.get(Transaction, trade_id).company_id == original_id
     kept = db.scalar(select(Position).where(Position.company_id == target_id))
     assert kept.quantity == Decimal("12.5") and kept.source == "screenshot_confirmed"
+
+
+def test_friday_close_still_imports_on_monday_morning(db, quote, monkeypatch):
+    """El cierre del viernes visto el lunes antes de la apertura (~60 h) es el
+    ultimo precio de mercado: antes caducaba a las 24 h y no dejaba importar
+    una captura en fin de semana."""
+    import asyncio
+    import time
+
+    friday_close = int(time.time()) - 60 * 3600
+    monkeypatch.setattr(imports.extended_quote_service, "get",
+                        AsyncMock(return_value=quote.model_copy(update={"timestamp": friday_close})))
+    result = asyncio.run(review_rows(db, "e" * 64, rows()))
+    assert result["can_confirm"]
+    assert result["rows"][0]["price"] == "42.0"
+    assert confirm_review(db, result["review_id"], True)["positions_imported"] == 1
+
+
+def test_week_old_quote_still_blocks(db, quote, monkeypatch):
+    import asyncio
+    import time
+
+    week_old = int(time.time()) - 7 * 86400
+    monkeypatch.setattr(imports.extended_quote_service, "get",
+                        AsyncMock(return_value=quote.model_copy(update={"timestamp": week_old})))
+    assert not asyncio.run(review_rows(db, "f" * 64, rows()))["can_confirm"]

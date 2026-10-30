@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -19,6 +20,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import FundManager, ManagerHolding
 from app.services.investor_profiles import public_profile
 from app.services.manager_holding_ingestion_service import (
@@ -26,6 +28,7 @@ from app.services.manager_holding_ingestion_service import (
     REVIEWED_MANAGERS,
     SOURCE,
     ManagerHoldingIngestionService,
+    _latest_accession,
     public_coverage,
     verification_status,
 )
@@ -136,25 +139,72 @@ def _manager(db: Session, inv: Investor) -> FundManager | None:
     return db.scalar(select(FundManager).where(FundManager.cik == inv.cik))
 
 
+def _reviewed_managers(db: Session) -> dict[str, FundManager]:
+    """Todos los gestores revisados del tenant en UNA consulta (antes, una por
+    inversor de la tabla)."""
+    ciks = [inv.cik for inv in INVESTORS if inv.cik is not None and inv.cik in REVIEWED_MANAGERS]
+    if not ciks:
+        return {}
+    return {m.cik: m for m in db.scalars(select(FundManager).where(FundManager.cik.in_(ciks)))}
+
+
+def _latest_summaries(
+    db: Session, managers: list[FundManager]
+) -> dict[int, tuple[int, float | None]]:
+    """(posiciones, valor en miles USD) de la vista vigente de cada gestor, en
+    UNA consulta de columnas. Misma regla que _latest_view + _total: ultimo
+    periodo, accession vigente (_latest_accession), suma de los valores que hay."""
+    by_id = {m.id: m for m in managers if m.last_report_date is not None}
+    if not by_id:
+        return {}
+    grouped: dict[int, list[Any]] = defaultdict(list)
+    for row in db.execute(
+        select(
+            ManagerHolding.manager_id,
+            ManagerHolding.report_date,
+            ManagerHolding.accession_number,
+            ManagerHolding.filing_date,
+            ManagerHolding.value_usd_thousands,
+        ).where(
+            ManagerHolding.manager_id.in_(list(by_id)),
+            *tenant_filters(db, ManagerHolding),
+        )
+        .join(FundManager, FundManager.id == ManagerHolding.manager_id)
+        .where(ManagerHolding.report_date == FundManager.last_report_date)
+    ):
+        grouped[row.manager_id].append(row)
+    summaries: dict[int, tuple[int, float | None]] = {}
+    for manager_id, rows in grouped.items():
+        accession = _latest_accession(rows)
+        view = [r for r in rows if r.accession_number == accession]
+        values = [r.value_usd_thousands for r in view if r.value_usd_thousands is not None]
+        summaries[manager_id] = (len(view), float(sum(values, Decimal(0))) if values else None)
+    return summaries
+
+
 def list_investors(db: Session) -> dict[str, Any]:
     from app.services.investor_autosync import maybe_autosync_holdings
 
     maybe_autosync_holdings(db)
+    managers = _reviewed_managers(db)
+    summaries = _latest_summaries(db, list(managers.values()))
     out: list[dict[str, Any]] = []
     for inv in INVESTORS:
         item = _entry(inv)
-        manager = _manager(db, inv)
-        rows = _latest_view(db, manager) if manager else []
+        manager = managers.get(inv.cik) if inv.cik in REVIEWED_MANAGERS else None
+        positions, value = summaries.get(manager.id, (0, None)) if manager else (0, None)
         item.update(
             {
-                "coverage": public_coverage(manager.coverage) if manager and rows else None,
-                "verification": verification_status(manager.coverage) if manager and rows else None,
+                "coverage": public_coverage(manager.coverage) if manager and positions else None,
+                "verification": verification_status(manager.coverage)
+                if manager and positions
+                else None,
                 "official_name": REVIEWED_MANAGERS.get(inv.cik or ""),
                 "report_date": manager.last_report_date.isoformat()
                 if manager and manager.last_report_date
                 else None,
-                "positions": len(rows) if rows else None,
-                "value_usd_thousands": _total(rows),
+                "positions": positions or None,
+                "value_usd_thousands": value,
                 "note": None if inv.cik else NO_13F_NOTE,
             }
         )
@@ -243,10 +293,11 @@ def most_bought(db: Session) -> dict[str, Any]:
     pending = 0
     partial = 0
     periods: set[str] = set()
+    managers = _reviewed_managers(db)
     for inv in INVESTORS:
-        if inv.cik is None:
+        if inv.cik is None or inv.cik not in REVIEWED_MANAGERS:
             continue
-        manager = _manager(db, inv)
+        manager = managers.get(inv.cik)
         if manager is None:
             continue
         result = service.changes(db, cik=inv.cik)

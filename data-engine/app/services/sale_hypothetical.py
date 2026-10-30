@@ -99,6 +99,8 @@ class HypoSale:
     gain_eur: Decimal | None = None
     tax_eur: Decimal | None = None
     native_gain: Decimal | None = None
+    #: Cambio EUR por unidad de la divisa de venta, en la fecha de venta.
+    sale_rate: Decimal | None = None
     missing: list[str] = field(default_factory=list)
     invalid: str | None = None
     undated: bool = False
@@ -317,12 +319,15 @@ def simulate_hypothetical_sale(
             as_of=today, max_age_days=MAX_FX_AGE_DAYS,
         )
     )
+    result.sale_rate = sale_rate
     same_ccy = all(lot.currency == result.sale_currency for lot in result.fifo.lots)
     if same_ccy:
         native_cost = sum((lot.unit_cost_native * lot.quantity for lot in result.fifo.lots), Decimal("0"))
         result.native_gain = result.sale_price * result.quantity - native_cost
-    cost_eur = result.fifo.cost_eur
-    if cost_eur is None:
+    # Criterio del informe fiscal (DGT V0152-26): coste nativo al cambio de
+    # la venta; solo un lote en otra divisa necesita el cambio de su compra.
+    cost_eur = result.fifo.cost_eur_dgt(result.sale_currency, sale_rate) if sale_rate is not None else None
+    if cost_eur is None and sale_rate is not None:
         result.missing.append(
             "la fecha de compra de cada lote (para pasar el coste a euros al tipo de ese día)"
             if any(lot.trade_date is None for lot in result.fifo.lots)

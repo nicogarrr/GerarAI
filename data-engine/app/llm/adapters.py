@@ -400,6 +400,27 @@ class OpenAICompatibleProvider(LLMProvider):
             safe(error or "-"),
         )
 
+    def _recorded_model(self, body_model: Any, requested_model: str) -> str:
+        """Modelo que viaja en ``LLMResponse.model``.
+
+        A diferencia del registro `llm.call` (que ya redacta), este valor se
+        PERSISTE (budget_usage, telemetria del chat) y se devuelve al frontend
+        (ChatResponse.model), y lo controla el proveedor: un endpoint custom
+        de tenant podria devolver en `body["model"]` la propia clave, un
+        `sk-...` o una cadena de miles de caracteres que romperia el insert
+        (String(160)). Mismas reglas que los avisos (`_collect_warnings`):
+        redaccion con la key y las cabeceras conocidas, espacios normalizados
+        y cota de longitud. Si el proveedor no manda modelo (o queda vacio),
+        se conserva el pedido, como antes.
+        """
+        if not isinstance(body_model, str):
+            return requested_model
+        known = [str(self._api_key or "")]
+        known.extend(str(v) for v in self._extra_headers.values())
+        text = redact_secrets(body_model, known)
+        text = " ".join(text.split())[:160]
+        return text or requested_model
+
     def _redact_for_log(self, value: object) -> str:
         """Texto apto para el registro `llm.call` y las trazas.
 
@@ -630,7 +651,7 @@ class OpenAICompatibleProvider(LLMProvider):
         return LLMResponse(
             message=Message(MessageRole.ASSISTANT, content),
             usage=usage,
-            model=body.get("model") if isinstance(body.get("model"), str) else model,
+            model=self._recorded_model(body.get("model"), model),
             provider=self.name,
             finish_reason=finish_reason if isinstance(finish_reason, str) else None,
             request_id=body.get("id") if isinstance(body.get("id"), str) else None,

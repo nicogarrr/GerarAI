@@ -56,3 +56,15 @@ export function groupLetters(docs: LetterDoc[]): AuthorGroup[] {
     for (const group of out) group.letters.sort(byRecent);
     return out.sort((a, b) => b.letters.length - a.letters.length || a.name.localeCompare(b.name, 'es'));
 }
+
+export type LetterNeighbors = { older: LetterDoc | null; newer: LetterDoc | null };
+
+/** Carta anterior (más antigua) y siguiente (más reciente) del mismo autor, en el orden de groupLetters. */
+export function letterNeighbors(groups: AuthorGroup[], id: number): LetterNeighbors {
+    for (const group of groups) {
+        const index = group.letters.findIndex((letter) => letter.id === id);
+        if (index === -1) continue;
+        return { older: group.letters[index + 1] ?? null, newer: group.letters[index - 1] ?? null };
+    }
+    return { older: null, newer: null };
+}

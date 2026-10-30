@@ -23,6 +23,7 @@ el valor afectado, sus consumidores y el reemplazo.
 | Marketstack | `MARKETSTACK_API_KEY` no figura en las variables actuales del proyecto Vercel. Quitar una variable no revoca la clave del proveedor. | Revocacion en el proveedor sin acreditar. No hay login utilizable disponible; el intento de abrir el panel termino en timeout. No se ha reseteado ninguna clave. |
 | MongoDB Atlas | La consola redirige a login; no hay sesion de administrador accesible en la comprobacion de hoy. | No se ha revisado Database Access ni Activity Feed ni cambiado usuarios. Una URI de conexion no sustituye el acceso al panel. |
 | Gemini y otros proveedores | El informe operativo del 28-oct indicaba tres claves historicas Gemini rechazadas y la contraseña historica Atlas rechazada; no encontro valores reales de Finnhub/FMP/Twelve Data/Alpha Vantage/Polygon en su barrido. | Es un informe previo, no una nueva prueba de validez ni un inventario exhaustivo reproducido el 29-oct. No presentar esos proveedores como exposiciones confirmadas sin recuperar evidencia concreta. |
+| Barrido gitleaks del historial completo (30-oct-2026) | 10.825 commits con reglas por defecto + reglas propias, valores redactados y solo comparados en privado (forma, longitud, entropia; ninguno probado contra el proveedor). Valores con forma de clave real, no marcadores: **Gemini/Google** 3 claves distintas (`RESUMEN_FINAL.md` e `INSTRUCCIONES_DESPLIEGUE.md` en `574df4ec`; `docker.env.example` en `e7e5597b`; `.env.bak` en `70098ea9`); **MongoDB Atlas** contrasena de usuario en la URI del cluster (`INSTRUCCIONES_DESPLIEGUE.md`, `574df4ec` y `97cf1049`); **Finnhub** (`.env.bak`, `docker.env.example`, `RESUMEN_FINAL.md`), **FMP**, **Twelve Data**, **Alpha Vantage**, **Marketstack** y **Better Auth** (`.env.bak` `70098ea9`, `docker.env.example` `e7e5597b`). **Polygon** solo aparece como marcador. Ningun valor real sigue en el arbol actual de `main`. | Corrige la fila anterior: Finnhub, FMP, Twelve Data, Alpha Vantage y Marketstack si tienen valores no ficticios en el historial. Validez sin comprobar (probar una clave filtrada contra el proveedor no se hizo). |
 
 No se han cambiado ni revocado credenciales en esta revision. Nunca guardar
 valores en este documento, capturas, logs o mensajes. Los secretos nuevos se
@@ -35,8 +36,11 @@ siga activo ni que todos los proveedores listados hayan tenido una clave real:
 
 - MongoDB: `INSTRUCCIONES_DESPLIEGUE.md`, commit `97cf1049`.
 - Better Auth: `docker.env.example`, `e7e5597b`; `.env.bak`, `70098ea9`.
-- Gemini y posibles asignaciones de proveedores: `RESUMEN_FINAL.md`,
+- Gemini (3 claves): `RESUMEN_FINAL.md` / `INSTRUCCIONES_DESPLIEGUE.md`,
   `574df4ec`; `docker.env.example`, `e7e5597b`; `.env.bak`, `70098ea9`.
+- Finnhub, FMP, Twelve Data, Alpha Vantage, Marketstack: `.env.bak`, `70098ea9`;
+  `docker.env.example`, `e7e5597b` (Finnhub tambien en `RESUMEN_FINAL.md`, `574df4ec`).
+- Polygon: solo marcadores; no hay clave que rotar.
 
 Si se confirma una credencial expuesta activa, primero inventariar consumidores.
 Crear y probar su reemplazo en ellos antes de revocar la anterior. Si ya esta
@@ -166,7 +170,7 @@ Después:
 
 - PR #2269: gitleaks en CI (commits nuevos de cada PR y push a `main`) y en
   pre-commit (`pip install pre-commit && pre-commit install`).
-- Seguimiento recomendado: añadir a `.gitleaks.toml` dos reglas propias para lo
-  que gitleaks no vio aquí: URIs con contraseña (`mongodb(+srv)?://usuario:contraseña@`)
-  y `BETTER_AUTH_SECRET=` con un valor que no sea un marcador.
+- `.gitleaks.toml` trae dos reglas propias para lo que gitleaks no vio aquí:
+  URIs de MongoDB con contraseña y `BETTER_AUTH_SECRET=` con un valor que no sea
+  un marcador (test: `data-engine/tests/test_gitleaks_custom_rules.py`).
 - Los `.env*` reales nunca se versionan; solo los `*.example` con marcadores.

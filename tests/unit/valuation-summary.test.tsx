@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import ValuationSummaryGrid, { ValuationSummaryCard } from '@/components/research/ValuationSummaryGrid';
-import { safetyMargin, type ValuationSummary } from '@/lib/research/valuation-summary';
+import { healthMissingLabel, safetyMargin, type ValuationSummary } from '@/lib/research/valuation-summary';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
 vi.mock('@/lib/actions/valuation-summary.actions', () => ({ getValuationSummaries: vi.fn() }));
 
@@ -28,7 +28,7 @@ describe('shared valuation', () => {
     render(<ValuationSummaryCard item={item} quote={quote} />);
     expect(screen.getByText('No evaluable (1/9 puntos con datos)')).toBeInTheDocument();
     expect(screen.getByText((text) => /^20[,.]0?0?\s*%$/.test(text))).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /net_income/ })).toHaveAttribute('href', 'https://www.sec.gov/test');
+    expect(screen.getByRole('link', { name: /Beneficio neto: 10 USD/ })).toHaveAttribute('href', 'https://www.sec.gov/test');
     expect(screen.getByText(/precio del modelo/)).toBeInTheDocument();
   });
   it('renders unavailable values and full scores without false certainty', () => {
@@ -61,5 +61,33 @@ describe('shared valuation', () => {
     await waitFor(() => expect(screen.getByText(/no está disponible ahora/)).toBeInTheDocument());
     view.rerender(<ValuationSummaryGrid quotes={[]} />);
     expect(view.container).toBeEmptyDOMElement();
+  });
+  it('names missing inputs and evidence in Spanish, not backend keys', () => {
+    const copy = structuredClone(item);
+    copy.health.piotroski.signals[0].point = null;
+    copy.health.piotroski.signals[0].missing_input = 'total_assets:FY2024';
+    render(<ValuationSummaryCard item={copy} quote={quote} />);
+    expect(screen.getByText('Dato pendiente: Activos totales (ejercicio 2024)')).toBeInTheDocument();
+    expect(screen.getByText('Dato pendiente: Beneficios retenidos (ejercicio 2025)')).toBeInTheDocument();
+    expect(screen.queryByText(/total_assets|retained_earnings|net_income/)).not.toBeInTheDocument();
+  });
+  it('healthMissingLabel keeps already-written reasons', () => {
+    expect(healthMissingLabel('current_liabilities:FY2023')).toBe('Pasivo corriente (ejercicio 2023)');
+    expect(healthMissingLabel('long_term_debt')).toBe('Deuda a largo plazo');
+    expect(healthMissingLabel('periodos no comparables')).toBe('periodos no comparables');
+    expect(healthMissingLabel('denominador no positivo')).toBe('denominador no positivo');
+  });
+});
+
+describe('valuation summary tap targets (mobile ≥44 px)', () => {
+  it('ticker link, methodology links and the details toggle are 44 px tall', () => {
+    render(<ValuationSummaryCard item={item} quote={quote} />);
+    const targets = [
+      screen.getByRole('link', { name: 'DEMO' }),
+      screen.getByRole('link', { name: 'Método Piotroski' }),
+      screen.getByRole('link', { name: 'Método Altman' }),
+      screen.getByText(/Ver puntos, fuentes/),
+    ];
+    for (const el of targets) expect(el.className).toMatch(/min-h-\[44px\]/);
   });
 });

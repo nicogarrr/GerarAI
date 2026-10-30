@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -9,6 +10,12 @@ import { getScreenerWorkspace, runSavedScreen } from '@/lib/actions/research-too
 import { formatNumber, formatPercent } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
 import { formatScreenRank } from '@/lib/screener-results';
+
+// Sin metadata propia la pestaña heredaba el título genérico de la app y
+// todos los filtros guardados se llamaban igual (WCAG 2.4.2).
+export const metadata: Metadata = {
+  title: 'Resultados del filtro guardado',
+};
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

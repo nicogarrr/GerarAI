@@ -6,6 +6,7 @@ from decimal import Decimal
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import FXRate, Portfolio
 from app.valuation.currency import normalize_currency
 
@@ -153,24 +154,33 @@ class PortfolioFXService:
         base, _ = normalize_currency(base_currency)
         codes = {normalize_currency(str(code))[0] for code in currencies if code}
         codes.add(base)
-        rows = list(
-            db.scalars(
-                select(FXRate)
-                .where(
-                    FXRate.base_currency.in_(codes),
-                    FXRate.quote_currency.in_(codes),
-                    FXRate.rate_date <= as_of_max,
-                )
-                .order_by(FXRate.rate_date, FXRate.created_at)
-            ).all()
-        )
+        # Columnas, no entidades: con años de historico son miles de filas y
+        # construir un objeto ORM por fila era la mayor parte del coste de
+        # /api/portfolio/intelligence (que llama aqui varias veces). Una
+        # consulta de columnas no recibe el with_loader_criteria del tenant,
+        # asi que el predicado va explicito (mismo filtro, mismas filas).
+        rows = db.execute(
+            select(
+                FXRate.base_currency,
+                FXRate.quote_currency,
+                FXRate.rate_date,
+                FXRate.rate,
+            )
+            .where(
+                FXRate.base_currency.in_(codes),
+                FXRate.quote_currency.in_(codes),
+                FXRate.rate_date <= as_of_max,
+                *tenant_filters(db, FXRate),
+            )
+            .order_by(FXRate.rate_date, FXRate.created_at)
+        ).all()
         table: dict[tuple[str, str], list[tuple[date, Decimal]]] = {}
-        for row in rows:
-            if row.rate is None:
+        for row_base, row_quote, rate_date, rate in rows:
+            if rate is None:
                 continue
             table.setdefault(
-                (row.base_currency.upper(), row.quote_currency.upper()), []
-            ).append((row.rate_date, row.rate))
+                (row_base.upper(), row_quote.upper()), []
+            ).append((rate_date, rate))
         return table
 
     @staticmethod

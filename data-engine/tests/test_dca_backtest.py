@@ -62,3 +62,14 @@ def test_range_and_insufficient_history() -> None:
     assert short["available"] is False and "insuficiente" in short["reason"]
     with pytest.raises(ValueError):
         backtest_dca(_bars(SERIES), base_amount=0)
+
+
+def test_valuation_says_when_the_month_is_still_open() -> None:
+    """Valorar a mitad de mes no es «el cierre de 2018-12»: se da la fecha y se marca abierto."""
+    open_month = backtest_dca(_bars(SERIES), today=date(2018, 12, 25))
+    assert open_month["valued_at_period"] == "2018-12"
+    assert open_month["valued_at_date"] == "2018-12-20"
+    assert open_month["valued_month_complete"] is False
+    closed = backtest_dca(_bars(SERIES), today=date(2030, 1, 1))
+    assert closed["valued_at_date"] == "2018-12-20"
+    assert closed["valued_month_complete"] is True

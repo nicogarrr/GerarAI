@@ -14,6 +14,7 @@ import {
     verifyDeleteReauthToken,
 } from "@/lib/auth/delete-reauth";
 import {deleteAuthAccountResidue} from "@/lib/better-auth/account-residue";
+import {buildAuthRateLimit} from "@/lib/better-auth/rate-limit";
 import {createAuthMiddleware} from "better-auth/api";
 import {
     isEmailAllowedToSignUp,
@@ -80,20 +81,15 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
             }
         }),
     },
-    rateLimit: {
-        enabled: env.NODE_ENV === 'production'
-            || process.env.APP_ENV === 'production'
-            || process.env.AUTH_RATE_LIMIT_ENABLED === 'true',
-        window: 60,
-        max: 100,
-        customRules: {
-            '/request-password-reset': { window: 60, max: 3 },
-            '/reset-password': { window: 60, max: 5 },
-            '/change-password': { window: 10, max: 3 },
-            '/verify-password': { window: 60, max: 10 },
-            '/delete-user': { window: 60, max: 3 },
+    // Contadores compartidos entre instancias (ver lib/better-auth/rate-limit.ts).
+    rateLimit: buildAuthRateLimit({
+        hasDatabase: Boolean(database),
+        env: {
+            NODE_ENV: env.NODE_ENV,
+            APP_ENV: process.env.APP_ENV,
+            AUTH_RATE_LIMIT_ENABLED: process.env.AUTH_RATE_LIMIT_ENABLED,
         },
-    },
+    }),
     // Perfil inversor persistido en el documento `user` de MongoDB.
     // Mongo es schemaless: additionalFields no requiere migraciones SQL,
     // better-auth los persiste y los devuelve en sesion cuando se piden.

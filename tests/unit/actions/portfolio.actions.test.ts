@@ -135,6 +135,13 @@ describe('lecturas de transacciones', () => {
             expect(researchRequest).toHaveBeenLastCalledWith('/api/portfolio/transactions/page?limit=50&offset=0', { fast: true });
         }
     });
+
+    it('pasa los filtros de ticker y tipo al backend (que filtra antes de paginar)', async () => {
+        researchRequest.mockResolvedValue({ items: [], total: 0 });
+        const page = await getPortfolioTransactionPage('tenant-one', 50, { ticker: 'SAN.MC', type: 'sell' });
+        expect(researchRequest).toHaveBeenLastCalledWith('/api/portfolio/transactions/page?limit=50&offset=50&ticker=SAN.MC&action=sell', { fast: true });
+        expect(page.filters).toEqual({ ticker: 'SAN.MC', type: 'sell' });
+    });
 });
 
 describe('getPortfolioSummary: dinero y suspensión de valoración', () => {
@@ -158,6 +165,30 @@ describe('getPortfolioSummary: dinero y suspensión de valoración', () => {
         expect(h.currentPrice).toBeNull();
         expect(h.valuationHold).toEqual({ reason: 'split sin verificar', effectiveDate: '2026-10-01' });
         expect(h.fxMissing).toBe(true);
+    });
+
+    it('coste y rendimiento solo con posiciones valoradas: una sin precio no diluye el % (cuadra con /inicio)', async () => {
+        seedSummary([
+            position({ ticker: 'VALORADA', market_value_base: 1500, cost_basis_base: 1000, unrealized_pnl_base: 500 }),
+            position({ ticker: 'SINPRECIO', market_value_base: null, cost_basis_base: 1000, unrealized_pnl_base: null }),
+            position({ ticker: 'SUSPENDIDA', cost_basis_base: 700, unrealized_pnl_base: null, valuation_hold: { reason: 'split', effective_date: null, since: null } }),
+        ]);
+        const summary = await getPortfolioSummary('tenant-one');
+        expect(summary.totalCost).toBe(1000);
+        expect(summary.totalGain).toBe(500);
+        expect(summary.totalGainPercent).toBeCloseTo(50, 6);
+        expect(summary.totalsExcluded).toBe(2);
+    });
+
+    it('un coste IBKR pendiente de revisión no entra en coste/rendimiento', async () => {
+        seedSummary([
+            position({ ticker: 'LIMPIA', market_value_base: 1500, cost_basis_base: 1000, unrealized_pnl_base: 500 }),
+            position({ ticker: 'REVISAR', market_value_base: 900, cost_basis_base: 3000, unrealized_pnl_base: -2100, cost_reconciliation: { status: 'currency_unverified', message: 'Divisa del coste sin verificar' } }),
+        ]);
+        const summary = await getPortfolioSummary('tenant-one');
+        expect(summary.totalCost).toBe(1000);
+        expect(summary.totalGainPercent).toBeCloseTo(50, 6);
+        expect(summary.totalsExcluded).toBe(1);
     });
 
     it('bases nulas -> fxMissing/valueMissing; coste 0 -> gainPercent 0 (no NaN)', async () => {

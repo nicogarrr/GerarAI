@@ -60,6 +60,9 @@ LAYERS = (
 # marcas de intento (una por compania). Literal a proposito: ese servicio
 # importa utc() de este modulo, y una importacion cruzada seria circular.
 SEC_BACKFILL_CONNECTOR = "sec-fundamentals-backfill"
+# refresh_rss_feeds guarda una ConnectorState por feed (cursor de #3029): se
+# agregan en una linea, igual que el backfill SEC.
+RSS_FEED_CONNECTOR = "rss"
 
 
 def utc(value: datetime | None) -> datetime | None:
@@ -118,7 +121,21 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
                        "last_attempt": utc(state.last_started_at).isoformat() if state.last_started_at else None,
                        "status": "degraded" if state.consecutive_errors else "observed" if state.last_success_at else "empty",
                        "errors": state.consecutive_errors} for state in states
-                      if state.connector != SEC_BACKFILL_CONNECTOR]
+                      if state.connector not in (SEC_BACKFILL_CONNECTOR, RSS_FEED_CONNECTOR)]
+        rss = [state for state in states if state.connector == RSS_FEED_CONNECTOR]
+        if rss:
+            ok = sum(1 for s in rss if s.last_success_at and not s.consecutive_errors)
+            failing = sum(1 for s in rss if s.consecutive_errors)
+            attempts = [stamp for s in rss if (stamp := utc(s.last_started_at)) is not None]
+            successes = [stamp for s in rss if (stamp := utc(s.last_success_at)) is not None]
+            last_attempt = max(attempts, default=None)
+            last_success = max(successes, default=None)
+            connectors.append({
+                "source": f"{RSS_FEED_CONNECTOR} · {len(rss)} feeds (ok {ok} · error {failing})",
+                "last_success": last_success.isoformat() if last_success else None,
+                "last_attempt": last_attempt.isoformat() if last_attempt else None,
+                "status": "degraded" if failing else "observed" if ok else "empty",
+                "errors": failing})
         backfill = [state for state in states if state.connector == SEC_BACKFILL_CONNECTOR]
         if backfill:
             # El backfill SEC guarda una marca por compania intentada

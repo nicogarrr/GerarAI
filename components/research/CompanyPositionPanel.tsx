@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { Panel } from '@/components/ui/panel';
 import type { CompanyHoldingContext } from '@/lib/actions/portfolio.actions';
+import { addTransactionHref } from '@/lib/portfolio/add-dialog-link';
 import { formatDate, formatMoney, formatNumber, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
 
 const money = (value: number | null, currency: string) =>
@@ -53,6 +54,12 @@ export function CompanyPositionPanel({ context }: { context: CompanyHoldingConte
         {!nativeCostKnown && !holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">Coste de adquisición desconocido. No se puede calcular la plusvalía.</p> : null}
         {nativeCostKnown && !costKnown ? <p className="mt-3 text-xs text-amber-200" role="status">Sin coste en {base}: falta el tipo de cambio de alguna compra. No se puede calcular la plusvalía en {base}.</p> : null}
         {holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">{holding.costReviewMessage}</p> : null}
-        <Link className="mt-2 inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">Ver en la cartera</Link>
+        {/* Comprar más o vender desde la ficha abre el alta con el símbolo ya
+            elegido; antes había que ir a Cartera, abrir «Añadir inversión» y
+            volver a buscar la empresa. */}
+        <div className="mt-2 flex flex-wrap gap-x-6">
+            <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={addTransactionHref(holding.symbol)}>Registrar compra o venta</Link>
+            <Link className="inline-flex min-h-11 items-center text-sm text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href="/portfolio">Ver en la cartera</Link>
+        </div>
     </Panel>;
 }

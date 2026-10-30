@@ -59,7 +59,8 @@ def sotp_discount_sensitivity(*, nav_per_share: float, base_discount: float) -> 
     for label, discount in (
         ("narrow_discount", max(base_discount - 0.05, 0.0)),
         ("base_discount", base_discount),
-        ("wide_discount", min(base_discount + 0.05, 0.60)),
+        # Nunca más estrecho que el base (un base > 60% invertía la fila).
+        ("wide_discount", max(base_discount, min(base_discount + 0.05, 0.60))),
     ):
         rows.append(
             {

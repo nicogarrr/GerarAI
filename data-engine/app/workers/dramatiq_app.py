@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 import dramatiq
 
 from app.core.config import get_settings
+from app.core.errors import redact_secrets
 from app.workers.bounded_broker import BoundedRedisBroker, QueueCapacityError, max_pending
 from app.workers.task_trace import TaskTraceMiddleware
 from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware
@@ -352,6 +353,56 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
     return decorator
 
 
+# Ventana de la marca "analisis ya encolado" del carril de alertas. El
+# dispatch corre cada 15 min y el actor es idempotente (lease + gate de
+# estado en BD), asi que la marca solo frena DUPLICADOS EN COLA, nunca el
+# trabajo: al consumirse el mensaje la fila sale de "pending" y el
+# re-encolado deja de verla. Si el mensaje muere sin consumirse (reintentos
+# agotados), la marca expira y un ciclo posterior reintenta. 6 h absorbe un
+# backlog largo sin congelar la recuperacion.
+ANALYSIS_ENQUEUE_MARK_TTL_SECONDS = 6 * 60 * 60
+
+
+def _analysis_enqueue_mark_key(tenant_id: int | None, alert_id: int) -> str:
+    return f"analysis_enqueued:{tenant_id}:{alert_id}"
+
+
+def _claim_analysis_enqueue(tenant_id: int | None, alert_id: int) -> bool:
+    """Marca atomica "ya hay un analyze_tracked_news_alert en cola".
+
+    True = este ciclo debe enviar el mensaje; False = ya hay uno en vuelo.
+    Fail-open: sin Redis (o Redis roto) se envia igual, porque un duplicado
+    lo absorben el lease del actor y su gate de estado, y perder el analisis
+    seria peor.
+    """
+    try:
+        client = _redis_client()
+        if client is None:
+            return True
+        return bool(
+            client.set(
+                _analysis_enqueue_mark_key(tenant_id, alert_id),
+                "1",
+                nx=True,
+                ex=ANALYSIS_ENQUEUE_MARK_TTL_SECONDS,
+            )
+        )
+    except Exception:  # noqa: BLE001 - sonda best-effort, fail-open
+        return True
+
+
+def _clear_analysis_enqueue_mark(tenant_id: int | None, alert_id: int) -> None:
+    """Libera la marca si el send fallo tras reclamarla (broker caido): sin
+    esto la alerta esperaria el TTL entero pese a no tener mensaje en cola."""
+    # nosemgrep: gerarai-broad-except-pass -- lock/cola Redis best-effort con caducidad por TTL o fallback local documentado
+    try:
+        client = _redis_client()
+        if client is not None:
+            client.delete(_analysis_enqueue_mark_key(tenant_id, alert_id))
+    except Exception:  # noqa: BLE001 - expira por TTL solo
+        pass
+
+
 def _run(coroutine):
     """Ejecuta la corrutina del actor, venga de donde venga el loop.
 
@@ -398,6 +449,15 @@ ALERT_QUEUE_NAME = "alerts"
 # la ingesta (rss, insider, ir, sec-mirror, backfill) no pisa GDELT y se
 # queda en default con mas hilos.
 GDELT_QUEUE_NAME = "gdelt"
+# Carril de computo rapido de cara al usuario (patron thesis/kpis/alerts):
+# el run diario del embudo ProPicks y los calculos cortos se hambreaban en la
+# cola default detras de la ingesta masiva (29-oct: default con >10k mensajes,
+# ProPicks sin actualizar desde 28-oct 03:38 UTC por starvation, no por el
+# filtro). Cola dedicada "computed" con worker propio de poca CPU (hay un
+# spotdl en el mismo host). Los mensajes legacy ya en default los drena el
+# worker default: queue_name solo enruta mensajes NUEVOS, el actor se
+# resuelve por nombre al consumir.
+COMPUTED_QUEUE_NAME = "computed"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -1862,7 +1922,7 @@ def refresh_portfolio_prices_intraday(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def refresh_propicks_prices(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1951,7 +2011,7 @@ def refresh_valuation_metrics(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def run_propicks_funnel(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1989,7 +2049,7 @@ def run_propicks_funnel(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def freeze_propicks_snapshot(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2012,7 +2072,7 @@ def freeze_propicks_snapshot(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def ingest_spy_daily(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2390,6 +2450,14 @@ def refresh_ir_pages(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id, ticker=ticker)
 
 
+# Presupuesto total de la corrida por debajo del time_limit de dramatiq
+# (600 s): los feeds se sondean en serie con hasta 20 s por feed y la ingesta
+# de cada lote suma; sin tope, una corrida lenta moria por TimeLimitExceeded
+# (prod: tenant 10, 601 s) y el tick siguiente repetia el barrido entero.
+# Al agotarse, los feeds restantes quedan diferidos al siguiente tick y el
+# resultado lo declara ("partial" + time_budget_exceeded), nada se silencia.
+_RSS_TIME_BUDGET_SECONDS = 480.0
+
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 @_coalesce_on_success("refresh_rss_feeds", 12 * 60, ("tenant_id", "feed_url", "ticker"))
 def refresh_rss_feeds(
@@ -2417,10 +2485,71 @@ def refresh_rss_feeds(
 
         db = _session(tenant_id, user_id)
         try:
+            from sqlalchemy import select as _select
+
+            from app.models.entities import ConnectorState
+
+            # Orden por ultima sondeada (la mas antigua primero), persistida
+            # en ConnectorState: sin cursor, cada tick empezaba por el feed 0
+            # y bajo lentitud sostenida los ultimos feeds no corrian nunca
+            # (hallazgo del piloto en #3029). El estado se commitea ANTES de
+            # sondear: si el worker muere por time_limit, el tick siguiente
+            # retoma por donde quedo. Los feeds sin estado van primeros.
+            tenant_clause = (
+                ConnectorState.tenant_id.is_(tenant_id)
+                if tenant_id is None
+                else ConnectorState.tenant_id == tenant_id
+            )
+            states = db.scalars(
+                _select(ConnectorState).where(
+                    ConnectorState.connector == "rss",
+                    ConnectorState.feed_url.is_not(None),
+                    tenant_clause,
+                )
+            ).all()
+            state_by_url = {state.feed_url: state for state in states}
+            _never = datetime.min.replace(tzinfo=UTC)
+
+            def _last_polled(feed) -> datetime:
+                state = state_by_url.get(feed.url)
+                ts = state.last_started_at if state is not None else None
+                if ts is None:
+                    return _never
+                return ts if ts.tzinfo is not None else ts.replace(tzinfo=UTC)
+
+            feeds = sorted(feeds, key=_last_polled)  # sorted es estable: empates conservan el orden de config
+
             service = FeedIngestionService()
             processed = ingested = 0
             errors: list[dict] = []
-            for feed in feeds:
+            started_at = time.monotonic()
+            for index, feed in enumerate(feeds):
+                if time.monotonic() - started_at >= _RSS_TIME_BUDGET_SECONDS:
+                    errors.append(
+                        {
+                            "url": None,
+                            "source": "rss",
+                            "type": "time_budget_exceeded",
+                            "message": (
+                                f"presupuesto de {_RSS_TIME_BUDGET_SECONDS:.0f}s "
+                                f"agotado; {len(feeds) - index} feeds diferidos "
+                                "al siguiente tick (retoman primero por orden "
+                                "de ultima sondeada)"
+                            ),
+                        }
+                    )
+                    break
+                state = state_by_url.get(feed.url)
+                if state is None:
+                    state = ConnectorState(
+                        tenant_id=tenant_id, connector="rss", feed_url=feed.url
+                    )
+                    db.add(state)
+                    state_by_url[feed.url] = state
+                state.last_started_at = datetime.now(UTC)
+                # Commit antes de sondear: si el worker muere a mitad, el tick
+                # siguiente no vuelve a empezar por este feed.
+                db.commit()
                 try:
                     result = _run(
                         service.poll_rss(feed.url, ticker=feed.ticker, source_label=feed.label)
@@ -2435,15 +2564,27 @@ def refresh_rss_feeds(
                         result,
                         ticker=feed.ticker,
                         news_lane=feed.lane,
+                        # Mismo presupuesto que abre feeds nuevos: agotado, la
+                        # ingesta sigue pero se omite el enriquecimiento Jev/LLM.
+                        llm_deadline=started_at + _RSS_TIME_BUDGET_SECONDS,
                         # Feeds de carril (gobierno): sin vínculo a empresa,
                         # fail-closed como el carril macro.
                         detect_company=feed.lane is None,
                     )
                     if result.status != "error":
                         processed += 1
+                        state.last_success_at = datetime.now(UTC)
+                        state.consecutive_errors = 0
                     ingested += int(ingestion.get("created", 0))
                 except Exception as exc:
                     _rollback(db)
+                    # Tras el rollback el estado queda expirado: reanexarlo
+                    # para registrar el error sin perder el last_started_at
+                    # ya commiteado antes de sondear.
+                    db.add(state)
+                    state.consecutive_errors = (state.consecutive_errors or 0) + 1
+                    state.last_error = redact_secrets(str(exc))[:500]
+                    db.commit()
                     errors.append(
                         {
                             "url": feed.url,
@@ -2472,7 +2613,7 @@ def refresh_rss_feeds(
         )
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
 def analyze_tracked_news_alert(alert_id: int, *, tenant_id: int | None = None,
                                user_id: str | None = None) -> dict[str, Any]:
     """Idempotent attributed-headline baseline, never a verified claim."""
@@ -2531,10 +2672,25 @@ def dispatch_tracked_news_alerts(tenant_id: int | None = None, user_id: str | No
             AlertAnalysis.status == "pending",
         ).order_by(AlertAnalysis.id).limit(20)).all()
         enqueued = 0
+        deduped = 0
         for row in pending:
-            analyze_tracked_news_alert.send(row.alert_id, tenant_id=tenant_id, user_id=user_id)
+            # Sin marca, cada ciclo re-encolaba las mismas filas pending bajo
+            # starvation (29-oct: 5.534 mensajes para ~20 analisis reales).
+            if not _claim_analysis_enqueue(tenant_id, row.alert_id):
+                deduped += 1
+                continue
+            try:
+                analyze_tracked_news_alert.send(row.alert_id, tenant_id=tenant_id, user_id=user_id)
+            except Exception:
+                _clear_analysis_enqueue_mark(tenant_id, row.alert_id)
+                raise
             enqueued += 1
-        return {"actor": "dispatch_tracked_news_alerts", **result, "analysis_enqueued": enqueued}
+        return {
+            "actor": "dispatch_tracked_news_alerts",
+            **result,
+            "analysis_enqueued": enqueued,
+            "analysis_deduped": deduped,
+        }
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("dispatch_tracked_news_alerts", exc, tenant_id=tenant_id)
@@ -3653,13 +3809,23 @@ def generate_thesis_job(run_id: int) -> None:
     run_thesis_job(run_id)
 
 
+# Se queda en default (29-oct, revision del piloto): no esta acreditado que
+# sea un job corto (hasta 50 quotes de proveedor + sync de acciones
+# corporativas por fila; time_limit 900 s) y en el worker-alerts de 2 hilos
+# dos refrescos simultaneos podian ocupar ambos hilos y retrasar las alertas.
+# La coalescencia hace que las copias encoladas bajo starvation se salten
+# casi gratis (patron rss/insider; la ventana 25 min < cadencia de 30 min,
+# como en refresh_news tracked).
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=900_000)
+@_coalesce_on_success("refresh_paper_trades", 25 * 60, ("tenant_id",))
 def refresh_paper_trades(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     from app.services.paper_trading_service import refresh_trades
 
     db = _session(tenant_id, user_id)
     try:
-        return {"actor": "refresh_paper_trades", **refresh_trades(db)}
+        # status ok explicito: sin el la marca de coalescencia nunca quedaba
+        # fresca (el decorador solo conserva el claim con status "ok").
+        return {"status": "ok", "actor": "refresh_paper_trades", **refresh_trades(db)}
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_paper_trades", exc, tenant_id=tenant_id)

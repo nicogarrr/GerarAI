@@ -37,7 +37,7 @@ describe('cerebro: panel diferido fuera del bundle inicial', () => {
     it('los oyentes de apertura (evento, sessionStorage, slot) viven en el shell siempre montado', () => {
         assert.match(shell, /window\.addEventListener\('gerarai:open-brain'/);
         assert.match(shell, /OPEN_BRAIN_PENDING_KEY/);
-        assert.match(shell, /getElementById\('brain-library-slot'\)/);
+        assert.match(shell, /getElementById\(BRAIN_LIBRARY_CONTEXT_ID\)/);
         assert.ok(!panel.includes("addEventListener('gerarai:open-brain'"), 'el panel no duplica oyentes');
     });
 
@@ -49,7 +49,8 @@ describe('cerebro: panel diferido fuera del bundle inicial', () => {
 
     it('el panel conserva el cierre y el foco modal', () => {
         assert.match(panel, /onClose\(\)/);
-        assert.match(panel, /aria-modal=\{librarySlot \? undefined : true\}/);
-        assert.match(panel, /role=\{librarySlot \? "region" : "dialog"\}/);
+        assert.match(panel, /aria-modal\n/);
+        assert.match(panel, /role="dialog"/);
+        assert.ok(!panel.includes('createPortal'), 'el Cerebro ya no se incrusta en ninguna página');
     });
 });

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import hmac
 import logging
 import math
 import time
@@ -23,7 +24,7 @@ from collections import deque
 
 from fastapi import Depends, HTTPException, Request, Response
 
-from app.core.auth import ResearchPrincipal, get_research_principal
+from app.core.auth import ResearchPrincipal, get_research_principal, sign_research_identity
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,25 @@ EXPENSIVE_PATH_MARKERS = (
     "/long-term-model/generate",
     "/thesis/generate",
     "/snapshot/refresh",
+)
+
+# Rutas que llaman a un LLM (o a un servicio externo caro) en la propia
+# peticion, por final exacto de la ruta. Sin ellas caian en el tier estandar
+# (300/min) y un solo usuario podia agotar la cuota compartida del proveedor.
+# Las traducciones de titulares quedan fuera a proposito: la UI las pide solas
+# por cada titular visible, van al proveedor gratuito y se cachean.
+EXPENSIVE_PATH_SUFFIXES = (
+    "/second-order",
+    "/inferred-inputs/llm",
+    "/discoveries/run",
+    "/llm-proposals",
+    "/paper-trading/feed",
+    "/propicks/review",
+    "/debate",
+    "/research/assistant",
+    "/extract-principles",
+    "/knowledge/documents/upload",
+    "/settings/llm/test",
 )
 
 EXEMPT_PATHS = {"/", "/health", "/health/live", "/health/ready"}
@@ -71,6 +91,8 @@ def _tier_for(path: str) -> str:
     que las rafagas de lecturas de mercado (una llamada por ticker) no
     estrangulen el resto de la navegacion, ni al reves."""
     if any(marker in path for marker in EXPENSIVE_PATH_MARKERS):
+        return "expensive"
+    if path.rstrip("/").endswith(EXPENSIVE_PATH_SUFFIXES):
         return "expensive"
     if path.startswith("/api/market/"):
         return "market"
@@ -325,6 +347,72 @@ async def _count_hits(key: str, *, use_redis: bool, redis_url: str) -> int:
         return sum(1 for h in hits if h > cutoff)
 
 
+_SIGNATURE_RE_HEX = frozenset("0123456789abcdef")
+
+
+def _carries_valid_signature(scope, settings) -> bool:
+    """True si la peticion trae una firma HMAC valida del puente de identidad.
+
+    En produccion TODO el trafico legitimo llega desde el servidor Next (las
+    IP de salida de Vercel), asi que el contador de 401 por IP es compartido
+    por todos los usuarios: 30 respuestas 401 en un minuto desde esa IP (de
+    cualquiera que comparta la salida, o de peticiones caducadas) dejaban a
+    TODOS los usuarios en 429 durante la ventana. Una firma valida demuestra
+    que quien llama tiene el secreto, asi que no se corta aunque la IP este
+    por encima del limite. Aqui no se lee el body ni se consume el nonce:
+    get_research_principal sigue haciendo la verificacion completa despues.
+    """
+    secret = getattr(settings, "research_auth_secret", None)
+    if not secret:
+        return False
+    headers: dict[str, str] = {}
+    for raw_name, raw_value in scope.get("headers") or []:
+        name = raw_name.decode("latin-1").lower()
+        if name.startswith("x-cavaai-"):
+            headers[name] = raw_value.decode("latin-1")
+    user = headers.get("x-cavaai-user", "")
+    tenant = headers.get("x-cavaai-tenant", "")
+    timestamp = headers.get("x-cavaai-timestamp", "")
+    signature = headers.get("x-cavaai-signature", "")
+    if not (user.strip() and tenant.strip() and timestamp and signature):
+        return False
+    if len(signature) != 64 or not set(signature) <= _SIGNATURE_RE_HEX:
+        return False
+    try:
+        issued_at = int(timestamp)
+    except ValueError:
+        return False
+    now = int(_now())
+    max_age = int(getattr(settings, "research_auth_max_age_seconds", 300))
+    if issued_at > now or now - issued_at > max_age:
+        return False
+    bound = tuple(
+        headers.get(f"x-cavaai-{part}")
+        for part in ("nonce", "method", "path", "body-hash")
+    )
+    if any(part is not None for part in bound):
+        if any(part is None for part in bound):
+            return False
+        nonce, method, path, body_hash = bound
+        if (method or "").upper() != str(scope.get("method") or "").upper():
+            return False
+        if path != str(scope.get("path") or ""):
+            return False
+    else:
+        nonce = method = path = body_hash = None
+    expected = sign_research_identity(
+        secret,
+        tenant_id=tenant,
+        user_id=user,
+        timestamp=timestamp,
+        nonce=nonce,
+        method=method,
+        path=path,
+        body_hash=body_hash,
+    )
+    return hmac.compare_digest(expected, signature)
+
+
 class AuthFailureLimitMiddleware:
     def __init__(self, app, limit: int = AUTH_FAILURE_LIMIT):
         self.app = app
@@ -347,7 +435,7 @@ class AuthFailureLimitMiddleware:
             failures = await _count_hits(key, use_redis=use_redis, redis_url=settings.redis_url)
         except Exception:  # noqa: BLE001 - el limite principal ya falla cerrado en prod
             failures = 0
-        if failures >= self.limit:
+        if failures >= self.limit and not _carries_valid_signature(scope, settings):
             from starlette.responses import JSONResponse
 
             response = JSONResponse(

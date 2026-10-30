@@ -74,11 +74,13 @@ from app.services.currency_ledger import (
 )
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.tax_irpf_filing import (
+    CARRYFORWARD_WINDOW_YEARS,
     SPECIAL_PAYMENT_TOKENS,
     build_casillas,
     build_double_taxation,
     build_interest,
     build_loss_compensation,
+    integrate_savings_base,
 )
 from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
 from app.valuation.currency import normalize_currency
@@ -1143,6 +1145,14 @@ class TaxReportService:
                 }
             )
 
+        # Intereses cobrados (casilla 0027): rendimiento del capital mobiliario
+        # del ahorro. None si alguno no tiene importe en EUR.
+        interest_block = build_interest(misc_rows, fiscal_year)
+        interest_received: Decimal | None = (
+            None if interest_block["incomplete"]
+            # nosemgrep: gerarai-money-none-to-zero -- con incomplete False el importe siempre está calculado
+            else Decimal(str(interest_block["received"]["amount_base"] or 0))
+        )
         dividend_ambiguous = any(b["ambiguous_cash"] for b in dividends)
         dividend_incomplete = any(b["missing_fx"] for b in dividends) or dividend_ambiguous
         realized_incomplete = any(b["missing_fx"] for b in realized)
@@ -1191,7 +1201,13 @@ class TaxReportService:
             "wash_sale_window_open": sorted(
                 b["ticker"] for b in realized if b["wash_sale_window_open"]
             ),
-            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable) else _money(total_dividends + total_gain),
+            # Base del ahorro del ejercicio: art. 49.1 LIRPF, la pérdida
+            # patrimonial solo compensa dividendos hasta el 25 %. Antes era la
+            # suma directa (1.000 de dividendos y -10.000 de pérdidas daban
+            # -9.000; la base real es 750 y el resto se arrastra).
+            # El saldo de RCM son dividendos MÁS intereses cobrados (art. 25.2
+            # y 46.b LIRPF), igual que en la compensación de pérdidas.
+            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable or interest_received is None) else _money(integrate_savings_base(total_dividends + interest_received, total_gain)),
             "dividend_count": len(dividends),
             "unattributed_tickers": sorted(
                 b["ticker"] for b in dividends if b.get("unattributed")
@@ -1502,10 +1518,12 @@ class TaxReportService:
             ):
                 country_by_ticker[company.ticker] = company.domicile_country
         summary = data.get("summary") or {}
-        # Saldos netos de los 4 ejercicios anteriores, recalculados en
+        # Saldos netos de los ejercicios anteriores, recalculados en
         # memoria sin la capa filing (evita recursion y dobles calculos).
+        # 8 y no 4: una perdida de fiscal_year-8 sigue viva en fiscal_year-4
+        # y consume ganancias de la ventana (art. 49.1.b LIRPF).
         prior_year_nets = []
-        for prior_year in range(fiscal_year - 4, fiscal_year):
+        for prior_year in range(fiscal_year - 2 * CARRYFORWARD_WINDOW_YEARS, fiscal_year):
             prior_data = self.compute_report(db, prior_year, include_filing=False)
             prior_summary = prior_data["summary"]
             # Rendimientos del ahorro del ejercicio previo (dividendos +

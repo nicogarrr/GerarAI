@@ -96,7 +96,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/HomeAttention.tsx':
     'useEffect loads independent attention sources; useState controls retries and bounded pagination',
   'app/(root)/inversores/_components/LibraryChat.tsx':
-    'useSyncExternalStore retrasa el slot hasta hidratar la pagina; evita insertar el portal del layout en HTML SSR aun sin hidratar',
+    'onClick del botón compacto abre el Cerebro flotante (openBrain) con el contexto de la biblioteca; se importa desde páginas server',
   'components/research/DecisionJournalEntryLink.tsx':
     'Client boundary for onClick and browser hash scrolling via scrollToHashAnchor; imported from server CompanyNavigation.',
   'components/research/ResearchHashScroll.tsx':
@@ -189,6 +189,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   // pestañas, sondeo cada minuto y botón de refresco manual del panel /mercados.
   'components/markets/LiveMarketsPanel.tsx': 'useState, useEffect, useCallback, jsx-onClick',
   'components/media/YouTubeEmbed.tsx': 'useState, jsx-onClick',
+  'components/plan/DeleteContributionButton.tsx': 'useRouter, useState, jsx-onClick, importa cliente: components/ui/confirm-dialog.tsx',
+  'components/plan/PlanContributionDialog.tsx': 'useRouter, useState, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
   'components/plan/PlanSetupDialog.tsx': 'useRouter, useState, browser:document, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
   'components/plan/PlanView.tsx': 'importa cliente: components/data/RecordViews.tsx, importa cliente: components/plan/PlanSetupDialog.tsx',
   'components/portfolio/AddTransactionButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (formulario de alta diferido en AddTransactionDialog)',
@@ -516,10 +518,10 @@ describe('la lista de excepciones no crece sin motivo', () => {
 });
 
 describe('el escaner y el guard cuentan lo mismo', () => {
-  it('LibraryChat justifica su directiva por montaje del slot tras hidratacion', () => {
+  it('LibraryChat justifica su directiva por el botón que abre el Cerebro', () => {
     const row = byRel.get('app/(root)/inversores/_components/LibraryChat.tsx');
     assert.ok(row);
-    assert.equal(row.hasUseClient, true, 'el slot se monta tras hidratar; solo GlobalBrain mantiene estado de conversacion');
+    assert.equal(row.hasUseClient, true, 'el botón abre el Cerebro; solo GlobalBrain mantiene estado de conversacion');
     assert.equal(row.justified, true);
   });
 

@@ -3,6 +3,7 @@ import { modelConditionState } from '@/lib/research/coverage-state';
 import { formatCompact, formatMarketDate, formatNumber, formatPercent, NA } from '@/lib/format';
 import { etiquetaTipoEvento } from '@/lib/labels';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { financialFormula } from '@/lib/research/financial-display';
 import { frameworkLabel, frameworkTerm } from '@/lib/research/framework-terms';
 import { expectationMetricLabel, reviewStatusLabel } from '@/lib/research/expectation-labels';
 import { ExpectationsList, type ExpectationRow } from '@/components/research/ExpectationsList';
@@ -113,6 +114,11 @@ function translate(map: Record<string, string>, value: string | null | undefined
   return map[value] ?? value;
 }
 
+/** Fórmula del beneficio del propietario tal como llega del backend. */
+export function ownerEarningsFormulaLabel(formula: string): string {
+  return PROSE_ES[formula] ?? financialFormula(formula);
+}
+
 /** Driver, KPI, entrada o restricción del modelo en español (marco por tipo de empresa primero, luego métricas). */
 export function termLabel(raw: string): string {
   return frameworkTerm(raw) ?? metricLabel(raw);
@@ -189,7 +195,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
 
       <div className="mb-4 rounded-md border border-gray-800 bg-black/10 p-3 text-xs leading-5 text-gray-400">
         <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map(termLabel).join(' · ')}
-        <span className="mx-2 text-gray-700">|</span>
+        <span aria-hidden="true" className="mx-2 text-gray-700">|</span>
         <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map(termLabel).join(' · ')}
       </div>
 
@@ -300,7 +306,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
         <div className="rounded-md border border-gray-800 p-3 text-sm">
           <div className="text-xs font-semibold uppercase text-gray-500">Beneficio del propietario</div>
           <div className="mt-2 text-xl font-semibold text-gray-200">{compactNumber(model.owner_earnings.value)}</div>
-          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? translate(PROSE_ES, model.owner_earnings.formula, model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map(termLabel).join(', ')}.`}</p>
+          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map(termLabel).join(', ')}.`}</p>
         </div>
         <div className="rounded-md border border-gray-800 p-3 text-sm">
           <div className="text-xs font-semibold uppercase text-gray-500">Motor de oportunidad de mercado</div>

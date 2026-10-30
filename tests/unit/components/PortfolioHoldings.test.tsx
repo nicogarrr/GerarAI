@@ -55,6 +55,14 @@ describe('PortfolioHoldings estados y numeros', () => {
         expect(row.textContent).toContain('N/D');
     });
 
+    it('cantidad fraccionaria: hasta 4 decimales (no «0,00» para 0,004 acciones) y entera sin decimales', () => {
+        render(<PortfolioHoldings holdings={[holding({ symbol: 'FRAC', quantity: 0.0042 }), holding({ symbol: 'MSFT', quantity: 12 })]} userId="u" />);
+        const frac = desktop().getByText('FRAC').closest('tr')!;
+        expect(frac.querySelectorAll('td')[1].textContent).toBe('0,0042');
+        const whole = desktop().getByText('MSFT').closest('tr')!;
+        expect(whole.querySelectorAll('td')[1].textContent).toBe('12');
+    });
+
     it('caja 0 o null no pinta fila de caja', () => {
         render(<PortfolioHoldings holdings={[holding()]} userId="u" cash={0} />);
         expect(desktop().queryByText('Caja')).not.toBeInTheDocument();
@@ -133,7 +141,8 @@ describe('PortfolioHoldings eliminar', () => {
     it('pide confirmacion y no borra si se cancela', () => {
         render(<PortfolioHoldings holdings={[holding()]} userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar posición en AAPL' }));
-        expect(screen.getByText(/toda la posición en AAPL/)).toBeInTheDocument();
+        expect(screen.getByText(/Se borrarán todas las operaciones de AAPL: compras, ventas y dividendos, también los de años ya declarados/)).toBeInTheDocument();
+        expect(screen.getByText(/registra la venta en lugar de borrarla/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
         expect(h.del).not.toHaveBeenCalled();
     });
@@ -142,7 +151,7 @@ describe('PortfolioHoldings eliminar', () => {
         h.del.mockResolvedValue(undefined);
         render(<PortfolioHoldings holdings={[holding()]} userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar posición en AAPL' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar todo el historial' }));
         await waitFor(() => expect(h.success).toHaveBeenCalledWith('Posición AAPL eliminada'));
         expect(h.del).toHaveBeenCalledWith('u1', 'AAPL');
         expect(h.routerRefresh).toHaveBeenCalled();
@@ -152,7 +161,7 @@ describe('PortfolioHoldings eliminar', () => {
         h.del.mockRejectedValue(new Error('x'));
         render(<PortfolioHoldings holdings={[holding()]} userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar posición en AAPL' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar todo el historial' }));
         await waitFor(() => expect(h.showError).toHaveBeenCalled());
         expect(h.success).not.toHaveBeenCalled();
     });
@@ -243,5 +252,14 @@ describe('PortfolioHoldings cabecera', () => {
         const note = screen.getByText(/La G\/P va en EUR \(divisa base\)/);
         expect(heading).not.toContainElement(note);
         expect(note.tagName).toBe('P');
+    });
+});
+
+describe('PortfolioHoldings: objetivo táctil del ticker en móvil', () => {
+    it('el enlace del ticker de la tarjeta móvil mide 44 px', () => {
+        render(<PortfolioHoldings holdings={[holding()]} userId="u" />);
+        const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/research/'));
+        const mobile = links.find((a) => !a.closest('table'));
+        expect(mobile?.className).toMatch(/min-h-\[44px\]/);
     });
 });

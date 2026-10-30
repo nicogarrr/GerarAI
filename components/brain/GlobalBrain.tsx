@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { brainStorageKey, restoreConversation, serializeConversation } from '@/lib/brain/conversation';
-import { markBrainReady, OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail, knowledgeHandoff, type KnowledgeBrainContext } from '@/lib/brain/open-brain';
+import { BRAIN_LIBRARY_CONTEXT_ID, markBrainReady, OPEN_BRAIN_PENDING_KEY, type OpenBrainDetail, knowledgeHandoff, readLibraryContext, type KnowledgeBrainContext } from '@/lib/brain/open-brain';
 import type { BrainMessage } from './GlobalBrainPanel';
 
 // El panel del cerebro (chat, guía, biblioteca: ~16 KB gz con sus dependencias)
@@ -38,7 +38,7 @@ interface GlobalBrainProps {
  * Shell del cerebro global de GerarAI, montado UNA vez en el layout
  * autenticado: mantiene el gatillo (botón fijo que nunca tapa la BottomNav),
  * los oyentes de apertura (evento gerarai:open-brain, handoff pendiente en
- * sessionStorage, slot incrustado de la biblioteca) y el estado de la
+ * sessionStorage, marcador de contexto de la biblioteca) y el estado de la
  * conversación, para que cerrar y reabrir no la pierda aunque el panel se
  * desmonte. El panel pesado vive en GlobalBrainPanel (chunk diferido).
  */
@@ -50,7 +50,6 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // el botón flotante era un cerebro suelto que nadie tocaba (Tester Nico).
     const [showHint, setShowHint] = useState(true);
     const [knowledge, setKnowledge] = useState<KnowledgeBrainContext | null>(null);
-    const [librarySlot, setLibrarySlot] = useState<HTMLElement | null>(null);
     // La conversación se conserva al navegar y al cerrar el panel: se restaura
     // al montar (solo cliente, así el SSR siempre pinta el saludo y no hay
     // desajuste de hidratación) y se guarda recortada tras cada cambio.
@@ -66,23 +65,18 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         return () => clearTimeout(t);
     }, []);
 
-    // The page owns only a slot. This layout instance keeps the transcript
-    // when moving between embedded doctrine and the floating panel elsewhere.
+    // Las páginas de doctrina (Biblioteca, cartas, lector de una carta) ya no
+    // incrustan el Cerebro en mitad del contenido: dejan un marcador oculto
+    // con su contexto (ámbito, autores, carta) y el Cerebro sigue siendo el
+    // mismo botón pequeño abajo a la derecha que en el resto de la app, plegado
+    // hasta que el usuario lo abre. Al abrirlo pregunta a esa biblioteca.
     useEffect(() => {
         let current: HTMLElement | null = null;
         const sync = () => {
-            const slot = document.getElementById('brain-library-slot');
-            if (slot === current) return;
-            current = slot;
-            setLibrarySlot(slot);
-            if (slot) {
-                let authors: string[] = [];
-                try { authors = JSON.parse(slot.dataset.authors ?? '[]'); } catch { /* empty filter */ }
-                // knowledgeHandoff sanea el contexto (documentId numérico,
-                // título y autores acotados) antes de fijarlo.
-                setKnowledge(knowledgeHandoff({ knowledge: { scope: slot.dataset.scope === 'letters' ? 'letters' : 'library', authors, documentId: Number(slot.dataset.documentId), documentTitle: slot.dataset.documentTitle } }));
-                void loadBrainPanel();
-            } else { setKnowledge(null); setIsOpen(false); }
+            const marker = document.getElementById(BRAIN_LIBRARY_CONTEXT_ID);
+            if (marker === current) return;
+            current = marker;
+            setKnowledge(readLibraryContext(marker));
         };
         queueMicrotask(sync);
         const observer = new MutationObserver(sync);
@@ -90,9 +84,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         return () => observer.disconnect();
     }, [pathname]);
 
+    // Una apertura sin detalle (botón «Cerebro» de la BottomNav) conserva el
+    // contexto vigente, p. ej. el de la Biblioteca; con detalle manda él.
     function openWithDetail(detail?: OpenBrainDetail | null) {
         setIsOpen(true);
-        setKnowledge(knowledgeHandoff(detail));
+        if (detail) setKnowledge(knowledgeHandoff(detail));
         openSeqRef.current += 1;
         setOpenDetail({ detail: detail ?? null, seq: openSeqRef.current });
         void loadBrainPanel();
@@ -158,12 +154,11 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         }
     }, [messages, userId]);
 
-    if (isOpen || librarySlot) {
+    if (isOpen) {
         return (
             <GlobalBrainPanel
                 userId={userId}
                 knowledge={knowledge}
-                librarySlot={librarySlot}
                 openDetail={openDetail}
                 messages={messages}
                 setMessages={setMessages}
@@ -172,6 +167,8 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
             />
         );
     }
+
+    const hint = knowledge ? 'Pregunta a la biblioteca' : 'Pregunta al Cerebro';
 
     // Burbuja fija: en móvil queda POR ENCIMA de la BottomNav (min-h-14 +
     // safe-area), nunca la tapa; en escritorio vuelve a la esquina habitual.
@@ -186,14 +183,14 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                     : 'pointer-events-none translate-x-2 opacity-0'
                     } group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100`}
             >
-                Pregunta al Cerebro
+                {hint}
             </span>
             <Button
                 onClick={() => setIsOpen(true)}
                 onPointerDown={() => void loadBrainPanel()}
                 onFocus={() => void loadBrainPanel()}
                 aria-label="Abrir el cerebro"
-                title="Pregunta al Cerebro"
+                title={hint}
                 className="h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white"
             >
                 <BrainGlassesIcon className={`h-14 w-14 shrink-0 object-contain ${showHint ? 'brain-breathe' : ''}`} />

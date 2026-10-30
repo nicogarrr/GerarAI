@@ -45,10 +45,13 @@ externas de datos/LLM, como hoy.
 
 ## Presupuesto de memoria (VM de 12 GB)
 
-El compose suma **10.176 MiB (~9,94 GiB)** de limites: backend 2G, worker
-1,25G, thesis/knowledge 1G, kpis/gdelt 640M, alerts 320M, scheduler 128M,
-Postgres 896M, Redis 896M (maxmemory 768 MB), Qdrant 768M, MinIO 256M, Garage
-192M y Caddy 64M. El resto de la VM (~2 GB) queda para kernel/page cache.
+El compose suma **10.240 MiB (10 GiB justos)** de limites: backend 2G, worker
+1,25G, thesis 1G, gdelt 640M, knowledge 512M, kpis 448M, official-closes y
+dca-manual 384M cada uno, alerts 320M, scheduler 128M, Postgres 896M, Redis
+896M (maxmemory 768 MB), Qdrant 768M, MinIO 256M, Garage 192M y Caddy 64M.
+El resto de la VM (~2 GB) queda para kernel/page cache. La cola "computed"
+(ProPicks diario y calculos cortos) no anade contenedor: la consume el
+worker-alerts (29-oct), precisamente para no romper este techo.
 
 Ademas de los limites, crea **2-4 GB de swap** (recomendado 4 GB) para que un
 pico puntual de un worker no dispare el OOM killer del kernel:

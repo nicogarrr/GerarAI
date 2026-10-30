@@ -38,6 +38,14 @@ type Props = {
   fxRates?: PortfolioFxRate[];
 };
 
+/**
+ * Cantidad de acciones: entera sin decimales y fraccionaria con hasta 4, como
+ * en Movimientos. Con 2 fijos, 0,004 acciones se leía «0,00» y 1,2345 «1,23».
+ */
+export function formatQuantity(quantity: number): string {
+  return formatNumber(quantity, { maximumFractionDigits: 4 });
+}
+
 /** Lista corta de símbolos para un toast: como mucho 5 en crudo y el resto contado. */
 function describeSymbols(symbols: string[]): string {
   const shown = symbols.slice(0, 5);
@@ -80,12 +88,56 @@ function FxEffectLine({ holding, format }: { holding: PortfolioHolding; format: 
   );
 }
 
+/**
+ * Borrar una posición borra TODAS sus filas del ledger (compras, ventas y
+ * dividendos, también de años ya declarados): el informe fiscal pierde esas
+ * ganancias y dividendos. El texto lo dice y señala la alternativa habitual.
+ */
+export function describeHoldingDeletion(symbol: string | null): string {
+  if (!symbol) return '';
+  return `Se borrarán todas las operaciones de ${symbol}: compras, ventas y dividendos, también los de años ya declarados. ` +
+    'El informe fiscal y la rentabilidad se recalcularán sin ellas y no se puede deshacer. ' +
+    'Si has vendido la posición, registra la venta en lugar de borrarla.';
+}
+
+export type HoldingSort = 'value' | 'best' | 'worst' | 'symbol';
+
+export const HOLDING_SORT_LABELS: Record<HoldingSort, string> = {
+  value: 'Mayor valor',
+  best: 'Mejor rentabilidad',
+  worst: 'Peor rentabilidad',
+  symbol: 'Símbolo (A-Z)',
+};
+
+/**
+ * Orden de la lista de posiciones. Las filas sin dato para el criterio
+ * (valor sin precio o sin tipo de cambio, G/P desconocida) van al final en vez
+ * de contarse como 0 y mezclarse con las reales.
+ */
+export function sortHoldings(holdings: PortfolioHolding[], sort: HoldingSort): PortfolioHolding[] {
+  const valueKnown = (h: PortfolioHolding) => !h.valueMissing && !h.fxMissing && h.currentPrice !== null && Number.isFinite(h.value);
+  const gainKnown = (h: PortfolioHolding) => valueKnown(h) && Number.isFinite(h.gainPercent);
+  const rows = [...holdings];
+  if (sort === 'symbol') return rows.sort((a, b) => a.symbol.localeCompare(b.symbol, 'es'));
+  const known = sort === 'value' ? valueKnown : gainKnown;
+  const metric = (h: PortfolioHolding) => (sort === 'value' ? h.value : h.gainPercent);
+  const direction = sort === 'worst' ? 1 : -1;
+  return rows.sort((a, b) => {
+    const ka = known(a);
+    const kb = known(b);
+    if (ka !== kb) return ka ? -1 : 1;
+    if (!ka) return a.symbol.localeCompare(b.symbol, 'es');
+    return direction * (metric(a) - metric(b)) || a.symbol.localeCompare(b.symbol, 'es');
+  });
+}
+
 export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency, fxRates }: Props) {
   const router = useRouter();
   const [currentHoldings, setCurrentHoldings] = useState<PortfolioHolding[]>(holdings);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmSymbol, setConfirmSymbol] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sort, setSort] = useState<HoldingSort>('value');
   const format = (value: number, currency: string) => formatMoney(value, currency, { maximumFractionDigits: 2 });
   const cashCurrency = baseCurrency ?? holdings[0]?.baseCurrency ?? 'EUR';
   const showCash = typeof cash === 'number' && cash !== 0;
@@ -99,6 +151,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   const weight = (symbol: string) => formatPercent(weights.get(symbol), { fromRatio: false, digits: 1 }, NA);
   // Nivel DCA de tu fórmula + valor justo único (tesis o motor), una sola petición.
   const signals = useHoldingSignals(currentHoldings.map((holding) => holding.symbol));
+  const sortedHoldings = sortHoldings(currentHoldings, sort);
 
   // Sync props if they change (e.g. from server revalidation): ajuste
   // durante el render (reset al cambiar la prop), no efecto con setState.
@@ -207,9 +260,23 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
           </div>
         ) : (
           <>
+            {currentHoldings.length > 1 ? (
+              <label className="mb-3 flex items-center justify-end gap-2 text-sm text-gray-400">
+                Ordenar por
+                <select
+                  value={sort}
+                  onChange={(event) => setSort(event.target.value as HoldingSort)}
+                  className="min-h-11 rounded-md border border-gray-700 bg-gray-800 px-2 text-gray-100 md:min-h-9"
+                >
+                  {(Object.keys(HOLDING_SORT_LABELS) as HoldingSort[]).map((key) => (
+                    <option key={key} value={key}>{HOLDING_SORT_LABELS[key]}</option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             {/* Móvil: cards sin scroll horizontal */}
             <div className="space-y-3 md:hidden">
-              {currentHoldings.map((holding) => {
+              {sortedHoldings.map((holding) => {
                 const gainKnown = !holding.fxMissing && holding.cost > 0;
                 const isPositive = holding.gain >= 0;
                 return (
@@ -217,7 +284,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <div className="flex items-center justify-between gap-2">
                       <Link
                         href={`/research/${holding.symbol}`}
-                        className="flex items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
+                        className="flex min-h-[44px] items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
                       >
                         <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
                         {holding.symbol}
@@ -238,7 +305,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TrackedAnalysisStatus analysis={holding.analysis} />
                     {holding.costReviewMessage ? <p role="status" className="mt-2 text-sm text-amber-300">{holding.costReviewMessage}</p> : null}
                     <dl className="mt-3 space-y-1.5 text-sm">
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatQuantity(holding.quantity)}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Promedio</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Actual</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? 'N/D' : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
                       <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
@@ -321,7 +388,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {currentHoldings.map((holding) => {
+                {sortedHoldings.map((holding) => {
                   const gainKnown = !holding.fxMissing && holding.cost > 0;
                   const isPositive = holding.gain >= 0;
                   return (
@@ -351,7 +418,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-gray-300">
-                        {formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatQuantity(holding.quantity)}
                       </TableCell>
                       <TableCell className="text-right text-gray-300">
                         {holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}
@@ -420,7 +487,8 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
         open={confirmSymbol !== null}
         onOpenChange={(next) => { if (!next) setConfirmSymbol(null); }}
         title="Eliminar posición"
-        description={confirmSymbol ? `¿Estás seguro de eliminar toda la posición en ${confirmSymbol}? Esto borrará todas las transacciones asociadas.` : ''}
+        description={describeHoldingDeletion(confirmSymbol)}
+        confirmLabel="Eliminar todo el historial"
         onConfirm={() => { if (confirmSymbol) handleDelete(confirmSymbol); }}
       />
     </Card>

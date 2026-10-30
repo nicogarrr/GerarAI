@@ -237,3 +237,31 @@ def test_sec_backfill_aggregate_observed_when_only_ok(db):
     row = [r for r in inventory(db)["connectors"]
            if r["source"].startswith("sec-fundamentals-backfill")][0]
     assert row["status"] == "observed" and row["errors"] == 0
+
+
+
+def test_rss_feed_states_aggregate_into_one_line(db):
+    """refresh_rss_feeds guarda una ConnectorState por feed (cursor de #3029):
+    una linea "rss" por feed llenaria el panel de filas identicas sin URL.
+    Se agrega en una sola linea con contadores, como el backfill SEC."""
+    now = datetime.now(UTC)
+    db.add_all([
+        ConnectorState(tenant_id=1, connector="rss", feed_url=f"https://feed{n}.example/rss",
+                       last_started_at=now, last_success_at=now)
+        for n in range(3)
+    ] + [
+        ConnectorState(tenant_id=1, connector="rss", feed_url="https://caido.example/rss",
+                       last_started_at=now, consecutive_errors=2, last_error="timeout"),
+        ConnectorState(tenant_id=1, connector="insider-monitor",
+                       last_started_at=now, last_success_at=now),
+    ])
+    db.commit()
+    connectors = inventory(db)["connectors"]
+    rows = [row for row in connectors if row["source"].startswith("rss")]
+    assert len(rows) == 1
+    row = rows[0]
+    assert "4 feeds" in row["source"]
+    assert "ok 3" in row["source"] and "error 1" in row["source"]
+    assert row["status"] == "degraded" and row["errors"] == 1
+    assert row["last_success"] is not None and row["last_attempt"] is not None
+    assert any(r["source"] == "insider-monitor" for r in connectors)

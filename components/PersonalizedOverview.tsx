@@ -146,7 +146,7 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
                                 : 'Añádelas a la watchlist para ver precio, valoración y avisos.'}
                         </p>
                     </div>
-                    <Link href="/watchlist" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
+                    <Link href={watchlistDone ? '/watchlist' : '/watchlist?anadir=1'} className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
                         {watchlistDone ? 'Ver' : 'Añadir'}
                         <span className="sr-only"> empresas a la watchlist</span>
                     </Link>
@@ -157,7 +157,7 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
                         <p className="text-sm font-medium text-gray-100">Registra tu primera compra</p>
                         <p className="text-xs text-gray-400">Con tus posiciones verás el valor de la cartera y dónde poner la aportación del mes.</p>
                     </div>
-                    <Link href="/portfolio" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
+                    <Link href="/portfolio?anadir=1" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
                         Añadir<span className="sr-only"> inversión</span>
                     </Link>
                 </li>
