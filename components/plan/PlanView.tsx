@@ -52,6 +52,31 @@ const PLAN_LABELS: Record<string, string> = {
     expected_conversion_complete: 'Conversión prevista completa',
 };
 
+const BASE_HIDDEN_PLAN_KEYS = ['id', 'plan_exists', 'currency_contract_enabled', 'monthly_currency_recorded', 'monthly_contribution_currency', 'expected_basis', 'expected_conversion_complete'];
+/** Campos que solo explican conversiones de divisa. */
+const FX_DETAIL_KEYS = ['expected_contributions_converted_base', 'expected_missing_fx', 'expected_periods', 'actual_contributions_converted_base', 'contributions_complete', 'contributions_missing_fx'];
+
+/**
+ * Sin ninguna conversión pendiente (cuota en la divisa base o sin divisa, y
+ * todas las aportaciones con tipo de cambio) los campos «convertidas (parcial
+ * si…)», «cuotas sin tipo de cambio: —» o «cuotas previstas: N/D» repetían el
+ * total o no decían nada: se ocultan. Si falta algún tipo, se muestran.
+ */
+export function planHiddenKeys(plan: Record<string, unknown>): string[] {
+    const base = typeof plan.base_currency === 'string' ? plan.base_currency.toUpperCase() : null;
+    const planCurrency = typeof plan.monthly_contribution_currency === 'string' && plan.monthly_contribution_currency
+        ? plan.monthly_contribution_currency.toUpperCase()
+        : null;
+    const empty = (value: unknown) => !Array.isArray(value) || value.length === 0;
+    const noFx = (planCurrency === null || planCurrency === base)
+        && plan.contributions_complete !== false
+        && empty(plan.contributions_missing_fx)
+        && empty(plan.expected_missing_fx)
+        && empty(plan.expected_periods);
+    // «Plan configurado: Sí» es tautológico dentro de la propia tarjeta del plan.
+    return noFx ? [...BASE_HIDDEN_PLAN_KEYS, ...FX_DETAIL_KEYS] : BASE_HIDDEN_PLAN_KEYS;
+}
+
 /** Claves de GET /api/plan/drift (investment_plan_service.drift_analysis). */
 const DRIFT_LABELS: Record<string, string> = {
     plan_exists: 'Plan configurado',
@@ -272,7 +297,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 record={initialPlan}
                 fetchRecord={getPlan}
                 columnLabels={PLAN_LABELS}
-                hiddenKeys={['id', 'currency_contract_enabled', 'monthly_currency_recorded', 'monthly_contribution_currency', 'expected_basis', 'expected_conversion_complete']}
+                hiddenKeys={planHiddenKeys(initialPlan)}
                 formatColumns={{...PLAN_FORMAT, ...DETAIL_FORMAT}}
                 maxKeys={20}
                 emptyMessage={t('plan.empty')}

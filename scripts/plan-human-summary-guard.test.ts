@@ -5,7 +5,10 @@ test('plan formats amounts only with declared base currency and hides technical 
  const s=readFileSync('components/plan/PlanView.tsx','utf8');
  assert.match(s,/typeof record.base_currency === 'string'/);
  // «Divisa base» es visible en la ficha del plan (decisión de auditoría); solo se oculta el id técnico.
- assert.match(s,/hiddenKeys=\{\['id'[,\]]/);
+ assert.match(s,/BASE_HIDDEN_PLAN_KEYS = \['id'[,\]]/);
+ assert.match(s,/hiddenKeys=\{planHiddenKeys\(initialPlan\)\}/);
+ const base=s.slice(s.indexOf('const BASE_HIDDEN_PLAN_KEYS'),s.indexOf('\n',s.indexOf('const BASE_HIDDEN_PLAN_KEYS')));
+ assert.ok(!base.includes("'base_currency'"),'la divisa base sigue visible en la tarjeta del plan');
  assert.match(s,/target_pct: 'Peso objetivo'/);
  assert.match(s,/band_pct: 'Banda de tolerancia'/);
 });
