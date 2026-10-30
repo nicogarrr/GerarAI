@@ -293,3 +293,21 @@ def test_fcf_per_share_cagr_ignores_quarterly_rows_like_plain_cagr():
     expected = (Decimal(2) ** (Decimal(1) / 4)) - 1  # 10 -> 20 por acción en 4 años
     assert plain is not None and abs(plain.value - expected) < Decimal("0.000001")
     assert ratio is not None and abs(ratio.value - expected) < Decimal("0.000001")
+
+
+
+def test_point_value_prefers_the_annual_row_over_a_later_quarter():
+    """El valor puntual sigue la misma regla que `_cagr`: el anual manda."""
+    def fact(fid, value, year, quarter):
+        return FinancialFact(
+            id=fid, company_id=1, metric="free_cash_flow", value=Decimal(value), period=f"{quarter}{year}",
+            fiscal_year=year, fiscal_quarter=quarter, confidence=Decimal("0.9"),
+        )
+
+    service = ScreenerService()
+    mixed = service._observations_from_rows([], [fact(3, "50", 2024, "Q3"), fact(2, "200", 2023, "FY")])
+    assert mixed["free_cash_flow"].value == Decimal("200")
+    assert mixed["free_cash_flow"].period == "FY2023"
+    # Sin ninguna fila anual se usa la más reciente, como antes.
+    only_quarters = service._observations_from_rows([], [fact(3, "50", 2024, "Q3"), fact(1, "40", 2024, "Q2")])
+    assert only_quarters["free_cash_flow"].value == Decimal("50")
