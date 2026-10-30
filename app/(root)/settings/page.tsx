@@ -1,4 +1,5 @@
 import { getDcaAlertSettings } from '@/lib/actions/dca-settings.actions';
+import { getT } from '@/lib/i18n/server';
 import type { Metadata } from 'next';
 import { getIBKRConnection } from '@/lib/actions/ibkr-settings.actions';
 import SettingsContent from '@/components/settings/SettingsContent';
@@ -11,7 +12,10 @@ import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = { title: 'Ajustes' };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('settings.title') };
+}
 
 export default async function SettingsPage() {
   try {
