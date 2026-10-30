@@ -99,6 +99,10 @@ describe('SourceAuditDetail', () => {
         expect(screen.getByText(/Bloqueada por afirmaciones de baja confianza/)).toBeInTheDocument();
         expect(screen.getByText('Falta conciliar con SEC/FMP las cifras financieras reportadas.')).toBeInTheDocument();
         expect(screen.getByText('Otra')).toBeInTheDocument();
+        // La conciliación ausente descuenta 5 puntos pero no es baja confianza:
+        // va con su propio título para que la puntuación sea explicable.
+        expect(screen.getByText('Conciliación SEC/FMP (1)')).toBeInTheDocument();
+        expect(screen.getByText('Baja confianza (1)')).toBeInTheDocument();
     });
     it('una auditoría superada no muestra motivo de bloqueo', () => {
         render(<SourceAuditDetail audit={audit({ passed: true })} ticker="X" />);

@@ -5,8 +5,10 @@ import type { ResearchSourceAudit } from '@/lib/actions/research.actions';
 
 const MAX_ITEMS = 5;
 
+const RECONCILIATION_CLAIM_RE = /^SEC\/FMP reconciliation missing for reported financial facts\.?$/i;
+
 const WEAK_CLAIM_ES: ReadonlyArray<[RegExp, string]> = [
-  [/^SEC\/FMP reconciliation missing for reported financial facts\.?$/i, 'Falta conciliar con SEC/FMP las cifras financieras reportadas.'],
+  [RECONCILIATION_CLAIM_RE, 'Falta conciliar con SEC/FMP las cifras financieras reportadas.'],
 ];
 
 export function weakClaimEs(text: string): string {
@@ -44,7 +46,11 @@ export function SourceAuditDetail({ audit, ticker }: { audit: ResearchSourceAudi
       {!audit.passed && !hasReason && !onlyWeak ? <p className="mt-3 text-sm text-amber-300">Motivo del bloqueo no registrado en esta auditoría. Regenera la tesis para obtenerlo.</p> : null}
       <ClaimList title="Afirmaciones sin fuente" items={audit.unsupported_claims} />
       <ClaimList title="Datos en conflicto" items={audit.data_conflicts} />
-      <ClaimList title="Baja confianza" items={audit.weak_claims.map(weakClaimEs)} />
+      {/* La conciliación ausente NO es una afirmación de baja confianza, aunque
+          el backend la devuelva en weak_claims: con su propio título el -5 de la
+          puntuación se puede explicar con lo que se muestra. */}
+      <ClaimList title="Baja confianza" items={audit.weak_claims.filter((claim) => !RECONCILIATION_CLAIM_RE.test(claim.trim())).map(weakClaimEs)} />
+      <ClaimList title="Conciliación SEC/FMP" items={audit.weak_claims.filter((claim) => RECONCILIATION_CLAIM_RE.test(claim.trim())).map(weakClaimEs)} />
     </>
   );
 }
