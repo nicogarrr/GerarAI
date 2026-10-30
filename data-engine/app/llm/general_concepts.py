@@ -103,3 +103,20 @@ def canonical_concept(question: str) -> str | None:
 def local_definition(question: str) -> str | None:
     concept = canonical_concept(question)
     return DEFINITIONS.get(concept) if concept else None
+
+
+_FOLLOWUP_RE = re.compile(r"(?:y|entonces) (?:(?:el|la|los|las|un|una|the) )?(.+?)")
+
+
+def followup_definition(question: str, last_user_question: str | None) -> str | None:
+    """«¿qué es el PER?» → «¿y el FCF?»: la forma abreviada solo vale si el
+    turno anterior del usuario ya era una pregunta de concepto. Sin ese ancla,
+    «¿y el efectivo?» en otro contexto no es una consulta de glosario.
+    """
+    if canonical_concept(last_user_question or "") is None:
+        return None
+    value = re.sub(r"^[¿¡\s]+|[?!.\s]+$", "", _normalize(question))
+    match = re.fullmatch(_FOLLOWUP_RE, value)
+    if not match:
+        return None
+    return DEFINITIONS.get(_ALIASES.get(match.group(1)) or "")

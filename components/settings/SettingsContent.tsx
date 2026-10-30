@@ -1,4 +1,6 @@
+import { getT } from '@/lib/i18n/server';
 import DcaAlertsForm from '@/components/settings/DcaAlertsForm';
+import LanguageForm from '@/components/settings/LanguageForm';
 import type { DcaAlertSettings } from '@/lib/actions/dca-settings.actions';
 import Link from 'next/link';
 import IBKRConnectionForm from '@/components/settings/IBKRConnectionForm';
@@ -20,56 +22,57 @@ export type SettingsContentProps = {
   ibkr: IBKRConnection | null;
 };
 
-function Unavailable() {
-  return <p className="text-sm text-gray-400">No disponible ahora. Recarga para volver a intentarlo.</p>;
-}
-
-export default function SettingsContent({ declarant, llm, currency, ibkr, dca }: SettingsContentProps) {
+export default async function SettingsContent({ declarant, llm, currency, ibkr, dca }: SettingsContentProps) {
+  const t = await getT();
+  const unavailable = <p className="text-sm text-gray-400">{t('settings.unavailable')}</p>;
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-3xl flex-col gap-5">
-      <h1 className="text-3xl font-bold text-gray-100">Ajustes</h1>
-      <nav aria-label="Secciones de ajustes" className="flex flex-wrap gap-2 text-sm">
+      <h1 className="text-3xl font-bold text-gray-100">{t('settings.title')}</h1>
+      <nav aria-label={t('settings.navAria')} className="flex flex-wrap gap-2 text-sm">
         {[
-          ['ibkr', 'IBKR'], ['divisa', 'Divisa'], ['telegram', 'Telegram'], ['dca', 'Avisos DCA'], ['llm', 'IA'], ['fiscal', 'Fiscalidad'],
+          ['idioma', t('settings.sections.language')], ['ibkr', t('settings.sections.ibkr')], ['divisa', t('settings.sections.currency')], ['telegram', t('settings.sections.telegram')], ['dca', t('settings.sections.dca')], ['llm', t('settings.sections.llm')], ['fiscal', t('settings.sections.tax')],
         ].map(([id, label]) => (
           <a className="flex min-h-11 items-center rounded-lg border border-gray-700 px-3 text-gray-300 transition hover:border-teal-500 hover:text-teal-300 focus-visible:outline-2 focus-visible:outline-teal-400" href={`#${id}`} key={id}>
             {label}
           </a>
         ))}
       </nav>
-      <Panel className="scroll-mt-24" id="ibkr" title="Conectar IBKR" description="">
-        {ibkr ? <IBKRConnectionForm initial={ibkr} /> : <Unavailable />}
+      <Panel className="scroll-mt-24" id="idioma" title={t('settings.language.title')} description={t('settings.language.description')}>
+        <LanguageForm />
+      </Panel>
+      <Panel className="scroll-mt-24" id="ibkr" title={t('settings.ibkr.title')} description="">
+        {ibkr ? <IBKRConnectionForm initial={ibkr} /> : unavailable}
       </Panel>
       <Panel
         className="scroll-mt-24"
-        description="Divisa en la que ves la cartera y sus totales. La fiscalidad sigue en euros."
+        description={t('settings.currency.description')}
         id="divisa"
-        title="Divisa base"
+        title={t('settings.currency.title')}
       >
-        {currency ? <BaseCurrencyForm initial={currency} /> : <Unavailable />}
+        {currency ? <BaseCurrencyForm initial={currency} /> : unavailable}
       </Panel>
-      <Panel className="scroll-mt-24" id="telegram" title="Telegram">
-        <p className="text-sm text-gray-400">La vinculación de Telegram desde la app no está disponible todavía. En Alertas puedes consultar el estado del canal configurado en el servidor.</p>
+      <Panel className="scroll-mt-24" id="telegram" title={t('settings.telegram.title')}>
+        <p className="text-sm text-gray-400">{t('settings.telegram.body')}</p>
         <Link className="inline-flex min-h-11 items-center gap-2 text-sm text-teal-300 hover:underline" href="/alerts">
-          Ver estado de Telegram y gestionar alertas <span aria-hidden="true">→</span>
+          {t('settings.telegram.link')} <span aria-hidden="true">→</span>
         </Link>
       </Panel>
-      <Panel className="scroll-mt-24" id="dca" title="Avisos DCA">
-        {dca ? <DcaAlertsForm initial={dca} /> : <Unavailable />}
+      <Panel className="scroll-mt-24" id="dca" title={t('settings.dca.title')}>
+        {dca ? <DcaAlertsForm initial={dca} /> : unavailable}
       </Panel>
       <SettingsSection
-        description={llm?.source === 'tenant' ? 'Configuración con tu clave API.' : 'Proveedor de GerarAI o tu propia clave API.'}
+        description={llm?.source === 'tenant' ? t('settings.llm.descriptionTenant') : t('settings.llm.descriptionPlatform')}
         id="llm"
-        title="Modelo de IA"
+        title={t('settings.llm.title')}
       >
-        {llm ? <LlmSettingsForm initial={llm} /> : <Unavailable />}
+        {llm ? <LlmSettingsForm initial={llm} /> : unavailable}
       </SettingsSection>
       <SettingsSection
-        description="Datos del declarante y custodia para el Modelo 720."
+        description={t('settings.tax.description')}
         id="fiscal"
-        title="Datos fiscales del declarante"
+        title={t('settings.tax.title')}
       >
-        {declarant ? <TaxDeclarantForm initial={declarant} /> : <Unavailable />}
+        {declarant ? <TaxDeclarantForm initial={declarant} /> : unavailable}
       </SettingsSection>
     </main>
   );

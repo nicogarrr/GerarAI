@@ -706,6 +706,30 @@ class ThesisService:
         escrito por esta generación (nunca ``db.rollback()`` global, que
         descartaría trabajo ajeno pendiente en la sesión).
         """
+        # i18n B: narrativas, debate y revision heredan el idioma guardado
+        # del tenant/peticion (db.info lo puebla get_db o el worker).
+        from app.core.i18n import language_from_db, reset_language_scope, set_language_scope
+
+        _lang_token = set_language_scope(language_from_db(db))
+        try:
+            return self._generate_with_scope(
+                db, ticker, force_new_version, phase_callback,
+                stored_evidence_only=stored_evidence_only,
+                refresh_receipt=refresh_receipt,
+            )
+        finally:
+            reset_language_scope(_lang_token)
+
+    def _generate_with_scope(
+        self,
+        db: Session,
+        ticker: str,
+        force_new_version: bool = False,
+        phase_callback=None,
+        *,
+        stored_evidence_only: bool = False,
+        refresh_receipt: dict | None = None,
+    ) -> ThesisVersion:
         # La narrativa se prepara sin transacción de tesis ni sesión en red.
         narrative_sections = prepare_news_narrative(db, ticker)
         savepoint = db.begin_nested()

@@ -1,4 +1,4 @@
-"""Breaker de cuota 429 para flujos de fondo (jev_fallback y cia.).
+"""Breaker de cuota 429 para flujos de fondo (background_classifier y cia.).
 
 Reproduccion del hallazgo de prod (worker-default, ~21:43-21:48 UTC): con el
 cupo semanal de opencode-go agotado, cada `classify_free` hacia max_retries+1
@@ -64,7 +64,7 @@ def _clear_breakers():
 
 
 def _request() -> LLMRequest:
-    return LLMRequest(messages=(Message("user", "hola"),), task="jev_fallback")
+    return LLMRequest(messages=(Message("user", "hola"),), task="background_classifier")
 
 
 def test_quota_429_single_attempt_then_breaker_fails_fast():

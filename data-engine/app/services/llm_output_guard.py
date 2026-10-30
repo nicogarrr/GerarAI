@@ -32,6 +32,8 @@ EnglishMode = Literal["strict", "off"]
 REASON_CJK = "cjk"
 REASON_ENGLISH = "english"
 REASON_CORRUPT = "corrupt_token"
+# i18n B: prosa en espanol cuando la peticion generaba en ingles.
+REASON_SPANISH = "spanish"
 
 # Hangul, Hiragana, Katakana, CJK unificado y extensiones, formas de ancho
 # completo y signos CJK. Cubre el "문화?" medido.
@@ -199,6 +201,27 @@ _EN_MARKERS = frozenset(
     ["therefore", "however", "provided", "thus", "hence", "moreover", "furthermore", "whereas", "although"]
 )
 
+# Espejo para generacion en ingles (i18n B): palabras funcionales que NO
+# existen en ingles. Se excluyen a proposito las ambiguas con el ingles o el
+# dominio financiero ("a", "no", "sin", "son", "en", "es", "se", "su", "o",
+# "un", "y"): un texto ingles limpio no debe sumar aciertos aqui, igual que
+# uno espanol no los suma en _EN_WORDS. Los nombres propios con articulo
+# espanol ("Los Angeles", "El Nino", "La Liga") suman 1-2 aciertos como mucho:
+# por debajo de SPANISH_MIN_HITS, igual que en el sentido contrario.
+_ES_WORDS = frozenset(
+    [
+        "el", "la", "los", "las", "una", "unas", "del", "que", "está", "están",
+        "fue", "era", "eran", "ha", "han", "con", "por", "para", "como",
+        "más", "muy", "ya", "sí", "este", "esta", "estos", "estas", "pero",
+        "porque", "cuando", "donde", "qué", "cuál", "cuánto", "también",
+        "entre", "sobre", "hasta", "desde", "durante", "según", "precio",
+        "cartera", "empresa", "acciones", "datos", "año", "años", "último",
+        "última", "puede", "pueden", "tiene", "tienen", "hace", "después",
+        "antes", "mismo", "misma", "toda", "todo", "todas", "todos", "otra",
+        "otro", "dos", "cada", "parte", "contra", "sigue", "siguen",
+    ]
+)
+
 _WORD_RE = re.compile(r"[A-Za-z\u00c0-\u024f]+(?:[\u2019\x27][A-Za-z]+)?")
 _QUOTED_RE = re.compile(r"\"[^\"\n]{0,600}\"|\u201c[^\u201d\n]{0,600}\u201d|\u00ab[^\u00bb\n]{0,600}\u00bb")
 _SENTENCE_START_RE = re.compile(r"(?:^|[.!?\n]\s+)([A-Za-z]+)[,\s]")
@@ -229,6 +252,12 @@ def _strip_quoted(text: str) -> str:
     return _QUOTED_RE.sub(" ", text)
 
 
+SPANISH_MIN_HITS = 4
+SPANISH_MIN_RATIO = 0.08
+SPANISH_SHORT_HITS = 2
+SPANISH_SHORT_RATIO = 0.3
+
+
 def _english_hits(text: str) -> tuple[int, int]:
     words = _WORD_RE.findall(_strip_quoted(text))
     if not words:
@@ -238,8 +267,28 @@ def _english_hits(text: str) -> tuple[int, int]:
     return hits, len(words)
 
 
-def inspect_text(text: str, *, english: EnglishMode = "strict") -> list[str]:
-    """Motivos por los que ``text`` no es publicable (lista vacia = limpio)."""
+def _spanish_hits(text: str) -> tuple[int, int]:
+    words = _WORD_RE.findall(_strip_quoted(text))
+    if not words:
+        return 0, 0
+    lowered = [w.lower() for w in words]
+    hits = sum(1 for w in lowered if w in _ES_WORDS)
+    return hits, len(words)
+
+
+def inspect_text(
+    text: str,
+    *,
+    english: EnglishMode = "strict",
+    expected_language: str = "es",
+) -> list[str]:
+    """Motivos por los que ``text`` no es publicable (lista vacia = limpio).
+
+    ``expected_language`` es el idioma que la generacion debia producir
+    (i18n B): con "es" (defecto) se rechaza el ingles segun ``english``;
+    con "en" el chequeo se invierte: el ingles es el idioma esperado y se
+    rechaza prosa en espanol con la misma heuristica en espejo.
+    """
     if not isinstance(text, str) or not text.strip():
         return []
     reasons: list[str] = []
@@ -253,7 +302,15 @@ def inspect_text(text: str, *, english: EnglishMode = "strict") -> list[str]:
         or any(w.lower() not in _LONG_OK for w in _LONG_WORD_RE.findall(text))
     ):
         reasons.append(REASON_CORRUPT)
-    if english == "strict":
+    if expected_language == "en":
+        hits, total = _spanish_hits(text)
+        ratio = hits / max(total, 1)
+        if (
+            (hits >= SPANISH_MIN_HITS and ratio >= SPANISH_MIN_RATIO)
+            or (hits >= SPANISH_SHORT_HITS and ratio >= SPANISH_SHORT_RATIO)
+        ):
+            reasons.append(REASON_SPANISH)
+    elif english == "strict":
         hits, total = _english_hits(text)
         starters = {m.group(1).lower() for m in _SENTENCE_START_RE.finditer(_strip_quoted(text))}
         marker_start = bool(starters & _EN_MARKERS) and hits >= 2
@@ -284,7 +341,12 @@ def _is_free_text(value: str) -> bool:
     return bool(value.strip()) and " " in value.strip()
 
 
-def inspect_response_text(text: str, *, english: EnglishMode = "strict") -> list[str]:
+def inspect_response_text(
+    text: str,
+    *,
+    english: EnglishMode = "strict",
+    expected_language: str = "es",
+) -> list[str]:
     """Como ``inspect_text`` pero, si la respuesta es JSON, evalua el CONJUNTO de
     los valores de texto libre (no cada uno por separado, o varias frases
     cortas en ingles sumarian por debajo del umbral) y no mira las claves ni los
@@ -296,7 +358,7 @@ def inspect_response_text(text: str, *, english: EnglishMode = "strict") -> list
         try:
             parsed = json.loads(stripped)
         except ValueError:
-            return inspect_text(text, english=english)
+            return inspect_text(text, english=english, expected_language=expected_language)
         values = list(_walk_strings(parsed))
         reasons: list[str] = []
         # CJK, control y tokens corruptos: tambien en valores de una palabra.
@@ -304,13 +366,13 @@ def inspect_response_text(text: str, *, english: EnglishMode = "strict") -> list
             for reason in inspect_text(chunk, english="off"):
                 if reason not in reasons:
                     reasons.append(reason)
-        if english == "strict":
+        if english == "strict" or expected_language == "en":
             prose = " . ".join(v for v in values if _is_free_text(v))
-            for reason in inspect_text(prose, english="strict"):
+            for reason in inspect_text(prose, english=english, expected_language=expected_language):
                 if reason not in reasons:
                     reasons.append(reason)
         return reasons
-    return inspect_text(text, english=english)
+    return inspect_text(text, english=english, expected_language=expected_language)
 
 
 class LLMOutputRejected(Exception):
@@ -342,6 +404,13 @@ RETRY_HINT = (
     "financieros habituales)."
 )
 
+RETRY_HINT_EN = (
+    "\n\nRETRY: your previous answer mixed languages or contained corrupt "
+    "tokens. Reply ONLY in English, with no Chinese, Korean or Japanese "
+    "characters and no Spanish phrases (except tickers, acronyms and standard "
+    "financial terms)."
+)
+
 
 def guard_stats() -> dict[str, int]:
     """Contadores acumulados del proceso: llamadas, disparos, reintentos
@@ -361,14 +430,15 @@ def _count(source: str, key: str) -> None:
         _stats[f"{source}.{key}"] += 1
 
 
-def _with_retry_hint(request: LLMRequest) -> LLMRequest:
+def _with_retry_hint(request: LLMRequest, *, expected_language: str = "es") -> LLMRequest:
+    hint = RETRY_HINT_EN if expected_language == "en" else RETRY_HINT
     messages = list(request.messages)
     for index, message in enumerate(messages):
         if str(getattr(message.role, "value", message.role)) == "system":
-            messages[index] = Message(message.role, message.content + RETRY_HINT)
+            messages[index] = Message(message.role, message.content + hint)
             break
     else:
-        messages.insert(0, Message("system", RETRY_HINT.strip()))
+        messages.insert(0, Message("system", hint.strip()))
     return replace(request, messages=messages)
 
 
@@ -388,6 +458,7 @@ async def complete_guarded(
     *,
     source: str,
     english: EnglishMode = "strict",
+    expected_language: str = "es",
     on_response: Callable[[Any], None] | None = None,
     before_retry: Callable[[], None] | None = None,
 ) -> GuardedResponse:
@@ -404,7 +475,9 @@ async def complete_guarded(
     first = await provider.complete(request)
     if on_response is not None:
         on_response(first)
-    reasons = inspect_response_text(getattr(first, "text", "") or "", english=english)
+    reasons = inspect_response_text(
+        getattr(first, "text", "") or "", english=english, expected_language=expected_language
+    )
     if not reasons:
         return GuardedResponse(first)
     _count(source, "triggered")
@@ -414,7 +487,7 @@ async def complete_guarded(
     logger.warning("llm_output_guard[%s]: salida rechazada (%s), reintento unico", source, ",".join(reasons))
     if before_retry is not None:
         before_retry()
-    retry_request = _with_retry_hint(request)
+    retry_request = _with_retry_hint(request, expected_language=expected_language)
     cjk_retry = getattr(provider, "complete_cjk_retry", None)
     if REASON_CJK in reasons and callable(cjk_retry):
         # Chat real medido: 94,6 s cuando el primario gratuito lento fallaba
@@ -428,7 +501,9 @@ async def complete_guarded(
         second = await provider.complete(retry_request)
     if on_response is not None:
         on_response(second)
-    retry_reasons = inspect_response_text(getattr(second, "text", "") or "", english=english)
+    retry_reasons = inspect_response_text(
+        getattr(second, "text", "") or "", english=english, expected_language=expected_language
+    )
     if not retry_reasons:
         _count(source, "recovered")
         return GuardedResponse(second, discarded=[first], retried=True, calls=2)

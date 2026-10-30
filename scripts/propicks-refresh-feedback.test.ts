@@ -13,7 +13,7 @@ test('el botón anuncia el estado por sí mismo (QA: sin feedback)', () => {
   const source = readFileSync('components/proPicks/EnhancedProPicksContent.tsx', 'utf8');
   const simple = source.match(/<span>\{loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\}<\/span>/g) ?? [];
   assert.equal(simple.length, 1, 'el botón principal «Actualizar selección» cambia su etiqueta mientras carga');
-  const condicional = source.match(/<span>\{lastGenerated \? \(loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\) : \(loading \? 'Generando selección\.\.\.' : 'Generar selección ahora'\)\}<\/span>/g) ?? [];
-  assert.equal(condicional.length, 1, 'el botón del estado vacío anuncia «Actualizando selección...» al actualizar y «Generando selección...» al generar el primer run');
+  const condicional = source.match(/<span>\{emptyStateNeedsRun \? \(loading \? 'Generando selección\.\.\.' : 'Generar selección ahora'\) : \(loading \? 'Actualizando selección\.\.\.' : 'Actualizar selección'\)\}<\/span>/g) ?? [];
+  assert.equal(condicional.length, 1, 'el botón del estado vacío anuncia «Actualizando selección...» al actualizar y «Generando selección...» al generar (primer run o run con 0 aptas): la etiqueta dice la acción real');
   assert.doesNotMatch(source, /bg-teal-600/, 'el primario vive en Button, no en overrides locales');
 });

@@ -427,6 +427,12 @@ def _session(tenant_id: int | None, user_id: str | None):
         raise ValueError(f"Active tenant {tenant_id} was not found")
     db.info["tenant_id"] = tenant.id
     db.info["user_id"] = user_id
+    # i18n B: los jobs heredan el idioma guardado del tenant (generacion LLM).
+    from app.core.i18n import SUPPORTED_LANGUAGES
+
+    _lang = (tenant.metadata_ or {}).get("language")
+    if _lang in SUPPORTED_LANGUAGES:
+        db.info["language"] = _lang
     # El SELECT del tenant abre una transaccion (autocommit=False); sin este
     # commit cada actor arrancaba "idle in transaction" y la mantenia abierta
     # durante toda la unidad de trabajo, bloqueando escritores (p. ej. el

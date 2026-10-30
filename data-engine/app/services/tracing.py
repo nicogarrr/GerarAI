@@ -96,6 +96,7 @@ METADATA_ALLOWLIST = {
     "prompt_version",
     "prompt_hash",
     "prompt_source",
+    "prompt_lang",
     # Escalares de observabilidad que el workflow de Langfuse ya emitia.
     "latency_ms",
     "cost",

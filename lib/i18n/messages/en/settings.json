@@ -1,1 +1,46 @@
-{}
+{
+  "title": "Settings",
+  "navAria": "Settings sections",
+  "unavailable": "Not available right now. Reload to try again.",
+  "sections": {
+    "language": "Language",
+    "ibkr": "IBKR",
+    "currency": "Currency",
+    "telegram": "Telegram",
+    "dca": "DCA alerts",
+    "llm": "AI",
+    "tax": "Taxes"
+  },
+  "language": {
+    "title": "Language",
+    "description": "Interface language. Market data and proper names stay unchanged.",
+    "label": "App language",
+    "optionEs": "Español",
+    "optionEn": "English",
+    "applying": "Applying…"
+  },
+  "ibkr": {
+    "title": "Connect IBKR"
+  },
+  "currency": {
+    "title": "Base currency",
+    "description": "The currency your portfolio and its totals are shown in. Tax reporting stays in euros."
+  },
+  "telegram": {
+    "title": "Telegram",
+    "body": "Linking Telegram from the app is not available yet. In Alerts you can check the status of the channel configured on the server.",
+    "link": "See Telegram status and manage alerts"
+  },
+  "dca": {
+    "title": "DCA alerts"
+  },
+  "llm": {
+    "title": "AI model",
+    "descriptionTenant": "Configured with your API key.",
+    "descriptionPlatform": "GerarAI's provider or your own API key."
+  },
+  "tax": {
+    "title": "Declarant tax details",
+    "description": "Declarant and custody details for Form 720."
+  }
+}

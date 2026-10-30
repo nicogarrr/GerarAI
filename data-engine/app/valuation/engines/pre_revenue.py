@@ -18,7 +18,12 @@ from __future__ import annotations
 from dataclasses import replace
 
 from app.services.inferred_input_service import InferredInputService
-from app.valuation.dcf_fcff import DCFInputs, run_dcf
+from app.valuation.dcf_fcff import (
+    ConvergenceDCFInputs,
+    DCFInputs,
+    run_dcf,
+    run_dcf_margin_convergence,
+)
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -26,15 +31,20 @@ from app.valuation.engines.base import (
     adr_ratio,
     apply_publication_blockers,
     default_growth,
+    expected_value_or_nd,
     insufficient_result,
     is_adr_without_ratio,
     margin_of_safety,
+    normalize_scenario_display,
     resolve_rates,
 )
 from app.valuation.funding_gap import estimate_funding_gap
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
-from app.valuation.scenario_definitions import speculative_causal_scenarios
+from app.valuation.scenario_definitions import (
+    evidence_weighted_probabilities,
+    speculative_causal_scenarios,
+)
 from app.valuation.scenario_model import Scenario, probability_weighted_value
 from app.valuation.sensitivity import sensitivity_grid
 
@@ -91,6 +101,161 @@ class PreRevenueScenarioEngine(ValuationEngine):
         )
         return result
 
+    def _margin_convergence_orientation(
+        self,
+        context: ValuationContext,
+        snapshot,
+        current_price: float | None,
+        *,
+        reported_margin: float,
+    ) -> dict | None:
+        """Orientación por convergencia de margen para growth con margen inmaduro.
+
+        Solo si existe un margen FCF OBJETIVO inferido y validado (base
+        explícita + URLs https, positivo). Resultado SIEMPRE orientativo
+        (blocker ``inferred_fcf_margin_target``): los supuestos son el margen
+        reportado (hecho) y el objetivo (inferencia marcada); nada se inventa.
+        None = sin base para converger: el llamador mantiene el N/D explicado.
+        """
+        company = context.company
+        if context.db is None or company.id is None:
+            return None
+        target_input = InferredInputService().latest_valid(context.db, company.id, "fcf_margin")
+        if target_input is None:
+            return None
+        target_margin = float(target_input.value)
+        if target_margin <= 0:
+            return None
+        revenue = snapshot.value("revenue")
+        shares = snapshot.value("shares_diluted")
+        net_debt = snapshot.value("net_debt")
+        if revenue is None or revenue <= 0 or shares is None or net_debt is None:
+            return None
+
+        growth = snapshot.value("revenue_growth")
+        if growth is None:
+            growth = default_growth(company)
+        growth = max(min(growth, 0.60), -0.15)
+        wacc, wacc_source, terminal, _terminal_source, _dropped = resolve_rates(
+            context.db, company, as_of=context.as_of
+        )
+
+        scenario_defs = {
+            "bear": {
+                "revenue_growth": max(growth - 0.08, -0.15),
+                "wacc": wacc + 0.02,
+            },
+            "base": {"revenue_growth": growth, "wacc": wacc},
+            "bull": {
+                "revenue_growth": min(growth + 0.08, 0.60),
+                "wacc": max(wacc - 0.01, terminal + 0.01),
+            },
+        }
+        scenario_values: dict[str, float | None] = {}
+        scenario_traces: dict = {}
+        for name, assumptions in scenario_defs.items():
+            try:
+                dcf = run_dcf_margin_convergence(
+                    ConvergenceDCFInputs(
+                        revenue=revenue,
+                        revenue_growth=assumptions["revenue_growth"],
+                        initial_fcf_margin=reported_margin,
+                        target_fcf_margin=target_margin,
+                        wacc=assumptions["wacc"],
+                        terminal_growth=terminal,
+                        net_debt=net_debt,
+                        shares_outstanding=shares,
+                    )
+                )
+                value: float | None = dcf.value_per_share
+                trace = dcf.trace
+            except ValueError:
+                # Ni convergiendo se alcanza un FCF terminal positivo: el
+                # escenario no es valorable (N/D explicado abajo).
+                value = None
+                trace = {"error": "converged_fcf_not_positive"}
+            scenario_values[name] = value
+            scenario_traces[name] = {
+                "definition": {"name": name, "assumptions": assumptions},
+                "value_per_share": value,
+                "trace": trace,
+            }
+
+        probabilities = evidence_weighted_probabilities(
+            evidence_confidence=0.0, directional_signal=0.0, downside_risk=0.0
+        )
+        weighted = probability_weighted_value(
+            [Scenario(name, probabilities[name], v) for name, v in scenario_values.items() if v is not None]
+            or [Scenario("base", 1.0, 0.0)]
+        )
+        # El esperado se pondera con los brutos disponibles; los N/D (no
+        # calculables) no pueden aportar y se declaran en scenario_notes.
+        expected_raw = weighted["expected_value"] if any(
+            v is not None for v in scenario_values.values()
+        ) else 0.0
+        expected, expected_note = expected_value_or_nd(expected_raw)
+        display, scenario_notes = normalize_scenario_display(
+            scenario_values, scenario_traces=scenario_traces
+        )
+        if expected_note:
+            scenario_notes["expected"] = expected_note
+
+        ratio = adr_ratio(company)
+        comparable_price = current_price / ratio if (ratio and current_price) else current_price
+        blockers = ["inferred_fcf_margin_target"]
+        if wacc_source != "calculated_metric":
+            blockers.append("traceable_wacc")
+        return apply_publication_blockers(
+            {
+                "ticker": company.ticker,
+                "model_type": company.valuation_model,
+                "status": "ok",
+                "publishable": True,
+                "current_price": current_price,
+                "bear_value": display["bear"],
+                "base_value": display["base"],
+                "bull_value": display["bull"],
+                "expected_value": expected,
+                "margin_of_safety": margin_of_safety(expected, comparable_price),
+                "missing_inputs": [],
+                "publication_blockers": blockers,
+                "adr_ratio": ratio,
+                "value_per_share_basis": "ordinary_share",
+                "listed_share_values": None,
+                "comparable_price_basis": "ordinary_share" if ratio else "listed_share",
+                "scenario_notes": scenario_notes,
+                "reverse_dcf": {},
+                "sensitivity": {"rows": []},
+                "moat": empty_moat_framework(
+                    company.company_type, company.factor_tags or [], company.special_risks or []
+                ),
+                "trace": {
+                    "method": "fcff_dcf_margin_convergence",
+                    "engine": self.key,
+                    "input_source": "financial_facts+inferred_target",
+                    "publishable": False,
+                    "status": "ok",
+                    "model_version": MODEL_VERSION,
+                    "reported_fcf_margin": reported_margin,
+                    "target_fcf_margin": target_margin,
+                    "target_fcf_margin_input_id": target_input.id,
+                    "target_fcf_margin_base": target_input.base,
+                    "target_fcf_margin_source_urls": list(target_input.source_urls or []),
+                    "revenue_growth": growth,
+                    "wacc": wacc,
+                    "wacc_source": wacc_source,
+                    "terminal_growth": terminal,
+                    "expected_value_raw": expected_raw,
+                    "scenario_notes": scenario_notes,
+                    "scenarios": scenario_traces,
+                    "probabilities": probabilities,
+                    "fact_ids": snapshot.fact_ids(),
+                    "periods": snapshot.periods(),
+                    "publication_blockers": blockers,
+                },
+            }
+        )
+
     def _value_ordinary(self, context: ValuationContext) -> dict:
         company = context.company
         snapshot = context.snapshot
@@ -98,6 +263,20 @@ class PreRevenueScenarioEngine(ValuationEngine):
 
         rejected = self._reported_non_positive_fcf(company, snapshot, current_price)
         if rejected is not None:
+            # Antes de negar: growth con margen inmaduro y un objetivo de margen
+            # inferido validado (base + URLs) obtiene una ORIENTACION por
+            # convergencia de margen. Sin objetivo con fuente, N/D explicado.
+            reported = snapshot.value("fcf_margin")
+            if reported is None:
+                fcf = snapshot.value("free_cash_flow")
+                rev = snapshot.value("revenue")
+                reported = (fcf / rev) if (fcf is not None and rev) else None
+            if reported is not None and reported <= 0:
+                convergence = self._margin_convergence_orientation(
+                    context, snapshot, current_price, reported_margin=float(reported)
+                )
+                if convergence is not None:
+                    return convergence
             return rejected
 
         # Still refuse bootstrap — speculative names need at least revenue + shares.
@@ -183,7 +362,18 @@ class PreRevenueScenarioEngine(ValuationEngine):
             # -84,70 USD/accion con un margen de -15,46) que se publicaban como
             # bear/base/bull. El capital propio no vale menos de cero. Un margen
             # INFERIDO solo sustituye a un FCF AUSENTE (mas arriba), nunca a uno
-            # reportado: el dato reportado gana. Se niega, como standard_dcf.
+            # reportado: el dato reportado gana.
+            # Empresa de alto crecimiento con margen inmaduro (RKLB, 30-oct-2026:
+            # «es imposible que el valor justo sea -94 %»): con un margen FCF
+            # OBJETIVO inferido y validado (base explicita + URLs https) se
+            # publica una ORIENTACION por convergencia de margen (del reportado
+            # al objetivo en 5 anos), nunca una valoracion final. Sin objetivo
+            # con fuente, se niega, como standard_dcf.
+            convergence = self._margin_convergence_orientation(
+                context, snapshot, current_price, reported_margin=margin
+            )
+            if convergence is not None:
+                return convergence
             result = insufficient_result(
                 ticker=company.ticker,
                 model_type=company.valuation_model,

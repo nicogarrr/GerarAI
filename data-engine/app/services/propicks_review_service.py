@@ -60,6 +60,16 @@ _SCHEMA = {
 _PROMPT = get_prompt("propicks_review_service", allow_remote=False)
 SYSTEM = _PROMPT.text
 
+
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("propicks_review_service", allow_remote=False)
+
+
 _NUM = re.compile(r"\d[\d.,]*")
 
 
@@ -166,12 +176,12 @@ async def review_shortlist(
         batch = candidates[i : i + BATCH]
         packet = _packet(batch)
         request = LLMRequest(
-            messages=[Message("system", SYSTEM), Message("user", packet)],
+            messages=[Message("system", _prompt().text), Message("user", packet)],
             task=REVIEW_TASK,
             temperature=0.2,
             max_tokens=3500,
             response_format=ResponseFormat.json_schema(_SCHEMA, name="propicks_review"),
-            metadata=_PROMPT.trace_metadata(),
+            metadata=_prompt().trace_metadata(),
         )
         try:
             guarded = await complete_guarded(

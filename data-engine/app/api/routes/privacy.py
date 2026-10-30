@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services.privacy_service import (
     PrivacyConfirmationError,
     PrivacyPartialFailure,
@@ -68,10 +69,7 @@ def export_account(db: Session = Depends(get_db)) -> dict:
         logger.error("account export failed", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=(
-                "No se pudo generar la exportación. No se ha enviado ningún dato; "
-                "inténtalo de nuevo."
-            ),
+            detail=ui_error(502, "export_failed").detail,
         ) from exc
 
 
@@ -108,24 +106,17 @@ def delete_account(
         )
         raise HTTPException(
             status_code=502,
-            detail=(
-                "No se pudo completar el borrado: quedan datos en el "
-                "almacenamiento externo y no se ha borrado nada en la base de "
-                "datos. Vuelve a intentarlo."
-            ),
+            detail=ui_error(502, "deletion_residue").detail,
         ) from exc
     except ValueError:
         logger.warning("account deletion rejected")
         raise HTTPException(
             status_code=400,
-            detail="No se pudo procesar la solicitud de borrado.",
+            detail=ui_error(502, "deletion_request_failed").detail,
         ) from None
     except Exception as exc:  # noqa: BLE001 - no filtrar internos al cliente
         logger.error("account deletion failed", exc_info=True)
         raise HTTPException(
             status_code=502,
-            detail=(
-                "No se pudo borrar la cuenta. No se ha confirmado ningún "
-                "borrado parcial; vuelve a intentarlo."
-            ),
+            detail=ui_error(502, "deletion_failed").detail,
         ) from exc

@@ -85,6 +85,8 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/settings/LanguageForm.tsx':
+    'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
   'lib/i18n/client.tsx':
     'provider y hooks de locale (useT/useLocale/useFormat): contexto React de cliente por definición',
   'components/forms/SelectField.tsx': 'usa useId, Controller (react-hook-form) y el hook useT de i18n',

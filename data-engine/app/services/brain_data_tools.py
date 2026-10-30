@@ -113,7 +113,7 @@ def _dividend_line(company: Company, record: DividendRecord) -> str:
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
     """Dividendos GUARDADOS (declarados por el proveedor); nada proyectado ni inventado."""
     today = date.today()
-    portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobrar\w*\b", question))
+    portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobr\w*\b", question))
     company = None if portfolio else _company_in_question(db, question)
     if company is not None:
         kept, uncertain = resolve_yahoo_events(db.scalars(select(DividendRecord).where(
