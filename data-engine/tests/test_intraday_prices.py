@@ -173,3 +173,37 @@ def test_refresh_with_companies_filter_only_fetches_positions_universe(db):
     prices_step = result["stages"][0]
     assert prices_step["status"] == "ok"
     assert prices_step["updated"] == 1
+
+
+def test_fetch_intraday_yahoo_remembers_listing_currency(monkeypatch):
+    """La divisa del listado (``fast_info``, una peticion por simbolo) no se
+    pide en cada pasada de 15 min: se recuerda; un fallo no se recuerda."""
+    from app.services import market_refresh_service as mrs
+
+    getattr(mrs, "_listing_currency_cache", {}).clear()
+    idx = pd.date_range("2026-09-25 13:30", periods=2, freq="15min", tz="UTC")
+    frame = pd.DataFrame({("ASTS", "Close"): [60.0, 61.0], ("NOCUR", "Close"): [1.0, 2.0]}, index=idx)
+    lookups: list[str] = []
+
+    class _FakeYF:
+        @staticmethod
+        def download(symbols, **kwargs):
+            return frame
+
+        @staticmethod
+        def Ticker(symbol):  # noqa: N802 - API de yfinance
+            lookups.append(symbol)
+
+            class Ticker:
+                fast_info = {"currency": "USD" if symbol == "ASTS" else None}
+
+            return Ticker()
+
+    monkeypatch.setitem(__import__("sys").modules, "yfinance", _FakeYF)
+    first = fetch_intraday_yahoo(["ASTS", "NOCUR"])
+    second = fetch_intraday_yahoo(["ASTS", "NOCUR"])
+    assert first["ASTS"][2] == "USD" and second["ASTS"][2] == "USD"
+    assert second["NOCUR"][2] is None
+    # ASTS una sola vez; NOCUR (sin divisa) se reintenta en cada pasada.
+    assert lookups == ["ASTS", "NOCUR", "NOCUR"]
+    getattr(mrs, "_listing_currency_cache", {}).clear()
