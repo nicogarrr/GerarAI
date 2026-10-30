@@ -251,3 +251,23 @@ def test_pregunta_de_noticias_abre_con_las_noticias(db):
     )
     assert resp.answer.startswith("Últimas noticias guardadas:")
     assert resp.answer.count("Últimas noticias guardadas") == 1
+
+
+def test_autor_sin_documentos_con_empresa_no_vuelca_datos(db):
+    _company(db)
+    resp = asyncio.run(
+        ChatService().answer(db, "¿qué diría Buffett de ASTS?", "portfolio", None, use_jev=False)
+    )
+    assert resp.prompt_version == "author-source-missing-v1"
+    assert "biblioteca" in resp.answer
+    assert "Datos almacenados" not in resp.answer
+    assert resp.llm_trace["provider_calls"] == 0
+
+
+def test_empresa_sin_autor_en_la_pregunta_sigue_igual(db):
+    c = _company(db)
+    _fact(db, c, "net_debt", 180_000_000)
+    resp = asyncio.run(
+        ChatService().answer(db, "¿cuánta deuda tiene ASTS?", "portfolio", None, use_jev=False)
+    )
+    assert "180" in resp.answer

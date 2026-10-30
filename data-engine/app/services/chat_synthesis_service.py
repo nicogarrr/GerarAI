@@ -309,6 +309,13 @@ def _general_quantity_context(text: str) -> bool:
     return bool(_FIN_SCOPE_RE.search(re.sub(r"[$€£%]", "", text)) or _MONEY_NEAR_RE.search(text))
 
 
+def _plain(text: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", (text or "").lower())
+        if not unicodedata.combining(c)
+    )
+
+
 _INVESTOR_NAME_LIST = ("buffett", "munger", "graham", "marks", "klarman", "lynch", "fisher", "templeton")
 _INVESTOR_NAMES = r"(?:" + "|".join(_INVESTOR_NAME_LIST) + r")"
 _REPORTING_VERBS = (
@@ -619,6 +626,28 @@ class ChatSynthesisService:
         enable_debate: bool | None = None,
         page: dict | None = None,
     ) -> ChatResponse:
+        # «¿Qué diría Buffett de ASTS?» con la biblioteca sin ese autor: la
+        # ruta de empresa tampoco puede ponerle palabras en boca; misma
+        # respuesta honesta que la ruta general (author-source-missing-v1).
+        question_plain = _plain(question)
+        asked_investors = {
+            name for name in _INVESTOR_NAME_LIST
+            if re.search(rf"\b{name}\b", question_plain)
+        }
+        if asked_investors:
+            author_chunks = [
+                source for source in baseline.sources
+                if source.get("type") == "knowledge_chunk" and source.get("text")
+                and any(name in _plain(str(source.get("author") or "")) for name in asked_investors)
+            ]
+            if not author_chunks:
+                return ChatResponse(
+                    answer=("No tengo un fragmento verificable de ese autor para darte una cita literal. "
+                            "Puedes añadir su carta o documento a la biblioteca; también puedo explicar "
+                            "el concepto sin atribuírselo ni presentarlo como una cita."),
+                    sources=[], model="deterministic", prompt_version="author-source-missing-v1",
+                    confidence=0.9, llm_trace={"path": "author_source_missing", "provider_calls": 0},
+                )
         retrieval_ids = [
             f"{source.get('type')}:{source.get('id')}"
             for source in baseline.sources
@@ -894,12 +923,6 @@ class ChatSynthesisService:
         # año, fragmento): el frontend pliega citas de TODAS las rutas con el
         # mismo contrato. El prompt recibe la vista recortada; la respuesta
         # devuelve la fuente completa y plegable.
-        def _plain(text: str) -> str:
-            return "".join(
-                c for c in unicodedata.normalize("NFKD", (text or "").lower())
-                if not unicodedata.combining(c)
-            )
-
         def _author_key(author: object) -> str:
             # Apellido o nombre completo normalizado, para cotejar autorias.
             return _plain(str(author or "")).strip()
