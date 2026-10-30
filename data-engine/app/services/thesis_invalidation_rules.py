@@ -11,9 +11,11 @@ uno salta. No hay un segundo evaluador.
 Metricas soportadas:
 
 - ``precio``: ultimo cierre de ``MarketPrice`` (caducado => no dispara).
-- ``margen_seguridad_pct``: ``(valor_esperado_tesis / precio - 1) * 100``. Mismo
-  benchmark que ``ThesisVersion.margin_of_safety`` (valor ESPERADO de la tesis),
-  pero con el precio de hoy.
+- ``margen_seguridad_pct``: ``((valor_esperado_tesis - precio) / valor_esperado_tesis) * 100``.
+  Misma convencion (V - P) / V que ``ThesisVersion.margin_of_safety``, el motor
+  (``discount_to_value_v1``) y el resto de pantallas, con el mismo benchmark
+  (valor ESPERADO de la tesis) pero el precio de hoy. Una regla «< 20» pide lo
+  mismo que el margen que muestran la ficha, la cartera y el screener.
 - ``variacion_desde_tesis_pct``: ``(precio / precio_en_la_tesis - 1) * 100``.
 - ``metrica:<nombre>``: ultimo ``CalculatedMetric`` con ese nombre (ejercicio
   mas reciente) y, si no hay, ultimo ``FinancialFact``. El umbral va en la
@@ -306,7 +308,10 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
         if price is None or price <= 0:
             return None, {**base, **info}
         if metric == MARGIN_OF_SAFETY_PCT:
-            value = (Decimal(reference) / price - 1) * 100
+            # Convencion unica del producto (V - P) / V: el % que ve el usuario
+            # en la tesis, la ficha, la cartera y el screener. V/P - 1 es el
+            # potencial de revalorizacion, no el margen (ver engines/base.py).
+            value = (Decimal(reference) - price) / Decimal(reference) * 100
         else:
             value = (price / Decimal(reference) - 1) * 100
         return value, {**base, **info, "reference": str(reference)}
