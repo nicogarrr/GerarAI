@@ -1,5 +1,5 @@
 import { defineConfig } from "@playwright/test";
-import { E2E_UI_BACKEND_URL, E2E_UI_DATABASE_URL, e2eUiBackendPort } from "./e2e/fixtures/e2e-env";
+import { E2E_REDIS_URL, E2E_UI_BACKEND_URL, E2E_UI_DATABASE_URL, e2eUiBackendPort } from "./e2e/fixtures/e2e-env";
 
 const runE2E = process.env.E2E_RUN === "1";
 const runUiE2E = process.env.E2E_UI_RUN === "1";
@@ -51,6 +51,7 @@ export default defineConfig({
           RESEARCH_AUTH_MAX_AGE_SECONDS: "3600",
           CAVAAI_ENABLE_VECTOR_INGEST: "0",
           CAVAAI_ENABLE_VECTOR_CHAT: "0",
+          REDIS_URL: E2E_REDIS_URL,
           // E2E determinista: no depende de Finnhub/Yahoo ni de la red. El
           // endpoint responde vacío con `unavailable=true` y la UI muestra el
           // estado final honesto en lugar de "cargando" indefinidamente.
@@ -89,6 +90,7 @@ export default defineConfig({
           RESEARCH_AUTH_MAX_AGE_SECONDS: "3600",
           CAVAAI_ENABLE_VECTOR_INGEST: "0",
           CAVAAI_ENABLE_VECTOR_CHAT: "0",
+          REDIS_URL: E2E_REDIS_URL,
         },
         url: `${apiBaseURL}/health`,
         reuseExistingServer: !process.env.CI,

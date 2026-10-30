@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { e2eUiBackendPort, e2eUiDatabasePath } from '../../../e2e/fixtures/e2e-env';
+import { DEFAULT_E2E_REDIS_URL, e2eUiBackendPort, e2eUiDatabasePath } from '../../../e2e/fixtures/e2e-env';
 
 /**
  * Los e2e deben poder correr fuera del layout de CI (otra máquina, otro puerto,
@@ -39,6 +39,14 @@ describe('e2e configurables por entorno', () => {
         expect(e2eUiDatabasePath('sqlite:///./cavaai_ui_e2e.db', '/repo')).toBe('/repo/data-engine/cavaai_ui_e2e.db');
         expect(e2eUiDatabasePath('sqlite:////tmp/e2e/ui.db', '/repo')).toBe('/tmp/e2e/ui.db');
         expect(() => e2eUiDatabasePath('postgresql://x/y', '/repo')).toThrow(/sqlite/);
+    });
+
+    it('los backends e2e reciben REDIS_URL de E2E_REDIS_URL (por defecto el Redis de servicio de CI)', () => {
+        const config = readFileSync(path.join(root, 'playwright.config.ts'), 'utf8');
+        const backends = config.split(/command:\s*`\$\{pythonBin\} -m uvicorn/).slice(1);
+        expect(backends).toHaveLength(2);
+        for (const block of backends) expect(block.split('url:')[0]).toMatch(/REDIS_URL:\s*E2E_REDIS_URL/);
+        expect(DEFAULT_E2E_REDIS_URL).toBe('redis://localhost:6379/0');
     });
 
     it('el puerto del backend sale de E2E_UI_BACKEND_URL', () => {
