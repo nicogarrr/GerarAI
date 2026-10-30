@@ -30,3 +30,22 @@ test('Auditoría A: un 13F sin verificar nunca se presenta como verificado', () 
   assert.match(holdingsVerificationNote('partial') ?? '', /parciales/);
   assert.equal(holdingsVerificationNote('ok'), null);
 });
+
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+
+test('ficha-4: ningún panel pinta las limitaciones del 13F en crudo (inglés)', () => {
+  // La ficha (Gestores que la declaran) hacía holders.limitations.join(' ') y
+  // mostraba «Quarterly cadence with up to a 45-day reporting lag…» en inglés.
+  const raw: string[] = [];
+  for (const root of ['app', 'components']) {
+    for (const name of readdirSync(root, { recursive: true, encoding: 'utf8' })) {
+      if (!name.endsWith('.tsx')) continue;
+      const file = path.join(root, name);
+      if (/\.limitations\.(join|map)\(/.test(readFileSync(file, 'utf8'))) raw.push(file);
+    }
+  }
+  assert.deepEqual(raw, []);
+  const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+  assert.match(page, /ownershipLimitations\(holders\.limitations\)/);
+});
