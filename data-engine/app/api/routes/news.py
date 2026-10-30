@@ -136,96 +136,112 @@ def news_events(
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == lane)
     elif lane == "macro":
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")
-        # Frescura: el carril se refresca cada hora (macro_news_refresh); un
-        # titular macro de más de 72 h ya no es contexto actual y ensuciaba el
-        # carril. Solo lectura: las filas no se borran.
-        macro_cutoff = datetime.now(UTC) - timedelta(hours=72)
-        stmt = stmt.where(NewsEvent.date >= macro_cutoff)
-    ordered = stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id))
-    # Lectura: se ocultan filas etiquetadas con un ticker cuyo titular y resumen
-    # no citan a la empresa (ticker pegado delante, nada mas). Criterio sin LLM;
-    # las filas no se borran. El offset cuenta filas visibles.
-    rows: list = []
-    skipped = 0
-    scanned = 0
-    # Agrupación de titulares 13F (boilerplate de MarketBeat y agregadores):
-    # una fila visible por empresa y día con recuento, representada por el
-    # primer evento del grupo. En la ficha de empresa se muestran sin agrupar.
-    clusters: dict[tuple, dict] = {}
-    story_groups: list[StoryGroup] = []
-    while len(rows) < limit and scanned < _SCAN_LIMIT:
-        chunk = db.execute(ordered.limit(_SCAN_CHUNK).offset(scanned)).all()
-        if not chunk:
-            break
-        scanned += len(chunk)
-        for event, company in chunk:
-            if _is_off_topic(event, company):
-                continue
-            # Filas legacy sin contenido (titular y resumen = enlace del visor):
-            # no se borran, no se muestran.
-            if is_viewer_link_only(event.title, event.summary):
-                continue
-            item = None
-            if ticker is None:
-                # Portada (sin filtro de empresa): fuera el spam legal de
-                # bufetes ("SHAREHOLDER ALERT"...) y los titulares literales
-                # repetidos. En la ficha de una empresa se muestra todo lo
-                # de esa empresa, incluidas las solicitudes de bufetes.
-                if is_law_firm_solicitation(original_headline(event), event.summary):
+    def _scan(ordered_stmt) -> tuple[list, dict, list]:
+        """Filas visibles (con clustering) de una consulta ordenada."""
+        # Lectura: se ocultan filas etiquetadas con un ticker cuyo titular y resumen
+        # no citan a la empresa (ticker pegado delante, nada mas). Criterio sin LLM;
+        # las filas no se borran. El offset cuenta filas visibles.
+        rows: list = []
+        skipped = 0
+        scanned = 0
+        # Agrupación de titulares 13F (boilerplate de MarketBeat y agregadores):
+        # una fila visible por empresa y día con recuento, representada por el
+        # primer evento del grupo. En la ficha de empresa se muestran sin agrupar.
+        clusters: dict[tuple, dict] = {}
+        story_groups: list[StoryGroup] = []
+        while len(rows) < limit and scanned < _SCAN_LIMIT:
+            chunk = db.execute(ordered_stmt.limit(_SCAN_CHUNK).offset(scanned)).all()
+            if not chunk:
+                break
+            scanned += len(chunk)
+            for event, company in chunk:
+                if _is_off_topic(event, company):
                     continue
-                # Nota de prensa de agencia sin empresa detectada y fuera del
-                # carril macro: anuncios de producto/lifestyle que inundaban
-                # «Todas» (medido en prod 19-oct-2026: 24/30 de agencia,
-                # 23/30 sin empresa). Solo portada; las filas no se borran y
-                # cualquier evento con empresa detectada sigue entrando.
-                if (
-                    company is None
-                    and (event.metadata_ or {}).get("news_lane") != "macro"
-                    and (event.source or "") in PRESS_WIRE_SOURCES
-                ):
+                # Filas legacy sin contenido (titular y resumen = enlace del visor):
+                # no se borran, no se muestran.
+                if is_viewer_link_only(event.title, event.summary):
                     continue
-                headline = original_headline(event)
-                if is_position_change_headline(headline):
-                    key = (company.id if company else None, event.date.date())
-                    cluster = clusters.get(key)
-                    if cluster is None:
-                        clusters[key] = {"event": event, "company": company, "count": 1}
-                        item = ("cluster", key)
-                    else:
-                        cluster["count"] += 1
-                elif (event.metadata_ or {}).get("news_lane") == "social":
-                    # Conversación social sin verificar: nunca entra en los
-                    # clústeres de historia ni en el recuento «N fuentes».
-                    item = (event, company)
-                else:
-                    # Misma historia reescrita por otro medio (o traducida): se
-                    # agrupa en la fila más reciente y queda como cobertura
-                    # («N fuentes») en vez de repetirse en portada. La dedup
-                    # literal queda absorbida por la firma (Jaccard 1.0).
-                    sig = event_signature(event, company)
-                    group = find_group(story_groups, event, company, sig)
-                    if group is not None:
-                        absorb(group, event)
+                item = None
+                if ticker is None:
+                    # Portada (sin filtro de empresa): fuera el spam legal de
+                    # bufetes ("SHAREHOLDER ALERT"...) y los titulares literales
+                    # repetidos. En la ficha de una empresa se muestra todo lo
+                    # de esa empresa, incluidas las solicitudes de bufetes.
+                    if is_law_firm_solicitation(original_headline(event), event.summary):
                         continue
-                    story_groups.append(
-                        StoryGroup(
-                            event=event,
-                            company=company,
-                            signature=sig,
-                            text_key=exact_key(original_headline(event)),
+                    # Nota de prensa de agencia sin empresa detectada y fuera del
+                    # carril macro: anuncios de producto/lifestyle que inundaban
+                    # «Todas» (medido en prod 19-oct-2026: 24/30 de agencia,
+                    # 23/30 sin empresa). Solo portada; las filas no se borran y
+                    # cualquier evento con empresa detectada sigue entrando.
+                    if (
+                        company is None
+                        and (event.metadata_ or {}).get("news_lane") != "macro"
+                        and (event.source or "") in PRESS_WIRE_SOURCES
+                    ):
+                        continue
+                    headline = original_headline(event)
+                    if is_position_change_headline(headline):
+                        key = (company.id if company else None, event.date.date())
+                        cluster = clusters.get(key)
+                        if cluster is None:
+                            clusters[key] = {"event": event, "company": company, "count": 1}
+                            item = ("cluster", key)
+                        else:
+                            cluster["count"] += 1
+                    elif (event.metadata_ or {}).get("news_lane") == "social":
+                        # Conversación social sin verificar: nunca entra en los
+                        # clústeres de historia ni en el recuento «N fuentes».
+                        item = (event, company)
+                    else:
+                        # Misma historia reescrita por otro medio (o traducida): se
+                        # agrupa en la fila más reciente y queda como cobertura
+                        # («N fuentes») en vez de repetirse en portada. La dedup
+                        # literal queda absorbida por la firma (Jaccard 1.0).
+                        sig = event_signature(event, company)
+                        group = find_group(story_groups, event, company, sig)
+                        if group is not None:
+                            absorb(group, event)
+                            continue
+                        story_groups.append(
+                            StoryGroup(
+                                event=event,
+                                company=company,
+                                signature=sig,
+                                text_key=exact_key(original_headline(event)),
+                            )
                         )
-                    )
-                    item = ("story", len(story_groups) - 1)
-            else:
-                item = (event, company)
-            if item is None:
-                continue
-            if skipped < offset:
-                skipped += 1
-            elif len(rows) < limit:
-                rows.append(item)
-        if len(chunk) < _SCAN_CHUNK:
-            break
+                        item = ("story", len(story_groups) - 1)
+                else:
+                    item = (event, company)
+                if item is None:
+                    continue
+                if skipped < offset:
+                    skipped += 1
+                elif len(rows) < limit:
+                    rows.append(item)
+            if len(chunk) < _SCAN_CHUNK:
+                break
+        return rows, clusters, story_groups
+
+    # Frescura (solo carril macro): el carril se refresca cada hora
+    # (macro_news_refresh); un titular macro de más de 72 h ya no es contexto
+    # actual y ensuciaba el carril. Solo lectura: las filas no se borran.
+    fresh_stmt = stmt
+    if lane == "macro":
+        macro_cutoff = datetime.now(UTC) - timedelta(hours=72)
+        fresh_stmt = stmt.where(NewsEvent.date >= macro_cutoff)
+    ordered = fresh_stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id))
+    rows, clusters, story_groups = _scan(ordered)
+    archive_fallback = False
+    if lane == "macro" and offset == 0 and not rows:
+        # Sin frescura (fuente caída; medido en prod 30-oct-2026: GDELT
+        # inalcanzable >72h y carril a 0): en vez de un vacío mudo se sirve
+        # el archivo reciente marcado como ``archive`` y con su fecha real
+        # visible. La UI lo anuncia; nunca se finge frescura.
+        archive_fallback = True
+        rows, clusters, story_groups = _scan(stmt.order_by(desc(NewsEvent.date), desc(NewsEvent.id)))
+
     events = []
     related_by_event = _related_tickers_for_rows(db, rows, clusters, story_groups)
     for item in rows:
@@ -289,6 +305,9 @@ def news_events(
                 "coverage_count": len(story_coverage) + 1 if story_coverage else None,
                 "coverage": story_coverage or None,
                 # Carril macro GDELT (#564): None en eventos de empresa.
+                # True solo en el fallback de archivo del carril macro (sin
+                # frescura): la UI anuncia «archivo» y nunca finge frescura.
+                "archive": archive_fallback,
                 "news_lane": (event.metadata_ or {}).get("news_lane"),
                 "macro_theme": (event.metadata_ or {}).get("macro_theme"),
                 "source_tier": persisted.get("source_tier"),
