@@ -643,12 +643,21 @@ class ThesisProjectionService:
                         "crecimiento dos veces)"
                     )
                 else:
-                    multiple = scenario_value / anchor_base_ps
+                    # ADR: valor del motor, FCF/ingresos y acciones del filing son por
+                    # acción ORDINARIA y el precio es del ADR (N ordinarias). Se pasa
+                    # todo a base ADR para que múltiplo de mercado, objetivo y MOS
+                    # comparen lo mismo (antes: objetivo por ordinaria vs precio ADR).
+                    adr = _num(valuation.get("adr_ratio"))
+                    per_listed = adr if adr is not None and adr > 0 else 1.0
+                    scenario_value *= per_listed
+                    projected *= per_listed
+                    anchor_listed_ps = anchor_base_ps * per_listed
+                    multiple = scenario_value / anchor_listed_ps
                     # El valor actual del escenario ya descuenta su crecimiento; aplicar
                     # ese multiplo al ancla ya crecida lo cuenta dos veces. Tope: el
                     # multiplo de mercado actual (precio fechado / ancla por accion),
                     # sin expansion de multiplo. Convencion declarada, INFERIDO.
-                    market_multiple = price / anchor_base_ps
+                    market_multiple = price / anchor_listed_ps
                     capped = multiple > market_multiple
                     multiple = min(multiple, market_multiple)
                     target = projected * multiple
@@ -657,6 +666,8 @@ class ThesisProjectionService:
                         f"valor/acción actual del escenario / {anchor_kind} por acción "
                         f"actual, aplicado al {anchor_kind} por acción proyectado"
                     )
+                    if per_listed != 1.0:
+                        base += f"; por ADR ({per_listed:g} acciones ordinarias)"
                     if capped:
                         base += (
                             f"; acotado al multiplo de mercado actual ({market_multiple:.1f}x, "
