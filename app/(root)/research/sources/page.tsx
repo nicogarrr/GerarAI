@@ -230,7 +230,15 @@ export default async function ResearchSourcesPage({
               {documents.map((document) => (
                 <tr key={document.id} className="border-b border-gray-900 last:border-0">
                   <th className="py-3 text-left text-sm font-semibold text-gray-200" scope="row">{document.ticker ?? 'GLOBAL'}</th>
-                  <td className="py-3 text-gray-300">{document.title}</td>
+                  <td className="py-3 text-gray-300">
+                    {document.source_url ? (
+                      <a className="underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
+                        {document.title}
+                      </a>
+                    ) : (
+                      document.title
+                    )}
+                  </td>
                   <td className="py-3 text-gray-400">{sourceTypeLabel(document.source_type)}</td>
                   <td className="py-3 text-gray-400">{sourceTierLabel(document.source_tier)}</td>
                   <td className="py-3 text-gray-500">
@@ -238,7 +246,7 @@ export default async function ResearchSourcesPage({
                   </td>
                   <td className="py-3 text-gray-500">
                     {document.source_url ? (
-                      <a className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
+                      <a aria-label={`Abrir la fuente de «${document.title}»`} className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">
                         abrir
                       </a>
                     ) : (
