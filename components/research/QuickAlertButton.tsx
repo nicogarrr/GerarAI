@@ -44,10 +44,10 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
           aria-label="Alerta de precio"
           onPointerDown={() => void loadQuickAlertPopoverBody()}
           onFocus={() => void loadQuickAlertPopoverBody()}
-          className={compact ? 'size-11 gap-1.5 p-0 text-gray-300 hover:text-teal-300 sm:h-8 sm:w-auto sm:px-3 sm:text-xs' : 'min-h-[44px] gap-1.5 px-3 text-sm sm:min-h-0 sm:h-8 sm:text-xs'}
+          className={compact ? 'h-11 gap-1.5 px-3 text-gray-300 hover:text-teal-300 sm:h-8 sm:w-auto sm:px-3 sm:text-xs' : 'min-h-[44px] gap-1.5 px-3 text-sm sm:min-h-0 sm:h-8 sm:text-xs'}
         >
           <BellPlus aria-hidden="true" className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-          {compact ? <span className="hidden sm:inline">Alerta de precio</span> : 'Alerta de precio'}
+          {compact ? <><span className="sm:hidden">Alerta</span><span className="hidden sm:inline">Alerta de precio</span></> : 'Alerta de precio'}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 border-gray-700 bg-gray-900">
