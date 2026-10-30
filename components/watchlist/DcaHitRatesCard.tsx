@@ -60,7 +60,7 @@ export default function DcaHitRatesCard({ data, compact = false }: { data: DcaHi
                                     const avg = dcaPercent(cell.avg_return);
                                     return (
                                         <td key={cell.horizon_months} className="px-2 py-1 text-right tabular-nums text-gray-200">
-                                            {pct ?? <span className="text-gray-600">—</span>}
+                                            {pct ?? <span className="text-gray-500">—</span>}
                                             {!compact && cell.months > 0 ? (
                                                 <span className="block text-[10px] text-gray-500">
                                                     n={INT.format(cell.months)}{avg ? ` · media ${avg}` : ''}
