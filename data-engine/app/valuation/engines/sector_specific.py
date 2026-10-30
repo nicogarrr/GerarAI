@@ -42,11 +42,12 @@ cada motor (spread ROE-CoE en bancos, 1-combined_ratio en aseguradoras,
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from sqlalchemy import desc, select
 
 from app.models import FinancialFact
+from app.valuation.fact_reference import split_scaled_value
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -222,7 +223,14 @@ def _resolve_inputs(
             chosen = next((row for row in pool if _same_anchor_period(anchor_row, row)), None)
             if chosen is None and pool:
                 dropped[key] = [_fact_trace(row) for row in pool[:MAX_EXPOSED_PERIODS]]
-        values[key] = _sourced(chosen)
+        sourced = _sourced(chosen)
+        if sourced is not None and chosen is not None:
+            # Acciones/por accion del ejercicio frente al precio de hoy: un split
+            # posterior al cierre cambia la escala (misma regla que el DCF).
+            scaled = split_scaled_value(context.db, context.company.id, chosen)
+            if scaled != sourced.value:
+                sourced = replace(sourced, value=scaled)
+        values[key] = sourced
     return ResolvedInputs(values=values, anchor=anchor, dropped=dropped, market_rates=rate_traces)
 
 

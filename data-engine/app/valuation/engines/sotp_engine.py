@@ -14,6 +14,7 @@ from __future__ import annotations
 from sqlalchemy import desc, select
 
 from app.models import FinancialFact
+from app.valuation.fact_reference import split_scaled_value
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -109,7 +110,9 @@ class SOTPEngine(ValuationEngine):
             latest_by_metric.setdefault(fact.metric, fact)
         shares_fact = latest_by_metric.get("shares_diluted")
         net_debt_fact = latest_by_metric.get("net_debt")
-        shares = float(shares_fact.value) if shares_fact is not None else None
+        shares = (
+            split_scaled_value(context.db, company.id, shares_fact) if shares_fact is not None else None
+        )
         net_debt = float(net_debt_fact.value) if net_debt_fact is not None else None
 
         segments: list[dict] = []
@@ -369,7 +372,7 @@ class SOTPEngine(ValuationEngine):
         if nav_fact is None or shares_fact is None:
             return None
         nav_total = float(nav_fact.value)
-        shares = float(shares_fact.value)
+        shares = split_scaled_value(context.db, company.id, shares_fact)
         if nav_total <= 0 or shares <= 0:
             return None
         if (

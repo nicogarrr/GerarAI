@@ -156,15 +156,31 @@ def _split_adjusted(db: Session, company_id: int, row: FinancialFact, sourced: S
     (antes 100) daba PER 3 en vez de 12, y un DDM o un valor por accion x4.
     Misma regla que el snapshot del DCF (split_factor_for_fact).
     """
-    if sourced.metric not in SHARE_COUNT_METRICS and sourced.metric not in PER_SHARE_METRICS:
-        return sourced
-    factor = float(
-        split_factor_for_fact(db, company_id, period=row.period, filed=row.filed, cutoff=date.today())
-    )
-    if factor == 1.0 or factor <= 0:
+    factor = post_split_factor(db, company_id, row)
+    if factor == 1.0:
         return sourced
     value = sourced.value * factor if sourced.metric in SHARE_COUNT_METRICS else sourced.value / factor
     return replace(sourced, value=value, split_factor=factor)
+
+
+def post_split_factor(db: Session, company_id: int, row: FinancialFact) -> float:
+    """Factor de splits posteriores para un recuento de acciones o una magnitud
+    por accion; 1.0 para cualquier otra metrica (importes totales no cambian)."""
+    if row.metric not in SHARE_COUNT_METRICS and row.metric not in PER_SHARE_METRICS:
+        return 1.0
+    factor = float(
+        split_factor_for_fact(db, company_id, period=row.period, filed=row.filed, cutoff=date.today())
+    )
+    return factor if factor > 0 else 1.0
+
+
+def split_scaled_value(db: Session, company_id: int, row: FinancialFact) -> float:
+    """``row.value`` en la base del precio de hoy (ver ``_split_adjusted``)."""
+    factor = post_split_factor(db, company_id, row)
+    value = float(row.value)
+    if factor == 1.0:
+        return value
+    return value * factor if row.metric in SHARE_COUNT_METRICS else value / factor
 
 
 def resolve_aliases(
