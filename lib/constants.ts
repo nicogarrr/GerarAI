@@ -153,7 +153,10 @@ export const ROUTE_CATALOG: NavSection[] = [
         label: 'Screeners',
         icon: Filter,
         hub: '/discover',
-        description: 'Busca con métricas y filtros guardados.',
+        // Sin tarjeta propia en /discover (sin description): duplicaba
+        // concepto con «Explorar acciones» (informe UX 29-oct, punto 7). Se
+        // llega desde /screener («Crea el primero en Screeners») y por el
+        // subnav del hub.
         children: [{ href: '/screener', label: 'Explorar acciones', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
       },
       {
