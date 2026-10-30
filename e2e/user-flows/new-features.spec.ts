@@ -69,7 +69,13 @@ for (const vp of VIEWPORTS) {
       await seedHoldingAndPaper();
       await visit(page, `/research/${TICKER}`);
       const heading = page.getByRole("heading", { name: "Tu posición" });
-      await expect(heading).toBeVisible();
+      // La lectura de cartera del servidor de Next se cachea 15 s: si un spec
+      // anterior la dejó vacía (first-steps borra su compra justo antes), la
+      // posición sembrada por backend aparece al caducar. Recargar hasta verla.
+      await expect(async () => {
+        if (!(await heading.isVisible())) await page.reload({ waitUntil: "domcontentloaded" });
+        await expect(heading).toBeVisible({ timeout: 5_000 });
+      }).toPass({ timeout: 45_000, intervals: [2_000, 4_000] });
       // El panel = el ancestro más cercano del título que contiene la lista de cifras.
       const panel = heading.locator("xpath=ancestor::*[.//dl][1]");
       await expect(panel.getByText("Acciones", { exact: true })).toBeVisible();
@@ -83,6 +89,17 @@ for (const vp of VIEWPORTS) {
       // Una sola capa de navegación de empresa (c959c94) y sin desborde.
       await expect(page.getByRole("navigation", { name: "Secciones de la empresa" })).toHaveCount(1);
       await expectHealthyPage(page, "ficha con posición");
+
+      // «Registrar compra o venta» abre el alta en Cartera con la empresa ya
+      // elegida (sin volver a buscarla) y no deja el parámetro en la URL.
+      await panel.getByRole("link", { name: "Registrar compra o venta" }).click();
+      const dialog = page.getByRole("dialog", { name: "Nueva Inversión" });
+      await expect(dialog).toBeVisible({ timeout: 30_000 });
+      await expect(dialog.getByPlaceholder(/Buscar por nombre o símbolo/)).toHaveValue(TICKER);
+      await expect(dialog.getByText(/Precio \(USD\)/)).toBeVisible();
+      await expect(page).toHaveURL(/\/portfolio(?!.*anadir)/);
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
     });
 
     test("Seguir: diario con versiones legibles y operaciones simuladas de la empresa", async ({ page }) => {

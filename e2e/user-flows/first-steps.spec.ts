@@ -37,7 +37,13 @@ for (const vp of VIEWPORTS) {
     test("Inicio → «Añadir» inversión abre el alta, registra una compra sin sugerencias, la edita y la borra", async ({ page }) => {
       await resetAll();
       await visit(page, "/inicio");
-      await expect(page.getByText("Primeros pasos")).toBeVisible({ timeout: 30_000 });
+      // La lectura de cartera del servidor de Next se cachea 15 s: tras vaciar
+      // la cartera por backend, Inicio pasa a «Primeros pasos» al caducar.
+      const firstSteps = page.getByText("Primeros pasos");
+      await expect(async () => {
+        if (!(await firstSteps.isVisible())) await page.reload({ waitUntil: "domcontentloaded" });
+        await expect(firstSteps).toBeVisible({ timeout: 10_000 });
+      }).toPass({ timeout: 60_000, intervals: [2_000, 4_000] });
       // Sin fuente de noticias (CI y local) Inicio dice «no hay noticias», no
       // un aviso de error con un «Reintentar» que no arregla nada.
       await expect(page.getByRole("heading", { name: "Noticias destacadas" })).toBeVisible({ timeout: 30_000 });

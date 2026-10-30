@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { consumeOpenParam } from '@/hooks/useOpenFromQuery';
+import { addTransactionHref } from '@/lib/portfolio/add-dialog-link';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 // Contenido mínimo con el DialogContent real: solo se ve si el diálogo está abierto.
@@ -23,11 +24,18 @@ afterEach(() => goTo('/'));
 describe('enlaces «…?anadir=1» de Primeros pasos', () => {
     it('consumeOpenParam lo lee una vez y lo quita de la URL sin tocar el resto', () => {
         goTo('/portfolio?tab=posiciones&anadir=1#lista');
-        expect(consumeOpenParam()).toBe(true);
+        expect(consumeOpenParam()).toEqual({ symbol: null });
         expect(`${window.location.pathname}${window.location.search}${window.location.hash}`).toBe('/portfolio?tab=posiciones#lista');
-        expect(consumeOpenParam()).toBe(false);
+        expect(consumeOpenParam()).toBeNull();
         goTo('/portfolio?anadir=0');
-        expect(consumeOpenParam()).toBe(false);
+        expect(consumeOpenParam()).toBeNull();
+    });
+
+    it('consumeOpenParam devuelve el símbolo y quita también «simbolo» de la URL', () => {
+        goTo(addTransactionHref('BRK.B'));
+        expect(window.location.search).toBe('?anadir=1&simbolo=BRK.B');
+        expect(consumeOpenParam()).toEqual({ symbol: 'BRK.B' });
+        expect(window.location.search).toBe('');
     });
 
     it('/portfolio?anadir=1 abre «Nueva Inversión» una sola vez aunque haya varios botones', async () => {
