@@ -190,3 +190,16 @@ def test_plan_notice_detail_bounded(db):
     text = _ctx(db).render()
     assert 'CURRENCY_PENDING' in text
     assert 'TRAILING_NOT_INCLUDED' not in text
+
+
+def test_nivel_dca_desactualizado_se_marca(db):
+    """Mismo límite que la watchlist (dca_max_data_age_days = 14): un nivel con el
+    último cierre de hace 26 días no se le da al Cerebro como el de hoy."""
+    from datetime import date
+
+    stale = _ctx(db).render()  # cierre DCA 2026-10-01, hoy 2026-10-27
+    assert "nivel DCA 4X DCA" in stale
+    assert "[desactualizado: último cierre de hace 26 días]" in stale
+    fresh = _ctx(db, today=date(2026, 10, 10)).render()
+    assert "nivel DCA 4X DCA" in fresh
+    assert "desactualizado" not in fresh

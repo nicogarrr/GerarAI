@@ -263,7 +263,9 @@ def default_dca_reader(db: Session, tenant: int, symbols: list[str]) -> dict[str
         return None
 
 
-def _dca_text(levels: dict[str, Any] | None, symbol: str) -> tuple[str, int | None]:
+def _dca_text(
+    levels: dict[str, Any] | None, symbol: str, today: date | None = None
+) -> tuple[str, int | None]:
     if levels is None:
         return _NO_DCA, None
     reading = levels.get(symbol.upper())
@@ -274,7 +276,15 @@ def _dca_text(levels: dict[str, Any] | None, symbol: str) -> tuple[str, int | No
     status = getattr(reading, "status", "") or ""
     when = getattr(reading, "signal_date", None)
     extra = " (en formación)" if status == "forming" else ""
-    return f"nivel DCA {label}{extra} ({_day(when)})", level
+    stale = ""
+    if today is not None and isinstance(when, date):
+        from app.core.config import get_settings
+
+        age = (today - when).days
+        if age > int(get_settings().dca_max_data_age_days):
+            # Mismo límite que la watchlist («desactualizado»): no es el nivel de hoy.
+            stale = f" [desactualizado: último cierre de hace {age} días]"
+    return f"nivel DCA {label}{extra} ({_day(when)}){stale}", level
 
 
 # ------------------------------------------------------------------ bloques
@@ -315,7 +325,9 @@ def _fair_values(db: Session, companies: list[Company], today: date) -> dict[int
         return {}
 
 
-def _portfolio_block(db: Session, tenant: int, levels: dict[str, Any] | None) -> ContextBlock:
+def _portfolio_block(
+    db: Session, tenant: int, levels: dict[str, Any] | None, today: date | None = None
+) -> ContextBlock:
     block = ContextBlock("cartera")
     rows = db.execute(
         select(Position, Company)
@@ -359,7 +371,7 @@ def _portfolio_block(db: Session, tenant: int, levels: dict[str, Any] | None) ->
         if pnl is None:
             pnl = _f(pos.unrealized_pnl)
         pnl_pct = pnl / cost if pnl is not None and cost else None
-        dca, level = _dca_text(levels, comp.ticker)
+        dca, level = _dca_text(levels, comp.ticker, today)
         parts = [f"- {comp.ticker} ({_short(comp.name, 40)})"]
         if weight is not None:
             parts.append(f"peso {pct_es(weight)}")
@@ -416,7 +428,7 @@ def _watchlist_block(
     for item in items[:MAX_WATCH]:
         symbol = str(item.symbol).upper()
         comp = companies.get(symbol)
-        dca, level = _dca_text(levels, symbol)
+        dca, level = _dca_text(levels, symbol, today)
         row: dict[str, Any] = {"ticker": symbol, "dca_level": level, "mos": None, "fair_value": None, "price": None}
         if comp is None:
             block.lines.append(f"- {symbol}: aún sin ficha en GerarAI (sin precio ni valor justo); {dca}.")
@@ -688,7 +700,7 @@ def build_user_context(
         symbols = sorted({str(s).upper() for s in [*held, *watched]})
         levels = (dca_reader or default_dca_reader)(db, tenant, symbols)
     builders: dict[str, Callable[[], ContextBlock]] = {
-        "cartera": lambda: _portfolio_block(db, tenant, levels),
+        "cartera": lambda: _portfolio_block(db, tenant, levels, today),
         "watchlist": lambda: _watchlist_block(db, tenant, levels, today),
         "tesis": lambda: _theses_block(db, tenant),
         "avisos": lambda: _alerts_block(db, tenant, now),
