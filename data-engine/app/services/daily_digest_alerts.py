@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.local_date import USER_TIMEZONE
 from app.models import PortfolioMoveDigest, ResearchAlert
 
 VERSION = "daily-digest-alert-v1"
@@ -110,9 +111,9 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
     sampled = digest.generated_at
     if sampled.tzinfo is None:
         sampled = sampled.replace(tzinfo=UTC)
-    else:
-        sampled = sampled.astimezone(UTC)
-    sampled_txt = sampled.strftime("%Y-%m-%d %H:%M UTC")
+    sampled = sampled.astimezone(UTC)  # metadatos máquina: siempre UTC
+    # La hora que lee el usuario va en Europe/Madrid, no en la del servidor (UTC).
+    sampled_txt = sampled.astimezone(USER_TIMEZONE).strftime("%Y-%m-%d %H:%M") + " (hora de Madrid)"
     alert = ResearchAlert(
         tenant_id=tenant_id, company_id=None, severity="low", status="open",
         alert_type="daily_digest",
