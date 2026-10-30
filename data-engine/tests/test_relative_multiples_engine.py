@@ -700,3 +700,44 @@ def test_relative_engine_declares_every_multiple_kind_it_claims_to_run(db):
         assert "historical_valuation_service" in spec["source_of_formula"]
         assert MULTIPLE_KINDS[kind]["denominator"] in spec["implied"]
     assert UNDECLARED_SOURCE == "N/D"
+
+
+def test_relative_engine_own_multiple_of_an_adr_uses_price_per_ordinary(db):
+    """ADR 2:1 (adr:2) a 40 por ADR = 20 por ordinaria; EPS por ordinaria 2.
+
+    PER propio = 20 / 2 = 10 (en main 40 / 2 = 20, el más caro del grupo);
+    base = mediana 13 x 2 = 26 por ordinaria, 52 por ADR; margen con 20.
+    """
+    company = _subject(db, ticker="RELADR2")
+    company.factor_tags = ["software", "adr:2"]
+    db.commit()
+    _peers(db)
+    result = _value(db, company, price=40.0)
+
+    assert result["status"] == "ok"
+    assert result["relative"]["own_multiple"]["value"] == pytest.approx(10.0)
+    assert result["base_value"] == pytest.approx(26.0)
+    assert result["listed_share_values"]["base"] == pytest.approx(52.0)
+    assert result["margin_of_safety"] == pytest.approx((result["expected_value"] - 20.0) / result["expected_value"])
+
+
+def test_relative_engine_measures_an_adr_peer_per_ordinary_share(db):
+    """Par ADR 2:1 a 36 por ADR con EPS 2 por ordinaria: PER 18 / 2 = 9, no 18.
+
+    Un par marcado «adr» sin ratio no tiene precio comparable: rechazado.
+    """
+    company = _subject(db)
+    _peers(db)
+    adr_peer = _peer(db, "RELPADR", price=36.0, eps=2.0)
+    adr_peer.factor_tags = ["software", "adr:2"]
+    bare_adr = _peer(db, "RELPBARE", price=36.0, eps=2.0)
+    bare_adr.factor_tags = ["software", "adr"]
+    db.commit()
+    result = _value(db, company)
+
+    block = next(entry for entry in result["trace"]["peer_multiples"] if entry["multiple"] == "pe")
+    values = {peer["ticker"]: peer["value"] for peer in block["peers"]}
+    assert values["RELPADR"] == pytest.approx(9.0)
+    assert "RELPBARE" not in values
+    rejected = {entry["ticker"] for entry in result["trace"]["screens"]["pe"]["rejected_peers"]}
+    assert "RELPBARE" in rejected

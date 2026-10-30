@@ -39,6 +39,7 @@ from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
     ValuationEngine,
+    adr_comparable_price,
     adr_ratio,
     apply_publication_blockers,
     insufficient_result,
@@ -598,6 +599,12 @@ class RelativeMultiplesEngine(ValuationEngine):
         bundles: dict[str, _PeerBundle] = {}
         for peer in peers:
             price, price_as_of = prices.get(peer.id, (None, None))
+            # Un par ADR se mide igual que la propia: precio por ordinaria. Un
+            # par marcado ADR sin ratio no tiene precio comparable (rechazado).
+            if is_adr_without_ratio(peer):
+                price = None
+            else:
+                price, _peer_ratio = adr_comparable_price(peer, price)
             stored: dict[str, SourcedFact] = {}
             for kind in MULTIPLE_KINDS:
                 row = provider_rows.get(
@@ -685,11 +692,22 @@ class RelativeMultiplesEngine(ValuationEngine):
             )
         return usable, rejected
 
+    @staticmethod
+    def _comparable_price(context: ValuationContext) -> float | None:
+        """Precio por accion ORDINARIA (ADR: precio / ratio), la base de los hechos.
+
+        El multiplo propio (PER, EV/...) se calcula con EPS y acciones por
+        ordinaria: con el precio del ADR salia N veces caro frente a los pares
+        y el percentil del multiplo propio quedaba falseado (BABA 8:1).
+        """
+        comparable, _ratio = adr_comparable_price(context.company, context.current_price)
+        return comparable
+
     def _own_reading(
         self, kind: str, context: ValuationContext, fundamentals: dict[str, float]
     ) -> MultipleReading:
         # nosemgrep: gerarai-money-none-to-zero -- derive_multiple devuelve lectura no disponible con price <= 0; un precio desconocido no produce multiplo
-        price = float(context.current_price or 0.0)
+        price = float(self._comparable_price(context) or 0.0)
         return derive_multiple(
             kind,
             price=price,
@@ -727,7 +745,7 @@ class RelativeMultiplesEngine(ValuationEngine):
                     peer_multiple=multiple,
                     fundamentals=fundamentals,
                     # nosemgrep: gerarai-money-none-to-zero -- derive_multiple devuelve lectura no disponible con price <= 0; un precio desconocido no produce multiplo
-                    price=float(context.current_price or 0.0),
+                    price=float(self._comparable_price(context) or 0.0),
                     shares=fundamentals["shares_diluted"],
                     total_debt=fundamentals.get("total_debt"),
                     cash=fundamentals.get("cash_and_equivalents"),
