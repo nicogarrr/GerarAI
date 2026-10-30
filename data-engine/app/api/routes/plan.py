@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -38,6 +38,22 @@ class PlanUpsertInput(BaseModel):
     start_date: date
     horizon_years: int = Field(default=30, ge=1, le=80)
     target_allocations: list[PlanTarget] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _targets_fit_in_each_dimension(self) -> PlanUpsertInput:
+        # Cada dimension (ticker, sector, clase de activo) describe la MISMA
+        # cartera: 60 % MSFT + 60 % NVDA no cabe. El formulario ya lo impide;
+        # la API no debe guardar un plan que el reparto y la desviacion leerian
+        # como pesos imposibles (espejo de lib/plan/target-totals.ts).
+        totals: dict[str, float] = {}
+        for target in self.target_allocations:
+            totals[target.kind] = totals.get(target.kind, 0.0) + target.target_pct
+        for kind, total in totals.items():
+            if total > 100 + 1e-9:
+                raise ValueError(
+                    f"Los objetivos de tipo {kind} suman {total:g} %: no pueden superar el 100 %."
+                )
+        return self
 
 
 class ContributionInput(BaseModel):
