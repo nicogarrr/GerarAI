@@ -1,3 +1,4 @@
+import { chartPriceUnit } from '@/lib/market/chart-price-units';
 import { metricLabel } from '@/lib/research/metric-labels';
 
 export type HealthEvidence = { fact_id: number; metric: string; value: number; unit: string; period_end: string; source_url: string; source_type: string };
@@ -16,8 +17,14 @@ export type ValuationSummary = {
 /** Margin of safety is the discount to VALUE, not upside divided by price. */
 export function safetyMargin(price: number | null, currency: string | null, fair: ValuationSummary['fair_value']): number | null {
   if (!fair.publishable || !fair.value || !Number.isFinite(fair.value) || fair.value <= 0 || price == null || !Number.isFinite(price) || price <= 0) return null;
-  if (!currency || !fair.currency || currency.toUpperCase() !== fair.currency.toUpperCase()) return null;
-  return (fair.value - price) / fair.value;
+  // Unidad, no solo divisa: «GBp» (peniques) no es «GBP». Comparar en
+  // mayúsculas igualaba 1.500 p con un valor justo de 15 £ (margen −9.900 %).
+  // El precio se pasa a la unidad mayor; el valor justo debe venir ya en ella.
+  const quoteUnit = chartPriceUnit(currency);
+  const fairUnit = chartPriceUnit(fair.currency);
+  if (!quoteUnit || !fairUnit || fairUnit.divisor !== 1 || quoteUnit.currency !== fairUnit.currency) return null;
+  const major = price / quoteUnit.divisor;
+  return (fair.value - major) / fair.value;
 }
 
 /**
