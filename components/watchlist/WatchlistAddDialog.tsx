@@ -78,6 +78,11 @@ export default function WatchlistAddDialog({ followedSymbols }: { followedSymbol
                 value={term}
                 onValueChange={setTerm}
                 onSelect={(stock) => void handleAdd(stock)}
+                onEnterWithoutResults={() => {
+                    // Mismo atajo que el buscador global: sin sugerencias,
+                    // Enter añade lo escrito por su símbolo (antes no hacía nada).
+                    if (canAddManual) void handleAdd({ symbol: manualSymbol, name: '', exchange: '', type: '', isInWatchlist: false });
+                }}
                 disabledSymbols={[...followed]}
                 disabled={adding !== null}
                 placeholder="Buscar acciones (p. ej. SAN o Santander)"
