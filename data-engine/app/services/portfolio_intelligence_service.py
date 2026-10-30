@@ -877,13 +877,24 @@ class PortfolioIntelligenceService:
         # calcula una vez. La media de cada serie sobre unas fechas dadas se
         # reutiliza entre pares: statistics.mean es exacta pero cara, y antes
         # se recalculaba 2 veces por par (684 medias con 19 posiciones).
-        means: dict[tuple[int, tuple[date, ...]], float] = {}
+        # Igual para las desviaciones y su suma de cuadrados: dependen solo de
+        # (serie, fechas), no del par. Mismas operaciones en el mismo orden que
+        # antes, asi que el coeficiente sale identico bit a bit; solo se dejan
+        # de repetir 2 de las 3 sumas por par (30 posiciones = 435 pares).
+        deviations: dict[tuple[int, tuple[date, ...]], tuple[list[float], float]] = {}
 
-        def _cached_mean(company_id: int, series: dict[date, float], dates: tuple[date, ...]) -> float:
+        def _cached_deviations(
+            company_id: int, series: dict[date, float], dates: tuple[date, ...]
+        ) -> tuple[list[float], float]:
             key = (company_id, dates)
-            if key not in means:
-                means[key] = mean([series[day] for day in dates])
-            return means[key]
+            cached = deviations.get(key)
+            if cached is None:
+                values = [series[day] for day in dates]
+                centre = mean(values)
+                deltas = [value - centre for value in values]
+                cached = (deltas, sum(delta**2 for delta in deltas))
+                deviations[key] = cached
+            return cached
 
         computed: dict[tuple[int, int], tuple[float | None, int]] = {}
         for _, left_company in rows:
@@ -906,14 +917,10 @@ class PortfolioIntelligenceService:
                     # Historico insuficiente: N/D, no un coeficiente de ruido.
                     correlation = None
                 else:
-                    xs, ys = [left[day] for day in dates], [right[day] for day in dates]
-                    x_mean = _cached_mean(left_company.id, left, dates)
-                    y_mean = _cached_mean(right_company.id, right, dates)
-                    numerator = sum((x - x_mean) * (y - y_mean) for x, y in zip(xs, ys))
-                    denominator = math.sqrt(
-                        sum((x - x_mean) ** 2 for x in xs)
-                        * sum((y - y_mean) ** 2 for y in ys)
-                    )
+                    x_dev, x_ss = _cached_deviations(left_company.id, left, dates)
+                    y_dev, y_ss = _cached_deviations(right_company.id, right, dates)
+                    numerator = sum(x * y for x, y in zip(x_dev, y_dev, strict=True))
+                    denominator = math.sqrt(x_ss * y_ss)
                     correlation = numerator / denominator if denominator else None
                 computed[(left_company.id, right_company.id)] = (correlation, len(dates))
                 result[left_company.ticker][right_company.ticker] = correlation
