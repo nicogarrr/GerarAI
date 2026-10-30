@@ -11,6 +11,7 @@ from decimal import Decimal
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -311,6 +312,7 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "positions"
     __table_args__ = (
         Index("ix_positions_portfolio_company", "portfolio_id", "company_id"),
+        CheckConstraint("quantity >= 0", name="ck_positions_quantity_non_negative"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -381,6 +383,9 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
         UniqueConstraint("tenant_id", "external_id", name="uq_transaction_tenant_external"),
         Index("ix_transactions_portfolio_trade_date", "portfolio_id", "trade_date"),
         Index("ix_transactions_company_action", "company_id", "action"),
+        CheckConstraint("quantity >= 0", name="ck_transactions_quantity_non_negative"),
+        CheckConstraint("price >= 0", name="ck_transactions_price_non_negative"),
+        CheckConstraint("fees >= 0", name="ck_transactions_fees_non_negative"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1011,7 +1016,10 @@ class PortfolioMoveDigest(TenantOwnedMixin, Base, TimestampMixin):
 
 class MarketPrice(Base, TimestampMixin):
     __tablename__ = "market_prices"
-    __table_args__ = (UniqueConstraint("company_id", "date", name="uq_market_price_company_date"),)
+    __table_args__ = (
+        UniqueConstraint("company_id", "date", name="uq_market_price_company_date"),
+        CheckConstraint("close >= 0", name="ck_market_prices_close_non_negative"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
