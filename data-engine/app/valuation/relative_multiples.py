@@ -30,8 +30,8 @@ Formulas, and why they are the ones already in the codebase
 
 ``pe = price / eps`` and ``ev_to_x = (price * shares + debt - cash) / x`` are
 the formulas ``HistoricalValuationService`` already uses per year
-(``app/services/historical_valuation_service.py``: ``"pe": self._divide(price, eps)``,
-``"ev_to_fcf": self._divide(enterprise_value, fcf)``). They are re-declared here
+(``app/services/historical_valuation_service.py``: ``"pe": self._multiple(price, eps)``,
+``"ev_to_fcf": self._multiple(enterprise_value, fcf)``, N/D when either side is <= 0). They are re-declared here
 as pure functions rather than imported so the module stays DB-free, and
 ``tests/test_relative_multiples_engine.py`` asserts that the two agree on the
 same inputs, so this is a *shared* primitive and not a second opinion.
