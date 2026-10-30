@@ -101,7 +101,7 @@ def test_copy_carries_source_date_basis_and_variations(db):
 def test_copy_seals_universe_sampling_time(db):
     digest = make_digest(db)
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert "2026-10-10 05:15 UTC" in alert.message  # cartera medida al generar
+    assert "2026-10-10 07:15 (hora de Madrid)" in alert.message  # cartera medida al generar
     assert alert.metadata_["positions_sampled_at"] == "2026-10-10T05:15:00+00:00"
 
 
@@ -249,7 +249,7 @@ def test_aware_non_utc_generated_at_is_converted(db):
     digest = make_digest(db)
     digest.generated_at = datetime(2026, 10, 10, 7, 15, tzinfo=timezone(timedelta(hours=2)))
     alert = emit_digest_alert(db, digest, AS_OF)
-    assert "2026-10-10 05:15 UTC" in alert.message
+    assert "2026-10-10 07:15 (hora de Madrid)" in alert.message
     assert alert.metadata_["positions_sampled_at"] == "2026-10-10T05:15:00+00:00"
 
 
@@ -270,3 +270,12 @@ def test_last_session_date_skips_weekends():
     assert last_session_date(date(2026, 10, 18)) == date(2026, 10, 16)  # domingo
     assert last_session_date(date(2026, 10, 17)) == date(2026, 10, 16)  # sabado
     assert last_session_date(date(2026, 10, 20)) == date(2026, 10, 19)  # martes
+
+
+def test_sampling_time_uses_madrid_winter_offset(db):
+    digest = make_digest(db)
+    digest.generated_at = datetime(2026, 11, 2, 23, 30, tzinfo=UTC)  # CET: 3-nov 00:30
+    db.commit()
+    alert = emit_digest_alert(db, digest, AS_OF)
+    assert "2026-11-03 00:30 (hora de Madrid)" in alert.message
+    assert " UTC)" not in alert.message
