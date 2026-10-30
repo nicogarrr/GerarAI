@@ -146,6 +146,33 @@ def test_engine_valuation_answer_uses_the_engine_output(db, monkeypatch):
     assert resp.sources[0]["url"] == "/research/UBER?view=valuation"
 
 
+def test_engine_valuation_answer_adr_shows_per_adr_scenarios(db, monkeypatch):
+    """BABA 8:1: motor por ordinaria (base 25, esperado 25), precio por ADR 160.
+
+    Por ADR: base 25 x 8 = 200; margen (200 − 160) / 200 = +20 %. Antes la
+    respuesta ponía «base 25,00 USD» junto a «Precio usado 160,00 USD».
+    """
+    comp = _company(db, "BABA")
+    db.commit()
+    from app.services import valuation_service
+
+    def fake_value(self, _db, company, **_kw):
+        assert company.id == comp.id
+        return {"model_type": "dcf", "publishable": True, "bear_value": 15.0, "base_value": 25.0,
+                "bull_value": 35.0, "expected_value": 25.0, "current_price": 160.0,
+                "margin_of_safety": 0.2, "adr_ratio": 8.0,
+                "listed_share_values": {"bear": 120.0, "base": 200.0, "bull": 280.0, "expected": 200.0},
+                "trace": {"price_as_of": "2026-10-24"}}
+
+    monkeypatch.setattr(valuation_service.ValuationService, "value_company", fake_value)
+    resp = asyncio.run(ChatService().answer(db, "¿Cuál es el valor justo de BABA?", "portfolio", None))
+    assert resp.llm_trace["path"] == "engine_valuation"
+    assert ("Escenarios por ADR (1 ADR = 8 acciones ordinarias): bajista 120,00 USD, base 200,00 USD, "
+            "alcista 280,00 USD, esperado 200,00 USD") in resp.answer
+    assert "base 25,00 USD" not in resp.answer
+    assert "Precio usado 160,00 USD" in resp.answer
+
+
 def test_thesis_margin_question_keeps_the_thesis_route(db, monkeypatch):
     _company(db, "UBER")
     db.commit()
