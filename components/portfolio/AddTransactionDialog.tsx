@@ -20,6 +20,7 @@ import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { parseLocalizedNumber, todayLocal } from '@/lib/format';
 import { currencyForTicker, currencyOptions, NEW_TRANSACTION_CURRENCY } from './transactionCurrencies';
+import { SYMBOL_VALIDATION } from '@/lib/constants';
 
 type DialogProps = {
   userId: string;
@@ -48,6 +49,30 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
 
 
   const [fieldErrors, setFieldErrors] = useState<TransactionFormErrors>({});
+
+  // Alta por símbolo: si el buscador no encuentra la empresa (proveedor caído
+  // o sin cuota, ticker poco común, mercado no cubierto) el diálogo era un
+  // callejón sin salida, porque el símbolo solo se fijaba eligiendo una
+  // sugerencia. Igual que en la watchlist: el texto con forma de ticker se
+  // puede usar tal cual.
+  const manualSymbol = searchQuery.trim().toUpperCase();
+  const canUseManualSymbol =
+    !formData.symbol &&
+    manualSymbol.length >= SYMBOL_VALIDATION.MIN_LENGTH &&
+    manualSymbol.length <= SYMBOL_VALIDATION.MAX_LENGTH &&
+    SYMBOL_VALIDATION.PATTERN.test(manualSymbol);
+
+  const selectSymbol = (symbol: string, companyName: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      symbol,
+      companyName,
+      // La divisa sigue al ticker (SAN.MC -> EUR, luego AAPL -> USD) salvo
+      // que el usuario la haya elegido a mano: esa eleccion se respeta.
+      currency: currencyChosen ? prev.currency : currencyForTicker(symbol),
+    }));
+    setSearchQuery(symbol);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,19 +149,22 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
                   setFormData({ ...formData, symbol: '', companyName: '' });
                 }
               }}
-              onSelect={(stock) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  symbol: stock.symbol,
-                  companyName: stock.name,
-                  // La divisa sigue al ticker (SAN.MC -> EUR, luego AAPL -> USD) salvo
-                  // que el usuario la haya elegido a mano: esa eleccion se respeta.
-                  currency: currencyChosen ? prev.currency : currencyForTicker(stock.symbol),
-                }));
-                setSearchQuery(stock.symbol);
-              }}
+              onSelect={(stock) => selectSymbol(stock.symbol, stock.name)}
               className="bg-gray-800 border-gray-700 text-gray-100 w-full"
             />
+            {canUseManualSymbol && (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-gray-400">
+                <span>¿No aparece en la lista?</span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => selectSymbol(manualSymbol, '')}
+                  className="min-h-[44px] px-2 text-teal-300 hover:bg-teal-950/40 hover:text-teal-200"
+                >
+                  Usar «{manualSymbol}» como símbolo
+                </Button>
+              </div>
+            )}
             {fieldErrors.symbol && (
               <p role="alert" className="text-sm text-red-400">{fieldErrors.symbol}</p>
             )}
@@ -146,7 +174,9 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
               <div className="flex items-center gap-2 p-2 bg-teal-900/30 rounded border border-teal-700">
                 <TrendingUp className="h-4 w-4 text-teal-400" />
                 <span className="text-teal-300 font-medium">{formData.symbol}</span>
-                <span className="text-gray-400 text-sm">- {formData.companyName}</span>
+                {formData.companyName ? (
+                  <span className="text-gray-400 text-sm">- {formData.companyName}</span>
+                ) : null}
               </div>
             )}
           </div>
