@@ -1,1 +1,11 @@
-{}
+{
+  "passwordReset": {
+    "subject": "Restablece tu contraseña de GerarAI",
+    "greetingNamed": "Hola {name},",
+    "greeting": "Hola,",
+    "body": "Hemos recibido una solicitud para restablecer la contraseña de tu cuenta de GerarAI.",
+    "linkIntro": "Abre este enlace (caduca pronto y solo se puede usar una vez):",
+    "ignore": "Si no has pedido el cambio, ignora este correo: tu contraseña actual sigue siendo válida.",
+    "noAsk": "GerarAI no te pedirá la contraseña por correo."
+  }
+}
