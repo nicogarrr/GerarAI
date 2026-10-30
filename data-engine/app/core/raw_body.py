@@ -45,11 +45,7 @@ class RawBodyMiddleware:
         # Un request sin firma no puede llegar a ninguna ruta firmada: no hay
         # motivo para bufferizar 10-16MB de un cliente anonimo antes de que
         # la auth lo rechace. Se le aplica un tope pequeno.
-        has_signature = any(
-            name.lower() == b"x-cavaai-signature" and value
-            for name, value in scope.get("headers") or []
-        )
-        if not has_signature and self.max_unsigned_body_bytes is not None:
+        if self.max_unsigned_body_bytes is not None and not _signed_by_bridge(scope):
             limit = min(limit, self.max_unsigned_body_bytes)
         chunks: list[bytes] = []
         total = 0
@@ -86,3 +82,29 @@ class RawBodyMiddleware:
             return await receive()
 
         await self.app(scope, replay_receive, send)
+
+
+def _signed_by_bridge(scope: dict) -> bool:
+    """True si la peticion puede optar al limite grande de body.
+
+    Antes bastaba con que existiera la cabecera ``X-CavaAI-Signature`` (con
+    cualquier valor): un cliente anonimo contra el dominio publico mandaba
+    ``X-CavaAI-Signature: x`` y el backend bufferizaba 10-16MB por peticion
+    antes de que la auth lo rechazase. Con secreto configurado se exige la
+    firma HMAC de cabeceras valida y vigente (la misma comprobacion sin body
+    que usa el corte de 401); el body se verifica despues en la auth. Sin
+    secreto (desarrollo local) se mantiene la comprobacion de presencia.
+    """
+    has_header = any(
+        name.lower() == b"x-cavaai-signature" and value
+        for name, value in scope.get("headers") or []
+    )
+    if not has_header:
+        return False
+    from app.core import config
+    from app.core.rate_limit import _carries_valid_signature
+
+    settings = config.get_settings()
+    if not getattr(settings, "research_auth_secret", None):
+        return True
+    return _carries_valid_signature(scope, settings)
