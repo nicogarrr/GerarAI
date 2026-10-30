@@ -24,6 +24,15 @@ describe('shared valuation', () => {
     expect(safetyMargin(80, 'USD', { ...item.fair_value, publishable: false })).toBeNull();
     expect(safetyMargin(80, 'USD', { ...item.fair_value, value: NaN })).toBeNull();
   });
+  it('compares London pence quotes in pounds, never GBp as GBP', () => {
+    // Valor justo 15 £; cotización 1.200 GBp = 12 £ -> (15 - 12) / 15 = 20 %.
+    const gbp = { ...item.fair_value, value: 15, currency: 'GBP' };
+    expect(safetyMargin(1200, 'GBp', gbp)).toBeCloseTo(.2);
+    expect(safetyMargin(1200, 'GBX', gbp)).toBeCloseTo(.2);
+    expect(safetyMargin(12, 'GBP', gbp)).toBeCloseTo(.2);
+    // Un valor justo rotulado en peniques no se compara a ciegas.
+    expect(safetyMargin(12, 'GBP', { ...gbp, currency: 'GBp' })).toBeNull();
+  });
   it('renders sourced points, dated model, partial not scored as zero', () => {
     render(<ValuationSummaryCard item={item} quote={quote} />);
     expect(screen.getByText('No evaluable (1/9 puntos con datos)')).toBeInTheDocument();
