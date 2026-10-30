@@ -32,7 +32,7 @@ def _company(db, ticker, name):
     return comp
 
 
-def _position(db, company, qty, cost, value, currency="USD"):
+def _position(db, company, qty, cost, value, currency="EUR"):
     pos = Position(
         tenant_id=1, company_id=company.id, quantity=Decimal(str(qty)),
         average_cost=Decimal(str(cost)), market_value=Decimal(str(value)),
