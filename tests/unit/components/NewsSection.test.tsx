@@ -1,3 +1,4 @@
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
