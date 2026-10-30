@@ -1,3 +1,6 @@
+'use client';
+
+import { useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DcaSignalItem } from '@/lib/dca/types';
 import { DCA_STATUS_LABEL, dcaDataAge, dcaMissingBadge, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
@@ -11,6 +14,10 @@ interface DcaLevelBadgeProps {
 
 /** Badge del nivel DCA con el color de su zona y el detalle en el tooltip. */
 export default function DcaLevelBadge({ item, signalMonths, compact = false }: DcaLevelBadgeProps) {
+    // Un tooltip solo abre con hover/foco: en el móvil el toque no enseñaba la
+    // zona ni los cierres que activarían 2X-4X. El toque lo abre y lo cierra.
+    const [open, setOpen] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
     const state = item?.state ?? null;
     if (!state) {
         if (compact) return null;
@@ -38,10 +45,15 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
         .map((key) => ({ key, value: dcaPrice(state.level_prices?.[key], state.currency_label) }))
         .filter((entry) => entry.value);
     const badge = (
-        <Tooltip>
+        <Tooltip open={open} onOpenChange={setOpen}>
             <TooltipTrigger asChild>
                 <button
                     type="button"
+                    ref={triggerRef}
+                    aria-expanded={open}
+                    // preventDefault evita que Radix cierre el tooltip en pointerdown/click.
+                    onPointerDown={(event) => event.preventDefault()}
+                    onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }}
                     className="inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                     style={{ backgroundColor: state.color, color: state.fg, borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
                     aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}${staleText ? `, ${staleText}` : ''}`}
@@ -50,7 +62,11 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     {forming ? <span aria-hidden="true" className="opacity-70">·</span> : null}
                 </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom">
+            <TooltipContent
+                side="bottom"
+                // Tocar el propio badge lo cierra con su onClick, no como «fuera».
+                onPointerDownOutside={(event) => { if (triggerRef.current?.contains(event.target as Node)) event.preventDefault(); }}
+            >
                 <p className="font-semibold">{state.zone}</p>
                 <p>Estado: mes {DCA_STATUS_LABEL[state.status] ?? state.status} ({state.period})</p>
                 {close ? <p>Cierre asentado: {close} · {state.signal_date}</p> : null}
