@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.services.notification_service import NotificationService
 from app.services.price_freshness import market_price_is_stale
+from app.services.price_units import listing_price
 from app.services.review_alert_service import ReviewAlertService
 
 # Operators the evaluator understands. `create()` did not validate the operator,
@@ -363,6 +364,27 @@ class AlertRuleService:
                 basis = "close"
             if previous_value is None or current_value is None or previous_value == 0:
                 return None, {"kind": kind, "status": "missing_two_prices"}
+            # Cada cierre en la divisa principal de SU cotizacion (70 GBp y
+            # 0,71 GBP son 0,70 y 0,71 GBP): mezclar peniques y libras daba
+            # -99 % o +9.900 % y disparaba la alerta. Dos monedas distintas
+            # no son un movimiento de precio.
+            company = db.get(Company, rule.company_id)
+            if company is not None:
+                current_listed = listing_price(
+                    Decimal(current_value), quote_currency=latest.quote_currency, company=company
+                )
+                previous_listed = listing_price(
+                    Decimal(previous_value), quote_currency=previous.quote_currency, company=company
+                )
+                if (
+                    current_listed is None
+                    or previous_listed is None
+                    or current_listed[1] != previous_listed[1]
+                ):
+                    return None, {"kind": kind, "status": "mixed_units", "basis": basis}
+                current_value, previous_value = current_listed[0], previous_listed[0]
+                if previous_value == 0:
+                    return None, {"kind": kind, "status": "missing_two_prices"}
             change = (Decimal(current_value) / Decimal(previous_value) - 1) * 100
             age_days = (date.today() - prices[0].date).days
             return change, {

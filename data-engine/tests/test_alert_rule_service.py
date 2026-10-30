@@ -237,3 +237,47 @@ def test_max_age_zero_keeps_today_price_fresh(db, monkeypatch):
     rule = module.AlertRule(company_id=company.id, target={"kind": "market_price"})
     _, observation = AlertRuleService()._observe(db, rule)
     assert observation["status"] == "fresh"
+
+
+
+def _london_price(db: Session, company: Company, *, day: date, close: str, unit: str) -> None:
+    db.add(MarketPrice(
+        company_id=company.id, date=day, open=Decimal(close), high=Decimal(close), low=Decimal(close),
+        close=Decimal(close), adj_close=Decimal(close), source="yahoo_finance", quote_currency=unit,
+    ))
+    db.commit()
+
+
+def _london_company(db: Session) -> Company:
+    company = Company(
+        ticker="VOD.L", name="Vodafone", exchange="LSE", currency="GBp",
+        sector="Telecom", industry="Telecom", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    return company
+
+
+def test_price_change_compares_pence_and_pounds_in_the_same_unit(db):
+    """70 GBp ayer y 0,71 GBP hoy es +1,43 %, no -99 %."""
+    from app.services import alert_rule_service as module
+
+    company = _london_company(db)
+    _london_price(db, company, day=date.today() - timedelta(days=1), close="70", unit="GBp")
+    _london_price(db, company, day=date.today(), close="0.71", unit="GBP")
+    rule = module.AlertRule(company_id=company.id, target={"kind": "price_change_percent"})
+    change, observation = AlertRuleService()._observe(db, rule)
+    assert observation["status"] == "fresh"
+    assert change == pytest.approx(Decimal("1.428571"), abs=Decimal("0.0001"))
+
+
+def test_price_change_between_different_moneys_is_not_a_move(db):
+    from app.services import alert_rule_service as module
+
+    company = _london_company(db)
+    _london_price(db, company, day=date.today() - timedelta(days=1), close="70", unit="GBp")
+    _london_price(db, company, day=date.today(), close="0.90", unit="USD")
+    rule = module.AlertRule(company_id=company.id, target={"kind": "price_change_percent"})
+    change, observation = AlertRuleService()._observe(db, rule)
+    assert change is None and observation["status"] == "mixed_units"
