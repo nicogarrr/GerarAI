@@ -51,7 +51,9 @@ from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
     ValuationEngine,
+    adr_ratio,
     insufficient_result,
+    is_adr_without_ratio,
     margin_of_safety,
 )
 from app.valuation.moat_framework import empty_moat_framework
@@ -297,6 +299,26 @@ def _reit_sensitivity_rows(
     return {"rows": rows, "trace": {"method": "reit_cap_rate_sensitivity"}}
 
 
+def _adr_refusal(context: ValuationContext, engine_key: str) -> dict | None:
+    """Mismo rechazo que el DCF: libro y acciones vienen en ordinarias y el
+    precio es el del ADR; sin ratio, valor y precio no son comparables."""
+    if not is_adr_without_ratio(context.company):
+        return None
+    return insufficient_result(
+        ticker=context.company.ticker,
+        model_type=context.company.valuation_model,
+        engine_key=engine_key,
+        current_price=context.current_price,
+        missing_inputs=["adr_ratio"],
+        reason=(
+            f"{context.company.ticker} is quoted as an ADR but the ordinary-shares-per-ADR "
+            "ratio is unknown, so per-share book/NAV and the quoted price are not on the "
+            "same basis."
+        ),
+        snapshot=context.snapshot,
+    )
+
+
 def _result(
     context: ValuationContext,
     *,
@@ -330,6 +352,14 @@ def _result(
     # snapshot no puede saber que libro, acciones y ROE son del mismo ejercicio.
     if period_anchor:
         trace.update(period_anchor)
+    # Valor por acción ORDINARIA (libro / acciones del filing); un ADR cotiza
+    # N ordinarias. El margen se mide contra el precio por ordinaria, como en
+    # standard_dcf/utilities; antes se comparaba con el precio del ADR (error xN).
+    ratio = adr_ratio(company)
+    price = context.current_price
+    comparable_price = price / ratio if (ratio and price) else price
+    trace["adr_ratio"] = ratio
+    trace["comparable_price"] = comparable_price
     return {
         "ticker": company.ticker,
         "model_type": company.valuation_model,
@@ -340,8 +370,16 @@ def _result(
         "base_value": scenario_values["base"],
         "bull_value": scenario_values["bull"],
         "expected_value": expected,
-        "margin_of_safety": margin_of_safety(expected, context.current_price),
+        "margin_of_safety": margin_of_safety(expected, comparable_price),
         "missing_inputs": [],
+        "adr_ratio": ratio,
+        "value_per_share_basis": "ordinary_share",
+        "listed_share_values": (
+            {name: value * ratio for name, value in (*scenario_values.items(), ("expected", expected))}
+            if ratio
+            else None
+        ),
+        "comparable_price_basis": "ordinary_share" if ratio else "listed_share",
         "reverse_dcf": {},
         "sensitivity": sensitivity,
         "moat": empty_moat_framework(
@@ -370,6 +408,9 @@ class BankValuationEngine(ValuationEngine):
     key = "bank"
 
     def value(self, context: ValuationContext) -> dict:
+        refused = _adr_refusal(context, self.key)
+        if refused is not None:
+            return refused
         resolved = _resolve_inputs(
             context,
             anchor_metrics=("tangible_book_value", "tangible_common_equity"),
@@ -473,6 +514,9 @@ class InsurerValuationEngine(ValuationEngine):
     key = "insurer"
 
     def value(self, context: ValuationContext) -> dict:
+        refused = _adr_refusal(context, self.key)
+        if refused is not None:
+            return refused
         resolved = _resolve_inputs(
             context,
             # total_equity: nombre canonico del hecho reportado SEC
@@ -579,6 +623,9 @@ class ReitValuationEngine(ValuationEngine):
     key = "reit"
 
     def value(self, context: ValuationContext) -> dict:
+        refused = _adr_refusal(context, self.key)
+        if refused is not None:
+            return refused
         resolved = _resolve_inputs(
             context,
             anchor_metrics=("net_operating_income", "noi"),
