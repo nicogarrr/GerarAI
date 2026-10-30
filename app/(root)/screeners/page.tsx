@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CriterionFields, CustomMetricFields, FormulaField, RankingFields } from '@/components/screeners/FilterFields';
 import {
-  createCustomMetric,
-  createSavedScreen,
-  updateSavedScreen,
+  createCustomMetricResult,
+  createSavedScreenResult,
+  updateSavedScreenResult,
   deleteSavedScreen,
   getScreenerMetricCoverage,
   getScreenerWorkspace,
@@ -162,7 +162,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><h2 className="font-semibold text-gray-100">Filtros guardados</h2><div className="mt-4 grid gap-3">{screens.map((screen) => <article className="rounded-lg border border-gray-800 bg-black/30 p-4" key={screen.id}><div className="flex items-start gap-3"><div><h3 className="font-semibold text-gray-200">{screen.name}</h3><p className="mt-1 text-xs text-gray-500">{formatNumber(screen.criteria.length, { maximumFractionDigits: 0 })} {screen.criteria.length === 1 ? 'criterio' : 'criterios'} · {screen.alerts_enabled ? 'alertas activadas' : 'alertas desactivadas'} · última {formatDate(screen.last_run_at, { day: 'numeric', month: 'short', year: 'numeric' }, NO_CORRIDO)}</p></div><Button asChild className="ml-auto" size="sm"><Link href={`/screeners/${screen.id}`}><Play aria-hidden="true" className="h-4 w-4" />Ejecutar</Link></Button></div>{screen.description ? <p className="mt-3 text-sm text-gray-400">{screen.description}</p> : null}
         <details className="mt-3"><summary className="cursor-pointer py-2 text-sm text-teal-300">Editar o eliminar</summary>
-          <MutationForm action={updateSavedScreen} className="mt-3 grid gap-3" showSuccessInline>
+          <MutationForm action={updateSavedScreenResult} className="mt-3 grid gap-3" showSuccessInline>
             <input type="hidden" name="screen_id" value={screen.id} />
             <label className="text-sm">Nombre<Input name="name" defaultValue={screen.name} required /></label>
             <label className="text-sm">Descripción<Input name="description" defaultValue={screen.description} /></label>
@@ -184,7 +184,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
       <details className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 font-semibold text-gray-100"><Save aria-hidden="true" className="h-5 w-5 text-teal-300" />Constructor visual de filtros<ChevronDown aria-hidden="true" className="ml-auto h-4 w-4 text-gray-500" /></summary>
         <div className="mt-4">
-          <MutationForm action={createSavedScreen} resetOnSuccess successMessage="Filtro guardado">
+          <MutationForm action={createSavedScreenResult} resetOnSuccess successMessage="Filtro guardado">
             <div className="grid gap-3 sm:grid-cols-2">
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-name">Nombre del filtro *</label><Input className="min-h-11" id="screen-name" name="name" placeholder="Calidad a precio razonable" required /></div>
               <div><label className="mb-1.5 block text-sm font-medium text-gray-200" htmlFor="screen-desc">Qué buscas (opcional)</label><Input className="min-h-11" id="screen-desc" name="description" placeholder="Empresas rentables con retorno superior al coste de capital" /></div>
@@ -200,7 +200,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
       <details className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 font-semibold text-gray-100"><Calculator aria-hidden="true" className="h-5 w-5 text-teal-300" />Métrica personalizada<ChevronDown aria-hidden="true" className="ml-auto h-4 w-4 text-gray-500" /></summary>
         <div className="mt-4">
-          <MutationForm action={createCustomMetric} resetOnSuccess successMessage="Métrica personalizada guardada">
+          <MutationForm action={createCustomMetricResult} resetOnSuccess successMessage="Métrica personalizada guardada">
             <CustomMetricFields />
             <Button className="mt-4" type="submit">Guardar métrica</Button>
           </MutationForm>

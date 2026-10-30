@@ -34,6 +34,18 @@ export function MutationForm({
     setIsPending(true);
     try {
       const result = await action(formData);
+      // Contrato de resultado tipado (carril B, p.ej. createAlertResult /
+      // uploadKnowledgeDocumentResult): un { ok: false } es un rechazo de
+      // negocio con su mensaje, no un exito: va al error inline y NUNCA al
+      // toast de exito. Sin este caso MutationForm celebraba el rechazo.
+      if (result && typeof result === 'object' && 'ok' in result && (result as { ok: unknown }).ok === false) {
+        const message =
+          'message' in result && typeof (result as { message: unknown }).message === 'string'
+            ? (result as { message: string }).message
+            : 'No se pudo completar la operación. Inténtalo de nuevo.';
+        setError(message);
+        return;
+      }
       const message = result && typeof result === 'object' && 'message' in result && typeof result.message === 'string' ? result.message : successMessage;
       if (resetOnSuccess) formRef.current?.reset();
       toast.success(message);

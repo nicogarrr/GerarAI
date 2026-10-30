@@ -36,8 +36,8 @@ describe('Biblioteca: flujo de lectura', () => {
 
     it('la lista va antes que las colecciones y los formularios de alta viven en «Subir»', () => {
         expect(bibliotecaTab.indexOf('id="documentos"')).toBeLessThan(bibliotecaTab.indexOf('>Colecciones</h2>'));
-        expect(bibliotecaTab).not.toContain('action={createKnowledgeCollection}');
-        expect(subirTab).toContain('action={createKnowledgeCollection}');
+        expect(bibliotecaTab).not.toContain('action={createKnowledgeCollectionResult}');
+        expect(subirTab).toContain('action={createKnowledgeCollectionResult}');
         expect(subirTab).toContain('Colecciones por defecto');
     });
 });

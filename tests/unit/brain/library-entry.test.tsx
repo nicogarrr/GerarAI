@@ -4,7 +4,7 @@ import {expect,it,vi} from 'vitest';
 vi.mock('next/navigation',()=>({usePathname:()=>'/knowledge'}));
 vi.mock('@/lib/actions/brain.actions',()=>({chatWithPortfolio:vi.fn()}));
 vi.mock('@/lib/research/assistant-actions',()=>({askResearchAssistantAction:vi.fn()}));
-vi.mock('@/lib/actions/knowledge-chat.actions',()=>({askKnowledge:vi.fn()}));
+vi.mock('@/lib/actions/knowledge-chat.actions',()=>({askKnowledge:vi.fn(),askKnowledgeResult:vi.fn(async()=>({ok:true,answer:{status:'sin_datos',retrieval:'solo_texto',message:null,answers:[]}}))}));
 vi.mock('@/components/search/TickerSearchInput',()=>({TickerSearchInput:()=>null}));
 import {LibraryChat} from '@/app/(root)/inversores/_components/LibraryChat';
 import {GlobalBrain} from '@/components/brain/GlobalBrain';
