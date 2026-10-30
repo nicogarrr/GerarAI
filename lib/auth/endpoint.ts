@@ -18,8 +18,8 @@ type AuthEndpoint =
 /** Use the official HTTP pipeline, including its existing rate limits/CSRF.
  * Unlike direct auth.api calls, router calls do not run nextCookies' bridge,
  * so forward their Set-Cookie values explicitly, including expired cookies.
- * No custom IP trust, rate policy or persistent storage is introduced here.
- * Existing memory rate limits remain per process, not global across replicas.
+ * No custom IP trust or rate policy is introduced here; the counters live in
+ * the shared database (lib/better-auth/rate-limit.ts), not per process.
  */
 export async function callAuthEndpoint(
     path: AuthEndpoint,
