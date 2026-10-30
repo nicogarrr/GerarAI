@@ -211,3 +211,21 @@ def _other_tenant_dca_row(db, *, tenant, symbol, level, company_id=None, status=
         " updated_at) VALUES (:t, :s, :c, :l, :st, '2026-09', '2026-09-30', 100, '{}', '{}', '[]',"
         " 'nico-v1', '2026-09-30', 'test', '2026-09-30', '2026-09-30')"
     ), {"t": tenant, "s": symbol, "c": company_id, "l": level, "st": status})
+
+
+def test_stale_dca_level_is_said_not_given_as_today(db, with_engine):
+    """Un nivel con el último cierre más viejo que dca_max_data_age_days (14) se avisa."""
+    from app.services.brain_context_tools import dca_answer
+
+    comp = _company(db, "POOL")
+    _state(db, "POOL", 4, status="confirmed")  # último cierre 2026-10-26
+    _state(db, "UBER", 2, status="confirmed")
+    db.commit()
+    fresh = dca_answer(db, 1, comp, today=date(2026, 10, 30)).answer
+    assert "desactualizado" not in fresh.lower()
+    stale = dca_answer(db, 1, comp, today=date(2026, 12, 1)).answer
+    assert "**POOL: 4X DCA**" in stale
+    assert "Ojo: desactualizado, el último cierre es de hace 36 días" in stale
+    summary = dca_answer(db, 1, None, today=date(2026, 12, 1)).answer
+    assert "Desactualizados (último cierre de hace más de 14 días" in summary
+    assert "POOL, UBER." in summary

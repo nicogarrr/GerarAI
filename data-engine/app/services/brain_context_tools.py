@@ -305,9 +305,34 @@ def _fmt_close(value: float | None, currency: str | None) -> str:
     return f"{text} {currency}".strip() if currency else text
 
 
-def dca_answer(db: Session, tenant: int, company: Company | None) -> ChatResponse:
-    """Nivel DCA guardado (último veredicto del motor); «sin nivel» si no hay."""
+def _dca_stale_age(signal_date: date | None, today: date) -> int | None:
+    """Días del último cierre si pasa el mismo límite que la watchlist (``dca_max_data_age_days``)."""
+    from app.core.config import get_settings
+
+    if signal_date is None:
+        return None
+    age = max((today - signal_date).days, 0)
+    return age if age > int(get_settings().dca_max_data_age_days) else None
+
+
+def _dca_max_age_days() -> int:
+    from app.core.config import get_settings
+
+    return int(get_settings().dca_max_data_age_days)
+
+
+def dca_answer(db: Session, tenant: int, company: Company | None, *, today: date | None = None) -> ChatResponse:
+    """Nivel DCA guardado (último veredicto del motor); «sin nivel» si no hay.
+
+    Un nivel con el último cierre demasiado viejo (motor parado, ticker que ya
+    no se evalúa) se dice como tal: la watchlist lo marca «desactualizado» y el
+    Cerebro no puede darlo como el nivel de hoy.
+    """
+    from zoneinfo import ZoneInfo
+
     from app.services.dca_level_reader import read_dca_levels
+
+    today = today or datetime.now(ZoneInfo("America/New_York")).date()
 
     symbols = [company.ticker] if company is not None else None
     levels = read_dca_levels(db, tenant, symbols)
@@ -326,6 +351,10 @@ def dca_answer(db: Session, tenant: int, company: Company | None) -> ChatRespons
             f"Cierre usado {_fmt_close(reading.close, reading.currency)} del {_day(reading.signal_date)}; {state}.",
             "Es la lectura de tu fórmula DCA, no una orden de compra.",
         ]
+        stale_age = _dca_stale_age(reading.signal_date, today)
+        if stale_age is not None:
+            lines.insert(1, f"Ojo: desactualizado, el último cierre es de hace {stale_age} días; "
+                            "puede no ser el nivel de hoy.")
         return _response(lines, [_source("dca_signal", reading.symbol, f"Nivel DCA {reading.symbol}",
                                          "/watchlist")], "dca_level")
     if not levels:
@@ -341,6 +370,10 @@ def dca_answer(db: Session, tenant: int, company: Company | None) -> ChatRespons
     forming = sum(1 for reading in levels.values() if reading.forming)
     if forming:
         lines.append(f"{forming} con el mes aún en formación: se confirman al cierre del mes.")
+    stale = sorted(r.symbol for r in levels.values() if _dca_stale_age(r.signal_date, today) is not None)
+    if stale:
+        lines.append(f"Desactualizados (último cierre de hace más de "
+                     f"{_dca_max_age_days()} días, pueden no ser el nivel de hoy): {', '.join(stale)}.")
     lines.append("Es la lectura de tu fórmula DCA, no una orden de compra.")
     return _response(lines, [_source("dca_signal", "all", "Niveles DCA", "/watchlist")], "dca_level")
 
