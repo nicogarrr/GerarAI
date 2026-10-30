@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import (
     CashBalance,
     Company,
@@ -236,7 +237,9 @@ class InvestmentPlanService:
                 continue
             total_actual += contribution.amount * rate
         complete = not missing_fx
-        today = today or date.today()
+        # «Este mes» es el del usuario (Europe/Madrid), no el día UTC del servidor:
+        # entre las 00:00 y las 02:00 del día 1 en Madrid la cuota nueva ya cuenta.
+        today = today or local_today()
         months_elapsed = self._months_between(plan.start_date, today)
         plan_currency = (plan.monthly_contribution_currency or "").upper() or None
         enforced = plan_currency_enforced()
