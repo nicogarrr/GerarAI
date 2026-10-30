@@ -117,3 +117,4 @@ def downgrade() -> None:
 
     with op.batch_alter_table("positions", schema=None) as batch_op:
         batch_op.drop_constraint("fk_positions_portfolio_id_cascade", type_="foreignkey")
+
