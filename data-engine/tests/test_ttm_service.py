@@ -152,3 +152,51 @@ def test_recent_annual_fallback_remains_available(db):
     _fact(db, company, "operating_income", "2025-12-31:FY", 20, "FY")
     db.commit()
     assert _metric(build_company_ttm(db, company), "operating_income")["value"] == Decimal("20")
+
+
+def _seed_capex_over_ocf(db, company):
+    """Cuatro trimestres consecutivos con capex > flujo operativo (capex en
+    negativo, salida de caja): OCF 12.000 M, capex -15.500 M por trimestre."""
+    quarters = [("2025-03-31", "Q1"), ("2025-06-30", "Q2"), ("2025-09-30", "Q3"), ("2025-12-31", "Q4")]
+    for end, label in quarters:
+        _fact(db, company, "operating_cash_flow", f"{end}:{label}", 12_000 * M, label)
+        _fact(db, company, "capital_expenditure", f"{end}:{label}", -15_500 * M, label)
+
+
+def test_fcf_negativo_por_capex_va_con_nota_explicada(db):
+    company = _company(db, "CAPX")
+    _seed_capex_over_ocf(db, company)
+    db.commit()
+    payload = build_company_ttm(db, company)
+    fcf = next(m for m in payload["metrics"] if m["metric"] == "free_cash_flow")
+    assert Decimal(str(fcf["value"])) == Decimal(4 * -3_500 * M)  # TTM: 4 trimestres de -3.500 M
+    assert fcf["note"] is not None
+    assert "capex" in fcf["note"].lower()
+    assert "supera" in fcf["note"]
+    assert "flujo de caja operativo" in fcf["note"]
+
+
+def test_fcf_positivo_sin_nota_de_capex(db):
+    company = _company(db, "CAPY")
+    quarters = [("2025-03-31", "Q1"), ("2025-06-30", "Q2"), ("2025-09-30", "Q3"), ("2025-12-31", "Q4")]
+    for end, label in quarters:
+        _fact(db, company, "operating_cash_flow", f"{end}:{label}", 20_000 * M, label)
+        _fact(db, company, "capital_expenditure", f"{end}:{label}", -15_500 * M, label)
+    db.commit()
+    payload = build_company_ttm(db, company)
+    fcf = next(m for m in payload["metrics"] if m["metric"] == "free_cash_flow")
+    assert Decimal(str(fcf["value"])) == Decimal(4 * 4_500 * M)  # TTM: 4 trimestres de 4.500 M
+    assert fcf["note"] is None
+
+
+def test_ocf_negativo_nota_distinta_del_capex(db):
+    company = _company(db, "CAPZ")
+    quarters = [("2025-03-31", "Q1"), ("2025-06-30", "Q2"), ("2025-09-30", "Q3"), ("2025-12-31", "Q4")]
+    for end, label in quarters:
+        _fact(db, company, "operating_cash_flow", f"{end}:{label}", -2_000 * M, label)
+        _fact(db, company, "capital_expenditure", f"{end}:{label}", -15_500 * M, label)
+    db.commit()
+    payload = build_company_ttm(db, company)
+    fcf = next(m for m in payload["metrics"] if m["metric"] == "free_cash_flow")
+    assert fcf["note"] is not None
+    assert "ya es negativo" in fcf["note"]

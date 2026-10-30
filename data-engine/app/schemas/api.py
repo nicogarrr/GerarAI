@@ -887,7 +887,10 @@ class ValuationResponse(BaseModel):
     # la base del precio cotizado (ADR) cuando hay adr_ratio.
     adr_ratio: float | None = None
     value_per_share_basis: str | None = None
-    listed_share_values: dict[str, float] | None = None
+    # Un escenario con valor por acción <= 0 es N/D (None) con su explicación
+    # en scenario_notes; nunca una cifra negativa.
+    listed_share_values: dict[str, float | None] | None = None
+    scenario_notes: dict[str, str] = {}
     reverse_dcf: dict = {}
     sensitivity: dict = {}
     moat: dict = {}
