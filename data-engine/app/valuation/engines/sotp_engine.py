@@ -14,7 +14,6 @@ from __future__ import annotations
 from sqlalchemy import desc, select
 
 from app.models import FinancialFact
-from app.valuation.fact_reference import split_scaled_value
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -25,6 +24,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
+from app.valuation.fact_reference import split_scaled_value
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.scenario_definitions import holding_company_scenarios
 from app.valuation.scenario_model import Scenario, probability_weighted_value
