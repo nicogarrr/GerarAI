@@ -143,6 +143,31 @@ export const METRIC_LABELS: Record<string, string> = {
     cloud_cost: 'coste de nube',
     customers: 'clientes',
     retention: 'retención',
+    // Entradas pendientes de los motores y del modelo a largo plazo que la
+    // ficha pinta con termLabel (guard: scripts/missing-inputs-i18n-guard.test.ts)
+    adr_ratio: 'ratio ADR (acciones ordinarias por ADR)',
+    fiscal_year: 'ejercicio fiscal',
+    maintenance_capex_or_capital_expenditure: 'capex de mantenimiento o CapEx total',
+    m_and_a_purchase_price_and_post_deal_returns: 'precio pagado en adquisiciones (M&A) y su rentabilidad posterior',
+    free_cash_flow_or_fcf_margin: 'flujo de caja libre o margen FCF',
+    single_reporting_currency: 'una única divisa de reporte en los hechos',
+    dividend_per_share_or_payout_ratio: 'dividendo por acción o ratio de reparto (payout)',
+    delta_total_debt_or_total_debt_pair: 'variación de la deuda total (o deuda total de dos ejercicios)',
+    delta_working_capital_or_working_capital_pair: 'variación del capital circulante (o capital circulante de dos ejercicios)',
+    production_volume_or_sales_volume: 'volumen de producción o de ventas',
+    cash_cost_per_unit: 'coste en efectivo por unidad',
+    realized_or_spot_commodity_price: 'precio realizado o spot de la materia prima',
+    commodity_earnings_multiple: 'múltiplo de beneficios del sector',
+    consistent_period_volume_cost_price: 'volumen, coste y precio del mismo periodo',
+    valid_effective_tax_rate_and_commodity_earnings_multiple: 'tipo impositivo efectivo y múltiplo de beneficios válidos',
+    valid_shares_and_cost_of_equity_spread: 'acciones y diferencial sobre el coste del capital propio válidos',
+    positive_cap_rate_and_shares: 'cap rate positivo y número de acciones',
+    consistent_segment_periods: 'segmentos del mismo periodo',
+    consistent_nav_and_shares_period: 'NAV y acciones del mismo periodo',
+    tam_or_sector_revenue: 'TAM o ingresos del sector',
+    market_growth: 'crecimiento del mercado',
+    som_or_captureable_market: 'mercado capturable (SOM)',
+    future_market_or_base_revenue: 'mercado futuro o ingresos del escenario base',
     'segment_*_operating_metric': 'métrica operativa por segmento',
     'segment_*_valuation_multiple': 'múltiplo de valoración por segmento',
 };
@@ -151,5 +176,9 @@ export const METRIC_LABELS: Record<string, string> = {
 export function metricLabel(metric: string): string {
     const known = (Object.hasOwn(METRIC_LABELS, metric) ? METRIC_LABELS[metric] : null) ?? (Object.hasOwn(METRIC_LABELS, metric.toLowerCase()) ? METRIC_LABELS[metric.toLowerCase()] : null);
     if (known) return known;
+    // «fx_rate:CNY/USD» (valuation_service, DCF inverso): el tipo de cambio
+    // que falta entre la divisa de reporte y la del listado.
+    const fx = /^fx_rate:([a-z]{3})\/([a-z]{3})$/i.exec(metric);
+    if (fx) return `tipo de cambio ${fx[1].toUpperCase()}/${fx[2].toUpperCase()}`;
     return metric.replaceAll('_', ' ');
 }
