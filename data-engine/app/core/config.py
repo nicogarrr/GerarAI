@@ -467,6 +467,12 @@ class Settings(BaseSettings):
     # Env: LANGFUSE_ENABLED / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY /
     # LANGFUSE_HOST / LANGFUSE_SAMPLE_RATE.
     langfuse_enabled: bool = False
+    # Generación multidioma (i18n B). Apagado: TODO se genera en español,
+    # byte a byte como antes (prompts, validadores de idioma y detail= de
+    # HTTPException visibles). Encendido: la cabecera firmada
+    # X-GerarAI-Language (es/en) fija el idioma de generación de la petición.
+    # Env: I18N_GENERATION_ENABLED.
+    i18n_generation_enabled: bool = False
     langfuse_public_key: str | None = Field(default=None, repr=False)
     langfuse_secret_key: str | None = Field(default=None, repr=False)
     langfuse_host: str = "https://cloud.langfuse.com"

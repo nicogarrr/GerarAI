@@ -4746,6 +4746,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/language": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Language */
+        get: operations["read_language_api_settings_language_get"];
+        /** Update Language */
+        put: operations["update_language_api_settings_language_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/llm": {
         parameters: {
             query?: never;
@@ -8395,6 +8413,20 @@ export interface components {
             /** Status Code */
             status_code: number | null;
         };
+        /** LanguageOut */
+        LanguageOut: {
+            /** Generation Enabled */
+            generation_enabled: boolean;
+            /** Language */
+            language: string;
+            /** Supported */
+            supported: string[];
+        };
+        /** LanguageUpdate */
+        LanguageUpdate: {
+            /** Language */
+            language: string;
+        };
         /** LibraryQuestion */
         LibraryQuestion: {
             /** Author */
@@ -10057,7 +10089,7 @@ export interface components {
             expected_value?: number | null;
             /** Listed Share Values */
             listed_share_values?: {
-                [key: string]: number;
+                [key: string]: number | null;
             } | null;
             /** Margin Of Safety */
             margin_of_safety?: number | null;
@@ -10091,6 +10123,13 @@ export interface components {
              */
             reverse_dcf: {
                 [key: string]: unknown;
+            };
+            /**
+             * Scenario Notes
+             * @default {}
+             */
+            scenario_notes: {
+                [key: string]: string;
             };
             /**
              * Sensitivity
@@ -21843,6 +21882,86 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_language_api_settings_language_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_language_api_settings_language_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LanguageUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LanguageOut"];
                 };
             };
             /** @description Validation Error */

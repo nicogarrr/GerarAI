@@ -18,6 +18,7 @@ from app.api.routes import (
     knowledge,
     knowledge_graph,
     knowledge_rag,
+    language,
     macro_calendar,
     market,
     market_context,
@@ -107,6 +108,8 @@ api_router.include_router(screeners.router, prefix="/screeners", tags=["screener
 api_router.include_router(memory.router, prefix="/memory", tags=["memory"])
 api_router.include_router(sources.router, prefix="/sources", tags=["sources"])
 api_router.include_router(settings.router, prefix="/settings", tags=["settings"])
+# /settings/language: preferencia de idioma de generacion del tenant (i18n B).
+api_router.include_router(language.router, prefix="/settings", tags=["settings"])
 api_router.include_router(market.router, prefix="/market", tags=["market"])
 api_router.include_router(market_context.router, prefix="/market", tags=["market"])
 api_router.include_router(money_flows.router, prefix="/market/flows", tags=["market", "flows"])

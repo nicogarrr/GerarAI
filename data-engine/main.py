@@ -18,6 +18,7 @@ from app.api.routes.health import router as health_router
 from app.core.auth import get_research_principal
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
+from app.core.i18n import bind_request_language
 from app.core.llm_tenant_scope import bind_llm_cache_tenant
 from app.core.rate_limit import AuthFailureLimitMiddleware, enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
@@ -181,6 +182,9 @@ if get_settings().app_env.lower() != "test":
 private_dependencies = [
     Depends(get_research_principal),
     Depends(enforce_rate_limit),
+    # Idioma de generacion de la peticion (i18n): va el primero de los
+    # "binds" para que get_db y los servicios lo vean ya fijado.
+    Depends(bind_request_language),
     Depends(bind_llm_cache_tenant),
     Depends(bind_tenant_llm_settings),
 ]
