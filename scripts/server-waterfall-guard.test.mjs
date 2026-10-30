@@ -8,7 +8,8 @@ const research = readFileSync('app/(root)/research/page.tsx', 'utf8');
 test('watchlist starts dated changes, monitor and per-symbol reads together (no serial chain)', () => {
     assert.doesNotMatch(watchlist, /await fetchDatedChanges/);
     assert.doesNotMatch(watchlist, /await getWatchlistMonitor/);
-    assert.match(watchlist, /Promise\.all\(\[getWatchlistState\(\), searchParams\]\)/);
+    // #3255 (A9) añade el contexto FX de la cartera en el mismo Promise.all: sigue en paralelo.
+    assert.match(watchlist, /Promise\.all\(\[getWatchlistState\(\), searchParams(, getPortfolioFxContext\(userId\))?\]\)/);
     assert.match(watchlist, /Promise\.all\(\[datedChangesPromise, monitorPromise, Promise\.all\(basicsPromises\)(, Promise\.all\(notFoundPromises\))?\]\)/);
 });
 
