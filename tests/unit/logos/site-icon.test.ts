@@ -1,7 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 
-import { domainFromWebsite, fetchSiteIcon, iconCandidatesFromHtml, imageSide, isSafeIconUrl } from '@/lib/logos/site-icon';
+import { domainFromWebsite, fetchSiteIcon, iconCandidatesFromHtml, imageSide, isSafeIconUrl, type LookupLike } from '@/lib/logos/site-icon';
+import { isPublicIp } from '@/lib/logos/public-ip';
+
+/** DNS simulado: cualquier host resuelve a una IP pública (los tests no tocan la red). */
+const publicLookup: LookupLike = async () => [{ address: '93.184.216.34', family: 4 }];
 
 /** PNG mínimo con la cabecera IHDR de lado x lado, relleno hasta superar MIN_IMAGE. */
 function png(side: number, pad = 100): Uint8Array {
@@ -94,14 +98,14 @@ describe('fetchSiteIcon', () => {
             if (url === 'https://acme.com/t.png') return res(png(180), { url, type: 'application/octet-stream' });
             return res('', { ok: false });
         });
-        const icon = await fetchSiteIcon('acme.com', fetchMock);
+        const icon = await fetchSiteIcon('acme.com', fetchMock, publicLookup);
         expect(icon).toMatchObject({ contentType: 'image/png', url: 'https://acme.com/t.png', size: 180 });
         expect(fetchMock.mock.calls[0][1]?.headers).toMatchObject({ 'User-Agent': expect.stringContaining('GerarAI-logo') });
     });
     it('rechaza dominios inseguros sin hacer ninguna petición', async () => {
         const fetchMock = vi.fn();
-        expect(await fetchSiteIcon('127.0.0.1', fetchMock)).toBeNull();
-        expect(await fetchSiteIcon('localhost', fetchMock)).toBeNull();
+        expect(await fetchSiteIcon('127.0.0.1', fetchMock, publicLookup)).toBeNull();
+        expect(await fetchSiteIcon('localhost', fetchMock, publicLookup)).toBeNull();
         expect(fetchMock).not.toHaveBeenCalled();
     });
     it('salta iconos borrosos (<32 px), HTML de error con 200 y imágenes demasiado pequeñas; cae a favicon.ico', async () => {
@@ -113,23 +117,124 @@ describe('fetchSiteIcon', () => {
             if (url.endsWith('/favicon.ico')) return res(ico, { url, type: 'image/x-icon' });
             return res('', { ok: false });
         });
-        expect(await fetchSiteIcon('acme.com', fetchMock)).toMatchObject({ contentType: 'image/x-icon', size: 64 });
+        expect(await fetchSiteIcon('acme.com', fetchMock, publicLookup)).toMatchObject({ contentType: 'image/x-icon', size: 64 });
         const htmlError = vi.fn(async (url: string) => res('<html>error</html>'.padEnd(200, ' '), { url, type: 'image/png' }));
-        expect(await fetchSiteIcon('acme.com', htmlError)).toBeNull();
+        expect(await fetchSiteIcon('acme.com', htmlError, publicLookup)).toBeNull();
     });
     it('una redirección a un host inseguro invalida la respuesta', async () => {
-        const fetchMock = vi.fn(async (url: string) => res(png(180), { url: 'https://127.0.0.1/evil.png', type: 'image/png' }));
-        expect(await fetchSiteIcon('acme.com', fetchMock)).toBeNull();
+        const fetchMock = vi.fn(async (_u: string) => res(png(180), { url: 'https://127.0.0.1/evil.png', type: 'image/png' }));
+        expect(await fetchSiteIcon('acme.com', fetchMock, publicLookup)).toBeNull();
     });
     it('respeta el tope de tamaño (content-length) y los errores de red', async () => {
         const big = vi.fn(async (url: string) => res(png(180), { url, type: 'image/png', headers: { 'content-length': String(400 * 1024) } }));
-        expect(await fetchSiteIcon('acme.com', big)).toBeNull();
+        expect(await fetchSiteIcon('acme.com', big, publicLookup)).toBeNull();
         const boom = vi.fn(async () => { throw new Error('net'); });
-        expect(await fetchSiteIcon('acme.com', boom)).toBeNull();
+        expect(await fetchSiteIcon('acme.com', boom, publicLookup)).toBeNull();
     });
     it('acepta SVG sin medir su lado', async () => {
         const svg = '<svg xmlns="http://www.w3.org/2000/svg">' + ' '.repeat(100) + '</svg>';
         const fetchMock = vi.fn(async (url: string) => (url === 'https://acme.com/' ? res('<link rel="icon" href="/l.svg">', { url }) : res(svg, { url, type: 'image/svg+xml' })));
-        expect(await fetchSiteIcon('acme.com', fetchMock)).toMatchObject({ contentType: 'image/svg+xml', size: null });
+        expect(await fetchSiteIcon('acme.com', fetchMock, publicLookup)).toMatchObject({ contentType: 'image/svg+xml', size: null });
+    });
+});
+
+describe('isPublicIp (anti-SSRF DNS)', () => {
+    it.each([
+        ['93.184.216.34', true],
+        ['8.8.8.8', true],
+        ['10.0.0.1', false],
+        ['172.16.0.1', false],
+        ['192.168.1.1', false],
+        ['127.0.0.1', false],
+        ['169.254.169.254', false], // metadata de cloud
+        ['100.64.0.1', false], // CGNAT
+        ['192.0.2.1', false], // TEST-NET-1
+        ['198.51.100.1', false], // TEST-NET-2
+        ['203.0.113.9', false], // TEST-NET-3
+        ['224.0.0.1', false], // multicast
+        ['0.0.0.0', false],
+        ['::1', false],
+        ['::', false],
+        ['::ffff:127.0.0.1', false], // IPv4-mapeada privada
+        ['::ffff:8.8.8.8', true],
+        ['64:ff9b::10.0.0.1', false], // NAT64 con IPv4 privada
+        ['fe80::1', false], // link-local
+        ['fd00::1', false], // ULA
+        ['ff02::1', false], // multicast
+        ['2001:db8::1', false], // documentación
+        ['2002::1', false], // 6to4 opaco
+        ['2606:4700:4700::1111', true],
+        ['no-es-ip', false],
+        ['999.1.1.1', false],
+    ])('%s -> %s', (ip, expected) => {
+        expect(isPublicIp(ip)).toBe(expected);
+    });
+});
+
+describe('fetchSiteIcon (anti-SSRF DNS y redirecciones)', () => {
+    it('rechaza un host que resuelve a una IP privada sin hacer ninguna petición', async () => {
+        const fetchMock = vi.fn();
+        const privateLookup: LookupLike = async () => [{ address: '169.254.169.254', family: 4 }];
+        expect(await fetchSiteIcon('acme.com', fetchMock, privateLookup)).toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it('rechaza si CUALQUIER dirección resuelta es privada (round-robin)', async () => {
+        const fetchMock = vi.fn();
+        const mixedLookup: LookupLike = async () => [
+            { address: '93.184.216.34', family: 4 },
+            { address: '10.0.0.1', family: 4 },
+        ];
+        expect(await fetchSiteIcon('acme.com', fetchMock, mixedLookup)).toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it('un fallo de DNS invalida el host sin petición', async () => {
+        const fetchMock = vi.fn();
+        const failingLookup: LookupLike = async () => { throw new Error('ENOTFOUND'); };
+        expect(await fetchSiteIcon('acme.com', fetchMock, failingLookup)).toBeNull();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+    it('sigue una redirección https válida y valida el host de destino', async () => {
+        const calls: string[] = [];
+        const fetchMock = vi.fn(async (url: string) => {
+            calls.push(url);
+            if (url === 'https://acme.com/') {
+                return new Response(null, { status: 302, headers: { location: 'https://cdn.acme.com/t.png' } });
+            }
+            if (url.endsWith('/apple-touch-icon.png')) return res(png(180), { url, type: 'image/png' });
+            return res('', { ok: false });
+        });
+        const icon = await fetchSiteIcon('acme.com', fetchMock, publicLookup);
+        expect(icon).toMatchObject({ contentType: 'image/png', url: 'https://acme.com/apple-touch-icon.png' });
+        // El salto 302 se siguió y validó, y nunca se pidió nada fuera de hosts seguros.
+        expect(calls).toContain('https://cdn.acme.com/t.png');
+        expect(calls.every((u) => u.startsWith('https://acme.com/') || u.startsWith('https://cdn.acme.com/'))).toBe(true);
+    });
+    it('una redirección a http nunca llega a conectarse', async () => {
+        const calls: string[] = [];
+        const fetchMock = vi.fn(async (u: string) => {
+            calls.push(u);
+            if (u === 'https://acme.com/') return new Response(null, { status: 302, headers: { location: 'http://acme.com/x.png' } });
+            return res('', { ok: false });
+        });
+        expect(await fetchSiteIcon('acme.com', fetchMock, publicLookup)).toBeNull();
+        expect(calls.some((u) => u.startsWith('http://'))).toBe(false);
+    });
+    it('una redirección a un host que resuelve a IP privada nunca llega a conectarse', async () => {
+        const calls: string[] = [];
+        const fetchMock = vi.fn(async (url: string) => {
+            calls.push(url);
+            if (url === 'https://acme.com/') return new Response(null, { status: 302, headers: { location: 'https://internal.example/x.png' } });
+            return res('', { ok: false });
+        });
+        const lookup: LookupLike = async (host) =>
+            host === 'internal.example' ? [{ address: '10.0.0.5', family: 4 }] : [{ address: '93.184.216.34', family: 4 }];
+        expect(await fetchSiteIcon('acme.com', fetchMock, lookup)).toBeNull();
+        expect(calls.some((u) => u.includes('internal.example'))).toBe(false);
+    });
+    it('corta las cadenas de redirecciones que no terminan', async () => {
+        const fetchMock = vi.fn(async (url: string) => new Response(null, { status: 302, headers: { location: `${url}x` } }));
+        expect(await fetchSiteIcon('acme.com', fetchMock, publicLookup)).toBeNull();
+        // Cada candidato corta tras 1 + MAX_REDIRECTS peticiones: nunca un bucle.
+        expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(3 * 4);
     });
 });
