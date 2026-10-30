@@ -108,7 +108,12 @@ class DividendIngestionService(ProviderIngestionService):
             ], "fmp"
         return [
             {
-                "ex_date": self._epoch_to_date(row.get("date")),
+                "ex_date": self._epoch_to_date(
+                    row.get("date"), row.get("exchangeTimezoneName")
+                ),
+                # Fecha que guardaban las versiones que leian el epoch en UTC
+                # (un dia antes en ASX/NZX): permite corregir la fila ya guardada.
+                "legacy_utc_ex_date": self._epoch_to_date(row.get("date")),
                 "pay_date": None,  # chart API no expone fecha de pago
                 "amount": self._parse_amount(row),
                 "currency": listing_currency,
@@ -230,13 +235,29 @@ class DividendIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
-        return db.scalar(
+        record = db.scalar(
             select(DividendRecord).where(
                 DividendRecord.company_id == company.id,
                 DividendRecord.ex_date == row["ex_date"],
                 DividendRecord.amount == row["amount"],
             )
         )
+        legacy = row.get("legacy_utc_ex_date")
+        if record is not None or legacy is None or legacy == row["ex_date"]:
+            return record
+        # Fila guardada con la fecha UTC (un dia antes en ASX/NZX): se corrige
+        # en sitio en vez de duplicar el cobro.
+        record = db.scalar(
+            select(DividendRecord).where(
+                DividendRecord.company_id == company.id,
+                DividendRecord.ex_date == legacy,
+                DividendRecord.amount == row["amount"],
+                DividendRecord.source == "yahoo_finance",
+            )
+        )
+        if record is not None:
+            record.ex_date = row["ex_date"]
+        return record
 
     @staticmethod
     def _new_record(
