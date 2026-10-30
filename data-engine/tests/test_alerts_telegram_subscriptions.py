@@ -50,6 +50,7 @@ def test_listado_por_defecto_todo_apagado_y_sin_chat(db):
     rows = list_telegram_subscriptions(db)
     assert [row["event_type"] for row in rows] == [
         "thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event",
+        "earnings",
     ]
     assert all(row["enabled"] is False and row["chat_id"] is None for row in rows)
 
