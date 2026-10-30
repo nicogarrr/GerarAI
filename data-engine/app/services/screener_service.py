@@ -795,8 +795,10 @@ class ScreenerService:
     ) -> Observation | None:
         # Same dedup rule as `_cagr`: newest row per fiscal_year, not the last
         # write of a comprehension over an unsorted series.
-        numerator_by_year = self._newest_per_year(numerators)
-        denominator_by_year = self._newest_per_year(denominators)
+        # Solo filas anuales, igual que `_cagr`: un trimestre ingerido despues
+        # del anual no puede ocupar el lugar del ano.
+        numerator_by_year = self._newest_per_year(numerators, annual_only=True)
+        denominator_by_year = self._newest_per_year(denominators, annual_only=True)
         years = sorted(numerator_by_year.keys() & denominator_by_year.keys())
         if len(years) < 2:
             return None
