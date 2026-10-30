@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { confirmPortfolioImage, previewPortfolioImage, reviewPortfolioImage, searchImageInstrument } from '@/lib/actions/portfolio-image.actions';
-import { imageFileError, imageRowsPending, normalizeImageQuantity, type ImageInstrument, type ImagePreview, type ImageReview } from '@/lib/portfolio/image-import';
+import { imageFileError, imageRowsPending, normalizeImageQuantity, unwrapImageResult, type ImageInstrument, type ImagePreview, type ImageReview } from '@/lib/portfolio/image-import';
 import { formatMoney, formatNumber, formatPercent } from '@/lib/format';
 import { toast } from 'sonner';
 
@@ -54,7 +54,7 @@ export default function ImportImageButton() {
                 reader.onerror = () => reject(new Error('No se pudo abrir la imagen'));
                 reader.readAsDataURL(file);
             });
-            const result = await previewPortfolioImage(encoded);
+            const result = unwrapImageResult(await previewPortfolioImage(encoded));
             setPreview(result);
             setDrafts(result.rows.map(row => ({ query: row.identity, instrument: null, quantity: row.quantity ?? '', checked: false })));
         });
@@ -92,7 +92,7 @@ export default function ImportImageButton() {
                 <div className="flex items-center justify-between gap-2"><span className="text-xs font-medium uppercase tracking-wide text-gray-400">Posición {index + 1}</span><span className={`text-xs ${row.checked ? 'text-emerald-300' : 'text-amber-200'}`}>{row.checked ? 'Revisada' : 'Por revisar'}</span></div>
                 <details className="text-xs text-gray-500"><summary className="cursor-pointer">Texto leído en la captura</summary><p className="mt-2 break-words text-gray-400">Leído: {preview?.rows[index]?.raw ?? 'Fila manual'}</p></details>
                 <label className="grid gap-1 text-sm">Instrumento<Input value={row.query} disabled={busy} onChange={e => change(index, { query: e.target.value, instrument: null })} /></label>
-                <Button variant="outline" className="min-h-11" disabled={busy || !row.query.trim()} onClick={() => void run(async () => { const version = generation.current; const items = await searchImageInstrument(row.query); if (generation.current === version) setMatches({ index, items }); })}><Search className="h-4 w-4" aria-hidden="true" />Buscar instrumento</Button>
+                <Button variant="outline" className="min-h-11" disabled={busy || !row.query.trim()} onClick={() => void run(async () => { const version = generation.current; const items = unwrapImageResult(await searchImageInstrument(row.query)); if (generation.current === version) setMatches({ index, items }); })}><Search className="h-4 w-4" aria-hidden="true" />Buscar instrumento</Button>
                 {matches?.index === index && <div className="grid gap-2">{matches.items.length === 0 && <p className="text-sm">Sin coincidencias. Busca por ticker o nombre.</p>}{matches.items.map(item => <Button key={item.ticker} variant="outline" className="h-auto min-h-11 justify-start whitespace-normal text-left" disabled={busy} onClick={() => change(index, { instrument: item, query: item.ticker })}>{item.ticker} · {item.name} · {item.exchange} · {item.currency}</Button>)}</div>}
                 {row.instrument && <p className="text-sm text-green-200">{row.instrument.name} · {row.instrument.exchange} · {row.instrument.currency}</p>}
                 <label className="grid gap-1 text-sm">Cantidad<Input inputMode="decimal" placeholder="Ej. 125,5 (sin miles)" className="h-11 text-base" value={row.quantity} disabled={busy} aria-invalid={row.quantity.trim() !== '' && normalizeImageQuantity(row.quantity) === null} onChange={e => change(index, { quantity: e.target.value })} /></label>
@@ -104,7 +104,7 @@ export default function ImportImageButton() {
             </section>)}
             {preview && !review && <>
                 <Button className="mb-3 min-h-11 w-full whitespace-normal" variant="outline" disabled={busy || drafts.length >= 60} onClick={() => { setDrafts(old => [...old, { query: '', instrument: null, quantity: '', checked: false }]); setPreview(old => old ? { ...old, rows: [...old.rows, { raw: 'Fila manual', identity: '', quantity: null, currency: null, warning: 'Completa los datos ilegibles' }] } : old); }}>Añadir fila ilegible manualmente</Button>
-                <Button className="mb-3 min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !ready} onClick={() => void run(async () => { const rows = drafts.map(r => ({ ticker: r.instrument!.ticker, quantity: normalizeImageQuantity(r.quantity)!, currency: r.instrument!.currency, confirmed: r.checked })); setReview(await reviewPortfolioImage(preview.image_hash, rows)); })}>Consultar precios y revisar</Button>
+                <Button className="mb-3 min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !ready} onClick={() => void run(async () => { const rows = drafts.map(r => ({ ticker: r.instrument!.ticker, quantity: normalizeImageQuantity(r.quantity)!, currency: r.instrument!.currency, confirmed: r.checked })); setReview(unwrapImageResult(await reviewPortfolioImage(preview.image_hash, rows))); })}>Consultar precios y revisar</Button>
                 {pending && !busy && <p role="status" className="-mt-1 mb-3 text-center text-xs text-gray-400">{pending}</p>}
             </>}
             {review && <>
@@ -119,7 +119,7 @@ export default function ImportImageButton() {
                 </>}
             <details className="mt-4 text-xs leading-relaxed text-gray-500"><summary className="cursor-pointer text-gray-400">Qué se importa y qué no</summary><p className="mt-2">Solo posiciones nuevas. No sustituye las existentes ni reconstruye compras, coste o rentabilidad histórica. Caja y margen no se determinan. Para conciliar una cartera existente, usa el fichero del bróker.</p></details>
             </div>
-            {review && <div className="grid shrink-0 gap-2 border-t border-gray-800 bg-gray-900 px-5 py-4 sm:px-6"><p className="mb-1 text-xs text-gray-400">Solo posiciones nuevas. Coste, caja y margen no determinados.</p><Button className="min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !review.can_confirm || review.already_imported} onClick={() => void run(async () => { const result = await confirmPortfolioImage(review.review_id); toast.success(result.status === 'already_imported' ? 'Esta importación ya estaba guardada' : importedPositionsMessage(result.positions_imported)); setOpen(false); setPreview(null); setDrafts([]); setReview(null); router.refresh(); })}>Confirmar y guardar posiciones</Button><Button className="min-h-11" variant="ghost" disabled={busy} onClick={() => setReview(null)}>Corregir filas</Button></div>}
+            {review && <div className="grid shrink-0 gap-2 border-t border-gray-800 bg-gray-900 px-5 py-4 sm:px-6"><p className="mb-1 text-xs text-gray-400">Solo posiciones nuevas. Coste, caja y margen no determinados.</p><Button className="min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !review.can_confirm || review.already_imported} onClick={() => void run(async () => { const result = unwrapImageResult(await confirmPortfolioImage(review.review_id)); toast.success(result.status === 'already_imported' ? 'Esta importación ya estaba guardada' : importedPositionsMessage(result.positions_imported)); setOpen(false); setPreview(null); setDrafts([]); setReview(null); router.refresh(); })}>Confirmar y guardar posiciones</Button><Button className="min-h-11" variant="ghost" disabled={busy} onClick={() => setReview(null)}>Corregir filas</Button></div>}
         </DialogContent>
     </Dialog>;
 }
