@@ -14,6 +14,7 @@ from __future__ import annotations
 from sqlalchemy import desc, select
 
 from app.models import FinancialFact
+from app.valuation.currency import reporting_currencies
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -175,6 +176,21 @@ class SOTPEngine(ValuationEngine):
         segment_periods = set(segment_period_keys)
         if len(segment_periods) > 1:
             missing.append("consistent_segment_periods")
+        # Divisas: el filtro de divisa del servicio solo mira los hechos del
+        # snapshot (revenue, net_debt...), no los segment_*. Un segmento en EUR
+        # sumado a otro en USD y a una deuda neta en USD publicaba un NAV en
+        # una divisa inexistente. Sin una unica divisa de reporte: N/D.
+        currency_units = [
+            fact.unit
+            for fact in segment_sources
+            if fact.metric.endswith("_operating_metric")
+        ]
+        if net_debt_fact is not None:
+            currency_units.append(net_debt_fact.unit)
+        snapshot_facts = getattr(snapshot, "facts", None) or {}
+        currency_units.extend(getattr(fact, "unit", None) for fact in snapshot_facts.values())
+        if len(reporting_currencies(currency_units)) > 1:
+            missing.append("single_reporting_currency")
         if not segments:
             missing.extend(
                 missing_segments
