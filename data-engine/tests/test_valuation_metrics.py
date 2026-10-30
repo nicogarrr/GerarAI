@@ -362,3 +362,29 @@ def test_pb_ignora_split_anterior_al_cierre_o_posterior_al_precio():
     _run(db, [company])
     row = _metric(db, company, METRIC_PB)
     assert Decimal(row.value) == Decimal("2")
+
+
+def test_pb_no_reajusta_acciones_de_un_10k_publicado_tras_el_split():
+    """Split 10:1 el 2026-03-02 y 10-K del FY2025 publicado el 2026-03-20:
+    las acciones ya vienen reexpresadas (1000, ASC 260). Calculo
+    independiente: libros/accion = 1000/1000 = 1; cierre 2 -> P/B = 2. Con la
+    regla solo por cierre de ejercicio se multiplicaban otra vez x10 -> 20.
+    """
+    from app.models import FinancialFact
+
+    db = _db()
+    company = _seed_pb(db, shares="1000", price="2")
+    shares = db.scalar(
+        select(FinancialFact).where(
+            FinancialFact.company_id == company.id,
+            FinancialFact.metric == "shares_diluted",
+        )
+    )
+    shares.filed = date(2026, 3, 20)
+    db.flush()
+    _split(db, company, "10", date(2026, 3, 2))
+    _run(db, [company])
+    row = _metric(db, company, METRIC_PB)
+    assert row is not None
+    assert Decimal(row.value) == Decimal("2")
+    assert row.calculation_trace.get("split_factor") in (None, "1")

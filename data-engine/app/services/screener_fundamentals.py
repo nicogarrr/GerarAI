@@ -19,8 +19,7 @@ from app.models import Company, FinancialFact, MarketPrice
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
-    cumulative_split_factor_after,
-    period_end_date,
+    fact_split_factor,
     split_events_by_company,
 )
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
@@ -191,6 +190,8 @@ def load_screener_ratios(
             else {"source": price.source, "date": price.date.isoformat(), "id": price.id}
         )
         currency = (company.currency or "").upper()
+        # Fecha del precio usado: un split posterior a ese precio no lo cambia.
+        price_cutoff = live_date if use_live else price.date
         years = sorted({year for year, _ in facts_for_company}, reverse=True)
         if ratio:
             price_provenance["adr_ratio"] = ratio
@@ -212,9 +213,13 @@ def load_screener_ratios(
                 # ejercicio del EPS, el EPS se expresa en acciones actuales
                 # (reportado / factor acumulado) o el PER sale inflado por
                 # el factor del split.
-                split_factor = cumulative_split_factor_after(
+                # Regla unica (fact_split_factor): un 10-K publicado DESPUES
+                # del split ya trae el EPS reexpresado y no se ajusta otra vez.
+                split_factor = fact_split_factor(
                     splits_by_company.get(company.id, []),
-                    period_end_date(eps.period),
+                    period=eps.period,
+                    filed=eps.filed,
+                    cutoff=price_cutoff,
                 )
                 metrics["pe"] = _ratio(close / (eps.value / split_factor))
                 pe_prov: dict = {"id": eps.id, "source": eps.source_type, "year": year}
@@ -233,9 +238,11 @@ def load_screener_ratios(
                 # son del cierre del ejercicio. Tras un split posterior el
                 # recuento se expresa en acciones actuales (x factor
                 # acumulado); sin ajuste el P/B salia dividido por el factor.
-                shares_split_factor = cumulative_split_factor_after(
+                shares_split_factor = fact_split_factor(
                     splits_by_company.get(company.id, []),
-                    period_end_date(shares.period),
+                    period=shares.period,
+                    filed=shares.filed,
+                    cutoff=price_cutoff,
                 )
                 metrics["pb"] = _ratio(
                     close / (equity.value / (shares.value * shares_split_factor))
