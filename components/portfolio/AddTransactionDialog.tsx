@@ -37,6 +37,11 @@ function defaultCurrencyFor(symbol: string): string | null {
   return SUFFIX_CURRENCY[symbol.slice(idx + 1).toUpperCase()] ?? null;
 }
 
+// Opciones del selector de moneda del alta (la misma lista que pinta el
+// Select de abajo). Una divisa verificada fuera de esta lista no puede
+// sembrar el selector: se ignora y manda la heurística de sufijo.
+const FORM_CURRENCIES: readonly string[] = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'];
+
 
 type DialogProps = {
   userId: string;
@@ -45,9 +50,13 @@ type DialogProps = {
       seleccionada y el usuario solo añade cantidad, precio y fecha. */
   initialSymbol?: string;
   initialCompanyName?: string;
+  /** Divisa VERIFICADA del listado tal como la muestra la ficha de origen
+      (p. ej. `stock.currency` de la watchlist, que viene del backend).
+      Tiene prioridad sobre la heurística de sufijo; si no hay dato, null. */
+  initialCurrency?: string | null;
 };
 
-export default function AddTransactionDialog({ userId, onClose, initialSymbol, initialCompanyName }: DialogProps) {
+export default function AddTransactionDialog({ userId, onClose, initialSymbol, initialCompanyName, initialCurrency }: DialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState(initialSymbol ?? '');
@@ -56,7 +65,14 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
     symbol: initialSymbol ?? '',
     companyName: initialCompanyName ?? '',
     type: 'buy' as 'buy' | 'sell',
-    currency: (initialSymbol ? defaultCurrencyFor(initialSymbol) : null) ?? 'USD',
+    // Semilla del SELECTOR de moneda (editable por el usuario entre 9
+    // divisas), no un importe pintado: primero la divisa verificada de la
+    // ficha de origen, luego la heurística de sufijo de mercado (B5); USD
+    // es solo el default visible que el usuario confirma o cambia antes de
+    // guardar. Nunca se inventa la divisa de un importe ya guardado.
+    currency: initialCurrency && FORM_CURRENCIES.includes(initialCurrency)
+        ? initialCurrency
+        : (initialSymbol ? defaultCurrencyFor(initialSymbol) : null) ?? 'USD',
     quantity: '',
     price: '',
     fees: '',
@@ -178,7 +194,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
             <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
               <SelectTrigger id="currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
-                {['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'].map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
+                {FORM_CURRENCIES.map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

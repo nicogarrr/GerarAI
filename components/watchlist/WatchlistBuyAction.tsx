@@ -13,6 +13,10 @@ type Props = {
   userId: string;
   symbol: string;
   companyName: string;
+  /** Divisa verificada del listado tal como la muestra la watchlist
+      (`stock.currency`, del backend; null si aún no hay dato): siembra el
+      selector de moneda del alta en lugar de suponerla. */
+  currency?: string | null;
   /** Estilo del gatillo: opción de menú (tabla desktop) o botón (tarjeta móvil). */
   variant: 'menu-item' | 'button';
 };
@@ -30,7 +34,7 @@ const TRIGGER_CLASS: Record<Props['variant'], string> = {
     'inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg border border-teal-800 bg-teal-950/40 px-3 text-sm font-medium text-teal-300 transition-colors hover:bg-teal-900/50 hover:text-teal-200',
 };
 
-export default function WatchlistBuyAction({ userId, symbol, companyName, variant }: Props) {
+export default function WatchlistBuyAction({ userId, symbol, companyName, currency, variant }: Props) {
   const [open, setOpen] = useState(false);
   // Una vez abierto, el diálogo queda montado (oculto por Radix al cerrar)
   // para conservar lo escrito si se cierra sin enviar.
@@ -60,6 +64,7 @@ export default function WatchlistBuyAction({ userId, symbol, companyName, varian
           onClose={() => setOpen(false)}
           initialSymbol={symbol}
           initialCompanyName={companyName}
+          initialCurrency={currency}
         />
       ) : null}
     </Dialog>

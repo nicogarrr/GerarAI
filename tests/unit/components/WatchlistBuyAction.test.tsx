@@ -26,8 +26,8 @@ async function flush(ms = 0) {
     });
 }
 
-async function openDialog() {
-    render(<WatchlistBuyAction userId="user-1" symbol="SAN.MC" companyName="Banco Santander SA" variant="menu-item" />);
+async function openDialog(currency?: string | null, symbol = 'SAN.MC') {
+    render(<WatchlistBuyAction userId="user-1" symbol={symbol} companyName="Banco Santander SA" currency={currency} variant="menu-item" />);
     fireEvent.click(screen.getByRole('button', { name: 'Registrar compra' }));
     for (let i = 0; i < 50 && !screen.queryByRole('dialog'); i++) await flush(100);
     return screen.getByRole('dialog');
@@ -64,5 +64,34 @@ describe('WatchlistBuyAction', () => {
         expect(addTransaction).toHaveBeenCalledOnce();
         const [userId, symbol, type] = addTransaction.mock.calls[0];
         expect({ userId, symbol, type }).toEqual({ userId: 'user-1', symbol: 'SAN.MC', type: 'buy' });
+    });
+
+    it('siembra el selector con la divisa verificada de la watchlist (nunca la inventa)', async () => {
+        // AAPL no tiene sufijo de mercado: solo la divisa VERIFICADA que
+        // muestra la ficha puede fijar EUR aquí.
+        const dialog = await openDialog('EUR', 'AAPL');
+        expect(within(dialog).getByText('Precio (EUR)')).toBeInTheDocument();
+
+        fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
+        fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
+        fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        await flush();
+
+        expect(addTransaction).toHaveBeenCalledOnce();
+        const currency = addTransaction.mock.calls[0][7];
+        expect(currency).toBe('EUR');
+    });
+
+    it('sin divisa verificada siembra por sufijo de mercado (SAN.MC -> EUR), no USD', async () => {
+        const dialog = await openDialog(null);
+        expect(within(dialog).getByText('Precio (EUR)')).toBeInTheDocument();
+    });
+
+    it('una divisa verificada fuera del selector no siembra el alta', async () => {
+        // Si el backend mandara una divisa que el selector no admite, se
+        // ignora y manda la heurística de sufijo (SAN.MC -> EUR).
+        const dialog = await openDialog('SEK');
+        expect(within(dialog).getByText('Precio (EUR)')).toBeInTheDocument();
     });
 });
