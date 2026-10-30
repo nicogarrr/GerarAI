@@ -14,7 +14,7 @@ import re
 import traceback
 import uuid
 
-from app.core.log_redaction import redact_telegram_tokens
+from app.core.log_redaction import redact_structured, redact_telegram_tokens
 
 logger = logging.getLogger("gerarai.request_errors")
 
@@ -59,12 +59,19 @@ _SECRET_KV_RE = re.compile(
 
 
 def redact_secrets(text: str) -> str:
-    """Redacta credenciales: pares de query, userinfo de URL y password=."""
-    return _SECRET_KV_RE.sub(
-        r"\1=REDACTED",
-        _SECRET_QUERY_RE.sub(
-            r"\1=REDACTED", _USERINFO_RE.sub(r"\1:REDACTED@", redact_telegram_tokens(text))
-        ),
+    """Redacta credenciales: pares de query, userinfo de URL y password=.
+
+    Despues aplica las mascaras estructuradas del filtro de logs (claves en
+    dicts/JSON, variables con prefijo, credenciales con forma de proveedor): esto es lo que
+    viaja en el traceback del seguimiento de errores.
+    """
+    return redact_structured(
+        _SECRET_KV_RE.sub(
+            r"\1=REDACTED",
+            _SECRET_QUERY_RE.sub(
+                r"\1=REDACTED", _USERINFO_RE.sub(r"\1:REDACTED@", redact_telegram_tokens(text))
+            ),
+        )
     )
 
 

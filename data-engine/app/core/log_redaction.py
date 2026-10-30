@@ -39,6 +39,25 @@ _GFC_RE = re.compile(r"\bgfc_[A-Za-z0-9_-]{16,}")
 _TELEGRAM_TOKEN_RE = re.compile(r"(?i)(/bot)[0-9]+(?::|%3a)[A-Za-z0-9_-]+")
 
 
+# Claves entre comillas, como salen al loguear un dict o un JSON
+# (``{'api_key': 'sk-...'}``, ``"X-Finnhub-Token": "..."``): el patron de
+# cabecera exige el ``:``/``=`` pegado a la clave y no las veia.
+_QUOTED_KEY_RE = re.compile(
+    rf"""(?i)(["'](?:[\w-]*[_-])?(?:{_KEYS})["']\s*[:=]\s*["'])[^"']+"""
+)
+# Variables de entorno con prefijo de proveedor (``OPENAI_API_KEY=...``):
+# ``\b`` no corta dentro de ``OPENAI_API_KEY`` y el patron de cabecera no casaba.
+_ENV_KEY_RE = re.compile(
+    r"""(?i)\b([A-Z0-9][A-Z0-9_]*_(?:API_KEY|API_TOKEN|SECRET_KEY|SECRET|TOKEN|PASSWORD|DSN)\s*[:=]\s*["']?)[^\s,;'"&)]+"""
+)
+# Credenciales con forma de proveedor aunque no lleven nombre delante (mensajes
+# de error de SDKs, trazas): OpenAI/Anthropic/OpenRouter, Groq, Google, GitHub, Slack.
+_PROVIDER_TOKEN_RE = re.compile(
+    r"\b(?:sk-(?:ant-|proj-|or-v1-)?[A-Za-z0-9_-]{16,}|gsk_[A-Za-z0-9]{20,}"
+    r"|AIza[0-9A-Za-z_-]{35}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}"
+    r"|xox[abpr]-[A-Za-z0-9-]{10,})"
+)
+
 REDACTED = "[REDACTED]"
 
 
@@ -49,6 +68,13 @@ def _mask(match: re.Match[str]) -> str:
     # Idempotente: un valor ya enmascarado por otra capa se deja como esta.
     tail = match.group(0)[len(match.group(1)):]
     return match.group(0) if tail.lower() in _ALREADY else match.group(1) + REDACTED
+
+
+def redact_structured(text: str) -> str:
+    """Claves entre comillas, variables con prefijo y credenciales con forma de proveedor."""
+    text = _PROVIDER_TOKEN_RE.sub(REDACTED, text)
+    text = _QUOTED_KEY_RE.sub(_mask, text)
+    return _ENV_KEY_RE.sub(_mask, text)
 
 
 def redact_telegram_tokens(text: str) -> str:
@@ -63,6 +89,7 @@ def redact(text: str) -> str:
     text = _QUERY_RE.sub(_mask, text)
     text = _USERINFO_RE.sub(lambda m: m.group(1) + REDACTED + "@", text)
     text = _BEARER_RE.sub(lambda m: m.group(1) + " " + REDACTED, text)
+    text = redact_structured(text)
     return _HEADER_RE.sub(_mask, text)
 
 
