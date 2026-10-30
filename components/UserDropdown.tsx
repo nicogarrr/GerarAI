@@ -15,9 +15,11 @@ import { BrainCircuit, ChevronDown, CircleHelp, LogOut, Settings, ShieldCheck } 
 import { signOut } from "@/lib/actions/auth.actions";
 import { toast } from "sonner";
 import { runSignOut } from "@/lib/auth/sign-out-flow";
+import { useT } from "@/lib/i18n/client";
 
 const UserDropdown = ({ user }: { user: User }) => {
     const router = useRouter();
+    const t = useT();
     const handleSignOut = async () => {
         await runSignOut({
             signOut,
@@ -42,7 +44,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                         </AvatarFallback>
                     </Avatar>
                     <span className="sr-only text-sm font-medium text-gray-400 md:not-sr-only md:inline">{user.name}</span>
-                    <span className="sr-only">, menú de usuario</span>
+                    <span className="sr-only">{t('shell.user.menuSuffix')}</span>
                     <ChevronDown aria-hidden="true" className="hidden h-4 w-4 text-gray-500 md:inline" />
                 </Button>
             </DropdownMenuTrigger>
@@ -78,28 +80,28 @@ const UserDropdown = ({ user }: { user: User }) => {
                     className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"
                 >
                     <BrainCircuit aria-hidden="true" className="mr-2 hidden h-4 w-4 sm:block" />
-                    Modelo de IA
+                    {t('shell.user.aiModel')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => router.push("/settings")}
                     className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"
                 >
                     <Settings aria-hidden="true" className="mr-2 hidden h-4 w-4 sm:block" />
-                    Ajustes
+                    {t('shell.user.settings')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={() => router.push("/security")}
                     className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"
                 >
                     <ShieldCheck aria-hidden="true" className="mr-2 hidden h-4 w-4 sm:block" />
-                    Seguridad
+                    {t('shell.user.security')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                     onClick={handleSignOut}
                     className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"
                 >
                     <LogOut aria-hidden="true" className="mr-2 hidden h-4 w-4 sm:block" />
-                    Cerrar sesión
+                    {t('shell.user.signOut')}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

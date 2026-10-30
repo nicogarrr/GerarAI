@@ -30,6 +30,13 @@ describe('Company position panel edge branches', () => {
         expect(gainCell()).toHaveClass('text-gray-100');
         expect(gainCell()).toHaveTextContent('0,00 €');
     });
+    it('A3: sin cotización real la plusvalía es N/D (no un 0 que parece dato) y lo explica', () => {
+        render(<CompanyPositionPanel context={held({ quoteMissing: true, gain: 0, gainPercent: 0, nativeGain: null })} />);
+        expect(gainCell()).toHaveTextContent('N/D');
+        expect(gainCell()).not.toHaveTextContent('0,00');
+        expect(screen.queryByText(/en USD/)).not.toBeInTheDocument();
+        expect(screen.getByRole('status')).toHaveTextContent('Sin cotización real');
+    });
     it('keeps an unknown gain neutral even when the stored gain is positive', () => {
         render(<CompanyPositionPanel context={held({ cost: 0, gain: 450 })} />);
         expect(gainCell()).toHaveClass('text-gray-100');

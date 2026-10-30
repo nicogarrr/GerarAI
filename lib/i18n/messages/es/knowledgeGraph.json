@@ -1,0 +1,89 @@
+{
+  "canvas": {
+    "label": "Grafo de conocimiento interactivo",
+    "feature": "Grafo de conocimiento",
+    "description": "Vista del grafo. Arrastra para desplazar, usa la rueda o los botones para acercar y alejar, pulsa un nodo para ver su detalle y las flechas del teclado para moverte sin ratón.",
+    "roleDescription": "Grafo de conocimiento",
+    "preparing": "Preparando la vista del grafo…",
+    "zoomIn": "Acercar",
+    "zoomOut": "Alejar",
+    "fit": "Ajustar a la pantalla",
+    "reset": "Reiniciar la vista",
+    "zoomLevel": "Zoom {percent}%",
+    "keyboardHelp": "Teclado: flechas para desplazar, + y − para acercar y alejar, 0 para ajustar y Escape para reiniciar.",
+    "selectedNode": "Nodo seleccionado: {label}",
+    "hoverNode": "Nodo bajo el puntero: {label}, tipo {type}, {degree} relaciones.",
+    "nodesDrawn": "Nodos dibujados: {drawn} de {total}",
+    "edgesDrawn": "Relaciones dibujadas: {drawn} de {total}",
+    "truncatedHint": "El dibujo se limita a {max} nodos. Acota con los filtros de arriba o exporta el JSON para ver el subgrafo cargado completo: el volcado no pasa por el recorte del dibujo.",
+    "isolatedOn": {
+      "one": "Mostrando el nodo seleccionado y su único vecino; el resto queda atenuado.",
+      "other": "Mostrando el nodo seleccionado y sus {count} vecinos; el resto queda atenuado."
+    },
+    "isolatedOff": "Vista completa: sin nodos atenuados.",
+    "isolate": "Aislar nodo",
+    "controls": "Controles de la vista del grafo",
+    "zoomLimits": "Zoom entre {min}% y {max}%.",
+    "nodeLabel": "{label}, tipo {type}",
+    "tooltipMeta": "Tipo {type} · {degree} relaciones",
+    "noNodesInScene": "No hay nodos que dibujar.",
+    "degradedEmpty": "El grafo está vacío: no hay nodos activos en el backend.",
+    "degradedEmptyHint": "Pulsa «Sincronizar grafo» para crear los nodos y relaciones deterministas.",
+    "exportSvg": "Descargar SVG",
+    "exportJson": "Descargar JSON"
+  },
+  "search": {
+    "label": "Buscar un nodo por nombre",
+    "placeholder": "Buscar nodo por nombre",
+    "results": {
+      "one": "1 nodo coincide con «{query}».",
+      "other": "{count} nodos coinciden con «{query}»."
+    },
+    "noResults": "Ningún nodo dibujado contiene «{query}».",
+    "hint": "Al elegir un nodo se centra y queda en la URL, para poder compartir el enlace.",
+    "open": "Centrar y seleccionar «{label}»",
+    "clear": "Limpiar la búsqueda"
+  },
+  "detail": {
+    "title": "Detalle del nodo",
+    "empty": "Selecciona un nodo del grafo para ver lo que el backend sabe de él.",
+    "absent": "N/D",
+    "neighborsTitle": "Vecinos ({count})",
+    "noNeighbors": "Este nodo no tiene relaciones en el subgrafo visible.",
+    "directionOut": "sale",
+    "directionIn": "entra",
+    "confidence": "Confianza",
+    "provenance": "Procedencia",
+    "scopeLink": "Abrir el entorno completo de este nodo en el servidor",
+    "unknownNode": "El nodo #{id} no está en el subgrafo que se ha cargado.",
+    "shareLink": "Enlace compartible a este nodo",
+    "shareLinkCopied": "Enlace copiado al portapapeles.",
+    "shareLinkFailed": "No se pudo copiar el enlace: selecciónalo aquí abajo y cópialo a mano.",
+    "fields": {
+      "id": "Identificador",
+      "label": "Etiqueta",
+      "type": "Tipo",
+      "key": "Clave",
+      "entityType": "Tipo de entidad",
+      "entityId": "Identificador de entidad",
+      "confidence": "Confianza",
+      "degree": "Grado",
+      "description": "Descripción",
+      "attributes": "Atributos"
+    }
+  },
+  "listing": {
+    "title": "Nodos del grafo en texto",
+    "description": "Misma información que el dibujo, en texto: sirve de lectura con lector de pantalla, de respaldo si el lienzo no carga y de contenido indexable.",
+    "columnLabel": "Etiqueta",
+    "columnType": "Tipo",
+    "columnDegree": "Relaciones",
+    "select": "Seleccionar y centrar el nodo {label}",
+    "rowCount": {
+      "one": "1 nodo en el subgrafo visible.",
+      "other": "{count} nodos en el subgrafo visible."
+    },
+    "empty": "No hay nodos que listar.",
+    "caption": "Tabla de nodos del grafo: etiqueta, tipo y número de relaciones de cada nodo."
+  }
+}

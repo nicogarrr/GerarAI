@@ -29,6 +29,7 @@ import {
     UsersRound,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { TranslationKey } from '@/lib/i18n/messages';
 
 // Timeouts (en milisegundos)
 export const TIMEOUTS = {
@@ -69,7 +70,8 @@ export const ERROR_MESSAGES = {
 // se descubren comparando las rutas del app/ con esta lista.
 export type NavItem = {
   href: string;
-  label: string;
+  /** Clave i18n de la etiqueta (messages nav.*); se resuelve con t() en el componente. */
+  labelKey: TranslationKey;
   icon: LucideIcon;
   /**
    * Hub primario (una de las 6 entradas de NAV_SECTIONS) al que pertenece la
@@ -77,15 +79,16 @@ export type NavItem = {
    * `null` = sin hub (destinos de apoyo como /help): no se resalta nada.
    */
   hub?: string | null;
-  /** Descripcion de una linea para tarjetas de hub (/discover). */
-  description?: string;
+  /** Clave i18n de la descripcion de una linea para tarjetas de hub (/discover). */
+  descriptionKey?: TranslationKey;
   /**
-   * Etiqueta corta solo para el subnav contextual (SectionNav), cuando la
-   * etiqueta del catalogo (alineada con el H1) repetiria el nombre de la
-   * seccion: /research se anuncia como «Empresas» dentro de Research.
-   * Migas, buscador y /discover siguen usando `label`.
+   * Clave i18n de la etiqueta corta solo para el subnav contextual
+   * (SectionNav), cuando la etiqueta del catalogo (alineada con el H1)
+   * repetiria el nombre de la seccion: /research se anuncia como
+   * «Empresas» dentro de Research. Migas, buscador y /discover siguen
+   * usando `labelKey`.
    */
-  subnavLabel?: string;
+  subnavLabelKey?: TranslationKey;
   /**
    * Oculta el enlace a la propia página en el subnav contextual cuando la
    * página YA ofrece ese destino con su propia navegación: /portfolio tiene
@@ -97,120 +100,120 @@ export type NavItem = {
 };
 
 export type NavSection = {
-  title: string;
+  /** Clave i18n del titulo de seccion; sin clave = seccion sin titulo visible. */
+  titleKey?: TranslationKey;
   items: NavItem[];
 };
 
 export const NAV_SECTIONS: NavSection[] = [{
-  title: '',
   items: [
-    { href: '/inicio', label: 'Inicio', icon: Home },
-    { href: '/portfolio', label: 'Cartera', icon: Briefcase },
-    { href: '/research', label: 'Research', icon: FileSearch },
-    { href: '/discover', label: 'Descubrir', icon: Filter },
-    { href: '/watchlist', label: 'Watchlist', icon: Star },
-    { href: '/knowledge', label: 'Biblioteca', icon: BookOpen },
+    { href: '/inicio', labelKey: 'nav.items.inicio', icon: Home },
+    { href: '/portfolio', labelKey: 'nav.portfolio', icon: Briefcase },
+    { href: '/research', labelKey: 'nav.research', icon: FileSearch },
+    { href: '/discover', labelKey: 'nav.items.discover', icon: Filter },
+    { href: '/watchlist', labelKey: 'nav.items.watchlist', icon: Star },
+    { href: '/knowledge', labelKey: 'nav.items.knowledge', icon: BookOpen },
   ],
 }];
 
 export const ROUTE_CATALOG: NavSection[] = [
   {
-    title: 'Principal',
+    titleKey: 'nav.sections.principal',
     items: [
-      { href: '/inicio', label: 'Inicio', icon: Home, hub: '/inicio' },
-      { href: '/discover', label: 'Descubrir', icon: Filter, hub: '/discover' },
+      { href: '/inicio', labelKey: 'nav.items.inicio', icon: Home, hub: '/inicio' },
+      { href: '/discover', labelKey: 'nav.items.discover', icon: Filter, hub: '/discover' },
     ],
   },
   {
-    title: 'Cartera',
+    titleKey: 'nav.sections.cartera',
     items: [
-      { href: '/portfolio', label: 'Resumen', icon: Briefcase, hub: '/portfolio', subnavHideSelf: true },
-      { href: '/portfolio/intelligence', label: 'Inteligencia', icon: Sparkles, hub: '/portfolio' },
-      { href: '/risk', label: 'Exposiciones', icon: Gauge, hub: '/portfolio' },
-      { href: '/taxes', label: 'Impuestos', icon: Receipt, hub: '/portfolio' },
-      { href: '/corporate-actions', label: 'Acciones corp.', icon: Building2, hub: '/portfolio' },
-      { href: '/calendar', label: 'Calendario', icon: CalendarDays, hub: '/portfolio' },
-      { href: '/portfolio/stress', label: 'Estrés histórico', icon: LineChart, hub: '/portfolio' },
-      { href: '/paper-trading', label: 'Mi cuenta demo', icon: FlaskConical, hub: '/portfolio' },
+      { href: '/portfolio', labelKey: 'nav.items.resumen', icon: Briefcase, hub: '/portfolio', subnavHideSelf: true },
+      { href: '/portfolio/intelligence', labelKey: 'nav.items.inteligencia', icon: Sparkles, hub: '/portfolio' },
+      { href: '/risk', labelKey: 'nav.items.exposiciones', icon: Gauge, hub: '/portfolio' },
+      { href: '/taxes', labelKey: 'nav.items.impuestos', icon: Receipt, hub: '/portfolio' },
+      { href: '/corporate-actions', labelKey: 'nav.items.accionesCorp', icon: Building2, hub: '/portfolio' },
+      { href: '/calendar', labelKey: 'nav.items.calendario', icon: CalendarDays, hub: '/portfolio' },
+      { href: '/portfolio/stress', labelKey: 'nav.items.estresHistorico', icon: LineChart, hub: '/portfolio' },
+      { href: '/paper-trading', labelKey: 'nav.items.cuentaDemo', icon: FlaskConical, hub: '/portfolio' },
     ],
   },
   {
-    title: 'Análisis',
+    titleKey: 'nav.sections.analisis',
     items: [
       {
         href: '/research',
-        label: 'Research',
+        labelKey: 'nav.research',
         icon: FileSearch,
         hub: '/research',
-        subnavLabel: 'Empresas',
+        subnavLabelKey: 'nav.items.empresas',
         children: [
-          { href: '/research/news', label: 'Noticias', icon: Newspaper, hub: '/research' },
-          { href: '/research/sources', label: 'Fuentes', icon: Library, hub: '/research' },
+          { href: '/research/news', labelKey: 'nav.items.noticias', icon: Newspaper, hub: '/research' },
+          { href: '/research/sources', labelKey: 'nav.items.fuentes', icon: Library, hub: '/research' },
         ],
       },
       {
         href: '/screeners',
-        label: 'Screeners',
+        labelKey: 'nav.screeners',
         icon: Filter,
         hub: '/discover',
-        // Sin tarjeta propia en /discover (sin description): duplicaba
+        // Sin tarjeta propia en /discover (sin descriptionKey): duplicaba
         // concepto con «Explorar acciones» (informe UX 29-oct, punto 7). Se
         // llega desde /screener («Crea el primero en Screeners») y por el
         // subnav del hub.
-        children: [{ href: '/screener', label: 'Explorar acciones', icon: LineChart, hub: '/discover', description: 'Explora empresas por sector y mira subidas, bajadas y más activas.' }],
+        children: [{ href: '/screener', labelKey: 'nav.screener', icon: LineChart, hub: '/discover', descriptionKey: 'nav.descriptions.screener' }],
       },
       {
         href: '/mercados',
-        label: 'Panorama de mercado',
+        labelKey: 'nav.items.panoramaMercado',
         icon: LineChart,
         hub: '/discover',
-        description: 'Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.',
+        descriptionKey: 'nav.descriptions.panoramaMercado',
       },
       {
         href: '/knowledge',
-        label: 'Biblioteca',
+        labelKey: 'nav.items.knowledge',
         icon: BookOpen,
         hub: '/knowledge',
         subnavHideSelf: true,
-        children: [{ href: '/knowledge-graph', label: 'Grafo', icon: Share2, hub: '/knowledge' }],
+        children: [{ href: '/knowledge-graph', labelKey: 'nav.items.grafo', icon: Share2, hub: '/knowledge' }],
       },
     ],
   },
   {
-    title: 'Señales',
+    titleKey: 'nav.sections.senales',
     items: [
-      { href: '/watchlist', label: 'Watchlist', icon: Star, hub: '/watchlist' },
-      { href: '/insider', label: 'Insider', icon: Users, hub: '/discover', description: 'Compras declaradas por directivos en Form 4.' },
-      { href: '/ownership', label: '13F', icon: Landmark, hub: '/discover', description: 'Posiciones declaradas por los grandes fondos en el Form 13F.' },
+      { href: '/watchlist', labelKey: 'nav.items.watchlist', icon: Star, hub: '/watchlist' },
+      { href: '/insider', labelKey: 'nav.items.insider', icon: Users, hub: '/discover', descriptionKey: 'nav.descriptions.insider' },
+      { href: '/ownership', labelKey: 'nav.items.ownership', icon: Landmark, hub: '/discover', descriptionKey: 'nav.descriptions.ownership' },
       {
         href: '/inversores',
-        label: 'Inversores',
+        labelKey: 'nav.items.inversores',
         icon: UsersRound,
         hub: '/discover',
-        description: 'Carteras declaradas y cambios en los filings.',
+        descriptionKey: 'nav.descriptions.inversores',
         // Canales vive bajo /inversores (su HubNav) pero pertenece al hub de
         // Biblioteca: el subnav contextual alli es el de Conocimiento.
-        children: [{ href: '/inversores/canales', label: 'Canales', icon: Users, hub: '/knowledge' }],
+        children: [{ href: '/inversores/canales', labelKey: 'nav.items.canales', icon: Users, hub: '/knowledge' }],
       },
-      { href: '/alerts', label: 'Alertas', icon: Bell, hub: '/watchlist' },
-      { href: '/propicks', label: 'ProPicks', icon: Lightbulb, hub: '/discover', description: 'Ranking, reglas de selección y backtest.' },
-      { href: '/temas', label: 'Temas', icon: LineChart, hub: '/discover', description: 'Rentabilidad YTD y 1M de temas de mercado.' },
-      { href: '/cuellos', label: 'Cuellos de botella', icon: Gauge, hub: '/discover', description: 'Escasez detectada en las fuentes y candidatos inferidos.' },
-      { href: '/macro-calendar', label: 'Calendario macro', icon: CalendarDays, hub: '/discover', description: 'FOMC, IPC y empleo, y resúmenes de tus 8-K.' },
+      { href: '/alerts', labelKey: 'nav.items.alertas', icon: Bell, hub: '/watchlist' },
+      { href: '/propicks', labelKey: 'nav.items.propicks', icon: Lightbulb, hub: '/discover', descriptionKey: 'nav.descriptions.propicks' },
+      { href: '/temas', labelKey: 'nav.items.temas', icon: LineChart, hub: '/discover', descriptionKey: 'nav.descriptions.temas' },
+      { href: '/cuellos', labelKey: 'nav.items.cuellos', icon: Gauge, hub: '/discover', descriptionKey: 'nav.descriptions.cuellos' },
+      { href: '/macro-calendar', labelKey: 'nav.items.calendarioMacro', icon: CalendarDays, hub: '/discover', descriptionKey: 'nav.descriptions.calendarioMacro' },
     ],
   },
   {
     // Un solo destino: sin titulo de seccion visible (showsNavSectionTitle),
     // se acabo el duplicado «Mi plan»/«Plan» (quick win UX 3).
-    title: 'Mi plan',
-    items: [{ href: '/plan', label: 'Plan', icon: Target, hub: '/portfolio' }],
+    titleKey: 'nav.sections.miPlan',
+    items: [{ href: '/plan', labelKey: 'nav.items.plan', icon: Target, hub: '/portfolio' }],
   },
   {
-    title: 'Sistema',
+    titleKey: 'nav.sections.sistema',
     // /export ya no esta en el menu (sin uso; la ruta sigue existiendo). /security vive en el menu del avatar y /screener como hijo de Screeners.
     // /help es publica y sin hub: no se resalta ninguna seccion al visitarla.
     items: [
-      { href: '/help', label: 'Ayuda', icon: CircleHelp, hub: null },
+      { href: '/help', labelKey: 'nav.items.ayuda', icon: CircleHelp, hub: null },
     ],
   },
 ];
@@ -221,11 +224,11 @@ export const ROUTE_CATALOG: NavSection[] = [
  * o es la ruta del asistente.
  */
 export const MOBILE_TAB_ITEMS: NavItem[] = [
-  { href: '/inicio', label: 'Inicio', icon: Home },
-  { href: '/discover', label: 'Descubrir', icon: Filter },
-  { href: '/watchlist', label: 'Watchlist', icon: Star },
-  { href: '/portfolio', label: 'Cartera', icon: Briefcase },
-  { href: '/research', label: 'Research', icon: FileSearch },
+  { href: '/inicio', labelKey: 'nav.items.inicio', icon: Home },
+  { href: '/discover', labelKey: 'nav.items.discover', icon: Filter },
+  { href: '/watchlist', labelKey: 'nav.items.watchlist', icon: Star },
+  { href: '/portfolio', labelKey: 'nav.portfolio', icon: Briefcase },
+  { href: '/research', labelKey: 'nav.research', icon: FileSearch },
 ];
 
 /** Aplana el arbol a una lista de rutas, para buscar un href puntual. */
@@ -272,7 +275,7 @@ export function sectionForRoute(pathname: string): string | null {
 
 /** Encabezado de seccion visible solo si la seccion aporta mas de un destino. */
 export function showsNavSectionTitle(section: NavSection): boolean {
-  return section.title !== '' && section.items.length > 1;
+  return section.titleKey !== undefined && section.items.length > 1;
 }
 
 export const POPULAR_STOCK_SYMBOLS = [
@@ -298,6 +301,36 @@ export const RISK_TOLERANCE_OPTIONS = [
   { value: "aggressive", label: "Agresivo - Alto riesgo, alto retorno" },
   { value: "very_aggressive", label: "Muy agresivo - Máximo potencial" }
 ] as const;
+
+// Mapas valor -> clave i18n (auth.goals/risk/industries) para las opciones de onboarding.
+export const INVESTMENT_GOAL_LABEL_KEYS = {
+  growth: 'auth.goals.growth',
+  income: 'auth.goals.income',
+  value: 'auth.goals.value',
+  speculation: 'auth.goals.speculation',
+  retirement: 'auth.goals.retirement',
+  education: 'auth.goals.education',
+} as const;
+
+export const RISK_TOLERANCE_LABEL_KEYS = {
+  conservative: 'auth.risk.conservative',
+  moderate: 'auth.risk.moderate',
+  aggressive: 'auth.risk.aggressive',
+  very_aggressive: 'auth.risk.very_aggressive',
+} as const;
+
+export const PREFERRED_INDUSTRY_LABEL_KEYS = {
+  technology: 'auth.industries.technology',
+  healthcare: 'auth.industries.healthcare',
+  finance: 'auth.industries.finance',
+  consumer: 'auth.industries.consumer',
+  energy: 'auth.industries.energy',
+  industrial: 'auth.industries.industrial',
+  real_estate: 'auth.industries.real_estate',
+  materials: 'auth.industries.materials',
+  utilities: 'auth.industries.utilities',
+  communication: 'auth.industries.communication',
+} as const;
 
 export const PREFERRED_INDUSTRIES = [
   { value: "technology", label: "Tecnología" },

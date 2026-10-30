@@ -14,6 +14,7 @@ from app.core.llm_settings_crypto import (
     encryption_available,
 )
 from app.core.rate_limit import enforce_llm_test_rate_limit
+from app.core.ui_errors import ui_error
 from app.llm.factory import create_llm_provider
 from app.llm.tenant_config import current_tenant_llm_config
 from app.services.budget import BudgetController
@@ -134,10 +135,7 @@ def update_llm_settings(
     if update.api_key and update.api_key.strip() and not encryption_available(app_settings):
         raise HTTPException(
             status_code=503,
-            detail=(
-                "El cifrado de claves no esta configurado "
-                "(LLM_SETTINGS_ENCRYPTION_KEY); no se ha guardado nada."
-            ),
+            detail=ui_error(503, "encryption_keys_not_configured").detail,
         )
     try:
         save_tenant_settings(db, update, app_settings)
@@ -146,7 +144,7 @@ def update_llm_settings(
         db.rollback()
         raise HTTPException(
             status_code=503,
-            detail="El cifrado de claves no esta disponible; no se ha guardado nada.",
+            detail=ui_error(503, "encryption_keys_unavailable").detail,
         ) from exc
     except ValueError as exc:
         db.rollback()
@@ -182,7 +180,7 @@ async def test_llm_settings(
         except ValueError as exc:
             raise HTTPException(
                 status_code=422,
-                detail="No se pudo leer la clave guardada; vuelve a introducirla.",
+                detail=ui_error(502, "saved_key_unreadable").detail,
             ) from exc
     if not key:
         raise HTTPException(
@@ -299,7 +297,7 @@ async def connect_ibkr(payload: IBKRConnectRequest, db: Session = Depends(get_db
     _require_tenant(db)
     settings = get_settings()
     if not encryption_available(settings):
-        raise HTTPException(status_code=503, detail="El cifrado no está disponible. No se ha guardado el token.")
+        raise HTTPException(status_code=503, detail=ui_error(503, "encryption_unavailable_token").detail)
     try:
         token, query_id, account_id = ibkr.validate_input(payload.token, payload.query_id, payload.account_id)
         # Release the auth read transaction before waiting for IBKR.

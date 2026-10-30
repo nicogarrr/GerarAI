@@ -42,6 +42,9 @@ function ico(side: number): Uint8Array {
   return b;
 }
 
+// DNS simulado: el guard no toca la red; cualquier host resuelve a IP publica.
+const publicLookup = async () => [{ address: '93.184.216.34', family: 4 }];
+
 type Route = { status?: number; body: Uint8Array | string; type?: string; url?: string };
 function fakeFetch(routes: Record<string, Route>, calls: string[] = []) {
   return async (url: string) => {
@@ -112,7 +115,7 @@ describe('icono de la web oficial', () => {
     const icon = await site.fetchSiteIcon('uber.com', fakeFetch({
       'https://uber.com/': { body: '<link rel="apple-touch-icon" href="/t.png">', type: 'text/html', url: 'https://www.uber.com/' },
       'https://www.uber.com/t.png': { body: png(180) },
-    }));
+    }), publicLookup);
     assert.ok(icon);
     assert.equal(icon.contentType, 'image/png');
     assert.equal(icon.size, 180);
@@ -123,7 +126,7 @@ describe('icono de la web oficial', () => {
     const icon = await site.fetchSiteIcon('hims.com', fakeFetch({
       'https://hims.com/': { status: 403, body: 'denied', type: 'text/html' },
       'https://hims.com/favicon.ico': { body: ico(48), type: 'image/x-icon' },
-    }));
+    }), publicLookup);
     assert.equal(icon?.contentType, 'image/x-icon');
   });
 
@@ -135,7 +138,7 @@ describe('icono de la web oficial', () => {
       'https://x.com/b.png': { body: '<!doctype html><html>' + 'x'.repeat(200), type: 'image/png' },
       'https://x.com/apple-touch-icon.png': { body: png(180), url: 'http://x.com/apple-touch-icon.png' },
       'https://x.com/favicon.ico': { body: ico(16), type: 'image/x-icon' },
-    }, calls));
+    }, calls), publicLookup);
     assert.equal(icon, null);
     assert.ok(calls.length <= 7, 'número de peticiones acotado');
   });

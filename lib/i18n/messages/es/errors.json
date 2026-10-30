@@ -1,0 +1,45 @@
+{
+  "notFound": {
+    "metaTitle": "Página no encontrada",
+    "title": "Página no encontrada",
+    "body": "La página que buscas no existe o se ha movido. Revisa la dirección o vuelve a empezar desde un lugar que conozcas.",
+    "backHome": "Volver al inicio",
+    "methodology": "Ver la metodología",
+    "help": "Centro de ayuda",
+    "wordmarkAria": "GerarAI, inicio",
+    "navAria": "Navegación principal",
+    "navHome": "Inicio",
+    "navMethodology": "Metodología",
+    "navHelp": "Ayuda"
+  },
+  "globalError": {
+    "htmlLang": "es",
+    "title": "Algo ha fallado",
+    "body": "Error inesperado en la aplicación. El detalle queda en los logs del servidor; no se muestra aquí a propósito.",
+    "reference": "Referencia: {digest}",
+    "retry": "Reintentar"
+  },
+  "backend": {
+    "authFailed": "No se pudo iniciar sesión. Revisa tu correo y tu contraseña.",
+    "authUnavailable": "El servicio de autenticación no está disponible ahora mismo. Inténtalo de nuevo en unos minutos.",
+    "invalidSymbol": "Símbolo con formato no válido. Debe tener entre 1 y 10 caracteres y solo letras, números, puntos y guiones.",
+    "missingApiKey": "Este servicio no está configurado en este servidor.",
+    "rateLimitExceeded": "Has superado el límite de peticiones. Inténtalo de nuevo en unos minutos.",
+    "databaseError": "No se pudo conectar con la base de datos. Inténtalo de nuevo.",
+    "externalApiError": "No se pudieron obtener los datos del servicio externo.",
+    "notFound": "No se encontró el recurso solicitado.",
+    "validationError": "Los datos introducidos no son válidos.",
+    "emailAlreadyRegistered": "Este email ya está registrado. Inicia sesión.",
+    "passwordTooShort": "La contraseña debe tener al menos 8 caracteres.",
+    "invalidCredentialsLong": "Email o contraseña no válidos. Revisa los datos e inténtalo de nuevo.",
+    "invalidTotp": "Código de autenticación no válido. Inténtalo de nuevo.",
+    "signOutFailed": "No se pudo cerrar la sesión. Recarga la página e inténtalo de nuevo."
+  },
+  "upload": {
+    "choose": "Elegir archivo",
+    "tooBig": "\"{name}\" pesa {sizeMb} MB y el límite de subida es {maxMB} MB: elige un archivo más pequeño o súbelo comprimido.",
+    "noFile": "Ningún archivo seleccionado",
+    "loading": "Cargando el selector de archivo"
+  },
+  "mutationFailed": "No se pudo completar la operación. Inténtalo de nuevo."
+}

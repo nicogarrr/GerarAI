@@ -15,7 +15,7 @@ test('el filtro del subnav oculta el self-link solo cuando el item lo pide', () 
 });
 
 test('/portfolio y /knowledge ocultan su self-link; /research conserva el suyo', () => {
-    assert.match(constants, /href: '\/portfolio', label: 'Resumen', icon: Briefcase, hub: '\/portfolio', subnavHideSelf: true/);
+    assert.match(constants, /href: '\/portfolio', labelKey: 'nav.items.resumen', icon: Briefcase, hub: '\/portfolio', subnavHideSelf: true/);
     const catalog = constants.slice(constants.indexOf('export const ROUTE_CATALOG'));
     const knowledge = catalog.slice(catalog.indexOf("href: '/knowledge',"), catalog.indexOf("href: '/knowledge',") + 400);
     assert.match(knowledge, /subnavHideSelf: true/);
@@ -24,8 +24,9 @@ test('/portfolio y /knowledge ocultan su self-link; /research conserva el suyo',
 });
 
 test('la subnav anuncia el overflow horizontal con la pista del patron y conserva accesibilidad', () => {
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/shell.json', 'utf8')).sectionNav.scrollHint, 'Desliza para ver más secciones');
     assert.match(nav, /OverflowScrollRegion/, 'reutiliza la region con pista');
-    assert.match(nav, /hint="Desliza para ver más secciones"/, 'pista con texto de secciones');
+    assert.match(nav, /hint=\{t\('shell.sectionNav.scrollHint'\)\}/, 'pista con texto de secciones');
     assert.match(nav, /aria-controls="subnav-seccion-lista"/, 'toggle sigue controlando la lista');
     assert.match(nav, /aria-expanded=\{open\}/, 'toggle sigue exponiendo estado');
     assert.match(nav, /sm:flex-wrap/, 'en escritorio la lista sigue envolviendo (sin scroll)');

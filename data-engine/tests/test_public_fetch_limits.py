@@ -131,3 +131,34 @@ def test_async_resolution_uses_same_pinned_address(monkeypatch):
             await backend.connect_tcp("127.0.0.1", 443)
 
     anyio.run(scenario)
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "::ffff:127.0.0.1",  # IPv4-mapped loopback
+        "::127.0.0.1",  # IPv4-compatible (obsoleto) loopback
+        "::ffff:169.254.169.254",  # IPv4-mapped metadata
+        "::169.254.169.254",  # IPv4-compatible metadata
+        "64:ff9b::7f00:1",  # NAT64 -> 127.0.0.1
+        "64:ff9b::a9fe:a9fe",  # NAT64 -> 169.254.169.254
+        "64:ff9b::a00:1",  # NAT64 -> 10.0.0.1
+        "64:ff9b:1::a00:1",  # NAT64 local
+        "2002:7f00:1::",  # 6to4 de 127.0.0.1
+    ],
+)
+def test_resolution_rejects_ipv4_embedded_in_ipv6(monkeypatch, address):
+    monkeypatch.setattr(
+        public_fetch.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(socket.AF_INET6, socket.SOCK_STREAM, 6, "", (address, 443, 0, 0))],
+    )
+
+    with pytest.raises(ValueError, match="Private"):
+        public_fetch._resolve_public_url("https://embedded.example/document")
+
+
+@pytest.mark.parametrize("address", ["::127.0.0.1", "64:ff9b::a9fe:a9fe", "::ffff:127.0.0.1"])
+def test_ip_literal_url_with_embedded_ipv4_is_rejected(address):
+    with pytest.raises(ValueError):
+        public_fetch.validate_public_url(f"http://[{address}]/latest/meta-data/")

@@ -21,7 +21,6 @@ import {
     getPortfolioSummary,
     getPortfolioScores,
     quickAddPosition,
-    getPortfolioWithWeights,
     refreshPortfolioHoldings,
     updateAllPortfolioPrices,
     importFromIBKR,
@@ -33,6 +32,7 @@ import {
     getPortfolioDataQuality,
     syncPortfolioDividends,
     getCompanyHolding,
+    getPortfolioFxContext,
 } from '@/lib/actions/portfolio.actions';
 
 const position = (over: object = {}) => ({
@@ -177,6 +177,19 @@ describe('getPortfolioSummary: dinero y suspensión de valoración', () => {
         expect(summary.quality).toBeNull(); // data-quality caída -> null, no rompe
     });
 
+    it('A3: una posición sin cotización real no entra en coste ni plusvalía totales', async () => {
+        seedSummary([
+            position(),
+            position({ ticker: 'SINCOT', quote_missing: true, unrealized_pnl: null, unrealized_pnl_native: null, unrealized_pnl_base: null }),
+        ]);
+        const summary = await getPortfolioSummary('tenant-one');
+        expect(summary.holdings.find((h) => h.symbol === 'SINCOT')?.quoteMissing).toBe(true);
+        expect(summary.holdings.find((h) => h.symbol === 'AAPL')?.quoteMissing).toBe(false);
+        // Solo AAPL: su coste 900 sin el de SINCOT (que diluía la rentabilidad con una ganancia 0 inventada).
+        expect(summary.totalCost).toBe(900);
+        expect(summary.totalGain).toBe(450);
+    });
+
     it('valoración en suspensión: currentPrice null y fxMissing declarado, nunca un precio rancio', async () => {
         seedSummary([position({ valuation_hold: { reason: 'split sin verificar', effective_date: '2026-10-01', since: null } })]);
         const [h] = (await getPortfolioSummary('tenant-one')).holdings;
@@ -259,25 +272,26 @@ describe('getPortfolioScores: null es ausencia, no un cero', () => {
     });
 });
 
-describe('quickAddPosition / getPortfolioWithWeights', () => {
+describe('pesos de cartera', () => {
+    it('no exporta getPortfolioWithWeights: su denominador incluía la caja y los pesos no sumaban 100 %', async () => {
+        const mod = await import('@/lib/actions/portfolio.actions');
+        expect('getPortfolioWithWeights' in mod).toBe(false);
+    });
+});
+
+describe('quickAddPosition', () => {
     it('quickAddPosition es una compra hoy', async () => {
         researchRequest.mockResolvedValue({});
         expect(await quickAddPosition('tenant-one', 'AAPL', 2, 100)).toEqual({ success: true });
         expect(JSON.parse(researchRequest.mock.calls[0][1].body).action).toBe('buy');
     });
 
-    it('pesos en % del valor total; cartera vacía -> 0', async () => {
-        seedSummary([position({ market_value_base: 1350 })], { total_value: 2700 });
-        const [h] = await getPortfolioWithWeights('tenant-one');
-        expect(h.weight).toBeCloseTo(50, 1);
-        seedSummary([], { total_value: 0 });
-        expect((await getPortfolioWithWeights('tenant-one')).length).toBe(0);
-    });
 });
 
 describe('refreshPortfolioHoldings: declara lo que SE ESCRIBIÓ', () => {
-    it('sin posiciones -> ValidationError', async () => {
-        await expect(refreshPortfolioHoldings([])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    it('sin posiciones: resultado vacío y tranquilo, nunca un error (en prod se veía «motor no responde»)', async () => {
+        await expect(refreshPortfolioHoldings([])).resolves.toEqual({ ok: true, updated: [], skipped: [], failed: [], holdings: [] });
+        expect(researchRequest).not.toHaveBeenCalled();
     });
 
     it('sin clave de proveedor: ok false, todo skipped, y NO se invalida nada', async () => {
@@ -412,5 +426,29 @@ describe('getCompanyHolding: posición de la ficha con las cifras de Cartera', (
         expect(await getCompanyHolding('AAPL')).toEqual({ status: 'error', message: 'No se pudo cargar tu posición en esta empresa.' });
         researchRequest.mockRejectedValue(new AppError('sin sesión', 'RESEARCH_API_ERROR', 401));
         await expect(getCompanyHolding('AAPL')).rejects.toThrow('sin sesión');
+    });
+    it('la fecha «Datos de tu cartera a …» es la de ESTA posición, no la más antigua de toda la cartera', async () => {
+        // El resumen agregado da la fecha mínima de todas las posiciones (MSFT,
+        // con cotización vieja); la ficha de AAPL debe mostrar la suya.
+        seedSummary(
+            [position({ as_of: '2026-10-29' }), position({ ticker: 'MSFT', as_of: '2026-10-20' })],
+            { data_as_of: '2026-10-20' },
+        );
+        const aapl = await getCompanyHolding('AAPL');
+        expect(aapl.status === 'held' && aapl.positionsAsOf).toBe('2026-10-29');
+        const msft = await getCompanyHolding('MSFT');
+        expect(msft.status === 'held' && msft.positionsAsOf).toBe('2026-10-20');
+    });
+});
+
+describe('getPortfolioFxContext (A9: objetivo de ADR en la watchlist)', () => {
+    it('devuelve los tipos de la cartera y su divisa base para convertir el objetivo', async () => {
+        const fx_rates = [{ scope: 'positions', currency: 'USD', rate: 0.9, as_of: '2026-10-29' }];
+        seedSummary([], { fx_rates, base_currency: 'EUR' });
+        await expect(getPortfolioFxContext('tenant-one')).resolves.toEqual({ fxRates: fx_rates, baseCurrency: 'EUR' });
+    });
+    it('con el motor caído no rompe la watchlist: lista vacía y vuelve la etiqueta «(ADR, USD)»', async () => {
+        researchRequest.mockRejectedValue(new AppError('caído', 'RESEARCH_API_ERROR', 503));
+        await expect(getPortfolioFxContext('tenant-one')).resolves.toEqual({ fxRates: [], baseCurrency: null });
     });
 });

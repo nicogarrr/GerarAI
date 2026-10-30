@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
@@ -281,14 +282,23 @@ class OpenAICompatibleProvider(LLMProvider):
             raise ProviderTransportError(self.name, "timeout", 1) from None
 
         if cache is not None and cache_key is not None:
-            await cache.store(
+            stored = await cache.store(
                 cache_key,
                 response,
                 used_fallback=used_fallback,
                 model=model,
                 task=request.task,
             )
+            if stored:
+                # La clave viaja con la respuesta para que el llamador pueda
+                # retirarla si la rechaza (evict_cached).
+                response = replace(response, cache_key=cache_key)
         return response
+
+    async def evict_cached(self, response: Any) -> None:
+        key = getattr(response, "cache_key", None)
+        if key and self._response_cache is not None:
+            await self._response_cache.evict(key)
 
     async def _complete_with_fallback(
         self, request: LLMRequest, model: str

@@ -792,6 +792,46 @@ class KnowledgeLibraryService:
         ]
 
     @staticmethod
+    def search_documents(
+        db: Session, query: str, *, limit: int = 50, offset: int = 0,
+    ) -> dict[str, Any]:
+        """Busca documentos del tenant por título, autor o ticker.
+
+        Cada palabra de ``query`` debe aparecer (sin distinguir mayúsculas)
+        en alguno de esos campos. ILIKE basta a esta escala (cientos de
+        documentos por tenant), sin índice nuevo ni migración. ``%`` y ``_``
+        se buscan literalmente. El recuento lleva el filtro de tenant
+        explícito: los agregados no pasan por el filtro ORM.
+        """
+        terms = [term for term in query.split() if term][:8]
+        if not terms:
+            return {"items": [], "total": 0, "query": ""}
+        conditions = []
+        for term in terms:
+            escaped = term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
+            conditions.append(
+                KnowledgeDocument.title.ilike(pattern, escape="\\")
+                | KnowledgeDocument.author.ilike(pattern, escape="\\")
+                | KnowledgeDocument.ticker.ilike(pattern, escape="\\")
+            )
+        where = [*tenant_filters(db, KnowledgeDocument), *conditions]
+        total = db.scalar(select(func.count()).select_from(KnowledgeDocument).where(*where)) or 0
+        statement = (
+            select(KnowledgeDocument).where(*where)
+            .order_by(desc(KnowledgeDocument.created_at), desc(KnowledgeDocument.id))
+            .limit(limit).offset(offset)
+        )
+        return {
+            "items": [
+                KnowledgeLibraryService.document_dict(document)
+                for document in db.scalars(statement).all()
+            ],
+            "total": total,
+            "query": " ".join(terms),
+        }
+
+    @staticmethod
     def set_document_ticker(
         db: Session, document: KnowledgeDocument, ticker: str | None
     ) -> dict:

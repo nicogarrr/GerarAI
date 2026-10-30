@@ -10,6 +10,7 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n/client';
 
 export type CountryOption = { value: string; label: string; search: string };
 
@@ -30,14 +31,15 @@ export default function CountrySelectCommand({
     flagFor: (countryCode: string) => string;
     onSelect: (value: string) => void;
 }) {
+    const t = useT();
     return (
         <Command className='bg-gray-800 border-gray-600'>
             <CommandInput
-                placeholder='Buscar países…'
+                placeholder={t('auth.signUp.countrySearchPlaceholder')}
                 className='country-select-input'
             />
             <CommandEmpty className='country-select-empty'>
-                No se ha encontrado ningún país.
+                {t('auth.signUp.countryEmpty')}
             </CommandEmpty>
             <CommandList className='max-h-60 bg-gray-800 scrollbar-hide-default'>
                 <CommandGroup className='bg-gray-800'>

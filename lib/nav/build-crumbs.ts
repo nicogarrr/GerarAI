@@ -1,29 +1,32 @@
 // @ts-expect-error TS5097: extensión explícita para node --experimental-strip-types (guards).
 import { flattenNavItems, NAV_SECTIONS, ROUTE_CATALOG, type NavItem } from '../constants.ts';
+import type { TranslationKey } from '@/lib/i18n/messages';
 
 /** Nombre canonico de cada hub: el del menu lateral (NAV_SECTIONS). */
-const HUB_LABELS = new Map(NAV_SECTIONS.flatMap((section) => section.items).map((item) => [item.href, item.label]));
+const HUB_LABEL_KEYS = new Map(NAV_SECTIONS.flatMap((section) => section.items).map((item) => [item.href, item.labelKey]));
 
 // href opcional: los niveles que no son una ruta real (la seccion del menu)
 // se muestran como texto plano - un enlace a `#Seccion` no navega a nada (F141).
-export type Crumb = { href?: string; label: string };
+// labelKey: clave i18n (nav.*) a resolver con t() en el componente; rawLabel:
+// texto ya resuelto (slug humanizado, ticker, override en vivo del componente).
+export type Crumb = { href?: string; labelKey?: TranslationKey; rawLabel?: string };
 
-/** Sub-rutas con nombre legible; el resto se muestra tal cual (ticker, screenId). */
-const SUBROUTE_LABELS: Record<string, string> = {
-  'financial-terminal': 'Terminal financiero',
-  'driver-assumptions': 'Supuestos de drivers',
-  'decision-lessons': 'Lecciones de decisiones',
-  'management-credibility': 'Credibilidad de la directiva',
+/** Sub-rutas con nombre legible (claves i18n); el resto se muestra tal cual (ticker, screenId). */
+const SUBROUTE_LABEL_KEYS: Record<string, TranslationKey> = {
+  'financial-terminal': 'nav.subroutes.terminalFinanciero',
+  'driver-assumptions': 'nav.subroutes.driverAssumptions',
+  'decision-lessons': 'nav.subroutes.decisionLessons',
+  'management-credibility': 'nav.subroutes.credibilidadDirectiva',
   // Fuera del nav principal (quick win UX 3); la miga sigue legible.
   // Modulo Inversores: sub-paginas fijas (no son un slug de inversor).
   // Sub-pestaña de Calendarios (#1777): sin entrada, la miga salia cruda.
-  'suscripcion': 'Suscripción',
-  'resultados': 'Resultados',
+  'suscripcion': 'nav.subroutes.suscripcion',
+  'resultados': 'nav.subroutes.resultados',
   // Sub-paginas de ficha: sin entrada la miga salia en minuscula cruda
   // ("… > ASTS > tesis") mientras el H1 dice "Tesis de inversión".
-  'tesis': 'Tesis',
-  'shorts': 'Cortos públicos',
-  'filings': 'Documentos',
+  'tesis': 'nav.subroutes.tesis',
+  'shorts': 'nav.subroutes.cortos',
+  'filings': 'nav.subroutes.filings',
 };
 
 /** Slug sin etiqueta propia (p. ej. "warren-buffett") -> "Warren Buffett" en vez del slug crudo. */
@@ -56,25 +59,25 @@ const HOME_HREF = '/inicio';
 export function buildCrumbs(pathname: string): Crumb[] {
   const items = flattenNavItems();
   const parentOf = new Map<string, NavItem>();
-  const sectionOf = new Map<string, string>();
+  const sectionOf = new Map<string, TranslationKey | undefined>();
   for (const section of ROUTE_CATALOG) {
     for (const item of section.items) {
-      sectionOf.set(item.href, section.title);
+      sectionOf.set(item.href, section.titleKey);
       for (const node of [item, ...(item.children ?? [])]) {
         parentOf.set(node.href, item);
-        if (!sectionOf.has(node.href)) sectionOf.set(node.href, section.title);
+        if (!sectionOf.has(node.href)) sectionOf.set(node.href, section.titleKey);
       }
     }
   }
 
-  if (pathname === HOME_HREF) return [{ href: HOME_HREF, label: 'Inicio' }];
+  if (pathname === HOME_HREF) return [{ href: HOME_HREF, labelKey: 'nav.items.inicio' }];
 
   // Ancla: el href mas largo que sea prefijo de la ruta.
   const anchor = items
     .filter((item) => item.href !== HOME_HREF && (pathname === item.href || pathname.startsWith(`${item.href}/`)))
     .sort((a, b) => b.href.length - a.href.length)[0];
 
-  const crumbs: Crumb[] = [{ href: HOME_HREF, label: 'Inicio' }];
+  const crumbs: Crumb[] = [{ href: HOME_HREF, labelKey: 'nav.items.inicio' }];
 
   if (!anchor) return crumbs;
 
@@ -87,9 +90,9 @@ export function buildCrumbs(pathname: string): Crumb[] {
     ? (items.find((item) => item.href === anchor.hub) ?? urlParent)
     : urlParent;
 
-  const sectionTitle = sectionOf.get((crumbParent ?? anchor).href);
-  if (sectionTitle && sectionTitle !== 'Principal') {
-    crumbs.push({ label: sectionTitle });
+  const sectionTitleKey = sectionOf.get((crumbParent ?? anchor).href);
+  if (sectionTitleKey && sectionTitleKey !== 'nav.sections.principal') {
+    crumbs.push({ labelKey: sectionTitleKey });
   }
   // Cualquier nivel que sea un HUB (padre por cruce o el propio ancla) se
   // nombra como en el menu lateral (NAV_SECTIONS): una sola etiqueta por
@@ -97,17 +100,25 @@ export function buildCrumbs(pathname: string): Crumb[] {
   // el catalogo). Si el nombre canonico repite el de la seccion (/portfolio
   // en Cartera), se conserva la etiqueta del catalogo para no duplicar
   // niveles.
-  const canonicalName = (href: string) => {
-    const name = HUB_LABELS.get(href);
-    return name && name !== sectionTitle ? name : undefined;
+  // Dedupe por equivalencia de TEXTO entre el titulo de seccion y el nombre
+  // canonico del hub: con claves i18n no se puede comparar el literal (cada
+  // locale lo resuelve distinto), asi que la equivalencia se declara aqui.
+  // /portfolio en la seccion Cartera: ambos dicen «Cartera»; se conserva la
+  // etiqueta del catalogo («Resumen») para no duplicar niveles.
+  const SECTION_TITLE_EQUALS_HUB_NAME: Record<string, TranslationKey> = {
+    'nav.sections.cartera': 'nav.portfolio',
+  };
+  const canonicalNameKey = (href: string) => {
+    const key = HUB_LABEL_KEYS.get(href);
+    return key && SECTION_TITLE_EQUALS_HUB_NAME[sectionTitleKey ?? ''] !== key && key !== sectionTitleKey ? key : undefined;
   };
   // Si el ancla es un hijo declarado (/research/news), su padre (/research)
   // es un nivel real de la jerarquia: sin el la miga saltaba de la seccion
   // al hijo ("Analisis > Noticias") y el padre dejaba de ser alcanzable.
   if (crumbParent && crumbParent.href !== anchor.href) {
-    crumbs.push({ href: crumbParent.href, label: canonicalName(crumbParent.href) ?? crumbParent.label });
+    crumbs.push({ href: crumbParent.href, labelKey: canonicalNameKey(crumbParent.href) ?? crumbParent.labelKey });
   }
-  crumbs.push({ href: anchor.href, label: canonicalName(anchor.href) ?? anchor.label });
+  crumbs.push({ href: anchor.href, labelKey: canonicalNameKey(anchor.href) ?? anchor.labelKey });
 
   // Segmentos restantes: hijo declarado del nav, sub-ruta con nombre o el
   // propio identificador (ticker, screenId).
@@ -117,11 +128,12 @@ export function buildCrumbs(pathname: string): Crumb[] {
     const pathSoFar = `${anchor.href}/${rest.slice(0, index + 1).join('/')}`;
     const declared = parent?.children?.find((child) => child.href === pathSoFar);
     if (declared) {
-      crumbs.push({ href: declared.href, label: declared.label });
+      crumbs.push({ href: declared.href, labelKey: declared.labelKey });
       parent = declared;
       return;
     }
-    crumbs.push({ href: pathSoFar, label: SUBROUTE_LABELS[segment] ?? (anchor.href === '/inversores' ? humanizeSlug(segment) : segment) });
+    const labelKey = SUBROUTE_LABEL_KEYS[segment];
+    crumbs.push(labelKey ? { href: pathSoFar, labelKey } : { href: pathSoFar, rawLabel: anchor.href === '/inversores' ? humanizeSlug(segment) : segment });
   });
 
   return crumbs;

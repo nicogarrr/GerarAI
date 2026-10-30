@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.models import AlertDelivery, AlertRule, Company, NewsEvent, ResearchAlert
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.schemas import (
@@ -73,10 +74,7 @@ def create_alert(
     if _is_unverified_stub(company):
         # /companies/ensure crea una ficha minima para cualquier ticker con formato valido;
         # si Finnhub no la reconocio (sigue sin nombre ni bolsa), no se crean alertas sobre ella.
-        raise HTTPException(
-            status_code=422,
-            detail=f"Símbolo no reconocido: {company.ticker}. Comprueba que exista en bolsa.",
-        )
+        raise ui_error(422, "symbol_not_recognized", ticker=company.ticker)
     return AlertRuleService().create(
         db,
         company,
@@ -432,7 +430,7 @@ def list_telegram_subscriptions(db: Session = Depends(get_db)) -> list[dict]:
     from app.services.outbound_alerts import EVENT_TYPES
 
     if not db.info.get("tenant_id") or not db.info.get("user_id"):
-        raise HTTPException(status_code=401, detail="Se requiere una identidad verificada")
+        raise ui_error(401, "verified_identity_required")
     rows = {row.event_type: row for row in db.scalars(select(AlertSubscription).where(
         AlertSubscription.user_id == db.info["user_id"],
         AlertSubscription.tenant_id == db.info["tenant_id"],
@@ -451,16 +449,16 @@ def set_telegram_subscription(
 
     tenant, user = db.info.get("tenant_id"), db.info.get("user_id")
     if not tenant or not user:
-        raise HTTPException(status_code=401, detail="Se requiere una identidad verificada")
+        raise ui_error(401, "verified_identity_required")
     from app.services.telegram_link import binding_for
 
     if payload.enabled and not binding_for(db, tenant, user, payload.chat_id):
-        raise HTTPException(status_code=403, detail="Vincula y confirma este chat con Asistenta antes de activarlo")
+        raise ui_error(403, "chat_link_required")
     row = db.scalar(select(AlertSubscription).where(
         AlertSubscription.tenant_id == tenant, AlertSubscription.event_type == event_type,
     ))
     if row and row.user_id != user:
-        raise HTTPException(status_code=403, detail="Solo el propietario puede cambiar esta suscripción")
+        raise ui_error(403, "subscription_owner_only")
     now = datetime.now(UTC)
     if row is None:
         row = AlertSubscription(tenant_id=tenant, user_id=user, event_type=event_type,
@@ -519,7 +517,7 @@ class PushStatusOut(BaseModel):
 def _push_identity(db: Session) -> tuple[int, str]:
     tenant, user = db.info.get("tenant_id"), db.info.get("user_id")
     if not tenant or not user:
-        raise HTTPException(status_code=401, detail="Se requiere una identidad verificada")
+        raise ui_error(401, "verified_identity_required")
     return tenant, user
 
 
@@ -555,14 +553,14 @@ def register_push_device(payload: PushSubscriptionIn, db: Session = Depends(get_
 
     tenant, user = _push_identity(db)
     if not is_configured(get_settings()):
-        raise HTTPException(status_code=409, detail="Las notificaciones push no están configuradas en el servidor")
+        raise ui_error(409, "push_not_configured")
     if not endpoint_is_allowed(payload.endpoint):
-        raise HTTPException(status_code=422, detail="Endpoint de notificaciones no admitido")
+        raise ui_error(422, "push_endpoint_unsupported")
     digest = endpoint_hash(payload.endpoint)
     row = db.scalar(select(PushSubscription).where(
         PushSubscription.tenant_id == tenant, PushSubscription.endpoint_hash == digest))
     if row is not None and row.user_id != user:
-        raise HTTPException(status_code=403, detail="Este dispositivo pertenece a otro usuario")
+        raise ui_error(403, "device_belongs_to_other")
     if row is None:
         db.add(PushSubscription(tenant_id=tenant, user_id=user, endpoint=payload.endpoint,
                                 endpoint_hash=digest, p256dh=payload.keys.p256dh,
@@ -597,9 +595,9 @@ def set_push_preference(event_type: PushEventType, payload: PushPreferenceIn,
     tenant, user = _push_identity(db)
     if payload.enabled:
         if not is_configured(get_settings()):
-            raise HTTPException(status_code=409, detail="Las notificaciones push no están configuradas en el servidor")
+            raise ui_error(409, "push_not_configured")
         if not devices_for(db, tenant, user):
-            raise HTTPException(status_code=403, detail="Activa las notificaciones en este dispositivo antes de elegir tipos")
+            raise ui_error(403, "enable_notifications_first")
     row = db.scalar(select(PushPreference).where(
         PushPreference.tenant_id == tenant, PushPreference.user_id == user,
         PushPreference.event_type == event_type))

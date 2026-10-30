@@ -9,6 +9,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { isAuthError } from '@/lib/types/errors';
 import { sectionError } from '@/lib/section-error';
+import { spanishBackendMessage } from '@/lib/research/backend-error-es';
 
 // Forzar renderizado dinámico
 export const dynamic = 'force-dynamic';
@@ -48,18 +49,18 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     // oculte el resto de la cartera. Summary/positions son esenciales; scores,
     // transactions y tearsheet son lecturas tolerantes a falta de historial.
     const [summaryResult, transactionsResult, scoresResult, tearsheetResult, forecastResult, dividendsResult] = await Promise.all([
-      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? error.message : 'No se pudo cargar la cartera', cause: error as unknown })),
-      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? error.message : 'No se pudieron cargar los movimientos' })),
+      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar la cartera', cause: error as unknown })),
+      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudieron cargar los movimientos' })),
       // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
       // desconocidos, y la UI los pinta como "no disponible" en vez de
       // "0,00", que es lo que se veia cuando el backend no respondia.
-      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? error.message : 'No se pudieron cargar los factores' })),
-      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? error.message : 'No se pudo cargar el historial' })),
+      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudieron cargar los factores' })),
+      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar el historial' })),
       // La previsión es lectura tolerante: un fallo deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? error.message : 'No se pudo cargar la previsión' })),
+      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar la previsión' })),
       // La proyección de dividendos también es lectura tolerante: un fallo
       // deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? error.message : 'No se pudo cargar la proyección de dividendos' })),
+      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar la proyección de dividendos' })),
     ]);
     if (!summaryResult.value) {
       // Antes se reconstruia un Error plano desde el mensaje: perdia code y

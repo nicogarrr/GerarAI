@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 // Quick win UX 4: la ficha y las tarjetas de research leen sector/industria
 // en español (nunca «Information Technology» cruda). Capturas para el OK
@@ -13,7 +14,7 @@ test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1 to run browser tests.");
 // research-relevance / f339).
 const apiSecret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const apiUser = "e2e-browser-user";
-const apiBase = "http://127.0.0.1:8100";
+const apiBase = E2E_UI_BACKEND_URL;
 
 function signedHeaders(method: string, path: string, body: Buffer) {
   const timestamp = Math.floor(Date.now() / 1000).toString();

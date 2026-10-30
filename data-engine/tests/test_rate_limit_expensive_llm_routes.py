@@ -24,6 +24,7 @@ LLM_ROUTES = [
     "/api/knowledge/documents/7/extract-principles",
     "/api/knowledge/documents/upload",
     "/api/settings/llm/test",
+    "/api/knowledge-rag/query",
 ]
 
 

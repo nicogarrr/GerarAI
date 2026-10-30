@@ -1,6 +1,7 @@
 "use client";
 
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Aviso de conexion. Se renderiza en flujo normal justo encima del header, asi
@@ -10,6 +11,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
  */
 export const OnlineBanner = () => {
     const online = useOnlineStatus();
+    const t = useT();
 
     // Live region PERMANENTE: montarla al irse la conexion hace que parte de
     // los lectores de pantalla no la anuncien (una region que no existia no se
@@ -28,7 +30,7 @@ export const OnlineBanner = () => {
             {...(online ? {} : { 'data-online-banner': true })}
             className={online ? 'sr-only' : 'w-full bg-amber-100 py-2 text-center text-sm text-amber-900'}
         >
-            {online ? null : 'Sin conexión. Algunos datos pueden estar desactualizados hasta que se recupere la conexión.'}
+            {online ? null : t('shell.offline.banner')}
         </div>
     );
 };

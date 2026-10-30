@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services import market_change, market_themes, movers_cache
 from app.services.provenance import SourceKind, coverage_for_age, provenance
 
@@ -282,7 +283,7 @@ def market_quote(symbol: str) -> dict:
     # Un simbolo con caracteres de control ("%00") rompia la URL de Yahoo en
     # httpx (InvalidURL -> 500). Nunca hay cotizacion para eso: 404.
     if not normalized or not normalized.isprintable() or len(normalized) > 32:
-        raise HTTPException(status_code=404, detail="Sin cotización disponible")
+        raise HTTPException(status_code=404, detail=ui_error(404, "no_quote_available").detail)
     now = time.monotonic()
     with _quote_cache_lock:
         cached = _quote_cache.get(normalized)
@@ -290,7 +291,7 @@ def market_quote(symbol: str) -> dict:
             return cached["data"]
     data = _fetch_yahoo_quote(_shared_yahoo_client(), normalized)
     if not data:
-        raise HTTPException(status_code=404, detail="Sin cotización disponible")
+        raise HTTPException(status_code=404, detail=ui_error(404, "no_quote_available").detail)
     with _quote_cache_lock:
         if len(_quote_cache) >= _QUOTE_CACHE_MAX:
             _quote_cache.clear()
@@ -391,7 +392,7 @@ def market_candles(
     """
     normalized = symbol.strip().upper()
     if not normalized or not normalized.isprintable() or len(normalized) > 32 or to_ts <= from_ts:
-        raise HTTPException(status_code=404, detail="Sin velas disponibles")
+        raise HTTPException(status_code=404, detail=ui_error(404, "no_candles_available").detail)
     interval = _YAHOO_INTERVAL_BY_RESOLUTION[resolution]
     # El rango exacto cambia en cada petición; se agrupa por hora de fin para
     # que el gráfico de la ficha (ventana de 1 año) comparta caché.
@@ -403,7 +404,7 @@ def market_candles(
             return cached["data"]
     data = _fetch_yahoo_candles(_shared_yahoo_client(), normalized, from_ts, to_ts, interval)
     if not data:
-        raise HTTPException(status_code=404, detail="Sin velas disponibles")
+        raise HTTPException(status_code=404, detail=ui_error(404, "no_candles_available").detail)
     with _candles_cache_lock:
         if len(_candles_cache) >= _CANDLES_CACHE_MAX:
             _candles_cache.clear()

@@ -22,6 +22,16 @@ from app.services.prompt_registry import get_prompt
 _PROMPT = get_prompt("news_headline_translation", allow_remote=False)
 
 
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("news_headline_translation", allow_remote=False)
+
+
+
 def _needs_translation(text: str) -> bool:
     from app.services.public_headline_translation import needs_translation
     return needs_translation(text)
@@ -326,10 +336,10 @@ async def translate_headline(db, event_id: int, *, provider=None) -> dict:
                         break
                     try:
                         request = LLMRequest(model=link_model, messages=[
-                            Message("system", _PROMPT.text),
+                            Message("system", _prompt().text),
                             Message("user", json.dumps({"headline": original}, ensure_ascii=False)),
                         ], temperature=0, max_tokens=220,
-                        metadata={**_PROMPT.trace_metadata(), "tenant_id": str(tenant)}, response_format=ResponseFormat.json_object())
+                        metadata={**_prompt().trace_metadata(), "tenant_id": str(tenant)}, response_format=ResponseFormat.json_object())
                         response = await asyncio.wait_for(link.complete(request), timeout=min(HEADLINE_ATTEMPT_SECONDS, remaining))
                     except Exception as exc:
                         failure_reason = _classify_translation_failure(exc)

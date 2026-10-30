@@ -1,0 +1,61 @@
+{
+  "dialog": {
+    "close": "Close dialog",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "command": {
+    "placeholder": "Search stocks, theses or documents...",
+    "error": "The search could not be completed. Please try again.",
+    "title": "Search stocks",
+    "subtitle": "Search by symbol or company, or jump to a GerarAI section",
+    "inputPlaceholder": "Search stocks or command \"ASTS FA\"...",
+    "inputAria": "Search stocks or sections",
+    "loading": "Loading stocks...",
+    "noStocks": "No stocks available",
+    "resultsCount": "Search results ({n})",
+    "popular": "Popular stocks",
+    "unverifiedCoverage": "Stock page coverage not verified",
+    "tickerCommands": "{ticker} commands",
+    "stockPage": "Stock page",
+    "directSymbol": "Go directly by symbol",
+    "paletteTitle": "Command palette",
+    "palettePlaceholder": "Search for a command to run..."
+  },
+  "search": {
+    "placeholder": "Search by name or symbol",
+    "noResults": "No results",
+    "addStock": "Add stock",
+    "openAria": "Open search",
+    "stocksPlaceholder": "Search stocks..."
+  },
+  "methodologyDisclosure": "Methodology and limits",
+  "nameAvatar": {
+    "photo": "Photo of {name}"
+  },
+  "scrollRegion": {
+    "hintColumns": "Scroll to see more columns"
+  },
+  "pagination": {
+    "aria": "Pagination: {label}",
+    "prevAria": "Previous page: {label}",
+    "nextAria": "Next page: {label}",
+    "prev": "Previous",
+    "next": "Next"
+  },
+  "panel": {
+    "collapse": "Collapse",
+    "expand": "Expand"
+  },
+  "analystTargets": {
+    "loading": "Loading analyst price target for {symbol}",
+    "noData": "No analyst price targets for this security.",
+    "fetched": " · fetched {date}",
+    "convertedNote": " · targets in {from} converted to {to} at the portfolio exchange rate",
+    "unconvertedNote": " · targets in {from}, the row trades in {to}: no exchange rate, no upside shown to avoid mixing currencies",
+    "firmsOne": "{n} firm with a 12-month target",
+    "firmsOther": "{n} firms with 12-month targets",
+    "firmsNone": "aggregate consensus only, no per-firm detail",
+    "convertedFrom": "(converted from {currency})"
+  }
+}

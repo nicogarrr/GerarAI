@@ -3,15 +3,18 @@
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 
-export type PushEventType =
-    | 'thesis_broken'
-    | 'new_filing'
-    | 'insiders'
-    | 'shorts_rising'
-    | 'daily_digest'
-    | 'dca_levels'
-    | 'macro_event'
-    | 'earnings';
+export const PUSH_EVENT_TYPES = [
+    'thesis_broken',
+    'new_filing',
+    'insiders',
+    'shorts_rising',
+    'daily_digest',
+    'dca_levels',
+    'macro_event',
+    'earnings',
+] as const;
+
+export type PushEventType = (typeof PUSH_EVENT_TYPES)[number];
 
 export type PushStatus = {
     enabled: boolean;
@@ -50,7 +53,13 @@ export async function removePushDevice(endpoint: string): Promise<void> {
 /** PUT /api/alerts/push/preferences/{tipo}: activa o apaga un tipo de aviso. */
 export async function setPushPreference(eventType: PushEventType, enabled: boolean): Promise<void> {
     await requireAuthenticatedUser();
-    await researchRequest(`/api/alerts/push/preferences/${eventType}`, {
+    // Una server action recibe argumentos arbitrarios del cliente: el tipo de
+    // TypeScript no protege en runtime. Sin esta lista, «../../x» componía otra
+    // ruta del backend (fetch resuelve los «..») con la identidad del usuario.
+    if (!(PUSH_EVENT_TYPES as readonly string[]).includes(eventType)) {
+        throw new Error('Tipo de aviso no válido');
+    }
+    await researchRequest(`/api/alerts/push/preferences/${encodeURIComponent(eventType)}`, {
         method: 'PUT',
         body: jsonBody({ enabled }),
     });

@@ -22,23 +22,27 @@ const CountrySelectCommand = dynamic(() => import('@/components/forms/CountrySel
 });
 const preloadCountryCommand = () => void import('@/components/forms/CountrySelectCommand');
 import countryList from 'react-select-country-list';
+import { useLocale, useT } from '@/lib/i18n/client';
 
 // Los nombres visibles van en español; el value sigue siendo el código ISO.
 // `react-select-country-list` solo trae etiquetas en inglés. Si el runtime no
 // implementa `Intl.DisplayNames` (o falla para un código), se conserva la
 // etiqueta inglesa: la pantalla nunca se queda sin nombre.
-const regionNames = (() => {
+// i18n B: los nombres de pais siguen el locale activo (Intl.DisplayNames);
+// si el runtime no lo implementa (o falla para un codigo) se conserva la
+// etiqueta inglesa de la libreria: la pantalla nunca se queda sin nombre.
+function regionNamesFor(locale: string): Intl.DisplayNames | null {
     try {
         if (typeof Intl === 'undefined' || typeof Intl.DisplayNames !== 'function') return null;
-        return new Intl.DisplayNames(['es'], { type: 'region' });
+        return new Intl.DisplayNames([locale], { type: 'region' });
     } catch {
         return null;
     }
-})();
+}
 
-function countryLabel(code: string, fallback: string): string {
+function countryLabel(names: Intl.DisplayNames | null, code: string, fallback: string): string {
     try {
-        return regionNames?.of(code) ?? fallback;
+        return names?.of(code) ?? fallback;
     } catch {
         return fallback;
     }
@@ -66,20 +70,23 @@ const CountrySelect = ({
     label: string;
 }) => {
     const [open, setOpen] = useState(false);
+    const t = useT();
+    const locale = useLocale();
+    const regionNames = useMemo(() => regionNamesFor(locale), [locale]);
 
     // Get country options with Spanish labels and flags. `search` lleva el
     // nombre español, el inglés original y el ISO para que buscar «España»
     // (o «Spain», o «ES») encuentre la misma opción.
     const countries: CountryOption[] = useMemo(
         () => countryList().getData().map((country) => {
-            const label = countryLabel(country.value, country.label);
+            const label = countryLabel(regionNames, country.value, country.label);
             return {
                 value: country.value,
                 label,
                 search: `${label} ${country.label} ${country.value}`,
             };
         }),
-        [],
+        [regionNames],
     );
 
     // Helper function to get flag emoji
@@ -111,7 +118,7 @@ const CountrySelect = ({
               <span>{countries.find((c) => c.value === value)?.label}</span>
             </span>
                     ) : (
-                        'Selecciona tu país…'
+                        t('auth.signUp.countryPlaceholder')
                     )}
                     <ChevronsUpDown className='ml-2 h-4 w-4 shrink-0 opacity-50' />
                 </Button>
@@ -141,6 +148,7 @@ export const CountrySelectField = <TFieldValues extends FieldValues = FieldValue
                                        error,
                                        required = false,
                                    }: CountrySelectProps<TFieldValues>) => {
+    const t = useT();
     const errorId = `${name}-error`;
     const hintId = `${name}-hint`;
     return (
@@ -152,7 +160,7 @@ export const CountrySelectField = <TFieldValues extends FieldValues = FieldValue
                 name={name}
                 control={control}
                 rules={{
-                    required: required ? `Por favor, selecciona ${label.toLowerCase()}` : false,
+                    required: required ? t('auth.fields.selectRequired', { label: label.toLowerCase() }) : false,
                 }}
                 render={({ field }) => (
                     <CountrySelect
@@ -166,7 +174,7 @@ export const CountrySelectField = <TFieldValues extends FieldValues = FieldValue
             />
             {error ? <p id={errorId} role='alert' className='text-sm text-red-500'>{error.message}</p> : null}
             <p id={hintId} className='text-xs text-gray-500'>
-                Te mostramos datos de mercado y noticias relevantes según tu país.
+                {t('auth.signUp.countryHint')}
             </p>
         </div>
     );

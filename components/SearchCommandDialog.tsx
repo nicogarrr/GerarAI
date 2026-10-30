@@ -9,6 +9,7 @@ import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG, SYMBOL_VALIDATION } from "@/lib/constants";
+import { useT } from "@/lib/i18n/client";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
 import { closeSearchCommand } from "@/lib/search/search-command-store";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
@@ -22,6 +23,7 @@ import { etiquetaTipoInstrumento } from "@/lib/labels";
  * inicial de TODAS las páginas autenticadas.
  */
 export default function SearchCommandDialog({ open, initialStocks, getFocusTarget }: SearchCommandDialogProps) {
+    const t = useT();
     const router = useRouter()
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
@@ -253,8 +255,8 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                 }}
                 className="search-dialog z-[70]"
                 overlayClassName="z-[70]"
-                title="Buscar acciones"
-                description="Busca por símbolo o empresa, o salta a una sección de GerarAI"
+                title={t('ui.command.title')}
+                description={t('ui.command.subtitle')}
             >
                 <div className="search-field">
                     <CommandInput
@@ -269,8 +271,8 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                 setLoading(false);
                             }
                         }}
-                        placeholder="Buscar acciones o comando «ASTS FA»..."
-                        aria-label="Buscar acciones o secciones"
+                        placeholder={t('ui.command.inputPlaceholder')}
+                        aria-label={t('ui.command.inputAria')}
                         className="search-input"
                     />
                     {loading && <Loader2 aria-hidden="true" className="search-loader" />}
@@ -298,10 +300,10 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                         </CommandGroup>
                     ) : null}
                     {loading ? (
-                        <CommandEmpty className="search-list-empty">Cargando acciones...</CommandEmpty>
+                        <CommandEmpty className="search-list-empty">{t('ui.command.loading')}</CommandEmpty>
                     ) : searchError ? (
                         <div role="alert" className="search-list-indicator">
-                            No se pudo completar la búsqueda. Inténtalo de nuevo.
+                            {t('ui.command.error')}
                         </div>
                     ) : (
                         <>
@@ -313,11 +315,11 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                             {displayStocks?.length === 0 && !commandQuery ? (
                                 directSymbol ? null : (
                                     <div className="search-list-indicator">
-                                        {isSearchMode ? 'Sin resultados' : 'No hay acciones disponibles'}
+                                        {isSearchMode ? t('ui.search.noResults') : t('ui.command.noStocks')}
                                     </div>
                                 )
                             ) : (
-                                <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={isSearchMode ? `Resultados de búsqueda (${displayStocks.length})` : 'Acciones populares'}>
+                                <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={isSearchMode ? t('ui.command.resultsCount', { n: displayStocks.length }) : t('ui.command.popular')}>
                                     {displayStocks.map(stock => (
                                         <CommandItem
                                             key={stock.symbol}
@@ -331,7 +333,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                                 <div className="search-item-name line-clamp-2 break-words" title={formatCompanyName(stock.name)}>{formatCompanyName(stock.name)}</div>
                                                 <div className="text-sm text-gray-500">{stock.symbol} | {stock.exchange} | {etiquetaTipoInstrumento(stock.type)}</div>
                                                 {stock.fichaCoverage === 'unknown' ? (
-                                                    <div className="mt-0.5 text-xs text-gray-500">Cobertura de ficha no comprobada</div>
+                                                    <div className="mt-0.5 text-xs text-gray-500">{t('ui.command.unverifiedCoverage')}</div>
                                                 ) : null}
                                             </div>
                                         </CommandItem>
@@ -339,7 +341,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                 </CommandGroup>
                             )}
                             {commandQuery && !commandQuery.exact ? (
-                                <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={`Comandos de ${commandQuery.ticker}`}>
+                                <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={t('ui.command.tickerCommands', { ticker: commandQuery.ticker })}>
                                     {commandQuery.matches.map((cmd) => (
                                         <CommandItem
                                             key={cmd.code}
@@ -363,32 +365,50 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                 antes desaparecian con el primer caracter y cmdk no
                                 podia filtrarlas, asi que "ir a Temas" por teclado
                                 era imposible. */}
-                            {ROUTE_CATALOG.filter((section) => section.items.length > 1 && (!isSearchMode || navSectionMatchesSearch(section, searchTerm, flattenNavItems))).map((section) => (
+                            {ROUTE_CATALOG.filter((section) => section.items.length > 1).map((section) => {
+                                // Textos nav.* resueltos al locale activo: la
+                                // coincidencia del buscador y lo pintado son
+                                // siempre el mismo idioma.
+                                const sectionTitle = section.titleKey ? t(section.titleKey) : '';
+                                const resolvedItems = flattenNavItems([section]).map((item) => ({
+                                    item,
+                                    label: t(item.labelKey),
+                                    haystacks: [
+                                        sectionTitle,
+                                        t(item.labelKey),
+                                        item.subnavLabelKey ? t(item.subnavLabelKey) : '',
+                                        item.descriptionKey ? t(item.descriptionKey) : '',
+                                    ],
+                                }));
+                                const visibleItems = resolvedItems.filter(({ haystacks }) => !isSearchMode || navItemMatchesSearch(haystacks, searchTerm));
+                                if (isSearchMode && !navSectionMatchesSearch(resolvedItems.map(({ haystacks }) => haystacks), searchTerm)) return null;
+                                return (
                                 <CommandGroup
-                                    key={section.title}
-                                    heading={section.title}
+                                    key={section.titleKey ?? section.items[0]?.href}
+                                    heading={sectionTitle}
                                     className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-gray-500"
                                 >
-                                    {flattenNavItems([section]).filter(item => !isSearchMode || navItemMatchesSearch(section, item, searchTerm)).map((item) => (
+                                    {visibleItems.map(({ item, label, haystacks }) => (
                                         <CommandItem
                                             key={item.href}
-                                            value={`ir ${item.label}`}
-                                            keywords={[section.title, ...(item.description ? [item.description] : [])]}
+                                            value={`ir ${label}`}
+                                            keywords={haystacks.filter(Boolean)}
                                             onSelect={() => go(item.href)}
                                             className="flex min-h-11 items-center gap-2 px-4"
                                         >
                                             {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 text-gray-500" />}
-                                            <span className="flex-1 truncate">{item.label}</span>
+                                            <span className="flex-1 truncate">{label}</span>
                                             <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
                                         </CommandItem>
                                     ))}
                                 </CommandGroup>
-                            ))}
+                                );
+                            })}
 
                         </>
                     )}
                     {directSymbol && !loading ? (
-                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading="Ficha">
+                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading={t('ui.command.stockPage')}>
                             <CommandItem
                                 value={`direct:${directSymbol}`}
                                 onSelect={() => handleSelectStock(directSymbol)}
@@ -398,7 +418,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                 <TrendingUp aria-hidden="true" className="h-4 w-4 text-teal-400" />
                                 <div className="min-w-0 flex-1">
                                     <div className="search-item-name truncate">Abrir la ficha de «{directSymbol}»</div>
-                                    <div className="text-sm text-gray-500">Ir directo por símbolo</div>
+                                    <div className="text-sm text-gray-500">{t('ui.command.directSymbol')}</div>
                                 </div>
                                 <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
                             </CommandItem>

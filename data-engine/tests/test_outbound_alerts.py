@@ -188,3 +188,49 @@ def test_telegram_http_429_body_retry_after():
         response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         assert notification_service.NotificationService._extract_retry_after(exc) == 1200
+
+
+def test_telegram_text_earnings_reminder_is_spanish_without_technical_ids():
+    payload = {
+        "type": "earnings_reminder",
+        "severity": "high",
+        "title": "ZZA presenta resultados hoy",
+        "message": "ZZA Inc\n\nFecha: 2 nov 2026\nEstado de la fecha: Fecha confirmada por la fuente",
+        "ticker": "ZZA",
+        "company_id": 7,
+        "alert_id": 42,
+        "jev_urgency": {},
+    }
+    text = notification_service.NotificationService._telegram_text(payload)
+    assert text == f"{payload['title']}\n{payload['message']}"
+    assert "Alert id" not in text and "company id" not in text and "HIGH" not in text
+
+
+def test_dispatch_pending_redispatches_earnings_with_opt_in(db, monkeypatch):
+    calls = []
+    monkeypatch.setattr(notification_service, "get_settings", lambda: SimpleNamespace())
+    monkeypatch.setattr(notification_service.NotificationService, "_dispatch_telegram", lambda self, settings, payload: calls.append(payload) or self._result("delivered"))
+    opt_in(db, "earnings")
+    row = alert(db, "earnings_reminder")
+    stats = dispatch_pending(db)
+    assert stats["redispatched"] == 1 and not stats["errors"]
+    assert calls and calls[0]["alert_id"] == row.id
+
+
+def test_dispatch_pending_skips_earnings_without_valid_binding(db, monkeypatch):
+    from app.models.entities import TelegramChatBinding
+    calls = []
+    monkeypatch.setattr(notification_service, "get_settings", lambda: SimpleNamespace())
+    monkeypatch.setattr(notification_service.NotificationService, "_dispatch_telegram", lambda self, settings, payload: calls.append(payload) or self._result("delivered"))
+    opt_in(db, "earnings")
+    # El consentimiento exige un chat vinculado vigente: sin el, el aviso de
+    # resultados se marca como omitido (sin HTTP) y no reintenta en caliente.
+    for binding in db.scalars(select(TelegramChatBinding)).all():
+        db.delete(binding)
+    db.commit()
+    row = alert(db, "earnings_reminder")
+    stats = dispatch_pending(db)
+    assert stats["redispatched"] == 0 and calls == []
+    delivery = db.scalar(select(AlertDelivery).where(
+        AlertDelivery.alert_id == row.id, AlertDelivery.channel == "telegram"))
+    assert delivery is not None and delivery.status == "skipped"

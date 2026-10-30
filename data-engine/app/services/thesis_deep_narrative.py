@@ -784,6 +784,16 @@ _PROMPT = get_prompt("thesis_deep_narrative", allow_remote=False)
 _SYSTEM = _PROMPT.text
 
 
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("thesis_deep_narrative", allow_remote=False)
+
+
+
 def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMRequest:
     visible = [
         {"id": fact["id"], "texto": fact["texto"], "fuente": _visible_fuente(fact["fuente"])}
@@ -794,7 +804,7 @@ def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMReque
         user["nota"] = extra_note
     return LLMRequest(
         messages=[
-            Message("system", _SYSTEM),
+            Message("system", _prompt().text),
             Message("user", json.dumps(user, ensure_ascii=False)),
         ],
         task="deep_thesis",
@@ -809,7 +819,7 @@ def _build_request(facts: list[dict], extra_note: str | None = None) -> LLMReque
         response_format=ResponseFormat.json_schema(
             _OUTPUT_SCHEMA, name="thesis_deep_narrative"
         ),
-        metadata=_PROMPT.trace_metadata(),
+        metadata=_prompt().trace_metadata(),
     )
 
 

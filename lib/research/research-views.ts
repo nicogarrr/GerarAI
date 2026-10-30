@@ -165,7 +165,16 @@ export function canonicalViewUrl(ticker: string, requested: string | undefined):
 export function legacyResearchRedirect(pathname: string, search: string): string | null {
   const match = /^\/research\/([^/]+?)(?:\/([^/]+))?\/?$/.exec(pathname);
   if (!match) return null;
-  const ticker = decodeURIComponent(match[1]);
+  // Static research routes are not company tickers.
+  if (['assistant', 'news', 'sources'].includes(match[1])) return null;
+  let ticker: string;
+  try {
+    ticker = decodeURIComponent(match[1]);
+  } catch {
+    // `%` mal formado (p. ej. /research/%E0): sin redirección; Next responde
+    // 400 como antes, en vez de un 500 por URIError dentro del middleware.
+    return null;
+  }
   const subroute = match[2];
   const params = new URLSearchParams(search);
   if (subroute !== undefined) {

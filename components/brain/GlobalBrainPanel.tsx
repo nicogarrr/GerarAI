@@ -27,7 +27,7 @@ const ReactMarkdown = dynamic(() => import('react-markdown'), {
 });
 import type { PortfolioChatCitation } from '@/lib/chat/citations';
 import { BrainSources } from './BrainSources';
-import { askKnowledge, type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
+import { askKnowledgeResult, type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
 import { analysisToText, isSubmitShortcut, SUGGESTED_QUESTIONS } from '@/lib/knowledge/analysis';
 const BrainLibraryAnswer = dynamic(() => import('./BrainLibraryAnswer').then(m => m.BrainLibraryAnswer));
 
@@ -265,7 +265,12 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
 
         if (knowledge) {
             try {
-                const result = await askKnowledge(userMsg, knowledge.scope, author, analysis ? 'analisis' : 'respuesta', page, knowledge.documentId);
+                const outcome = await askKnowledgeResult(userMsg, knowledge.scope, author, analysis ? 'analisis' : 'respuesta', page, knowledge.documentId);
+                if (!outcome.ok) {
+                    setMessages(prev => [...prev, { role: 'assistant', content: outcome.message }]);
+                    return;
+                }
+                const result = outcome.answer;
                 const text = result.analysis ? analysisToText(result.analysis) : (result.answers ?? []).map(a => `${a.text ?? ''}\n«${a.citation.quote}» (${a.citation.author ?? 'Autor no registrado'} · ${a.citation.title}${a.citation.page_number !== null ? ` · Página ${a.citation.page_number}` : ''} · Fragmento ${a.citation.chunk_index + 1}${a.citation.publication_date ? ` · ${a.citation.publication_date}` : ''})`).join('\n\n');
                 setMessages(prev => [...prev, { role: 'assistant', content: text || result.message || 'Sin datos en la biblioteca.', library: result }]);
             } catch (error) {

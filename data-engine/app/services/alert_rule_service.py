@@ -19,9 +19,10 @@ from app.models import (
     ResearchAlert,
 )
 from app.services.notification_service import NotificationService
-from app.services.price_freshness import market_price_is_stale
-from app.services.price_units import listing_price
+from app.services.price_freshness import close_is_stale
+from app.services.price_units import close_in_company_currency, listing_price
 from app.services.review_alert_service import ReviewAlertService
+from app.services.trading_sessions import missing_sessions
 
 # Operators the evaluator understands. `create()` did not validate the operator,
 # so a rule created with "!=" (which the screener's comparator table does accept)
@@ -148,7 +149,8 @@ class AlertRuleService:
         observed, observation = self._observe(db, rule)
         event_kind = observation.get("kind") in _EVENT_KINDS
         stale_observation = observation.get("status") == "stale"
-        matched = False if stale_observation else self._matches(
+        session_gap = observation.get("status") == "session_gap"
+        matched = False if stale_observation or session_gap else self._matches(
             observed,
             str((rule.condition or {}).get("operator") or "=="),
             (rule.condition or {}).get("value"),
@@ -260,6 +262,8 @@ class AlertRuleService:
                 if triggered
                 else "skipped_stale_observation"
                 if stale_observation
+                else "skipped_session_gap"
+                if session_gap
                 else "evaluated"
             ),
             "matched": bool(matched),
@@ -280,6 +284,12 @@ class AlertRuleService:
             db.refresh(rule)
         return result
 
+    @staticmethod
+    def _listing(db: Session, rule: AlertRule) -> tuple[str | None, str | None]:
+        """(bolsa, ticker) de la empresa de la regla, para la hora de cierre."""
+        company = db.get(Company, rule.company_id) if rule.company_id is not None else None
+        return (company.exchange, company.ticker) if company is not None else (None, None)
+
     def _observe(self, db: Session, rule: AlertRule) -> tuple[Any, dict[str, Any]]:
         kind = str((rule.target or {}).get("kind") or "")
         if kind == "market_price":
@@ -293,14 +303,28 @@ class AlertRuleService:
             )
             if prices:
                 age_days = (date.today() - prices[0].date).days
-                return Decimal(prices[0].close), {
+                # El umbral se pide «en <divisa de la empresa>» (ficha): el
+                # cierre va a esa misma unidad. TSCO.L cotiza en GBp y reporta
+                # en GBP: comparar 250,5 peniques con «3 GBP» disparaba al
+                # instante. Otra divisa sin tipo FX: sin observacion.
+                observed = self._price_in_threshold_unit(
+                    db, rule, Decimal(prices[0].close), unit=prices[0].quote_currency, on=prices[0].date
+                )
+                if observed is None:
+                    return None, {"kind": kind, "status": "mixed_units", "date": prices[0].date.isoformat()}
+                return observed, {
                     "kind": kind,
                     "market_price_id": prices[0].id,
                     "date": prices[0].date.isoformat(),
                     "age_days": age_days,
                     "status": (
                         "stale"
-                        if market_price_is_stale(age_days, get_settings().market_price_max_age_days)
+                        if close_is_stale(
+                            prices[0].date,
+                            self._listing(db, rule)[0],
+                            get_settings().market_price_max_age_days,
+                            ticker=self._listing(db, rule)[1],
+                        )
                         else "fresh"
                     ),
                 }
@@ -313,9 +337,18 @@ class AlertRuleService:
                 .order_by(desc(Position.as_of))
                 .limit(1)
             )
+            position_price = (
+                self._price_in_threshold_unit(
+                    db, rule, Decimal(position.market_price), unit=position.currency, on=position.as_of
+                )
+                if position and position.market_price is not None
+                else None
+            )
+            if position and position.market_price is not None and position_price is None:
+                return None, {"kind": kind, "status": "mixed_units", "position_id": position.id}
             return (
                 (
-                    Decimal(position.market_price),
+                    position_price,
                     {
                         "kind": kind,
                         "position_id": position.id,
@@ -323,9 +356,11 @@ class AlertRuleService:
                         "age_days": (date.today() - position.as_of).days,
                         "status": (
                             "stale"
-                            if market_price_is_stale(
-                                (date.today() - position.as_of).days,
+                            if close_is_stale(
+                                position.as_of,
+                                self._listing(db, rule)[0],
                                 get_settings().market_price_max_age_days,
+                                ticker=self._listing(db, rule)[1],
                             )
                             else "fresh"
                         ),
@@ -346,6 +381,20 @@ class AlertRuleService:
             if len(prices) < 2:
                 return None, {"kind": kind, "status": "missing_two_prices"}
             latest, previous = prices
+            company = db.get(Company, rule.company_id)
+            # La regla es una variacion de UNA sesion: si entre los dos ultimos
+            # cierres guardados falta alguna sesion de la bolsa (no un festivo),
+            # el cociente es un movimiento de varias sesiones presentado como
+            # diario. Sin observacion hasta tener dos sesiones consecutivas.
+            gap = missing_sessions(db, company, previous.date, latest.date)
+            if gap:
+                return None, {
+                    "kind": kind,
+                    "status": "session_gap",
+                    "latest_date": latest.date.isoformat(),
+                    "previous_date": previous.date.isoformat(),
+                    "missing_sessions": [day.isoformat() for day in gap],
+                }
             # Cierres ajustados cuando ambas filas los traen: un split o una
             # distribución entre las dos sesiones no es un movimiento de precio
             # (200 -> 110 tras un split 2:1 es +10 %, no -45 %). Mismo criterio
@@ -370,12 +419,7 @@ class AlertRuleService:
             # no son un movimiento de precio.
             # Misma etiqueta de unidad (o ambas sin etiqueta, filas legacy): el
             # cociente no depende de la unidad y se usa tal cual.
-            company = (
-                db.get(Company, rule.company_id)
-                if latest.quote_currency != previous.quote_currency
-                else None
-            )
-            if company is not None:
+            if company is not None and latest.quote_currency != previous.quote_currency:
                 current_listed = listing_price(
                     Decimal(current_value), quote_currency=latest.quote_currency, company=company
                 )
@@ -401,7 +445,12 @@ class AlertRuleService:
                 "age_days": age_days,
                 "status": (
                     "stale"
-                    if market_price_is_stale(age_days, get_settings().market_price_max_age_days)
+                    if close_is_stale(
+                        prices[0].date,
+                        company.exchange if company is not None else None,
+                        get_settings().market_price_max_age_days,
+                        ticker=company.ticker if company is not None else None,
+                    )
                     else "fresh"
                 ),
             }
@@ -471,6 +520,21 @@ class AlertRuleService:
                 else (None, {"kind": kind, "status": "missing"})
             )
         return None, {"kind": kind, "status": "unsupported_target"}
+
+    @staticmethod
+    def _price_in_threshold_unit(
+        db: Session, rule: AlertRule, value: Decimal, *, unit: str | None, on: date
+    ) -> Decimal | None:
+        """Precio en la divisa de la empresa, la unidad en la que se pide el umbral.
+
+        Sin unidad declarada (filas legacy) o con la misma unidad, tal cual.
+        """
+        if not unit:
+            return value
+        company = db.get(Company, rule.company_id)
+        if company is None:
+            return value
+        return close_in_company_currency(db, value, quote_currency=unit, company=company, on=on)
 
     @staticmethod
     def _matches(observed: Any, operator: str, expected: Any) -> bool:

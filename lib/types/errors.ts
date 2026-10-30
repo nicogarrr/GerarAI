@@ -3,6 +3,8 @@
 // (--experimental-strip-types), que no resuelve alias ni añade extensiones.
 // @ts-expect-error TS5097
 import { redactSecretsInText } from '../upstream/redact.ts';
+// @ts-expect-error TS5097
+import { spanishBackendMessage } from '../research/backend-error-es.ts';
 /**
  * Tipos centralizados para manejo de errores
  * Reemplaza el uso de 'any' en catch blocks
@@ -290,7 +292,6 @@ const MESSAGE_TRANSLATIONS: Array<[RegExp, string]> = [
   [/^rate limit exceeded$/i, 'Demasiadas peticiones. Espera un momento y reintenta.'],
   [/^an unexpected error occurred$/i, 'Ha ocurrido un error inesperado.'],
   [/^an unknown error occurred$/i, 'Ha ocurrido un error inesperado.'],
-  [/not found$/i, 'no encontrado'],
   [/unexpected response/i, 'El motor de análisis no responde ahora mismo.'],
 ];
 
@@ -331,19 +332,14 @@ export function getFriendlyErrorMessage(
 
   const message = getErrorMessage(error);
   for (const [pattern, replacement] of MESSAGE_TRANSLATIONS) {
-    if (pattern.test(message)) {
-      return replacement.endsWith('no encontrado')
-        ? `${message.replace(pattern, replacement)}`
-        : replacement;
-    }
+    if (pattern.test(message)) return replacement;
   }
 
-  if (cause === 'unknown') {
-    // Mensajes crudos en inglés del runtime no deben llegar a la UI.
-    if (/[a-z]{4,}/i.test(message) && !/[áéíóúñ¿¡]/i.test(message) && message.split(' ').length > 12) {
-      console.error('[error no mostrado en UI]', error);
-      return DEFAULT_UNKNOWN_MESSAGE;
-    }
-  }
-  return message || DEFAULT_UNKNOWN_MESSAGE;
+  // Textos del motor en inglés («Holding not found», «Tenant context
+  // required»…): traducidos o, si no se conocen, aviso genérico en español.
+  // Antes solo se ocultaban los de más de 12 palabras y «X not found» salía
+  // como «Holding no encontrado».
+  const spanish = spanishBackendMessage(message, DEFAULT_UNKNOWN_MESSAGE);
+  if (spanish !== message) console.error('[error traducido para la UI]', error);
+  return spanish;
 }

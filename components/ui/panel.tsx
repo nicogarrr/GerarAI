@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n/client';
 
 import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
@@ -87,6 +88,7 @@ export function Panel({
     children,
     ...props
 }: PanelProps) {
+    const t = useT();
     const hydrated = React.useSyncExternalStore(subscribeHydration, () => true, () => false);
     const [open, setOpen] = React.useState(defaultOpen);
     const contentId = React.useId();
@@ -123,7 +125,7 @@ export function Panel({
                 {toggleable ? (
                     <button
                         disabled={!hydrated}
-                        aria-label={`${effectiveOpen ? 'Contraer' : 'Expandir'} ${title}`}
+                        aria-label={`${effectiveOpen ? t('ui.panel.collapse') : t('ui.panel.expand')} ${title}`}
                         aria-controls={contentId}
                         aria-expanded={effectiveOpen}
                         className={cn(
@@ -137,7 +139,7 @@ export function Panel({
                             className={cn('h-5 w-5 transition-transform', effectiveOpen ? 'rotate-180' : 'rotate-0')}
                         />
                         <span aria-hidden="true" className="sr-only">
-                            {effectiveOpen ? 'Contraer' : 'Expandir'} {title}
+                            {effectiveOpen ? t('ui.panel.collapse') : t('ui.panel.expand')} {title}
                         </span>
                     </button>
                 ) : null}

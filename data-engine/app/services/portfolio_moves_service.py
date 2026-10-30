@@ -10,6 +10,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, MarketPrice, NewsEvent, PortfolioMoveDigest, Position
+from app.services.trading_sessions import missing_sessions
 
 VERSION = "current-holdings-adjusted-moves-v4"
 DAILY_BAR_SOURCES = frozenset({"yfinance"})
@@ -40,7 +41,14 @@ def build_digest(db: Session, as_of: date, generated_at: datetime | None = None)
         item = {"position_id": position.id, "company_id": company.id, "ticker": company.ticker,
                 "quantity": str(position.quantity), "date": as_of.isoformat(), "status": "sin datos",
                 "catalyst": "sin catalizador identificado", "related_news": []}
-        if current and prior:
+        # Variacion de UNA sesion: si entre el cierre anterior guardado y el
+        # de as_of falta una sesion de la bolsa (no festivo), el cociente es un
+        # movimiento de varias sesiones; no se presenta como el del dia.
+        gap = missing_sessions(db, company, prior.date, current.date) if current and prior else []
+        if gap:
+            item.update(status="hueco de sesión", previous_date=prior.date.isoformat(),
+                        missing_sessions=[day.isoformat() for day in gap])
+        elif current and prior:
             # Adjusted closes, not quoted closes: splits and distributions
             # must not become a spurious portfolio-movement signal.
             change_pct = (Decimal(current.adj_close) / Decimal(prior.adj_close) - 1) * 100

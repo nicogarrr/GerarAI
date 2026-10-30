@@ -22,7 +22,7 @@ const readSource = (rel: string) => readFileSync(join(root, rel), 'utf8');
 
 describe('propicks methodology honesty guard (F178)', () => {
     it('la metodología no promete valor/momentum ni backtest por estrategia como presente', () => {
-        const page = readSource('app/(public)/metodologia/page.tsx');
+        const page = readSource('app/(public)/metodologia/page.tsx') + readSource('lib/i18n/messages/es/landing.json');
         assert.ok(!page.includes('están publicadas con sus métricas'), 'las estrategias no se declaran publicadas');
         assert.ok(!page.includes('se rebalancea el día 1 de cada'), 'sin rebalanceo mensual prometido');
         assert.ok(
@@ -40,7 +40,7 @@ describe('propicks methodology honesty guard (F178)', () => {
     });
 
     it('el embudo v1 sigue declarando explícitamente lo que NO incluye', () => {
-        const page = readSource('app/(public)/metodologia/page.tsx');
+        const page = readSource('app/(public)/metodologia/page.tsx') + readSource('lib/i18n/messages/es/landing.json');
         assert.ok(
             page.includes('Lo que v1 NO incluye todavía:'),
             'tripwire: la declaración de límites de v1 no debe desaparecer',

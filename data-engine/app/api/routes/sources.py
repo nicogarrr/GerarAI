@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.core.source_urls import linkable_source_url
 from app.core.tenancy import tenant_filters
+from app.core.ui_errors import ui_error
 from app.llm.errors import LLMError
 from app.models import (
     Company,
@@ -309,7 +310,7 @@ async def extract_document_kpis(
     except LLMError as exc:
         # El texto de LLMError es diagnostico interno (proveedor, estado HTTP,
         # motivo de configuracion), no un mensaje para el usuario.
-        raise HTTPException(status_code=503, detail="El modelo no está disponible ahora; reintenta más tarde.") from exc
+        raise HTTPException(status_code=503, detail=ui_error(503, "model_unavailable").detail) from exc
     except BudgetExceededError as exc:
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 

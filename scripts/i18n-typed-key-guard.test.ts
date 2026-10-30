@@ -22,8 +22,10 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { loadMessages } from './i18n-messages.mjs';
+
 const t = readFileSync('lib/i18n/t.ts', 'utf8');
-const es = JSON.parse(readFileSync('lib/i18n/es.json', 'utf8')) as unknown;
+const es = loadMessages('es').dict as unknown;
 
 /** `para[A-Z]` pegado a un nombre de API: texto al que una librería se tragó la frase. */
 const SWALLOWED_API_NAME = /\bpara[A-Z][A-Za-z]{3,}/;

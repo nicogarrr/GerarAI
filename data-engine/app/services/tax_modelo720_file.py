@@ -101,9 +101,14 @@ def _num(value: Decimal | int | str, int_len: int, dec_len: int) -> str:
 
 
 def _money_field(value: Decimal, sign_pos: bool = True) -> tuple[str, str]:
-    """Signo + importe de 14 posiciones (12 enteras + 2 decimales)."""
-    sign = "N" if value < 0 else " "
-    return sign, _num(value, 12, 2)
+    """Signo + importe de 14 posiciones (12 enteras + 2 decimales).
+
+    El signo sale del importe YA redondeado a céntimos: un -0,004 se escribe
+    como 0,00 y no como "N" + ceros (un cero negativo que el impreso no admite).
+    """
+    digits = _num(value, 12, 2)
+    sign = "N" if value < 0 and int(digits) else " "
+    return sign, digits
 
 
 class Modelo720FileService:

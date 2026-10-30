@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services import schedule13dg_monitor, schedule13dg_service
 from app.services.manager_holding_ingestion_service import (
     LIMITATIONS,
@@ -93,10 +94,7 @@ def schedule_13dg_sync(
     if normalized not in watchlist_tickers(db, tenant_id):
         raise HTTPException(
             status_code=404,
-            detail=(
-                f"{normalized} no esta en la watchlist ni en la cartera; "
-                "la ingesta SC 13D/13G esta acotada a emisores seguidos"
-            ),
+            detail=ui_error(404, "ownership_scope_limited", ticker=normalized).detail,
         )
     return schedule13dg_monitor.scan(
         db,

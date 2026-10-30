@@ -584,7 +584,15 @@ class NewsService:
                 source_reference={"type": "news_event", "id": news.id},
                 auto_apply=True,
             )
-        elif not company:
+        else:
+            # Sin empresa (carriles macro/gobierno) o via ligera Jev
+            # (duplicado/ruido: sin ThesisChange ni claim scan): el commit de
+            # scan_text no corre en ninguna de las dos ramas. Sin este commit
+            # el evento quedaba flush pero NUNCA persistido cuando el llamador
+            # no commiteaba (los workers de ingesta cierran la sesion sin
+            # commit): la noticia se perdia en silencio y, al no existir en el
+            # tracker, cada barrido siguiente volvia a ingerirla y a pagar su
+            # gate Jev/LLM otra vez en vez de detectarla como duplicada.
             db.commit()
 
         action = (

@@ -32,6 +32,16 @@ from app.services.second_order_quota import reserve_llm_call
 _PROMPT = get_prompt("second_order_news_service", allow_remote=False)
 
 
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("second_order_news_service", allow_remote=False)
+
+
+
 class CausalStep(BaseModel):
     cause: str = Field(max_length=180)
     effect: str = Field(max_length=180)
@@ -107,7 +117,7 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
     )
     request = LLMRequest(
         messages=[
-            Message("system", _PROMPT.text),
+            Message("system", _prompt().text),
             Message("user", (context + "\n\nNoticia:\n" if context else "") + text[:3500]),
         ],
         task="news_second_order",
@@ -117,7 +127,7 @@ async def _extract_with_llm(text: str, context: str = "", before_retry=None) -> 
         max_tokens=3000,
         reasoning_effort=settings.reasoning_effort_for("segundo_orden"),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="second_order_themes"),
-        metadata=_PROMPT.trace_metadata(),
+        metadata=_prompt().trace_metadata(),
     )
     # Pin an approved model: task overrides may route to paid models.
     if not is_owner_approved_model(provider.model_router.resolve(request), settings):

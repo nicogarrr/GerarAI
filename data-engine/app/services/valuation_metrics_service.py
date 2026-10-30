@@ -47,11 +47,14 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
+from app.services.price_units import close_in_company_currency, price_in_currency
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.split_adjustment import (
     fact_split_factor,
+    split_after_price,
     split_events_by_company,
 )
+from app.valuation.currency import listing_quote_unit
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 
 METRIC_VERSION = "valuation-v1"
@@ -88,9 +91,16 @@ def default_dividend_fetcher(symbol: str) -> list[dict[str, Any]] | None:
     import yfinance as yf
 
     try:
-        series = yf.Ticker(symbol).dividends
+        ticker = yf.Ticker(symbol)
+        series = ticker.dividends
     except Exception:
         return None
+    # Unidad en la que Yahoo da precio Y dividendos de ESTE simbolo (TSCO.L:
+    # GBp; VUSA.L: GBP). Viaja en los metadatos de la misma descarga.
+    try:
+        unit = str((ticker.history_metadata or {}).get("currency") or "").strip() or None
+    except Exception:
+        unit = None
     if series is None:
         return None
     events: list[dict[str, Any]] = []
@@ -101,7 +111,10 @@ def default_dividend_fetcher(symbol: str) -> list[dict[str, Any]] | None:
             continue
         if not qty.is_finite() or qty < 0:
             continue
-        events.append({"date": idx.date().isoformat(), "amount": str(qty)})
+        event = {"date": idx.date().isoformat(), "amount": str(qty)}
+        if unit:
+            event["currency"] = unit
+        events.append(event)
     return events
 
 
@@ -131,8 +144,9 @@ def default_finnhub_yield_fetcher(ticker: str) -> Decimal | None:
 
 def _latest_price(
     db: Session, company_id: int, as_of: date
-) -> tuple[Decimal, date, str | None] | None:
-    """Ultimo cierre <= as_of con frescura <= PRICE_FRESHNESS_DAYS.
+) -> tuple[Decimal, date, str | None, str | None] | None:
+    """Ultimo cierre <= as_of con frescura <= PRICE_FRESHNESS_DAYS
+    (cierre, fecha, fuente, divisa de cotizacion).
 
     Nunca un precio posterior a as_of (point-in-time, precedente F370) ni un
     precio viejo presentado como actual (precedente del track record).
@@ -150,7 +164,7 @@ def _latest_price(
         return None
     if (as_of - row.date).days > PRICE_FRESHNESS_DAYS:
         return None
-    return close, row.date, getattr(row, "source", None)
+    return close, row.date, getattr(row, "source", None), getattr(row, "quote_currency", None)
 
 
 def _book_value_per_share(
@@ -214,8 +228,14 @@ def _book_value_per_share(
     # 10:1 dejaba el P/B dividido entre 10 (misma regla que el screener).
     # Un 10-K publicado DESPUES del split ya trae las acciones reexpresadas:
     # misma regla que el DCF (fact_split_factor, consciente del `filed`).
+    events = split_events_by_company(db, [company.id]).get(company.id, [])
+    # Cierre anterior a un split ya efectivo: base del precio desconocida
+    # (vieja o ya ajustada por el proveedor): P/B N/D, como la valoracion
+    # (#3227); nunca un P/B que puede salir x factor.
+    if price_date is not None and split_after_price(events, price_date, as_of):
+        return None
     split_factor = fact_split_factor(
-        split_events_by_company(db, [company.id]).get(company.id, []),
+        events,
         period=sh_period,
         filed=sh_filed,
         cutoff=price_date or as_of,
@@ -232,6 +252,17 @@ def _book_value_per_share(
         "equity_source": eq_src,
         "shares_source": sh_src,
     }
+
+
+def _dividend_unit(events: list[dict[str, Any]], company: Company) -> str | None:
+    """Unidad de los dividendos de Yahoo: la que declara el fetcher; si no
+    declara, la unidad de cotizacion del listado. Unidades mezcladas: None."""
+    units = {str(e.get("currency")).strip() for e in events if e.get("currency")}
+    if len(units) > 1:
+        return None
+    if units:
+        return units.pop()
+    return listing_quote_unit(company.ticker, getattr(company, "currency", None))
 
 
 def ttm_dividend_per_share(
@@ -335,8 +366,11 @@ def compute_valuation_metrics(
         "skipped": {
             "sin_precio_fresco": 0,
             "sin_libros": 0,
+            "sin_fx_cotizacion": 0,
             "sin_simbolo_yahoo": 0,
             "dividendos_fuente_fallo": 0,
+            "precio_anterior_a_split": 0,
+            "sin_unidad_cotizacion": 0,
         },
     }
     for company in companies:
@@ -344,13 +378,26 @@ def compute_valuation_metrics(
         if price is None:
             stats["skipped"]["sin_precio_fresco"] += 1
             continue
-        close, price_date, price_source = price
+        close, price_date, price_source, quote_currency = price
 
         book = _book_value_per_share(db, company, as_of, price_date)
+        # Los libros van en Company.currency y el cierre en la divisa de
+        # cotizacion: TSCO.L cotiza en GBp y reporta en GBP (250 peniques son
+        # 2,50 GBP; sin pasar a libras el P/B salia x100); SHEL.L en GBp con
+        # cuentas en USD necesita FX point-in-time. Sin tipo valido: N/D.
+        pb_close = (
+            close_in_company_currency(
+                db, close, quote_currency=quote_currency, company=company, on=price_date,
+            )
+            if book is not None
+            else None
+        )
         if book is None:
             stats["skipped"]["sin_libros"] += 1
+        elif pb_close is None:
+            stats["skipped"]["sin_fx_cotizacion"] += 1
         else:
-            pb = close / book["bvps"]
+            pb = pb_close / book["bvps"]
             _upsert_metric(
                 db,
                 tenant_id=tenant_id,
@@ -365,7 +412,9 @@ def compute_valuation_metrics(
                 ),
                 trace={
                     "as_of": as_of.isoformat(),
-                    "price": str(close),
+                    "price": str(pb_close),
+                    "quote_close": str(close),
+                    "quote_currency": quote_currency,
                     "price_date": price_date.isoformat(),
                     "price_source": price_source,
                     "fiscal_year": book["fiscal_year"],
@@ -388,8 +437,33 @@ def compute_valuation_metrics(
         if events is None:
             stats["skipped"]["dividendos_fuente_fallo"] += 1
             continue
+        # Cierre anterior a un split ya efectivo: Yahoo devuelve los
+        # dividendos ajustados al split y la base del cierre es desconocida
+        # (vieja o ya ajustada), asi que el yield podia salir x factor (un
+        # 10:1 daba 10 veces mas). N/D, como P/B, PER y la valoracion (#3227).
+        split_events = split_events_by_company(db, [company.id]).get(company.id, [])
+        if split_after_price(split_events, price_date, as_of):
+            stats["skipped"]["precio_anterior_a_split"] += 1
+            continue
+        # Dividendos y cierre en la MISMA unidad: Yahoo da los dividendos en la
+        # unidad de su cotizacion (TSCO.L en peniques), pero el cierre guardado
+        # puede venir de otra fuente con otra unidad (GBP) o sin unidad (spot
+        # sin divisa declarada). Conversion exacta peniques<->libras; si la
+        # unidad del cierre no se puede establecer: N/D, como el P/B (#3261).
+        dividend_unit = _dividend_unit(events, company)
+        yield_close = (
+            price_in_currency(
+                close, quote_currency=quote_currency, target_currency=dividend_unit,
+                company=company,
+            )
+            if dividend_unit
+            else None
+        )
+        if yield_close is None or yield_close <= 0:
+            stats["skipped"]["sin_unidad_cotizacion"] += 1
+            continue
         ttm, used = ttm_dividend_per_share(events, as_of)
-        yahoo_yield = ttm / close
+        yahoo_yield = ttm / yield_close
         finnhub_yield = finnhub_yield_fetcher(company.ticker)
         disagree = (
             finnhub_yield is not None
@@ -403,6 +477,9 @@ def compute_valuation_metrics(
             "ttm_dividend_per_share": str(ttm),
             "dividend_events": used,
             "price": str(close),
+            "price_quote_currency": quote_currency,
+            "dividend_currency": dividend_unit,
+            "price_in_dividend_unit": str(yield_close),
             "price_date": price_date.isoformat(),
             "yahoo_label": YAHOO_LABEL,
             "finnhub_label": FINNHUB_LABEL,

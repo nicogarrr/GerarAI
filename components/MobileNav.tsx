@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n/client';
 
 import dynamic from 'next/dynamic';
 import { useRef, useState } from 'react';
@@ -21,6 +22,7 @@ const MobileNavDrawer = dynamic(loadMobileNavDrawer, { loading: () => null });
  * ninguna navegacion por secciones: solo logo, buscador y avatar.
  */
 export default function MobileNav({ initialStocks }: { initialStocks?: StockWithWatchlistStatus[] }) {
+    const t = useT();
     const [open, setOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -32,7 +34,7 @@ export default function MobileNav({ initialStocks }: { initialStocks?: StockWith
                 onClick={() => setOpen(true)}
                 onPointerDown={() => void loadMobileNavDrawer()}
                 onFocus={() => void loadMobileNavDrawer()}
-                aria-label="Abrir menú de navegación"
+                aria-label={t('shell.nav.openMenu')}
                 aria-expanded={open}
                 aria-controls="mobile-nav-drawer"
                 className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white md:hidden"

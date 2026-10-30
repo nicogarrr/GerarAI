@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.models.paper_trading import PaperTrade
 from app.schemas.paper_trading import PaperProposal
 from app.services.llm_proposal_runner import QuotaExceeded, generate_proposal
@@ -54,7 +55,7 @@ async def llm_propose(body: LLMProposalRequest, db: Session = Depends(get_db)) -
     except ProposalRejected as exc:
         db.rollback()
         status = 503 if exc.reason in {"llm_deshabilitado", "presupuesto_agotado", "modelo_no_gratuito", "modelo_no_verificable", "fallback_no_gratuito"} else 422
-        raise HTTPException(status_code=status, detail=f"Propuesta rechazada: {exc.reason}") from exc
+        raise ui_error(status, "proposal_rejected", reason=exc.reason) from exc
     except UnknownProposalCurrency as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(exc)) from None
@@ -104,7 +105,7 @@ def feed(db: Session = Depends(get_db)) -> dict:
 def close(proposal_id: int, db: Session = Depends(get_db)) -> dict:
     row = db.scalar(select(PaperTrade).where(PaperTrade.id == proposal_id))
     if row is None:
-        raise HTTPException(status_code=404, detail="Propuesta no encontrada")
+        raise HTTPException(status_code=404, detail=ui_error(404, "proposal_not_found").detail)
     if row.status == "closed":
         return trade_out(row)
     # Drop the read transaction before provider work. refresh_trades locks only
@@ -116,9 +117,9 @@ def close(proposal_id: int, db: Session = Depends(get_db)) -> dict:
         return trade_out(row)
     out = trade_out(row)
     if row.status != "open" or out["quote_status"] != "available" or row.mark_at is None or row.mark_price is None:
-        raise HTTPException(status_code=409, detail="Sin precio real reciente para cerrar")
+        raise HTTPException(status_code=409, detail=ui_error(409, "no_real_price_to_close").detail)
     if row.entry_at == row.mark_at:
-        raise HTTPException(status_code=409, detail="Falta una cotización posterior a la entrada")
+        raise ui_error(409, "missing_quote_after_entry")
     close_position(row, row.mark_price, row.mark_at, "manual", current_assumptions())
     db.commit()
     return trade_out(row, datetime.now(UTC))

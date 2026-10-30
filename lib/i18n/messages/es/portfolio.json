@@ -1,0 +1,20 @@
+{
+  "scores": {
+    "quality": "Consistencia",
+    "growth": "Retorno (banda)",
+    "value": "Resiliencia",
+    "dividend": "Dividendos (banda)"
+  },
+  "tearsheet": {
+    "maxDrawdown": "Caída máxima",
+    "winRate": "Ratio de acierto"
+  },
+  "fxMissingNotice": {
+    "one": "Los totales de la cartera excluyen 1 saldo o posición sin tipo de cambio válido.",
+    "other": "Los totales de la cartera excluyen {n} saldos o posiciones sin tipo de cambio válido."
+  },
+  "valuationHoldNotice": {
+    "one": "Los totales de la cartera excluyen 1 posición con valoración pendiente tras un split sin precio post-split verificado ({tickers}). Cantidad y coste sí están ajustados.",
+    "other": "Los totales de la cartera excluyen {n} posiciones con valoración pendiente tras un split sin precio post-split verificado ({tickers}). Cantidad y coste sí están ajustados."
+  }
+}

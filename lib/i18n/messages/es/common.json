@@ -1,0 +1,43 @@
+{
+  "na": "N/D",
+  "notRun": "No corrido",
+  "actions": {
+    "retry": "Reintentar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "close": "Cerrar",
+    "delete": "Eliminar",
+    "apply": "Aplicar",
+    "regenerate": "Regenerar",
+    "export": "Exportar",
+    "search": "Buscar"
+  },
+  "states": {
+    "loadingAlerts": "Cargando alertas...",
+    "alertsLoadError": "No se pudieron cargar tus alertas. Reintenta en unos segundos.",
+    "noAlerts": "No tienes alertas configuradas",
+    "noAlertsHint": "Crea tu primera alerta para recibir notificaciones en tiempo real",
+    "neverTriggered": "Todavía no se ha disparado",
+    "loading": "Cargando...",
+    "empty": "Sin datos",
+    "noResults": "Sin resultados",
+    "error": "Se produjo un error inesperado",
+    "errorHint": "Inténtalo de nuevo. Si el problema persiste, revisa tu conexión.",
+    "backendOfflineTitle": "Servicio no disponible",
+    "alertsLoadErrorSession": "Tu sesión ha caducado. Vuelve a entrar para ver tus alertas.",
+    "alertsLoadErrorForbidden": "No tienes permiso para ver estas alertas.",
+    "alertsLoadErrorRate": "Demasiadas peticiones. Espera un momento y reintenta."
+  },
+  "labels": {
+    "ticker": "Ticker",
+    "company": "Empresa",
+    "sector": "Sector",
+    "price": "Precio",
+    "date": "Fecha",
+    "score": "Score",
+    "coverage": "Cobertura",
+    "confidence": "Confianza",
+    "missing": "Faltantes",
+    "status": "Estado"
+  }
+}

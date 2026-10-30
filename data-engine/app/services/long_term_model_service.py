@@ -228,8 +228,7 @@ def _calculated_line(
 def _derived_fcf(ocf: FinancialFact | None, capex: FinancialFact | None) -> Decimal | None:
     """Free cash flow derived from the two reported legs: ``operating_cash_flow + capital_expenditure``.
 
-    Capex keeps the sign it has in the filing (reported negative, so the sum is
-    a subtraction in practice). Returns ``None`` when either leg is missing or
+    Capex is an outflow whatever sign it was stored with: OCF - |capex|. Returns ``None`` when either leg is missing or
     unreadable: substituting a silent 0 would publish a cash flow the issuer
     never reported, which is exactly what the reported line's absence was
     telling us.
@@ -238,7 +237,9 @@ def _derived_fcf(ocf: FinancialFact | None, capex: FinancialFact | None) -> Deci
     investing = _float(capex.value) if capex is not None else None
     if operating is None or investing is None:
         return None
-    return Decimal(str(operating)) + Decimal(str(investing))
+    # Capex es salida de caja: un hecho guardado en positivo (sin normalizar)
+    # sumaba en vez de restar. Siempre OCF - |capex|.
+    return Decimal(str(operating)) - abs(Decimal(str(investing)))
 
 
 def _is_annual(fact: FinancialFact) -> bool:
@@ -2021,7 +2022,11 @@ class LongTermModelService:
 
         price = resolve_model_price(db, company.id)
         if price is None:
-            return _current_price_with_date(db, company.id)
+            # resolve_model_price ya mira cierres y marks; None significa que no
+            # hay precio o que no se puede pasar a la divisa del listado (cierre
+            # en USD de una ficha en EUR sin tipo FX). Caer al cierre crudo
+            # publicaba 250 USD como precio en EUR: N/D, como ValuationService.
+            return None, None, None
         source = "market_price" if price.source == "market_close" else "position_mark"
         return price.value, _date_value(price.as_of), source
 

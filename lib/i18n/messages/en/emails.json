@@ -1,0 +1,11 @@
+{
+  "passwordReset": {
+    "subject": "Reset your GerarAI password",
+    "greetingNamed": "Hi {name},",
+    "greeting": "Hi,",
+    "body": "We received a request to reset the password for your GerarAI account.",
+    "linkIntro": "Open this link (it expires soon and can only be used once):",
+    "ignore": "If you did not request the change, ignore this email: your current password remains valid.",
+    "noAsk": "GerarAI will never ask you for your password by email."
+  }
+}

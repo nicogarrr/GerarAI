@@ -1,0 +1,45 @@
+{
+  "notFound": {
+    "metaTitle": "Page not found",
+    "title": "Page not found",
+    "body": "The page you are looking for does not exist or has moved. Check the address or start again from somewhere you know.",
+    "backHome": "Back to home",
+    "methodology": "See the methodology",
+    "help": "Help center",
+    "wordmarkAria": "GerarAI, home",
+    "navAria": "Main navigation",
+    "navHome": "Home",
+    "navMethodology": "Methodology",
+    "navHelp": "Help"
+  },
+  "globalError": {
+    "htmlLang": "en",
+    "title": "Something went wrong",
+    "body": "Unexpected application error. The details stay in the server logs; they are intentionally not shown here.",
+    "reference": "Reference: {digest}",
+    "retry": "Try again"
+  },
+  "backend": {
+    "authFailed": "Could not sign in. Check your email and password.",
+    "authUnavailable": "The authentication service is unavailable right now. Try again in a few minutes.",
+    "invalidSymbol": "Invalid symbol format. It must be 1 to 10 characters and only letters, numbers, dots and dashes.",
+    "missingApiKey": "This service is not configured on this server.",
+    "rateLimitExceeded": "You have exceeded the request limit. Try again in a few minutes.",
+    "databaseError": "Could not connect to the database. Try again.",
+    "externalApiError": "Could not fetch data from the external service.",
+    "notFound": "The requested resource was not found.",
+    "validationError": "The submitted data is not valid.",
+    "emailAlreadyRegistered": "This email is already registered. Sign in.",
+    "passwordTooShort": "Password must be at least 8 characters.",
+    "invalidCredentialsLong": "Invalid email or password. Check the details and try again.",
+    "invalidTotp": "Invalid authentication code. Try again.",
+    "signOutFailed": "Could not sign out. Reload the page and try again."
+  },
+  "upload": {
+    "choose": "Choose file",
+    "tooBig": "\"{name}\" is {sizeMb} MB and the upload limit is {maxMB} MB: choose a smaller file or upload it compressed.",
+    "noFile": "No file selected",
+    "loading": "Loading the file picker"
+  },
+  "mutationFailed": "We couldn't complete the operation. Please try again."
+}

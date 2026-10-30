@@ -308,6 +308,14 @@ def get_db(
             # leer cabeceras de autenticacion fuera de get_research_principal.
             if request is not None:
                 request.state.tenant_id = tenant.id
+        # Idioma de generacion de la peticion (i18n): los servicios que
+        # puentean hilos propios (chat) copian db.info, no el contextvar.
+        from app.core.i18n import DEFAULT_LANGUAGE, current_language, tenant_stored_language
+
+        language = current_language()
+        if language == DEFAULT_LANGUAGE:
+            language = tenant_stored_language(db) or DEFAULT_LANGUAGE
+        db.info["language"] = language
         yield db
     finally:
         db.rollback()

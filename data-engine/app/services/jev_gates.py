@@ -23,11 +23,9 @@ import math
 from collections.abc import Sequence
 from typing import Any
 
-from app.core.config import get_settings
 from app.llm.jev import JevCreditExhausted, JevDecision
 from app.services.async_bridge import run_from_any_context
 from app.services.jev_availability import credit_status, mark_credit_exhausted
-from app.services.jev_fallback import classify_free
 from app.services.jev_triage_service import build_client
 
 logger = logging.getLogger("gerarai.jev_gates")
@@ -124,11 +122,6 @@ CLAIM_RELATION_CRITERIA = {
 }
 
 
-# Solo estos gates pueden usar la ruta gratuita cuando acaba el crédito.
-# Sus salidas son etiquetas de metadata, nunca decisiones finales.
-FREE_GATES = frozenset({"universe_relevance", "copilot_ticket", "alert_digest"})
-
-
 async def jev_choice_or_none(
     *,
     name: str,
@@ -140,8 +133,6 @@ async def jev_choice_or_none(
     """Una clasificación acotada; falla cerrado al flujo preexistente."""
     state = credit_status()["status"]
     if state in {"fallback_proveedor_alternativo", "desactivado_sin_credito", "estado_no_disponible"}:
-        if state == "fallback_proveedor_alternativo" and name in FREE_GATES:
-            return await classify_free(text[:max_chars], instructions=instructions, criteria=criteria)
         return None
     try:
         client = build_client()
@@ -157,8 +148,6 @@ async def jev_choice_or_none(
         return decision
     except JevCreditExhausted:
         mark_credit_exhausted()
-        if get_settings().typesafe_fallback == "instructor" and name in FREE_GATES:
-            return await classify_free(text[:max_chars], instructions=instructions, criteria=criteria)
         return None
     except Exception as exc:  # noqa: BLE001
         logger.warning("jev gate %s failed: %s", name, exc)

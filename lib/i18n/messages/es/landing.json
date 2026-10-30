@@ -1,0 +1,368 @@
+{
+  "nav": {
+    "methodology": "Metodología",
+    "help": "Ayuda",
+    "privacy": "Privacidad",
+    "terms": "Términos",
+    "ariaLabel": "Páginas de GerarAI"
+  },
+  "shell": {
+    "skipLink": "Saltar al contenido",
+    "wordmarkAria": "GerarAI, inicio"
+  },
+  "header": {
+    "signIn": "Iniciar sesión",
+    "signUp": "Crear cuenta",
+    "dashboard": "Ir a mi panel"
+  },
+  "footer": {
+    "disclaimer": "Herramienta educativa de análisis: GerarAI no da asesoramiento de inversión y las decisiones son tuyas.",
+    "chartsBy": "Gráficos interactivos por",
+    "navAria": "Enlaces del pie"
+  },
+  "hero": {
+    "metaTitle": "Research OS de inversión fundamental con fuentes trazables",
+    "metaDescription": "GerarAI convierte el research de una empresa en tesis trazables y versionadas: cada afirmación conserva su fuente y cada resultado revisa tu previsión.",
+    "ogTitle": "GerarAI: research de empresas con fuentes trazables y tesis versionadas",
+    "ogDescription": "Cada afirmación conserva su fuente, cada tesis tiene versión y cada resultado contrasta tu previsión. Metodología pública.",
+    "kicker": "Research OS de inversión fundamental",
+    "titlePre": "Tesis ",
+    "titleHighlight": "trazables",
+    "titlePost": " que se revisan contra la realidad",
+    "subtitle": "Cada afirmación conserva su documento y su fecha, y cada tesis tiene versión. Si un dato no está, GerarAI lo dice en lugar de inventarlo.",
+    "ctaStart": "Empezar mi primera tesis",
+    "ctaAccess": "Pedir acceso",
+    "ctaMethodology": "Ver la metodología",
+    "shotDesktopAlt": "Ficha de empresa de GerarAI: precio con su fuente, variación y gráfico de evolución",
+    "shotTabletAlt": "GerarAI en tablet: la misma ficha adaptada a pantalla mediana",
+    "shotMobileAlt": "GerarAI en móvil: precio y gráfico de la ficha de empresa",
+    "caption": "Capturas reales de la aplicación con datos de ejemplo. La interfaz declara de dónde sale cada cifra que muestra, o que no hay fuente disponible."
+  },
+  "help": {
+    "metaTitle": "Centro de ayuda",
+    "metaDescription": "Documentación por módulo, preguntas frecuentes y contacto de GerarAI"
+  },
+  "forgotPassword": {
+    "metaTitle": "Restablecer contraseña",
+    "metaDescription": "Consulta cómo recuperar el acceso a tu cuenta de GerarAI.",
+    "h1": "Restablecer contraseña",
+    "bodyConfigured": "Si tu cuenta tiene un email asociado, te enviaremos un enlace de un solo uso. Por seguridad no confirmamos si un email está registrado.",
+    "bodyUnconfigured": "Este despliegue no tiene configurado el correo saliente, así que no podemos enviarte ningún enlace de restablecimiento. Si ya has iniciado sesión, cambia la contraseña desde Seguridad; si no puedes entrar, usa el canal de soporte."
+  },
+  "resetPassword": {
+    "metaTitle": "Nueva contraseña",
+    "metaDescription": "Elige una nueva contraseña para tu cuenta de GerarAI.",
+    "h1": "Nueva contraseña",
+    "body": "El enlace caduca y solo se puede usar una vez. Al guardarla se cerrarán las sesiones abiertas."
+  },
+  "metodologia": {
+    "metaTitle": "Metodología",
+    "metaDescription": "Fuentes de datos, motores de valoración, límites y costes de GerarAI: de dónde sale cada dato y qué no debes esperar de la plataforma.",
+    "kicker": "Transparencia",
+    "h1": "Metodología",
+    "intro": "Fuentes, motores de valoración, límites y costes de GerarAI: de dónde sale cada dato, cómo se calcula cada número y qué no debes esperar de la plataforma.",
+    "actions": {
+      "library": "Biblioteca",
+      "search": "Buscar evidencia",
+      "propicks": "Ver ProPicks"
+    },
+    "publicNotice": {
+      "body": "Esta página es pública. Los botones y las fichas que enlazan (research, índices, señales de insiders, Biblioteca, búsqueda de evidencia y ProPicks) forman parte del espacio de trabajo: requieren una cuenta, así que al pulsarlos se te pedirá iniciar sesión.",
+      "createAccount": "Crear cuenta",
+      "or": "o",
+      "signIn": "iniciar sesión"
+    },
+    "sourcesTitle": "Fuentes de datos",
+    "sources": {
+      "finnhub": {
+        "title": "Finnhub",
+        "text": "Precios (quotes), perfiles de compañía (profile2) y búsqueda de símbolos, incluidos tickers poco comunes. Capa gratuita con clave.",
+        "cta": "Ver research"
+      },
+      "yahoo": {
+        "title": "Yahoo Finance · chart API",
+        "text": "Índices y futuros reales: S&P 500 (^GSPC), Nasdaq (^IXIC), Bitcoin (BTC-USD), oro (GC=F) y plata (SI=F). Sin API key y con caché de 60 s. Nunca un ETF etiquetado como índice.",
+        "cta": "Ver índices en la home"
+      },
+      "sec": {
+        "title": "SEC EDGAR",
+        "text": "Filings 10-K/10-Q y Form 4 (operaciones de insiders) directamente del regulador de EE. UU. Acceso público y gratuito: la fuente primaria de documentos.",
+        "cta": "Ver señales insider"
+      },
+      "others": {
+        "title": "Otras fuentes públicas",
+        "text": "FRED (series macroeconómicas, cuando está configurada), CelesTrak (elementos orbitales), GDELT (noticias), CNMV (posiciones cortas en España) y FINRA (interés corto en EE. UU.).",
+        "cta": "Ver research"
+      }
+    },
+    "fmpNotice": {
+      "lead": "FMP solo cubre mercado US:",
+      "body": "el plan gratuito de Financial Modeling Prep quedó limitado a compañías US (sus endpoints antiguos responden «Legacy Endpoint» o 402 fuera de ese mercado). La API acepta el refresco con FMP para cualquier emisor, pero fuera de US el proveedor lo rechaza y el refresco falla con aviso. No hay sustitución automática: si el emisor reporta a SEC EDGAR o ESEF, puedes lanzar tú el refresco desde esas fuentes (acción separada en la ficha); y si ninguna fuente cubre al emisor, los financieros se muestran como no disponibles en lugar de estimarse. En el refresco de precios del backend, los listados US se consultan primero en FMP si hay clave y la cotización trae fecha válida; Finnhub es el fallback. Yahoo Finance aporta el refresco intradía de cartera y las series históricas de ProPicks, también para listados no-US cuando el símbolo de su bolsa se conoce. Sin cotización o símbolo fiable, se muestra sin precio."
+    },
+    "orbital": {
+      "title": "Señal orbital AST: semieje mayor",
+      "body": "Para cada objeto del grupo AST de CelesTrak calculamos el semieje mayor con a = (μ / (2πn / 86.400)²)^(1/3), con μ terrestre = 398.600,4418 km³/s² y n en revoluciones al día. Conservamos hasta 32 épocas distintas por ID NORAD. Comparamos solo una ventana de 24 a 72 horas con al menos tres épocas separadas por dos horas. Una caída de 2 km o más invita a revisar fuentes, no prueba despliegue, maniobra ni causa: la resistencia atmosférica, ajustes orbitales y revisiones de elementos también pueden producir cambios. BSTAR y las derivadas del movimiento medio son parámetros de ajuste, no telemetría independiente. La señal es exploratoria y no sustituye una confirmación primaria. El grupo AST se consulta cada dos horas como máximo. GP (catálogo general) y SupGP (elementos suplementarios AST-E) se guardan y representan en series independientes: no se comparan entre sí. Una fuente puede faltar sin invalidar la otra. Nunca se consulta CelesTrak al abrir la vista; después de 30 horas sin descarga válida se ocultan señal e historial caducados de cada fuente. La época orbital y la fecha de descarga son distintas."
+    },
+    "engines": {
+      "title": "Motores de valoración",
+      "intro": "Cada compañía se valora con el motor que le corresponde por su tipo y sus etiquetas. Cuando falta un dato obligatorio, el motor devuelve «datos insuficientes» en lugar de inventar un número.",
+      "dcf": {
+        "title": "DCF estándar (por defecto)",
+        "textPre": "DCF FCFF a 5 años sobre ingresos y margen FCF del último snapshot coherente: si falta el margen se deriva como FCF/ingresos (acotado a 1%-50%) y el crecimiento sale de los hechos o de un valor por defecto (acotado a -15%/+45%). El",
+        "textWacc": "WACC",
+        "textMid": "y el crecimiento terminal usan un valor por defecto etiquetado como tal; la deuda neta del snapshot resta al equity (la caja neta suma). Escenarios bajista/base/alcista, sensibilidad 3x3 crecimiento x WACC y",
+        "textReverseDcf": "DCF inverso",
+        "textPost": "incluidos."
+      },
+      "preRevenue": {
+        "title": "Pre-revenue / especulativo (pre-FCF)",
+        "text": "DCF a 5 años para empresas sin caja libre: ingresos mínimos de 1,0 (para que ~0 no rompa la matemática), margen 1%-40%, crecimiento por defecto del 20% (acotado a -15%/+60%) y WACC del 13% por defecto. Escenarios causales (retraso de ejecución o estrés de financiación, base, monetización acelerada) con dilución extra en el escenario bajista (≥15%, tope del 80% del valor) y necesidad de financiación estimada a 2 años con buffer del 50%."
+      },
+      "commodities": {
+        "title": "Commodities (minería, energía, uranio)",
+        "text": "Flujo = max(precio - coste unitario, 0) x volumen x (1 - tasa), y equity = flujo x múltiplo - deuda neta, todo desde hechos financieros (precio realizado o spot, coste, volumen, múltiplo). Los escenarios son el grid de precios x0,75 / x1,0 / x1,25 sobre el precio de referencia, y esa misma tabla es la sensibilidad."
+      },
+      "sotp": {
+        "title": "SOTP (multi-segmento)",
+        "text": "NAV = suma de (métrica operativa del segmento x múltiplo del segmento) - deuda neta, con contrato explícito de hechos por segmento y descuento holding entre 0 y 1. Escenarios: descuento +15pp (techo 45%) / base / -8pp con NAV x1,12 en el alcista; sensibilidad del descuento -5pp / base / +5pp. Nunca cae a un DCF de firma única."
+      },
+      "holding": {
+        "title": "Holding company (tipo BN/BABA)",
+        "text": "Para holdings: hereda el SOTP con descuento holding explícito que recoge el descuento de conglomerado persistente del grupo. Mismos escenarios y misma sensibilidad del descuento que el SOTP."
+      },
+      "footnote": "Además existen motores sectoriales dedicados para bancos (P/B justificado = (ROE - g)/(CoE - g)), aseguradoras (el mismo P/B multiplicado por un factor del combined ratio) e inmobiliarias cotizadas (REIT). Los escenarios de cada motor se muestran con sus supuestos en la ficha de la compañía."
+    },
+    "propicks": {
+      "title": "Cómo se generan los ProPicks",
+      "step1": {
+        "title": "Métricas de calidad y crecimiento",
+        "text": "Rentabilidad, flujo de caja, crecimiento y salud de balance, calculadas sobre los filings persistidos. La valoración y el momentum puntúan cuando hay datos para la empresa (CFROI y WACC; serie de precios); si faltan, la categoría entra neutra (50) y se marca n/d en la tarjeta."
+      },
+      "step2": {
+        "title": "Ranking por percentiles del universo",
+        "text": "Cada componente se convierte a percentil sobre todo el universo persistido y se pondera con pesos declarados; si un componente falta, los pesos se renormalizan y queda registrado."
+      },
+      "step3": {
+        "title": "Score + confianza verificable",
+        "text": "Score 0-100 con nivel de confianza y motivos auditables: cada motivo muestra su métrica y su valor."
+      },
+      "step4": {
+        "title": "Backtesting walk-forward",
+        "text": "Existe un backtest walk-forward global, pero es un baseline de momentum solo-precio: no es un backtest de ProPicks. El backtest por estrategia se publicará cuando existan fundamentales point-in-time; hasta entonces ninguna estrategia muestra desempeño simulado."
+      },
+      "footnote": "De las cuatro estrategias (adaptativa, value, momentum y defensiva), cada ficha declara su estado real: si aún no tiene selección o backtest publicados, lo dice en lugar de mostrar estimaciones."
+    },
+    "funnel": {
+      "title": "Embudo de ProPicks",
+      "introPre": "El embudo evalúa",
+      "introStrong": "todo el universo persistido",
+      "introPost": "(2.110 empresas: SEC + ESEF) con métricas ya calculadas en base de datos. Nada se imputa: cada empresa lleva su mapa de cobertura por métrica (ok / missing / approx) y el motivo exacto de cada filtro que no supera.",
+      "coverageStrong": "Cobertura mínima:",
+      "coverageRest": "al menos 6 de las 9 métricas de calidad (ROIC, CFROI aproximado, FCF margin 5y, owner earnings 5y, márgenes 5y, ROE 5y, ROA 5y, capex/DA, MOAT V2).",
+      "consistencyStrong": "Consistencia de beneficios",
+      "consistencyRest": "(Graham / Buffett): beneficio neto positivo en al menos 4 de los últimos 5 ejercicios con datos; con menos de 4 años de datos no hay evidencia suficiente.",
+      "debtStrong": "Deuda:",
+      "debtRest": "ND/EBITDA < 3 cuando la métrica existe (hoy cobertura US; en EUR se declara missing y no se aplica, nunca se inventa).",
+      "qualityStrong": "Filtro de calidad por rama sectorial:",
+      "qualityRest": "el ROIC/CFROI no es significativo en bancos y aseguradoras (Greenblatt las excluye de la Magic Formula por la misma razón). Financieras: ROE 5y > coste de equity, con la aproximación declarada de usar el WACC almacenado como proxy del coste de equity. Resto: ROIC > WACC y CFROI > WACC.",
+      "rankingStrong": "Ranking:",
+      "rankingRest": "cada componente se convierte a percentil sobre el universo y se pondera: spread ROIC-WACC 25%, spread CFROI-WACC 15%, MOAT V2 20%, ROE 5y 10%, FCF margin 5y 10%, crecimiento de ingresos (CAGR) 10%, owner earnings 5y 5%, conversión FCF 5%. Si un componente no aplica o falta, los pesos se renormalizan y queda declarado.",
+      "v1Strong": "Lo que v1 NO incluye todavía:",
+      "v1Rest": "la valoración (FCF yield / earnings yield) y el momentum aún no entran en el embudo v1: las series de precios solo se guardan para el top-N de cada ejecución, no para todo el universo. Cada ejecución se guarda completa, con los candidatos descartados y sus motivos, así que el histórico y las entradas y salidas son auditables."
+    },
+    "moat": {
+      "title": "Marco de calidad (MOAT)",
+      "intro": "Estos ocho criterios describen calidad financiera histórica, no demuestran por sí solos un foso competitivo. Solo se puntúan en el perfil operativo general y con datos suficientes. Para empresas en etapa temprana o de crecimiento, financieras y cíclicas el resultado es «no evaluable con estos umbrales», no un 0/8. El perfil se basa en tipo, sector y etiquetas registrados, no en el ticker ni en pérdidas de un año. La evaluación del foso exige evidencia verificable por separado; su ausencia no equivale a cero.",
+      "check1": "Margen FCF 5 años",
+      "check1Threshold": "media > 5%",
+      "check2": "Margen neto 5 años",
+      "check2Threshold": "media > 15%",
+      "check3": "ROE 5 años",
+      "check3Threshold": "media > 15%",
+      "check4": "ROA 5 años",
+      "check4Threshold": "media > 7%",
+      "check5": "ROIC",
+      "check5Threshold": "> WACC",
+      "check6": "CFROI (aprox. declarada)",
+      "check6Threshold": "> WACC",
+      "check7": "Owner earnings 5 años (Buffett)",
+      "check7Threshold": "media > 0",
+      "check8": "Capex / D&A 5 años",
+      "check8Threshold": "media ≤ 1,5 (1,0 = solo mantenimiento)",
+      "noteOwner": "Owner earnings estima el capex de mantenimiento como min(|capex|, D&A), una aproximación conservadora (Buffett, carta de 1986); el CFROI es una aproximación, no el CFROI completo de Credit Suisse.",
+      "noteEsef": "Emisores ESEF (España/UE): IFRS reparte la deuda en varias partidas y no se suman, así que ROIC y WACC estándar no son calculables. Se usan dos aproximaciones conservadoras: el WACC como coste de equity puro (umbral más exigente) y el capital invertido como activos menos caja (ROIC a la baja). Sin datos suficientes, el criterio queda no evaluable."
+    },
+    "limits": {
+      "title": "Límites que debes conocer",
+      "delay": {
+        "title": "Datos con retraso",
+        "text": "Los datos de mercado llegan con ligero retraso en la mayoría de mercados. Suficiente para análisis, no para trading intradía."
+      },
+      "coverage": {
+        "title": "Cobertura parcial",
+        "text": "No todos los tickers tienen la misma cobertura: si faltan filings o métricas, la ficha lo indica en lugar de inventar."
+      },
+      "pit": {
+        "title": "Point-in-time",
+        "textPre": "Los motores de valoración solo usan información disponible en cada fecha simulada. Evitar el",
+        "textLookAhead": "look-ahead",
+        "textPost": "es lo que hace que un backtest sea creíble."
+      },
+      "advice": {
+        "title": "No es asesoramiento",
+        "text": "GerarAI es una herramienta educativa y de análisis. Las decisiones de inversión son siempre tuyas."
+      }
+    },
+    "costs": {
+      "title": "Costes explícitos",
+      "data": {
+        "title": "Datos: 0 EUR/mes",
+        "text": "Finnhub (capa gratuita con clave), Yahoo Finance (sin clave), SEC EDGAR (acceso público) y el resto de fuentes listadas arriba se usan sin cuota de pago."
+      },
+      "llm": {
+        "title": "Modelos LLM: por uso",
+        "text": "Los modelos de lenguaje usan OpenCode Go como proveedor principal; el chat tiene como respaldo Groq y Gemini cuando están configurados, en su capa gratuita. El coste se registra por modelo: si no se conoce, se dice «desconocido» en lugar de poner un 0."
+      },
+      "infra": {
+        "title": "Infraestructura: autoalojada",
+        "text": "Frontend en Vercel; backend autoalojado en una máquina propia. Sin cuota cloud: solo energía y hardware del host."
+      }
+    }
+  },
+  "privacidad": {
+    "metaTitle": "Privacidad",
+    "metaDescription": "Política de privacidad y tratamiento de datos personales de GerarAI.",
+    "h1": "Política de privacidad",
+    "lastReview": "Última revisión editorial: 27 de octubre de 2026.",
+    "legalNote": "Este texto es informativo y no constituye asesoramiento jurídico.",
+    "s1": {
+      "title": "1. Responsable del tratamiento",
+      "identity": "Identidad: Nicolás Iglesias García.",
+      "contact": "Contacto de privacidad:"
+    },
+    "s2": {
+      "title": "2. Qué datos tratamos",
+      "p1": "Datos de cuenta (email, nombre, país y preferencias de inversión que decidas facilitar), datos de cartera y operaciones, tesis, claims y evidencia, watchlist, reglas y alertas, documentos que subas y su metadata, notas y memoria de investigación, y mensajes que envíes al asistente. También registramos telemetría técnica del chat (ruta, modelo, latencia y, temporalmente, la pregunta) para operar y mejorar el servicio.",
+      "p2": "No pedimos datos de salud, ideología, religión ni datos biométricos. No vendemos datos personales. El tratamiento que hagan los proveedores de IA depende de sus condiciones y de la configuración elegida."
+    },
+    "s3": {
+      "title": "3. Finalidades y base jurídica",
+      "i1": "Prestar el servicio que solicitas (cuenta, cartera, tesis, watchlist, alertas, documentos y asistente): ejecución del contrato.",
+      "i2": "Proteger la cuenta, prevenir abusos y operar y mejorar el servicio (incluida la telemetría técnica del chat): interés legítimo.",
+      "i3": "Cumplir obligaciones legales: obligación legal."
+    },
+    "s4": {
+      "title": "4. Proveedores y subencargados",
+      "intro": "El servicio se apoya en los siguientes proveedores:",
+      "llmStrong": "Modelos de lenguaje",
+      "llmRest": ": OpenCode (modelos DeepSeek), Groq, Google (Gemini) y OpenRouter, según la configuración de proveedores. Intervienen en las funciones con IA y reciben el contexto enviado por esas funciones, que puede incluir datos de investigación y de cartera.",
+      "marketStrong": "Proveedores de datos de mercado",
+      "marketRest": ": Finnhub, Financial Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak y otras fuentes gratuitas configuradas. Estas consultas se hacen por ticker y no incluyen tus datos personales.",
+      "hostingStrong": "Hosting y bases de datos",
+      "hostingRest": ": Vercel (frontend, con las funciones en la región de Fráncfort, fra1), Oracle Cloud (servidor del motor de datos en la región eu-madrid-1, Madrid, España), MongoDB Atlas (cuentas y datos auxiliares) y PostgreSQL en el propio servidor.",
+      "storageStrong": "Almacenamiento y búsqueda",
+      "storageRest": ": MinIO o Garage (documentos), Qdrant (índice vectorial) y Redis (colas y caché), todos en el propio servidor.",
+      "backupsStrong": "Copias de seguridad",
+      "backupsRest": ": Cloudflare R2, cuando está configurado.",
+      "mailStrong": "Correo saliente",
+      "mailRest": ": SMTP para avisos y restablecimiento de contraseña, mediante el servidor SMTP configurado.",
+      "transfers": "Regiones y transferencias internacionales: el frontend se ejecuta en la región de Fráncfort (fra1) de Vercel. Los proveedores de modelos de lenguaje y el resto de servicios externos pueden tratar datos fuera de la Unión Europea conforme a sus condiciones."
+    },
+    "s5": {
+      "title": "5. Conservación",
+      "docs1": "Documentos financieros: por defecto 2.555 días (7 años), configurable con",
+      "docs2": ". La purga requiere activar la tarea de conservación y desactivar el modo de prueba sin borrado. Por defecto está apagada y en modo de prueba sin borrado; esos plazos no garantizan un borrado automático. Cuando se ejecuta la purga, se borran el original, los fragmentos y los vectores, y se conserva una referencia tombstone sin contenido para que las decisiones históricas sigan siendo auditables.",
+      "telemetry1": "Preguntas crudas de telemetría del chat: por defecto 90 días, configurable con",
+      "telemetry2": ".",
+      "access1": "Solicitudes de acceso: por defecto 365 días, configurable con",
+      "access2": "; el borrado automático por TTL en MongoDB solo se activa si el operador lo habilita expresamente.",
+      "backups": "Copias de seguridad: el script local permite configurar cuántas conservar (8 por defecto); no es una garantía de ejecución. Además, cuando está configurada, una copia en Cloudflare R2 cuya caducidad fija la regla de expiración del bucket."
+    },
+    "s6": {
+      "title": "6. Tus derechos",
+      "p1Pre": "Puedes solicitar acceso, rectificación, supresión, limitación, portabilidad y oposición. Desde",
+      "p1Post": "puedes descargar una copia en JSON de tus datos estructurados y metadatos (perfil, cartera, tesis, claims y evidencia, watchlist, alertas, conocimiento, planes y ajustes) y borrar tu cuenta y todos sus datos. La exportación no incluye los archivos originales de los documentos que hayas subido: de cada documento solo viajan sus metadatos y el recuento de fragmentos. El borrado elimina PostgreSQL, documentos originales, vectores y sesiones; es irreversible.",
+      "p2Pre": "También puedes reclamar ante la Agencia Española de Protección de Datos (AEPD,",
+      "p2Post": ")."
+    },
+    "s7": {
+      "title": "7. Seguridad y código fuente",
+      "p1": "Aplicamos aislamiento por cuenta, autenticación firmada entre frontend y data engine, y restricciones de acceso a datos. Ningún sistema es infalible: si detectas un problema de seguridad, usa el canal de contacto indicado arriba.",
+      "p2Pre": "El código de GerarAI se publica bajo la licencia AGPL-3.0. Puedes consultarlo en",
+      "p2Post": ". El código fuente correspondiente a la versión desplegada debe estar disponible para los usuarios del servicio."
+    },
+    "s8": {
+      "title": "8. Cambios",
+      "p": "Podemos actualizar esta política para reflejar cambios legales o técnicos. La fecha de la última revisión y los cambios relevantes se publicarán en esta página."
+    },
+    "footer": {
+      "pre": "Consulta también los",
+      "terms": "términos de uso",
+      "mid": "y la",
+      "methodology": "metodología"
+    }
+  },
+  "terminos": {
+    "metaTitle": "Términos de uso",
+    "metaDescription": "Condiciones de uso del servicio GerarAI.",
+    "h1": "Términos de uso",
+    "lastReview": "Última revisión editorial: 27 de octubre de 2026.",
+    "legalNote": "Este documento es informativo y no constituye asesoramiento jurídico.",
+    "s1": {
+      "title": "1. Titular del servicio",
+      "pPre": "GerarAI es un proyecto personal de Nicolás Iglesias García (España). Contacto:"
+    },
+    "s2": {
+      "title": "2. Qué es GerarAI",
+      "p1": "GerarAI es una herramienta educativa de investigación y organización de inversiones. Permite guardar una cartera, construir tesis, enlazar evidencia, seguir una watchlist, configurar alertas y consultar un asistente. No es un bróker, no ejecuta órdenes y no custodia dinero ni valores.",
+      "p2": "GerarAI no ofrece asesoramiento financiero, fiscal o jurídico personalizado. Las decisiones de inversión y sus consecuencias son exclusivamente tuyas. Los datos pueden ser incompletos o llegar con retraso; las etiquetas OFICIAL / INFERIDO / SIN_DATOS no convierten una estimación en un hecho."
+    },
+    "s3": {
+      "title": "3. Cuenta y seguridad",
+      "pPre": "Debes mantener la confidencialidad de tus credenciales y avisarnos de cualquier uso no autorizado. Puedes activar la verificación en dos pasos y cambiar la contraseña desde",
+      "pPost": ". Una cuenta es personal; no compartas el acceso."
+    },
+    "s4": {
+      "title": "4. Uso aceptable",
+      "i1": "No intentes acceder a datos de otras cuentas ni eludir el aislamiento del servicio.",
+      "i2": "No subas contenido ilícito, malware ni datos personales de terceros sin base legal.",
+      "i3": "No abuses de límites, automatizaciones o APIs de proveedores externos.",
+      "i4": "No uses el servicio para operar un negocio de asesoramiento financiero regulado sin cumplir tus obligaciones."
+    },
+    "s5": {
+      "title": "5. Datos y proveedores externos",
+      "pPre": "El servicio combina datos de proveedores públicos y privados (SEC EDGAR, CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT y CelesTrak, entre otros) y puede enviar contexto de investigación y, según la función, datos de cartera a un proveedor de modelos de lenguaje cuando actives las funciones correspondientes. Consulta la",
+      "pLink": "política de privacidad",
+      "pPost": "para el detalle y los subencargados."
+    },
+    "s6": {
+      "title": "6. Propiedad intelectual y licencia",
+      "pPre": "El código de GerarAI se distribuye bajo AGPL-3.0 (",
+      "pLink": "repositorio público",
+      "pPost": "). Las marcas, textos editoriales y datos de terceros conservan sus licencias y condiciones. Tus datos y tus tesis siguen siendo tuyos; nos autorizas a tratarlos solo para prestarte el servicio."
+    },
+    "s7": {
+      "title": "7. Disponibilidad y responsabilidad",
+      "p": "El servicio se ofrece «tal cual» y «según disponibilidad». Puede haber interrupciones por mantenimiento, límites de proveedores gratuitos o causas de fuerza mayor. En la medida permitida por la ley, el titular no responde de daños indirectos, lucro cesante o decisiones de inversión basadas en la información mostrada."
+    },
+    "s8": {
+      "title": "8. Baja y borrado",
+      "pPre": "Puedes exportar tus datos y borrar la cuenta desde",
+      "pMid": ". El borrado es inmediato e irreversible y elimina también los documentos originales, los vectores y las sesiones. Los plazos de conservación y las excepciones legales se describen en la",
+      "pLink": "política de privacidad",
+      "pPost": "."
+    },
+    "s9": {
+      "title": "9. Ley aplicable y jurisdicción",
+      "p": "Estos términos se rigen por la ley española. Si eres consumidor, conservas los derechos imperativos y el fuero de tu lugar de residencia."
+    },
+    "s10": {
+      "title": "10. Cambios",
+      "p": "Podemos actualizar estos términos. Publicaremos la fecha de la última revisión en esta página."
+    },
+    "footer": {
+      "pre": "Consulta también la",
+      "link": "política de privacidad"
+    }
+  }
+}

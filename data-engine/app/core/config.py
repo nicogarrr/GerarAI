@@ -317,6 +317,10 @@ class Settings(BaseSettings):
     # filtros, todas las secciones). Debe coincidir con IBKR_FLEX_QUERY_ID para que
     # la sync pueda cerrar posiciones; el XML por si solo no lo prueba.
     ibkr_flex_complete_query_id: str | None = None
+    # A7: dias que se conservan las filas crudas de FOTO del Flex (posiciones,
+    # caja, FX, NAV). Los eventos (operaciones, dividendos) no caducan nunca.
+    # 0 = sin poda. Env: IBKR_RAW_ROWS_RETENTION_DAYS.
+    ibkr_raw_rows_retention_days: int = 400
     # SEC fair-access: exige UA declarado con contacto; bloquea placeholders
     # tipo example.com con 403. Este valor verificado 200 desde prod (25/9).
     # OJO: este default es un fallback LOCAL no contactable (el dominio .local
@@ -463,6 +467,12 @@ class Settings(BaseSettings):
     # Env: LANGFUSE_ENABLED / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY /
     # LANGFUSE_HOST / LANGFUSE_SAMPLE_RATE.
     langfuse_enabled: bool = False
+    # Generación multidioma (i18n B). Apagado: TODO se genera en español,
+    # byte a byte como antes (prompts, validadores de idioma y detail= de
+    # HTTPException visibles). Encendido: la cabecera firmada
+    # X-GerarAI-Language (es/en) fija el idioma de generación de la petición.
+    # Env: I18N_GENERATION_ENABLED.
+    i18n_generation_enabled: bool = False
     langfuse_public_key: str | None = Field(default=None, repr=False)
     langfuse_secret_key: str | None = Field(default=None, repr=False)
     langfuse_host: str = "https://cloud.langfuse.com"
@@ -609,7 +619,6 @@ class Settings(BaseSettings):
     typesafe_api_key: str | None = None
     typesafe_base_url: str = "https://api.typesafe.ai"
     typesafe_model: str = "jev-latest"
-    typesafe_fallback: str = Field(default="instructor", pattern="^(instructor|off)$")
     llm_enabled: bool = True
     # Clave del cifrado en reposo de las API keys LLM por tenant. En
     # produccion es obligatoria (>=32 bytes); en local/test se deriva de

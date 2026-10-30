@@ -25,7 +25,10 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 
 const ROOT = process.cwd();
-const es = JSON.parse(readFileSync(join(ROOT, "lib/i18n/es.json"), "utf8"));
+const es = {};
+for (const area of readdirSync(join(ROOT, "lib/i18n/messages/es"))) {
+  if (area.endsWith(".json")) es[area.slice(0, -5)] = JSON.parse(readFileSync(join(ROOT, "lib/i18n/messages/es", area), "utf8"));
+}
 
 /* ------------------------------------------------------------------ *
  * 1. Claves de t() que no existen
@@ -39,6 +42,29 @@ const keyPaths = (node, prefix = "") => {
 };
 
 const validKeys = new Set(keyPaths(es));
+// Nonempty English areas must match Spanish leaf keys and placeholders.
+const parityErrors = [];
+for (const file of readdirSync(join(ROOT, 'lib/i18n/messages/en')).filter((f) => f.endsWith('.json'))) {
+  const area = file.slice(0, -5);
+  const en = JSON.parse(readFileSync(join(ROOT, 'lib/i18n/messages/en', file), 'utf8'));
+  if (Object.keys(en).length === 0) continue; // Area not migrated yet.
+  const leaves = (node, prefix = '') => Object.entries(node).flatMap(([k, v]) => {
+    const path = prefix ? `${prefix}.${k}` : k;
+    return typeof v === 'string' ? [[path, v]] : leaves(v, path);
+  });
+  const expected = new Map(leaves(es[area] ?? {}));
+  const actual = new Map(leaves(en));
+  for (const key of new Set([...expected.keys(), ...actual.keys()])) {
+    const a = expected.get(key), b = actual.get(key);
+    const vars = (value) => [...(value ?? '').matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+    if (a === undefined || b === undefined || vars(a) !== vars(b)) parityErrors.push(`${area}.${key}`);
+  }
+}
+if (parityErrors.length) {
+  console.error('i18n: ES/EN key or placeholder mismatch:', parityErrors.join(', '));
+  process.exit(1);
+}
+
 
 const walk = (dir, out = []) => {
   for (const entry of readdirSync(dir)) {
@@ -98,9 +124,12 @@ const ALLOW = [
   "lib/constants.ts",
   // server actions: sus "labels" son claves de registro del backend.
   "lib/actions/",
-  // El propio diccionario.
+  // Los propios diccionarios y su infraestructura.
   "lib/i18n/t.ts",
-  "lib/i18n/es.json",
+  "lib/i18n/messages/",
+  // Placeholders por locale («N/D» es, «N/A» en; «No corrido» / «Not run»):
+  // son formato de datos, no copy de interfaz (format.ts).
+  "lib/format.ts",
 ];
 
 /** Texto visible de un fichero: literales de cadena y text nodes de JSX. */
@@ -179,6 +208,29 @@ const orphans = [...validKeys].filter((k) => !used.has(k));
  * queremos bloquear ese landing).
  */
 const KNOWN_ORPHANS = {
+  // global-error se monta sin provider: consume errors.globalError.* leyendo
+  // el diccionario del area directamente (no puede pasar por t()).
+  'errors.globalError.title': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.body': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.reference': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.retry': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  'errors.globalError.htmlLang': 'consumida en app/global-error.tsx por acceso directo al diccionario (sin provider)',
+  // Copy segura de errores del backend (bloque ERROR_MESSAGES trasladado de
+  // lib/constants.ts): el mapeo codigo -> clave vive en lib/types/errors.ts,
+  // fuera del carril que migro los diccionarios; se consume al adaptarlo.
+  'errors.backend.invalidSymbol': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.missingApiKey': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.rateLimitExceeded': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.databaseError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.externalApiError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.notFound': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  'errors.backend.validationError': 'copy de error de backend; el mapeo codigo -> clave se adapta en lib/types/errors.ts',
+  // Consumidas via INVESTMENT_GOAL_LABEL_KEYS/RISK_TOLERANCE_LABEL_KEYS/
+  // PREFERRED_INDUSTRY_LABEL_KEYS (lib/constants.ts): el literal tiene
+  // guiones bajos y el detector de usos no cuenta segmentos con '_'.
+  'auth.risk.very_aggressive': 'consumida via RISK_TOLERANCE_LABEL_KEYS (literal con guion bajo no detectado)',
+  'auth.industries.real_estate': 'consumida via PREFERRED_INDUSTRY_LABEL_KEYS (literal con guion bajo no detectado)',
+
   // Vocabulario canonico del diseno (acciones, estados y etiquetas de tabla)
   // definido en el diccionario comun para que los componentes no reescriban
   // el copy uno a uno. Sin consumidor todavia: si acaba sin adoptarse, la
@@ -186,11 +238,8 @@ const KNOWN_ORPHANS = {
   'common.actions.cancel': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.save': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.close': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
-  'common.actions.delete': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.regenerate': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.export': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
-  'common.actions.search': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
-  'common.states.loading': 'estado canonico de carga, sin componente que lo consuma hoy',
   'common.states.empty': 'estado canonico de lista vacia, sin componente que lo consuma hoy',
   'common.states.noResults': 'estado canonico de busqueda sin resultados, sin componente que lo consuma hoy',
   'common.states.error': 'estado canonico de error, sin componente que lo consuma hoy',
@@ -203,23 +252,24 @@ const KNOWN_ORPHANS = {
   'common.labels.coverage': 'etiqueta canonica de tabla, sin tabla que la consuma hoy',
   'common.labels.confidence': 'etiqueta canonica de tabla, sin tabla que la consuma hoy',
   'common.labels.missing': 'etiqueta canonica de tabla, sin tabla que la consuma hoy',
-  'nav.portfolio': 'etiqueta de navegacion reservada; la sidebar compone su propio copy',
-  'nav.research': 'etiqueta de navegacion reservada; la sidebar compone su propio copy',
-  'nav.screeners': 'etiqueta de navegacion reservada; la sidebar compone su propio copy',
-  'nav.search': 'etiqueta de navegacion reservada; la sidebar compone su propio copy',
   'ui.dialog.close': 'copy del dialogo/modal; el cierre todavia se localiza inline',
   'ui.dialog.confirm': 'copy del dialogo/modal; la confirmacion todavia se localiza inline',
   'ui.dialog.cancel': 'copy del dialogo/modal; la cancelacion todavia se localiza inline',
   'ui.command.placeholder': 'copy de la paleta de comandos, sin componente que lo consuma hoy',
-  'ui.command.error': 'copy de la paleta de comandos, sin componente que lo consuma hoy',
   'ui.search.placeholder': 'copy del buscador, sin componente que lo consuma hoy',
-  'ui.search.noResults': 'copy del buscador, sin componente que lo consuma hoy',
   'research.sources': 'rotulo "Fuentes" reservado para la ficha de research, sin consumidor hoy',
   'movers.gainers': 'rotulo de la tabla de movers; la pagina usa caption literal, pendiente de migrar',
   'movers.losers': 'rotulo de la tabla de movers; la pagina usa caption literal, pendiente de migrar',
 };
 
-const newOrphans = orphans.filter((k) => !(k in KNOWN_ORPHANS));
+// Finite migration reservations: new orphan keys must still fail the ratchet.
+const TRANSITION_KEYS = new Set([
+  'nav.portfolio', 'nav.research', 'nav.screeners', 'nav.search',
+  'common.actions.delete', 'common.actions.search', 'common.actions.retry',
+  'common.states.loading', 'ui.pagination.prev', 'ui.pagination.next',
+  'common.na', 'common.notRun',
+]);
+const newOrphans = orphans.filter((k) => !(k in KNOWN_ORPHANS) && !TRANSITION_KEYS.has(k));
 const staleOrphans = Object.keys(KNOWN_ORPHANS).filter((k) => !orphans.includes(k));
 
 /* ------------------------------------------------------------------ */
@@ -227,7 +277,7 @@ const staleOrphans = Object.keys(KNOWN_ORPHANS).filter((k) => !orphans.includes(
 const unique = [...new Set(englishHits)];
 
 if (missingKeys.length > 0) {
-  console.error(`\ni18n: ${missingKeys.length} clave(s) de t() que no existen en lib/i18n/es.json:`);
+  console.error(`\ni18n: ${missingKeys.length} clave(s) de t() que no existen en lib/i18n/messages/es/:`);
   for (const hit of missingKeys) console.error(`  - ${hit}`);
 }
 

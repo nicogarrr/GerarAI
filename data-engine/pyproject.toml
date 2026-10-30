@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cavaai-data-engine"
-version = "0.9.0"
+version = "0.5.0"
 description = "FastAPI data engine for CavaAI"
 # Interpreter UNICO y declarado. 3.12 no es arbitrario: es lo que ejecutan los
 # dos Dockerfiles (python:3.12-slim), los 8 jobs de .github/workflows/ci.yml

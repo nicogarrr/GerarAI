@@ -55,8 +55,6 @@ const COMPONENTS_EXCEPTIONS: Record<string, string> = {
     "Lo importa components/portfolio/PortfolioTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
   'components/proPicks/StrategyFactsheet.tsx':
     "Lo importa components/proPicks/ProPicksTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
-  'components/proPicks/WalkForwardResults.tsx':
-    "Lo importa components/proPicks/ProPicksTabs.tsx ('use client'): cliente por herencia, quitar la directiva no ahorra un byte. Se deja tal cual para no ensuciar el diff de un fichero sin ganancia real.",
 };
 
 /**
@@ -85,6 +83,16 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/LoadingState.tsx': 'useT lee el contexto de locale para estados de carga accesibles',
+  'components/ui/methodology-disclosure.tsx': 'useT lee locale para título predeterminado; también usado desde componentes client',
+  'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
+  'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
+
+  'components/settings/LanguageForm.tsx':
+    'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
+  'lib/i18n/client.tsx':
+    'provider y hooks de locale (useT/useLocale/useFormat): contexto React de cliente por definición',
+  'components/forms/SelectField.tsx': 'usa useId, Controller (react-hook-form) y el hook useT de i18n',
   'components/research/ValuationSummaryGrid.tsx': 'useState y useEffect para carga batch asíncrona y descarte de respuestas de selección anterior',
   'components/alerts/PushNotifications.tsx': 'useState/useEffect para permiso Notification, registro serviceWorker, PushManager y preferencias opt-in del navegador',
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',

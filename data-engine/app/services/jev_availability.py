@@ -31,9 +31,8 @@ def credit_status() -> dict:
         # DB sin verificar: no llamar a TypeSafe ni afirmar que está activo.
         return {"status": "estado_no_disponible", "last_billing_failure_at": None}
     return {
-        "status": ("fallback_proveedor_alternativo" if get_settings().typesafe_fallback == "instructor"
-                   else "desactivado_sin_credito") if last else
-                  ("activo" if configured else "sin_configurar"),
+        "status": "desactivado_sin_credito" if last else ("activo" if configured else "sin_configurar"),
+        "fallback_available": False,
         "last_billing_failure_at": last,
     }
 
@@ -68,7 +67,6 @@ def mark_credit_exhausted() -> None:
             "process stops TypeSafe calls and reports estado_no_disponible"
         )
         return
-    mode = get_settings().typesafe_fallback
     for tenant_id in tenant_ids:
         # Las alertas son filas tenant-owned: con research_auth_required los
         # guards de database.py rechazan escrituras tenant-owned en sesiones
@@ -81,10 +79,7 @@ def mark_credit_exhausted() -> None:
                 alert = ResearchAlert(
                     tenant_id=tenant_id, alert_type="typesafe_credit_exhausted",
                     severity="medium", status="open", title="Crédito de TypeSafe agotado",
-                    message=("JEV usa el proveedor alternativo configurado para las etiquetas "
-                             "prioritarias; su coste no está verificado, no asumir que es gratuito."
-                             if mode == "instructor" else
-                             "JEV está desactivado; se usa el flujo habitual sin sus etiquetas."),
+                    message="JEV está desactivado por falta de crédito; se conserva toda la evidencia sin etiquetas alternativas.",
                     fingerprint=f"typesafe_credit_exhausted:{tenant_id}",
                     channels=["in_app"], metadata_={"changed_at": now.isoformat(), "audience": "internal_ops"},
                 )

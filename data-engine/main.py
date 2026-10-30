@@ -1,6 +1,7 @@
 """FastAPI bootstrap for the GerarAI data engine."""
 
 import asyncio
+import logging
 import math
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -17,6 +18,7 @@ from app.api.routes.health import router as health_router
 from app.core.auth import get_research_principal
 from app.core.config import get_settings
 from app.core.database import SessionLocal, init_db
+from app.core.i18n import bind_request_language
 from app.core.llm_tenant_scope import bind_llm_cache_tenant
 from app.core.rate_limit import AuthFailureLimitMiddleware, enforce_rate_limit
 from app.core.raw_body import RawBodyMiddleware
@@ -136,7 +138,7 @@ _EXPOSE_SCHEMA = _app_env in {"local", "test", "ci", "dev", "development"}
 # generando el JSON via app.openapi() sin necesidad de HTTP.
 app = FastAPI(
     title="GerarAI Research Engine",
-    version="0.9.0",
+    version="0.5.0",
     lifespan=lifespan,
     docs_url="/docs" if _EXPOSE_SCHEMA else None,
     redoc_url="/redoc" if _EXPOSE_SCHEMA else None,
@@ -180,6 +182,9 @@ if get_settings().app_env.lower() != "test":
 private_dependencies = [
     Depends(get_research_principal),
     Depends(enforce_rate_limit),
+    # Idioma de generacion de la peticion (i18n): va el primero de los
+    # "binds" para que get_db y los servicios lo vean ya fijado.
+    Depends(bind_request_language),
     Depends(bind_llm_cache_tenant),
     Depends(bind_tenant_llm_settings),
 ]
@@ -285,6 +290,33 @@ def _upstream_network_errors() -> list[type[Exception]]:
 
 for _upstream_error in _upstream_network_errors():
     app.add_exception_handler(_upstream_error, upstream_network_error_handler)
+
+
+async def job_queue_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Redis (cola de trabajos) caído al encolar: 503 explícito, no 500 genérico.
+
+    Los endpoints «-async»/«refresh» encolan con Dramatiq; con Redis caído el
+    ``.send()`` lanzaba ``redis.exceptions.ConnectionError`` y la petición
+    acababa en un 500 «Internal server error» sin causa. No se ha encolado
+    nada, así que es un 503 reintentable y queda en el log con ruta y causa.
+    """
+    logging.getLogger("gerarai.job_queue").warning(
+        "job_queue_unavailable path=%s cause=%s", request.url.path, type(exc).__name__
+    )
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Background job queue unavailable; nothing was queued. Try again shortly."},
+        headers={"Retry-After": "30"},
+    )
+
+
+try:
+    import redis.exceptions as _redis_exceptions
+except ImportError:  # pragma: no cover - redis llega con dramatiq
+    pass
+else:
+    for _queue_error in (_redis_exceptions.ConnectionError, _redis_exceptions.TimeoutError):
+        app.add_exception_handler(_queue_error, job_queue_unavailable_handler)
 
 # /api/health es público (sin firma): lo montamos fuera del research API
 # para que orquestación/monitoreo pueda consultarlo sin identidad.

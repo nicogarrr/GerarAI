@@ -1,0 +1,50 @@
+{
+  "menu": {
+    "expand": "Expandir menú",
+    "collapse": "Plegar menú"
+  },
+  "nav": {
+    "primaryAria": "Navegación principal",
+    "bottomAria": "Navegación inferior",
+    "openMenu": "Abrir menú de navegación",
+    "menuTitle": "Menú de navegación",
+    "closeBackdrop": "Cerrar menú por fondo",
+    "closeMenu": "Cerrar menú de navegación",
+    "mobileAria": "Navegación móvil"
+  },
+  "sectionNav": {
+    "sections": "Secciones",
+    "ariaLabel": "Herramientas de la sección",
+    "scrollHint": "Desliza para ver más secciones"
+  },
+  "breadcrumbs": {
+    "aria": "Ruta de navegación"
+  },
+  "header": {
+    "homeAria": "GerarAI, inicio",
+    "alerts": "Alertas"
+  },
+  "offline": {
+    "banner": "Sin conexión. Algunos datos pueden estar desactualizados hasta que se recupere la conexión."
+  },
+  "publicNav": {
+    "openMenu": "Abrir menú de páginas",
+    "menuTitle": "Menú de páginas",
+    "closeMenu": "Cerrar menú de páginas",
+    "pagesAria": "Páginas de GerarAI"
+  },
+  "user": {
+    "menuSuffix": ", menú de usuario",
+    "aiModel": "Modelo de IA",
+    "settings": "Ajustes",
+    "security": "Seguridad",
+    "signOut": "Cerrar sesión"
+  },
+  "error": {
+    "title": "Algo salió mal",
+    "body": "Ha ocurrido un error inesperado. Por favor, intenta recargar la página.",
+    "devDetails": "Detalles técnicos (solo en desarrollo)",
+    "retry": "Intentar de nuevo",
+    "reload": "Recargar página"
+  }
+}

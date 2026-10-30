@@ -48,6 +48,7 @@ const RATING_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  final: 'generada · pendiente de aprobación',
   draft: 'borrador',
   review: 'en revisión',
   approved: 'aprobada',
@@ -97,10 +98,13 @@ function NarrativeText({ text }: { text: string }) {
     : <span key={index}>{cleanThesisText(part)}</span>)}</>;
 }
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
+function ScoreBar({ label, value, scale = 'quality' }: { label: string; value: number; scale?: 'quality' | 'risk' }) {
   const clamped = Math.max(0, Math.min(100, value));
-  const tone =
-    clamped >= 70 ? 'bg-teal-400' : clamped >= 40 ? 'bg-amber-400' : 'bg-red-400';
+  // 'quality': cuanto más alto, mejor. 'risk' (riesgo de valoración): cuanto
+  // más alto, peor; sin invertir, una especulativa (75/100) salía en verde.
+  const good = scale === 'risk' ? clamped < 40 : clamped >= 70;
+  const mid = scale === 'risk' ? clamped < 70 : clamped >= 40;
+  const tone = good ? 'bg-teal-400' : mid ? 'bg-amber-400' : 'bg-red-400';
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -253,7 +257,11 @@ export default function ThesisMemo({
       </div>
 
 
-      {thesis.status !== 'published' && thesis.status !== 'approved' && thesis.status !== 'insufficient_data' ? (
+      {thesis.status === 'final' ? (
+        <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+          Generación completada, pendiente de aprobación. La auditoría automática de fuentes y la aprobación para publicar son pasos distintos; consulta el resultado de la auditoría en Fuentes.
+        </p>
+      ) : thesis.status !== 'published' && thesis.status !== 'approved' && thesis.status !== 'insufficient_data' ? (
         <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
           Borrador en revisión: texto sin auditar
         </p>
@@ -425,7 +433,7 @@ export default function ThesisMemo({
           <ScoreBar label="Confianza en datos" value={thesis.data_confidence_score} />
           <ScoreBar label="Cobertura de fuentes" value={thesis.source_coverage_score} />
           <ScoreBar label="Red team" value={thesis.red_team_score} />
-          <ScoreBar label="Riesgo de valoración" value={thesis.valuation_risk_score} />
+          <ScoreBar label="Riesgo de valoración" value={thesis.valuation_risk_score} scale="risk" />
         </div>
       </section>
 

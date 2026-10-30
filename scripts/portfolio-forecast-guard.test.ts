@@ -43,7 +43,7 @@ const REAL_EMPTY_PAYLOAD: PortfolioForecast = {
 
 async function renderForecast(payload: PortfolioForecast): Promise<string> {
     const ts = await import('typescript');
-    const { mkdirSync, readFileSync, rmSync, writeFileSync } = await import('node:fs');
+    const { mkdirSync, readFileSync, rmSync, writeFileSync, cpSync } = await import('node:fs');
     const { createElement } = await import('react');
     const { renderToStaticMarkup } = await import('react-dom/server');
 
@@ -60,10 +60,23 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
         }).outputText;
     try {
         writeFileSync(`${dir}/utils.mjs`, compile('lib/utils.ts'));
-        writeFileSync(`${dir}/format.mjs`, compile('lib/format.ts'));
+        // Compile the real locale context and translator, not a translation stub.
+        mkdirSync(`${dir}/i18n/messages`, { recursive: true });
+        cpSync('lib/i18n/messages', `${dir}/i18n/messages`, { recursive: true });
+        for (const file of ['client.tsx', 'locale.ts', 'translate.ts', 't.ts', 'messages/index.ts']) {
+            const target = file.replace(/\.tsx?$/, '.mjs');
+            writeFileSync(`${dir}/i18n/${target}`, compile(`lib/i18n/${file}`).replace(/\.ts(['"])/g, '.mjs$1'));
+        }
+        // format.ts importa el registro de locales (i18n): se compila también
+        // y se reescribe la ruta al .mjs local, como con los demás stubs.
+        writeFileSync(`${dir}/locale.mjs`, compile('lib/i18n/locale.ts'));
+        writeFileSync(
+            `${dir}/format.mjs`,
+            compile('lib/format.ts').replaceAll("'./i18n/locale.ts'", "'./i18n/locale.mjs'"),
+        );
         writeFileSync(
             `${dir}/panel.mjs`,
-            compile('components/ui/panel.tsx').replaceAll('@/lib/utils', './utils.mjs'),
+            compile('components/ui/panel.tsx').replaceAll('@/lib/utils', './utils.mjs').replaceAll('@/lib/i18n/client', './i18n/client.mjs'),
         );
         // El componente usa next/link para navegación SPA; fuera de Next se
         // monta con un stub que renderiza un <a> plano (mismo destino).

@@ -36,3 +36,13 @@ export function formatScreenCriterionRight(value: string | null | undefined): st
 export function screenMissingFieldsLabel(fields: string[]): string {
   return fields.map((field) => metricLabel(field)).join(', ');
 }
+
+/**
+ * Entrada del aviso «sin coincidencias por falta de dato»: la métrica con su
+ * etiqueta legible (nunca el slug técnico) y el recuento en formato es-ES.
+ * La página de filtro guardado mostraba el slug crudo (`wacc`) en este aviso
+ * mientras el resto de la pantalla ya usaba etiquetas («WACC»).
+ */
+export function screenMissingDataEntry(field: string, count: number, companyCount: number): string {
+  return `${metricLabel(field)} (sin dato en ${formatNumber(count, { maximumFractionDigits: 0 })} de ${formatNumber(companyCount, { maximumFractionDigits: 0 })} empresas)`;
+}

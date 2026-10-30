@@ -1,0 +1,368 @@
+{
+  "nav": {
+    "methodology": "Methodology",
+    "help": "Help",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "ariaLabel": "GerarAI pages"
+  },
+  "shell": {
+    "skipLink": "Skip to content",
+    "wordmarkAria": "GerarAI, home"
+  },
+  "header": {
+    "signIn": "Sign in",
+    "signUp": "Create account",
+    "dashboard": "Go to my dashboard"
+  },
+  "footer": {
+    "disclaimer": "Educational analysis tool: GerarAI does not provide investment advice and the decisions are yours.",
+    "chartsBy": "Interactive charts by",
+    "navAria": "Footer links"
+  },
+  "hero": {
+    "metaTitle": "Fundamental investment Research OS with traceable sources",
+    "metaDescription": "GerarAI turns company research into traceable, versioned theses: every claim keeps its source and every outcome reviews your forecast.",
+    "ogTitle": "GerarAI: company research with traceable sources and versioned theses",
+    "ogDescription": "Every claim keeps its source, every thesis has a version and every outcome checks your forecast. Public methodology.",
+    "kicker": "Fundamental investment Research OS",
+    "titlePre": "",
+    "titleHighlight": "Traceable",
+    "titlePost": " theses that get checked against reality",
+    "subtitle": "Every claim keeps its document and its date, and every thesis has a version. If a data point is missing, GerarAI says so instead of inventing it.",
+    "ctaStart": "Start my first thesis",
+    "ctaAccess": "Request access",
+    "ctaMethodology": "See the methodology",
+    "shotDesktopAlt": "GerarAI company page: price with its source, change and evolution chart",
+    "shotTabletAlt": "GerarAI on tablet: the same company page adapted to a medium screen",
+    "shotMobileAlt": "GerarAI on mobile: price and chart from the company page",
+    "caption": "Real screenshots of the application with sample data. The interface declares where every figure it shows comes from, or that no source is available."
+  },
+  "help": {
+    "metaTitle": "Help center",
+    "metaDescription": "Documentation by module, frequently asked questions and GerarAI contact"
+  },
+  "forgotPassword": {
+    "metaTitle": "Reset password",
+    "metaDescription": "How to recover access to your GerarAI account.",
+    "h1": "Reset password",
+    "bodyConfigured": "If your account has an associated email, we will send you a one-time link. For security we do not confirm whether an email is registered.",
+    "bodyUnconfigured": "This deployment has no outgoing mail configured, so we cannot send you any reset link. If you are already signed in, change your password from Security; if you cannot sign in, use the support channel."
+  },
+  "resetPassword": {
+    "metaTitle": "New password",
+    "metaDescription": "Choose a new password for your GerarAI account.",
+    "h1": "New password",
+    "body": "The link expires and can only be used once. Saving it will sign out your open sessions."
+  },
+  "metodologia": {
+    "metaTitle": "Methodology",
+    "metaDescription": "Data sources, valuation engines, limits and costs of GerarAI: where every figure comes from and what you should not expect from the platform.",
+    "kicker": "Transparency",
+    "h1": "Methodology",
+    "intro": "Sources, valuation engines, limits and costs of GerarAI: where every figure comes from, how every number is calculated and what you should not expect from the platform.",
+    "actions": {
+      "library": "Library",
+      "search": "Search evidence",
+      "propicks": "See ProPicks"
+    },
+    "publicNotice": {
+      "body": "This page is public. The buttons and cards it links to (research, indices, insider signals, Library, evidence search and ProPicks) are part of the workspace: they require an account, so clicking them will ask you to sign in.",
+      "createAccount": "Create account",
+      "or": "or",
+      "signIn": "sign in"
+    },
+    "sourcesTitle": "Data sources",
+    "sources": {
+      "finnhub": {
+        "title": "Finnhub",
+        "text": "Quotes, company profiles (profile2) and symbol search, including uncommon tickers. Free tier with an API key.",
+        "cta": "See research"
+      },
+      "yahoo": {
+        "title": "Yahoo Finance · chart API",
+        "text": "Real indices and futures: S&P 500 (^GSPC), Nasdaq (^IXIC), Bitcoin (BTC-USD), gold (GC=F) and silver (SI=F). No API key and 60 s cache. Never an ETF labelled as an index.",
+        "cta": "See indices on the home page"
+      },
+      "sec": {
+        "title": "SEC EDGAR",
+        "text": "10-K/10-Q filings and Form 4 (insider transactions) directly from the US regulator. Public, free access: the primary source of documents.",
+        "cta": "See insider signals"
+      },
+      "others": {
+        "title": "Other public sources",
+        "text": "FRED (macroeconomic series, when configured), CelesTrak (orbital elements), GDELT (news), CNMV (short positions in Spain) and FINRA (short interest in the US).",
+        "cta": "See research"
+      }
+    },
+    "fmpNotice": {
+      "lead": "FMP only covers the US market:",
+      "body": "Financial Modeling Prep's free plan is now limited to US companies (its legacy endpoints answer \"Legacy Endpoint\" or 402 outside that market). The API accepts an FMP refresh for any issuer, but outside the US the provider rejects it and the refresh fails with a notice. There is no automatic fallback: if the issuer reports to SEC EDGAR or ESEF, you can run the refresh yourself from those sources (a separate action on the company page); and if no source covers the issuer, financials are shown as unavailable instead of being estimated. In the backend price refresh, US listings are queried on FMP first when a key exists and the quote carries a valid date; Finnhub is the fallback. Yahoo Finance provides the intraday portfolio refresh and the ProPicks price history, also for non-US listings when their exchange symbol is known. Without a reliable quote or symbol, it is shown without a price."
+    },
+    "orbital": {
+      "title": "AST orbital signal: semi-major axis",
+      "body": "For each object in CelesTrak's AST group we compute the semi-major axis with a = (μ / (2πn / 86,400)²)^(1/3), with Earth μ = 398,600.4418 km³/s² and n in revolutions per day. We keep up to 32 distinct epochs per NORAD ID. We only compare a 24-to-72-hour window with at least three epochs two hours apart. A drop of 2 km or more is a reason to review sources, not proof of deployment, manoeuvre or cause: atmospheric drag, orbit adjustments and element revisions can also produce changes. BSTAR and the mean-motion derivatives are fitting parameters, not independent telemetry. The signal is exploratory and does not replace primary confirmation. The AST group is polled at most every two hours. GP (general catalogue) and SupGP (supplementary AST-E elements) are stored and plotted as independent series: they are not compared with each other. One source may be missing without invalidating the other. CelesTrak is never polled when the view is opened; after 30 hours without a valid download, stale signals and history from each source are hidden. The orbital epoch and the download date are different things."
+    },
+    "engines": {
+      "title": "Valuation engines",
+      "intro": "Each company is valued with the engine that matches its type and tags. When a required input is missing, the engine returns \"insufficient data\" instead of inventing a number.",
+      "dcf": {
+        "title": "Standard DCF (default)",
+        "textPre": "5-year FCFF DCF on revenue and FCF margin from the latest coherent snapshot: if the margin is missing it is derived as FCF/revenue (bounded to 1%-50%) and growth comes from the facts or a default (bounded to -15%/+45%). The",
+        "textWacc": "WACC",
+        "textMid": "and terminal growth use a default value labelled as such; the snapshot's net debt is subtracted from equity (net cash adds). Bear/base/bull scenarios, a 3x3 growth x WACC sensitivity and a",
+        "textReverseDcf": "reverse DCF",
+        "textPost": "are included."
+      },
+      "preRevenue": {
+        "title": "Pre-revenue / speculative (pre-FCF)",
+        "text": "5-year DCF for companies without free cash flow: minimum revenue of 1.0 (so ~0 does not break the maths), margin 1%-40%, default growth of 20% (bounded to -15%/+60%) and default WACC of 13%. Causal scenarios (execution delay or financing stress, base, accelerated monetisation) with extra dilution in the bear scenario (≥15%, capped at 80% of value) and an estimated 2-year financing need with a 50% buffer."
+      },
+      "commodities": {
+        "title": "Commodities (mining, energy, uranium)",
+        "text": "Flow = max(price - unit cost, 0) x volume x (1 - rate), and equity = flow x multiple - net debt, all from financial facts (realised or spot price, cost, volume, multiple). The scenarios are the price grid x0.75 / x1.0 / x1.25 around the reference price, and that same table is the sensitivity."
+      },
+      "sotp": {
+        "title": "SOTP (multi-segment)",
+        "text": "NAV = sum of (segment operating metric x segment multiple) - net debt, with an explicit fact contract per segment and a holding discount between 0 and 1. Scenarios: discount +15pp (cap 45%) / base / -8pp with NAV x1.12 in the bull case; discount sensitivity -5pp / base / +5pp. It never falls back to a single-firm DCF."
+      },
+      "holding": {
+        "title": "Holding company (BN/BABA type)",
+        "text": "For holdings: inherits the SOTP with an explicit holding discount that captures the group's persistent conglomerate discount. Same scenarios and same discount sensitivity as the SOTP."
+      },
+      "footnote": "There are also dedicated sector engines for banks (justified P/B = (ROE - g)/(CoE - g)), insurers (the same P/B multiplied by a combined-ratio factor) and listed real estate (REITs). Each engine's scenarios are shown with their assumptions on the company page."
+    },
+    "propicks": {
+      "title": "How ProPicks are generated",
+      "step1": {
+        "title": "Quality and growth metrics",
+        "text": "Profitability, cash flow, growth and balance-sheet health, computed on the persisted filings. Valuation and momentum score when data exists for the company (CFROI and WACC; price series); when missing, the category enters neutral (50) and is marked n/a on the card."
+      },
+      "step2": {
+        "title": "Percentile ranking across the universe",
+        "text": "Each component is converted to a percentile over the whole persisted universe and weighted with declared weights; if a component is missing, the weights are renormalised and it is recorded."
+      },
+      "step3": {
+        "title": "Score + verifiable confidence",
+        "text": "0-100 score with a confidence level and auditable reasons: each reason shows its metric and its value."
+      },
+      "step4": {
+        "title": "Walk-forward backtesting",
+        "text": "A global walk-forward backtest exists, but it is a price-only momentum baseline: it is not a ProPicks backtest. The per-strategy backtest will be published once point-in-time fundamentals exist; until then no strategy shows simulated performance."
+      },
+      "footnote": "Of the four strategies (adaptive, value, momentum and defensive), each card declares its real status: if it does not yet have a published selection or backtest, it says so instead of showing estimates."
+    },
+    "funnel": {
+      "title": "The ProPicks funnel",
+      "introPre": "The funnel evaluates",
+      "introStrong": "the entire persisted universe",
+      "introPost": "(2,110 companies: SEC + ESEF) with metrics already computed in the database. Nothing is imputed: each company carries its per-metric coverage map (ok / missing / approx) and the exact reason for every filter it fails.",
+      "coverageStrong": "Minimum coverage:",
+      "coverageRest": "at least 6 of the 9 quality metrics (ROIC, approximate CFROI, 5y FCF margin, 5y owner earnings, 5y margins, 5y ROE, 5y ROA, capex/D&A, MOAT V2).",
+      "consistencyStrong": "Earnings consistency",
+      "consistencyRest": "(Graham / Buffett): positive net income in at least 4 of the last 5 fiscal years with data; with fewer than 4 years of data there is not enough evidence.",
+      "debtStrong": "Debt:",
+      "debtRest": "ND/EBITDA < 3 when the metric exists (currently US coverage; for EUR it is declared missing and not applied, never invented).",
+      "qualityStrong": "Sector-branch quality filter:",
+      "qualityRest": "ROIC/CFROI is not meaningful for banks and insurers (Greenblatt excludes them from the Magic Formula for the same reason). Financials: 5y ROE > cost of equity, with the declared approximation of using the stored WACC as a proxy for the cost of equity. Everything else: ROIC > WACC and CFROI > WACC.",
+      "rankingStrong": "Ranking:",
+      "rankingRest": "each component is converted to a percentile over the universe and weighted: ROIC-WACC spread 25%, CFROI-WACC spread 15%, MOAT V2 20%, 5y ROE 10%, 5y FCF margin 10%, revenue growth (CAGR) 10%, 5y owner earnings 5%, FCF conversion 5%. If a component does not apply or is missing, the weights are renormalised and it is declared.",
+      "v1Strong": "What v1 does NOT include yet:",
+      "v1Rest": "valuation (FCF yield / earnings yield) and momentum do not enter the v1 funnel yet: price series are only stored for the top-N of each run, not for the whole universe. Every run is stored in full, with the discarded candidates and their reasons, so the history and the entries and exits are auditable."
+    },
+    "moat": {
+      "title": "Quality framework (MOAT)",
+      "intro": "These eight criteria describe historical financial quality; they do not by themselves prove a competitive moat. They are only scored on the general operating profile and with sufficient data. For early-stage or growth companies, financials and cyclicals the result is \"not evaluable with these thresholds\", not 0/8. The profile is based on the recorded type, sector and tags, not on the ticker or on one year's losses. Assessing the moat requires separately verifiable evidence; its absence is not equivalent to zero.",
+      "check1": "5y FCF margin",
+      "check1Threshold": "average > 5%",
+      "check2": "5y net margin",
+      "check2Threshold": "average > 15%",
+      "check3": "5y ROE",
+      "check3Threshold": "average > 15%",
+      "check4": "5y ROA",
+      "check4Threshold": "average > 7%",
+      "check5": "ROIC",
+      "check5Threshold": "> WACC",
+      "check6": "CFROI (declared approx.)",
+      "check6Threshold": "> WACC",
+      "check7": "5y owner earnings (Buffett)",
+      "check7Threshold": "average > 0",
+      "check8": "Capex / D&A 5 years",
+      "check8Threshold": "average ≤ 1.5 (1.0 = maintenance only)",
+      "noteOwner": "Owner earnings estimates maintenance capex as min(|capex|, D&A), a conservative approximation (Buffett, 1986 letter); the CFROI is an approximation, not the full Credit Suisse CFROI.",
+      "noteEsef": "ESEF issuers (Spain/EU): IFRS spreads debt across several line items that are not added up, so standard ROIC and WACC are not computable. Two conservative approximations are used: WACC as a pure cost of equity (a stricter threshold) and invested capital as assets minus cash (a downward-biased ROIC). Without enough data, the criterion is left not evaluable."
+    },
+    "limits": {
+      "title": "Limits you should know",
+      "delay": {
+        "title": "Delayed data",
+        "text": "Market data arrives with a slight delay in most markets. Good enough for analysis, not for intraday trading."
+      },
+      "coverage": {
+        "title": "Partial coverage",
+        "text": "Not all tickers have the same coverage: when filings or metrics are missing, the company page says so instead of inventing."
+      },
+      "pit": {
+        "title": "Point-in-time",
+        "textPre": "The valuation engines only use information available on each simulated date. Avoiding",
+        "textLookAhead": "look-ahead",
+        "textPost": "is what makes a backtest credible."
+      },
+      "advice": {
+        "title": "Not investment advice",
+        "text": "GerarAI is an educational and analysis tool. Investment decisions are always yours."
+      }
+    },
+    "costs": {
+      "title": "Explicit costs",
+      "data": {
+        "title": "Data: 0 EUR/month",
+        "text": "Finnhub (free tier with key), Yahoo Finance (no key), SEC EDGAR (public access) and the rest of the sources listed above are used with no paid plan."
+      },
+      "llm": {
+        "title": "LLM models: pay per use",
+        "text": "The language models use OpenCode Go as the main provider; the chat falls back to Groq and Gemini when configured, on their free tier. Cost is recorded per model: when it is unknown, it says \"unknown\" instead of showing a 0."
+      },
+      "infra": {
+        "title": "Infrastructure: self-hosted",
+        "text": "Frontend on Vercel; backend self-hosted on our own machine. No cloud bill: just the host's power and hardware."
+      }
+    }
+  },
+  "privacidad": {
+    "metaTitle": "Privacy",
+    "metaDescription": "GerarAI privacy policy and personal data processing.",
+    "h1": "Privacy policy",
+    "lastReview": "Last editorial review: October 27, 2026.",
+    "legalNote": "This text is informative and does not constitute legal advice.",
+    "s1": {
+      "title": "1. Data controller",
+      "identity": "Identity: Nicolás Iglesias García.",
+      "contact": "Privacy contact:"
+    },
+    "s2": {
+      "title": "2. What data we process",
+      "p1": "Account data (email, name, country and the investment preferences you choose to share), portfolio and transaction data, theses, claims and evidence, watchlist, rules and alerts, documents you upload and their metadata, research notes and memory, and messages you send to the assistant. We also record technical chat telemetry (route, model, latency and, temporarily, the question) to operate and improve the service.",
+      "p2": "We do not ask for health, ideology, religion or biometric data. We do not sell personal data. How AI providers process data depends on their terms and on the chosen configuration."
+    },
+    "s3": {
+      "title": "3. Purposes and legal basis",
+      "i1": "Providing the service you request (account, portfolio, theses, watchlist, alerts, documents and assistant): performance of the contract.",
+      "i2": "Protecting the account, preventing abuse and operating and improving the service (including technical chat telemetry): legitimate interest.",
+      "i3": "Complying with legal obligations: legal obligation."
+    },
+    "s4": {
+      "title": "4. Providers and sub-processors",
+      "intro": "The service relies on the following providers:",
+      "llmStrong": "Language models",
+      "llmRest": ": OpenCode (DeepSeek models), Groq, Google (Gemini) and OpenRouter, depending on the provider configuration. They take part in the AI features and receive the context sent by those features, which may include research and portfolio data.",
+      "marketStrong": "Market data providers",
+      "marketRest": ": Finnhub, Financial Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak and other configured free sources. These queries are made per ticker and do not include your personal data.",
+      "hostingStrong": "Hosting and databases",
+      "hostingRest": ": Vercel (frontend, with functions in the Frankfurt region, fra1), Oracle Cloud (data engine server in the eu-madrid-1 region, Madrid, Spain), MongoDB Atlas (accounts and auxiliary data) and PostgreSQL on the server itself.",
+      "storageStrong": "Storage and search",
+      "storageRest": ": MinIO or Garage (documents), Qdrant (vector index) and Redis (queues and cache), all on the server itself.",
+      "backupsStrong": "Backups",
+      "backupsRest": ": Cloudflare R2, when configured.",
+      "mailStrong": "Outbound email",
+      "mailRest": ": SMTP for notices and password reset, through the configured SMTP server.",
+      "transfers": "Regions and international transfers: the frontend runs in Vercel's Frankfurt region (fra1). The language model providers and the rest of the external services may process data outside the European Union under their own terms."
+    },
+    "s5": {
+      "title": "5. Retention",
+      "docs1": "Financial documents: 2,555 days (7 years) by default, configurable with",
+      "docs2": ". Purging requires enabling the retention task and disabling the no-delete dry-run mode. By default it is off and in no-delete dry-run mode; those periods do not guarantee automatic deletion. When the purge runs, the original, the chunks and the vectors are deleted, and a content-free tombstone reference is kept so historical decisions remain auditable.",
+      "telemetry1": "Raw chat telemetry questions: 90 days by default, configurable with",
+      "telemetry2": ".",
+      "access1": "Access requests: 365 days by default, configurable with",
+      "access2": "; automatic TTL deletion in MongoDB is only enabled if the operator turns it on expressly.",
+      "backups": "Backups: the local script lets you configure how many to keep (8 by default); it is not a guarantee of execution. In addition, when configured, a copy in Cloudflare R2 whose expiry is set by the bucket's expiration rule."
+    },
+    "s6": {
+      "title": "6. Your rights",
+      "p1Pre": "You can request access, rectification, erasure, restriction, portability and objection. From",
+      "p1Post": "you can download a JSON copy of your structured data and metadata (profile, portfolio, theses, claims and evidence, watchlist, alerts, knowledge, plans and settings) and delete your account and all its data. The export does not include the original files of the documents you uploaded: only each document's metadata and chunk count travel. Deletion removes PostgreSQL, original documents, vectors and sessions; it is irreversible.",
+      "p2Pre": "You can also lodge a complaint with the Spanish Data Protection Agency (AEPD,",
+      "p2Post": ")."
+    },
+    "s7": {
+      "title": "7. Security and source code",
+      "p1": "We apply per-account isolation, signed authentication between the frontend and the data engine, and data access restrictions. No system is infallible: if you spot a security issue, use the contact channel indicated above.",
+      "p2Pre": "The GerarAI code is published under the AGPL-3.0 license. You can read it at",
+      "p2Post": ". The source code corresponding to the deployed version must be available to the service's users."
+    },
+    "s8": {
+      "title": "8. Changes",
+      "p": "We may update this policy to reflect legal or technical changes. The date of the last review and any relevant changes will be published on this page."
+    },
+    "footer": {
+      "pre": "See also the",
+      "terms": "terms of use",
+      "mid": "and the",
+      "methodology": "methodology"
+    }
+  },
+  "terminos": {
+    "metaTitle": "Terms of use",
+    "metaDescription": "Terms of use of the GerarAI service.",
+    "h1": "Terms of use",
+    "lastReview": "Last editorial review: October 27, 2026.",
+    "legalNote": "This document is informative and does not constitute legal advice.",
+    "s1": {
+      "title": "1. Service owner",
+      "pPre": "GerarAI is a personal project by Nicolás Iglesias García (Spain). Contact:"
+    },
+    "s2": {
+      "title": "2. What GerarAI is",
+      "p1": "GerarAI is an educational tool for investment research and organisation. It lets you keep a portfolio, build theses, link evidence, follow a watchlist, set up alerts and ask an assistant. It is not a broker, it does not execute orders and it does not hold money or securities.",
+      "p2": "GerarAI does not offer personalised financial, tax or legal advice. Investment decisions and their consequences are exclusively yours. Data may be incomplete or arrive delayed; the OFFICIAL / INFERRED / NO_DATA labels do not turn an estimate into a fact."
+    },
+    "s3": {
+      "title": "3. Account and security",
+      "pPre": "You must keep your credentials confidential and notify us of any unauthorised use. You can enable two-step verification and change your password from",
+      "pPost": ". An account is personal; do not share access."
+    },
+    "s4": {
+      "title": "4. Acceptable use",
+      "i1": "Do not try to access other accounts' data or bypass the service's isolation.",
+      "i2": "Do not upload illegal content, malware or third parties' personal data without a legal basis.",
+      "i3": "Do not abuse limits, automations or external providers' APIs.",
+      "i4": "Do not use the service to run a regulated financial-advisory business without meeting your obligations."
+    },
+    "s5": {
+      "title": "5. Data and external providers",
+      "pPre": "The service combines data from public and private providers (SEC EDGAR, CNMV, Finnhub, FMP, Yahoo Finance, FRED, GDELT and CelesTrak, among others) and may send research context and, depending on the feature, portfolio data to a language model provider when you enable the corresponding features. See the",
+      "pLink": "privacy policy",
+      "pPost": "for details and sub-processors."
+    },
+    "s6": {
+      "title": "6. Intellectual property and license",
+      "pPre": "The GerarAI code is distributed under AGPL-3.0 (",
+      "pLink": "public repository",
+      "pPost": "). Trademarks, editorial texts and third-party data keep their own licenses and terms. Your data and your theses remain yours; you authorise us to process them only to provide the service to you."
+    },
+    "s7": {
+      "title": "7. Availability and liability",
+      "p": "The service is offered \"as is\" and \"as available\". There may be interruptions due to maintenance, free-tier provider limits or force majeure. To the extent permitted by law, the owner is not liable for indirect damages, lost profits or investment decisions based on the information shown."
+    },
+    "s8": {
+      "title": "8. Cancellation and deletion",
+      "pPre": "You can export your data and delete the account from",
+      "pMid": ". Deletion is immediate and irreversible and also removes original documents, vectors and sessions. Retention periods and legal exceptions are described in the",
+      "pLink": "privacy policy",
+      "pPost": "."
+    },
+    "s9": {
+      "title": "9. Governing law and jurisdiction",
+      "p": "These terms are governed by Spanish law. If you are a consumer, you keep the mandatory rights and the jurisdiction of your place of residence."
+    },
+    "s10": {
+      "title": "10. Changes",
+      "p": "We may update these terms. We will publish the date of the last review on this page."
+    },
+    "footer": {
+      "pre": "See also the",
+      "link": "privacy policy"
+    }
+  }
+}

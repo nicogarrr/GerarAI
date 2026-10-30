@@ -30,8 +30,8 @@ def _company(db, ticker, name):
 def test_mi_cartera_lists_stored_positions_without_llm(db):
     a = _company(db, "AAA", "Alpha")
     b = _company(db, "BBB", "Beta")
-    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
-    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("2"), average_cost=Decimal("50"), market_value=Decimal("100")))
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), currency="EUR", market_value=Decimal("300")))
+    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("2"), average_cost=Decimal("50"), currency="EUR", market_value=Decimal("100")))
     db.commit()
     resp = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
     assert resp.model == "deterministic"
@@ -61,7 +61,7 @@ def test_other_tenant_positions_never_appear_and_no_tenant_means_no_overview(db)
     db.commit()
     db.info["tenant_id"] = 1
     resp = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
-    assert "AAA" in resp.answer and "SECRET" not in resp.answer and "1 posiciones" in resp.answer
+    assert "AAA" in resp.answer and "SECRET" not in resp.answer and "1 posición abierta" in resp.answer
     db.info["tenant_id"] = None
     assert ChatService()._portfolio_overview(db) is None
 

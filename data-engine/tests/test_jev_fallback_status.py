@@ -39,18 +39,13 @@ def test_transition_persists_once_and_alerts_once(monkeypatch):
     assert jev_availability.credit_status()["last_billing_failure_at"]
 
 
-def test_fallback_only_marks_tier_one(monkeypatch):
-    monkeypatch.setattr(jev_gates, "credit_status", lambda: {"status": "fallback_proveedor_alternativo"})
-    class Decision:
-        label = "observed"
-        confidence = .91
-        backend = "jev_fallback_alternative"
-    async def free(*args, **kwargs):
-        return Decision()
-    monkeypatch.setattr(jev_gates, "classify_free", free)
-    assert asyncio.run(jev_gates.jev_choice_or_none(name="claim_routing", text="x", instructions="?", criteria={"observed": "x"})) is None
-    mark = jev_gates.mark_only("copilot_ticket", "x", "?", {"observed": "x"})
-    assert mark["backend"] == "jev_fallback_alternative"
+def test_no_fallback_after_credit_exhaustion(monkeypatch):
+    monkeypatch.setattr(jev_gates, "credit_status", lambda: {"status": "desactivado_sin_credito"})
+    def forbidden_client():
+        raise AssertionError("No provider may be called after credit exhaustion")
+    monkeypatch.setattr(jev_gates, "build_client", forbidden_client)
+    assert asyncio.run(jev_gates.jev_choice_or_none(
+        name="copilot_ticket", text="x", instructions="?", criteria={"observed": "x"})) is None
 
 def test_billing_403_with_provider_signal_is_credit():
     def handler(req):
@@ -128,23 +123,9 @@ def test_mark_credit_exhausted_with_auth_required_writes_alerts(monkeypatch):
     assert jev_availability.credit_status()["last_billing_failure_at"]
 
 
-def test_classify_free_request_uses_registered_prompt_and_traces_it(monkeypatch):
-    from app.services import jev_fallback, prompt_registry
-
-    seen = []
-
-    class Provider:
-        name = "fake"
-
-        async def generate_json(self, request, *, schema, schema_name):
-            seen.append(request)
-            return {"choice": "yes", "confidence": 0.9}
-
-    monkeypatch.setattr(jev_fallback, "create_llm_provider", lambda: Provider())
-    decision = asyncio.run(
-        jev_fallback.classify_free("texto", instructions="?", criteria={"yes": "si", "no": "no"})
-    )
-    assert decision is not None and decision.label == "yes"
-    resolved = prompt_registry.get_prompt("jev_fallback", allow_remote=False)
-    assert seen[0].messages[0].content == resolved.text
-    assert seen[0].metadata == resolved.trace_metadata()
+def test_go_global_configuration_unchanged():
+    from app.core.config import Settings
+    settings = Settings(_env_file=None)
+    assert settings.llm_provider == "opencode-go"
+    assert settings.chat_go_subscription_enabled is True
+    assert "opencode_go_api_key" in Settings.model_fields
