@@ -641,7 +641,7 @@ class MarketRefreshService:
             # A8: refresco de hoy = 24 h desde el cierre de la bolsa (antes de la
             # apertura el cierre de ayer sigue vigente); fecha pasada: días naturales.
             stale = (
-                close_is_stale(latest.date, company.exchange, max_age)
+                close_is_stale(latest.date, company.exchange, max_age, ticker=company.ticker)
                 if as_of == date.today()
                 else market_price_is_stale(age_days, max_age)
             )
