@@ -30,8 +30,14 @@ describe('Errores y títulos que un lector de pantalla puede encontrar', () => {
     });
 
     it('el aviso de noticias caídas no habla de «dashboard»', () => {
+        // El copy vive en los mensajes i18n desde la traducción del shell
+        // (E1-E3); NewsSection lo referencia por clave. La regla (nada de
+        // «dashboard») se aplica al texto real que oye el lector de pantalla.
         const news = src('components/NewsSection.tsx');
-        expect(news).toContain('El resto de la página sigue funcionando.');
+        expect(news).toContain("t('home.news.error')");
         expect(news).not.toContain('El resto del dashboard');
+        const home = JSON.parse(src('lib/i18n/messages/es/home.json')) as { news: { error: string } };
+        expect(home.news.error).toContain('El resto de la página sigue funcionando.');
+        expect(home.news.error).not.toContain('dashboard');
     });
 });

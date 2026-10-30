@@ -65,10 +65,16 @@ test.describe("hardening frontend estático", () => {
 
     expect(mobileNav).toContain("closeButtonRef");
     expect(mobileNav).toContain("aria-labelledby=\"mobile-nav-title\"");
-    expect(mobileNav).toContain('aria-label="Cerrar menú por fondo"');
+    // Los aria-label del drawer viven en i18n desde E1-E3: la fuente referencia
+    // la clave y el texto real se verifica en los mensajes «es».
+    expect(mobileNav).toContain("aria-label={t('shell.nav.closeBackdrop')}");
+    const shellMessages = JSON.parse(source("lib", "i18n", "messages", "es", "shell.json")) as { nav: { closeBackdrop: string } };
+    expect(shellMessages.nav.closeBackdrop).toBe("Cerrar menú por fondo");
     expect(mobileNav).toContain("querySelectorAll<HTMLElement>");
     expect(searchCommand).toContain("searchError");
-    expect(searchCommand).toContain("No se pudo completar la búsqueda");
+    expect(searchCommand).toContain("t('ui.command.error')");
+    const uiMessages = JSON.parse(source("lib", "i18n", "messages", "es", "ui.json")) as { command: { error: string } };
+    expect(uiMessages.command.error).toContain("No se pudo completar la búsqueda");
     expect(searchCommand).not.toMatch(/catch \(error: any\)[\s\S]*?setStocks\(\[\]\);[\s\S]*?\n\s*}/);
     expect(portfolioChat).toContain("Abrir el cerebro");
     expect(portfolioChat).toContain("aria-labelledby=\"global-brain-title\"");

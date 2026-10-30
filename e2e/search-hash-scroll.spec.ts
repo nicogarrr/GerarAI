@@ -1,4 +1,21 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+// Calentamiento del chunk de la paleta (patrón del repo, cf. 'MSFT ALERT'
+// en search-hash-scroll.spec.ts): con el dev server frío (CI), el primer
+// Ctrl+K compila el chunk del diálogo y los listeners de Escape de Radix se
+// registran después de la primera pintada, perdiendo la tecla y dejando un
+// diálogo abierto huérfano. Abrir y cerrar una vez estabiliza el entorno;
+// las aserciones medidas después siguen siendo estrictas.
+async function warmUpPalette(page: Page) {
+    await page.keyboard.press('Control+k');
+    await expect(page.locator('[role="dialog"]')).toHaveCount(1);
+    for (let i = 0; i < 3 && (await page.locator('[role="dialog"]').count()) > 0; i++) {
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+    }
+    await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+}
+
+
 
 // Bug (22-oct-2026, prod): comandos de ficha con ancla desde la paleta
 // («MSFT GP») con la página YA abierta y desplazada abajo: location.hash
@@ -42,6 +59,7 @@ test.describe('paleta: comandos de ficha (ancla y destino)', () => {
     test('comando sin ancla sigue navegando (MSFT TESIS)', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 860 });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+        await warmUpPalette(page);
         await page.keyboard.press('Control+k');
         const input = page.locator('[role="dialog"] input');
         await expect(input).toBeFocused();

@@ -10,6 +10,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const headerStore = new Map<string, string>();
 vi.mock('next/headers', () => ({
     headers: async () => ({ get: (name: string) => headerStore.get(name.toLowerCase()) ?? null }),
+    // El 404 público se traduce con getT() (lib/i18n/server lee la cookie de
+    // locale): sin cookie de locale el idioma por defecto es «es».
+    cookies: async () => ({ get: () => undefined }),
 }));
 const requireAuthenticatedUser = vi.fn();
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser: () => requireAuthenticatedUser() }));
