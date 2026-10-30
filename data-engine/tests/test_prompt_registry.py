@@ -118,6 +118,7 @@ def test_thesis_narrative_prompt_version_and_hash_are_pinned(name):
         "prompt_version": version,
         "prompt_hash": content_hash,
         "prompt_source": "code",
+        "prompt_lang": "es",
     }
 
 

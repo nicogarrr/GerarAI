@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.i18n import current_language
 from app.llm import LLMRequest, Message, ResponseFormat, parse_json_response
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import fallback_notice
@@ -21,7 +22,7 @@ from app.llm.reasoning_sections import chat_reasoning_effort
 from app.schemas import ChatResponse, SynthesisSection
 from app.services.budget import BudgetController, BudgetExceededError
 from app.services.langfuse_client import LangfuseTracer
-from app.services.llm_output_guard import _english_hits, inspect_response_text
+from app.services.llm_output_guard import _english_hits, _spanish_hits, inspect_response_text
 from app.services.prompt_registry import get_prompt
 
 PROMPT_VERSION = get_prompt("chat_source_synthesis", allow_remote=False).version
@@ -161,12 +162,15 @@ _SECTION_LABEL_DUMP_RE = re.compile(
 )
 
 
-def _prose_answer_valid(text: str | None, *, max_chars: int = 2000) -> bool:
+def _prose_answer_valid(
+    text: str | None, *, max_chars: int = 2000, expected_language: str = "es"
+) -> bool:
     """La respuesta visible es prosa, no el volcado del contrato.
 
-    Rechaza IDs de cita, etiquetas de seccion, URLs y volcados en ingles:
-    cualquiera de esos significa que el modelo pego estructura interna en la
-    respuesta que lee el usuario.
+    Rechaza IDs de cita, etiquetas de seccion, URLs y volcados en OTRO idioma
+    (i18n B: ingles cuando se genera en espanol, espanol cuando se genera en
+    ingles): cualquiera de esos significa que el modelo pego estructura
+    interna en la respuesta que lee el usuario.
     """
     body = (text or "").strip()
     if not body or len(body) > max_chars:
@@ -177,7 +181,10 @@ def _prose_answer_valid(text: str | None, *, max_chars: int = 2000) -> bool:
         return False
     if re.search(r"https?://|www[.]", body, re.IGNORECASE):
         return False
-    hits, total = _english_hits(body)
+    if expected_language == "en":
+        hits, total = _spanish_hits(body)
+    else:
+        hits, total = _english_hits(body)
     if hits >= 2 and hits / max(total, 1) >= 0.15:
         return False
     return True
@@ -400,6 +407,119 @@ def _reject_untrusted_output(payload: dict, baseline: Any, question: str) -> Non
         raise ValueError("Ungrounded number in model answer")
 
 
+# --- Validacion EN (i18n B) ------------------------------------------------
+# Espejo en ingles de los controles de prosa libre: misma regla (cada
+# clausula con cifra exige aproximador propio, nada de atribuciones a fuentes
+# no aportadas ni de claims de cartera sin posiciones en el prompt), con los
+# marcadores en ingles. El camino espanol de _inferred_general_text_valid no
+# se toca.
+_EN_PORTFOLIO_CLAIM_RE = re.compile(
+    r"(?i)\b(?:my|your|our)\s+(?:portfolio|positions?|holdings?|returns?|investments?|performance)\b"
+)
+_EN_ATTRIBUTION_RE = re.compile(
+    r"(?i)\b(?:official(?:ly)?|reported|annual report|10-K|10-Q|"
+    r"filed|filing|stated|announced|press release)\b"
+)
+_EN_ACCORDING_TO_RE = re.compile(r"(?i)\baccording to\b")
+_EN_APPROXIMATE_RE = re.compile(
+    r"(?i)(?:roughly|about|around|approximately|approx\w*|estimated?\w*|"
+    r"some|over|under|more than|less than|fewer than|nearly|almost|"
+    r"on the order of|tens of|hundreds of|thousands of|close to|up to|"
+    r"between)\s+(?:(?:the|a|an|of)\s+){0,2}$"
+)
+_EN_NUMBER_RE = re.compile(r"\d[\d.,]*")
+_EN_SCALE_WORD_RE = re.compile(r"(?i)(?:thousand|million|billion|trillion)")
+
+
+def _inferred_general_text_valid_en(
+    text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
+    allow_named_attribution: bool = False,
+    allowed_investors: frozenset[str] = frozenset(),
+    grounded_numbers: frozenset[str] = frozenset(),
+    allow_portfolio_claims: bool = False,
+) -> bool:
+    """Version EN de la validacion de prosa libre (ver el espejo ES)."""
+    if len(text) > 8000 or not text.strip() or re.search(r"https?://|www[.]|\bdoi:", text, re.I):
+        return False
+    if _SECRET_RE.search(text):
+        return False
+    if re.search(
+        r"(?i)\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+"
+        r"(?:com|org|net|io|ai|es|gov|edu|co|uk|de|fr|app|dev|info|biz|eu)\b(?:/[^\s]*)?",
+        text,
+    ):
+        return False
+    if allow_placeholders:
+        def placeholder(match: re.Match[str]) -> str:
+            content = match.group(1).strip()
+            if content.upper() in {"INFERIDO", "SIN_DATOS", "OFICIAL"}:
+                return match.group()
+            if _FIN_WORDS_RE.search(content) or re.search(r"\d", content):
+                return match.group()
+            return ""
+        text = re.sub(r"\[([^\]]+)\]", placeholder, text)
+    if re.search(r"\[[^\]]+\]", text):
+        return False
+    if _EN_ATTRIBUTION_RE.search(text):
+        return False
+    # «according to X» se trata como el «segun X» espanol: solo con doctrina
+    # aportada (allow_named_attribution) y nombre autorizado.
+    if _EN_ACCORDING_TO_RE.search(text) and not allow_named_attribution:
+        return False
+    if _reports_named_investor_opinion(text):
+        if not allow_named_attribution:
+            return False
+        plain = "".join(
+            c for c in unicodedata.normalize("NFKD", text.lower())
+            if not unicodedata.combining(c)
+        )
+        named = {
+            name for name in _INVESTOR_NAME_LIST
+            if re.search(rf"\b{name}\b", plain)
+        }
+        if not named <= allowed_investors:
+            return False
+    # Una cifra contable con decimales no la convierte en estimacion un "about".
+    if any(
+        _number_key(m.group()) not in grounded_numbers
+        for m in re.finditer(r"\d[\d.,]*[.,]\d{2}(?!\d)", text)
+    ):
+        return False
+    hits, total = _spanish_hits(text)
+    if hits >= 2 and hits / max(total, 1) >= 0.15:
+        return False
+    if _EN_PORTFOLIO_CLAIM_RE.search(text) and not allow_portfolio_claims:
+        return False
+    if not quantitative:
+        return True
+    clauses = re.split(r"[;!?\n]|(?<!\d)[.](?!\d)|\b(?:and|but)\b", text)
+    for clause in clauses:
+        if allow_named_attribution and not _MAGNITUDE_MARKER_RE.search(clause):
+            continue
+        for match in _EN_NUMBER_RE.finditer(clause):
+            token = match.group().strip().rstrip(".,")
+            if grounded_numbers and _number_key(token) in grounded_numbers:
+                continue
+            prefix = clause[max(0, match.start() - 90):match.start()]
+            # Un año aislado en contexto de fecha no es una cifra empresarial.
+            if re.fullmatch(r"(?:19|20)\d{2}", token) and re.search(
+                r"(?i)(?:\bin\b|\bof\b|\bfor\b|\bfiscal\b|\byear\b|\bfrom\b|\bto\b|"
+                r"(?:19|20)\d{2}\s*(?:[-–]|and))\s*$", prefix,
+            ):
+                continue
+            # Unidad de escala que sigue a una cifra ya aproximada (8000 million).
+            if _EN_SCALE_WORD_RE.fullmatch(token) and re.search(
+                r"(?:\d[\d.,]*| thousand| million| billion)\s*$", prefix, re.I
+            ):
+                continue
+            if not _EN_APPROXIMATE_RE.search(prefix):
+                previous = clause[:match.start()]
+                range_start = re.search(r"\d[\d.,]*%?\s*(?:-|–|to|and)\s*$", previous)
+                if range_start is None or not _EN_APPROXIMATE_RE.search(previous[:range_start.start()]):
+                    return False
+    return True
+
+
 def _inferred_general_text_valid(
     text: str, *, allow_placeholders: bool = False, quantitative: bool = True,
     allow_named_attribution: bool = False,
@@ -605,7 +725,7 @@ def _with_fallback_notice(answer: str, response: Any) -> str:
     Decision del dueno (2026-10-27): una respuesta de respaldo nunca se
     presenta como si fuera de OpenCode Go.
     """
-    notice = fallback_notice(response)
+    notice = fallback_notice(response, lang=current_language())
     if not notice or not answer:
         return answer
     return f"{notice}\n\n{answer}"
@@ -733,13 +853,15 @@ class ChatSynthesisService:
                         raise BudgetExceededError("LLM budget exhausted")
 
                 def _validate_candidate(resp):
-                    if inspect_response_text(resp.text):
+                    if inspect_response_text(resp.text, expected_language=current_language()):
                         raise ValueError("Invalid response language")
                     data = parse_json_response(resp.text)
                     self._verified_sections(data, baseline, set(retrieval_ids))
                     float(data["confidence"])
                     data["insufficient_data"]
-                    if not _prose_answer_valid(data.get("answer")):
+                    if not _prose_answer_valid(
+                        data.get("answer"), expected_language=current_language()
+                    ):
                         raise ValueError("Invalid prose answer")
                     _reject_untrusted_output(data, baseline, question)
 
@@ -749,13 +871,16 @@ class ChatSynthesisService:
                     provider,
                     request,
                     source="chat_synthesis",
+                    expected_language=current_language(),
                     on_response=None if bind else _record,
                     before_retry=_can_retry,
                 )
                 response = guarded.response
                 cost = spent["cost"]
                 payload = parse_json_response(response.text)
-                if not _prose_answer_valid(payload.get("answer")):
+                if not _prose_answer_valid(
+                    payload.get("answer"), expected_language=current_language()
+                ):
                     raise ValueError("Invalid prose answer")
                 _reject_untrusted_output(payload, baseline, question)
                 sections = self._verified_sections(payload, baseline, set(retrieval_ids))
@@ -1072,9 +1197,14 @@ class ChatSynthesisService:
 
         try:
             def _validate_candidate(resp):
-                if inspect_response_text(resp.text, english="strict"):
+                lang = current_language()
+                if inspect_response_text(resp.text, english="strict", expected_language=lang):
                     raise ValueError("Invalid response language")
-                if not _inferred_general_text_valid(
+                validator = (
+                    _inferred_general_text_valid_en if lang == "en"
+                    else _inferred_general_text_valid
+                )
+                if not validator(
                     resp.text.strip(), allow_placeholders=scope == "ordinary",
                     quantitative=scope != "ordinary" or _general_quantity_context(resp.text),
                     allow_named_attribution=bool(doctrine),
@@ -1091,6 +1221,7 @@ class ChatSynthesisService:
                 request,
                 source="chat_general",
                 english="strict",
+                expected_language=current_language(),
                 on_response=None if bind else _record,
                 before_retry=_can_retry,
             )
@@ -1099,7 +1230,11 @@ class ChatSynthesisService:
 
             return self._general_fallback(baseline, reason="quota" if is_quota_exhausted(exc) else "provider_or_guard_failure")
         text = (guarded.response.text or "").strip()
-        if not _inferred_general_text_valid(
+        _post_validator = (
+            _inferred_general_text_valid_en if current_language() == "en"
+            else _inferred_general_text_valid
+        )
+        if not _post_validator(
             text,
             allow_placeholders=scope == "ordinary",
             quantitative=scope != "ordinary" or _general_quantity_context(text),

@@ -1013,6 +1013,12 @@ class ChatService:
         page: ChatPageContext | None = None,
         history: list[ChatTurn] | None = None,
     ) -> ChatResponse:
+        # Idioma de generacion (i18n B): esta corrutina puede correr en un
+        # hilo puente sin el contextvar de la peticion; la sesion es el
+        # canal robusto (chat.py copia db.info al hilo worker).
+        from app.core.i18n import language_from_db, reset_language_scope, set_language_scope
+
+        _lang_token = set_language_scope(language_from_db(db))
         try:
             return await self._answer_impl(
                 db, question, scope, ticker,
@@ -1033,6 +1039,8 @@ class ChatService:
                     "deadline_seconds": get_settings().chat_total_timeout_seconds,
                 },
             )
+        finally:
+            reset_language_scope(_lang_token)
 
     @bounded_chat
     async def _answer_impl(
