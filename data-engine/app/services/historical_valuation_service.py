@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, FinancialFact, MarketPrice
 from app.services.price_units import price_in_currency
 from app.valuation.currency import fact_currency, listing_currency, normalize_currency
+from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 from app.valuation.period_bounds import parse_period_bounds, to_date
 
 # Retraso conservador entre el cierre de un periodo y la publicacion de su
@@ -104,6 +105,15 @@ class HistoricalValuationService:
         currency = normalize_currency(company.currency)[0] or listing_currency(
             company.ticker, company.currency
         )
+        # Los hechos (EPS, FCF, acciones) son por accion ORDINARIA y el precio
+        # de un ADR es por ADR (N ordinarias): los multiplos usan el precio por
+        # ordinaria (precio / N), como los motores. Sin eso un ADR 2:1 salia
+        # con PER y EV dobles. Marcado ADR sin ratio valido: sin multiplos.
+        ratio = adr_ratio(company)
+        tagged_adr = any(
+            str(tag).strip().lower() == "adr" or str(tag).strip().lower().startswith(ADR_TAG_PREFIX)
+            for tag in (company.factor_tags or [])
+        )
         series = []
         for year in sorted(annual_prices.keys() | annual_facts.keys()):
             price_row = annual_prices.get(year)
@@ -129,7 +139,13 @@ class HistoricalValuationService:
             # value (including a reported 0) may enter enterprise value.
             debt = self._monetary_value(year_facts, "total_debt", currency)
             cash = self._monetary_value(year_facts, "cash_and_equivalents", currency)
-            market_cap = price * shares if price is not None and shares is not None else None
+            if price is None or (ratio is None and tagged_adr):
+                comparable_price = None
+            else:
+                comparable_price = price / Decimal(str(ratio)) if ratio else price
+            market_cap = (
+                comparable_price * shares if comparable_price is not None and shares is not None else None
+            )
             enterprise_value = (
                 market_cap + debt - cash
                 if market_cap is not None and debt is not None and cash is not None
@@ -142,7 +158,7 @@ class HistoricalValuationService:
                     "eps": eps,
                     "fcf_per_share": self._divide(fcf, shares),
                     "revenue_per_share": self._divide(revenue, shares),
-                    "pe": self._multiple(price, eps),
+                    "pe": self._multiple(comparable_price, eps),
                     "ev_to_fcf": self._multiple(enterprise_value, fcf),
                     "ev_to_revenue": self._multiple(enterprise_value, revenue),
                     "source_ids": {
@@ -170,6 +186,7 @@ class HistoricalValuationService:
         return {
             "ticker": company.ticker,
             "currency": currency,
+            "adr_ratio": ratio,
             "years_requested": years,
             "series": series,
             "statistics": statistics,
