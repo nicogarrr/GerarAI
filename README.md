@@ -12,7 +12,7 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](package.json)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](data-engine/pyproject.toml)
 
-> **Status:** v0.9.0 beta (pre-release). The 1.0 checklist is tracked in [docs/RELEASE_1_0.md](docs/RELEASE_1_0.md).
+> **Status:** v0.5.0 (pre-release), the production baseline of 30 October 2026. Hardening and review remain in progress.
 > The user interface is in Spanish (es-ES); code, APIs and this document are in English.
 > **Not financial advice.** See the [disclaimer](#disclaimer).
 

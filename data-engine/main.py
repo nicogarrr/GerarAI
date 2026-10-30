@@ -136,7 +136,7 @@ _EXPOSE_SCHEMA = _app_env in {"local", "test", "ci", "dev", "development"}
 # generando el JSON via app.openapi() sin necesidad de HTTP.
 app = FastAPI(
     title="GerarAI Research Engine",
-    version="0.9.0",
+    version="0.5.0",
     lifespan=lifespan,
     docs_url="/docs" if _EXPOSE_SCHEMA else None,
     redoc_url="/redoc" if _EXPOSE_SCHEMA else None,
