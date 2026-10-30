@@ -544,3 +544,29 @@ def test_ebro_reviewed_eps_conflict_blocks_per_and_derivation(db):
     assert any("cuarentena" in reason for reason in payload["sources"])
     assert _facts_for_metric(db, company.id, "eps_diluted") == []
     assert db.scalar(select(FinancialFact.value).where(FinancialFact.company_id==company.id, FinancialFact.metric=="eps_diluted")) == Decimal("1351")
+
+
+def test_adr_cap_uses_price_per_ordinary_share(db):
+    """BABA: 1 ADR = 8 ordinarias (tabla citada); el filing cuenta ORDINARIAS.
+
+    Cálculo independiente: 160 USD / 8 = 20 USD por ordinaria x 19.200 M
+    ordinarias = 384.000 M USD (en main 160 x 19.200 M = 3,07 billones).
+    """
+    company = _company(db, ticker="BABA", currency="USD")
+    _price(db, company, Decimal("160"), TODAY - timedelta(days=1))
+    _fact(db, company, "shares_outstanding", 19_200_000_000, year=None, source="SEC")
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["market_cap"] == pytest.approx(384_000_000_000)
+    assert result["adr_ratio"] == 8
+
+
+def test_adr_tag_without_ratio_no_cap(db):
+    company = _company(db, ticker="XADR", currency="USD")
+    company.factor_tags = ["adr"]
+    _price(db, company, Decimal("160"), TODAY - timedelta(days=1))
+    _fact(db, company, "shares_outstanding", 19_200_000_000, year=None, source="SEC")
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result == {"status": "unavailable", "reason": "adr_ratio_unknown"}
