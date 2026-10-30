@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { confirmPortfolioImage, previewPortfolioImage, reviewPortfolioImage, searchImageInstrument } from '@/lib/actions/portfolio-image.actions';
-import { imageFileError, type ImageInstrument, type ImagePreview, type ImageReview } from '@/lib/portfolio/image-import';
+import { imageFileError, imageRowsPending, normalizeImageQuantity, type ImageInstrument, type ImagePreview, type ImageReview } from '@/lib/portfolio/image-import';
 import { formatMoney, formatNumber, formatPercent } from '@/lib/format';
 import { toast } from 'sonner';
 
@@ -60,7 +60,8 @@ export default function ImportImageButton() {
         });
     }
 
-    const ready = drafts.length > 0 && drafts.every(row => row.instrument && row.checked && /^\d+(?:\.\d{1,6})?$/.test(row.quantity) && Number(row.quantity) > 0);
+    const pending = imageRowsPending(drafts);
+    const ready = pending === null;
     return <Dialog open={open} onOpenChange={next => { if (!busy) { setOpen(next); generation.current++; if (!next) { setPreview(null); setDrafts([]); setReview(null); setMatches(null); setError(null); } } }}>
         <DialogTrigger asChild><Button variant="outline" size="sm" className="min-h-11 border-gray-600 text-gray-200 sm:min-h-8"><ImagePlus className="mr-2 h-4 w-4" aria-hidden="true" />Importar captura</Button></DialogTrigger>
         <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden border-gray-700 bg-gray-900 p-0 text-gray-100 [&>button]:z-20 sm:max-w-xl" showCloseButton={!busy}>
@@ -94,13 +95,17 @@ export default function ImportImageButton() {
                 <Button variant="outline" className="min-h-11" disabled={busy || !row.query.trim()} onClick={() => void run(async () => { const version = generation.current; const items = await searchImageInstrument(row.query); if (generation.current === version) setMatches({ index, items }); })}><Search className="h-4 w-4" aria-hidden="true" />Buscar instrumento</Button>
                 {matches?.index === index && <div className="grid gap-2">{matches.items.length === 0 && <p className="text-sm">Sin coincidencias. Busca por ticker o nombre.</p>}{matches.items.map(item => <Button key={item.ticker} variant="outline" className="h-auto min-h-11 justify-start whitespace-normal text-left" disabled={busy} onClick={() => change(index, { instrument: item, query: item.ticker })}>{item.ticker} · {item.name} · {item.exchange} · {item.currency}</Button>)}</div>}
                 {row.instrument && <p className="text-sm text-green-200">{row.instrument.name} · {row.instrument.exchange} · {row.instrument.currency}</p>}
-                <label className="grid gap-1 text-sm">Cantidad<Input inputMode="decimal" placeholder="Ej. 125.5 (sin miles)" className="h-11 text-base" value={row.quantity} disabled={busy} onChange={e => change(index, { quantity: e.target.value })} /></label>
+                <label className="grid gap-1 text-sm">Cantidad<Input inputMode="decimal" placeholder="Ej. 125,5 (sin miles)" className="h-11 text-base" value={row.quantity} disabled={busy} aria-invalid={row.quantity.trim() !== '' && normalizeImageQuantity(row.quantity) === null} onChange={e => change(index, { quantity: e.target.value })} /></label>
+                {row.quantity.trim() !== '' && (normalizeImageQuantity(row.quantity) === null
+                    ? <p className="-mt-1 text-xs text-amber-200">Cantidad no válida: usa cifras y como mucho un decimal (125,5), sin separador de miles.</p>
+                    : <p className="-mt-1 text-xs text-gray-400">Se guardará como {formatNumber(Number(normalizeImageQuantity(row.quantity)), { maximumFractionDigits: 6 })} acciones.</p>)}
                 <label className="flex min-h-11 items-center gap-3 text-sm"><input className="h-5 w-5 accent-emerald-400" type="checkbox" checked={row.checked} disabled={busy || !row.instrument} onChange={e => { setReview(null); setDrafts(old => old.map((d, i) => i === index ? { ...d, checked: e.target.checked } : d)); }} />He revisado instrumento, cantidad y divisa</label>
                 <Button variant="ghost" disabled={busy} onClick={() => { generation.current++; setMatches(null); setDrafts(old => old.filter((_, i) => i !== index)); setPreview(old => old ? { ...old, rows: old.rows.filter((_, i) => i !== index) } : old); }}><X className="h-4 w-4" aria-hidden="true" />Omitir fila</Button>
             </section>)}
             {preview && !review && <>
                 <Button className="mb-3 min-h-11 w-full whitespace-normal" variant="outline" disabled={busy || drafts.length >= 60} onClick={() => { setDrafts(old => [...old, { query: '', instrument: null, quantity: '', checked: false }]); setPreview(old => old ? { ...old, rows: [...old.rows, { raw: 'Fila manual', identity: '', quantity: null, currency: null, warning: 'Completa los datos ilegibles' }] } : old); }}>Añadir fila ilegible manualmente</Button>
-                <Button className="mb-3 min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !ready} onClick={() => void run(async () => { const rows = drafts.map(r => ({ ticker: r.instrument!.ticker, quantity: r.quantity, currency: r.instrument!.currency, confirmed: r.checked })); setReview(await reviewPortfolioImage(preview.image_hash, rows)); })}>Consultar precios y revisar</Button>
+                <Button className="mb-3 min-h-11 w-full bg-emerald-400 text-gray-950 hover:bg-emerald-300" disabled={busy || !ready} onClick={() => void run(async () => { const rows = drafts.map(r => ({ ticker: r.instrument!.ticker, quantity: normalizeImageQuantity(r.quantity)!, currency: r.instrument!.currency, confirmed: r.checked })); setReview(await reviewPortfolioImage(preview.image_hash, rows)); })}>Consultar precios y revisar</Button>
+                {pending && !busy && <p role="status" className="-mt-1 mb-3 text-center text-xs text-gray-400">{pending}</p>}
             </>}
             {review && <>
                 <div className="mb-4"><h3 className="font-semibold">Revisión final</h3><p className="mt-1 text-sm text-gray-400">Precios consultados en mercado, no extraídos de la imagen.</p></div>
