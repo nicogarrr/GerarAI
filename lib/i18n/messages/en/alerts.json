@@ -1,0 +1,114 @@
+{
+  "create": "Create alert",
+  "new": "New alert",
+  "types": {
+    "priceAbove": "Price above",
+    "priceBelow": "Price below",
+    "priceChange": "Price change %",
+    "news": "New news item",
+    "earnings": "Earnings report"
+  },
+  "meta": {
+    "title": "Alerts",
+    "description": "Alerts for price, change, news and earnings of your stocks, with the evaluation engine status and Telegram delivery."
+  },
+  "header": { "title": "Alerts", "resultsLink": "Earnings" },
+  "manager": { "title": "My alerts" },
+  "dialog": {
+    "description": "Set up alerts to receive real-time notifications about changes in your stocks."
+  },
+  "form": {
+    "symbol": "Symbol",
+    "type": "Alert type",
+    "operator": "Operator",
+    "operatorGt": "Greater than (>)",
+    "operatorLt": "Less than (<)",
+    "valuePercent": "Percentage (%)",
+    "valuePrice": "Price (quote currency)",
+    "pricePlaceholder": "100.00",
+    "percentPlaceholder": "5",
+    "thresholdNote": "The alert stores the threshold without a currency: the engine compares it with the last close of the security in its exchange currency."
+  },
+  "errors": {
+    "invalidSymbol": "Enter a valid symbol (letters, numbers, dot or dash; maximum 20)",
+    "ambiguousNumber": "Ambiguous number format: use the dot for decimals and the comma for thousands (e.g. 1,234.56).",
+    "invalidNumber": "Enter a valid number",
+    "pricePositive": "The price must be greater than 0",
+    "duplicate": "You already have this alert set up."
+  },
+  "toast": {
+    "created": "Alert created",
+    "deleted": "Alert deleted",
+    "reviewLaunched": "Expectations review launched for {symbol}"
+  },
+  "telegram": {
+    "configured": "Telegram channel configured on the server",
+    "notConfigured": "Telegram not configured: alerts only arrive in the app"
+  },
+  "session": { "signIn": "Sign in" },
+  "empty": { "createFirst": "Create the first alert" },
+  "list": {
+    "createdAt": "Created: {date}",
+    "lastTriggered": "Last triggered: {date}",
+    "channelsTitle": "Channels: {channels} · triggers: {count}",
+    "motorEvaluated": "Engine: evaluated {date} · {count} triggers · {channels}",
+    "motorPending": "Engine: pending first evaluation (every 5 min)",
+    "staleData": "stale data",
+    "viewResearch": "View research →",
+    "review": "Run review",
+    "reviewAria": "Run expectations review for {symbol}",
+    "deleteAria": "Delete alert: {label}",
+    "thresholdNote": "Each price threshold is compared with the last saved close of the security, without currency conversion; the rule does not store the currency, which is why it is shown without a symbol."
+  },
+  "labels": {
+    "fallback": "Alert",
+    "price": "{symbol}: {type} {threshold}",
+    "priceChange": "{symbol}: {type} {direction} to {threshold}%",
+    "simple": "{symbol}: {type}",
+    "changeUp": "greater",
+    "changeDown": "less"
+  },
+  "triggered": {
+    "title": "Recent triggers and deliveries",
+    "lastShot": "Last trigger {date}",
+    "created": "Created {date}",
+    "viewOriginal": "View original notice",
+    "reviewThesis": "Review thesis of {ticker}",
+    "openDocument": "Open document",
+    "noChannels": "no channels",
+    "noDeliveryRecord": "no record",
+    "channelTitle": "channel {channel}: {status}"
+  },
+  "confirm": {
+    "title": "Delete alert",
+    "description": "Delete {label}? This action cannot be undone."
+  },
+  "push": {
+    "title": "Notifications on this device",
+    "iosPre": "On iPhone or iPad notifications only work with the app installed (iOS 16.4 or later): in Safari tap ",
+    "iosShare": "Share",
+    "iosMid": " and ",
+    "iosAdd": "Add to Home Screen",
+    "iosPost": ", then reopen this page from the icon.",
+    "unsupported": "This browser does not support push notifications. Telegram and email notifications keep working.",
+    "serverOff": "Push notifications are not enabled on the server yet.",
+    "denied": "You blocked GerarAI notifications. To enable them, allow them in the browser or system settings.",
+    "intro": "Receive notifications even when the app is not open. You choose which types; the notice includes the source and the time.",
+    "enable": "Enable notifications on this device",
+    "disable": "Disable on this device",
+    "legend": "Push notification types",
+    "errorEnable": "Could not enable on this device. Try again.",
+    "errorDisable": "Could not disable. Try again.",
+    "errorSave": "Could not save the change. Try again.",
+    "types": {
+      "macroEvent": "Macro events (CPI, jobs, FOMC): 24 h and 1 h before",
+      "earnings": "Upcoming portfolio and watchlist earnings: 7 days, 1 day and same day",
+      "dcaLevels": "DCA levels of your watchlist",
+      "newFiling": "New SEC filings",
+      "thesisBroken": "Thesis at risk",
+      "insiders": "Insider moves",
+      "shortsRising": "Rising short positions",
+      "dailyDigest": "Daily portfolio digest"
+    }
+  }
+}
