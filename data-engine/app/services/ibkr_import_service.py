@@ -20,6 +20,7 @@ from app.models import CashBalance, Company, FxConversion, IbkrRawRow, Position,
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
+from app.valuation.currency import MINOR_UNITS, SUFFIX_QUOTE_UNIT
 
 
 class IBKRImportError(ValueError):
@@ -832,6 +833,27 @@ def _auto_link_journal_after_import(db: Session) -> None:
     from app.services.journal_trade_link import auto_link_journal_trades_best_effort
 
     auto_link_journal_trades_best_effort(db)
+
+
+
+def _csv_default_currency(symbol: str, listing_currency: str | None = None) -> str:
+    """Divisa de una fila CSV sin columna ``currency``.
+
+    Antes era siempre USD: ``SAN.MC,buy,10,4.12`` quedaba como 4,12 US$. Con
+    sufijo de bolsa conocido se usa su divisa (``SUFFIX_QUOTE_UNIT``). Las
+    bolsas que cotizan en subunidad (.L peniques, .JO, .TA) siguen en USD:
+    no se sabe si el CSV trae peniques o libras. La identidad de la fila
+    (fingerprint) no cambia, así que reimportar un CSV antiguo no duplica.
+    Si la fila se resolvió por ISIN, manda la divisa del listado verificado.
+    """
+    if listing_currency and listing_currency.upper() not in MINOR_UNITS:
+        return listing_currency.upper()
+    if "." not in symbol:
+        return "USD"
+    unit = SUFFIX_QUOTE_UNIT.get("." + symbol.rsplit(".", 1)[1].upper())
+    if unit is None or unit in MINOR_UNITS:
+        return "USD"
+    return unit
 
 
 class IBKRImportService:
@@ -1840,7 +1862,9 @@ class IBKRImportService:
                         price=_num(_cell("price")),
                         trade_date=_day(_cell("date")),
                         fees=abs(_num(_cell("fees"))) if _cell("fees") else Decimal("0"),
-                        currency=_cell("currency").upper() or "USD",
+                        currency=_cell("currency").upper() or _csv_default_currency(
+                            symbol, listing.currency if listing is not None else None
+                        ),
                     )
                     transaction.external_id = external_id
                     transaction.raw_payload = {**transaction.raw_payload, "source": "ibkr_csv", "identity": "provider" if _cell("external_id") else "canonical_occurrence"}
