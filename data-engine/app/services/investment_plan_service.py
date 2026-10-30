@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from calendar import monthrange
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -126,6 +126,11 @@ class InvestmentPlanService:
         currency = (currency or "").strip().upper()
         if amount <= 0:
             raise ValueError("El importe de la aportación debe ser positivo con precisión de céntimos.")
+        # Una aportación futura contaría hoy como dinero ya aportado («En camino»
+        # adelantado) y leería una tasa de cambio que aún no existe. Un día de
+        # margen: el usuario en Madrid puede ir por delante del reloj del servidor.
+        if date_ > date.today() + timedelta(days=1):
+            raise ValueError("La fecha de la aportación no puede ser futura.")
         plan = self.get_plan(db)
         if plan is None:
             raise ValueError("Investment plan does not exist yet; create it first")
