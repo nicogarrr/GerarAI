@@ -5,7 +5,7 @@ const directory = 'app/chart-preview';
 if (existsSync(directory)) throw new Error('Refusing to overwrite existing route');
 mkdirSync(directory);
 const yahooRaw = { chart: { result: [{ timestamp: Array.from({length: 40}, (_,i)=>1790000000+i*86400), indicators: { quote: [{ close: Array.from({length:40}, (_,i)=>100+i), open: Array(40).fill(null), high: Array(40).fill(null), low: Array(40).fill(null), volume: Array(40).fill(null) }] } }] } };
-const adapter = spawnSync('python3', ['scripts/fixtures/yahoo-close-only-adapter.py'], {input:JSON.stringify(yahooRaw),encoding:'utf8'});
+const adapter = spawnSync(process.env.PYTHON_BIN || 'python3', ['scripts/fixtures/yahoo-close-only-adapter.py'], {input:JSON.stringify(yahooRaw),encoding:'utf8'});
 if (adapter.status !== 0) { rmSync(directory,{recursive:true}); throw new Error(adapter.stderr); }
 writeFileSync(`${directory}/yahoo.json`, adapter.stdout);
 
