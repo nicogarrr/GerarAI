@@ -13,6 +13,8 @@ export type ContributionAllocation = {
   dca_label: string | null;
   dca_period?: string | null;
   dca_status?: string | null;
+  /** Nivel de hace más de un mes: no se usa (pesa 1X). */
+  dca_stale?: boolean;
   multiplier: number;
   reason: string;
 };
