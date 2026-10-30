@@ -45,7 +45,7 @@ _interactive_quota_breaker: dict[tuple[str, str], float] = {}
 # de 0,75 s del reintento, y sin breaker cada item de un lote reintentaba 3
 # veces contra un proveedor agotado y el siguiente item volvia a sondearlo
 # (hallazgo de prod: minutos de 429 "weekly exhausted" en worker-default
-# desde jev_fallback). Mismo patron que el breaker de origen 502: cooldown
+# desde clasificadores de fondo). Mismo patron que el breaker de origen 502: cooldown
 # por (proveedor, modelo) y una sonda real al expirar. Los proveedores
 # interactivos (chat/debate) usan su propio breaker de arriba.
 # Clave: (proveedor, modelo, huella de la credencial) - la cuota es de UNA clave.

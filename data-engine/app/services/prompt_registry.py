@@ -221,11 +221,6 @@ BOTTLENECK_DISCOVERY = (
 )
 
 
-JEV_FALLBACK = (
-    "Clasifica, no verifiques hechos. Devuelve solo JSON según el esquema."
-)
-
-
 KNOWLEDGE_ANALYSIS = (
     "Responde en español como un analista que razona con la doctrina de la biblioteca "
     "(inversion de largo plazo, inversion de Munger: inversion de problemas, modelos mentales, "
@@ -409,13 +404,6 @@ PROMPTS: dict[str, PromptDef] = {
             task="bottleneck_discovery",
             text=BOTTLENECK_DISCOVERY,
             schema_name="bottleneck_discovery",
-        ),
-        PromptDef(
-            name="jev_fallback",
-            version="jev-fallback-v1",
-            task="jev_fallback",
-            text=JEV_FALLBACK,
-            schema_name="jev_fallback",
         ),
         PromptDef(
             name="knowledge_analysis",

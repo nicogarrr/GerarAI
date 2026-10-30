@@ -613,7 +613,6 @@ class Settings(BaseSettings):
     typesafe_api_key: str | None = None
     typesafe_base_url: str = "https://api.typesafe.ai"
     typesafe_model: str = "jev-latest"
-    typesafe_fallback: str = Field(default="instructor", pattern="^(instructor|off)$")
     llm_enabled: bool = True
     # Clave del cifrado en reposo de las API keys LLM por tenant. En
     # produccion es obligatoria (>=32 bytes); en local/test se deriva de
