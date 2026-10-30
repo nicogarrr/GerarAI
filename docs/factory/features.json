@@ -1227,10 +1227,10 @@
         "VAL-DOC-007"
       ],
       "milestone": "test-coverage-docs",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "verify-database-constraints",
