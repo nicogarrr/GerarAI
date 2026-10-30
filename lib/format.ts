@@ -173,6 +173,9 @@ export function formatNumber(
   return new Intl.NumberFormat(FORMAT_LOCALE, {
     maximumFractionDigits: 2,
     useGrouping: 'always',
+    // Una cifra que redondea a cero es cero, sin signo: -0,0004 salía «-0»
+    // (y formatCompact, que delega aquí, también). formatPercent ya lo hace.
+    signDisplay: 'negative',
     ...options,
   }).format(parsed);
 }
@@ -284,6 +287,7 @@ export function formatCompact(
     notation: 'compact',
     maximumFractionDigits,
     useGrouping: 'always',
+    signDisplay: 'negative',
     ...rest,
   }).format(parsed);
 }
