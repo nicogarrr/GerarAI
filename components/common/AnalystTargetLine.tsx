@@ -47,6 +47,8 @@ export default function AnalystTargetLine({
     fxRates?: readonly TargetFxRate[] | null;
     baseCurrency?: string | null;
 }) {
+    const t = useT();
+    const locale = useLocale();
     const [settled, setSettled] = useState(false);
     const [data, setData] = useState<ListingAnalystTargets | null>(null);
 

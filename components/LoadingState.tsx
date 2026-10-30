@@ -5,9 +5,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 /**
  * Client component desde la i18n ES/EN: el texto sr-only de carga se
- * resuelve con useT() (decision del piloto: client en vez de async/props,
- * asi los consumidores — app/(root)/inicio/page.tsx como fallback de
- * <Suspense> y app/(root)/research/[ticker]/loading.tsx— no cambian).
+ * resuelve con useT() desde el contexto de locale. Los consumidores
+ * existentes conservan una API síncrona para sus fallbacks de Suspense.
+
  *
  * Reusable loading states for better UX
  * Improves perceived performance during data fetching

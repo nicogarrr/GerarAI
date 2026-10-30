@@ -322,7 +322,12 @@ class DividendProjectionService:
 
             month_entries: dict[str, Decimal] = defaultdict(lambda: Decimal("0"))
             for record in trailing:
-                for year_offset in range(1, years_in_horizon + 1):
+                # Ex-date ya pasada y pago aun pendiente: ese cobro es real y cae
+                # dentro del horizonte (offset 0). Antes solo se replicaba a un
+                # ano vista y el trimestre declarado se perdia (3 de 4 pagos).
+                # Sin pay_date no hay pago pendiente que contar: solo replicas.
+                first_offset = 0 if record.pay_date and record.pay_date > today else 1
+                for year_offset in range(first_offset, years_in_horizon + 1):
                     projected = _shift_year(record.pay_date or record.ex_date, year_offset)
                     if projected < today or projected > end:
                         continue

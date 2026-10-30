@@ -2,36 +2,41 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 
 import { SUPPORT_EMAIL } from '@/lib/config/brand';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-    title: 'Privacidad',
-    description: 'Política de privacidad y tratamiento de datos personales de GerarAI.',
-    // Texto pendiente de validación jurídica por el titular: no se indexa.
-    robots: { index: false, follow: false },
-    alternates: { canonical: '/privacidad' },
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return {
+        title: t('landing.privacidad.metaTitle'),
+        description: t('landing.privacidad.metaDescription'),
+        // Texto pendiente de validación jurídica por el titular: no se indexa.
+        robots: { index: false, follow: false },
+        alternates: { canonical: '/privacidad' },
+    };
+}
 
-export default function PrivacyPage() {
+export default async function PrivacyPage() {
+    const t = await getT();
     return (
         <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-12">
-            <h1 className="text-3xl font-bold text-gray-100">Política de privacidad</h1>
-            <p className="mt-2 text-sm text-gray-500">Última revisión editorial: 27 de octubre de 2026.</p>
+            <h1 className="text-3xl font-bold text-gray-100">{t('landing.privacidad.h1')}</h1>
+            <p className="mt-2 text-sm text-gray-500">{t('landing.privacidad.lastReview')}</p>
 
             <div className="mt-6 rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-100" role="note">
                 <p>
-                    Este texto es informativo y no constituye asesoramiento jurídico.
+                    {t('landing.privacidad.legalNote')}
                 </p>
             </div>
 
             <article className="prose prose-invert mt-8 max-w-none space-y-6 text-sm leading-7 text-gray-300">
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">1. Responsable del tratamiento</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s1.title')}</h2>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
-                        <li>Identidad: Nicolás Iglesias García.</li>
+                        <li>{t('landing.privacidad.s1.identity')}</li>
                         <li>
-                            Contacto de privacidad:{' '}
+                            {t('landing.privacidad.s1.contact')}{' '}
                             <a className="text-teal-300 underline" href={`mailto:${SUPPORT_EMAIL}`}>
                                 {SUPPORT_EMAIL}
                             </a>
@@ -40,130 +45,93 @@ export default function PrivacyPage() {
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">2. Qué datos tratamos</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s2.title')}</h2>
                     <p>
-                        Datos de cuenta (email, nombre, país y preferencias de inversión que
-                        decidas facilitar), datos de cartera y operaciones, tesis, claims y
-                        evidencia, watchlist, reglas y alertas, documentos que subas y su
-                        metadata, notas y memoria de investigación, y mensajes que envíes al
-                        asistente. También registramos telemetría técnica del chat (ruta,
-                        modelo, latencia y, temporalmente, la pregunta) para operar y mejorar el
-                        servicio.
+                        {t('landing.privacidad.s2.p1')}
                     </p>
                     <p>
-                        No pedimos datos de salud, ideología, religión ni datos biométricos. No
-                        vendemos datos personales. El tratamiento que hagan los proveedores de IA
-                        depende de sus condiciones y de la configuración elegida.
+                        {t('landing.privacidad.s2.p2')}
                     </p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">3. Finalidades y base jurídica</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s3.title')}</h2>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
-                            Prestar el servicio que solicitas (cuenta, cartera, tesis, watchlist,
-                            alertas, documentos y asistente): ejecución del contrato.
+                            {t('landing.privacidad.s3.i1')}
                         </li>
                         <li>
-                            Proteger la cuenta, prevenir abusos y operar y mejorar el servicio
-                            (incluida la telemetría técnica del chat): interés legítimo.
+                            {t('landing.privacidad.s3.i2')}
                         </li>
-                        <li>Cumplir obligaciones legales: obligación legal.</li>
+                        <li>{t('landing.privacidad.s3.i3')}</li>
                     </ul>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">4. Proveedores y subencargados</h2>
-                    <p>El servicio se apoya en los siguientes proveedores:</p>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s4.title')}</h2>
+                    <p>{t('landing.privacidad.s4.intro')}</p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
-                            <strong>Modelos de lenguaje</strong>: OpenCode (modelos DeepSeek),
-                            Groq, Google (Gemini) y OpenRouter, según la configuración de proveedores.
-                            Intervienen en las funciones con IA y reciben el contexto enviado por
-                            esas funciones, que puede incluir datos de investigación y de cartera.
+                            <strong>{t('landing.privacidad.s4.llmStrong')}</strong>
+                            {t('landing.privacidad.s4.llmRest')}
                         </li>
                         <li>
-                            <strong>Proveedores de datos de mercado</strong>: Finnhub, Financial
-                            Modeling Prep, Yahoo Finance, SEC EDGAR, CNMV, FRED, GDELT, CelesTrak
-                            y otras fuentes gratuitas configuradas. Estas consultas se hacen por
-                            ticker y no incluyen tus datos personales.
+                            <strong>{t('landing.privacidad.s4.marketStrong')}</strong>
+                            {t('landing.privacidad.s4.marketRest')}
                         </li>
                         <li>
-                            <strong>Hosting y bases de datos</strong>: Vercel (frontend, con las
-                            funciones en la región de Fráncfort, fra1), Oracle Cloud (servidor
-                            del motor de datos en la región eu-madrid-1, Madrid, España), MongoDB Atlas (cuentas y datos auxiliares) y
-                            PostgreSQL en el propio servidor.
+                            <strong>{t('landing.privacidad.s4.hostingStrong')}</strong>
+                            {t('landing.privacidad.s4.hostingRest')}
                         </li>
                         <li>
-                            <strong>Almacenamiento y búsqueda</strong>: MinIO o Garage
-                            (documentos), Qdrant (índice vectorial) y Redis (colas y caché),
-                            todos en el propio servidor.
+                            <strong>{t('landing.privacidad.s4.storageStrong')}</strong>
+                            {t('landing.privacidad.s4.storageRest')}
                         </li>
                         <li>
-                            <strong>Copias de seguridad</strong>: Cloudflare R2, cuando está
-                            configurado.
+                            <strong>{t('landing.privacidad.s4.backupsStrong')}</strong>
+                            {t('landing.privacidad.s4.backupsRest')}
                         </li>
                         <li>
-                            <strong>Correo saliente</strong>: SMTP para avisos y
-                            restablecimiento de contraseña, mediante el servidor SMTP configurado.
+                            <strong>{t('landing.privacidad.s4.mailStrong')}</strong>
+                            {t('landing.privacidad.s4.mailRest')}
                         </li>
                     </ul>
                     <p className="mt-2">
-                        Regiones y transferencias internacionales: el frontend se ejecuta en la
-                        región de Fráncfort (fra1) de Vercel. Los proveedores de modelos de
-                        lenguaje y el resto de servicios externos pueden tratar datos fuera de
-                        la Unión Europea conforme a sus condiciones.
+                        {t('landing.privacidad.s4.transfers')}
                     </p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">5. Conservación</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s5.title')}</h2>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
                         <li>
-                            Documentos financieros: por defecto 2.555 días (7 años),
-                            configurable con <code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>. La purga
-                            requiere activar la tarea de conservación y desactivar el modo de prueba sin borrado.
-                            Por defecto está apagada y en modo de prueba sin borrado; esos plazos no garantizan un borrado automático.
-                            Cuando se ejecuta la purga, se borran el original, los fragmentos y los vectores, y se
-                            conserva una referencia tombstone sin contenido para que las
-                            decisiones históricas sigan siendo auditables.
+                            {t('landing.privacidad.s5.docs1')}{' '}<code>FINANCIAL_DOCUMENT_RETENTION_DAYS</code>
+                            {t('landing.privacidad.s5.docs2')}
                         </li>
                         <li>
-                            Preguntas crudas de telemetría del chat: por defecto 90 días,
-                            configurable con <code>CHAT_TELEMETRY_RETENTION_DAYS</code>.
+                            {t('landing.privacidad.s5.telemetry1')}{' '}<code>CHAT_TELEMETRY_RETENTION_DAYS</code>
+                            {t('landing.privacidad.s5.telemetry2')}
                         </li>
                         <li>
-                            Solicitudes de acceso: por defecto 365 días, configurable con{' '}
-                            <code>ACCESS_REQUEST_RETENTION_DAYS</code>; el borrado automático
-                            por TTL en MongoDB solo se activa si el operador lo habilita
-                            expresamente.
+                            {t('landing.privacidad.s5.access1')}{' '}
+                            <code>ACCESS_REQUEST_RETENTION_DAYS</code>
+                            {t('landing.privacidad.s5.access2')}
                         </li>
                         <li>
-                            Copias de seguridad: el script local permite configurar cuántas conservar
-                            (8 por defecto); no es una garantía de ejecución. Además,
-                            cuando está configurada, una copia en Cloudflare R2 cuya caducidad
-                            fija la regla de expiración del bucket.
+                            {t('landing.privacidad.s5.backups')}
                         </li>
                     </ul>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">6. Tus derechos</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s6.title')}</h2>
                     <p>
-                        Puedes solicitar acceso, rectificación, supresión, limitación,
-                        portabilidad y oposición. Desde{' '}
+                        {t('landing.privacidad.s6.p1Pre')}{' '}
                         <Link className="text-teal-300 underline" href="/security">/security</Link>{' '}
-                        puedes descargar una copia en JSON de tus datos estructurados y
-                        metadatos (perfil, cartera, tesis, claims y evidencia, watchlist,
-                        alertas, conocimiento, planes y ajustes) y borrar tu cuenta y todos
-                        sus datos. La exportación no incluye los archivos originales de los
-                        documentos que hayas subido: de cada documento solo viajan sus
-                        metadatos y el recuento de fragmentos. El borrado elimina PostgreSQL,
-                        documentos originales, vectores y sesiones; es irreversible.
+                        {t('landing.privacidad.s6.p1Post')}
                     </p>
                     <p>
-                        También puedes reclamar ante la Agencia Española de Protección de Datos
-                        (AEPD,{' '}
+                        {t('landing.privacidad.s6.p2Pre')}{' '}
                         <a
                             className="text-teal-300 underline"
                             href="https://www.aepd.es"
@@ -172,21 +140,17 @@ export default function PrivacyPage() {
                         >
                             www.aepd.es
                         </a>
-                        ).
+                        {t('landing.privacidad.s6.p2Post')}
                     </p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">7. Seguridad y código fuente</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s7.title')}</h2>
                     <p>
-                        Aplicamos aislamiento por cuenta, autenticación firmada entre frontend y
-                        data engine, y restricciones de acceso a datos. Ningún sistema es
-                        infalible: si detectas un problema de seguridad, usa el canal de
-                        contacto indicado arriba.
+                        {t('landing.privacidad.s7.p1')}
                     </p>
                     <p>
-                        El código de GerarAI se publica bajo la licencia AGPL-3.0. Puedes
-                        consultarlo en{' '}
+                        {t('landing.privacidad.s7.p2Pre')}{' '}
                         <a
                             className="text-teal-300 underline"
                             href="https://github.com/nicogarrr/gerarai"
@@ -195,26 +159,23 @@ export default function PrivacyPage() {
                         >
                             github.com/nicogarrr/gerarai
                         </a>
-                        . El código fuente correspondiente a la versión desplegada debe estar
-                        disponible para los usuarios del servicio.
+                        {t('landing.privacidad.s7.p2Post')}
                     </p>
                 </section>
 
                 <section>
-                    <h2 className="text-xl font-semibold text-gray-100">8. Cambios</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('landing.privacidad.s8.title')}</h2>
                     <p>
-                        Podemos actualizar esta política para reflejar cambios legales o
-                        técnicos. La fecha de la última revisión y los cambios relevantes se
-                        publicarán en esta página.
+                        {t('landing.privacidad.s8.p')}
                     </p>
                 </section>
             </article>
 
             <p className="mt-10 text-sm text-gray-500">
-                Consulta también los{' '}
-                <Link className="text-teal-300 underline" href="/terminos">términos de uso</Link>{' '}
-                y la{' '}
-                <Link className="text-teal-300 underline" href="/metodologia">metodología</Link>.
+                {t('landing.privacidad.footer.pre')}{' '}
+                <Link className="text-teal-300 underline" href="/terminos">{t('landing.privacidad.footer.terms')}</Link>{' '}
+                {t('landing.privacidad.footer.mid')}{' '}
+                <Link className="text-teal-300 underline" href="/metodologia">{t('landing.privacidad.footer.methodology')}</Link>.
             </p>
         </main>
     );
