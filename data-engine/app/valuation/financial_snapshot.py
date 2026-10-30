@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import Company, FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.reviewed_eps_adjustments import eligible_fact
+from app.services.split_adjustment import split_factor_for_fact
 
 # Income-statement style metrics: flows over a period. They must share the
 # anchor's period, otherwise a 12-month revenue gets divided by a 9-month OCF.
@@ -78,6 +79,10 @@ class FinancialSnapshot:
     filed_cutoff: str | None = None
     filed_excluded_future: int = 0
     filed_excluded_unknown: int = 0
+    # metric -> factor de splits posteriores al hecho (acciones x factor). El
+    # precio es de hoy (o del as_of); sin esto un 4:1 tras el cierre dejaba el
+    # valor por accion x4 frente a un precio ya dividido entre 4.
+    split_factors: dict[str, float] = field(default_factory=dict)
 
     def value(self, metric: str) -> float | None:
         """Return a finite float, or ``None``.
@@ -92,7 +97,7 @@ class FinancialSnapshot:
         value = float(fact.value)
         if not math.isfinite(value):
             return None
-        return value
+        return value * self.split_factors.get(metric, 1.0)
 
     def fact_ids(self) -> dict[str, int | None]:
         return {metric: fact.id for metric, fact in self.facts.items()}
@@ -487,6 +492,22 @@ class FinancialSnapshotBuilder:
                         )
                 if metric == "shares_diluted":
                     snapshot.shares_period = match.period
+                    factor = float(
+                        split_factor_for_fact(
+                            db,
+                            company.id,
+                            period=match.period,
+                            filed=match.filed,
+                            cutoff=as_of or date.today(),
+                        )
+                    )
+                    if factor != 1.0:
+                        snapshot.split_factors["shares_diluted"] = factor
+                        snapshot.warnings.append(
+                            f"shares_diluted {match.period} ajustadas por splits "
+                            f"posteriores al cierre (x{factor:g}) para compararlas "
+                            "con el precio actual."
+                        )
             else:
                 latest = facts_for(metric)
                 if latest:

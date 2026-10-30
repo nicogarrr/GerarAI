@@ -68,3 +68,32 @@ def period_end_date(period: str | None) -> date | None:
         return date.fromisoformat((period or "").split(":")[0])
     except ValueError:
         return None
+
+
+def split_factor_for_fact(
+    db: Session,
+    company_id: int,
+    *,
+    period: str | None,
+    filed: date | None,
+    cutoff: date,
+) -> Decimal:
+    """Factor de los splits que el hecho NO recoge todavia.
+
+    Cuenta los splits efectivos despues del cierre del periodo y tambien
+    despues de la publicacion (``filed``): un 10-K publicado tras el split ya
+    viene reexpresado (ASC 260), y ajustarlo otra vez lo duplicaria. Solo
+    entran splits con fecha <= ``cutoff`` (la fecha del precio o del as_of):
+    un split futuro respecto al precio no cambia ese precio.
+    """
+    ref = period_end_date(period)
+    if ref is None:
+        return Decimal(1)
+    if filed is not None and filed > ref:
+        ref = filed
+    events = [
+        event
+        for event in split_events_by_company(db, [company_id]).get(company_id, [])
+        if event[0] <= cutoff
+    ]
+    return cumulative_split_factor_after(events, ref)
