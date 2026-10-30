@@ -858,10 +858,10 @@
         "VAL-SEC-004"
       ],
       "milestone": "security-data-integrity",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "implement-command-injection-protection",
@@ -896,10 +896,10 @@
         "VAL-SEC-006"
       ],
       "milestone": "security-data-integrity",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "implement-fk-cascades",

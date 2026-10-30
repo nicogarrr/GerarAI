@@ -328,6 +328,17 @@ async def job_queue_unavailable_handler(request: Request, exc: Exception) -> JSO
     )
 
 
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """Agrega cabeceras de seguridad estandar a todas las respuestas HTTP."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    return response
+
+
 try:
     import redis.exceptions as _redis_exceptions
 except ImportError:  # pragma: no cover - redis llega con dramatiq
