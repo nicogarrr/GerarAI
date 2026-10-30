@@ -5,7 +5,9 @@ Lee las fechas YA refrescadas en ``earnings_dates`` (el refresco vive en
 emite una alerta ``earnings_reminder`` en tres ventanas: 7 dias, 1 dia y el
 propio dia. Cada aviso sale una unica vez por ticker, fecha y ventana
 (huella deduplicada) y se despacha por el outbox (in_app / correo SMTP /
-Telegram y push con suscripcion "earnings").
+Telegram y push con suscripcion "earnings"). El canal "email" solo se anuncia
+con el SMTP configurado (SMTP_HOST + SMTP_FROM + ALERT_EMAIL_TO); sin el, el
+aviso queda solo in_app aunque EARNINGS_ALERT_CHANNELS lo pida.
 
 Reglas de veracidad (las mismas del calendario de resultados):
 
@@ -41,6 +43,7 @@ from app.services.earnings_dates_service import (
     followed_companies,
     market_timezone,
 )
+from app.services.email_delivery import smtp_configured
 from app.services.propicks_price_service import yahoo_symbol
 
 logger = logging.getLogger(__name__)
@@ -58,6 +61,11 @@ HORIZON_DAYS = max(WINDOW_DAYS.values())
 def alert_channels(settings: Any) -> list[str]:
     raw = str(getattr(settings, "earnings_alert_channels", "in_app") or "in_app")
     channels = [c.strip() for c in raw.split(",") if c.strip() in _ALLOWED_CHANNELS]
+    # El correo solo se anuncia si el SMTP esta configurado (host + remitente +
+    # destinatario): sin el, el envio acabaria en not_configured y el aviso
+    # queda solo in_app, sin una entrega muerta en el outbox.
+    if not smtp_configured(settings):
+        channels = [c for c in channels if c != "email"]
     return list(dict.fromkeys(channels)) or ["in_app"]
 
 

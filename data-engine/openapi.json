@@ -8768,7 +8768,8 @@
               "shorts_rising",
               "daily_digest",
               "dca_levels",
-              "macro_event"
+              "macro_event",
+              "earnings"
             ],
             "title": "Event Type",
             "type": "string"
@@ -10607,7 +10608,8 @@
               "shorts_rising",
               "daily_digest",
               "dca_levels",
-              "macro_event"
+              "macro_event",
+              "earnings"
             ],
             "title": "Event Type",
             "type": "string"
@@ -12746,7 +12748,8 @@
                 "shorts_rising",
                 "daily_digest",
                 "dca_levels",
-                "macro_event"
+                "macro_event",
+                "earnings"
               ],
               "title": "Event Type",
               "type": "string"
@@ -14835,7 +14838,8 @@
                 "shorts_rising",
                 "daily_digest",
                 "dca_levels",
-                "macro_event"
+                "macro_event",
+                "earnings"
               ],
               "title": "Event Type",
               "type": "string"

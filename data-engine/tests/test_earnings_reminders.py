@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -12,7 +12,8 @@ from sqlalchemy.pool import StaticPool
 from app.core.config import get_settings
 from app.models import AlertDelivery, Company, EarningsDate, ResearchAlert, Tenant, WatchItem
 from app.models.entities import Base
-from app.services import earnings_alert_copy, earnings_reminders as er
+from app.services import earnings_alert_copy
+from app.services import earnings_reminders as er
 from app.services.outbound_alerts import EVENT_TYPES, event_type
 
 NOW = datetime(2026, 11, 2, 7, 0, tzinfo=UTC)  # lunes
@@ -118,6 +119,28 @@ def test_message_truthful_estimated_session_source_and_origin(db):
     assert "Tu watchlist" in alert.message
     # La fuente no publica hora: ninguna se inventa.
     assert ":00" not in alert.message
+    # Sin SMTP configurado el canal "email" no se anuncia: solo in_app.
+    assert alert.channels == ["in_app"]
+    delivery = db.scalar(select(AlertDelivery).where(AlertDelivery.alert_id == alert.id,
+                                                     AlertDelivery.channel == "email"))
+    assert delivery is None
+
+
+def test_email_channel_only_with_smtp_configured(db, monkeypatch):
+    """Con SMTP configurado, el canal "email" se anuncia y persiste su entrega."""
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.test")
+    monkeypatch.setenv("SMTP_FROM", "alertas@example.test")
+    monkeypatch.setenv("ALERT_EMAIL_TO", "nico@example.test")
+    get_settings.cache_clear()
+
+    import app.services.notification_service as ns
+
+    # Sin red: el envio real queda fuera del test.
+    monkeypatch.setattr(ns, "send_email", lambda settings, content: {"status": "delivered", "error": None})
+    _watch(db, "ZZM")
+    _row(db, "ZZM", 1)
+    er.emit_earnings_reminders(db, now=NOW)
+    alert = _alerts(db)[0]
     assert alert.channels == ["in_app", "email"]
     # Intencion de entrega durable para el canal externo.
     delivery = db.scalar(select(AlertDelivery).where(AlertDelivery.alert_id == alert.id,
