@@ -1,3 +1,5 @@
+import { getParticipationFilings } from '@/lib/actions/research.actions';
+import { ParticipationFilingsPanel } from '@/components/research/ParticipationFilingsPanel';
 import { FactCalculatedLabel } from '@/components/research/FactCalculatedLabel';
 import BlockedValuation from '@/components/research/BlockedValuation';
 import { ThesisSummary } from '@/components/research/ThesisSummary';
@@ -1580,9 +1582,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
     // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
-    const insiderFilings = await getInsiderFilings(ticker, 8).catch(() => null);
+    const [insiderFilings, participation] = await Promise.all([
+      getInsiderFilings(ticker, 8).catch(() => null),
+      getParticipationFilings(ticker).catch(() => null),
+    ]);
     return (
       <div className="space-y-6">
+        <ParticipationFilingsPanel data={participation} />
         {holders === null ? (
           <EmptyState title="No se pudieron cargar los superinversores de esta empresa." />
         ) : holders.status === 'sin_identificador' ? (

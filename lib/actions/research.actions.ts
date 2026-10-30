@@ -1445,3 +1445,9 @@ export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: s
     (position) => position.ticker,
   );
 }
+
+/** Read only: opening a company never starts a 13D/G scan. */
+export async function getParticipationFilings(ticker: string): Promise<import('@/lib/research/schedule13dg').ParticipationResponse> {
+  await requireAuthenticatedUser();
+  return getJson(`/api/ownership/schedule-13dg?ticker=${encodeURIComponent(ticker.trim().toUpperCase())}`, { ticker, count: 0, filings: [] });
+}
