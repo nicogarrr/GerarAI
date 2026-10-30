@@ -9,6 +9,7 @@ registros devuelven ``rows: null`` (codigo 1002), que NO es un fallo.
 import asyncio
 from datetime import date
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.services.connectors import ipo_calendar as ipo
@@ -44,6 +45,13 @@ def _payload(priced=None, upcoming=None):
             "upcoming": {"upcomingTable": {"rows": upcoming}},
         }
     }
+
+
+@pytest.fixture(autouse=True)
+def _clear_month_cache():
+    ipo._month_cache.clear()  # noqa: SLF001 - estado de proceso del conector
+    yield
+    ipo._month_cache.clear()  # noqa: SLF001
 
 
 def test_normalize_priced_row_real_format():
@@ -125,6 +133,7 @@ def test_fetch_ipo_calendar_combines_months_and_status(monkeypatch):
     async def all_down(url, params, client):
         return None
 
+    ipo._month_cache.clear()  # noqa: SLF001 - cada escenario parte sin cache
     monkeypatch.setattr(ipo, "_get_json", all_down)
     result = asyncio.run(ipo.fetch_ipo_calendar([date(2026, 10, 1), date(2026, 11, 1)]))
     assert result["status"] == "unavailable"
