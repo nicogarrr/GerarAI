@@ -47,7 +47,6 @@ from dataclasses import dataclass, replace
 from sqlalchemy import desc, select
 
 from app.models import FinancialFact
-from app.valuation.fact_reference import split_scaled_value
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -57,6 +56,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
+from app.valuation.fact_reference import split_scaled_value
 from app.valuation.moat_framework import empty_moat_framework
 
 # Nombre de la regla de coherencia temporal, para que el trace diga qué se
