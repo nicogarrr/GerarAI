@@ -49,6 +49,8 @@ def persist_filing(
         )
     )
     if record is not None:
+        from app.services.schedule13dg_news import ensure_news
+        ensure_news(db, filing, parsed, tenant_id=effective_tenant_id)
         return {"filing_created": False, "filing_id": record.id, "status": record.status}
 
     parsed_ok = bool(parsed.get("parsed_ok"))
@@ -87,4 +89,6 @@ def persist_filing(
     with db.begin_nested():
         db.add(record)
         db.flush()
+    from app.services.schedule13dg_news import ensure_news
+    ensure_news(db, filing, parsed, tenant_id=effective_tenant_id)
     return {"filing_created": True, "filing_id": record.id, "status": record.status}

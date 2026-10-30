@@ -464,7 +464,8 @@ class AlertRuleService:
         if kind == "news_event":
             statement = (
                 select(NewsEvent)
-                .where(NewsEvent.company_id == rule.company_id)
+                .where(NewsEvent.company_id == rule.company_id,
+                       NewsEvent.event_type != "ownership_disclosure")
                 .order_by(desc(NewsEvent.created_at))
                 .limit(1)
             )

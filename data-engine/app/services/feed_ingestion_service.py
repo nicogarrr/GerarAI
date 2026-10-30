@@ -309,8 +309,22 @@ class FeedIngestionService:
             }
 
         from app.schemas import NewsFeedItem
-        from app.services.news_service import NewsService
 
+        # 13D/G use the same accession-keyed, non-alerting writer as the
+        # structured monitor. Keep both publisher orders idempotent.
+        from app.services.connectors.form13dg import FORMS_13DG
+        from app.services.news_service import NewsService
+        from app.services.schedule13dg_news import ensure_news
+        participation_items = [item for item in result.items if result.source == "sec"
+                               and str(item.metadata.get("form") or "").upper() in FORMS_13DG]
+        participation_created = 0
+        for item in participation_items:
+            outcome = ensure_news(db, {**item.metadata, "issuer_ticker": item.ticker or ticker,
+                                       "document_url": item.url})
+            participation_created += int(outcome.get("created", False))
+        if participation_items:
+            db.commit()
+        remaining_items = [item for item in result.items if item not in participation_items]
         news_items = [
             NewsFeedItem(
                 title=item.title,
@@ -321,7 +335,7 @@ class FeedIngestionService:
                 published_at=item.published_at,
                 headline_from_source=item.headline_from_source,
             )
-            for item in result.items
+            for item in remaining_items
         ]
         # Procedencia en la creación (misma transacción): connector = conector
         # real de la ingesta (gdelt/rss/ir/sec; fail-closed para alertas).
@@ -341,6 +355,9 @@ class FeedIngestionService:
             llm_deadline=llm_deadline,
         )
         payload = response.model_dump(mode="json")
+        payload["created"] += participation_created
+        payload["received"] += len(participation_items)
+        payload["skipped_duplicates"] += len(participation_items) - participation_created
         payload["source"] = result.source
         payload["connector_errors"] = list(result.errors)
         return payload

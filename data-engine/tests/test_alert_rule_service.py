@@ -364,3 +364,17 @@ def test_yesterdays_close_is_current_before_the_open(db, monkeypatch):
     # Después del cierre del viernes sin cierre nuevo guardado: caduca.
     monkeypatch.setattr(price_freshness, "_now", lambda: datetime(2026, 10, 30, 20, 0, tzinfo=UTC))
     assert AlertRuleService()._observe(db, rule)[1]["status"] == "stale"
+
+
+def test_ownership_disclosure_remains_news_without_creating_generic_alert(db):
+    company = _company(db)
+    service = AlertRuleService()
+    rule = service.create(db, company, rule_type='news', operator='>', value=0)
+    event = _news(db, company, title='Declaración de participación: Vanguard')
+    event.event_type = 'ownership_disclosure'
+    db.commit()
+    result = service.evaluate(db, rule)
+    assert result['status'] == 'evaluated'
+    assert result['matched'] is False
+    assert db.query(ResearchAlert).count() == 0
+    assert db.get(NewsEvent, event.id) is not None

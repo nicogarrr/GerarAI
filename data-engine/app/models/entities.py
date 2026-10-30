@@ -1196,7 +1196,10 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "news_events"
     __table_args__ = (
         Index("ix_news_events_company_date", "company_id", "date"),
+        UniqueConstraint("sec_filing_identity", name="uq_news_sec_filing_identity"),
     )
+
+    sec_filing_identity: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int | None] = mapped_column(
