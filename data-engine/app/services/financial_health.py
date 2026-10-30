@@ -98,15 +98,15 @@ def calculate_health(facts: list[HealthFact], *, sector: str, company_type: str,
                      (v("total_assets", offset) + v("total_assets", offset + 1)) / 2)
 
     specs = [
-        ("roa", "Beneficio sobre activos positivo", "NI(t) / A(t-1) > 0", lambda: roa() > 0),
-        ("cfo", "Flujo operativo positivo", "CFO(t) / A(t-1) > 0", lambda: ratio(v("operating_cash_flow"), v("total_assets", 1)) > 0),
-        ("delta_roa", "Rentabilidad sobre activos mejora", "ROA(t) > ROA(t-1)", lambda: roa() > roa(1)),
-        ("accrual", "Caja operativa superior al beneficio", "CFO(t) / A(t-1) > ROA(t)", lambda: ratio(v("operating_cash_flow"), v("total_assets", 1)) > roa()),
-        ("leverage", "Apalancamiento a largo plazo baja", "LTD(t)/avgA(t) < LTD(t-1)/avgA(t-1)", lambda: leverage() < leverage(1)),
-        ("liquidity", "Liquidez corriente mejora", "CA(t)/CL(t) > CA(t-1)/CL(t-1)", lambda: ratio(v("current_assets"), v("current_liabilities")) > ratio(v("current_assets", 1), v("current_liabilities", 1))),
-        ("issuance", "Sin emisión de capital común", "common_stock_issued(t) = 0 (dato explícito)", lambda: v("common_stock_issued") == 0),
-        ("margin", "Margen bruto mejora", "GP(t)/sales(t) > GP(t-1)/sales(t-1)", lambda: ratio(v("gross_profit"), v("revenue")) > ratio(v("gross_profit", 1), v("revenue", 1))),
-        ("turnover", "Rotación de activos mejora", "sales(t)/A(t-1) > sales(t-1)/A(t-2)", lambda: ratio(v("revenue"), v("total_assets", 1)) > ratio(v("revenue", 1), v("total_assets", 2))),
+        ("roa", "Beneficio sobre activos positivo", "Beneficio neto(t) / Activos(t-1) > 0", lambda: roa() > 0),
+        ("cfo", "Flujo operativo positivo", "Flujo operativo(t) / Activos(t-1) > 0", lambda: ratio(v("operating_cash_flow"), v("total_assets", 1)) > 0),
+        ("delta_roa", "Rentabilidad sobre activos mejora", "ROA(t) > ROA(t-1)  (ROA = Beneficio neto / Activos del año anterior)", lambda: roa() > roa(1)),
+        ("accrual", "Caja operativa superior al beneficio", "Flujo operativo(t) / Activos(t-1) > ROA(t)", lambda: ratio(v("operating_cash_flow"), v("total_assets", 1)) > roa()),
+        ("leverage", "Apalancamiento a largo plazo baja", "Deuda a largo plazo(t) / Activos medios(t) < Deuda a largo plazo(t-1) / Activos medios(t-1)", lambda: leverage() < leverage(1)),
+        ("liquidity", "Liquidez corriente mejora", "Activo corriente(t) / Pasivo corriente(t) > Activo corriente(t-1) / Pasivo corriente(t-1)", lambda: ratio(v("current_assets"), v("current_liabilities")) > ratio(v("current_assets", 1), v("current_liabilities", 1))),
+        ("issuance", "Sin emisión de capital común", "Emisión de acciones ordinarias(t) = 0 (dato explícito)", lambda: v("common_stock_issued") == 0),
+        ("margin", "Margen bruto mejora", "Beneficio bruto(t) / Ventas(t) > Beneficio bruto(t-1) / Ventas(t-1)", lambda: ratio(v("gross_profit"), v("revenue")) > ratio(v("gross_profit", 1), v("revenue", 1))),
+        ("turnover", "Rotación de activos mejora", "Ventas(t) / Activos(t-1) > Ventas(t-1) / Activos(t-2)", lambda: ratio(v("revenue"), v("total_assets", 1)) > ratio(v("revenue", 1), v("total_assets", 2))),
     ]
     signals = out["piotroski"]["signals"]
     for key, label, formula, evaluate in specs:
@@ -137,7 +137,7 @@ def calculate_health(facts: list[HealthFact], *, sector: str, company_type: str,
         x4 = ratio(v("total_equity"), v("total_liabilities"))
         z = 6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4
         out["altman"].update({"status": "ok", "score": round(z, 4),
-            "formula": "6.56*WC/A + 3.26*RE/A + 6.72*EBIT/A + 1.05*book_equity/liabilities",
+            "formula": "6,56 × Fondo de maniobra/Activos + 3,26 × Reservas/Activos + 6,72 × EBIT/Activos + 1,05 × Patrimonio neto contable/Pasivos",
             "evidence": [f.evidence() for f in dict.fromkeys(used)]})
     except MissingInput as exc:
         out["altman"]["reason"] = str(exc)
