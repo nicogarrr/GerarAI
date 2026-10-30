@@ -8,13 +8,15 @@ vi.mock('@/app/(root)/inversores/_components/LibraryChat', () => ({ LibraryChat:
 vi.mock('@/components/research/NewsEventsFlow', () => ({ NewsEventsFlow: () => null }));
 vi.mock('@/components/research/ThesisMarkdown', () => ({ markdownComponents: {} }));
 vi.mock('@/lib/actions/research-tools.actions', () => ({
-  createDriverAssumption: vi.fn(), getDriverAssumptions: vi.fn(async () => []),
+  // Las acciones de mutación migraron a variantes *Result (devuelven
+  // {success} en vez de lanzar): el mock las nombra o el render falla.
+  createDriverAssumptionResult: vi.fn(), getDriverAssumptions: vi.fn(async () => []),
   getFinancialTerminal: vi.fn(async () => ({ coverage: {percent: 0, available: 0, requested: 0}, metrics: [], periodicity: 'annual' })),
-  createManagementPromise: vi.fn(), importManagementCallClaims: vi.fn(), reconcileManagementCredibility: vi.fn(), updateManagementExplanation: vi.fn(),
+  createManagementPromiseResult: vi.fn(), importManagementCallClaims: vi.fn(), reconcileManagementCredibility: vi.fn(), updateManagementExplanationResult: vi.fn(),
   getManagementCredibility: vi.fn(async () => ({ score: null, grade: 'insufficient_history', counts: {}, method: '', promises: [{id: 17, promise: 'Promesa sintética', promise_date: '2026-10-01', expected_period: 'FY2027', status: 'open'}] })),
   getKnowledgeGraph: vi.fn(async () => ({nodes: [], edges: [], node_count: 0, edge_count: 0})), getKnowledgeNeighborhood: vi.fn(), syncKnowledgeGraph: vi.fn(),
-  getKnowledgeLibrary: vi.fn(async () => ({collections: [], documents: [], principles: [], jobs: []})), getKnowledgeDocumentChunks: vi.fn(),
-  createKnowledgeCollection: vi.fn(), decideKnowledgePrinciple: vi.fn(), extractKnowledgePrinciples: vi.fn(), installKnowledgeDefaults: vi.fn(), mergeKnowledgePrinciple: vi.fn(), reviseKnowledgePrinciple: vi.fn(), setKnowledgeDocumentTicker: vi.fn(), uploadKnowledgeDocument: vi.fn(), searchResearchLibrary: vi.fn(),
+  getKnowledgeLibrary: vi.fn(async () => ({collections: [], documents: [], principles: [], jobs: []})), getKnowledgeDocument: vi.fn(async () => null), getKnowledgeDocumentChunks: vi.fn(),
+  createKnowledgeCollectionResult: vi.fn(), decideKnowledgePrinciple: vi.fn(), extractKnowledgePrinciples: vi.fn(), installKnowledgeDefaults: vi.fn(), mergeKnowledgePrinciple: vi.fn(), reviseKnowledgePrincipleResult: vi.fn(), setKnowledgeDocumentTicker: vi.fn(), uploadKnowledgeDocumentResult: vi.fn(), searchResearchLibrary: vi.fn(),
 }));
 vi.mock('@/lib/actions/research.actions', () => ({getResearchNews: vi.fn(async () => []), analyzeManualNews: vi.fn(), ingestResearchNewsFeed: vi.fn()}));
 vi.mock('@/lib/actions/ticker-context.actions', () => ({getTickerContext: vi.fn(async () => ({portfolioTickers: [], watchlistTickers: []}))}));

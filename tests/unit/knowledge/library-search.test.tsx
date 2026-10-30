@@ -12,8 +12,10 @@ vi.mock('@/app/(root)/inversores/_components/LibraryChat', () => ({ LibraryChat:
 vi.mock('@/components/research/ThesisMarkdown', () => ({ markdownComponents: {} }));
 vi.mock('@/lib/actions/research-tools.actions', () => ({
   getKnowledgeLibrary: library, getKnowledgeDocument: vi.fn(async () => null), getKnowledgeDocumentChunks: vi.fn(async () => []),
-  createKnowledgeCollection: vi.fn(), decideKnowledgePrinciple: vi.fn(), extractKnowledgePrinciples: vi.fn(), installKnowledgeDefaults: vi.fn(),
-  mergeKnowledgePrinciple: vi.fn(), reviseKnowledgePrinciple: vi.fn(), setKnowledgeDocumentTicker: vi.fn(), uploadKnowledgeDocument: vi.fn(),
+  // La página importa las variantes *Result de las mutaciones: nombrarlas
+  // en el mock o el render falla con «No "..." export is defined».
+  createKnowledgeCollectionResult: vi.fn(), decideKnowledgePrinciple: vi.fn(), extractKnowledgePrinciples: vi.fn(), installKnowledgeDefaults: vi.fn(),
+  mergeKnowledgePrinciple: vi.fn(), reviseKnowledgePrincipleResult: vi.fn(), setKnowledgeDocumentTicker: vi.fn(), uploadKnowledgeDocumentResult: vi.fn(),
 }));
 
 import Knowledge from '@/app/(root)/knowledge/page';

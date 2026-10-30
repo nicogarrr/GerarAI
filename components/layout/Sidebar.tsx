@@ -56,7 +56,7 @@ export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: 
                     {NAV_SECTIONS.map((section) => {
                         const showTitle = showsNavSectionTitle(section);
                         return (
-                            <li key={section.titleKey}>
+                            <li key={section.titleKey ?? section.items[0]?.href}>
                                 {showTitle && (
                                     collapsed ? (
                                         <div className="mx-2 my-3 border-t border-gray-700/50" aria-hidden="true" />

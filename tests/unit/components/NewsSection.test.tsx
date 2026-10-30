@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 const getNews = vi.fn();
 vi.mock('@/lib/actions/finnhub.actions', () => ({ getNews: (...args: unknown[]) => getNews(...args) }));
+// NewsSection es un server component traducido con getT(): lib/i18n/server
+// lee la cookie de locale vía next/headers; sin cookie el locale es «es».
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 import NewsSection from '@/components/NewsSection';
 
 describe('NewsSection', () => {
