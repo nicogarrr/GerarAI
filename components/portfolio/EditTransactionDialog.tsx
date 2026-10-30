@@ -19,6 +19,7 @@ import { updateTransaction } from '@/lib/actions/portfolio.actions';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import { currencyOptions } from './transactionCurrencies';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { formatNumberForInput, parseLocalizedNumber } from '@/lib/format';
 
@@ -38,8 +39,6 @@ type Props = {
     transaction: Transaction;
     userId: string;
 };
-
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'];
 
 function initialForm(transaction: Transaction) {
     return {
@@ -74,7 +73,6 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
         }
         setOpen(next);
     };
-    const currencyOptions = CURRENCIES.includes(formData.currency) ? CURRENCIES : [formData.currency, ...CURRENCIES];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -168,7 +166,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                         <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
                             <SelectTrigger id="edit-currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
                             <SelectContent className="bg-gray-800 border-gray-700">
-                                {currencyOptions.map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
+                                {currencyOptions(formData.currency).map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>

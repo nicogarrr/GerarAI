@@ -19,24 +19,7 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { parseLocalizedNumber, todayLocal } from '@/lib/format';
-
-// Divisa probable segun el sufijo de mercado del ticker (B5): al elegir
-// SAN.MC la moneda no puede quedarse en USD por defecto. El usuario puede
-// cambiarla despues; esto solo fija un default razonable.
-const SUFFIX_CURRENCY: Record<string, string> = {
-  MC: 'EUR', PA: 'EUR', AS: 'EUR', BR: 'EUR', LS: 'EUR', DE: 'EUR',
-  F: 'EUR', MI: 'EUR', VI: 'EUR', HE: 'EUR', ST: 'EUR', CO: 'EUR',
-  OL: 'EUR', AT: 'EUR', IR: 'EUR', DU: 'EUR', HM: 'EUR', MU: 'EUR',
-  L: 'GBP', IL: 'GBP', SW: 'CHF', VX: 'CHF', TO: 'CAD', V: 'CAD',
-  HK: 'HKD', T: 'JPY', AX: 'AUD', SS: 'CNY', SZ: 'CNY',
-};
-
-function defaultCurrencyFor(symbol: string): string | null {
-  const idx = symbol.lastIndexOf('.');
-  if (idx < 0) return null;
-  return SUFFIX_CURRENCY[symbol.slice(idx + 1).toUpperCase()] ?? null;
-}
-
+import { currencyOptions, defaultCurrencyFor } from './transactionCurrencies';
 
 type DialogProps = {
   userId: string;
@@ -173,7 +156,7 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
             <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
               <SelectTrigger id="currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
-                {['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'].map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
+                {currencyOptions(formData.currency).map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
