@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -288,6 +290,32 @@ class PublicPriceProvider:
 YahooIntradayFetcher = Callable[[list[str]], dict[str, tuple[Decimal, date] | tuple[Decimal, date, str | None]]]
 
 
+# Divisa del listado por simbolo (metadato de Yahoo, no cambia): el refresco
+# intradia corre cada 15 min en sesion y pedia ``fast_info`` (una peticion
+# HTTP en serie) por cada simbolo en CADA pasada. Se recuerda 24 h por
+# proceso; un fallo (None) no se recuerda. La entrada guarda el modulo que la
+# produjo para que un doble de yfinance en tests nunca reciba datos de otro.
+_LISTING_CURRENCY_TTL_S = 24 * 3600.0
+_listing_currency_lock = threading.Lock()
+_listing_currency_cache: dict[str, tuple[float, object, str]] = {}
+
+
+def _listing_currency(yf: object, symbol: str) -> str | None:
+    now = time.monotonic()
+    with _listing_currency_lock:
+        hit = _listing_currency_cache.get(symbol)
+        if hit is not None and hit[1] is yf and now - hit[0] < _LISTING_CURRENCY_TTL_S:
+            return hit[2]
+    try:
+        unit = yf.Ticker(symbol).fast_info["currency"]  # type: ignore[attr-defined]
+    except Exception:
+        return None
+    if isinstance(unit, str) and unit:
+        with _listing_currency_lock:
+            _listing_currency_cache[symbol] = (now, yf, unit)
+    return unit
+
+
 def fetch_intraday_yahoo(symbols: list[str]) -> dict[str, tuple[Decimal, date] | tuple[Decimal, date, str | None]]:
     """Ultimo precio intradia (velas de 15 min) via yfinance. Aislado para tests."""
     import yfinance as yf
@@ -321,11 +349,7 @@ def fetch_intraday_yahoo(symbols: list[str]) -> dict[str, tuple[Decimal, date] |
             if value > 0:
                 # fast_info is provider metadata for this actual symbol. A
                 # suffix cannot establish that the raw value is in pence.
-                try:
-                    unit = yf.Ticker(symbol).fast_info["currency"]
-                except Exception:
-                    unit = None
-                latest[symbol] = (value, day, unit)
+                latest[symbol] = (value, day, _listing_currency(yf, symbol))
         except (KeyError, IndexError):
             continue
     return latest
