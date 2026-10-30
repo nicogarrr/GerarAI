@@ -16,7 +16,15 @@ import { ListingStaleBanner } from '@/components/research/ListingStaleBanner';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
-import { asView, type View } from '@/lib/research/research-views';
+import { asView, canonicalViewUrl, tabHref, tabOfView, type View } from '@/lib/research/research-views';
+import { FinancialTerminalSection } from '@/components/research/sections/FinancialTerminalSection';
+import { ShareCapitalSection } from '@/components/research/sections/ShareCapitalSection';
+import { DriverAssumptionsSection } from '@/components/research/sections/DriverAssumptionsSection';
+import { ManagementCredibilitySection } from '@/components/research/sections/ManagementCredibilitySection';
+import { DecisionLessonsSection } from '@/components/research/sections/DecisionLessonsSection';
+import { SectionLoadError } from '@/components/research/sections/SectionLoadError';
+import { QuickGlancePanel } from '@/components/research/QuickGlancePanel';
+import { getAnalystTargets } from '@/lib/research/analyst-targets';
 import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -115,6 +123,8 @@ import {
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 import { getCompanyHolders } from '@/lib/actions/investors.actions';
+import { getShareCapital } from '@/lib/actions/share-capital.actions';
+import { getDecisionLessons, getDriverAssumptions, getFinancialTerminal, getManagementCredibility } from '@/lib/actions/research-tools.actions';
 import { getKnowledgeDocumentsForTicker } from '@/lib/actions/research-tools.actions';
 import { libraryDocumentHref } from '@/lib/knowledge/document-ticker';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
@@ -164,7 +174,7 @@ const readSnapshot = cache((ticker: string) => getResearchCompanySnapshot(ticker
 
 type PageProps = {
   params: Promise<{ ticker: string }>;
-  searchParams: Promise<{ view?: string; chat?: string; pagina?: string }>;
+  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; metrics?: string; years?: string; periodicity?: string }>;
 };
 
 
@@ -477,7 +487,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   if (!valuation) {
     return (
       <EmptyState
-        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=model`}>Genera primero el modelo a largo plazo</EmptyLink>}
+        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Genera primero el modelo a largo plazo</EmptyLink>}
         title="No hay ninguna valoración persistida."
       />
     );
@@ -570,7 +580,7 @@ function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel
   if (!model || model.status === 'not_generated') {
     return (
       <EmptyState
-        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=model`}>Generar el modelo a largo plazo</EmptyLink>}
+        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Generar el modelo a largo plazo</EmptyLink>}
         title="Genera el modelo a largo plazo antes de valorar la oportunidad de mercado."
       />
     );
@@ -671,7 +681,6 @@ type ViewWorkspaces = {
   changes: Awaited<ReturnType<typeof getResearchChangesWorkspace>>;
   financials: Awaited<ReturnType<typeof getResearchFinancialsWorkspace>>;
   model: Awaited<ReturnType<typeof getResearchLongTermModel>>;
-  'market-opportunity': Awaited<ReturnType<typeof getResearchLongTermModel>>;
   moat: Awaited<ReturnType<typeof getResearchMoatWorkspace>>;
   satellites: { orbits: Awaited<ReturnType<typeof getAstOrbitOverview>>; analysis: Awaited<ReturnType<typeof getAstsAnalysis>> } | null;
   peers: Awaited<ReturnType<typeof getResearchPeersWorkspace>>;
@@ -679,6 +688,11 @@ type ViewWorkspaces = {
   documents: Awaited<ReturnType<typeof getResearchDocumentsWorkspace>>;
   sources: Awaited<ReturnType<typeof getResearchSourceAuditsWorkspace>>;
   holders: Awaited<ReturnType<typeof getCompanyHolders>>;
+  terminal: Awaited<ReturnType<typeof getFinancialTerminal>> | null;
+  capital: Awaited<ReturnType<typeof getShareCapital>> | null;
+  supuestos: Awaited<ReturnType<typeof getDriverAssumptions>>;
+  directiva: Awaited<ReturnType<typeof getManagementCredibility>> | null;
+  lecciones: Awaited<ReturnType<typeof getDecisionLessons>>;
 };
 
 /**
@@ -707,7 +721,6 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
   changes: { changes: [], reviews: [], alerts: [], decisions: [], expectations: [], trades: [] },
   financials: { facts: [], calculatedMetrics: [], ttm: null },
   model: null,
-  'market-opportunity': null,
   moat: null,
   satellites: null,
   peers: { comparison: null, analysis: null },
@@ -715,59 +728,87 @@ const EMPTY_VIEW_DATA: { [K in keyof ViewWorkspaces]: ViewWorkspaces[K] } = {
   documents: [],
   sources: [],
   holders: null,
+  terminal: null,
+  capital: null,
+  supuestos: [],
+  directiva: null,
+  lecciones: { lessons: [], taxonomy: [] },
 };
 
 /**
- * UNA lectura: el workspace de la vista activa, o `undefined` si la vista no
- * tiene workspace propio.
+ * Lecturas de la pestaña activa: una por cada módulo que la compone (la
+ * entrada y sus secciones), lanzadas juntas al inicio del render. Cada
+ * sección recoge la suya con `viewData`: la de entrada conserva el
+ * comportamiento de siempre (fallo -> error boundary / BackendOffline) y el
+ * resto degradan a aviso inline con reintento, nunca a vacío fingido.
  *
- * Antes esta lectura vivía DENTRO de la rama `else if` de la vista, es decir
- * después de haber esperado el snapshot, el market y el watchlist: tres fases
- * de red encadenadas por descuido. Lanzarla aquí la convierte en la primera.
- *
- * Solo se lanza UNA por render porque la cadena `if/else if` de abajo ejecuta
- * una sola rama: esto no es un fan-out de 13 workspaces, es la eliminación de
- * una fase.
+ * El terminal, dilución, supuestos, directiva y lecciones eran subrutas
+ * propias y no tenían workspace: ahora son secciones de su pestaña.
  */
-function launchViewData(
+function launchTabData(
   activeView: View,
   ticker: string,
-): { key: keyof ViewWorkspaces; promise: Promise<unknown> } | undefined {
+  terminalQuery: { metrics?: string; years: number; periodicity: string },
+): { key: keyof ViewWorkspaces; promise: Promise<unknown> }[] {
+  // Cada lectura se envuelve en su telemetría en el sitio donde se lanza
+  // (guard D2a): un helper que la añadiera dentro volvería invisible el
+  // rastro de cada llamada.
+  const tasks: { key: keyof ViewWorkspaces; promise: Promise<unknown> }[] = [];
   switch (activeView) {
     case 'thesis':
-      return { key: 'thesis', promise: withResearchTelemetry('thesis-workspace', () => getThesisWithScenarios(ticker)) };
-    case 'changes':
-      return { key: 'changes', promise: withResearchTelemetry('changes-workspace', () => getResearchChangesWorkspace(ticker)) };
+      tasks.push({ key: 'thesis', promise: withResearchTelemetry('thesis-workspace', () => getThesisWithScenarios(ticker)) });
+      break;
     case 'financials':
-      return { key: 'financials', promise: withResearchTelemetry('financials-workspace', () => getResearchFinancialsWorkspace(ticker)) };
-    case 'model':
-      return { key: 'model', promise: withResearchTelemetry('long-term-model', () => getResearchLongTermModel(ticker)) };
-    case 'market-opportunity':
-      return { key: 'market-opportunity', promise: withResearchTelemetry('long-term-model', () => getResearchLongTermModel(ticker)) };
-    case 'moat':
-      return { key: 'moat', promise: withResearchTelemetry('moat-workspace', () => getResearchMoatWorkspace(ticker)) };
-    case 'satellites':
-      // Solo ASTS tiene orbitales: pedirlo para cualquier otro ticker sería una
-      // llamada segura de quedar sin usar.
-      return ticker === 'ASTS'
-        ? { key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => { const [orbits, analysis] = await Promise.all([getAstOrbitOverview().catch(() => null), getAstsAnalysis()]); return { orbits, analysis }; }) }
-        : undefined;
-    case 'peers':
-      return { key: 'peers', promise: withResearchTelemetry('peers-workspace', () => getResearchPeersWorkspace(ticker)) };
+      tasks.push({ key: 'financials', promise: withResearchTelemetry('financials-workspace', () => getResearchFinancialsWorkspace(ticker)) });
+      tasks.push({ key: 'terminal', promise: withResearchTelemetry('financial-terminal', () => getFinancialTerminal(ticker, terminalQuery)) });
+      tasks.push({ key: 'capital', promise: withResearchTelemetry('share-capital', () => getShareCapital(ticker)) });
+      break;
     case 'valuation':
-      return { key: 'valuation', promise: withResearchTelemetry('valuation-workspace', () => getResearchValuationWorkspace(ticker)) };
+      tasks.push({ key: 'valuation', promise: withResearchTelemetry('valuation-workspace', () => getResearchValuationWorkspace(ticker)) });
+      // Modelo y oportunidad de mercado leen el mismo workspace: una lectura.
+      tasks.push({ key: 'model', promise: withResearchTelemetry('long-term-model', () => getResearchLongTermModel(ticker)) });
+      tasks.push({ key: 'moat', promise: withResearchTelemetry('moat-workspace', () => getResearchMoatWorkspace(ticker)) });
+      tasks.push({ key: 'peers', promise: withResearchTelemetry('peers-workspace', () => getResearchPeersWorkspace(ticker)) });
+      tasks.push({ key: 'supuestos', promise: withResearchTelemetry('driver-assumptions', () => getDriverAssumptions(ticker)) });
+      break;
+    case 'changes':
+      tasks.push({ key: 'changes', promise: withResearchTelemetry('changes-workspace', () => getResearchChangesWorkspace(ticker)) });
+      tasks.push({ key: 'holders', promise: withResearchTelemetry('company-holders', () => getCompanyHolders(ticker)) });
+      tasks.push({ key: 'directiva', promise: withResearchTelemetry('management-credibility', () => getManagementCredibility(ticker)) });
+      tasks.push({ key: 'lecciones', promise: withResearchTelemetry('decision-lessons', () => getDecisionLessons(ticker)) });
+      // Solo ASTS tiene orbitales: pedirlo para otro ticker sería una
+      // llamada segura de quedar sin usar.
+      if (ticker === 'ASTS') {
+        tasks.push({ key: 'satellites', promise: withResearchTelemetry('ast-orbits', async () => {
+          const [orbits, analysis] = await Promise.all([getAstOrbitOverview().catch(() => null), getAstsAnalysis()]);
+          return { orbits, analysis };
+        }) });
+      }
+      break;
     case 'documents':
-      return { key: 'documents', promise: withResearchTelemetry('documents-workspace', () => getResearchDocumentsWorkspace(ticker, false)) };
-    case 'sources':
-      return { key: 'sources', promise: withResearchTelemetry('source-audits', () => getResearchSourceAuditsWorkspace(ticker)) };
-    case 'holders':
-      return { key: 'holders', promise: withResearchTelemetry('company-holders', () => getCompanyHolders(ticker)) };
+      tasks.push({ key: 'documents', promise: withResearchTelemetry('documents-workspace', () => getResearchDocumentsWorkspace(ticker, false)) });
+      tasks.push({ key: 'sources', promise: withResearchTelemetry('source-audits', () => getResearchSourceAuditsWorkspace(ticker)) });
+      break;
     default:
-      // 'overview' no tiene workspace (el snapshot lo trae) y 'chat' depende de
-      // `?chat=`, que no es parte de la clave de vista: se lanza aparte.
-      return undefined;
+      // 'overview' no tiene workspace (el snapshot lo trae) y sus lecturas
+      // (noticias, panel de vistazo) se lanzan aparte, con su degradación.
+      break;
   }
+  return tasks;
 }
+
+/**
+ * Workspace de la sección de ENTRADA de cada pestaña: solo su caída
+ * reconocida del motor degrada la página entera a BackendOffline; el resto
+ * de secciones muestran un aviso inline.
+ */
+const ENTRY_WORKSPACE: Partial<Record<View, keyof ViewWorkspaces>> = {
+  thesis: 'thesis',
+  financials: 'financials',
+  valuation: 'valuation',
+  changes: 'changes',
+  documents: 'documents',
+};
 
 export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
@@ -779,6 +820,22 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       if (typeof value === 'string') search.set(key, value);
     }
     redirect(`/research/${encodeURIComponent(ticker)}${search.size ? `?${search.toString()}` : ''}`);
+  }
+  // URLs antiguas de módulo o de grupo histórico (?view=moat, ?view=numeros):
+  // una redirección a la URL canónica de su pestaña (una URL por contenido),
+  // conservando el resto de parámetros (?chat=, ?pagina=, controles del terminal).
+  const canonicalView = canonicalViewUrl(ticker, query.view);
+  if (canonicalView) {
+    const hashAt = canonicalView.indexOf('#');
+    const hash = hashAt >= 0 ? canonicalView.slice(hashAt) : '';
+    const withoutHash = hashAt >= 0 ? canonicalView.slice(0, hashAt) : canonicalView;
+    const [pathnamePart, viewPart] = withoutHash.split('?view=');
+    const search = new URLSearchParams();
+    if (viewPart) search.set('view', viewPart);
+    for (const [key, value] of Object.entries(query)) {
+      if (key !== 'view' && typeof value === 'string') search.set(key, value);
+    }
+    redirect(`${pathnamePart}${search.size ? `?${search.toString()}` : ''}${hash}`);
   }
   const activeView = asView(query.view);
   //
@@ -812,7 +869,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const parsed = Number.parseInt(query.pagina ?? '1', 10);
     return Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;
   })();
-  const fichaNewsPromise = activeView === 'noticias'
+  const fichaNewsPromise = activeView === 'overview'
     ? settleResearchBatch(
         [{ key: 'ficha-news', promise: getResearchNews(null, (fichaNewsPageNumber - 1) * NEWS_PAGE_SIZE, NEWS_PAGE_SIZE + 1, ticker) }],
         RESEARCH_RENDER_BUDGET_MS,
@@ -821,13 +878,24 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // "Estado seguido" real del usuario. Antes esperaba al snapshot para pedirlo,
   // y no hay NINGÚN motivo: el watchlist es del tenant, no depende del ticker.
   const watchlistPromise = withResearchTelemetry('watchlist', () => getWatchlist()).catch(() => null);
-  // El workspace de la vista activa también sale aquí, antes de esperar el
-  // snapshot: la rama de abajo solo lo recoge. Es la fase que más tiempo
-  // añadía (la tesis son 7 llamadas) y no dependía de nada de lo anterior.
-  const viewTask = launchViewData(activeView, ticker);
-  const viewPromise = viewTask
-    ? settleResearchBatch([viewTask], RESEARCH_RENDER_BUDGET_MS)
+  // Las lecturas de la pestaña activa también salen aquí, antes de esperar
+  // el snapshot: las secciones de abajo solo las recogen. Es la fase que más
+  // tiempo añadía (la tesis son 7 llamadas) y no dependía de nada anterior.
+  const terminalQuery = {
+    metrics: query.metrics,
+    years: Math.max(1, Math.min(20, Number(query.years) || 10)),
+    periodicity: ['all', 'annual', 'quarterly'].includes(query.periodicity ?? '') ? query.periodicity! : 'annual',
+  };
+  const viewTasks = launchTabData(activeView, ticker, terminalQuery);
+  const viewPromise = viewTasks.length
+    ? settleResearchBatch(viewTasks, RESEARCH_RENDER_BUDGET_MS)
     : Promise.resolve([]);
+  // Panel de vistazo rápido del Resumen (opción 1, 29-oct-2026): modelo,
+  // recompras y directiva vuelan con el resto; su fallo solo omite la fila
+  // del panel, nunca rompe la ficha.
+  const glanceModelPromise = activeView === 'overview' ? withResearchTelemetry('glance-model', () => getResearchLongTermModel(ticker)).catch(() => null) : undefined;
+  const glanceCapitalPromise = activeView === 'overview' ? getShareCapital(ticker).catch(() => null) : undefined;
+  const glanceCredibilityPromise = activeView === 'overview' ? getManagementCredibility(ticker).catch(() => null) : undefined;
   // En master-miss estas promesas no se consumen: el manejador se adjunta
   // EN CREACIÓN, porque un .catch posterior deja ventana de unhandledRejection
   // si rechazan durante los awaits intermedios. La propagación al consumidor
@@ -958,7 +1026,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // reconocida del motor (red/timeout o 5xx) degrada a BackendOffline, igual que
   // snapshot y market arriba. Cualquier otro error (4xx, auth, programación) sigue
   // relanzándose desde `viewData` al error boundary sin rebajarlo a "offline".
-  const unavailableView = findUnavailableViewFailure(viewSettled, isBackendUnavailableError);
+  const entryWorkspace = ENTRY_WORKSPACE[activeView];
+  const entrySettled = entryWorkspace ? viewSettled.filter((entry) => entry.key === entryWorkspace) : [];
+  const unavailableView = findUnavailableViewFailure(entrySettled, isBackendUnavailableError);
   if (unavailableView) {
     console.warn(`[research] ${ticker} · ${activeView} motor no disponible: ${unavailableView.key}=${unavailableView.reason}`);
     return <BackendOffline feature={`Research de ${ticker}`} retryHref={viewRetryHref(ticker, activeView)} />;
@@ -1004,14 +1074,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       ? Promise.resolve(e2eExtendedQuoteFixture(ticker) as ExtendedQuote)
       : researchRequest<ExtendedQuote>(`/api/companies/${encodeURIComponent(headerQuoteSymbol)}/extended-quote`, { timeoutMs: 6000 }).catch(() => null))
     : undefined;
-  let content: React.ReactNode;
-
-  if (activeView === 'overview') {
+  // Constructores de secciones: cada pestaña compone sus módulos como
+  // secciones seguidas con título claro («Una fila, no tres menús», 29-oct-2026).
+  const buildOverviewContent = async (): Promise<React.ReactNode> => {
     // marketPromise ya se lanzó en paralelo al snapshot más arriba.
     let market: Awaited<ReturnType<typeof getCompanyMarketSnapshot>>;
     try {
+      // headerMarket ya guarda esta misma promesa resuelta (se esperó en la
+      // cabecera); aquí solo se distingue la caída del motor del resto.
       market = await marketPromise;
-      headerMarket = market;
     } catch (error) {
       if (isBackendUnavailableError(error)) {
         return <BackendOffline feature={`Datos de mercado de ${ticker}`} retryHref={`/research/${ticker}`} />;
@@ -1060,8 +1131,30 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: 'No se pudo cargar tu posición en esta empresa.' }))
         : Promise.resolve(null),
     ]);
-    content = (
-      <div className="space-y-6">
+    // Panel de vistazo rápido: datos reales ya existentes, cada fila a su
+    // sección. En móvil va arriba (bajo el precio de la cabecera); en PC
+    // es la columna lateral derecha (estilo Investing, opción 1).
+    const [glanceModel, glanceCapital, glanceCredibility, glanceAnalysts] = await Promise.all([
+      glanceModelPromise ?? Promise.resolve(null),
+      glanceCapitalPromise ?? Promise.resolve(null),
+      glanceCredibilityPromise ?? Promise.resolve(null),
+      getAnalystTargets(quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker).catch(() => null),
+    ]);
+    return (
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
+        <div className="min-w-0 xl:order-2">
+          <QuickGlancePanel
+            analysts={glanceAnalysts}
+            credibility={glanceCredibility}
+            currency={company.currency}
+            livePrice={headerMarket?.quote?.price ?? null}
+            moatScore={moatScore}
+            model={glanceModel}
+            shareCapital={glanceCapital}
+            ticker={ticker}
+          />
+        </div>
+        <div className="min-w-0 space-y-6 xl:order-1">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
           <Panel density="compact" title="Última tesis">
             {snapshot.latest_thesis ? (
@@ -1093,7 +1186,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
             <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=model`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
@@ -1108,7 +1201,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           actions={
             <Link
               className="inline-flex min-h-[44px] items-center sm:min-h-0 text-sm text-teal-300 hover:text-teal-200"
-              href={`/research/${encodeURIComponent(ticker)}?view=noticias`}
+              href="#noticias"
             >
               Ver todas
             </Link>
@@ -1145,7 +1238,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           actions={
             <Link
               className="inline-flex min-h-[44px] sm:min-h-0 items-center text-sm text-teal-300 hover:text-teal-200"
-              href={`/research/${encodeURIComponent(ticker)}?view=changes`}
+              href={`/research/${encodeURIComponent(ticker)}?view=seguimiento`}
             >
               Ver todos los cambios
             </Link>
@@ -1219,7 +1312,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           actions={moatScore ? (
             <Link
               className="inline-flex min-h-11 min-w-11 items-center text-sm text-teal-300 hover:text-teal-200"
-              href={`/research/${encodeURIComponent(ticker)}?view=moat`}
+              href={`/research/${encodeURIComponent(ticker)}?view=valoracion#foso`}
             >
               Ver la evaluación del foso
             </Link>
@@ -1244,10 +1337,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         >
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             {[
-              ['Modelo a largo plazo', 'model'],
-              ['Oportunidad de mercado', 'market-opportunity'],
-              ['Comparables', 'peers'],
-              ['Documentos y fuentes', 'documents'],
+              ['Modelo a largo plazo', 'valoracion#modelo'],
+              ['Oportunidad de mercado', 'valoracion#oportunidad'],
+              ['Comparables', 'valoracion#comparables'],
+              ['Documentos y fuentes', 'fuentes#documentos'],
             ].map(([nextLabel, nextView]) => (
               <NextStepLink href={`/research/${encodeURIComponent(ticker)}?view=${nextView}`} key={nextView}>
                 {nextLabel}
@@ -1256,14 +1349,17 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         </Panel>
         <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
-        {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
+        {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}
         </p>
         {/* Price chart lives once in the company header, across all views. */}
+        </div>
       </div>
     );
-  } else if (activeView === 'noticias') {
+  };
+
+  const buildNoticiasSection = async (): Promise<React.ReactNode> => {
     // Noticias de la empresa dentro de su ficha (cohesión: sin salir a
     // /research/news). Mismo componente y misma paginación que la portada de
     // noticias, filtrado por ticker en la API. La lectura sale del lote con
@@ -1276,7 +1372,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const newsHasMore = fetchedNews.length > NEWS_PAGE_SIZE;
     const newsEvents = dedupeNewsEvents(fetchedNews.slice(0, NEWS_PAGE_SIZE));
     // El flujo ya trae su propia sección con cabecera; sin Panel extra.
-    content = fichaNewsError ? (
+    return fichaNewsError ? (
       <Panel title="Noticias de la empresa">
         <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
           No se pudieron cargar las noticias. Reintenta en unos segundos.
@@ -1295,9 +1391,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         watchlistTickers={tickerContext.watchlistTickers}
       />
     );
-  } else if (activeView === 'thesis') {
+  };
+
+  const buildThesisContent = async (): Promise<React.ReactNode> => {
     const data = await viewData('thesis');
-    content = (
+    return (
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
         <div className="flex flex-wrap items-center gap-3">
           <ThesisGenerateButton ticker={ticker} />
@@ -1400,7 +1498,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             />
           ) : (
             <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=documents`}>Importa fuentes antes de generar</EmptyLink>}
+              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=fuentes`}>Importa fuentes antes de generar</EmptyLink>}
               title="Aún no existe ninguna tesis."
             />
           )}
@@ -1438,7 +1536,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
       </div>
     );
-  } else if (activeView === 'changes') {
+  };
+
+  const buildChangesContent = async (): Promise<React.ReactNode> => {
     const data = await viewData('changes');
     // Contexto de guía (revisiones anclables + noticias atribuidas): opcional,
     // su fallo no puede romper la pestaña Seguir.
@@ -1447,7 +1547,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       getGuideContext(ticker).catch(() => null),
       getCompanyPaperTrades(ticker).catch(() => null),
     ]);
-    content = (
+    return (
       <div className="space-y-6">
         {data.changes.length || data.reviews.length || data.alerts.length ? (
           <ChangesFeed alerts={data.alerts} changes={data.changes} reviews={data.reviews} ticker={ticker} />
@@ -1464,13 +1564,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         <CompanyPaperTrades state={paperTrades} ticker={ticker} />
       </div>
     );
-  } else if (activeView === 'holders') {
+  };
+
+  const buildHoldersSection = async (): Promise<React.ReactNode> => {
     const holders = await viewData('holders');
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
     // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
     const insiderFilings = await getInsiderFilings(ticker, 8).catch(() => null);
-    content = (
+    return (
       <div className="space-y-6">
         {holders === null ? (
           <EmptyState title="No se pudieron cargar los superinversores de esta empresa." />
@@ -1553,9 +1655,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
       </div>
     );
-  } else if (activeView === 'financials') {
+  };
+
+  const buildFinancialsContent = async (): Promise<React.ReactNode> => {
     const data = await viewData('financials');
-    content = (
+    return (
       <div className="space-y-6">
         <div className="flex flex-wrap gap-3">
           {/* FMP plan free solo cubre mercado US (402 en el resto): el boton
@@ -1583,19 +1687,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           } /></Panel>
       </div>
     );
-  } else if (activeView === 'model') {
+  };
+
+  const buildModelSection = async (): Promise<React.ReactNode> => {
     const model = await viewData('model');
-    content = (
+    return (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Modelo a largo plazo generado"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Generar modelo</Button></MutationForm>
         <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} />
       </div>
     );
-  } else if (activeView === 'market-opportunity') {
-    content = <MarketOpportunityView model={await viewData('market-opportunity')} ticker={ticker} />;
-  } else if (activeView === 'moat') {
+  };
+
+  const buildMarketOpportunitySection = async (): Promise<React.ReactNode> => {
+    return <MarketOpportunityView model={await viewData('model')} ticker={ticker} />;
+  };
+
+  const buildMoatSection = async (): Promise<React.ReactNode> => {
     const moat = await viewData('moat');
-    content = (
+    return (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Evaluación del foso refrescada"><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />Reevaluar evidencia</Button></MutationForm>
         <MoatClassificationPanel moat={moat} />
@@ -1613,37 +1723,45 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             );
           }) : (
             <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=model`}>Genera el modelo y reevalúa el foso</EmptyLink>}
+              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Genera el modelo y reevalúa el foso</EmptyLink>}
               title="Sin evaluación de foso persistida."
             />
           )}
         </div>
       </div>
     );
-  } else if (activeView === 'satellites') {
+  };
+
+  const buildSatellitesSection = async (): Promise<React.ReactNode> => {
     // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
     // lote en paralelo (null si degradó, igual que antes).
     const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
-    content = ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
-  } else if (activeView === 'peers') {
+    return ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
+  };
+
+  const buildPeersSection = async (): Promise<React.ReactNode> => {
     const peers = await viewData('peers');
-    content = (
+    return (
       <div className="space-y-6">
         <Panel title="Conjunto de comparables"><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_LABELS[peers.comparison.basis] ?? peers.comparison.basis) : 'Sin conjunto de comparables'} · {peers.comparison?.peer_count ?? 0} comparables con datos{(peers.comparison?.peers_without_data ?? []).length > 0 ? ` · sin datos: ${(peers.comparison?.peers_without_data ?? []).join(', ')}` : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
         <Panel title="Métricas comparables"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Object.entries(peers.comparison?.benchmarks ?? {}).map(([metric, value]) => <div className="rounded-lg border border-gray-800 p-3" key={metric}><div className="text-sm text-gray-200">{metric}</div><div className="mt-2 text-xs text-gray-500">Objetivo {formatPeerValue(value.target_value, metric)}{value.target_atypical ? ' (atípico: posible ganancia no operativa)' : ''} · mediana {peerMedianText(value, metric)} · n={value.peer_sample_size}</div>{(value.excluded_atypical ?? []).length > 0 ? <div className="mt-1 text-xs text-amber-300/80">Fuera de la mediana: {(value.excluded_atypical ?? []).map((ex) => `${ex.ticker} ${ex.value ?? 's/d'}`).join(', ')} - lectura atípica verificable, no benchmark</div> : null}</div>)}</div></Panel>
         <Panel title="Ventajas y desventajas"><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_ES[peers.analysis.methodology] ?? peers.analysis.methodology) : 'Sin análisis de comparables persistido.'}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
       </div>
     );
-  } else if (activeView === 'valuation') {
-    content = <ValuationView valuation={await viewData('valuation')} currency={company.currency} ticker={ticker} />;
-  } else if (activeView === 'documents') {
+  };
+
+  const buildValuationContent = async (): Promise<React.ReactNode> => {
+    return <ValuationView valuation={await viewData('valuation')} currency={company.currency} ticker={ticker} />;
+  };
+
+  const buildDocumentsContent = async (): Promise<React.ReactNode> => {
     // Conexión 10a: las lecturas de la biblioteca enlazadas a este ticker se
     // piden en paralelo; si la biblioteca falla, la vista sigue sin ellas.
     const [documents, libraryReadings] = await Promise.all([
       viewData('documents'),
       getKnowledgeDocumentsForTicker(ticker).catch(() => null),
     ]);
-    content = (
+    return (
       <div className="space-y-6">
         <details className="rounded-lg border border-gray-800 bg-surface-1 p-4" data-testid="add-source">
           <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">Añadir fuente (subir archivo o importar URL)</summary>
@@ -1702,9 +1820,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
       </div>
     );
-  } else if (activeView === 'sources') {
+  };
+
+  const buildSourcesSection = async (): Promise<React.ReactNode> => {
     const audits = await viewData('sources');
-    content = (
+    return (
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
           <div className="space-y-3">
@@ -1735,8 +1855,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         )}
       </Panel>
     );
-  } else {
-    content = (
+  };
+
+  const buildChatSection = async (): Promise<React.ReactNode> => {
+    return (
       <div className="space-y-6" id="chat-empresa" style={{ scrollMarginTop: '1rem' }}>
         <LegacyChatRedirect ticker={ticker} question={query.chat} />
         <Panel title="Pregunta al Cerebro sobre esta empresa">
@@ -1747,6 +1869,75 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </Panel>
       </div>
     );
+  };
+
+  // Secciones que eran subrutas propias hasta el 29-oct-2026.
+  const buildTerminalSection = async (): Promise<React.ReactNode> => {
+    const terminal = await viewData('terminal');
+    if (!terminal) return <EmptyState title="Sin datos del terminal financiero todavía: se cargan con los financieros de la empresa." />;
+    return <FinancialTerminalSection metrics={terminalQuery.metrics} periodicity={terminalQuery.periodicity} terminal={terminal} years={terminalQuery.years} />;
+  };
+  const buildCapitalSection = async (): Promise<React.ReactNode> => <ShareCapitalSection data={await viewData('capital')} ticker={ticker} />;
+  const buildSupuestosSection = async (): Promise<React.ReactNode> => <DriverAssumptionsSection assumptions={await viewData('supuestos')} ticker={ticker} />;
+  const buildDirectivaSection = async (): Promise<React.ReactNode> => {
+    const dashboard = await viewData('directiva');
+    if (!dashboard) return <EmptyState title="Sin compromisos de la directiva registrados todavía." />;
+    return <ManagementCredibilitySection dashboard={dashboard} ticker={ticker} />;
+  };
+  const buildLeccionesSection = async (): Promise<React.ReactNode> => <DecisionLessonsSection data={await viewData('lecciones')} ticker={ticker} />;
+
+  type TabSection = { id?: string; title?: string; node: React.ReactNode };
+
+  // Las secciones que no encabezan su pestaña degradan a aviso inline con
+  // reintento (nunca a vacío fingido ni a una pestaña entera caída); la de
+  // entrada conserva el comportamiento de siempre.
+  const optionalSection = async (id: string, title: string, build: () => Promise<React.ReactNode>): Promise<TabSection> => {
+    try {
+      return { id, title, node: await build() };
+    } catch (error) {
+      console.warn(`[research] ${ticker} · sección ${id} falló: ${error instanceof Error ? error.message : String(error)}`);
+      return { id, title, node: <SectionLoadError retryHref={`${tabHref(ticker, tabOfView(activeView))}#${id}`} title={title} /> };
+    }
+  };
+
+  // Las seis pestañas y sus secciones, en el orden acordado (opción 1).
+  let sections: TabSection[];
+  if (activeView === 'overview') {
+    sections = [
+      { node: await buildOverviewContent() },
+      await optionalSection('noticias', 'Noticias', buildNoticiasSection),
+    ];
+  } else if (activeView === 'thesis') {
+    sections = [{ node: await buildThesisContent() }];
+  } else if (activeView === 'financials') {
+    sections = [
+      { id: 'financieros', title: 'Financieros', node: await buildFinancialsContent() },
+      await optionalSection('terminal', 'Terminal financiero', buildTerminalSection),
+      await optionalSection('dilucion', 'Dilución y recompras', buildCapitalSection),
+    ];
+  } else if (activeView === 'valuation') {
+    sections = [
+      { id: 'valoracion', title: 'Valoración', node: await buildValuationContent() },
+      await optionalSection('modelo', 'Modelo a largo plazo', buildModelSection),
+      await optionalSection('supuestos', 'Supuestos de drivers', buildSupuestosSection),
+      await optionalSection('oportunidad', 'Oportunidad de mercado', buildMarketOpportunitySection),
+      await optionalSection('comparables', 'Comparables', buildPeersSection),
+      await optionalSection('foso', 'Foso', buildMoatSection),
+    ];
+  } else if (activeView === 'changes') {
+    sections = [
+      { id: 'cambios', title: 'Cambios y revisiones', node: await buildChangesContent() },
+      await optionalSection('superinversores', 'Superinversores', buildHoldersSection),
+      await optionalSection('directiva', 'Credibilidad de la directiva', buildDirectivaSection),
+      await optionalSection('lecciones', 'Lecciones de decisiones', buildLeccionesSection),
+      ...(ticker === 'ASTS' ? [await optionalSection('satellites', 'Satélites AST', buildSatellitesSection)] : []),
+    ];
+  } else {
+    sections = [
+      { id: 'documentos', title: 'Documentos', node: await buildDocumentsContent() },
+      await optionalSection('fuentes', 'Fuentes', buildSourcesSection),
+      { id: 'chat', title: 'Chat con fuentes', node: await buildChatSection() },
+    ];
   }
 
   const recentChangeCount = snapshot.recent_changes?.length ?? 0;
@@ -1795,10 +1986,30 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
-          <MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse>
+          <div className="scroll-mt-6" id="analistas"><MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
           <MobileCollapse title="Señales DCA: histórico"><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
-        {content}
+        {sections.filter((section) => section.id && section.title).length > 1 ? (
+          // Sumario local de la pestaña (anclas dentro de la página): nunca
+          // otra barra global de menús.
+          <nav aria-label="En esta página" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            {sections.filter((section) => section.id && section.title).map((section) => (
+              <a className="inline-flex min-h-[44px] items-center text-gray-500 hover:text-teal-300 sm:min-h-0" href={`#${section.id}`} key={section.id}>
+                {section.title}
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        <div className="space-y-10">
+          {sections.map((section, index) => (section.id ? (
+            <section aria-label={section.title} className="scroll-mt-24 space-y-5" id={section.id} key={section.id}>
+              {section.title ? <h2 className="text-lg font-semibold text-gray-100">{section.title}</h2> : null}
+              {section.node}
+            </section>
+          ) : (
+            <div key={`principal-${index}`}>{section.node}</div>
+          )))}
+        </div>
       </div>
     </main>
   );

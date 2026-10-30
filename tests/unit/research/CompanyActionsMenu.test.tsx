@@ -12,18 +12,20 @@ describe('Company secondary actions navigation', () => {
         const nav = await screen.findByRole('navigation', { name: 'Enlaces de la empresa' });
         expect(trigger).toHaveAttribute('aria-expanded', 'true');
         const links = [
-            [changeCount ? 'Qué ha cambiado (3)' : 'Qué ha cambiado', '/research/A%2FB%20%26%20C?view=changes'],
-            ['Terminal financiero', '/research/A%2FB%20%26%20C/financial-terminal'],
-            ['Supuestos de drivers', '/research/A%2FB%20%26%20C/driver-assumptions'],
-            ['Lecciones de decisiones', '/research/A%2FB%20%26%20C/decision-lessons'],
-            ['Credibilidad de la directiva', '/research/A%2FB%20%26%20C/management-credibility'],
+            [changeCount ? 'Qué ha cambiado (3)' : 'Qué ha cambiado', '/research/A%2FB%20%26%20C?view=seguimiento'],
+            ['Diario de decisiones', '/research/A%2FB%20%26%20C?view=seguimiento#diario-decisiones'],
+            ['Terminal financiero', '/research/A%2FB%20%26%20C?view=finanzas#terminal'],
+            ['Supuestos de drivers', '/research/A%2FB%20%26%20C?view=valoracion#supuestos'],
+            ['Lecciones de decisiones', '/research/A%2FB%20%26%20C?view=seguimiento#lecciones'],
+            ['Credibilidad de la directiva', '/research/A%2FB%20%26%20C?view=seguimiento#directiva'],
+            ['Dilución y recompras', '/research/A%2FB%20%26%20C?view=finanzas#dilucion'],
             ['Cortos públicos', '/research/A%2FB%20%26%20C/shorts'],
             ['Noticias', '/research/news?ticker=A%2FB%20%26%20C'],
             ['Insiders', '/insider?ticker=A%2FB%20%26%20C'],
             ['Dividendos y splits', '/corporate-actions?ticker=A%2FB%20%26%20C'],
         ];
         for (const [name, href] of links) expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', href);
-        expect(within(nav).getAllByRole('link')).toHaveLength(9);
+        expect(within(nav).getAllByRole('link')).toHaveLength(11);
         expect(within(nav).getByRole('button', { name: 'Guía de investigación' })).toBeVisible();
         fireEvent.keyDown(nav, { key: 'Escape' });
         expect(screen.queryByRole('navigation')).not.toBeInTheDocument();

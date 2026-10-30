@@ -15,7 +15,7 @@ export default function LegacyChatRedirect({ ticker, question }: { ticker: strin
     const text = question?.trim();
     if (!text) return;
     openBrain({ ticker, question: text.slice(0, 2000) });
-    router.replace(`${pathname}?view=chat`, { scroll: false });
+    router.replace(`${pathname}?view=fuentes#chat`, { scroll: false });
   }, [ticker, question, pathname, router]);
   return null;
 }

@@ -105,19 +105,24 @@ test.describe("company research workspace", () => {
     await expect(quote.getByText('Más detalle', { exact: true })).toHaveCount(0);
     await expect(quote.getByText(/Sesión regular del/)).toHaveCount(0);
     // Vista general compacta: la cabecera de tesis resume el estado; el
-    // modelo vive en su modulo (pestaña Números).
+    // modelo vive en su seccion (pestaña Valoración, ancla #modelo).
     await expect(page.getByRole("heading", { name: "Última tesis" })).toBeVisible();
 
-    // El modelo vive en el desplegable «Análisis avanzado» (IA nueva de la
-    // ficha: Resumen / Finanzas / Fuentes + avanzado).
-    await page.locator('summary', { hasText: "Análisis avanzado" }).click();
-    await page.getByRole("navigation", { name: "Análisis avanzado" }).getByRole("link", { name: "Modelo a largo plazo", exact: true }).click();
-    await expect(page).toHaveURL(/view=model/);
-    await expect(page.getByRole("heading", { name: "Modelo fundamental a largo plazo" })).toBeVisible();
+    // El modelo vive en la pestaña «Valoración» de la fila de seis pestañas,
+    // como sección con ancla #modelo (el cajón «Análisis avanzado» ya no
+    // existe: una fila de pestañas, no tres menús).
+    const tabs = page.getByTestId("company-navigation");
+    await tabs.getByRole("link", { name: "Valoración", exact: true }).click();
+    await expect(page).toHaveURL(/view=valoracion/);
+    // El sumario local «En esta página» lleva a la sección del modelo.
+    await page.getByRole("navigation", { name: "En esta página" }).getByRole("link", { name: "Modelo a largo plazo", exact: true }).click();
+    const modelo = page.locator("#modelo");
+    await expect(modelo).toBeVisible();
+    await expect(modelo.getByRole("heading", { name: "Modelo fundamental a largo plazo" })).toBeVisible();
 
-    // Con el modelo activo el desplegable avanzado ya queda abierto.
-    await page.getByRole("navigation", { name: "Análisis avanzado" }).getByRole("link", { name: "Cambios y revisiones", exact: true }).click();
-    await expect(page).toHaveURL(/view=changes/);
+    // Lo que antes era view=changes es ahora la pestaña «Seguimiento».
+    await tabs.getByRole("link", { name: "Seguimiento", exact: true }).click();
+    await expect(page).toHaveURL(/view=seguimiento/);
     await expect(page.getByRole("heading", { name: "Diario de decisiones" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Expectativa vs realidad" })).toBeVisible();
     await page.screenshot({ path: "test-results/gerarai-company-workspace.png", fullPage: true });

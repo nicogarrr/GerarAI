@@ -113,8 +113,10 @@ const TABLE_ROUTES = [
   { path: "/screener", heading: "Explorar acciones" },
   { path: "/research/news", heading: "Eventos de noticias" },
   { path: "/research/sources", heading: "Fuentes" },
-  { path: "/research/AAPL/financial-terminal", heading: "Terminal financiero" },
-  { path: "/research/AAPL/driver-assumptions", heading: "Supuestos de drivers" },
+  // Desde la fila de seis pestañas (29-oct-2026) estas URLs redirigen a su
+  // sección dentro de la ficha (Finanzas#terminal, Valoración#supuestos).
+  { path: "/research/AAPL/financial-terminal", heading: "AAPL" },
+  { path: "/research/AAPL/driver-assumptions", heading: "AAPL" },
   { path: "/portfolio/intelligence", heading: "Inteligencia de cartera" },
 ];
 

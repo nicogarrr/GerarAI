@@ -58,26 +58,29 @@ async function medirSalto(
   if (despues.max > 0) expect(despues.y).toBeGreaterThan(0);
 }
 
-test("ficha: las pestañas de módulo conservan la posición de scroll (desktop)", async ({ page }) => {
+test("ficha: las pestañas conservan la posición de scroll (desktop)", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/research/MSFT");
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
+  // Una sola fila de seis pestañas (29-oct-2026): ya no hay fila de módulos.
   await medirSalto(
     page,
-    page.getByRole("navigation", { name: /Módulos de/ }).getByRole("link", { name: "Tesis", exact: true }),
-    /\/research\/MSFT\?view=thesis/,
+    page.getByRole("navigation", { name: "Secciones de la empresa", exact: true }).getByRole("link", { name: "Tesis", exact: true }),
+    /\/research\/MSFT\?view=tesis/,
     page.getByTestId("company-header-quote"),
   );
 });
 
-test("ficha: los 3 pasos conservan la posición de scroll (móvil)", async ({ page }) => {
+test("ficha: las pestañas conservan la posición de scroll (móvil)", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/research/MSFT?view=moat");
+  // Pestaña canónica sin ancla: `?view=moat` es ahora una sección de
+  // Valoración (#foso) y el salto al ancla falseaba la posición de partida.
+  await page.goto("/research/MSFT?view=valoracion");
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
   await medirSalto(
     page,
     page.getByRole("navigation", { name: "Secciones de la empresa", exact: true }).getByRole("link", { name: "Finanzas", exact: true }),
-    /\/research\/MSFT\?view=financials/,
+    /\/research\/MSFT\?view=finanzas/,
     page.getByTestId("company-header-quote"),
   );
 });

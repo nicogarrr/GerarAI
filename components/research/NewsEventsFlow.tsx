@@ -26,12 +26,14 @@ function carrilHref(lane: NewsLane, ticker?: string | null): string {
   return text ? `/research/news?${text}` : '/research/news';
 }
 
-/** Paginación dentro de la ficha de empresa (?view=noticias&pagina=N): el
- *  usuario no sale del contexto de la acción. */
+/** Paginación dentro de la ficha de empresa: las noticias son una sección
+ *  del Resumen (/research/T?pagina=N#noticias); el usuario no sale del
+ *  contexto de la acción. */
 function fichaNewsPageHref(ticker: string, page: number): string {
-  const query = new URLSearchParams({ view: 'noticias' });
+  const query = new URLSearchParams();
   if (page > 1) query.set('pagina', String(page));
-  return `/research/${encodeURIComponent(ticker)}?${query.toString()}`;
+  const text = query.toString();
+  return `/research/${encodeURIComponent(ticker)}${text ? `?${text}` : ''}#noticias`;
 }
 
 const PAGER_LINK = 'inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-700 bg-black/30 px-4 py-2 text-sm font-medium text-gray-200 hover:border-teal-600 hover:text-teal-200';
