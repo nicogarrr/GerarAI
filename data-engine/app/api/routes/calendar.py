@@ -33,9 +33,17 @@ async def _empty_connector() -> dict:
     return {"status": "ok", "events": [], "errors": []}
 
 
+def _plus_days(start: date, days: int) -> date:
+    """``start + days`` o 400: ``desde=9999-12-31`` desbordaba ``date`` (500)."""
+    try:
+        return start + timedelta(days=days)
+    except OverflowError:
+        raise HTTPException(status_code=400, detail="fecha fuera de rango") from None
+
+
 def _resolve_range(desde: date | None, hasta: date | None) -> tuple[date, date]:
     start = desde or _madrid_today()
-    end = hasta or (start + timedelta(days=7))
+    end = hasta or _plus_days(start, 7)
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
     if (end - start).days + 1 > calendar_connector.MAX_DAYS_PER_REQUEST:
@@ -91,7 +99,7 @@ def followed_earnings_calendar(
     from app.services.earnings_dates_service import followed_calendar
 
     start = desde or _madrid_today()
-    end = hasta or (start + timedelta(days=60))
+    end = hasta or _plus_days(start, 60)
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
     if (end - start).days > 366:
@@ -141,7 +149,7 @@ async def catalysts_calendar(
     mostrando; nunca devuelve 5xx por un fallo del proveedor.
     """
     start = desde or _madrid_today()
-    end = hasta or (start + timedelta(days=14))
+    end = hasta or _plus_days(start, 14)
     start, end = _resolve_range(start, end)
     # held_tickers y pending_actions son sqlalchemy sincrono: hilo del pool.
     held, held_us = await run_in_threadpool(catalyst_service.held_tickers, db)
