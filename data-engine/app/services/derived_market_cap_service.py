@@ -55,6 +55,7 @@ from app.services.split_adjustment import (
     period_end_date,
     split_events_by_company,
 )
+from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 
 MAX_PRICE_AGE = timedelta(days=7)
 DERIVED_SOURCE = "derived"
@@ -223,6 +224,19 @@ def refresh_derived_market_cap(
     if close is None:
         _drop_derived()
         return {"status": "unavailable", "reason": "no_fx_for_quote_currency"}
+    # Un ADR cotiza por ADR (N ordinarias) y las acciones del filing son
+    # ORDINARIAS: precio x acciones salia N veces inflado (BABA 8:1, un cap
+    # de billones). Precio por ordinaria = cierre del ADR / N. Ficha marcada
+    # ADR sin ratio valido: N/D, nunca un cap con la base equivocada.
+    ratio = adr_ratio(company)
+    if ratio is None and any(
+        str(tag).strip().lower() == "adr" or str(tag).strip().lower().startswith(ADR_TAG_PREFIX)
+        for tag in (company.factor_tags or [])
+    ):
+        _drop_derived()
+        return {"status": "unavailable", "reason": "adr_ratio_unknown"}
+    if ratio:
+        close = close / Decimal(str(ratio))
     # La columna es Numeric(24,6): sin cuantizar a 6 decimales lo calculado
     # (una division larga) nunca iguala lo almacenado y cada GET reescribe
     # (medido con AENA: dos refrescos seguidos devolvian ok, no skipped).
@@ -282,5 +296,6 @@ def refresh_derived_market_cap(
         "quote_currency": price.quote_currency,
         "shares_basis": basis,
         "split_factor": float(split_factor),
+        "adr_ratio": ratio,
         "currency": str(getattr(company, "currency", "") or "USD"),
     }
