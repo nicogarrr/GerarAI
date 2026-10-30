@@ -38,7 +38,7 @@ export default function DcaAlertsForm({ initial }: { initial: DcaAlertSettings }
                 </select>
             </label>
         </div>
-        <p className="text-xs text-gray-400">Se usa el nivel nuevo: con 3X al subir y 1X al bajar, avisa en 2X → 3X y 2X → 1X. No avisa en 1X → 2X ni 3X → 2X. También avisa en 3X → 4X, pero no en 4X → 3X. Sin aviso en la primera evaluación ni si el nivel no cambia.</p>
+        <p className="text-xs text-gray-400">Te avisamos solo cuando el nivel cambia y cruza tu umbral en la dirección elegida: al subir, si el nivel nuevo llega a tu umbral de subida o lo supera; al bajar, si cae a tu umbral de bajada o por debajo. Sin aviso en la primera evaluación ni si el nivel no cambia.</p>
         <p className="text-xs text-gray-400">Los recortes tienen su propio control en el servidor y no se modifican aquí. Los ajustes antiguos por empresa ({saved.legacy_override_count}) se conservan, pero no se aplican.</p>
         <button type="submit" disabled={saving} aria-busy={saving} className="min-h-11 rounded border border-teal-600 px-4 text-sm text-teal-300 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar avisos DCA'}</button>
         {message ? <p role="status" className="text-sm text-teal-300">{message}</p> : null}

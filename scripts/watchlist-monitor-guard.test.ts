@@ -29,7 +29,7 @@ test('el recuento sobre/infravaloradas usa el valor justo ÚNICO con su proceden
     assert.match(route, /resolve_fair_values\(db, companies\)/);
     assert.match(route, /"fair_value_source": reading\["source"\]/);
     assert.match(page, /Según el valor justo \(\{fairValueSourceNote\}\)/);
-    assert.match(page, /por tesis publicada de K/);
+    assert.match(page, /por tesis publicada`/);
 });
 
 test('inicio y screener leen el mismo valor justo único, con etiqueta', () => {
