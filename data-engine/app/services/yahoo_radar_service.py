@@ -39,6 +39,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.valuation.currency import normalize_currency
+
 from app.models import Company
 
 YAHOO_SCREENER_URL = "https://query1.finance.yahoo.com/v1/finance/screener"
@@ -143,12 +145,20 @@ def parse_screener_quotes(payload: dict[str, Any]) -> list[RadarCandidate]:
         # es fraccion (0.081 = 8,1%) y "dividendYield" es porcentaje (8.1). El
         # 0 es ambiguo en Yahoo (valor real o ausencia: en HK devuelve 0 aun
         # pasando el filtro de yield), asi que 0/ausente -> N/D, nunca 0,0%.
-        yld = _raw_number(quote.get("trailingAnnualDividendYield"))
-        if yld is None or yld == 0:
-            pct = _raw_number(quote.get("dividendYield"))
-            yld = (pct / Decimal(100)) if pct is not None and pct > 0 else None
+        #
+        # Manda "dividendYield": es el campo que filtra el propio screener y
+        # sale bien en todas las divisas. "trailingAnnualDividendYield" divide
+        # el dividendo en la divisa principal entre un precio en subunidad
+        # (verificado 30-oct: TSCO.L 538 GBp, dividendo 0.148 GBP ->
+        # 0.000279 = 0,03 % en vez de 2,78 %; SHEL.L 0,04 % en vez de 2,9 %).
+        # Solo se usa como respaldo si la cotizacion NO va en subunidad.
         exchange = quote.get("fullExchangeName") or quote.get("exchange")
         currency = quote.get("currency")
+        pct = _raw_number(quote.get("dividendYield"))
+        yld = (pct / Decimal(100)) if pct is not None and pct > 0 else None
+        if yld is None and normalize_currency(str(currency or ""))[1] == 1:
+            trailing = _raw_number(quote.get("trailingAnnualDividendYield"))
+            yld = trailing if trailing is not None and trailing > 0 else None
         out.append(
             RadarCandidate(
                 symbol=symbol,
