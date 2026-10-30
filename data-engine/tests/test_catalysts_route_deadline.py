@@ -21,6 +21,7 @@ def test_catalysts_route_is_bounded_by_range_deadline_when_edgar_hangs(engine, d
     # La cache por dia del conector es estado de proceso: limpia antes y despues
     # para no heredar ni contaminar los dias de test_catalyst_calendar.
     connector._day_cache.clear()
+    connector._day_failures.clear()  # noqa: SLF001
     svc._FAILED_UNTIL.clear()
     _company(db, "LOOP", 10)
 
@@ -47,6 +48,7 @@ def test_catalysts_route_is_bounded_by_range_deadline_when_edgar_hangs(engine, d
         main.app.dependency_overrides.clear()
         svc._FAILED_UNTIL.clear()
         connector._day_cache.clear()
+        connector._day_failures.clear()  # noqa: SLF001
     assert res.status_code == 200
     # EDGAR dormia 3 s; con el deadline del rango (0,4 s) la ruta no lo espera.
     assert elapsed < 1.5, f"catalysts tardo {elapsed:.2f}s"
