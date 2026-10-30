@@ -2,9 +2,10 @@ import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.core.units import is_from_percent, to_fraction
 from app.models import CalculatedMetric, Company, FinancialFact
 from app.services.moat_profile import NONCOMPARABLE_PROFILES, PROFILE_LABELS, financial_quality_profile
@@ -302,6 +303,27 @@ def _capital_scale_conflict(equity_fact: FinancialFact, debt_fact: FinancialFact
 
 # Clave de db.info para la cache de hechos de calculate_all (ver alli).
 _FACTS_CACHE_KEY = "metric_calculation_facts_cache"
+# Hechos que lee _facts_for_metric por metrica (tope y orden comunes al
+# camino de una metrica y a la precarga de calculate_all).
+_FACTS_PER_METRIC = 20
+
+
+# Orden de los hechos de una metrica: ejercicio mas reciente, luego el
+# ultimo guardado; el id desempata para que el resultado sea determinista.
+_FACT_ORDER = (
+    FinancialFact.fiscal_year.desc().nullslast(),
+    desc(FinancialFact.created_at),
+    FinancialFact.id.asc(),
+)
+# Insumos de todas las formulas + alias que leen el tipo fiscal y el WACC.
+_PREFETCH_METRICS = frozenset(
+    {name for _, _, inputs, _ in METRIC_DEFINITIONS.values() for name in inputs}
+    | {
+        "cost_of_debt", "country_risk_premium", "effective_tax_rate", "tax_rate",
+        "income_before_tax", "pretax_income", "income_before_taxes", "income_tax_expense",
+        "tax_expense", "market_cap", "market_capitalization",
+    }
+)
 
 
 class MetricCalculationService:
@@ -314,6 +336,7 @@ class MetricCalculationService:
         owns_cache = _FACTS_CACHE_KEY not in db.info
         if owns_cache:
             db.info[_FACTS_CACHE_KEY] = {}
+            self._prefetch_facts(db, company, db.info[_FACTS_CACHE_KEY])
         try:
             results = [self.calculate(db, company, metric, persist=persist) for metric in METRIC_DEFINITIONS]
         finally:
@@ -558,14 +581,50 @@ class MetricCalculationService:
             db.scalars(
                 select(FinancialFact)
                 .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
-                .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
-                .limit(20)
+                .order_by(*_FACT_ORDER)
+                .limit(_FACTS_PER_METRIC)
             ).all()
         )
         if cache is not None:
             cache[key] = facts
             return list(facts)
         return facts
+
+    def _prefetch_facts(
+        self, db: Session, company: Company, cache: dict[tuple[int, str], list[FinancialFact]]
+    ) -> None:
+        """Una consulta para los insumos de TODAS las metricas de la empresa.
+
+        Antes cada insumo era su propia consulta (~19-26 por empresa; la
+        comparativa de comparables lanzaba 172 para 9 empresas). Mismo tope
+        y orden que ``_facts_for_metric``; un insumo sin hechos queda en
+        cache como lista vacia para no volver a consultarlo.
+        """
+        metrics = sorted(_PREFETCH_METRICS)
+        ranked = (
+            select(
+                FinancialFact.id,
+                func.row_number()
+                .over(partition_by=FinancialFact.metric, order_by=_FACT_ORDER)
+                .label("rn"),
+            )
+            .where(
+                FinancialFact.company_id == company.id,
+                FinancialFact.metric.in_(metrics),
+                *tenant_filters(db, FinancialFact),
+            )
+            .subquery()
+        )
+        grouped: dict[str, list[FinancialFact]] = {metric: [] for metric in metrics}
+        rows = db.execute(
+            select(FinancialFact, ranked.c.rn)
+            .join(ranked, FinancialFact.id == ranked.c.id)
+            .where(ranked.c.rn <= _FACTS_PER_METRIC)
+        ).all()
+        for fact, rn in sorted(rows, key=lambda row: (row[0].metric, row[1])):
+            grouped[fact.metric].append(fact)
+        for metric, facts in grouped.items():
+            cache[(company.id, metric)] = facts
 
     def _match_fact(self, db: Session, company: Company, metric: str, anchor: FinancialFact) -> FinancialFact | None:
         candidates = self._facts_for_metric(db, company, metric)
