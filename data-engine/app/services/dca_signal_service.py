@@ -37,10 +37,12 @@ Sin historia suficiente el ticker se omite con motivo: nunca se inventa.
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
+from time import monotonic as _monotonic
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -117,14 +119,18 @@ def fetch_yahoo_history(symbol: str, *, period: str = "max") -> FetchedHistory:
     ticker = yf.Ticker(symbol)
     hist = ticker.history(period=period, auto_adjust=False)
     rows: list[PriceRow] = []
-    for idx, row in hist.iterrows():
+    # Columnas en bloque, no ``iterrows`` (que crea una Series por fila: ~0,3 s
+    # para los ~11.000 dias de un historico "max"). Mismo filtrado fila a fila.
+    n = len(hist)
+    closes = hist["Close"].tolist() if "Close" in hist else [None] * n
+    adjs = hist["Adj Close"].tolist() if "Adj Close" in hist else [None] * n
+    for idx, close_raw, adj_raw in zip(hist.index, closes, adjs, strict=True):
         try:
-            close = float(row.get("Close"))
+            close = float(close_raw)
         except (TypeError, ValueError):
             continue
         if not math.isfinite(close) or close <= 0:
             continue
-        adj_raw = row.get("Adj Close")
         try:
             adj = float(adj_raw) if adj_raw is not None else None
         except (TypeError, ValueError):
@@ -139,6 +145,36 @@ def fetch_yahoo_history(symbol: str, *, period: str = "max") -> FetchedHistory:
     except Exception:  # noqa: BLE001 - la divisa es informativa
         currency = None
     return FetchedHistory(rows=rows, currency=currency)
+
+
+# Cache corta de proceso para la vista (backtest): cada apertura descargaba el
+# historico "max" entero de Yahoo. Datos publicos, iguales para todos los
+# usuarios. El job diario de senales no la usa (lee siempre fresco).
+_HISTORY_TTL_S = 600.0
+_HISTORY_MAX_ENTRIES = 64
+_history_lock = threading.Lock()
+_history_cache: dict[str, tuple[float, object, FetchedHistory]] = {}
+
+
+def fetch_yahoo_history_cached(symbol: str) -> FetchedHistory:
+    """``fetch_yahoo_history`` (historico "max") con cache de 10 min por simbolo.
+
+    Un fallo no se cachea. La entrada guarda la funcion que la produjo para
+    que un doble de test nunca reciba datos de otro.
+    """
+    key = symbol.strip().upper()
+    fetcher = fetch_yahoo_history
+    now = _monotonic()
+    with _history_lock:
+        hit = _history_cache.get(key)
+        if hit is not None and hit[1] is fetcher and now - hit[0] < _HISTORY_TTL_S:
+            return hit[2]
+    fetched = fetcher(symbol)
+    with _history_lock:
+        if len(_history_cache) >= _HISTORY_MAX_ENTRIES:
+            _history_cache.pop(min(_history_cache, key=lambda k: _history_cache[k][0]), None)
+        _history_cache[key] = (_monotonic(), fetcher, fetched)
+    return fetched
 
 
 def tracked_symbols(db: Session) -> dict[str, TrackedSymbol]:
