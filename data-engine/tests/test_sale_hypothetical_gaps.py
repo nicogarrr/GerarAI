@@ -153,19 +153,34 @@ def test_sin_precio_usa_la_ultima_cotizacion_real_y_no_la_semilla(db):
     assert sale.gain_eur == D("200")
 
 
-def test_lote_en_dolares_sin_fecha_pide_la_fecha_no_usa_el_tipo_de_hoy(db):
+def test_lote_en_dolares_sin_fecha_se_calcula_al_cambio_de_hoy(db):
+    """DGT V0152-26 (criterion of the tax report): the gain in the share's
+    currency is converted at the SALE-date rate, so an undated lot sold in its
+    own currency does not need a purchase-date rate: 500 $ × 0,9 = 450 €.
+    The FIFO order of undated lots is still disclosed (``undated``)."""
     _fx(db, TODAY, "0.9")
     lots = [HypoLot(quantity=D("10"), price=D("100"), currency="USD", trade_date=None)]
     sale = simulate_hypothetical_sale(db, lots=lots, question="si vendo a 150 $", company=None, today=TODAY)
-    assert sale.tax_eur is None and sale.gain_eur is None
-    assert any("fecha de compra" in item for item in sale.missing)
-    # La ganancia en la divisa del lote sí es un hecho y se da.
+    assert sale.missing == []
+    assert sale.undated is True
     assert sale.native_gain == D("500")
+    assert sale.gain_eur == D("450")
 
 
-def test_sin_tipo_de_cambio_de_la_compra_no_hay_cuota(db):
+def test_sin_tipo_de_cambio_de_la_compra_basta_el_de_la_venta(db):
+    """DGT V0152-26: only the sale-date rate is needed (1.000 $ cost × 0,9)."""
     _fx(db, TODAY, "0.9")
     lots = [HypoLot(quantity=D("10"), price=D("100"), currency="USD", trade_date=date(2020, 1, 2))]
+    sale = simulate_hypothetical_sale(db, lots=lots, question="si vendo a 150 $", company=None, today=TODAY)
+    assert sale.missing == []
+    assert sale.cost_eur == D("900")
+    assert sale.gain_eur == D("450")
+
+
+def test_lote_en_otra_divisa_sin_su_tipo_de_compra_no_hay_cuota(db):
+    """A lot in a currency other than the sale's keeps its purchase-date rate."""
+    _fx(db, TODAY, "0.9")
+    lots = [HypoLot(quantity=D("10"), price=D("100"), currency="GBP", trade_date=date(2020, 1, 2))]
     sale = simulate_hypothetical_sale(db, lots=lots, question="si vendo a 150 $", company=None, today=TODAY)
     assert sale.missing == ["el tipo de cambio de la fecha de compra"]
     assert sale.tax_eur is None
@@ -185,9 +200,10 @@ def test_lote_en_dolares_con_tipos_de_ambos_dias_calcula_en_euros(db):
     lots = [HypoLot(quantity=D("10"), price=D("100"), currency="USD", trade_date=date(2024, 1, 2))]
     sale = simulate_hypothetical_sale(db, lots=lots, question="si vendo a 150 $", company=None, today=TODAY)
     assert sale.missing == []
-    assert sale.cost_eur == D("920")
+    # DGT V0152-26: coste 1.000 $ al cambio de la venta (0,90), no al de compra (0,92).
+    assert sale.cost_eur == D("900")
     assert sale.value_eur == D("1350")
-    assert sale.gain_eur == D("430")
+    assert sale.gain_eur == D("450")
     assert sale.tax_eur is not None
 
 
