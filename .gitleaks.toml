@@ -15,3 +15,43 @@ regexes = [
   # Placeholder de .env.production.example (se sustituye en el despliegue).
   'GKgenera-GK-mas-24-hex',
 ]
+
+# Reglas propias para lo que las reglas por defecto no vieron en el historial
+# (docs/ROTACION_CLAVES.md): la contrasena de Atlas iba en una URI y el secreto
+# de Better Auth en una asignacion sin prefijo de proveedor.
+[[rules]]
+id = "mongodb-uri-with-password"
+description = "URI de MongoDB con usuario y contrasena embebidos"
+regex = '''mongodb(?:\+srv)?://[^:\s/@'"]+:([^@\s'"]{6,})@[^\s'"]+'''
+secretGroup = 1
+keywords = ["mongodb://", "mongodb+srv://"]
+
+[[rules.allowlists]]
+description = "Marcadores de documentacion y variables sin resolver"
+regexTarget = "secret"
+regexes = [
+  '''(?i)^(password|contrase(n|ñ)a|passw0rd|changeme|cambiame|secret|example)$''',
+  '''(?i)(<|>|\$\{|\{\{|xxx|tu_|your|cambia|genera|placeholder)''',
+]
+
+[[rules.allowlists]]
+description = "Servicios locales de desarrollo, CI y tests"
+regexTarget = "match"
+regexes = [
+  '''@(localhost|127\.0\.0\.1|mongo|mongodb|db)(:\d+)?([/?'"\s]|$)''',
+]
+
+[[rules]]
+id = "better-auth-secret-assignment"
+description = "BETTER_AUTH_SECRET con un valor que no es un marcador"
+regex = '''(?i)\bBETTER_AUTH_SECRET\s*[:=]\s*["']?([A-Za-z0-9+/=_\-]{32,})'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["better_auth_secret"]
+
+[[rules.allowlists]]
+description = "Secretos de CI/tests y marcadores con palabras"
+regexTarget = "secret"
+regexes = [
+  '''(?i)(test|local|dev|ci-|ci_|-ci|e2e|example|sample|placeholder|change|cambia|genera|your|tu-|secret|dummy|fake|only)''',
+]
