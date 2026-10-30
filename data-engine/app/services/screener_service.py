@@ -716,14 +716,18 @@ class ScreenerService:
         by_metric: dict[str, list[FinancialFact]] = {}
         for fact in facts:
             by_metric.setdefault(fact.metric, []).append(fact)
+        for metric_name, series in by_metric.items():
             # DEDUP RULE: facts arrive ordered (fiscal_year DESC NULLS LAST,
-            # id DESC), so `setdefault` keeps the newest fiscal year and, within
-            # a year, the newest ingested row. `_cagr` applies the SAME rule
-            # (see `_newest_per_year`); the two must never diverge or a
-            # restated issuer is screened on the new value with a CAGR derived
-            # from the old one.
+            # id DESC): the newest fiscal year and, within a year, the newest
+            # ingested row. Like `_cagr` (see `_newest_per_year`) an ANNUAL row
+            # wins: a Q3 ingested after the FY is not the year's value, and a
+            # criterion such as ``free_cash_flow > X`` or a custom formula mixing
+            # metrics must not compare a quarter against annual figures. Only a
+            # metric with no annual row at all falls back to the newest row.
+            annual = ScreenerService._newest_per_year(series, annual_only=True)
+            fact = annual[max(annual)] if annual else series[0]
             result.setdefault(
-                fact.metric,
+                metric_name,
                 Observation(
                     fact.value,
                     fact.confidence,
