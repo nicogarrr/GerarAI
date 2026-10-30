@@ -342,20 +342,29 @@ class EarningsWorkflowService:
             .order_by(desc(Document.published_at))
             .limit(20)
         ).all()
-        period_markers = {
-            str(fiscal_year).lower(),
-            fiscal_quarter.lower(),
-            f"{fiscal_year} {fiscal_quarter}".lower(),
-        }
-        matched = [
-            document
-            for document in candidates
-            if any(
-                marker in f"{document.title} {document.metadata_}".lower()
-                for marker in period_markers
+        # Automatic selection must establish the whole requested period. A
+        # matching year OR quarter includes other quarters/years and stages
+        # their figures as if they belonged to the requested earnings run.
+        matched = []
+        for document in candidates:
+            metadata = document.metadata_ or {}
+            year = metadata.get("fiscal_year")
+            quarter = metadata.get("fiscal_quarter")
+            title = document.title or ""
+            year_matches = (
+                str(year) == str(fiscal_year) if year is not None
+                else bool(re.search(rf"\b{re.escape(str(fiscal_year))}\b", title, re.IGNORECASE))
             )
-        ]
-        return matched or list(candidates[:4])
+            quarter_matches = (
+                str(quarter).upper() == fiscal_quarter.upper() if quarter is not None
+                else bool(re.search(rf"\b{re.escape(fiscal_quarter)}\b", title, re.IGNORECASE))
+            )
+            matches = year_matches and quarter_matches
+            if matches:
+                matched.append(document)
+        if not matched:
+            raise ValueError("No earnings documents confirmed for the requested fiscal period")
+        return matched
 
     def _document_text(
         self, db: Session, documents: list[Document]
