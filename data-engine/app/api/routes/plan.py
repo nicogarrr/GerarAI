@@ -27,6 +27,16 @@ class PlanTarget(BaseModel):
     target_pct: float = Field(ge=0, le=100)
     band_pct: float = Field(default=5, ge=0, le=50)
 
+    @model_validator(mode="after")
+    def _normalize_label(self) -> PlanTarget:
+        # «nvda» y «NVDA» son el mismo ticker: se guarda en mayusculas para que
+        # objetivos, desviacion, reparto y enlaces lo muestren igual.
+        label = self.label.strip()
+        if not label:
+            raise ValueError("La etiqueta del objetivo no puede estar vacía.")
+        self.label = label.upper() if self.kind == "ticker" else label
+        return self
+
 
 class PlanUpsertInput(BaseModel):
     monthly_contribution: float = Field(gt=0, le=1_000_000)
