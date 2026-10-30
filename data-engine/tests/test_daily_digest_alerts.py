@@ -279,3 +279,18 @@ def test_sampling_time_uses_madrid_winter_offset(db):
     alert = emit_digest_alert(db, digest, AS_OF)
     assert "2026-11-03 00:30 (hora de Madrid)" in alert.message
     assert " UTC)" not in alert.message
+
+
+def test_session_gap_is_named_with_missing_day_not_as_plain_missing_data(db):
+    # Un hueco de sesion (portfolio_moves #3277) no es "sin datos" ni 0: se
+    # nombra con la sesion que falta.
+    items = [
+        {"ticker": "ASTS", "status": "disponible", "price_change_pct": 1.0},
+        {"ticker": "SAN.MC", "status": "hueco de sesión", "previous_date": "2026-10-26",
+         "missing_sessions": ["2026-10-27"]},
+    ]
+    alert = emit_digest_alert(db, make_digest(db, items=items), AS_OF)
+    assert "Sin datos" not in alert.message
+    assert "SAN.MC (falta el cierre del 2026-10-27)" in alert.message
+    assert "hueco de sesión, no 0" in alert.message
+    assert alert.metadata_["coverage"] == "parcial"
