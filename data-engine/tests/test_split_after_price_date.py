@@ -21,6 +21,9 @@ from app.core.database import Base
 from app.models import Company, CorporateAction, FinancialFact, MarketPrice
 from app.services.long_term_model_service import LongTermModelService, _adjust_share_facts
 from app.services.valuation_service import ValuationService
+from app.valuation.engines.relative_multiples import _fundamentals
+from app.valuation.engines.standard_dcf import StandardDCFEngine
+from app.valuation.fact_reference import latest_facts, split_scaled_value
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
 
 SPLIT_DAY = date(2025, 6, 2)
@@ -47,6 +50,7 @@ def _db() -> tuple[Session, Company]:
             ("free_cash_flow", revenue * 0.10, "USD"),
             ("net_debt", 0.0, "USD"),
             ("shares_diluted", 100.0, "shares"),
+            ("eps_diluted", 1.5, "USD/shares"),
         ):
             db.add(FinancialFact(
                 company_id=company.id, metric=metric, value=Decimal(str(value)), unit=unit,
@@ -124,3 +128,39 @@ def test_adjust_share_facts_ignores_splits_after_the_cutoff():
     (scaled,) = _adjust_share_facts([fact], [split], cutoff=SPLIT_DAY)
     assert float(kept.value) == pytest.approx(100.0)
     assert float(scaled.value) == pytest.approx(400.0)
+
+
+def test_fact_reference_uses_the_price_date_as_split_cutoff():
+    """Motores DDM/FCFE, utilities, multiplos, SOTP y sectoriales leen por aqui."""
+    db, company = _db()
+    try:
+        _split(db, company)
+        stale = latest_facts(db, company.id, ["shares_diluted", "eps_diluted"], cutoff=PRE_SPLIT_CLOSE_DAY)
+        fresh = latest_facts(db, company.id, ["shares_diluted", "eps_diluted"], cutoff=SPLIT_DAY)
+        today = latest_facts(db, company.id, ["shares_diluted", "eps_diluted"])
+        row = db.query(FinancialFact).filter_by(metric="shares_diluted", fiscal_year=2024).one()
+        scaled_stale = split_scaled_value(db, company.id, row, cutoff=PRE_SPLIT_CLOSE_DAY)
+        own_stale = _fundamentals(db, company.id, cutoff=PRE_SPLIT_CLOSE_DAY)
+    finally:
+        db.close()
+    assert stale["shares_diluted"].value == pytest.approx(100.0)
+    assert stale["eps_diluted"].value == pytest.approx(1.5)
+    assert fresh["shares_diluted"].value == pytest.approx(400.0)
+    assert fresh["eps_diluted"].value == pytest.approx(0.375)
+    # Sin corte: hoy (comportamiento anterior para quien no pasa fecha).
+    assert today["shares_diluted"].value == pytest.approx(400.0)
+    assert scaled_stale == pytest.approx(100.0)
+    assert own_stale["shares_diluted"] == pytest.approx(100.0)
+
+
+def test_context_split_cutoff_is_the_price_date():
+    db, company = _db()
+    try:
+        context = StandardDCFEngine().build_context(
+            db, company, 20.0, None, price_as_of=PRE_SPLIT_CLOSE_DAY
+        )
+        replay = StandardDCFEngine().build_context(db, company, 20.0, date(2025, 3, 31))
+    finally:
+        db.close()
+    assert context.split_cutoff == PRE_SPLIT_CLOSE_DAY
+    assert replay.split_cutoff == date(2025, 3, 31)

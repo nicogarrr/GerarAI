@@ -86,6 +86,7 @@ from app.valuation.engines.base import (
     ValuationEngine,
     adr_ratio,
     apply_publication_blockers,
+    context_split_cutoff,
     default_terminal_growth,
     default_wacc,
     insufficient_result,
@@ -236,7 +237,10 @@ class RegulatedUtilityEngine(ValuationEngine):
             )
 
         raw = latest_facts(
-            context.db, company.id, sorted({alias for group in INPUT_ALIASES.values() for alias in group})
+            context.db,
+            company.id,
+            sorted({alias for group in INPUT_ALIASES.values() for alias in group}),
+            cutoff=context_split_cutoff(context),
         )
         rows = resolve_aliases(raw, INPUT_ALIASES)
 

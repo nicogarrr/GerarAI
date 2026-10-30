@@ -52,6 +52,7 @@ from app.valuation.engines.base import (
     ValuationContext,
     ValuationEngine,
     adr_ratio,
+    context_split_cutoff,
     insufficient_result,
     is_adr_without_ratio,
     margin_of_safety,
@@ -227,7 +228,9 @@ def _resolve_inputs(
         if sourced is not None and chosen is not None:
             # Acciones/por accion del ejercicio frente al precio de hoy: un split
             # posterior al cierre cambia la escala (misma regla que el DCF).
-            scaled = split_scaled_value(context.db, context.company.id, chosen)
+            scaled = split_scaled_value(
+                context.db, context.company.id, chosen, cutoff=context_split_cutoff(context)
+            )
             if scaled != sourced.value:
                 sourced = replace(sourced, value=scaled)
         values[key] = sourced

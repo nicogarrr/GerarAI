@@ -88,6 +88,7 @@ from app.valuation.engines.base import (
     ValuationEngine,
     adr_ratio,
     apply_publication_blockers,
+    context_split_cutoff,
     default_terminal_growth,
     default_wacc,
     insufficient_result,
@@ -521,7 +522,12 @@ class DividendDiscountEngine(_EquityMethodEngine):
         if refusal is not None:
             return refusal
 
-        raw = latest_facts(context.db, company.id, sorted({alias for group in DIVIDEND_ALIASES.values() for alias in group}))
+        raw = latest_facts(
+            context.db,
+            company.id,
+            sorted({alias for group in DIVIDEND_ALIASES.values() for alias in group}),
+            cutoff=context_split_cutoff(context),
+        )
         rows = resolve_aliases(raw, DIVIDEND_ALIASES)
 
         missing: list[str] = []
@@ -766,6 +772,7 @@ class FreeCashFlowToEquityEngine(_EquityMethodEngine):
             context.db,
             company.id,
             sorted({alias for group in FCFE_ALIASES.values() for alias in group} | {CASH_FLOW_WC_METRIC}),
+            cutoff=context_split_cutoff(context),
         )
         rows = resolve_aliases(raw, FCFE_ALIASES)
         wc_from_cash_flow = _cash_flow_wc_as_delta(raw, rows)

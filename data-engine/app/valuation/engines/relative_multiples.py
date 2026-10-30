@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -44,6 +45,7 @@ from app.valuation.engines.base import (
     adr_comparable_price,
     adr_ratio,
     apply_publication_blockers,
+    context_split_cutoff,
     insufficient_result,
     is_adr_without_ratio,
     margin_of_safety,
@@ -220,7 +222,14 @@ def _latest_price(db, company: Company) -> tuple[float | None, str | None]:
     return price, row.date.isoformat()
 
 
-def _fundamentals(db, company_id: int) -> dict[str, float]:
+def _iso_date(value: str | None) -> date | None:
+    try:
+        return date.fromisoformat((value or "")[:10])
+    except ValueError:
+        return None
+
+
+def _fundamentals(db, company_id: int, *, cutoff: date | None = None) -> dict[str, float]:
     """Latest usable fundamental per economic quantity, aliases resolved.
 
     One query per alias, then first-wins per canonical name. A company that
@@ -233,7 +242,7 @@ def _fundamentals(db, company_id: int) -> dict[str, float]:
         if canonical in resolved:
             continue
         for alias in aliases:
-            found = latest_facts(db, company_id, [alias]).get(alias)
+            found = latest_facts(db, company_id, [alias], cutoff=cutoff).get(alias)
             if found is not None:
                 resolved[canonical] = found.value
                 break
@@ -313,7 +322,7 @@ class RelativeMultiplesEngine(ValuationEngine):
                 extra_trace={"model_type": model_type, "engine": self.key},
             )
 
-        own_fundamentals = _fundamentals(context.db, company.id)
+        own_fundamentals = _fundamentals(context.db, company.id, cutoff=context_split_cutoff(context))
         shares = own_fundamentals.get("shares_diluted")
         if shares is None or shares <= 0:
             return _insufficient(
@@ -596,7 +605,9 @@ class RelativeMultiplesEngine(ValuationEngine):
             peer.id: _latest_price(context.db, peer) for peer in peers
         }
         fundamentals: dict[int, dict[str, float]] = {
-            peer.id: _fundamentals(context.db, peer.id) for peer in peers
+            # Cada par en la base de SU ultimo cierre (splits posteriores fuera).
+            peer.id: _fundamentals(context.db, peer.id, cutoff=_iso_date(prices[peer.id][1]))
+            for peer in peers
         }
         # The metric name embeds the ticker, so the lookup is keyed by the
         # generated name rather than by parsing it back: a peer ticker with an

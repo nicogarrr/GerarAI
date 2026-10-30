@@ -145,6 +145,13 @@ class ValuationContext:
     # Cutoff point-in-time (None = vigente). Los inputs con marca de tiempo
     # (WACC trazable) solo cuentan si existian a esa fecha.
     as_of: date | None = None
+    # Fecha del precio del modelo: los splits posteriores no cuentan al poner
+    # acciones y magnitudes por accion en la base del precio.
+    price_as_of: date | None = None
+
+    @property
+    def split_cutoff(self) -> date | None:
+        return self.price_as_of or self.as_of
 
 
 def insufficient_result(
@@ -235,7 +242,15 @@ class ValuationEngine(ABC):
             current_price=current_price,
             engine_key=self.key,
             as_of=as_of,
+            price_as_of=price_as_of,
         )
+
+
+def context_split_cutoff(context: Any) -> date | None:
+    """Fecha del precio (o del as_of) de un contexto; None = hoy.
+
+    Tolera contextos duck-typed (tests, llamadas directas a un motor)."""
+    return getattr(context, "price_as_of", None) or getattr(context, "as_of", None)
 
 
 def default_growth(company: Company) -> float:

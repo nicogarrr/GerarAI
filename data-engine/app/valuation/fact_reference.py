@@ -95,17 +95,28 @@ def _to_sourced(fact: FinancialFact) -> SourcedFact | None:
     )
 
 
-def latest_fact(db: Session, company_id: int, *metrics: str) -> SourcedFact | None:
+def latest_fact(
+    db: Session, company_id: int, *metrics: str, cutoff: date | None = None
+) -> SourcedFact | None:
     """Latest usable fact for any of ``metrics``, trying them in order."""
     for metric in metrics:
-        found = latest_facts(db, company_id, [metric]).get(metric)
+        found = latest_facts(db, company_id, [metric], cutoff=cutoff).get(metric)
         if found is not None:
             return found
     return None
 
 
-def latest_facts(db: Session, company_id: int, metrics: Sequence[str]) -> dict[str, SourcedFact]:
+def latest_facts(
+    db: Session,
+    company_id: int,
+    metrics: Sequence[str],
+    *,
+    cutoff: date | None = None,
+) -> dict[str, SourcedFact]:
     """Latest usable fact per metric, in one query per metric.
+
+    ``cutoff``: fecha del precio con el que se comparan acciones y magnitudes
+    por accion (splits posteriores a esa fecha no cuentan); None = hoy.
 
     A single grouped query would be cheaper, but "latest" here means
     ``fiscal_year`` then ``created_at`` and the caller may ask for the same
@@ -127,7 +138,7 @@ def latest_facts(db: Session, company_id: int, metrics: Sequence[str]) -> dict[s
             continue
         sourced = _to_sourced(row)
         if sourced is not None:
-            resolved[metric] = _split_adjusted(db, company_id, row, sourced)
+            resolved[metric] = _split_adjusted(db, company_id, row, sourced, cutoff=cutoff)
     return resolved
 
 
@@ -148,7 +159,14 @@ PER_SHARE_METRICS = frozenset(
 )
 
 
-def _split_adjusted(db: Session, company_id: int, row: FinancialFact, sourced: SourcedFact) -> SourcedFact:
+def _split_adjusted(
+    db: Session,
+    company_id: int,
+    row: FinancialFact,
+    sourced: SourcedFact,
+    *,
+    cutoff: date | None = None,
+) -> SourcedFact:
     """Pone acciones y magnitudes por accion en la base del precio de hoy.
 
     El precio de mercado ya refleja un split 4:1 posterior al ejercicio; el
@@ -156,27 +174,33 @@ def _split_adjusted(db: Session, company_id: int, row: FinancialFact, sourced: S
     (antes 100) daba PER 3 en vez de 12, y un DDM o un valor por accion x4.
     Misma regla que el snapshot del DCF (split_factor_for_fact).
     """
-    factor = post_split_factor(db, company_id, row)
+    factor = post_split_factor(db, company_id, row, cutoff=cutoff)
     if factor == 1.0:
         return sourced
     value = sourced.value * factor if sourced.metric in SHARE_COUNT_METRICS else sourced.value / factor
     return replace(sourced, value=value, split_factor=factor)
 
 
-def post_split_factor(db: Session, company_id: int, row: FinancialFact) -> float:
+def post_split_factor(
+    db: Session, company_id: int, row: FinancialFact, *, cutoff: date | None = None
+) -> float:
     """Factor de splits posteriores para un recuento de acciones o una magnitud
     por accion; 1.0 para cualquier otra metrica (importes totales no cambian)."""
     if row.metric not in SHARE_COUNT_METRICS and row.metric not in PER_SHARE_METRICS:
         return 1.0
     factor = float(
-        split_factor_for_fact(db, company_id, period=row.period, filed=row.filed, cutoff=date.today())
+        split_factor_for_fact(
+            db, company_id, period=row.period, filed=row.filed, cutoff=cutoff or date.today()
+        )
     )
     return factor if factor > 0 else 1.0
 
 
-def split_scaled_value(db: Session, company_id: int, row: FinancialFact) -> float:
-    """``row.value`` en la base del precio de hoy (ver ``_split_adjusted``)."""
-    factor = post_split_factor(db, company_id, row)
+def split_scaled_value(
+    db: Session, company_id: int, row: FinancialFact, *, cutoff: date | None = None
+) -> float:
+    """``row.value`` en la base del precio (ver ``_split_adjusted``)."""
+    factor = post_split_factor(db, company_id, row, cutoff=cutoff)
     value = float(row.value)
     if factor == 1.0:
         return value
