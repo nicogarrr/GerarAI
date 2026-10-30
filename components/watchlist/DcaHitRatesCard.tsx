@@ -16,7 +16,12 @@ function contrast(color: string | null): string {
  * confirmados con señal cuyo cierre era más alto N meses después. Solo
  * histórico: sin dato en una celda se dice, no se rellena.
  */
-export default function DcaHitRatesCard({ data, compact = false }: { data: DcaHitRates | null; compact?: boolean }) {
+export default function DcaHitRatesCard({ data, compact = false, scope = 'full' }: {
+    data: DcaHitRates | null;
+    compact?: boolean;
+    /** «range»: solo los meses con señal del rango elegido (p. ej. el backtest), no todo el histórico. */
+    scope?: 'full' | 'range';
+}) {
     if (!data) {
         return <p className="text-xs text-gray-500">Histórico de señales no disponible ahora mismo.</p>;
     }
@@ -28,7 +33,7 @@ export default function DcaHitRatesCard({ data, compact = false }: { data: DcaHi
             <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-100">¿Cuántas veces estaba más arriba?</p>
                 <p className="text-[11px] text-gray-500">
-                    {INT.format(data.months_completed)} meses completados · histórico completo
+                    {INT.format(data.months_completed)} meses completados · {scope === 'range' ? 'solo el rango elegido' : 'histórico completo'}
                     {data.first_period ? ` (${data.first_period} – ${data.last_period})` : ''}
                 </p>
             </div>
