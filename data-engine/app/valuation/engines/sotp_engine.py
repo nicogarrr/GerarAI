@@ -20,6 +20,7 @@ from app.valuation.engines.base import (
     ValuationEngine,
     adr_comparable_price,
     apply_publication_blockers,
+    context_split_cutoff,
     insufficient_result,
     is_adr_without_ratio,
     margin_of_safety,
@@ -111,7 +112,9 @@ class SOTPEngine(ValuationEngine):
         shares_fact = latest_by_metric.get("shares_diluted")
         net_debt_fact = latest_by_metric.get("net_debt")
         shares = (
-            split_scaled_value(context.db, company.id, shares_fact) if shares_fact is not None else None
+            split_scaled_value(context.db, company.id, shares_fact, cutoff=context_split_cutoff(context))
+            if shares_fact is not None
+            else None
         )
         net_debt = float(net_debt_fact.value) if net_debt_fact is not None else None
 
@@ -372,7 +375,7 @@ class SOTPEngine(ValuationEngine):
         if nav_fact is None or shares_fact is None:
             return None
         nav_total = float(nav_fact.value)
-        shares = split_scaled_value(context.db, company.id, shares_fact)
+        shares = split_scaled_value(context.db, company.id, shares_fact, cutoff=context_split_cutoff(context))
         if nav_total <= 0 or shares <= 0:
             return None
         if (
