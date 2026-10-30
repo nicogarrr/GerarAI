@@ -3683,6 +3683,47 @@ def dispatch_insider_alerts(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
+def dispatch_earnings_reminders(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Avisos de proximos resultados (7 / 1 / 0 dias) de cartera + watchlist.
+
+    Lee las fechas YA refrescadas en earnings_dates (no llama a fuentes): si el
+    refresco no corrio, no hay fechas frescas y no sale nada, nunca se inventa.
+    Persiste una alerta por ticker/fecha/ventana y la despacha por los canales
+    con consentimiento (in_app, correo SMTP, Telegram/push con suscripcion).
+    """
+    actor_name = "dispatch_earnings_reminders"
+    db = None
+    lease = None
+    try:
+        from app.services.earnings_reminders import emit_earnings_reminders
+        from app.services.outbound_alerts import dispatch_pending
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(
+            f"{actor_name}:{tenant_id}", ttl_seconds=300, redis_url=_lease_redis_url(),
+        )
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        stats = emit_earnings_reminders(db)
+        pending = dispatch_pending(db)
+        return {"status": "ok", "actor": actor_name,
+                "created": stats["created"], "existing": stats["existing"],
+                "redispatched": pending["redispatched"], "errors": pending["errors"][:20]}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(f"{actor_name}:{tenant_id}", lease, redis_url=_lease_redis_url())
+        if db is not None:
+            db.close()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
 def dispatch_macro_reminders(
     tenant_id: int | None = None,
     user_id: str | None = None,

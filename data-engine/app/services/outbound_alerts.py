@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.models import AlertDelivery, AlertSubscription, NewsEvent, PushPreference, ResearchAlert
 
 ALERT_TYPE_MACRO = "macro_event"
-EVENT_TYPES = ("thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event")
+EVENT_TYPES = ("thesis_broken", "new_filing", "insiders", "shorts_rising", "daily_digest", "dca_levels", "macro_event", "earnings")
 
 
 def event_type(db: Session, alert: ResearchAlert) -> str | None:
@@ -18,6 +18,8 @@ def event_type(db: Session, alert: ResearchAlert) -> str | None:
         return "dca_levels"
     if kind == ALERT_TYPE_MACRO:
         return "macro_event"
+    if kind == "earnings_reminder":
+        return "earnings"
     if kind in {"thesis_broken", "claim_contradicted"}:
         return "thesis_broken"
     if kind.startswith("insider_"):
@@ -95,6 +97,8 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         categories.append(ResearchAlert.alert_type == "dca_level")
     if "macro_event" in types:
         categories.append(ResearchAlert.alert_type == ALERT_TYPE_MACRO)
+    if "earnings" in types:
+        categories.append(ResearchAlert.alert_type == "earnings_reminder")
     starts = [db.scalar(select(model.enabled_at).where(
         model.tenant_id == tenant, model.enabled.is_(True),
     ).order_by(model.enabled_at).limit(1)) for model in (AlertSubscription, PushPreference)]

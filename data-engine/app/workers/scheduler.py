@@ -16,6 +16,7 @@ from app.workers.dramatiq_app import (
     backfill_finnhub_profiles,
     backfill_sec_fundamentals,
     consolidate_memory,
+    dispatch_earnings_reminders,
     dispatch_insider_alerts,
     dispatch_macro_reminders,
     dispatch_tracked_news_alerts,
@@ -586,6 +587,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="earnings_dates_refresh",
         hour="4,16",
         minute=20,
+    )
+    # Avisos de proximos resultados (7 / 1 / 0 dias antes): una vez al dia por
+    # la manana, tras el refresco de fechas de las 4:20. Lee solo la BD.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, dispatch_earnings_reminders),
+        "cron",
+        job_id="earnings_reminders_daily",
+        hour=7,
+        minute=5,
+        jitter=600,
     )
     # Retencion de datos personales: opt-in explicito. Encendido por defecto
     # seria un borrado silencioso en el primer deploy; el operador activa

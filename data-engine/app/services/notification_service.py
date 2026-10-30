@@ -297,12 +297,17 @@ class NotificationService:
             )
 
     def _dispatch_email(self, settings, alert: ResearchAlert, payload: dict) -> dict:
-        """Correo por SMTP. Las alertas DCA usan su plantilla; el resto, la generica."""
+        """Correo por SMTP. DCA y resultados usan su plantilla; el resto, la generica."""
         dca = (alert.metadata_ or {}).get("dca")
+        earnings = (alert.metadata_ or {}).get("earnings")
         if alert.alert_type == "dca_level" and isinstance(dca, dict):
             from app.services.dca_alert_copy import email_content
 
             content = email_content(dca)
+        elif alert.alert_type == "earnings_reminder" and isinstance(earnings, dict):
+            from app.services.earnings_alert_copy import email_content
+
+            content = email_content(earnings)
         else:
             content = generic_alert_content(payload)
         outcome = send_email(settings, content)
