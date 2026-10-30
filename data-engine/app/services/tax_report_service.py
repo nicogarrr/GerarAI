@@ -1454,10 +1454,21 @@ class TaxReportService:
             if all(r["status"] == COMPUTED for r in results)
             else INCOMPLETE
         )
+        # Igual que el resto de importes del informe, las cifras del libro de
+        # divisas se publican en centimos (ROUND_HALF_UP): un float con diez
+        # decimales de precision de calculo no es un dato fiscal y la UI lo
+        # mostraba en crudo. ``unconverted`` son unidades de la propia divisa
+        # y siguen la misma regla.
+        def _ledger_money(value) -> float | None:
+            return _money(Decimal(str(value))) if value is not None else None
+
         return {
             "criterion": CRITERION,
             "status": worst,
-            "gain_base": float(sum(Decimal(str(r["gain_base"])) for r in results)) if worst == COMPUTED else None,
+            "gain_base": (
+                _money(sum(Decimal(str(r["gain_base"])) for r in results))
+                if worst == COMPUTED else None
+            ),
             "reason": "; ".join(dict.fromkeys(r["reason"] for r in results if r["reason"])) or None,
             "rows": [row for r in results for row in r["rows"]],
             # Por divisa: cada una con su estado, ganancia en EUR y divisa sin convertir
@@ -1466,16 +1477,16 @@ class TaxReportService:
             "by_currency": {
                 r["currency"]: {
                     "status": r["status"],
-                    "gain_base": r["gain_base"],
-                    "blocked_loss_base": r["blocked_loss_base"],
-                    "unconverted": r["unconverted"],
+                    "gain_base": _ledger_money(r["gain_base"]),
+                    "blocked_loss_base": _ledger_money(r["blocked_loss_base"]),
+                    "unconverted": _ledger_money(r["unconverted"]),
                     "reason": r["reason"],
                 }
                 for r in results
             },
-            "unconverted": {r["currency"]: r["unconverted"] for r in results},
+            "unconverted": {r["currency"]: _ledger_money(r["unconverted"]) for r in results},
             "blocked_loss_base": (
-                float(sum(Decimal(str(r["blocked_loss_base"])) for r in results))
+                _money(sum(Decimal(str(r["blocked_loss_base"])) for r in results))
                 if worst == COMPUTED
                 else None
             ),

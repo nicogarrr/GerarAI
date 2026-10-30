@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { e2eUiDatabasePath } from "./e2e-env";
 
 /**
  * Semilla de tipos de cambio para Browser E2E, SIN endpoint de aplicación.
@@ -23,7 +24,7 @@ export function seedFxRates(
   quoteCurrency: string,
   rows: SeedFxRow[],
 ): void {
-  const dbPath = path.join(process.cwd(), "data-engine", "cavaai_ui_e2e.db");
+  const dbPath = e2eUiDatabasePath();
   const pythonBin = process.env.PYTHON_BIN ?? "python";
   const script = `
 import json, sqlite3, sys

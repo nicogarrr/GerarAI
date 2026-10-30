@@ -8,7 +8,7 @@ import re
 from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree
 
 from sqlalchemy import select, union_all
@@ -627,6 +627,18 @@ def parse_fx_trade(element: ElementTree.Element) -> dict | None:
     }
 
 
+def _prune_raw_rows_safely(db: Session) -> int:
+    """Retención de filas crudas (A7) en un savepoint: si falla, la importación sigue."""
+    from app.core.config import get_settings
+    from app.services.ibkr_raw_retention import prune_ibkr_raw_rows
+
+    try:
+        with db.begin_nested():
+            return prune_ibkr_raw_rows(db, keep_days=get_settings().ibkr_raw_rows_retention_days)
+    except Exception:  # noqa: BLE001 - la poda nunca rompe una importación válida
+        return 0
+
+
 def collect_raw_rows(root: ElementTree.Element) -> list[dict]:
     """Todas las filas con atributos de cada FlexStatement, tal cual vienen.
 
@@ -675,6 +687,91 @@ def _flex_ticker(symbol: str, element: ElementTree.Element | None) -> str:
 
     listing = reviewed_listing(_attr(element, "isin") if element is not None else None)
     return listing.ticker if listing else symbol.upper().strip()
+
+
+_FLEX_SPLIT_RATIO = re.compile(r"SPLIT\s+(\d+(?:\.\d+)?)\s+FOR\s+(\d+(?:\.\d+)?)", re.IGNORECASE)
+
+
+def _flex_split(element: ElementTree.Element, ca_type: str, symbol: str) -> dict | None:
+    """Split (FS) o contrasplit (RS) del Flex con ratio y fecha legibles, o None.
+
+    IBKR describe el evento como «SPLIT 10 FOR 1» (10 acciones nuevas por 1) o
+    «SPLIT 1 FOR 10» (contrasplit). El ratio guardado es acciones después /
+    antes, igual que ``SplitIngestionService``. SD/SO (dividendo en acciones,
+    escisión) no son un ratio sobre la misma empresa: siguen solo como aviso.
+    """
+    if ca_type not in {"FS", "RS"} or symbol == "?":
+        return None
+    match = _FLEX_SPLIT_RATIO.search(_attr(element, "description", "actionDescription") or "")
+    raw_date = re.sub(r"[^0-9]", "", (_attr(element, "dateTime", "reportDate", "date") or "").split(";", 1)[0])[:8]
+    if not match or len(raw_date) != 8:
+        return None
+    try:
+        effective = datetime.strptime(raw_date, "%Y%m%d").date()
+        numerator, denominator = Decimal(match.group(1)), Decimal(match.group(2))
+    except (ValueError, InvalidOperation):
+        return None
+    if numerator <= 0 or denominator <= 0:
+        return None
+    ratio = (numerator / denominator).quantize(Decimal("1e-10"))
+    # El tipo de IBKR y el ratio deben decir lo mismo; si no, solo aviso.
+    if (ca_type == "FS" and ratio <= 1) or (ca_type == "RS" and ratio >= 1):
+        return None
+    return {
+        "ticker": _flex_ticker(symbol, element),
+        "symbol": symbol,
+        "ca_type": ca_type,
+        "effective_date": effective,
+        "ratio": ratio,
+        "label": f"{match.group(1)} por {match.group(2)}",
+    }
+
+
+def _record_flex_splits(db: Session, splits: list[dict], row_errors: list[str]) -> None:
+    """A6: registra cada split del Flex como acción corporativa PENDIENTE.
+
+    No se aplica en la importación: aplicarlo reescribe cantidades y coste del
+    libro y, sin cierre post-split verificado, deja la posición en suspensión de
+    valoración. Ese paso es ``CorporateActionService.apply_action`` (un clic en
+    Acciones corporativas), que conserva el coste total. Mismo criterio de
+    duplicado que la ingesta de proveedores (±3 días, mismo ratio): un split ya
+    traído de Yahoo/FMP o de una importación anterior no se registra dos veces.
+    """
+    from app.models import CorporateAction
+    from app.services.company_resolver import resolve_company
+    from app.services.split_ingestion_service import SplitIngestionService
+
+    for split in splits:
+        company = resolve_company(db, split["ticker"])
+        where = f"{split['ca_type']} de {split['symbol']} ({split['effective_date'].isoformat()}, {split['label']})"
+        if company is None:
+            notice = (
+                f"Acción corporativa {where} no se aplica al libro de operaciones: "
+                "regístrala en Acciones corporativas para que el coste y el FIFO fiscal cuadren."
+            )
+        else:
+            existing = SplitIngestionService._existing_record(db, company, split)
+            if existing is None:
+                db.add(CorporateAction(
+                    company_id=company.id,
+                    action_type="split" if split["ratio"] > 1 else "reverse_split",
+                    effective_date=split["effective_date"],
+                    ratio=split["ratio"],
+                    description=f"IBKR Flex: split {split['label']}",
+                    applied=False,
+                    source="ibkr_flex",
+                ))
+                db.flush()
+                state = "registrada como pendiente"
+            else:
+                state = "ya aplicada" if existing.applied else "ya estaba pendiente"
+            notice = (
+                f"Acción corporativa {where} {state} en Acciones corporativas"
+                + ("." if existing is not None and existing.applied else
+                   ": aplícala allí para que el coste y el FIFO fiscal cuadren.")
+            )
+        if notice not in row_errors:
+            row_errors.append(notice)
 
 
 def _attr(element: ElementTree.Element, *names: str) -> str | None:
@@ -873,6 +970,163 @@ def _csv_default_currency(symbol: str, listing_currency: str | None = None) -> s
     return unit
 
 
+_LOT_ONLY_ATTRS = ("openDateTime", "holdingPeriodDateTime", "originatingOrderID", "originatingTransactionID")
+
+
+def _is_lot_position(element: ElementTree.Element) -> bool:
+    return _tag_name(element) == "OpenPosition" and (_attr(element, "levelOfDetail") or "").upper() == "LOT"
+
+
+def _lot_key(element: ElementTree.Element) -> tuple[str, str, str, str]:
+    return (
+        _attr(element, "accountId") or "",
+        _attr(element, "conid") or _attr(element, "symbol", "underlyingSymbol") or "",
+        (_attr(element, "currency") or "").upper(),
+        (_attr(element, "reportDate", "asOfDate") or "").split(";", 1)[0],
+    )
+
+
+def _merge_lot_rows(rows: list[ElementTree.Element]) -> list[ElementTree.Element]:
+    """Suma los lotes de una posicion en una fila resumen (cantidad, valor, coste y P/L)."""
+    if len(rows) == 1:
+        return rows
+    fields = ("position", "positionValue", "costBasisPrice", "costBasisMoney", "fifoPnlUnrealized")
+    if any(row.get(f) is not None and not _is_number(row.get(f)) for row in rows for f in fields):
+        return rows  # la validacion las senala/omite una a una
+    quantity = sum((_decimal(_attr(row, "position", "quantity")) for row in rows), Decimal("0"))
+    cost = sum(
+        (
+            _decimal(row.get("costBasisMoney"))
+            if row.get("costBasisMoney") is not None
+            else _decimal(_attr(row, "position", "quantity")) * _decimal(row.get("costBasisPrice"))
+            for row in rows
+        ),
+        Decimal("0"),
+    )
+    attrib = {k: v for k, v in rows[0].attrib.items() if k not in _LOT_ONLY_ATTRS}
+    attrib["levelOfDetail"] = "SUMMARY"
+    attrib["position" if "position" in attrib else "quantity"] = str(quantity)
+    if all(row.get("positionValue") is not None for row in rows):
+        attrib["positionValue"] = str(sum((_decimal(row.get("positionValue")) for row in rows), Decimal("0")))
+    if "costBasisMoney" in attrib or "costBasisPrice" in attrib:
+        attrib["costBasisMoney"] = str(cost)
+        attrib["costBasisPrice"] = str(cost / quantity) if quantity else "0"
+    if all(row.get("fifoPnlUnrealized") is not None for row in rows):
+        attrib["fifoPnlUnrealized"] = str(
+            sum((_decimal(row.get("fifoPnlUnrealized")) for row in rows), Decimal("0"))
+        )
+    return [ElementTree.Element(rows[0].tag, attrib)]
+
+
+# Niveles de detalle de la sección Trades que NO son ejecuciones: IBKR los
+# exporta con su propia etiqueta y el importador solo lee <Trade> (ejecución).
+_NON_EXECUTION_TRADE_TAGS = {"Order": "orden", "SymbolSummary": "resumen por símbolo", "AssetSummary": "resumen por activo"}
+
+
+def _trade_level_notice(root: ElementTree.Element) -> str | None:
+    """Aviso si la Flex trae operaciones solo a nivel de orden/resumen.
+
+    Una Flex Query con Trades > Options = solo «Orders» exporta ``<Order>`` y
+    ninguna fila ``<Trade>``. Antes se importaba con estado ``imported``, cero
+    operaciones y sin ningún aviso: las compras y ventas desaparecían en
+    silencio. No se importan las órdenes como operaciones porque una
+    reimportación posterior a nivel de ejecución las duplicaría.
+    """
+    tags = {_tag_name(e) for e in root.iter()}
+    if "Trade" in tags:
+        return None
+    found = [label for tag, label in _NON_EXECUTION_TRADE_TAGS.items() if tag in tags]
+    if not found:
+        return None
+    count = sum(1 for e in root.iter() if _tag_name(e) in _NON_EXECUTION_TRADE_TAGS)
+    return (
+        f"La Flex trae {count} fila(s) de operaciones a nivel de {' y '.join(found)}, pero ninguna "
+        "a nivel de ejecución: no se ha importado ninguna compra ni venta. En IBKR, edita la Flex "
+        "Query, sección Trades > Options, marca «Execution» y vuelve a importar."
+    )
+
+
+def _collapse_lot_positions(elements: list[ElementTree.Element]) -> list[ElementTree.Element]:
+    """Una Flex con «Open Positions: Lot» trae, por posicion, la fila SUMMARY y una
+    ``OpenPosition levelOfDetail="LOT"`` por lote. Cada fila sobrescribia la posicion,
+    asi que ganaba el ULTIMO lote (10 acciones en dos lotes 6+4 quedaban en 4, con el
+    coste de ese lote). Si hay fila resumen, los lotes se ignoran; si solo hay lotes,
+    se suman en una fila resumen."""
+    summary_keys = {
+        _lot_key(e) for e in elements if _tag_name(e) == "OpenPosition" and not _is_lot_position(e)
+    }
+    lots: dict[tuple[str, str, str, str], list[ElementTree.Element]] = {}
+    for element in elements:
+        if _is_lot_position(element) and _lot_key(element) not in summary_keys:
+            lots.setdefault(_lot_key(element), []).append(element)
+    collapsed: list[ElementTree.Element] = []
+    for element in elements:
+        if not _is_lot_position(element):
+            collapsed.append(element)
+            continue
+        key = _lot_key(element)
+        if key in summary_keys or key not in lots:
+            continue
+        collapsed.extend(_merge_lot_rows(lots.pop(key)))
+    return collapsed
+
+
+_FALLBACK_ID_FIELDS = {
+    "Trade": (
+        "accountId", "conid", "symbol", "buySell", "quantity", "tradePrice",
+        "tradeDate", "dateTime", "currency", "ibCommission",
+    ),
+    "CashTransaction": (
+        "accountId", "conid", "symbol", "type", "amount", "netCash",
+        "dateTime", "date", "settleDate", "currency", "description",
+    ),
+}
+
+
+def _fallback_key(tag: str, payload) -> list[str]:
+    return [tag] + [str(payload.get(field) or "") for field in _FALLBACK_ID_FIELDS[tag]]
+
+
+def _fallback_external_id(element: ElementTree.Element, counts: dict[str, int]) -> str:
+    """Id estable para una fila Flex sin tradeID/transactionID (columna no elegida
+    en la query). Sin el, reimportar el mismo extracto duplicaba la operacion o el
+    dividendo. Fila economica canonica + ocurrencia: dos ejecuciones identicas en
+    el mismo fichero siguen siendo dos."""
+    key = _fallback_key(_tag_name(element), element.attrib)
+    fingerprint = hashlib.sha256(json.dumps(key).encode()).hexdigest()[:40]
+    counts[fingerprint] = counts.get(fingerprint, 0) + 1
+    return f"ibkr-xml-{fingerprint}-{counts[fingerprint]}"
+
+
+def _fallback_already_imported(
+    db: Session, element: ElementTree.Element, external_id: str, trade_date: date, adopted: set[int]
+) -> bool:
+    if db.scalar(
+        select(Transaction.id).where(
+            Transaction.external_id == external_id, *tenant_filters(db, Transaction)
+        )
+    ) is not None:
+        return True
+    # Filas importadas antes de este id se guardaron con external_id NULL y el
+    # atributo crudo completo: se adoptan (una por ocurrencia) en vez de duplicarlas.
+    key = _fallback_key(_tag_name(element), element.attrib)
+    for legacy in db.scalars(
+        select(Transaction)
+        .where(
+            Transaction.external_id.is_(None),
+            Transaction.trade_date == trade_date,
+            *tenant_filters(db, Transaction),
+        )
+        .order_by(Transaction.id)
+    ):
+        if legacy.id in adopted or _fallback_key(_tag_name(element), legacy.raw_payload or {}) != key:
+            continue
+        adopted.add(legacy.id)
+        legacy.external_id = external_id
+        return True
+    return False
+
+
 class IBKRImportService:
     def import_flex_xml(self, db: Session, xml_text: str, **options) -> dict:
         """Importa un Flex Query (ver ``_import_flex_xml``).
@@ -1036,7 +1290,10 @@ class IBKRImportService:
         trades_already_present = 0
         non_stock_skipped = 0
         unknown_tickers: dict[str, int] = {}
-        elements = list(root.iter())
+        elements = _collapse_lot_positions(list(root.iter()))
+        level_notice = _trade_level_notice(root)
+        if level_notice and level_notice not in row_errors:
+            row_errors.append(level_notice)
         if trades_only:
             # Primero los Trade: crean los emisores a los que luego se atribuyen
             # los dividendos (orden estable, el resto mantiene su orden).
@@ -1045,11 +1302,14 @@ class IBKRImportService:
         # vengan en el orden que vengan, para poder neutralizar a su original.
         elements.sort(key=lambda e: 1 if _tag_name(e) == "Trade" and _is_cancel_trade(e) else 0)
         file_trades: list[Transaction] = []
+        fallback_counts: dict[str, int] = {}
+        fallback_adopted: set[int] = set()
         trades_cancelled = 0
         cash_misc_skipped = 0
         fx_conversions_imported = 0
         fx_conversions_skipped = 0
         fx_conversions_already_present = 0
+        flex_splits: list[dict] = []
         for element in elements:
             tag = _tag_name(element)
             if tag == "Trade" and (_attr(element, "assetCategory") or "").upper() == "CASH":
@@ -1077,6 +1337,12 @@ class IBKRImportService:
                 ca_symbol = _attr(element, "symbol", "underlyingSymbol") or "?"
                 ca_type = (_attr(element, "type", "activityType") or "").upper()
                 ca_date = _attr(element, "reportDate", "dateTime", "date") or "?"
+                split = _flex_split(element, ca_type, ca_symbol)
+                if split is not None:
+                    # A6: FS/RS con ratio legible se registra como acción corporativa
+                    # PENDIENTE al final de la importación (_record_flex_splits).
+                    flex_splits.append(split)
+                    continue
                 notice = (
                     f"Acción corporativa {ca_type} de {ca_symbol} ({ca_date}) no se aplica al "
                     "libro de operaciones: regístrala en Acciones corporativas para que "
@@ -1280,6 +1546,12 @@ class IBKRImportService:
                         row_errors.append(_missing_date_notice("Trade", symbol, element))
                     continue
                 external_id = _attr(element, "tradeID", "transactionID", "ibExecID")
+                if not external_id:
+                    external_id = _fallback_external_id(element, fallback_counts)
+                    if _fallback_already_imported(
+                        db, element, external_id, _date(raw_date), fallback_adopted
+                    ):
+                        existing_ids.add(external_id)
                 if external_id and external_id in existing_ids:
                     trades_already_present += 1
                     continue
@@ -1399,6 +1671,16 @@ class IBKRImportService:
                     cash_misc_skipped += 1
                     continue
                 external_id = _attr(element, "trxID", "transactionID", "id")
+                if not external_id:
+                    external_id = _fallback_external_id(element, fallback_counts)
+                    if _fallback_already_imported(
+                        db,
+                        element,
+                        external_id,
+                        _date(_attr(element, "dateTime", "date", "tradeDate")),
+                        fallback_adopted,
+                    ):
+                        existing_ids.add(external_id)
                 if external_id and external_id in existing_ids:
                     continue
                 amount = _decimal(_attr(element, "amount", "netCash", "proceeds"))
@@ -1477,6 +1759,8 @@ class IBKRImportService:
                     existing_ids.add(external_id)
                 db.add(transaction)
                 dividends_imported += 1
+
+        _record_flex_splits(db, flex_splits, row_errors)
 
         if trades_only:
             db.flush()
@@ -1584,6 +1868,7 @@ class IBKRImportService:
             p.company.ticker for p in checked_positions
             if cost_checks.get(p.id, {}).get("status") == "review_required"
         )
+        raw_rows_pruned = _prune_raw_rows_safely(db)
         db.commit()
         _auto_link_journal_after_import(db)
         # market_prices solo acumula hacia adelante: las companias que la
@@ -1618,6 +1903,7 @@ class IBKRImportService:
             "trades_imported": trades_imported,
             "raw_rows_stored": raw_rows_stored,
             "raw_rows_already_present": raw_rows_already_present,
+            "raw_rows_pruned": raw_rows_pruned,
             "fx_conversions_imported": fx_conversions_imported,
             "fx_conversions_skipped": fx_conversions_skipped,
             "trades_cancelled": trades_cancelled,

@@ -10,7 +10,8 @@ export type ScenarioValues = Record<ScenarioKey, number | string | null | undefi
 export type ValuationBasis = {
   value_per_share_basis?: string | null;
   adr_ratio?: number | null;
-  listed_share_values?: Partial<Record<ScenarioKey, number>> | null;
+  // null por clave: escenario N/D (valor por acción <= 0), nunca cifra negativa.
+  listed_share_values?: Partial<Record<ScenarioKey, number | null>> | null;
 } | null | undefined;
 
 export type ScenarioDisplay = {
@@ -20,7 +21,7 @@ export type ScenarioDisplay = {
 };
 
 function pickListed(
-  listed: Partial<Record<ScenarioKey, number>> | null | undefined,
+  listed: Partial<Record<ScenarioKey, number | null>> | null | undefined,
 ): ScenarioValues | null {
   if (!listed || typeof listed !== 'object') return null;
   const out = {} as ScenarioValues;

@@ -154,10 +154,17 @@ export type ResearchValuation = {
   missing_inputs?: string[];
   adr_ratio?: number | null;
   value_per_share_basis?: string | null;
-  listed_share_values?: Partial<Record<'bear' | 'base' | 'bull' | 'expected', number>> | null;
+  listed_share_values?: Partial<Record<'bear' | 'base' | 'bull' | 'expected', number | null>> | null;
+  /** Escenarios N/D (valor por acción <= 0): motivo en español, uno por escenario. */
+  scenario_notes?: Record<string, string> | null;
   reverse_dcf: {
+    status?: string;
+    out_of_bounds?: boolean;
+    reason?: string;
     required_revenue_growth?: number;
     solved_value_per_share?: number;
+    fcf_margin?: number | null;
+    wacc?: number | null;
     trace?: Record<string, unknown>;
   };
   sensitivity: {

@@ -11,9 +11,11 @@ uno salta. No hay un segundo evaluador.
 Metricas soportadas:
 
 - ``precio``: ultimo cierre de ``MarketPrice`` (caducado => no dispara).
-- ``margen_seguridad_pct``: ``(valor_esperado_tesis / precio - 1) * 100``. Mismo
-  benchmark que ``ThesisVersion.margin_of_safety`` (valor ESPERADO de la tesis),
-  pero con el precio de hoy.
+- ``margen_seguridad_pct``: ``((valor_esperado_tesis - precio) / valor_esperado_tesis) * 100``.
+  Misma convencion (V - P) / V que ``ThesisVersion.margin_of_safety``, el motor
+  (``discount_to_value_v1``) y el resto de pantallas, con el mismo benchmark
+  (valor ESPERADO de la tesis) pero el precio de hoy. Una regla «< 20» pide lo
+  mismo que el margen que muestran la ficha, la cartera y el screener.
 - ``variacion_desde_tesis_pct``: ``(precio / precio_en_la_tesis - 1) * 100``.
 - ``metrica:<nombre>``: ultimo ``CalculatedMetric`` con ese nombre (ejercicio
   mas reciente) y, si no hay, ultimo ``FinancialFact``. El umbral va en la
@@ -28,7 +30,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -42,8 +44,16 @@ from app.models import (
 )
 from app.services.claim_scope import latest_thesis_version
 from app.services.fair_value_service import listed_value
-from app.services.price_freshness import market_price_is_stale
+from app.services.price_freshness import close_is_stale
 from app.services.price_units import listing_price
+from app.services.split_adjustment import (
+    cumulative_split_factor_after,
+    period_end_date,
+    split_after_price,
+    split_events_by_company,
+    split_factor_for_fact,
+)
+from app.services.ttm_fundamentals import FLOW_METRICS
 
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
@@ -53,9 +63,24 @@ MAX_RULES = 20
 COOLDOWN_SECONDS = 86_400
 
 PRICE = "precio"
+QUARTER_LABELS = ("Q1", "Q2", "Q3", "Q4")
 MARGIN_OF_SAFETY_PCT = "margen_seguridad_pct"
 CHANGE_SINCE_THESIS_PCT = "variacion_desde_tesis_pct"
 METRIC_PREFIX = "metrica:"
+# Datos por accion y recuentos de acciones: cambian de base con un split. Un
+# BPA anual de antes de un 10:1 es 10 veces el de hoy; se reexpresa a la base
+# actual (regla unica fact_split_factor) antes de compararlo con el umbral.
+PER_SHARE_METRICS = frozenset(
+    {
+        "eps_diluted",
+        "eps_basic",
+        "fcf_per_share",
+        "revenue_per_share",
+        "ttm_dividend_per_share",
+        "loss_per_share",
+    }
+)
+SHARE_COUNT_METRICS = frozenset({"shares_diluted", "shares_outstanding"})
 
 METRIC_LABELS: dict[str, str] = {
     PRICE: "precio",
@@ -266,8 +291,36 @@ def _latest_price(db: Session, company_id: int) -> tuple[Decimal | None, dict[st
         "currency": currency,
         "date": price.date.isoformat(),
         "age_days": age_days,
-        "status": "stale" if market_price_is_stale(age_days, get_settings().market_price_max_age_days) else "fresh",
+        "status": (
+            "stale"
+            if close_is_stale(
+                price.date,
+                company.exchange if company else None,
+                get_settings().market_price_max_age_days,
+                ticker=company.ticker if company else None,
+            )
+            else "fresh"
+        ),
     }
+
+
+def _split_factor_since_thesis(
+    db: Session, company_id: int, thesis: ThesisVersion, price_day: Any
+) -> Decimal | None:
+    """Factor de splits entre la fecha de la tesis y el cierre; None si un split
+    ya efectivo es posterior al ultimo cierre (base del cierre desconocida)."""
+    events = split_events_by_company(db, [company_id]).get(company_id, [])
+    if not events:
+        return Decimal(1)
+    try:
+        close_day = date.fromisoformat(str(price_day)[:10])
+    except ValueError:
+        return None
+    if split_after_price(events, close_day, max(date.today(), close_day)):
+        return None
+    created = getattr(thesis, "created_at", None)
+    thesis_day = created.date() if created is not None else None
+    return cumulative_split_factor_after([e for e in events if e[0] <= close_day], thesis_day)
 
 
 def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any]]:
@@ -301,8 +354,20 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
         price, info = _latest_price(db, rule.company_id)
         if price is None or price <= 0:
             return None, {**base, **info}
+        # La tesis esta en la base de acciones de su fecha; el cierre, en la del
+        # dia. Un split posterior a la tesis cambia la base (10:1 -> precio de
+        # tesis 1000 = 100 hoy). Sin esto «variacion desde tesis» leia -90 % y
+        # disparaba el criterio. Con el ultimo cierre anterior a un split ya
+        # efectivo la base del cierre es desconocida: N/D, como en valoracion.
+        factor = _split_factor_since_thesis(db, rule.company_id, thesis, info.get("date"))
+        if factor is None:
+            return None, {**base, **info, "status": "missing", "missing": "precio_anterior_a_split"}
+        reference = Decimal(reference) / factor
         if metric == MARGIN_OF_SAFETY_PCT:
-            value = (Decimal(reference) / price - 1) * 100
+            # Convencion unica del producto (V - P) / V: el % que ve el usuario
+            # en la tesis, la ficha, la cartera y el screener. V/P - 1 es el
+            # potencial de revalorizacion, no el margen (ver engines/base.py).
+            value = (Decimal(reference) - price) / Decimal(reference) * 100
         else:
             value = (price / Decimal(reference) - 1) * 100
         return value, {**base, **info, "reference": str(reference)}
@@ -321,6 +386,22 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
             .limit(1)
         )
         if calculated is not None and calculated.value is not None:
+            if name in PER_SHARE_METRICS or name in SHARE_COUNT_METRICS:
+                # Sin fecha de publicacion no se sabe si el calculo ya recoge
+                # un split posterior al cierre del periodo: N/D, nunca x10.
+                events = split_events_by_company(db, [rule.company_id]).get(
+                    rule.company_id, []
+                )
+                end = period_end_date(calculated.period)
+                if events and (
+                    end is None or any(end < day <= date.today() for day, _r in events)
+                ):
+                    return None, {
+                        **base,
+                        "status": "missing",
+                        "missing": "split_posterior_al_periodo",
+                        "period": calculated.period,
+                    }
             return Decimal(calculated.value), {
                 **base,
                 "status": "fresh",
@@ -329,14 +410,36 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
                 "period": calculated.period,
                 "unit": calculated.unit,
             }
+        query = select(FinancialFact).where(
+            FinancialFact.company_id == rule.company_id, FinancialFact.metric == name
+        )
+        if name in FLOW_METRICS:
+            # Un flujo (ingresos, beneficio...) de un trimestre no es el del año:
+            # el 10-Q del Q1 tiene fiscal_year mas reciente que el ultimo 10-K y
+            # ganaba el orden, asi que «ingresos < X» comparaba un trimestre con
+            # un umbral anual. Solo cuentan los datos anuales.
+            query = query.where(
+                or_(
+                    FinancialFact.fiscal_quarter.is_(None),
+                    FinancialFact.fiscal_quarter.not_in(QUARTER_LABELS),
+                ),
+                ~or_(*(FinancialFact.period.like(f"%:{q}") for q in QUARTER_LABELS)),
+            )
         fact = db.scalar(
-            select(FinancialFact)
-            .where(FinancialFact.company_id == rule.company_id, FinancialFact.metric == name)
-            .order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at))
-            .limit(1)
+            query.order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at)).limit(1)
         )
         if fact is not None and fact.value is not None:
-            return Decimal(fact.value), {
+            value = Decimal(fact.value)
+            if name in PER_SHARE_METRICS or name in SHARE_COUNT_METRICS:
+                factor = split_factor_for_fact(
+                    db,
+                    rule.company_id,
+                    period=getattr(fact, "period", None),
+                    filed=getattr(fact, "filed", None),
+                    cutoff=date.today(),
+                )
+                value = value / factor if name in PER_SHARE_METRICS else value * factor
+            return value, {
                 **base,
                 "status": "fresh",
                 "source": "financial_fact",

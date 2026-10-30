@@ -43,6 +43,7 @@ def _money(value, currency) -> str:
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
 from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
+from app.services.position_value import position_base_value
 
 
 def _link(company: Company, view: str = "financials") -> str:
@@ -212,14 +213,12 @@ def _company_news_answer(db: Session, company: Company, tenant: int) -> ChatResp
         Position.tenant_id == tenant, Position.company_id == company.id, Position.quantity > 0,
     ).limit(1)).first()
     if position is not None:
-        def _value(pos: Position) -> float:
-            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
-            return float(raw or 0)
         total = sum(
-            _value(row) for row in db.scalars(select(Position).where(
+            position_base_value(row) or Decimal("0") for row in db.scalars(select(Position).where(
                 Position.tenant_id == tenant, Position.quantity > 0)).all()
         )
-        weight = f", el {_number(_value(position) / total * 100)} % de tu cartera" if total > 0 else ""
+        own = position_base_value(position)
+        weight = f", el {_number(own / total * 100)} % de tu cartera" if own is not None and total > 0 else ""
         holding_lines.append(
             f"Tienes {_number(position.quantity)} acciones de {company.ticker} en cartera{weight}. "
             "No calculo el impacto de cada noticia: eso pediria un analisis nuevo."

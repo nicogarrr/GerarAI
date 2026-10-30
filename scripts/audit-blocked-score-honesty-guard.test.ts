@@ -20,13 +20,13 @@ const backend = readFileSync('data-engine/app/services/source_auditor.py', 'utf8
 
 test('bloqueada con 100/100: el texto dice que no mide el motivo del bloqueo', () => {
     const text = auditScoreText(false, 100, String);
-    assert.match(text, /puntuación de respaldo de afirmaciones 100\/100 \(penaliza baja confianza\)/);
+    assert.match(text, /puntuación de respaldo de afirmaciones 100\/100 \(penaliza baja confianza y una conciliación SEC\/FMP ausente\)/);
     assert.match(text, /mide solo citas, no el motivo del bloqueo/);
 });
 
 test('superada: sin coletilla (nada que matizar)', () => {
     const text = auditScoreText(true, 92, String);
-    assert.equal(text, 'puntuación de respaldo de afirmaciones 92/100 (penaliza baja confianza)');
+    assert.equal(text, 'puntuación de respaldo de afirmaciones 92/100 (penaliza baja confianza y una conciliación SEC/FMP ausente)');
 });
 
 test('el estado se llama «bloqueada» en ambas páginas (nunca «fallida»)', () => {

@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 test.skip(process.env.E2E_UI_RUN !== '1', 'UI harness required');
 test('research controls cannot accept input before their client handlers exist', async ({ page, request }) => {
@@ -11,7 +12,7 @@ test('research controls cannot accept input before their client handlers exist',
   const secret = process.env.RESEARCH_AUTH_SECRET ?? 'cavaai-e2e-research-secret-at-least-32-characters';
   const signature = createHmac('sha256', secret)
     .update(`e2e-api-tenant:e2e-api-user:${timestamp}:${nonce}:POST:${path}:${hash}`).digest('hex');
-  const response = await request.post(`${process.env.E2E_UI_BACKEND_URL ?? 'http://127.0.0.1:8100'}${path}`, {
+  const response = await request.post(`${E2E_UI_BACKEND_URL}${path}`, {
     data: body, headers: {
       'Content-Type': 'application/json', 'X-CavaAI-Tenant': 'e2e-api-tenant', 'X-CavaAI-User': 'e2e-api-user',
       'X-CavaAI-Timestamp': timestamp, 'X-CavaAI-Nonce': nonce, 'X-CavaAI-Method': 'POST',

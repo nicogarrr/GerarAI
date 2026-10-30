@@ -132,18 +132,22 @@ async def backfill_ecb_rates(
         if major not in major_for:
             continue
         published.add(major)
-        for code, divisor in major_for[major]:
-            # 1 EUR = units_per_eur × major ⇒ 1 major = 1/units_per_eur EUR;
-            # 1 subunidad = (1/units_per_eur)/divisor EUR.
-            rate = Decimal("1") / (units_per_eur * divisor)
-            fx.upsert_rate(
-                db,
-                base_currency=base,
-                quote_currency=code,
-                rate=rate,
-                rate_date=day,
-                source=ECB_SOURCE,
-            )
+        # Se guarda SIEMPRE la fila de la divisa principal (1 major =
+        # 1/units_per_eur EUR): todos los lectores (``PortfolioFXService.rate``,
+        # ``fx_table``) normalizan la subunidad (GBp/GBX -> GBP / 100) y buscan
+        # la fila de GBP. Antes se guardaba una fila ``GBX`` con el tipo ya
+        # dividido entre 100 que nadie lee: una cartera solo con valores en
+        # peniques seguia sin tipo tras la descarga (coste en EUR y dividendos
+        # del informe fiscal «sin tipo»).
+        fx.upsert_rate(
+            db,
+            base_currency=base,
+            quote_currency=major,
+            rate=Decimal("1") / units_per_eur,
+            rate_date=day,
+            source=ECB_SOURCE,
+        )
+        for code, _divisor in major_for[major]:
             summary["written"][code] = summary["written"].get(code, 0) + 1
     db.commit()
     summary["not_published"] = sorted(

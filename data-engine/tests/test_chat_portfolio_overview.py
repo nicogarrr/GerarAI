@@ -30,8 +30,8 @@ def _company(db, ticker, name):
 def test_mi_cartera_lists_stored_positions_without_llm(db):
     a = _company(db, "AAA", "Alpha")
     b = _company(db, "BBB", "Beta")
-    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), market_value=Decimal("300")))
-    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("2"), average_cost=Decimal("50"), market_value=Decimal("100")))
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("10"), average_cost=Decimal("5"), currency="EUR", market_value=Decimal("300")))
+    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("2"), average_cost=Decimal("50"), currency="EUR", market_value=Decimal("100")))
     db.commit()
     resp = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
     assert resp.model == "deterministic"

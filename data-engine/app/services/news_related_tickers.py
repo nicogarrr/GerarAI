@@ -17,6 +17,7 @@ import time
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.models.entities import Company, MarketPrice
 from app.services.etf_holdings import etfs_for_tickers
 from app.services.market_change import OFFICIAL_CLOSE_SOURCES, common_sessions
+from app.services.price_units import listing_price
 
 MAX_RELATED = 6
 INDEX_TTL_SECONDS = 600
@@ -137,7 +139,13 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
         return {}
     since: date = session_day - timedelta(days=14)
     rows = db.execute(
-        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.close)
+        select(
+            MarketPrice.company_id,
+            MarketPrice.date,
+            MarketPrice.close,
+            MarketPrice.adj_close,
+            MarketPrice.quote_currency,
+        )
         .where(
             MarketPrice.company_id.in_(company_ids),
             MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES),
@@ -147,31 +155,73 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
     ).all()
     latest: dict[int, tuple] = {}
     previous: dict[int, tuple] = {}
-    for company_id, day, close in rows:
+    for company_id, day, close, adj_close, unit in rows:
         if close is None:
             continue
         if company_id not in latest:
-            latest[company_id] = (day, float(close))
+            latest[company_id] = (day, close, adj_close, unit)
         elif company_id not in previous:
-            previous[company_id] = (day, float(close))
+            previous[company_id] = (day, close, adj_close, unit)
+    companies = {
+        c.id: c for c in db.scalars(select(Company).where(Company.id.in_(list(latest)))).all()
+    } if latest else {}
     out: dict[int, dict] = {}
-    for company_id, (day, close) in latest.items():
+    for company_id, (day, close, adj_close, unit) in latest.items():
+        company = companies.get(company_id)
+        # Precio en la divisa principal de SU cotizacion (TSCO.L: 255 GBp se
+        # publica como 2,55 GBP), igual que el mercado del dia (market_change).
+        listed = _listed(close, unit, company)
         prev = previous.get(company_id)
-        comparable = (
-            day == session_day
+        change_pct = None
+        if (
+            listed is not None
+            and day == session_day
             and prev is not None
             and prev_session_day is not None
             and prev[0] == prev_session_day
-            and prev[1]
-        )
+        ):
+            change_pct = _session_change(company, (close, adj_close, unit), prev[1:])
         out[company_id] = {
-            "price": close,
+            "price": float(listed[0]) if listed is not None else None,
             "date": day.isoformat(),
-            "change_pct": (
-                round((close - prev[1]) / prev[1] * 100, 2) if comparable and prev is not None else None
-            ),
+            "change_pct": change_pct,
+            **({"currency": listed[1]} if listed is not None else {}),
         }
     return out
+
+
+def _listed(value, unit, company) -> tuple[Decimal, str | None] | None:
+    if value is None:
+        return None
+    amount = Decimal(str(value))
+    if company is None or not unit:
+        # Fila legacy sin unidad declarada: el cierre tal cual (como antes).
+        return amount, getattr(company, "currency", None)
+    return listing_price(amount, quote_currency=unit, company=company)
+
+
+def _session_change(company, latest: tuple, previous: tuple) -> float | None:
+    """Variacion entre dos sesiones en una sola unidad.
+
+    Cierres ajustados si ambas filas los traen (un split 4:1 entre las dos
+    sesiones no es un -75 %), como las alertas y el digest de cartera. Cada
+    cierre en la divisa principal de su cotizacion: 250 GBp y 2,55 GBP son
+    +2 %, no -99 %. Divisas distintas: sin variacion.
+    """
+    (close, adj, unit), (p_close, p_adj, p_unit) = latest, previous
+    if adj is not None and p_adj is not None and adj > 0 and p_adj > 0:
+        close, p_close = adj, p_adj
+    if unit == p_unit or not unit or not p_unit:
+        last, prev = Decimal(str(close)), Decimal(str(p_close))
+    else:
+        a = _listed(close, unit, company)
+        b = _listed(p_close, p_unit, company)
+        if a is None or b is None or a[1] != b[1]:
+            return None
+        last, prev = a[0], b[0]
+    if not prev:
+        return None
+    return round(float((last - prev) / prev * 100), 2)
 
 
 _INDEX_CACHE: dict = {"at": 0.0, "value": None}

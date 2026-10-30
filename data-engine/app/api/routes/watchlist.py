@@ -180,6 +180,9 @@ async def watchlist_monitor(
             "fair_value_label": reading["label"],
             "fair_value_as_of": reading["as_of"],
             "fair_value_publishable": reading["publishable"],
+            # Por que no hay cifra (p. ej. «faltan revenue, shares_diluted, fcf»);
+            # None cuando hay valor justo.
+            "fair_value_reason": reading.get("reason"),
             "valuation_side": side,
             "currency": company.currency,
             "next_earnings_date": None,
@@ -318,6 +321,7 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         from app.services.screener_fundamentals import _unit_currency
         from app.services.split_adjustment import (
             fact_split_factor,
+            split_after_price,
             split_events_by_company,
         )
 
@@ -335,8 +339,17 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         # inflado por el factor de cualquier split posterior al ejercicio.
         # Un 10-K publicado tras el split ya viene reexpresado: regla unica
         # fact_split_factor (consciente del `filed`), hasta la fecha del cierre.
+        split_events = split_events_by_company(db, [company.id]).get(company.id, [])
+        # Cierre anterior a un split ya efectivo: base desconocida (vieja o ya
+        # ajustada por el proveedor): PER N/D, como la valoracion (#3227).
+        if split_after_price(split_events, price_row.date, date.today()):
+            sources.append(
+                f"PER: N/D: el último cierre ({price_row.date.isoformat()}) es "
+                "anterior a un split ya efectivo y no se sabe si ya viene ajustado")
+            return {"market_cap": market_cap, "per": None,
+                    "currency": company.currency, "sources": sources}
         split_factor = fact_split_factor(
-            split_events_by_company(db, [company.id]).get(company.id, []),
+            split_events,
             period=eps_row.period,
             filed=eps_row.filed,
             cutoff=price_row.date,

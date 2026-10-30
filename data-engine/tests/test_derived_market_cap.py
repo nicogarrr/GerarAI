@@ -615,3 +615,21 @@ def test_split_after_close_but_in_future_not_counted(db):
     assert result["split_factor"] == 1.0
     assert result["market_cap"] == pytest.approx(
         25.70 * (1_972_000_000 / 12.89), rel=1e-6)
+
+
+def test_watchlist_per_nd_when_close_before_effective_split(db):
+    """PER de la watchlist: cierre de hace 3 dias, split 10:1 efectivo hace 2.
+    Base del cierre desconocida: PER N/D (antes 257 / 12,89 = 19,9 con un
+    cierre que podia estar ya ajustado -> PER real 199)."""
+    from app.api.routes.watchlist import watchlist_metrics
+
+    company = _company(db)
+    _price(db, company, Decimal("257.00"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    db.commit()
+    payload = watchlist_metrics("aena", db)
+    assert payload["per"] is None
+    assert payload["market_cap"] is None
+    assert any("anterior a un split ya efectivo" in s for s in payload["sources"])

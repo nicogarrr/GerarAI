@@ -42,27 +42,36 @@ test('all reference ranges load without claiming daily points are intraday', asy
 });
 test('close-only history stays honest; missing history stays empty', async ({ page }) => {
     await page.goto('/chart-preview?mode=close');
-    await expect(page.getByText('Sin datos OHLC para calcular niveles.')).toBeVisible();
     await expect(page.getByTestId('technical-price-canvas').locator('canvas').first()).toBeVisible();
+    // #2999 quitó el bloque escrito de pivotes («Sin datos OHLC para calcular
+    // niveles.»): con solo cierres, la lectura técnica se abstiene así.
+    await expect(page.getByText('Estructura: sin datos OHLC suficientes.')).toBeVisible();
+    await expect(page.getByText('Sin datos OHLC para Fibonacci.')).toBeVisible();
+    await expect(page.getByText('OHLC completo necesario')).toBeVisible();
     await page.goto('/chart-preview?mode=empty');
     await expect(page.getByText('Sin datos suficientes para este rango')).toBeVisible();
 });
 
 test('no quote AND no history preserves an explicit unavailable workspace', async ({ page }) => {
+    // La cabecera ya no lee snapshot.quote: pide su propia cotización a
+    // /extended-quote (que en e2e devuelve el fixture 336,56 US$). «Sin
+    // cotización» se simula en esa fuente.
+    await page.route('**/api/companies/*/extended-quote*', (route) =>
+        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ status: 'unavailable' }) }));
     await page.goto('/chart-preview?mode=unavailable');
     await expect(page.getByTestId('company-header-quote')).toBeVisible();
     await expect(page.getByTestId('company-technical-chart')).toBeVisible();
     await expect(page.getByText('Sin datos suficientes para este rango')).toBeVisible();
     await expect(page.getByText('336,56 US$')).not.toBeVisible();
-    await page.screenshot({ path: '/downloads/chart-unavailable.png', fullPage: true });
-    await expect(page.getByText('Sin datos OHLC para calcular niveles.')).toBeVisible();
+    await expect(page.getByText('Sin datos OHLC para Fibonacci.')).toBeVisible();
+    await page.screenshot({ path: 'test-results/chart-unavailable.png', fullPage: true });
 });
 
 test('Yahoo close-only through real adapter and normalizer abstains in UI', async ({ page }) => {
     await page.goto('/chart-preview?mode=yahoo');
     await expect(page.getByTestId('technical-price-canvas').locator('canvas').first()).toBeVisible();
-    await expect(page.getByText('Sin datos OHLC para calcular niveles.')).toBeVisible();
     await expect(page.getByText('Estructura: sin datos OHLC suficientes.')).toBeVisible();
     await expect(page.getByText('Sin datos OHLC para Fibonacci.')).toBeVisible();
-    await page.screenshot({path:'/downloads/yahoo-close-only-real-boundary.png',fullPage:true});
+    await expect(page.getByText('OHLC completo necesario')).toBeVisible();
+    await page.screenshot({path:'test-results/yahoo-close-only-real-boundary.png',fullPage:true});
 });

@@ -120,3 +120,42 @@ def test_index_is_cached_with_ttl(db):
     _co(db, "BBB", "Gamma Delta Industries Inc")
     by_name, _ = nrt._cached_index(db)
     assert "gamma delta industries" not in by_name
+
+
+
+def _px_unit(db, company, day, close, unit, adj=None):
+    db.add(MarketPrice(
+        company_id=company.id, date=day, close=close, adj_close=adj, quote_currency=unit, source="yfinance",
+    ))
+
+
+def test_quotes_show_pence_as_pounds_with_the_quote_currency(db):
+    """TSCO.L cotiza en GBp: 255 peniques se publican como 2,55 GBP, no «255 GBP»."""
+    tsco = _co(db, "TSCO.L", "Tesco PLC", currency="GBP", exchange="LSE")
+    _px_unit(db, tsco, date(2026, 10, 15), 250.0, "GBp")
+    _px_unit(db, tsco, date(2026, 10, 16), 255.0, "GBp")
+    db.flush()
+    quote = nrt.quotes_for(db, {tsco.id})[tsco.id]
+    assert quote["price"] == pytest.approx(2.55)
+    assert quote["currency"] == "GBP"
+    assert quote["change_pct"] == pytest.approx(2.0)
+
+
+def test_quote_change_between_pence_and_pounds_rows_is_a_real_move(db):
+    """250 GBp ayer y 2,55 GBP hoy es +2 %, no -98,98 %."""
+    tsco = _co(db, "TSCO.L", "Tesco PLC", currency="GBP", exchange="LSE")
+    _px_unit(db, tsco, date(2026, 10, 15), 250.0, "GBp")
+    _px_unit(db, tsco, date(2026, 10, 16), 2.55, "GBP")
+    db.flush()
+    assert nrt.quotes_for(db, {tsco.id})[tsco.id]["change_pct"] == pytest.approx(2.0)
+
+
+def test_quote_change_across_a_split_uses_adjusted_closes(db):
+    """Split 4:1 entre sesiones: 200 -> 52 es +4 % (ajustado 50 -> 52), no -74 %."""
+    nvda = _co(db, "NVDA", "NVIDIA Corporation")
+    _px_unit(db, nvda, date(2026, 10, 15), 200.0, "USD", adj=50.0)
+    _px_unit(db, nvda, date(2026, 10, 16), 52.0, "USD", adj=52.0)
+    db.flush()
+    quote = nrt.quotes_for(db, {nvda.id})[nvda.id]
+    assert quote["price"] == 52.0
+    assert quote["change_pct"] == pytest.approx(4.0)

@@ -6,6 +6,7 @@ import { AppError } from '@/lib/types/errors';
 import type { InvestorVideo } from '@/lib/ui/youtube-video';
 
 import type { ManagerChanges, OwnershipProvenance } from './ownership.actions';
+import { spanishBackendMessage } from '@/lib/research/backend-error-es';
 
 export type InvestorSummary = {
   slug: string;
@@ -88,7 +89,7 @@ export async function syncInvestorPortfoliosNow(): Promise<SyncPortfoliosResult>
         return { success: true };
     } catch (error) {
         console.error('syncInvestorPortfoliosNow error:', error);
-        return { success: false, message: error instanceof AppError ? error.message : 'No se pudo encolar la sincronización.' };
+        return { success: false, message: error instanceof AppError ? spanishBackendMessage(error.message) : 'No se pudo encolar la sincronización.' };
     }
 }
 

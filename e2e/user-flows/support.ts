@@ -1,6 +1,7 @@
 import { expect, test as base } from "@playwright/test";
 import type { Page, Request, Response } from "@playwright/test";
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { E2E_UI_BACKEND_URL } from "../fixtures/e2e-env";
 
 /**
  * Suite de flujos de usuario (E2E_UI_RUN=1): navegador real contra la app
@@ -153,7 +154,7 @@ export { expect };
 // Backend firmado como el usuario del bypass E2E (e2e-browser-user), solo para
 // preparar/limpiar estado. Los flujos en sí van siempre por la UI.
 
-const backendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+const backendURL = E2E_UI_BACKEND_URL;
 const secret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const browserUser = "e2e-browser-user";
 

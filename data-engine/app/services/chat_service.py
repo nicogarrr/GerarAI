@@ -41,6 +41,7 @@ from app.services.company_resolver import resolve_company
 from app.services.library_context import company_library_context, retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
 from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.position_value import position_base_value
 from app.services.source_hierarchy_service import source_tier_key
 from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
 
@@ -736,6 +737,9 @@ _PAGE_CONTENT_RE = re.compile(
 _NET_WORTH_CUE_RE = re.compile(r"(?i)\b(?:patrimonio|caja|margen|neto)\b")
 
 
+_UNVALUED_TEXT = "sin valor en {base} (falta tipo de cambio o la valoración está suspendida)"
+
+
 class ChatService:
     def __init__(self, provider: LLMProvider | None = None) -> None:
         self.memory = MemoryService()
@@ -1422,20 +1426,22 @@ class ChatService:
         if not rows:
             return []
 
-        def _value(pos: Position) -> float:
-            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
-            return float(raw or 0)
+        def _value(pos: Position) -> float | None:
+            raw = position_base_value(pos)
+            return float(raw) if raw is not None else None
 
-        rows.sort(key=lambda row: _value(row[0]), reverse=True)
+        rows.sort(key=lambda row: _value(row[0]) or 0.0, reverse=True)
         bases = {pos.base_currency or "EUR" for pos, _ in rows}
-        total = sum(_value(pos) for pos, _ in rows) if len(bases) == 1 else 0.0
+        total = sum(_value(pos) or 0.0 for pos, _ in rows) if len(bases) == 1 else 0.0
         out: list[dict] = []
         for pos, comp in rows[:limit]:
             out.append({
                 "ticker": comp.ticker,
                 "name": comp.name,
                 "sector": comp.sector,
-                "weight_pct": round(_value(pos) / total * 100, 1) if total > 0 else None,
+                "weight_pct": (
+                    round(value / total * 100, 1) if total > 0 and (value := _value(pos)) is not None else None
+                ),
                 "position_id": pos.id,
             })
         return out
@@ -1521,12 +1527,13 @@ class ChatService:
         if not rows:
             return None
 
-        def _value(pos: Position) -> float:
-            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
-            return float(raw or 0)
+        def _value(pos: Position) -> float | None:
+            raw = position_base_value(pos)
+            return float(raw) if raw is not None else None
 
-        rows.sort(key=lambda row: _value(row[0]), reverse=True)
-        total = sum(_value(pos) for pos, _ in rows)
+        rows.sort(key=lambda row: _value(row[0]) or 0.0, reverse=True)
+        total = sum(_value(pos) or 0.0 for pos, _ in rows)
+        unvalued = sum(1 for pos, _ in rows if _value(pos) is None)
         as_of = max(pos.as_of for pos, _ in rows)
         bases = {pos.base_currency or "EUR" for pos, _ in rows}
         mixed = len(bases) > 1
@@ -1534,13 +1541,21 @@ class ChatService:
         lines = []
         sources = []
         for pos, comp in rows[:limit]:
+            value = _value(pos)
             weight = (
-                f" ({_fmt_number_es(_value(pos) / total * 100, 1)} %)" if total > 0 and not mixed else ""
+                f" ({_fmt_number_es(value / total * 100, 1)} %)"
+                if value is not None and total > 0 and not mixed
+                else ""
+            )
+            value_text = (
+                f"valor {_fmt_number_es(value, 2)} {_currency_display(pos.base_currency or 'EUR')}{weight}"
+                if value is not None
+                else _UNVALUED_TEXT.format(base=_currency_display(pos.base_currency or "EUR"))
             )
             lines.append(
                 f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
                 f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {_currency_display(pos.currency)}, "
-                f"valor {_fmt_number_es(_value(pos), 2)} {_currency_display(pos.base_currency or 'EUR')}{weight}"
+                + value_text
             )
             sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of)))
         extra = f"\n(Se muestran las {limit} mayores de {len(rows)}.)" if len(rows) > limit else ""
@@ -1548,6 +1563,7 @@ class ChatService:
             "monedas base distintas, sin total"
             if mixed
             else f"valor total {_fmt_money_es(total)} {_currency_display(base)}"
+            + (f" sin contar {unvalued} sin valor en {_currency_display(base)}" if unvalued else "")
         )
         answer = (
             f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
@@ -1557,7 +1573,7 @@ class ChatService:
         )
         cash_line = self._cash_line(
             db, tenant_id, base if not mixed else None,
-            positions_total=None if mixed else total,
+            positions_total=None if mixed or unvalued else total,
         )
         if cash_line:
             answer += "\n\n" + cash_line
@@ -1693,6 +1709,7 @@ class ChatService:
         key_name, label, highest = metric
 
         def _value(pos: Position) -> float:
+            # Orden dentro de UNA moneda (currency_of): base si existe, si no el nativo.
             raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
             return float(raw or 0)
 
@@ -1958,9 +1975,9 @@ class ChatService:
         if not rows:
             return None
 
-        def _value(pos: Position) -> float:
-            raw = pos.market_value_base if pos.market_value_base is not None else pos.market_value
-            return float(raw or 0)
+        def _value(pos: Position) -> float | None:
+            raw = position_base_value(pos)
+            return float(raw) if raw is not None else None
 
         found = [(pos, comp) for pos, comp in rows if comp.id == company.id]
         if not found:
@@ -1977,23 +1994,33 @@ class ChatService:
                 llm_trace={"path": "portfolio_position", "generated": False, "provider_calls": 0},
             )
         pos, comp = found[0]
-        total = sum(_value(p) for p, _ in rows)
+        total = sum(_value(p) or 0.0 for p, _ in rows)
         bases = {p.base_currency or "EUR" for p, _ in rows}
         mixed = len(bases) > 1
-        if total > 0 and not mixed:
-            weight_text = f", un {_fmt_number_es(_value(pos) / total * 100, 1)} % del valor de tus posiciones"
+        unvalued = any(_value(p) is None for p, _ in rows)
+        value = _value(pos)
+        if value is None:
+            weight_text = ""
+        elif total > 0 and not mixed:
+            known = " con valor conocido" if unvalued else ""
+            weight_text = f", un {_fmt_number_es(value / total * 100, 1)} % del valor de tus posiciones{known}"
         else:
             weight_text = " (sin peso: monedas base distintas)"
+        value_text = (
+            f"valor {_fmt_money_es(value)} {_currency_display(pos.base_currency or 'EUR')}{weight_text}"
+            if value is not None
+            else _UNVALUED_TEXT.format(base=_currency_display(pos.base_currency or "EUR"))
+        )
         answer = (
             f"Tu posición guardada en {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
             f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
-            f"valor {_fmt_money_es(_value(pos))} {_currency_display(pos.base_currency or 'EUR')}{weight_text}, "
+            f"{value_text}, "
             f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
         )
         if _NET_WORTH_CUE_RE.search(question):
             cash_line = self._cash_line(
                 db, tenant_id, None if mixed else (pos.base_currency or "EUR"),
-                positions_total=None if mixed else total,
+                positions_total=None if mixed or unvalued else total,
             )
             if cash_line:
                 answer += "\n\n" + cash_line

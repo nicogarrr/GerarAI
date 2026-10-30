@@ -98,10 +98,13 @@ function NarrativeText({ text }: { text: string }) {
     : <span key={index}>{cleanThesisText(part)}</span>)}</>;
 }
 
-function ScoreBar({ label, value }: { label: string; value: number }) {
+function ScoreBar({ label, value, scale = 'quality' }: { label: string; value: number; scale?: 'quality' | 'risk' }) {
   const clamped = Math.max(0, Math.min(100, value));
-  const tone =
-    clamped >= 70 ? 'bg-teal-400' : clamped >= 40 ? 'bg-amber-400' : 'bg-red-400';
+  // 'quality': cuanto más alto, mejor. 'risk' (riesgo de valoración): cuanto
+  // más alto, peor; sin invertir, una especulativa (75/100) salía en verde.
+  const good = scale === 'risk' ? clamped < 40 : clamped >= 70;
+  const mid = scale === 'risk' ? clamped < 70 : clamped >= 40;
+  const tone = good ? 'bg-teal-400' : mid ? 'bg-amber-400' : 'bg-red-400';
   return (
     <div className="min-w-0">
       <div className="flex items-baseline justify-between gap-2 text-xs">
@@ -430,7 +433,7 @@ export default function ThesisMemo({
           <ScoreBar label="Confianza en datos" value={thesis.data_confidence_score} />
           <ScoreBar label="Cobertura de fuentes" value={thesis.source_coverage_score} />
           <ScoreBar label="Red team" value={thesis.red_team_score} />
-          <ScoreBar label="Riesgo de valoración" value={thesis.valuation_risk_score} />
+          <ScoreBar label="Riesgo de valoración" value={thesis.valuation_risk_score} scale="risk" />
         </div>
       </section>
 

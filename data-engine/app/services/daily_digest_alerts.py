@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.local_date import USER_TIMEZONE
 from app.models import PortfolioMoveDigest, ResearchAlert
 
 VERSION = "daily-digest-alert-v1"
@@ -73,11 +74,17 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
     # "disponible" sin variacion finita NO cuenta como dato: pasa a Sin datos.
     disponibles = []
     sin_datos = set()
+    # Hueco de sesion: hay cierre del dia, pero falta una sesion entre el y el
+    # anterior; no hay variacion de UN dia que mostrar. Se nombra aparte, con
+    # la sesion que falta, en vez de mezclarlo con "Sin datos" sin motivo.
+    huecos: dict[str, list[str]] = {}
     for item in items:
         pct = _fmt_pct(item.get("price_change_pct"))
         if item.get("status") == "disponible" and pct is not None:
             disponibles.append((abs(float(item["price_change_pct"])),
                                 f"{item['ticker']} {pct}"))
+        elif item.get("status") == "hueco de sesión" and item.get("ticker"):
+            huecos[item["ticker"]] = [str(day) for day in item.get("missing_sessions") or []]
         elif item.get("ticker"):
             sin_datos.add(item["ticker"])
     disponibles.sort(reverse=True)
@@ -101,18 +108,31 @@ def emit_digest_alert(db: Session, digest: PortfolioMoveDigest, as_of: date) -> 
     if items and sin_datos_shown:
         resumen += f" Sin datos: {', '.join(sin_datos_shown)}"
         resumen += f" y {omitidas_sd} mas." if omitidas_sd else "."
+    if huecos:
+        partes = []
+        for ticker in sorted(huecos)[:_MAX_LINEAS]:
+            dias = huecos[ticker]
+            if dias:
+                faltan = ", ".join(dias)
+                partes.append(f"{ticker} (falta el cierre del {faltan})" if len(dias) == 1
+                              else f"{ticker} (faltan los cierres del {faltan})")
+            else:
+                partes.append(f"{ticker} (falta una sesión intermedia)")
+        resto = len(huecos) - len(partes)
+        resumen += (" Sin variación diaria por hueco de sesión, no 0: " + ", ".join(partes)
+                    + (f" y {resto} más." if resto else "."))
     # La etiqueta del digest habla de su propia cobertura; si el resumen filtro
     # variaciones no finitas u omitio filas, el resumen es parcial aunque el
     # digest dijera "complete".
     cobertura_resumen = digest.coverage
-    if items and (sin_datos or omitidas or total_var < len(items)):
+    if items and (sin_datos or huecos or omitidas or total_var < len(items)):
         cobertura_resumen = "parcial"
     sampled = digest.generated_at
     if sampled.tzinfo is None:
         sampled = sampled.replace(tzinfo=UTC)
-    else:
-        sampled = sampled.astimezone(UTC)
-    sampled_txt = sampled.strftime("%Y-%m-%d %H:%M UTC")
+    sampled = sampled.astimezone(UTC)  # metadatos máquina: siempre UTC
+    # La hora que lee el usuario va en Europe/Madrid, no en la del servidor (UTC).
+    sampled_txt = sampled.astimezone(USER_TIMEZONE).strftime("%Y-%m-%d %H:%M") + " (hora de Madrid)"
     alert = ResearchAlert(
         tenant_id=tenant_id, company_id=None, severity="low", status="open",
         alert_type="daily_digest",

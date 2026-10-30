@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { expect, type Locator, type Page, test } from "@playwright/test";
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 // Hallazgos QA de la ficha (Nico, 2026-10-19):
 //  (6) 390px: el enlace "Ver la evaluación del foso" se pintaba encima del
@@ -7,7 +8,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 // (10) 1280px: la barra de 9 modulos desbordaba con scrollbar horizontal.
 test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1 to run browser tests.");
 
-const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+const uiBackendURL = E2E_UI_BACKEND_URL;
 const e2eResearchSecret =
   process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 

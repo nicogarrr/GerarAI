@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/ui/page-header';
 import {
-  createKnowledgeCollection,
+  createKnowledgeCollectionResult,
   decideKnowledgePrinciple,
   extractKnowledgePrinciples,
   getKnowledgeDocumentChunks,
@@ -26,9 +26,9 @@ import {
   getKnowledgeDocument,
   installKnowledgeDefaults,
   mergeKnowledgePrinciple,
-  reviseKnowledgePrinciple,
+  reviseKnowledgePrincipleResult,
   setKnowledgeDocumentTicker,
-  uploadKnowledgeDocument,
+  uploadKnowledgeDocumentResult,
 } from '@/lib/actions/research-tools.actions';
 import BackendOffline from '@/components/system/BackendOffline';
 import { DeleteCollectionButton } from '@/components/knowledge/DeleteCollectionButton';
@@ -284,15 +284,17 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           </div>
         </section>
       ) : null}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+      {/* Tres cifras en una fila también en móvil: apiladas ocupaban ~300 px y
+          empujaban el buscador y la lista fuera de la primera pantalla. */}
+      <section aria-label="Resumen de la biblioteca" className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           ['Colecciones', collections.length],
           ['Documentos', library.documentTotal],
           ['Pendientes de aprobación', library.proposedTotal],
         ].map(([label, value]) => (
-          <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{formatNumber(Number(value), { maximumFractionDigits: 0 })}</div>
+          <div className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-4" key={label}>
+            <div className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">{label}</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-gray-100 sm:mt-2 sm:text-2xl">{formatNumber(Number(value), { maximumFractionDigits: 0 })}</div>
           </div>
         ))}
       </section>
@@ -407,7 +409,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         </TabsContent>
 
         <TabsContent className="mt-2" value={TABS.subir}>
-          <MutationForm id="upload-knowledge" action={uploadKnowledgeDocument} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Documento ingerido">
+          <MutationForm id="upload-knowledge" action={uploadKnowledgeDocumentResult} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Documento ingerido">
             <div className="mb-4 flex items-center gap-2"><UploadCloud aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">{t('knowledge.upload')}</h2></div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {/* F142: etiquetas visibles - antes solo había placeholders/valores
@@ -485,7 +487,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             </div>
           </MutationForm>
           <section className="mt-6 grid grid-cols-1 gap-4 sm:gap-6 xl:grid-cols-2">
-            <MutationForm action={createKnowledgeCollection} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
+            <MutationForm action={createKnowledgeCollectionResult} className="rounded-xl border border-gray-800 bg-surface-1 p-5" resetOnSuccess successMessage="Colección creada">
               <div className="mb-4 flex items-center gap-2"><Library aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Nueva colección</h2></div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Nombre de la colección</span><Input className="h-11 w-full" name="name" placeholder={t('knowledge.qualityCompounders')} required /></label>
@@ -519,7 +521,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
               {principle.exceptions.length ? <p className="mt-2 text-sm text-amber-200"><span className="font-semibold">Excepciones:</span> {principle.exceptions.join('; ')}</p> : null}
               {principle.semantic_duplicate_of_id ? <div className="mt-3 rounded border border-amber-900/60 bg-amber-950/20 p-2 text-xs text-amber-200">Posible duplicado del principio #{principle.semantic_duplicate_of_id}. Revísalo antes de aprobar.</div> : null}
               {principle.status === 'proposed' ? <div className="mt-4 flex flex-wrap gap-2"><MutationForm action={decideKnowledgePrinciple.bind(null, principle.id, 'approve')} successMessage="Principio aprobado"><Button className="min-h-[44px]" size="sm" type="submit"><Check aria-hidden="true" className="h-4 w-4" />Aprobar</Button></MutationForm><MutationForm action={decideKnowledgePrinciple.bind(null, principle.id, 'reject')} successMessage="Principio rechazado"><Button className="min-h-[44px]" size="sm" type="submit" variant="outline"><X aria-hidden="true" className="h-4 w-4" />Rechazar</Button></MutationForm>{principle.semantic_duplicate_of_id ? <MutationForm action={mergeKnowledgePrinciple.bind(null, principle.id, principle.semantic_duplicate_of_id)} successMessage="Principio fusionado"><Button className="min-h-[44px]" size="sm" type="submit" variant="outline">Fusionar duplicado</Button></MutationForm> : null}</div> : null}
-              {['proposed', 'approved'].includes(principle.status) ? <details className="mt-4 border-t border-gray-800 pt-3"><summary className="cursor-pointer text-xs font-semibold uppercase text-gray-500">Corregir como nueva versión</summary><MutationForm action={reviseKnowledgePrinciple.bind(null, principle.id)} className="mt-3 grid grid-cols-1 gap-2" successMessage="Revisión propuesta"><Textarea className="min-h-[88px] w-full text-base md:text-sm" defaultValue={principle.principle} name="principle" required /><Input className="h-11 w-full" defaultValue={principle.category} name="category" required /><Input className="h-11 w-full" defaultValue={principle.application_conditions.join(', ')} name="application_conditions" placeholder="Condiciones, separadas por comas" /><Input className="h-11 w-full" defaultValue={principle.exceptions.join(', ')} name="exceptions" placeholder="Excepciones, separadas por comas" /><Button className="h-11 w-full sm:w-fit" size="sm" type="submit">Crear revisión</Button></MutationForm></details> : null}
+              {['proposed', 'approved'].includes(principle.status) ? <details className="mt-4 border-t border-gray-800 pt-3"><summary className="cursor-pointer text-xs font-semibold uppercase text-gray-500">Corregir como nueva versión</summary><MutationForm action={reviseKnowledgePrincipleResult.bind(null, principle.id)} className="mt-3 grid grid-cols-1 gap-2" successMessage="Revisión propuesta"><Textarea className="min-h-[88px] w-full text-base md:text-sm" defaultValue={principle.principle} name="principle" required /><Input className="h-11 w-full" defaultValue={principle.category} name="category" required /><Input className="h-11 w-full" defaultValue={principle.application_conditions.join(', ')} name="application_conditions" placeholder="Condiciones, separadas por comas" /><Input className="h-11 w-full" defaultValue={principle.exceptions.join(', ')} name="exceptions" placeholder="Excepciones, separadas por comas" /><Button className="h-11 w-full sm:w-fit" size="sm" type="submit">Crear revisión</Button></MutationForm></details> : null}
             </article>
           ))}
           {!visiblePrinciples.length ? (

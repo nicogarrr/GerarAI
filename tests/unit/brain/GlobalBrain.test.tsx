@@ -5,7 +5,11 @@ let pathname = '/portfolio';
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 
 const askKnowledge = vi.fn();
-vi.mock('@/lib/actions/knowledge-chat.actions', () => ({ askKnowledge: (...a: unknown[]) => askKnowledge(...a) }));
+vi.mock('@/lib/actions/knowledge-chat.actions', () => ({
+    askKnowledge: (...a: unknown[]) => askKnowledge(...a),
+    // El panel consume la variante tipada; el mock conserva el espia interno.
+    askKnowledgeResult: async (...a: unknown[]) => ({ ok: true as const, answer: await askKnowledge(...a) }),
+}));
 vi.mock('@/components/brain/BrainLibraryAnswer', () => ({ BrainLibraryAnswer: () => <div>Citas conservadas</div> }));
 const chatWithPortfolio = vi.fn();
 vi.mock('@/lib/actions/brain.actions', () => ({ chatWithPortfolio: (...a: unknown[]) => chatWithPortfolio(...a) }));

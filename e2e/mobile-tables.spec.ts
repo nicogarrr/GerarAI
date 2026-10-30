@@ -2,10 +2,11 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
-const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+const uiBackendURL = E2E_UI_BACKEND_URL;
 const e2eResearchSecret =
   process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 

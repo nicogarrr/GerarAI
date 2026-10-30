@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 from decimal import Decimal, InvalidOperation
+from fractions import Fraction
 from typing import Any
 
 import httpx
@@ -129,6 +130,77 @@ def _verify_totals(
 # ambos son cobertura "partial", asi que toda pantalla que ya mostraba «Datos
 # parciales» sigue haciendolo; el motivo exacto viaja en ``verification``.
 VERIFICATION_COVERAGES = frozenset({"mismatch", "unverified"})
+
+
+
+# --- Splits entre dos trimestres 13F ------------------------------------------
+# Un split 10:1 entre dos 13F multiplica por 10 las acciones de TODOS los
+# tenedores sin que nadie compre nada (NVDA 10:1, 2024-06-10: Q1 2024 → Q2 2024).
+# Comparar acciones a pelo marcaba a cada gestor como «increased» y la lista
+# «lo que mas compran» se llenaba de compras inventadas. El propio filing trae
+# la evidencia: un tenedor que no opera tiene EXACTAMENTE ratio × acciones y el
+# precio implicito (valor / acciones) cae en la misma proporcion.
+SPLIT_MIN_RATIO = Fraction(3, 2)
+SPLIT_MAX_NUMERATOR = 50
+SPLIT_MAX_DENOMINATOR = 4
+SPLIT_PRICE_TOLERANCE = 1.5
+_DOLLAR_VALUE_FROM = date(2022, 12, 31)
+
+
+def _value_dollars(row: Any) -> Decimal | None:
+    value = getattr(row, "value_usd_thousands", None)
+    report = getattr(row, "report_date", None)
+    if value is None or report is None:
+        return None
+    return Decimal(value) if report >= _DOLLAR_VALUE_FROM else Decimal(value) * 1000
+
+
+def implied_split_ratio(now: Any, before: Any) -> Fraction | None:
+    """Ratio de split (acciones despues / antes) que explica el cambio, o None.
+
+    Exige las dos evidencias: acciones en proporcion EXACTA y sencilla (2:1,
+    3:2, 10:1, 1:10...) y precio implicito del filing movido en esa misma
+    proporcion (tolerancia x1,5 para el movimiento del mercado en el
+    trimestre). Un gestor que de verdad duplica su posicion conserva el precio
+    implicito y no pasa la segunda prueba.
+    """
+    if (getattr(now, "share_type", None) or "SH").upper() != "SH":
+        return None
+    if (getattr(before, "share_type", None) or "SH").upper() != "SH":
+        return None
+    now_shares, before_shares = now.shares, before.shares
+    if not now_shares or not before_shares or now_shares <= 0 or before_shares <= 0:
+        return None
+    ratio = Fraction(Decimal(now_shares)) / Fraction(Decimal(before_shares))
+    magnitude = ratio if ratio > 1 else 1 / ratio
+    if (
+        magnitude < SPLIT_MIN_RATIO
+        or magnitude.numerator > SPLIT_MAX_NUMERATOR
+        or magnitude.denominator > SPLIT_MAX_DENOMINATOR
+    ):
+        return None
+    now_value, before_value = _value_dollars(now), _value_dollars(before)
+    if not now_value or not before_value or now_value <= 0 or before_value <= 0:
+        return None
+    price_ratio = float((before_value / Decimal(before_shares)) / (now_value / Decimal(now_shares)))
+    if not float(ratio) / SPLIT_PRICE_TOLERANCE <= price_ratio <= float(ratio) * SPLIT_PRICE_TOLERANCE:
+        return None
+    return ratio
+
+
+def share_change_label(now: Any, before: Any) -> str:
+    """increased / decreased / unchanged por acciones, neutralizando un split."""
+    # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
+    now_shares = Decimal(now.shares or 0)
+    # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
+    before_shares = Decimal(before.shares or 0)
+    if implied_split_ratio(now, before) is not None:
+        return "unchanged"
+    if now_shares > before_shares:
+        return "increased"
+    if now_shares < before_shares:
+        return "decreased"
+    return "unchanged"
 
 
 def public_coverage(raw: str | None) -> str | None:
@@ -455,16 +527,7 @@ class ManagerHoldingIngestionService:
                 labels.append("closed")
             else:
                 assert now is not None and before is not None
-                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
-                now_shares = now.shares or Decimal(0)
-                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
-                before_shares = before.shares or Decimal(0)
-                if now_shares > before_shares:
-                    labels.append("increased")
-                elif now_shares < before_shares:
-                    labels.append("decreased")
-                else:
-                    labels.append("unchanged")
+                labels.append(share_change_label(now, before))
         return labels
 
     def changes(self, db: Session, *, cik: str) -> dict[str, Any]:
@@ -535,16 +598,7 @@ class ManagerHoldingIngestionService:
                 change = "closed"
             else:
                 assert now is not None and before is not None
-                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
-                now_shares = now.shares or Decimal(0)
-                # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
-                before_shares = before.shares or Decimal(0)
-                if now_shares > before_shares:
-                    change = "increased"
-                elif now_shares < before_shares:
-                    change = "decreased"
-                else:
-                    change = "unchanged"
+                change = share_change_label(now, before)
             subject = now or before
             assert subject is not None
             changes.append(

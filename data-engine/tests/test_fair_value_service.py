@@ -261,3 +261,171 @@ def test_adr_live_engine_value_is_per_adr(db, monkeypatch):
                                                    "listed_share_values": {"expected": 80.0}})
     out = fvs.resolve_fair_value(db, company, live=True)
     assert out["value"] == 80.0
+
+
+# --- Propuesta (b): insufficient_data y borradores orientativos caducos -----
+
+
+def _insufficient_model(db, company, *, version, missing=("revenue", "fcf"), when=None):
+    model = ValuationModel(
+        company_id=company.id,
+        model_type="dcf",
+        version=version,
+        status="insufficient_data",
+        calculation_trace={
+            "missing_inputs": list(missing),
+            "reason": "snapshot incompleto",
+        },
+    )
+    if when is not None:
+        model.created_at = when
+    db.add(model)
+    db.flush()
+
+
+def test_choose_orientative_engine_older_than_180_days_is_not_served():
+    engine = Candidate(value=42.5, as_of=TODAY - timedelta(days=200), publishable=False)
+    out = choose(None, engine, today=TODAY)
+    assert out["value"] is None and out["source"] is None
+    assert out["label"] == "Sin valor justo"
+    assert "borrador orientativo" in out["reason"]
+    assert out["missing_inputs"] == []
+
+
+def test_choose_orientative_engine_without_date_is_not_served():
+    engine = Candidate(value=42.5, as_of=None, publishable=False)
+    out = choose(None, engine, today=TODAY)
+    assert out["value"] is None
+    assert "sin fecha" in out["reason"]
+
+
+def test_choose_engine_block_reason_reaches_the_no_value_reading():
+    from app.services.fair_value_service import EngineBlock
+
+    block = EngineBlock(
+        kind="insufficient_data",
+        reason="La última valoración del motor no dio cifra: faltan revenue, fcf.",
+        missing_inputs=("revenue", "fcf"),
+        as_of=TODAY,
+    )
+    out = choose(None, None, today=TODAY, engine_block=block)
+    assert out["value"] is None
+    assert out["reason"] == block.reason
+    assert out["missing_inputs"] == ["revenue", "fcf"]
+
+
+def test_choose_publishable_engine_does_not_expire():
+    engine = Candidate(value=90.0, as_of=TODAY - timedelta(days=400), publishable=True)
+    out = choose(None, engine, today=TODAY)
+    assert out["value"] == 90.0 and out["source"] == "motor"
+
+
+def test_latest_insufficient_data_hides_an_older_draft_number(db):
+    company = _company(db, "RKLBX")
+    _engine_output(db, company, status="draft", expected=95.0, version=1)
+    _insufficient_model(db, company, version=2, missing=("revenue", "shares_diluted", "fcf"))
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company], today=TODAY)[company.id]
+    assert out["value"] is None and out["source"] is None
+    assert out["label"] == "Sin valor justo"
+    assert "revenue" in out["reason"] and "shares_diluted" in out["reason"]
+    assert out["missing_inputs"] == ["revenue", "shares_diluted", "fcf"]
+
+
+def test_latest_insufficient_data_also_hides_an_older_final(db):
+    company = _company(db, "ASTSX")
+    _engine_output(db, company, status="final", expected=80.0, version=1)
+    _insufficient_model(db, company, version=2, missing=("net_debt",))
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company], today=TODAY)[company.id]
+    assert out["value"] is None
+    assert "net_debt" in out["reason"]
+
+
+def test_stale_persisted_draft_is_not_served_in_batch(db):
+    company = _company(db, "OLDRFT")
+    old = datetime(2026, 4, 10, 12, 0)
+    _engine_output(db, company, status="draft", expected=95.0, version=1, when=old)
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company], today=TODAY)[company.id]
+    assert out["value"] is None and out["source"] is None
+    assert "borrador orientativo" in out["reason"]
+
+
+def test_fresh_thesis_wins_over_latest_insufficient_data(db):
+    company = _company(db, "THWINS")
+    db.add(ThesisVersion(company_id=company.id, version=1, status="published",
+                         expected_value=150, thesis_markdown="t", executive_summary="s"))
+    _publishable_model(db, company)
+    _insufficient_model(db, company, version=3)
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company], today=TODAY)[company.id]
+    assert out["source"] == "tesis" and out["value"] == 150.0
+    assert out["reason"] is None
+
+
+def test_single_ticker_live_insufficient_data_reports_missing_inputs(db, monkeypatch):
+    company = _company(db, "UBERX")
+    db.commit()
+
+    class Insufficient:
+        def value_company(self, _db, _company):
+            return {
+                "status": "insufficient_data",
+                "publishable": False,
+                "expected_value": None,
+                "missing_inputs": ["revenue", "shares_diluted", "fcf"],
+                "trace": {"reason": "sin hechos SEC ingeridos"},
+            }
+
+    monkeypatch.setattr("app.services.valuation_service.ValuationService", Insufficient)
+    out = fvs.resolve_fair_value(db, company, live=True, today=TODAY)
+    assert out["value"] is None and out["source"] is None
+    assert "revenue" in out["reason"] and "fcf" in out["reason"]
+    assert out["missing_inputs"] == ["revenue", "shares_diluted", "fcf"]
+
+
+def test_watchlist_monitor_exposes_fair_value_reason(db, monkeypatch):
+    company = _company(db, "NOVAL")
+    _insufficient_model(db, company, version=1, missing=("revenue",))
+    db.commit()
+
+    async def earnings(*args):
+        return {"status": "unavailable", "events": []}
+
+    monkeypatch.setattr(watchlist, "fetch_earnings_range", earnings)
+    monitor = asyncio.run(watchlist.watchlist_monitor(tickers="NOVAL", db=db))
+    row = monitor["items"]["NOVAL"]
+    assert row["fair_value"] is None
+    assert row["fair_value_source"] is None
+    assert "revenue" in row["fair_value_reason"]
+
+
+def test_insufficient_model_without_trace_details_uses_generic_reason(db):
+    company = _company(db, "NOTRACE")
+    model = ValuationModel(company_id=company.id, model_type="dcf", version=1,
+                           status="insufficient_data", calculation_trace={})
+    db.add(model)
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company], today=TODAY)[company.id]
+    assert out["value"] is None
+    assert "no pudo calcular un valor" in out["reason"]
+    assert out["missing_inputs"] == []
+
+
+def test_persisted_engine_candidates_keeps_its_previous_contract(db):
+    company = _company(db, "COMPAT")
+    _engine_output(db, company, status="final", expected=80.0, version=1)
+    db.commit()
+    candidates = fvs.persisted_engine_candidates(db, [company.id])
+    assert candidates[company.id].value == 80.0
+
+
+def test_single_ticker_non_live_reads_persisted_block(db):
+    company = _company(db, "NOLIVE")
+    _engine_output(db, company, status="draft", expected=95.0, version=1)
+    _insufficient_model(db, company, version=2, missing=("revenue",))
+    db.commit()
+    out = fvs.resolve_fair_value(db, company, live=False, today=TODAY)
+    assert out["value"] is None
+    assert "revenue" in out["reason"]

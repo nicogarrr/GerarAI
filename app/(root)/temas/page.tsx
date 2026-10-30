@@ -119,48 +119,53 @@ function ThemeCard({
           </div>
         </summary>
         <div className="border-t border-gray-800 px-4 pb-4 pt-3">
-          <table className="w-full text-left text-xs">
-            <caption className="sr-only">Composición de {theme.name}</caption>
-            <thead className="uppercase text-gray-500">
-              <tr>
-                <th className="py-1 pr-2 font-medium" scope="col">Valor</th>
-                <th className="px-2 py-1 text-right font-medium" scope="col">Peso</th>
-                <th className="px-2 py-1 text-right font-medium" scope="col">{firstLabel}</th>
-                <th className="hidden px-2 py-1 text-right font-medium sm:table-cell" scope="col">Aporta</th>
-                <th className="py-1 pl-2 text-right font-medium" scope="col">{order === 'ytd' ? '1M' : 'YTD'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => {
-                const v1 = order === 'ytd' ? row.ytd : row.m1;
-                const v2 = order === 'ytd' ? row.m1 : row.ytd;
-                const weight = constituentWeight(theme, first, v1);
-                const contribution = constituentContribution(theme, first, v1);
-                return (
-                  <tr className="border-t border-gray-900" key={row.ticker}>
-                    <th className="py-1.5 pr-2 font-semibold" scope="row">
-                      <Link className="-my-1 inline-flex min-h-11 min-w-11 items-center justify-center text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
-                        {row.ticker}
-                      </Link>
-                      {row.reason ? (
-                        <span className="mt-0.5 block max-w-[11rem] text-[11px] font-normal leading-4 text-gray-500">
-                          {row.reason}
-                        </span>
-                      ) : null}
-                    </th>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
-                      {weight === null ? NA : formatPercent(weight, { fromRatio: false, digits: 1 })}
-                    </td>
-                    <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v1)]}`}>{pct(v1)}</td>
-                    <td className={`hidden px-2 py-1.5 text-right tabular-nums sm:table-cell ${TONE_TEXT[themeTone(contribution)]}`}>
-                      {contribution === null ? NA : formatPercent(contribution, { fromRatio: false, digits: 2, signDisplay: 'always' })}
-                    </td>
-                    <td className={`pl-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v2)]}`}>{pct(v2)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          {/* La tarjeta mide ~315 px en la rejilla de 2-3 columnas: «Aporta» sale
+              sólo si cabe en la tarjeta (container query, no ancho de ventana) y la
+              tabla nunca se sale de la tarjeta ni pisa la vecina. */}
+          <div className="@container overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <caption className="sr-only">Composición de {theme.name}</caption>
+              <thead className="uppercase text-gray-500">
+                <tr>
+                  <th className="py-1 pr-2 font-medium" scope="col">Valor</th>
+                  <th className="px-2 py-1 text-right font-medium" scope="col">Peso</th>
+                  <th className="px-2 py-1 text-right font-medium" scope="col">{firstLabel}</th>
+                  <th className="hidden px-2 py-1 text-right font-medium @sm:table-cell" scope="col">Aporta</th>
+                  <th className="py-1 pl-2 text-right font-medium" scope="col">{order === 'ytd' ? '1M' : 'YTD'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => {
+                  const v1 = order === 'ytd' ? row.ytd : row.m1;
+                  const v2 = order === 'ytd' ? row.m1 : row.ytd;
+                  const weight = constituentWeight(theme, first, v1);
+                  const contribution = constituentContribution(theme, first, v1);
+                  return (
+                    <tr className="border-t border-gray-900" key={row.ticker}>
+                      <th className="py-1.5 pr-2 font-semibold" scope="row">
+                        <Link className="-my-1 inline-flex min-h-11 min-w-11 items-center justify-center text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>
+                          {row.ticker}
+                        </Link>
+                        {row.reason ? (
+                          <span className="mt-0.5 block max-w-[11rem] text-[11px] font-normal leading-4 text-gray-500">
+                            {row.reason}
+                          </span>
+                        ) : null}
+                      </th>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-gray-400">
+                        {weight === null ? NA : formatPercent(weight, { fromRatio: false, digits: 1 })}
+                      </td>
+                      <td className={`px-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v1)]}`}>{pct(v1)}</td>
+                      <td className={`hidden px-2 py-1.5 text-right tabular-nums @sm:table-cell ${TONE_TEXT[themeTone(contribution)]}`}>
+                        {contribution === null ? NA : formatPercent(contribution, { fromRatio: false, digits: 2, signDisplay: 'always' })}
+                      </td>
+                      <td className={`pl-2 py-1.5 text-right tabular-nums ${TONE_TEXT[themeTone(v2)]}`}>{pct(v2)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
           <ThemeFundamentals themeId={theme.id} />
           {flow ? (
             <ThemeFlow flow={flow} holdings={holdings} />
