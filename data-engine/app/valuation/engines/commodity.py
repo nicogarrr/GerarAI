@@ -18,7 +18,9 @@ from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
     ValuationEngine,
+    adr_ratio,
     insufficient_result,
+    is_adr_without_ratio,
     margin_of_safety,
 )
 from app.valuation.moat_framework import empty_moat_framework
@@ -40,6 +42,25 @@ class CommodityCycleEngine(ValuationEngine):
         company = context.company
         snapshot = context.snapshot
         current_price = context.current_price
+        if is_adr_without_ratio(company):
+            # Producción y acciones vienen en ordinarias; el precio es del ADR.
+            result = insufficient_result(
+                ticker=company.ticker,
+                model_type=company.valuation_model,
+                engine_key=self.key,
+                current_price=current_price,
+                missing_inputs=["adr_ratio"],
+                reason=(
+                    f"{company.ticker} is quoted as an ADR but the ordinary-shares-per-ADR "
+                    "ratio is unknown, so value per share and the quoted price are not on "
+                    "the same basis."
+                ),
+                snapshot=snapshot,
+            )
+            result["moat"] = empty_moat_framework(
+                company.company_type, company.factor_tags or [], company.special_risks or []
+            )
+            return result
 
         def latest(metric: str) -> FinancialFact | None:
             return context.db.scalar(
@@ -160,6 +181,9 @@ class CommodityCycleEngine(ValuationEngine):
             ]
         )
         expected = weighted["expected_value"]
+        # Valor por acción ordinaria; un ADR cotiza N ordinarias (BHP, VALE...).
+        ratio = adr_ratio(company)
+        comparable_price = current_price / ratio if (ratio and current_price) else current_price
 
         return {
             "ticker": company.ticker,
@@ -171,8 +195,21 @@ class CommodityCycleEngine(ValuationEngine):
             "base_value": base_v,
             "bull_value": bull_v,
             "expected_value": expected,
-            "margin_of_safety": margin_of_safety(expected, current_price),
+            "margin_of_safety": margin_of_safety(expected, comparable_price),
             "missing_inputs": [],
+            "adr_ratio": ratio,
+            "value_per_share_basis": "ordinary_share",
+            "listed_share_values": (
+                {
+                    "bear": bear_v * ratio,
+                    "base": base_v * ratio,
+                    "bull": bull_v * ratio,
+                    "expected": expected * ratio,
+                }
+                if ratio
+                else None
+            ),
+            "comparable_price_basis": "ordinary_share" if ratio else "listed_share",
             "reverse_dcf": {},
             "sensitivity": grid,
             "moat": empty_moat_framework(
