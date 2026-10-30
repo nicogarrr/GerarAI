@@ -1018,6 +1018,34 @@ def _merge_lot_rows(rows: list[ElementTree.Element]) -> list[ElementTree.Element
     return [ElementTree.Element(rows[0].tag, attrib)]
 
 
+# Niveles de detalle de la sección Trades que NO son ejecuciones: IBKR los
+# exporta con su propia etiqueta y el importador solo lee <Trade> (ejecución).
+_NON_EXECUTION_TRADE_TAGS = {"Order": "orden", "SymbolSummary": "resumen por símbolo", "AssetSummary": "resumen por activo"}
+
+
+def _trade_level_notice(root: ElementTree.Element) -> str | None:
+    """Aviso si la Flex trae operaciones solo a nivel de orden/resumen.
+
+    Una Flex Query con Trades > Options = solo «Orders» exporta ``<Order>`` y
+    ninguna fila ``<Trade>``. Antes se importaba con estado ``imported``, cero
+    operaciones y sin ningún aviso: las compras y ventas desaparecían en
+    silencio. No se importan las órdenes como operaciones porque una
+    reimportación posterior a nivel de ejecución las duplicaría.
+    """
+    tags = {_tag_name(e) for e in root.iter()}
+    if "Trade" in tags:
+        return None
+    found = [label for tag, label in _NON_EXECUTION_TRADE_TAGS.items() if tag in tags]
+    if not found:
+        return None
+    count = sum(1 for e in root.iter() if _tag_name(e) in _NON_EXECUTION_TRADE_TAGS)
+    return (
+        f"La Flex trae {count} fila(s) de operaciones a nivel de {' y '.join(found)}, pero ninguna "
+        "a nivel de ejecución: no se ha importado ninguna compra ni venta. En IBKR, edita la Flex "
+        "Query, sección Trades > Options, marca «Execution» y vuelve a importar."
+    )
+
+
 def _collapse_lot_positions(elements: list[ElementTree.Element]) -> list[ElementTree.Element]:
     """Una Flex con «Open Positions: Lot» trae, por posicion, la fila SUMMARY y una
     ``OpenPosition levelOfDetail="LOT"`` por lote. Cada fila sobrescribia la posicion,
@@ -1263,6 +1291,9 @@ class IBKRImportService:
         non_stock_skipped = 0
         unknown_tickers: dict[str, int] = {}
         elements = _collapse_lot_positions(list(root.iter()))
+        level_notice = _trade_level_notice(root)
+        if level_notice and level_notice not in row_errors:
+            row_errors.append(level_notice)
         if trades_only:
             # Primero los Trade: crean los emisores a los que luego se atribuyen
             # los dividendos (orden estable, el resto mantiene su orden).
