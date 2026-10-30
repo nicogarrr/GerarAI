@@ -14,7 +14,9 @@ test('mobile access is in its reserved navigation row, not over page controls', 
   assert.ok(!brain.includes('translate-y-24'));
   // #1805: el Cerebro es una celda más de la rejilla (6 columnas), ya no una
   // franja apilada encima de la barra; sigue en la fila de navegación.
+  assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8')).name, 'Cerebro');
   assert.ok(nav.includes('grid-cols-6'));
-  assert.ok(nav.indexOf('<ul') < nav.indexOf('>Cerebro'));
+  assert.ok(nav.includes("{t('brain.name')}"));
+  assert.ok(nav.indexOf('<ul') < nav.indexOf("{t('brain.name')}"));
   assert.ok(nav.includes("new Event('gerarai:open-brain')"));
 });

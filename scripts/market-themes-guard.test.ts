@@ -112,7 +112,8 @@ describe('página /temas', () => {
     assert.ok(page.includes("export const dynamic = 'force-dynamic'"));
     // Menú de Descubrir y subnav se derivan del ROUTE_CATALOG (17-oct): la
     // presencia de /temas alli cubre ambos.
-    assert.ok(source('lib/constants.ts').includes("{ href: '/temas', label: 'Temas'"));
+    assert.ok(source('lib/constants.ts').includes("{ href: '/temas', labelKey: 'nav.items.temas'"));
+    assert.equal(JSON.parse(source('lib/i18n/messages/es/nav.json')).items.temas, 'Temas');
     assert.ok(source('components/layout/SectionNav.tsx').includes('flattenNavItems'));
     assert.ok(source('app/(root)/discover/page.tsx').includes('flattenNavItems'));
     assert.ok(source('app/robots.ts').includes("'/temas'"));

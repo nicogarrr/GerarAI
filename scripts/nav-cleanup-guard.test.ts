@@ -9,6 +9,7 @@ import test from 'node:test';
 
 const constants = readFileSync('lib/constants.ts', 'utf8');
 const sidebar = readFileSync('components/layout/Sidebar.tsx', 'utf8');
+const navEs = JSON.parse(readFileSync('lib/i18n/messages/es/nav.json', 'utf8'));
 const breadcrumbs = readFileSync('components/layout/Breadcrumbs.tsx', 'utf8');
 
 test('cada destino del sidebar aparece una sola vez (árbol + pie)', () => {
@@ -28,9 +29,10 @@ test('cada destino del sidebar aparece una sola vez (árbol + pie)', () => {
 });
 
 test('la sección del plan tiene un solo destino: sin título duplicado', () => {
+    assert.equal(navEs.sections.miPlan, 'Mi plan');
     // «Mi plan» con un solo item no muestra título (showsNavSectionTitle) y
     // el nav deja de leer «Mi plan / Plan» seguidos.
-    const section = /title: 'Mi plan',\s*\n\s*items: \[([\s\S]*?)\],\s*\n\s*\}/.exec(constants);
+    const section = /titleKey: 'nav.sections.miPlan',\s*\n\s*items: \[([\s\S]*?)\],\s*\n\s*\}/.exec(constants);
     assert.ok(section, 'sección Mi plan no encontrada');
     assert.equal((section[1].match(/href:/g) ?? []).length, 1);
     assert.match(constants, /export function showsNavSectionTitle[\s\S]*?section\.items\.length > 1/);
@@ -42,8 +44,9 @@ test('/research/workflows eliminado (pagina sin uso)', () => {
 });
 
 test('«Vista de mercado» pasa a «Mercado»', () => {
+    assert.equal(navEs.screener, 'Explorar acciones');
     assert.ok(!constants.includes('Vista de mercado'), 'queda el nombre antiguo');
-    assert.match(constants, /\{ href: '\/screener', label: 'Explorar acciones', icon: LineChart, hub: '\/discover'/);
+    assert.match(constants, /\{ href: '\/screener', labelKey: 'nav.screener', icon: LineChart, hub: '\/discover'/);
 });
 
 test('el árbol del sidebar encoge con min-h-0: el pie queda alcanzable', () => {
