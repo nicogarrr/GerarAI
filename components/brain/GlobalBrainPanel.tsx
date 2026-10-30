@@ -332,9 +332,12 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
             aria-modal={librarySlot ? undefined : true}
             aria-labelledby="global-brain-title"
             aria-busy={loading}
-            className={`${librarySlot ? 'relative h-[min(780px,80dvh)] min-h-[520px] w-full' : 'fixed z-50'} flex flex-col border-indigo-500/30 bg-slate-950/95 backdrop-blur-md shadow-2xl transition-all duration-300 ${librarySlot ? '' : isMaximized
-            ? 'top-4 bottom-4 left-4 right-4 w-auto h-auto'
-            : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
+            className={`${librarySlot ? 'relative h-[min(780px,80dvh)] min-h-[520px] w-full' : 'fixed z-50'} flex flex-col border-indigo-500/30 shadow-2xl transition-all duration-300 ${librarySlot ? 'bg-slate-950/95 backdrop-blur-md' : isMaximized
+            ? // Maximizado el panel cubre casi toda la pantalla: fondo sólido,
+              // sin transparencia; con /95 la barra inferior se veía detrás
+              // del campo de texto (informe UX 29-oct, punto 9).
+              'top-4 bottom-4 left-4 right-4 w-auto h-auto bg-slate-950'
+            : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 bg-slate-950/95 backdrop-blur-md md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
         >
             <CardHeader className="shrink-0 p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
