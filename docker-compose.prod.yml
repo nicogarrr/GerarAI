@@ -35,7 +35,7 @@ x-app-env: &app-env
   RESEARCH_AUTH_SECRET: ${RESEARCH_AUTH_SECRET:?Obligatorio}
   PYTHONUNBUFFERED: "1"
   DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-portfolio}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cavaai_research}
-  REDIS_URL: redis://redis:6379/0
+  REDIS_URL: redis://:${REDIS_PASSWORD:?Define REDIS_PASSWORD en .env.production}@redis:6379/0
   KPI_QUEUE_MAX_PENDING: ${KPI_QUEUE_MAX_PENDING:-500}
   KPI_DEFER_LEASE_SECONDS: ${KPI_DEFER_LEASE_SECONDS:-900}
   QDRANT_URL: http://qdrant:6333
@@ -178,18 +178,30 @@ services:
     ports: !reset []
     image: redis:7-alpine
     container_name: cavaai-redis
+    user: redis
     restart: unless-stopped
     # Cola Dramatiq + cache; AOF para no perder jobs en reinicio.
     # maxmemory 768 MB: con 512 MB el backlog de ingesta expulsaba/fallaba
     # jobs legitimos (noeviction convierte presion en QueueCapacityError, no
     # en perdida silenciosa). Alerta operativa: `INFO memory` >
     # 80% de 768 MB o `LLEN` de colas creciendo durante >30 min.
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "768mb", "--maxmemory-policy", "noeviction"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Define REDIS_PASSWORD en .env.production}
+    # Generated secret must use letters/digits only (URL/config safe). Keep it
+    # out of process arguments and logs; configuration file is mode 0600.
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$$REDIS_PASSWORD" in *[!a-zA-Z0-9]*|"") echo "Invalid Redis secret format" >&2; exit 1;; esac
+        umask 077
+        printf 'appendonly yes\nmaxmemory 768mb\nmaxmemory-policy noeviction\nrequirepass %s\n' "$$REDIS_PASSWORD" > /tmp/redis-auth.conf
+        exec redis-server /tmp/redis-auth.conf
     volumes:
       - redis_data:/data
     logging: *default-logging
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", 'REDISCLI_AUTH="$$REDIS_PASSWORD" redis-cli ping | grep -qx PONG']
       interval: 10s
       timeout: 5s
       retries: 5
