@@ -23,7 +23,7 @@ export function auditScoreText(
     score: number,
     formatScore: (value: number) => string,
 ): string {
-    const base = `puntuación de respaldo de afirmaciones ${formatScore(score)}/100 (penaliza baja confianza)`;
+    const base = `puntuación de respaldo de afirmaciones ${formatScore(score)}/100 (penaliza baja confianza y una conciliación SEC/FMP ausente)`;
     return passed
         ? base
         : `${base} — mide solo citas, no el motivo del bloqueo`;
