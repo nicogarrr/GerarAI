@@ -8,12 +8,14 @@ from app.core.config import Settings
 
 def test_empty_model_overrides_env_is_an_empty_dict(monkeypatch):
     monkeypatch.setenv("LLM_MODEL_OVERRIDES", "")
-    assert Settings(_env_file=None).llm_model_overrides == {}
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
+    assert Settings().llm_model_overrides == {}
 
 
 def test_json_model_overrides_env_still_parses(monkeypatch):
     monkeypatch.setenv("LLM_MODEL_OVERRIDES", '{"a": "b"}')
-    assert Settings(_env_file=None).llm_model_overrides == {"a": "b"}
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///test.db")
+    assert Settings().llm_model_overrides == {"a": "b"}
 
 
 def test_pool_probe_reports_outstanding_connections(monkeypatch, caplog, tmp_path):
@@ -67,3 +69,43 @@ def test_slow_request_middleware_logs_only_slow_requests(caplog):
     assert "slow request: GET /x status=200" in caplog.text
     assert "pool_checkedout=7" in caplog.text
     assert "secret" not in caplog.text
+
+
+def test_pool_configuration_defaults():
+    """VAL-PERF-007: connection pool configured with 10-20 connections."""
+    settings = Settings(database_url="postgresql://user:pass@localhost/db")
+    assert settings.db_pool_size == 10
+    assert settings.db_max_overflow == 10
+    assert settings.db_pool_timeout == 30.0
+    assert settings.db_pool_recycle == 3600
+    # Total connections: pool_size + max_overflow = 10 + 10 = 20
+
+
+def test_pool_kwargs_applied_only_for_postgres():
+    """Pool parameters are only applied to PostgreSQL, not SQLite."""
+    from app.core.database import _engine_pool_kwargs
+
+    settings = Settings(database_url="sqlite:///test.db")
+    
+    # SQLite should get empty dict (no pool params)
+    sqlite_kwargs = _engine_pool_kwargs("sqlite:///test.db", settings)
+    assert sqlite_kwargs == {}
+    
+    # PostgreSQL should get pool params
+    pg_kwargs = _engine_pool_kwargs("postgresql://user:pass@localhost/db", settings)
+    assert pg_kwargs["pool_size"] == 10
+    assert pg_kwargs["max_overflow"] == 10
+    assert pg_kwargs["pool_timeout"] == 30.0
+    assert pg_kwargs["pool_recycle"] == 3600
+    
+    # PostgreSQL with driver suffix
+    pg_psycopg_kwargs = _engine_pool_kwargs("postgresql+psycopg://user:pass@localhost/db", settings)
+    assert pg_psycopg_kwargs["pool_size"] == 10
+
+
+def test_pool_pre_ping_enabled():
+    """Pool pre-ping is enabled to detect stale connections."""
+    from app.core.database import engine
+    
+    # Check that pool_pre_ping is set on the engine
+    assert engine.pool._pre_ping is True

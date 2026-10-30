@@ -205,12 +205,12 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./portfolio_research_os.db"
     # Pool SQLAlchemy SOLO para Postgres (database.py ignora estos valores con
-    # sqlite). Backend: 20+10 conexiones; workers: 4+2 via compose. Juntos
+    # sqlite). Backend: 10+10 conexiones; workers: 4+2 via compose. Juntos
     # quedan muy por debajo de max_connections=200 del Postgres de prod.
-    db_pool_size: int = Field(default=20, ge=1, le=200)
+    db_pool_size: int = Field(default=10, ge=1, le=200)
     db_max_overflow: int = Field(default=10, ge=0, le=200)
     db_pool_timeout: float = Field(default=30.0, gt=0, le=300)
-    db_pool_recycle: int = Field(default=1800, ge=0)
+    db_pool_recycle: int = Field(default=3600, ge=0)
     # Defensa de red tras los commits de #1657: una transaccion abierta y
     # olvidada en un worker no puede bloquear tablas mas de 2 minutos. Solo
     # Postgres (se pasa via connect_args options); 0 lo desactiva.
@@ -261,7 +261,7 @@ class Settings(BaseSettings):
     knowledge_rag_min_free_gb: float = Field(default=3.0, ge=0.0, le=1000.0)
     # Chunks: margen bajo el truncado de ambos densos (MiniLM 256 wp, e5-large 512 wp).
     knowledge_rag_child_max_tokens: int = Field(default=200, ge=32, le=250)
-    knowledge_rag_child_overlap_tokens: int = Field(default=30, ge=0, le=100)
+    knowledge_rag_child_overlap_tokens: int = Field(default=50, ge=0, le=100)
     knowledge_rag_parent_max_tokens: int = Field(default=900, ge=200, le=4000)
     # Docling minimo: sin OCR, sin VLM, sin ASR. Tablas: "fast" (~145 MB) o
     # "accurate" (~213 MB).
