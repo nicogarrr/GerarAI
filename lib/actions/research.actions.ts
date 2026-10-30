@@ -1257,8 +1257,11 @@ export type ResearchNewsEvent = {
   requires_update: boolean;
   /** 'source' = fecha de la fuente; 'ingested_at_fallback' = la fuente no da fecha. */
   date_source?: string | null;
-  /** 'macro' = evento macro GDELT sin ticker; 'gobierno' = fuente oficial; null/ausente = empresa. */
+  /** 'macro' = evento macro sin ticker; 'gobierno' = fuente oficial; null/ausente = empresa. */
   news_lane?: string | null;
+  /** true = el carril macro no tiene frescura (fuente caída) y la API sirve
+   *  el archivo reciente marcado: la UI lo anuncia y nunca finge frescura. */
+  archive?: boolean;
   /** false = título de display generado por GerarAI (la UI omite el prefijo de ticker). */
   headline_from_source?: boolean;
   macro_theme?: string | null;

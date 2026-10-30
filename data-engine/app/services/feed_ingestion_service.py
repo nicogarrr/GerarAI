@@ -15,6 +15,7 @@ from app.services.connectors import (
     SECClient,
 )
 from app.services.document_ingestion_service import MAX_DOCUMENT_BYTES
+from app.services.macro_news import MACRO_NEWS_LANE
 from app.services.public_fetch import fetch_public_url_async
 
 
@@ -134,10 +135,35 @@ GOV_RSS_FEEDS: tuple[RSSFeed, ...] = (
 )
 
 
-def all_rss_feeds(value: str | None = None) -> list[RSSFeed]:
-    """Agencias + fuentes oficiales de gobierno incluidas + RSS_FEEDS, sin duplicados."""
+# Fuentes oficiales de estadística macro (RSS/Atom público, gratis, sin
+# clave), carril «macro». Es el carril de reserva cuando GDELT no responde:
+# medido en prod el 30-oct-2026, GDELT llevaba >72h inalcanzable desde la VM
+# (HTTP 000/429 sostenido) y el carril macro quedó a 0 (la API filtra a
+# 72h). URLs verificadas una a una el 30-oct-2026 con el UA del poller
+# (200 + XML válido). Descartadas en la verificación (no inventar fuentes):
+# BLS 403 a clientes servidor, INE retiró su RSS público (404 en todas las
+# rutas), IMF/OECD 403 (anti-bot), ONS/BIS/Census sin feed de comunicados
+# localizado. Misma regla fail-closed que el resto de carriles: company_id
+# NULL siempre y nunca alertas de noticias seguidas.
+MACRO_RSS_FEEDS: tuple[RSSFeed, ...] = (
+    RSSFeed("https://apps.bea.gov/rss/rss.xml", label="BEA (oficial)", lane=MACRO_NEWS_LANE),
+    RSSFeed(
+        "https://ec.europa.eu/eurostat/en/search"
+        "?p_p_id=estatsearchportlet_WAR_estatsearchportlet&p_p_lifecycle=2"
+        "&p_p_state=maximized&p_p_mode=view&p_p_resource_id=atom"
+        "&_estatsearchportlet_WAR_estatsearchportlet_collection=CAT_PREREL",
+        label="Eurostat (oficial)",
+        lane=MACRO_NEWS_LANE,
+    ),
+)
 
-    return _unique_feeds([*PRESS_WIRE_RSS_FEEDS, *GOV_RSS_FEEDS, *configured_rss_feeds(value)])
+
+def all_rss_feeds(value: str | None = None) -> list[RSSFeed]:
+    """Agencias + fuentes oficiales (gobierno y macro) incluidas + RSS_FEEDS, sin duplicados."""
+
+    return _unique_feeds(
+        [*PRESS_WIRE_RSS_FEEDS, *GOV_RSS_FEEDS, *MACRO_RSS_FEEDS, *configured_rss_feeds(value)]
+    )
 
 
 def _unique_feeds(feeds: list[RSSFeed]) -> list[RSSFeed]:
