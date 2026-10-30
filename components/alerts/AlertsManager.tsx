@@ -41,6 +41,7 @@ import { reviewResearchExpectations } from '@/lib/actions/research.actions';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { etiquetaCanal, etiquetaEstadoEntrega } from '@/lib/alerts/delivery-labels';
+import { alertSkipNote } from '@/lib/alerts/skip-note';
 
 const ALERT_TYPE_LABELS: Record<AlertType, string> = {
     price_above: t('alerts.types.priceAbove'),
@@ -521,7 +522,7 @@ function AlertsManager() {
                                         {alert.lastEvaluatedAt
                                             ? `Motor: evaluada ${formatUserDateTime(alert.lastEvaluatedAt)} · ${alert.triggerCount} disparos · ${(alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app'))}`
                                             : 'Motor: pendiente de primera evaluación (cada 5 min)'}
-                                        {alert.lastResultStatus === 'skipped_stale_observation' ? ' · dato desactualizado' : null}
+                                        {alertSkipNote(alert.lastResultStatus) ? ` · ${alertSkipNote(alert.lastResultStatus)}` : null}
                                     </p>
                                     {alert.symbol ? (
                                         <Link
