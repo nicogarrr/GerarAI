@@ -42,7 +42,7 @@ from app.services import market_change
 from app.services.analyst_targets_service import AnalystTargets, analyst_targets_service
 from app.services.async_bridge import run_from_any_context
 from app.services.company_changes_service import changes_since
-from app.services.company_enrichment_service import CompanyEnrichmentService
+from app.services.company_enrichment_service import CompanyEnrichmentService, fill_default_currency
 from app.services.company_resolver import resolve_companies, resolve_company
 from app.services.company_snapshot_service import CompanySnapshotService
 from app.services.connectors.fmp import FMPClient
@@ -367,7 +367,7 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
             ticker=ticker,
             name=(payload.name or ticker).strip(),
             exchange=(payload.exchange or "UNKNOWN").strip().upper(),
-            currency=(payload.currency or "USD").strip().upper(),
+            currency=(payload.currency or "").strip().upper(),
             sector=(payload.sector or "Unknown").strip(),
             industry=(payload.industry or "Unknown").strip(),
             domicile_country=(
@@ -387,6 +387,7 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
             CompanyEnrichmentService().enrich(db, company)
         except Exception:  # noqa: BLE001 - el ensure nunca debe fallar por esto
             logger.warning("enrich fallo para %s", ticker, exc_info=True)
+        fill_default_currency(company)
     else:
         if payload.name and company.name == company.ticker:
             company.name = payload.name.strip()
