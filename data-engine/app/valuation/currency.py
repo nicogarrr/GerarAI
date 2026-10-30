@@ -20,6 +20,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from functools import lru_cache
 
 from sqlalchemy.orm import Session
 
@@ -76,10 +77,13 @@ SUFFIX_QUOTE_UNIT: dict[str, str] = {
 }
 
 
+@lru_cache(maxsize=512)
 def normalize_currency(raw: str | None) -> tuple[str | None, int]:
     """``(divisa ISO principal, divisor)`` de un codigo de divisa del proveedor.
 
     ``"GBp"`` -> ``("GBP", 100)``; ``"usd"`` -> ``("USD", 1)``; vacio -> ``(None, 1)``.
+    Pura y con un puñado de codigos distintos: se memoriza (la reconstruccion
+    de la cartera la llama decenas de miles de veces por vista).
     """
     text = (raw or "").strip()
     if not text:

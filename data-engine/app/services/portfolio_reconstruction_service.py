@@ -213,11 +213,16 @@ class PortfolioReconstructionService:
             held = [cid for cid, q in qty.items() if q > 0]
             value = Decimal("0")
             reason = None
+            # Un tipo por divisa y dia (no uno por posicion y dia).
+            day_rates: dict[str, Decimal | None] = {}
             for cid in held:
                 close = prices.get((cid, day))
-                rate = PortfolioFXService.rate_from_table(
-                    fx_table, quote_currency=currency[cid], base_currency=base, as_of=day
-                )
+                cid_currency = currency[cid]
+                if cid_currency not in day_rates:
+                    day_rates[cid_currency] = PortfolioFXService.rate_from_table(
+                        fx_table, quote_currency=cid_currency, base_currency=base, as_of=day
+                    )
+                rate = day_rates[cid_currency]
                 if close is None:
                     reason = f"sin precio de cierre: {tickers.get(cid)}"
                     break

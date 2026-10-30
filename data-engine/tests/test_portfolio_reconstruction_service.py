@@ -122,3 +122,40 @@ def test_opening_quantity_is_derived_from_position_minus_ledger(db):
     assert result.quantity_check[0]["opening_derived"] == 10.0
     assert result.status == "ok"
     assert [row["value_base"] for row in result.series] == [100.0, 66.0, 72.0]
+
+
+def test_fx_lookup_is_once_per_currency_and_day_not_per_position(db, monkeypatch):
+    """Antes: un ``rate_from_table`` por posicion y dia (N x dias); ahora uno por divisa y dia."""
+    from app.services.portfolio_fx_service import PortfolioFXService
+
+    companies = [_company(db, f"C{i}") for i in range(5)]
+    days = 20
+    for company in companies:
+        _tx(db, company, D0, "buy", "10", "10")
+        for offset in range(days):
+            _price(db, company, D0 + timedelta(days=offset), 10 + offset * 0.1)
+        _position(db, company, "10", str(10 * (10 + (days - 1) * 0.1)))
+    db.commit()
+    calls = {"n": 0}
+    real = PortfolioFXService.rate_from_table
+
+    def counting(*args, **kwargs):
+        calls["n"] += 1
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(PortfolioFXService, "rate_from_table", staticmethod(counting))
+    result = PortfolioReconstructionService().build(db)
+
+    assert result.status == "ok" and result.usable
+    # 20 dias x 1 divisa + 5 flujos de compra (antes 5 x 20 + 5 = 105).
+    assert calls["n"] <= days + len(companies)
+
+
+def test_normalize_currency_is_memoized_and_unchanged():
+    from app.valuation.currency import normalize_currency
+
+    assert normalize_currency("GBp") == ("GBP", 100)
+    assert normalize_currency(" usd ") == ("USD", 1)
+    assert normalize_currency(None) == (None, 1)
+    assert normalize_currency("") == (None, 1)
+    assert getattr(normalize_currency, "cache_info", None) is not None
