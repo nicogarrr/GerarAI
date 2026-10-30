@@ -9,7 +9,7 @@ import { formatPercent } from '@/lib/format';
  *  significa que FALTA (el token suelto se leía como «WACC con fuente
  *  trazable», justo lo contrario). */
 const BLOCKER_LABELS: Record<string, string> = {
-  traceable_wacc: 'WACC sin cálculo trazable: se descontó con el tipo por defecto del modelo',
+  traceable_wacc: 'WACC sin cálculo trazable',
   forecast_is_not_the_driver: 'el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración',
 };
 
