@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
@@ -208,3 +208,96 @@ def test_period_label_legible():
     assert period_label(F) == "Q1 2026"
     F.period = "2025-12-31:FY"
     assert period_label(F) == "FY 2025"
+
+
+def test_flow_capex_excludes_fy_marker(db):
+    company = _seed_capex(db, tenant_id=1)
+    db.add(FinancialFact(
+        company_id=company.id, metric="capital_expenditure", value=Decimal("-90000000000"),
+        unit="USD", period="2027-12-31:FY", fiscal_year=2027, fiscal_quarter="FY",
+        source_type="SEC", is_reported=True, tenant_id=1,
+    ))
+    db.commit()
+    payload = build_theme_payload(db, FLOW_THEMES["centros-de-datos"], 1)
+    googl = next(row for row in payload["spenders"] if row["key"] == "GOOGL")
+    assert googl["period_label"] == "Q1 2026"
+
+
+def test_flow_capex_reports_outflow_magnitude(db):
+    company = _seed_capex(db, tenant_id=1)
+    fact = db.scalar(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "capital_expenditure",
+        FinancialFact.period == "2026-03-31:Q1",
+    ))
+    fact.value = Decimal("-35700000000")
+    db.commit()
+    payload = build_theme_payload(db, FLOW_THEMES["centros-de-datos"], 1)
+    googl = next(row for row in payload["spenders"] if row["key"] == "GOOGL")
+    assert googl["amount"] == 35700000000.0
+
+
+def test_flow_capex_orders_by_period_when_sec_fiscal_year_is_missing(db):
+    company = _seed_capex(db, tenant_id=1)
+    latest = db.scalar(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "capital_expenditure",
+        FinancialFact.period == "2026-03-31:Q1",
+    ))
+    latest.fiscal_year = None  # edgartools quarterly facts use this convention
+    db.commit()
+    payload = build_theme_payload(db, FLOW_THEMES["centros-de-datos"], 1)
+    googl = next(row for row in payload["spenders"] if row["key"] == "GOOGL")
+    assert googl["period_label"] == "Q1 2026"
+    assert googl["amount"] == 35700000000.0
+
+
+@pytest.mark.parametrize("uptime", [0.0, 30.0, 119.0, 121.0])
+def test_defense_first_request_does_not_invent_negative_cache(db, monkeypatch, uptime):
+    monkeypatch.setattr(money_flows.time, "monotonic", lambda: uptime)
+    monkeypatch.setattr(money_flows, "fetch_agency_obligations", lambda *a: 100.0)
+    monkeypatch.setattr(money_flows, "fetch_top_categories", lambda *a: [])
+    monkeypatch.setattr(money_flows, "fetch_top_recipients", lambda *a: [])
+    result = build_theme_payload(db, FLOW_THEMES["defensa"], 1)
+    assert result["spenders"][0]["amount"] == 100.0
+
+
+def test_usaspending_helpers_use_expected_endpoints(monkeypatch):
+    calls = []
+    def post(path, payload):
+        calls.append((path, payload))
+        return {"results": [{"aggregated_amount": "25", "amount": 25}]}
+    monkeypatch.setattr(money_flows, "_usaspending_post", post)
+    assert money_flows.fetch_agency_obligations("Defense", "2024-10-01", "2025-09-30") == 25.0
+    assert money_flows.fetch_top_categories("Defense", "2024-10-01", "2025-09-30")
+    assert money_flows.fetch_top_recipients("Defense", "2024-10-01", "2025-09-30")
+    assert [path for path, _ in calls] == [
+        "/search/spending_over_time/", "/search/spending_by_category/psc/",
+        "/search/spending_by_category/recipient/",
+    ]
+    assert calls[0][1]["filters"]["time_period"] == [{"start_date": "2024-10-01", "end_date": "2025-09-30"}]
+
+
+def test_usaspending_transport_and_empty_result(monkeypatch):
+    class Response:
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {"results": []}
+    monkeypatch.setattr(money_flows.httpx, "post", lambda *a, **k: Response())
+    assert money_flows._usaspending_post("/example/", {}) == {"results": []}
+    with pytest.raises(RuntimeError):
+        money_flows.fetch_agency_obligations("Defense", "2024-10-01", "2025-09-30")
+
+
+def test_flow_cache_hits_and_expiry(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(money_flows.time, "monotonic", lambda: now[0])
+    calls = []
+    def load():
+        calls.append(1)
+        return len(calls)
+    assert money_flows._cached("test", load) == 1
+    assert money_flows._cached("test", load) == 1
+    now[0] += 3601
+    assert money_flows._cached("test", load) == 2

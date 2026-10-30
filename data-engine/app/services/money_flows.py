@@ -319,12 +319,13 @@ def _latest_quarterly_fact(
             FinancialFact.metric == metric,
             FinancialFact.source_type.in_(["SEC", "ESEF"]),
             FinancialFact.is_reported.is_(True),
-            FinancialFact.fiscal_quarter.isnot(None),
+            FinancialFact.fiscal_quarter.in_(["Q1", "Q2", "Q3", "Q4"]),
         )
         .options(selectinload(FinancialFact.source))
         .order_by(
-            FinancialFact.fiscal_year.desc().nullslast(),
-            FinancialFact.fiscal_quarter.desc(),
+            # SEC quarterly ingestion leaves fiscal_year=None. The canonical
+            # ISO period end is comparable across fiscal calendars and sources.
+            FinancialFact.period.desc(),
             FinancialFact.id.desc(),
         )
     ).all()
@@ -382,7 +383,9 @@ def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> di
         base["note"] = "Sin capex trimestral reportado en los datos de la app"
         return base
     base.update(
-        amount=float(capex.value),
+        # Both legacy positive capex and SEC negative cash-flow outflows
+        # represent spending here. Do not subtract a spender from the total.
+        amount=abs(float(capex.value)),
         unit=capex.unit,
         period_label=period_label(capex),
         source=fact_source(capex),
@@ -430,8 +433,8 @@ def build_usaspending_theme(
         spenders.append(spender)
     try:
         with _cache_lock:
-            failed_at = _cache.get(f"fail:{agency}", (0.0, None))[0]
-        if time.monotonic() - failed_at < _NEGATIVE_CACHE_TTL:
+            failure = _cache.get(f"fail:{agency}")
+        if failure is not None and time.monotonic() - failure[0] < _NEGATIVE_CACHE_TTL:
             raise RuntimeError("USAspending falló hace <2 min (caché negativa)")
         total = _cached(f"oblig:{agency}:{start}", lambda: fetch_agency_obligations(agency, start, end))
         spenders[0]["amount"] = total
