@@ -61,7 +61,7 @@ def test_other_tenant_positions_never_appear_and_no_tenant_means_no_overview(db)
     db.commit()
     db.info["tenant_id"] = 1
     resp = asyncio.run(ChatService().answer(db, "¿Qué tengo en mi cartera?", "portfolio", None))
-    assert "AAA" in resp.answer and "SECRET" not in resp.answer and "1 posiciones" in resp.answer
+    assert "AAA" in resp.answer and "SECRET" not in resp.answer and "1 posición abierta" in resp.answer
     db.info["tenant_id"] = None
     assert ChatService()._portfolio_overview(db) is None
 

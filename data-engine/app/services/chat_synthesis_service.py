@@ -840,9 +840,16 @@ class ChatSynthesisService:
         baseline trae doctrina de la biblioteca (cartas de inversores), con
         esos fragmentos como apoyo citable de forma natural.
         """
-        from app.llm.general_concepts import local_definition
+        from app.llm.general_concepts import followup_definition, local_definition
 
         definition = local_definition(question)
+        if definition is None and history:
+            last_user = next(
+                (turn.content for turn in reversed(history)
+                 if getattr(turn, "role", None) == "user" and getattr(turn, "content", "")),
+                None,
+            )
+            definition = followup_definition(question, last_user)
         if definition is not None:
             return ChatResponse(
                 answer=definition, sources=[], proposed_actions=[],
