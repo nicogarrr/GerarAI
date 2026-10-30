@@ -398,3 +398,45 @@ def test_compatible_execution_create_link_and_unlink_still_work(db, decision, ac
     assert entry.transaction_id is None
     service.link_transaction(db, company, entry.id, tx.id)
     assert entry.transaction_id == tx.id
+
+
+
+# --- ADR: el margen compara el valor por ADR con el precio del ADR -----------
+# Cálculo independiente: ordinaria 10, ratio 8 -> 80 por ADR; compra a 64 ->
+# margen 80/64 - 1 = 0,25 (en main: 10/64 - 1 = -0,84375).
+
+
+def test_adr_engine_margin_is_per_adr(db):
+    company = _company(db)
+    model = ValuationModel(company_id=company.id, model_type="standard_dcf", version=1, status="final",
+                           calculation_trace={}, created_at=datetime(2026, 3, 1, tzinfo=UTC),
+                           updated_at=datetime(2026, 3, 1, tzinfo=UTC))
+    db.add(model)
+    db.flush()
+    db.add(ValuationOutput(valuation_model_id=model.id, scenario="base", value_per_share=Decimal("10"),
+                           output_payload={"expected_value": 10.0, "adr_ratio": 8.0,
+                                           "listed_share_values": {"expected": 80.0}}))
+    db.commit()
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("64"), currency="USD")
+    assert reading is not None
+    assert reading["value"] == 80.0
+    assert reading["margin_vs_trade_price"] == pytest.approx(0.25)
+
+
+def test_adr_thesis_margin_is_per_adr_and_adr_without_listed_values_is_skipped(db):
+    company = _company(db)
+    created = datetime(2026, 3, 1, tzinfo=UTC)
+    db.add(ThesisVersion(company_id=company.id, version=1, status="published", thesis_markdown="# T",
+                         executive_summary="R", rating="watch", expected_value=Decimal("10"),
+                         valuation_basis={"adr_ratio": 8.0, "listed_share_values": {"expected": 80.0}},
+                         created_at=created, updated_at=created))
+    db.add(ThesisVersion(company_id=company.id, version=2, status="published", thesis_markdown="# T",
+                         executive_summary="R", rating="watch", expected_value=Decimal("11"),
+                         valuation_basis={"adr_ratio": 8.0},
+                         created_at=created, updated_at=created))
+    db.commit()
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("64"), currency="USD")
+    assert reading is not None
+    assert reading["version"] == 1
+    assert reading["value"] == 80.0
+    assert reading["margin_vs_trade_price"] == pytest.approx(0.25)
