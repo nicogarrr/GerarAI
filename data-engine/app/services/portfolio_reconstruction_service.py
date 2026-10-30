@@ -144,21 +144,29 @@ class PortfolioReconstructionService:
         lower = max(start, first_trade) if start else first_trade
         warmup = first_trade - timedelta(days=7)
         prices: dict[tuple[int, date], Decimal] = {}
-        for row in db.scalars(
-            select(MarketPrice).where(
+        # Columnas, no entidades: son años de cierres por valor (decenas de
+        # miles de filas) y construir un MarketPrice ORM por fila era el mayor
+        # coste de la reconstruccion. MarketPrice no es de tenant.
+        for price_company_id, price_date, close, quote_currency in db.execute(
+            select(
+                MarketPrice.company_id,
+                MarketPrice.date,
+                MarketPrice.close,
+                MarketPrice.quote_currency,
+            ).where(
                 MarketPrice.company_id.in_(company_ids), MarketPrice.date >= warmup
             )
-        ).all():
-            if row.close and row.close > 0:
-                company = companies_by_id.get(row.company_id)
+        ):
+            if close and close > 0:
+                company = companies_by_id.get(price_company_id)
                 if company is None:
                     continue
                 converted = price_in_currency(
-                    row.close, quote_currency=row.quote_currency,
-                    target_currency=currency[row.company_id], company=company,
+                    close, quote_currency=quote_currency,
+                    target_currency=currency[price_company_id], company=company,
                 )
                 if converted is not None:
-                    prices[(row.company_id, row.date)] = converted
+                    prices[(price_company_id, price_date)] = converted
         days = sorted({d for (_, d) in prices if d >= warmup})
         fx_table = fx.fx_table(
             db,
