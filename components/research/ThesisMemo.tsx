@@ -48,6 +48,7 @@ const RATING_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  final: 'generada · pendiente de aprobación',
   draft: 'borrador',
   review: 'en revisión',
   approved: 'aprobada',
@@ -253,7 +254,11 @@ export default function ThesisMemo({
       </div>
 
 
-      {thesis.status !== 'published' && thesis.status !== 'approved' && thesis.status !== 'insufficient_data' ? (
+      {thesis.status === 'final' ? (
+        <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
+          Generación completada, pendiente de aprobación. La auditoría automática de fuentes y la aprobación para publicar son pasos distintos; consulta el resultado de la auditoría en Fuentes.
+        </p>
+      ) : thesis.status !== 'published' && thesis.status !== 'approved' && thesis.status !== 'insufficient_data' ? (
         <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
           Borrador en revisión: texto sin auditar
         </p>
