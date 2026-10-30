@@ -166,7 +166,15 @@ async def catalysts_calendar(
             # Dividendos y plazos 10-Q/10-K siguen siendo solo de cartera:
             # para watchlist el brief pide resultados, no ruido.
             calendar_connector.fetch_dividends_range(start, end) if held_us else _empty_connector(),
-            catalyst_service.fetch_filing_deadlines(held_us, start, end) if held_us else _empty_connector(),
+            # Mismo deadline que NASDAQ: van en paralelo, asi la ruta entera
+            # cabe en ~8 s. Con 20 s (presupuesto propio de EDGAR) una SEC
+            # caida retenia la respuesta 20 s y el cliente (15 s) la cortaba:
+            # la pagina perdia tambien lo que si habia (acciones, dividendos).
+            catalyst_service.fetch_filing_deadlines(
+                held_us, start, end, budget_seconds=calendar_connector.RANGE_DEADLINE_S
+            )
+            if held_us
+            else _empty_connector(),
         )
     else:  # sin posiciones US no hay nada que cruzar con NASDAQ/EDGAR: no se les pregunta
         earnings = dividends = filings = {"status": "ok", "events": [], "errors": []}
