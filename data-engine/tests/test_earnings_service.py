@@ -101,3 +101,21 @@ def test_accounting_parentheses_are_not_silently_read_as_positive():
 def test_incomplete_numeric_groups_do_not_create_truncated_candidates():
     for text in ("Net income was $1,25 million.", "Net income was $12.5.3 million."):
         assert EarningsWorkflowService()._extract_metrics(text, {1: text}) == []
+
+
+def test_metric_patterns_skip_fiscal_years_and_growth_rates():
+    import re as _re
+
+    from app.services.earnings_service import METRIC_PATTERNS as _P
+
+    def first(metric, text):
+        m = _re.search(_P[metric], text, _re.IGNORECASE)
+        return m.groups() if m else None
+
+    assert first("revenue", "Revenue for the third quarter of 2026 was $5.1 billion.") == ("$5.1", "billion")
+    assert first("revenue", "Revenue grew 12% to $5.1 billion.") == ("$5.1", "billion")
+    assert first("revenue", "Revenue grew 12.5% year over year to 5.1 billion.") == ("5.1", "billion")
+    assert first("revenue", "Revenue for fiscal 2026 is expected to grow.") is None
+    assert first("net_income", "Net income in 2025 was -$1.2 million.") == ("-$1.2", "million")
+    assert first("revenue", "Revenue was $2,026 million.") == ("$2,026", "million")
+    assert first("gross_margin", "Gross margin for 2026 was 45.5%.") == ("45.5",)

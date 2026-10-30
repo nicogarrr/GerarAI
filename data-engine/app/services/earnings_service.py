@@ -26,8 +26,13 @@ from app.services.review_alert_service import ReviewAlertService
 _NUMBER = r"(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]+)?(?![0-9,]|\.[0-9])"
 _MONEY = rf"((?:[+−-]?\s*\$?\s*|\$\s*[+−-]?\s*){_NUMBER})"
 _SCALE = r"\s*(billion|million|bn|m)?"
+# Fiscal years ("third quarter of 2026") and growth rates ("grew 12%") are
+# prose between the label and the amount, never the amount itself.
+_YEAR = r"\b(?:19|20)[0-9]{2}\b(?![0-9,]|\.[0-9])"
+_GAP = rf"(?:[^0-9.$+−\-()]|{_YEAR}(?!\s*%)|[0-9]+(?:\.[0-9]+)?\s*%)"
+_NOT_BARE_YEAR = rf"(?!\s*{_YEAR}(?!\s*(?:billion|million|bn|m)\b))"
 METRIC_PATTERNS = {
-    metric: rf"\b{label}\b[^0-9.$+−\-()]{{0,80}}{_MONEY}{_SCALE}"
+    metric: rf"\b{label}\b{_GAP}{{0,80}}{_NOT_BARE_YEAR}{_MONEY}(?!\s*%){_SCALE}"
     for metric, label in {
         "revenue": r"(?:revenue|sales)",
         "operating_income": "operating income",
@@ -36,7 +41,7 @@ METRIC_PATTERNS = {
     }.items()
 }
 METRIC_PATTERNS.update({
-    metric: rf"\b{label}\b[^0-9+−\-()]{{0,40}}([+−-]?\s*{_NUMBER})\s*%"
+    metric: rf"\b{label}\b(?:[^0-9+−\-()]|{_YEAR}(?!\s*%)){{0,40}}([+−-]?\s*{_NUMBER})\s*%"
     for metric, label in {
         "gross_margin": "gross margin",
         "operating_margin": "operating margin",
