@@ -83,11 +83,16 @@ def fastembed_available() -> bool:
     return True
 
 
-def embed_dense(texts: list[str], model: str = DEFAULT_DENSE_MODEL) -> list[list[float]]:
+def embed_dense(
+    texts: list[str],
+    model: str = DEFAULT_DENSE_MODEL,
+    batch_size: int = 5,
+) -> list[list[float]]:
     """Embeddings densos normalizados via fastembed (ONNX CPU).
 
     Lanza ``FastembedUnavailable`` si la dependencia falta, o el error
     original si el modelo falla (el llamador decide degradar).
+    Procesa en lotes configurables (por defecto 5 fragmentos, VAL-PERF-005).
     """
     try:
         from fastembed import TextEmbedding
@@ -97,7 +102,7 @@ def embed_dense(texts: list[str], model: str = DEFAULT_DENSE_MODEL) -> list[list
             f"(model={model!r}). Install fastembed to enable the ONNX backend."
         ) from exc
     embedding = _cached_model("dense", TextEmbedding, model)
-    return [list(vector) for vector in embedding.embed(texts)]
+    return [list(vector) for vector in embedding.embed(texts, batch_size=batch_size)]
 
 
 @dataclass(frozen=True)

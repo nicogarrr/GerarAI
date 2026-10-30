@@ -15,6 +15,30 @@ def redact_secrets(text: str) -> str:
     return _redact_core(_redact_llm(text))
 
 
+_QDRANT_CLIENT_POOL: dict[str, QdrantClient] = {}
+_QDRANT_POOL_LOCK = threading.Lock()
+
+
+def get_qdrant_client(url: str) -> QdrantClient:
+    """Pool de conexiones thread-safe para reutilizar clientes Qdrant sin reconexiones repetidas.
+
+    Fulfills: VAL-PERF-005
+    """
+    cached = _QDRANT_CLIENT_POOL.get(url)
+    if cached is not None:
+        return cached
+    with _QDRANT_POOL_LOCK:
+        if url not in _QDRANT_CLIENT_POOL:
+            _QDRANT_CLIENT_POOL[url] = QdrantClient(url=url)
+        return _QDRANT_CLIENT_POOL[url]
+
+
+def clear_qdrant_pool() -> None:
+    """Limpia el pool de conexiones (para pruebas y reinicios)."""
+    with _QDRANT_POOL_LOCK:
+        _QDRANT_CLIENT_POOL.clear()
+
+
 class RAGIndex:
     collection_name = "portfolio_research_documents"
     vector_size = 384
@@ -23,7 +47,7 @@ class RAGIndex:
         self.settings = get_settings()
 
     def client(self) -> QdrantClient:
-        return QdrantClient(url=self.settings.qdrant_url)
+        return get_qdrant_client(self.settings.qdrant_url)
 
     def _setting(self, name: str, default):
         return getattr(self.settings, name, default)
