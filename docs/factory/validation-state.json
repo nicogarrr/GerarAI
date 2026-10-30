@@ -160,10 +160,10 @@
       "status": "pending"
     },
     "VAL-SEC-001": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-SEC-002": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-SEC-003": {
       "status": "pending"

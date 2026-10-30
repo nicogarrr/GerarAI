@@ -72,10 +72,10 @@ from scripts.backup.seed_drill_data import (  # noqa: E402
 SEED_BUCKET = "drill-bucket"
 SEED_COLLECTION = "drill_collection"
 
-PG_USER = "drill"
-PG_PASSWORD = "drill-password"
-MINIO_USER = "drilluser"
-MINIO_PASSWORD = "drillpassword123"
+PG_USER = os.getenv("DRILL_PG_USER", "drill")
+PG_PASSWORD = os.getenv("DRILL_PG_PASSWORD", "drill-password")
+MINIO_USER = os.getenv("DRILL_MINIO_USER", "drilluser")
+MINIO_PASSWORD = os.getenv("DRILL_MINIO_PASSWORD", "drillpassword123")
 APP_WAIT_SECONDS = 180
 
 

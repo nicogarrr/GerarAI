@@ -799,12 +799,12 @@
         "VAL-SEC-002"
       ],
       "milestone": "security-data-integrity",
-      "status": "in_progress",
+      "status": "completed",
       "workerSessionIds": [
         "7cfbfbf2-6063-43b3-9de2-88a4863a6622"
       ],
-      "currentWorkerSessionId": "7cfbfbf2-6063-43b3-9de2-88a4863a6622",
-      "completedWorkerSessionId": null
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "fix-sql-injection-vulnerability",
@@ -839,10 +839,10 @@
         "VAL-SEC-001"
       ],
       "milestone": "security-data-integrity",
-      "status": "pending",
+      "status": "completed",
       "workerSessionIds": [],
       "currentWorkerSessionId": null,
-      "completedWorkerSessionId": null
+      "completedWorkerSessionId": "antigravity-worker-v1"
     },
     {
       "id": "implement-ssrf-protection",
