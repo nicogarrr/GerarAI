@@ -216,9 +216,12 @@ def test_legacy_three_day_setting_cannot_mark_yesterday_price_fresh(db, monkeypa
     from types import SimpleNamespace
 
     from app.services import alert_rule_service as module
+    from app.services import price_freshness
 
     company = _company(db)
-    _price(db, company, day=date.today() - timedelta(days=1), close="210")
+    # Cierre NASDAQ de anteayer: más de 24 h desde su cierre en cualquier hora de hoy.
+    _price(db, company, day=date.today() - timedelta(days=2), close="210")
+    monkeypatch.setattr(price_freshness, "_now", lambda: datetime.now(UTC))
     monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=3))
     rule = module.AlertRule(company_id=company.id, target={"kind": "market_price"})
     _, observation = AlertRuleService()._observe(db, rule)
@@ -341,3 +344,23 @@ def test_price_threshold_without_fx_is_not_compared_across_moneys(db):
     observed, observation = AlertRuleService()._observe(db, AlertRule(company_id=company.id, target={"kind": "market_price"}))
     assert observed is None
     assert observation["status"] == "mixed_units"
+
+
+def test_yesterdays_close_is_current_before_the_open(db, monkeypatch):
+    """A8: a las 09:00 de Madrid el cierre de ayer del NASDAQ es el último real: vigente."""
+    from types import SimpleNamespace
+
+    from app.services import alert_rule_service as module
+    from app.services import price_freshness
+
+    company = _company(db)
+    _price(db, company, day=date(2026, 10, 29), close="210")
+    monkeypatch.setattr(price_freshness, "_now", lambda: datetime(2026, 10, 30, 8, 0, tzinfo=UTC))
+    monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=1))
+    rule = module.AlertRule(company_id=company.id, target={"kind": "market_price"})
+    value, observation = AlertRuleService()._observe(db, rule)
+    assert value == Decimal("210")
+    assert observation["status"] == "fresh"
+    # Después del cierre del viernes sin cierre nuevo guardado: caduca.
+    monkeypatch.setattr(price_freshness, "_now", lambda: datetime(2026, 10, 30, 20, 0, tzinfo=UTC))
+    assert AlertRuleService()._observe(db, rule)[1]["status"] == "stale"

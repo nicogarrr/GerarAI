@@ -26,7 +26,7 @@ from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.fmp import FMPClient
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
-from app.services.price_freshness import market_price_is_stale
+from app.services.price_freshness import close_is_stale, market_price_is_stale
 from app.services.price_units import price_in_currency
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.risk_service import RiskService
@@ -637,7 +637,15 @@ class MarketRefreshService:
                 stale_prices.append({"ticker": company.ticker, "status": "missing_market_price"})
                 continue
             age_days = (as_of - latest.date).days
-            if market_price_is_stale(age_days, self.settings.market_price_max_age_days):
+            max_age = self.settings.market_price_max_age_days
+            # A8: refresco de hoy = 24 h desde el cierre de la bolsa (antes de la
+            # apertura el cierre de ayer sigue vigente); fecha pasada: días naturales.
+            stale = (
+                close_is_stale(latest.date, company.exchange, max_age)
+                if as_of == date.today()
+                else market_price_is_stale(age_days, max_age)
+            )
+            if stale:
                 stale_prices.append(
                     {
                         "ticker": company.ticker,

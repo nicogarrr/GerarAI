@@ -42,7 +42,7 @@ from app.models import (
 )
 from app.services.claim_scope import latest_thesis_version
 from app.services.fair_value_service import listed_value
-from app.services.price_freshness import market_price_is_stale
+from app.services.price_freshness import close_is_stale
 from app.services.price_units import listing_price
 
 RULE_TYPE = "thesis_invalidation"
@@ -266,7 +266,11 @@ def _latest_price(db: Session, company_id: int) -> tuple[Decimal | None, dict[st
         "currency": currency,
         "date": price.date.isoformat(),
         "age_days": age_days,
-        "status": "stale" if market_price_is_stale(age_days, get_settings().market_price_max_age_days) else "fresh",
+        "status": (
+            "stale"
+            if close_is_stale(price.date, company.exchange if company else None, get_settings().market_price_max_age_days)
+            else "fresh"
+        ),
     }
 
 

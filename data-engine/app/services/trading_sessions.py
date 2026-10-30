@@ -32,6 +32,7 @@ _US_EXCHANGES = frozenset({
     "NASDAQ", "NMS", "NGM", "NCM", "NYSE", "NYQ", "NYSEARCA", "PCX", "ARCA",
     "AMEX", "ASE", "BATS", "US",
 })
+US_EXCHANGES = _US_EXCHANGES
 
 
 def _exchange_group(exchange: str | None) -> frozenset[str]:

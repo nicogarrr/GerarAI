@@ -23,7 +23,7 @@ from app.services.trading_sessions import missing_sessions, weekdays_between
 @pytest.fixture
 def db(monkeypatch):
     # Fechas fijas de calendario: la frescura no es lo que se prueba aqui.
-    monkeypatch.setattr(ars, "market_price_is_stale", lambda *_a, **_k: False)
+    monkeypatch.setattr(ars, "close_is_stale", lambda *_a, **_k: False)
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:

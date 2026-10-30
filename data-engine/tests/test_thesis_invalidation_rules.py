@@ -268,7 +268,9 @@ def test_legacy_three_day_setting_cannot_mark_yesterday_thesis_price_fresh(db, m
     from app.services import thesis_invalidation_rules as module
 
     company = _company(db)
-    _price(db, company, "210", day=date.today() - timedelta(days=1))
+    # Más de 24 h desde el cierre de su sesión a cualquier hora de hoy (A8: el techo
+    # #2884 se cuenta desde el cierre de la bolsa).
+    _price(db, company, "210", day=date.today() - timedelta(days=2))
     monkeypatch.setattr(module, "get_settings", lambda: SimpleNamespace(market_price_max_age_days=3))
     _, observation = module._latest_price(db, company.id)
     assert observation["status"] == "stale"
