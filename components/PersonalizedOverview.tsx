@@ -486,7 +486,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     /** Mayor variación absoluta desde la compra, no cambio de hoy ni su causa.
      *  Sin base de coste no hay dato para elegir esta posición. */
     const topMover = useMemo<PortfolioHolding | null>(() => {
-        const conCoste = (portfolioSummary?.holdings ?? []).filter((h) => h.cost > 0 && !h.fxMissing);
+        const conCoste = (portfolioSummary?.holdings ?? []).filter((h) => h.cost > 0 && !h.fxMissing && !h.quoteMissing);
         if (!conCoste.length) return null;
         return conCoste.reduce((a, b) => Math.abs(b.gainPercent) > Math.abs(a.gainPercent) ? b : a);
     }, [portfolioSummary]);

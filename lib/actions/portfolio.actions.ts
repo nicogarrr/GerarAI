@@ -76,6 +76,8 @@ export type PortfolioHolding = {
     nativeCurrency: string;
     baseCurrency: string;
     fxMissing: boolean;
+    /** A3: sin cotización real (el precio es el de la última operación): la plusvalía es desconocida. */
+    quoteMissing?: boolean;
     /** G/P y coste en divisa nativa tal como los expone la API (null si no hay dato). */
     nativeGain: number | null;
     nativeCost: number | null;
@@ -167,6 +169,8 @@ type ResearchPortfolioPosition = {
     first_buy_date: string | null;
     holding_days: number | null;
     fiscal_bucket: 'corto_plazo' | 'largo_plazo' | null;
+    // A3: el precio es el de la última operación (sin cotización real); plusvalía null.
+    quote_missing?: boolean;
 };
 
 type ResearchPortfolioSummaryResponse = {
@@ -313,6 +317,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             // fxMissing = no hay valor/rentabilidad base válidos. En suspensión de valoración también
             // (la UI muestra el motivo real vía valuationHold, no «conversión»).
             fxMissing: held || position.market_value_base === null || position.cost_basis_base === null,
+            quoteMissing: position.quote_missing === true,
             nativeGain: position.unrealized_pnl_native ?? null,
             nativeCost: position.cost_basis_native ?? null,
             priceEffect: position.pnl_price_effect_base ?? null,
@@ -329,7 +334,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     // el backend ya deja fuera del valor RV las que no tienen precio, FX o están en
     // suspensión (y un coste IBKR pendiente de revisión no es base fiable). Sumar su coste sin su ganancia diluía el rendimiento (coste 2.000,
     // ganancia 500 → +25 % en vez de +50 %) y descuadraba Cartera con /inicio.
-    const valued = holdings.filter((holding) => !holding.fxMissing && holding.cost > 0 && !holding.costReviewMessage);
+    const valued = holdings.filter((holding) => !holding.fxMissing && !holding.quoteMissing && holding.cost > 0 && !holding.costReviewMessage);
     const totalCost = valued.reduce((sum, holding) => sum + holding.cost, 0);
     const totalGain = valued.reduce((sum, holding) => sum + holding.gain, 0);
     return {

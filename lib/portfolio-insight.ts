@@ -17,6 +17,8 @@ export interface PortfolioInsightHolding {
     readonly gain: number;
     readonly gainPercent: number;
     readonly fxMissing?: boolean;
+    /** Sin cotización real: la plusvalía es desconocida (A3). */
+    readonly quoteMissing?: boolean;
     /** Coste IBKR pendiente de revisión: no es base de coste fiable. */
     readonly costReviewMessage?: string | null;
 }
@@ -42,7 +44,7 @@ export type PortfolioInsight =
 
 export function buildPortfolioInsight(summary: PortfolioInsightSummary | null | undefined): PortfolioInsight {
     if (!summary || summary.holdings.length === 0) return { kind: 'empty' };
-    const conCoste = summary.holdings.filter((h) => h.cost > 0 && !h.fxMissing && !h.costReviewMessage);
+    const conCoste = summary.holdings.filter((h) => h.cost > 0 && !h.fxMissing && !h.quoteMissing && !h.costReviewMessage);
     if (conCoste.length === 0) return { kind: 'no-cost-basis' };
     const topMover = conCoste.reduce((a, b) => (Math.abs(b.gainPercent) > Math.abs(a.gainPercent) ? b : a));
     const costeTotal = conCoste.reduce((sum, h) => sum + h.cost, 0);
