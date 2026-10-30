@@ -1,8 +1,12 @@
+'use client';
+
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { useT, useLocale, useFormat } from '@/lib/i18n/client';
 import { valuationRowKey, type DemoValuation, type ValuedPosition } from '@/lib/market/demo-valuation';
 import type { DemoPositionView } from './submit';
+import type { TFunction } from '@/lib/i18n/client';
+import type { Formatters } from '@/lib/i18n/format';
 
 /**
  * Posiciones abiertas de la cuenta demo, derivadas del libro por FIFO.
@@ -11,9 +15,9 @@ import type { DemoPositionView } from './submit';
  */
 /** dd/mm/yyyy desde la fecha civil del contrato, SIN crear Date: la fecha
  *  OCC es civil (Nueva York) y convertirla cambiaría el día según la tz. */
-function formatContractDate(iso: string): string {
+function formatContractDate(iso: string, locale: string = 'es'): string {
     const [y, m, d] = iso.split('-');
-    return `${d}/${m}/${y}`;
+    return locale === 'en' ? `${m}/${d}/${y}` : `${d}/${m}/${y}`;
 }
 
 function pnlTone(value: number | null): string {
@@ -21,21 +25,24 @@ function pnlTone(value: number | null): string {
 }
 
 export function PositionsTable({ positions, valuation }: { positions: DemoPositionView[]; valuation?: DemoValuation | null }) {
+    const ti = useT();
+    const locale = useLocale();
+    const f = useFormat();
     const valued = new Map<string, ValuedPosition>((valuation?.rows ?? []).map((row) => [valuationRowKey(row), row]));
     if (positions.length === 0) {
-        return <EmptyState title="Sin posiciones abiertas" description="Las compras que registres aparecerán aquí." />;
+        return <EmptyState title={ti('paperTrading.positions.emptyTitle')} description={ti('paperTrading.positions.emptyDescription')} />;
     }
     return (
         <div className="space-y-2">
-            <Table dense regionLabel="Tabla de posiciones abiertas, desplazable horizontalmente">
+            <Table dense regionLabel={ti('paperTrading.positions.regionLabel')}>
                 <TableHeader>
                     <TableRow>
-                        <TableHead>Instrumento</TableHead>
-                        <TableHead className="text-right">Cantidad</TableHead>
-                        <TableHead className="text-right">Coste medio</TableHead>
-                        {valuation ? <TableHead className="hidden text-right md:table-cell">Valor actual</TableHead> : null}
-                        {valuation ? <TableHead className="hidden text-right md:table-cell">PyG no realizada</TableHead> : null}
-                        <TableHead className="text-right">Realizado</TableHead>
+                        <TableHead>{ti('paperTrading.positions.colInstrument')}</TableHead>
+                        <TableHead className="text-right">{ti('paperTrading.positions.colQuantity')}</TableHead>
+                        <TableHead className="text-right">{ti('paperTrading.positions.colAvgCost')}</TableHead>
+                        {valuation ? <TableHead className="hidden text-right md:table-cell">{ti('paperTrading.positions.colValue')}</TableHead> : null}
+                        {valuation ? <TableHead className="hidden text-right md:table-cell">{ti('paperTrading.positions.colUnrealized')}</TableHead> : null}
+                        <TableHead className="text-right">{ti('paperTrading.positions.colRealized')}</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -44,80 +51,77 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                             <TableCell className="min-w-52 md:min-w-0">
                                 <span className="block font-medium text-gray-100">{position.name}</span>
                                 <span className="block text-xs text-gray-500">
-                                    {position.kind === 'opcion' ? 'Opción' : 'Acción'} · {position.instrumentKey}
+                                    {position.kind === 'opcion' ? ti('paperTrading.positions.kindOption') : ti('paperTrading.positions.kindStock')} · {position.instrumentKey}
                                 </span>
                                 {position.optionBadge === 'vencida' && position.optionExpiry ? (
                                     <div className="mt-1">
                                         <span className="inline-block rounded border border-amber-800 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-300">
-                                            Vencida el {formatContractDate(position.optionExpiry)}
+                                            {ti('paperTrading.positions.expiredBadge', { date: formatContractDate(position.optionExpiry, locale) })}
                                         </span>
                                         {/* Detalle expandible nativo (details/summary: funciona con teclado
                                             y en móvil sin JS): el límite queda accesible sin ruido visual. */}
                                         <details className="mt-1 text-xs text-gray-400">
-                                            <summary className="cursor-pointer select-none text-amber-300/80 underline decoration-dotted underline-offset-2">Qué significa</summary>
+                                            <summary className="cursor-pointer select-none text-amber-300/80 underline decoration-dotted underline-offset-2">{ti('paperTrading.positions.whatMeans')}</summary>
                                             <p className="mt-1 max-w-prose">
-                                                El libro no ejerce ni expira posiciones automáticamente. Para registrar el cierre usa la fecha
-                                                real de ejecución (el vencimiento o antes); la liquidación de opciones vencidas sin valor aún
-                                                no está soportada.
+                                                {ti('paperTrading.positions.expiredDetail')}
                                             </p>
                                         </details>
                                     </div>
                                 ) : null}
                                 {position.optionBadge === 'vence-hoy' && position.optionExpiry ? (
                                     <span className="mt-1 block rounded border border-amber-800 bg-amber-950/40 px-1.5 py-0.5 text-xs text-amber-300">
-                                        Vence hoy ({formatContractDate(position.optionExpiry)}, fecha del contrato): sin ejercicio ni expiración
-                                        automáticos; el cierre se registra a mano.
+                                        {ti('paperTrading.positions.expiresToday', { date: formatContractDate(position.optionExpiry, locale) })}
                                     </span>
                                 ) : null}
-                                {valuation ? <MobileValuation row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} /> : null}
+                                {valuation ? <MobileValuation row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} ti={ti} f={f} /> : null}
                             </TableCell>
-                            <TableCell className="text-right">{formatNumber(position.quantity, { maximumFractionDigits: 0 })}</TableCell>
-                            <TableCell className="text-right">{formatMoney(position.avgCost, position.currency)}</TableCell>
-                            {valuation ? <ValuationCells row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} /> : null}
+                            <TableCell className="text-right">{f.formatNumber(position.quantity, { maximumFractionDigits: 0 })}</TableCell>
+                            <TableCell className="text-right">{f.formatMoney(position.avgCost, position.currency)}</TableCell>
+                            {valuation ? <ValuationCells row={valued.get(valuationRowKey(position)) ?? null} currency={position.currency} ti={ti} f={f} /> : null}
                             <TableCell
                                 className={`text-right ${
                                     position.realizedPnl > 0 ? 'text-teal-300' : position.realizedPnl < 0 ? 'text-red-400' : 'text-gray-400'
                                 }`}
                             >
-                                {formatMoney(position.realizedPnl, position.currency)}
+                                {f.formatMoney(position.realizedPnl, position.currency)}
                             </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
-            <p className="text-xs text-gray-500">Realizado antes de comisiones (las comisiones solo mueven el efectivo). Sin ajustes por splits ni dividendos (simplificación de la demo).</p>
+            <p className="text-xs text-gray-500">{ti('paperTrading.positions.footnote')}</p>
         </div>
     );
 }
 
-function ValuationCells({ row, currency }: { row: ValuedPosition | null; currency: DemoPositionView['currency'] }) {
+function ValuationCells({ row, currency, ti, f }: { row: ValuedPosition | null; currency: DemoPositionView['currency']; ti: TFunction; f: Formatters }) {
     if (!row || row.status !== 'valorada' || row.marketValue === null) {
         return (
             <>
                 <TableCell className="hidden text-right md:table-cell">
-                    <span className="block text-gray-300">N/D</span>
+                    <span className="block text-gray-300">{ti('paperTrading.positions.nd')}</span>
                     {/* El motivo no va solo en title/truncate (auditor 21-oct-2026):
                         expandible nativo, accesible con teclado y táctil. */}
                     <details className="mt-0.5 text-xs text-gray-500">
-                        <summary className="ml-auto w-fit cursor-pointer select-none text-gray-400 underline decoration-dotted underline-offset-2">Motivo</summary>
-                        <p className="mt-1 max-w-56 whitespace-normal">{row?.note ?? 'Sin valoración.'}</p>
+                        <summary className="ml-auto w-fit cursor-pointer select-none text-gray-400 underline decoration-dotted underline-offset-2">{ti('paperTrading.positions.reasonSummary')}</summary>
+                        <p className="mt-1 max-w-56 whitespace-normal">{row?.note ?? ti('paperTrading.positions.noValuation')}</p>
                     </details>
                     {row?.quoteLabel ? <span className="block text-xs text-gray-500">{row.quoteLabel}</span> : null}
                 </TableCell>
-                <TableCell className="hidden text-right text-gray-400 md:table-cell">N/D</TableCell>
+                <TableCell className="hidden text-right text-gray-400 md:table-cell">{ti('paperTrading.positions.nd')}</TableCell>
             </>
         );
     }
     return (
         <>
             <TableCell className="hidden text-right md:table-cell">
-                <span className="block">{formatMoney(row.marketValue, currency)}</span>
+                <span className="block">{f.formatMoney(row.marketValue, currency)}</span>
                 <span className="block max-w-56 text-xs whitespace-normal text-gray-500">{row.quoteLabel}</span>
             </TableCell>
             <TableCell className={`hidden text-right md:table-cell ${pnlTone(row.unrealizedPnl)}`}>
-                <span className="block">{formatMoney(row.unrealizedPnl, currency)}</span>
+                <span className="block">{f.formatMoney(row.unrealizedPnl, currency)}</span>
                 {row.unrealizedPct !== null ? (
-                    <span className="block text-xs">{formatNumber(row.unrealizedPct, { maximumFractionDigits: 1 })} %</span>
+                    <span className="block text-xs">{f.formatNumber(row.unrealizedPct, { maximumFractionDigits: 1 })} %</span>
                 ) : null}
             </TableCell>
         </>
@@ -125,23 +129,22 @@ function ValuationCells({ row, currency }: { row: ValuedPosition | null; currenc
 }
 
 /** En móvil las columnas de valoración se ocultan y la misma información va bajo el nombre. */
-function MobileValuation({ row, currency }: { row: ValuedPosition | null; currency: DemoPositionView['currency'] }) {
+function MobileValuation({ row, currency, ti, f }: { row: ValuedPosition | null; currency: DemoPositionView['currency']; ti: TFunction; f: Formatters }) {
     if (!row || row.status !== 'valorada' || row.marketValue === null) {
         return (
             <span className="mt-1 block text-xs whitespace-normal text-gray-400 md:hidden">
-                Valor actual: N/D. {row?.note ?? 'Sin valoración.'}
+                {ti('paperTrading.positions.mobileValueNd', { note: row?.note ?? ti('paperTrading.positions.noValuation') })}
                 {row?.quoteLabel ? ` ${row.quoteLabel}.` : ''}
             </span>
         );
     }
     return (
         <span className="mt-1 block text-xs whitespace-normal text-gray-400 md:hidden">
-            Valor {formatMoney(row.marketValue, currency)} · PyG no realizada{' '}
-            <span className={pnlTone(row.unrealizedPnl)}>
-                {formatMoney(row.unrealizedPnl, currency)}
-                {row.unrealizedPct !== null ? ` (${formatNumber(row.unrealizedPct, { maximumFractionDigits: 1 })} %)` : ''}
-            </span>
-            . {row.quoteLabel}.
+            {ti('paperTrading.positions.mobileValue', {
+                value: f.formatMoney(row.marketValue, currency),
+                pnl: `${f.formatMoney(row.unrealizedPnl, currency)}${row.unrealizedPct !== null ? ` (${f.formatNumber(row.unrealizedPct, { maximumFractionDigits: 1 })} %)` : ''}`,
+                quoteLabel: row.quoteLabel ?? '',
+            })}
         </span>
     );
 }
