@@ -96,6 +96,30 @@ def safe_detail(exc: Exception, status_code: int) -> str:
     return f"{base} (ref: {ref})"
 
 
+
+
+def exc_summary(exc: BaseException) -> str:
+    """``TipoError: detalle`` redactado, para logs de dependencias caídas.
+
+    Los 503 fail-closed (rate limit, nonces) se registran sin traceback: el
+    texto de la excepción de redis/httpx puede llevar un DSN con credenciales,
+    así que pasa por :func:`redact_secrets` igual que los logs de request_error.
+    """
+    cause = exc.__cause__ or exc
+    return f"{type(cause).__name__}: {redact_secrets(str(cause))}"
+
+
+def ticker_from_path(path: str) -> str | None:
+    """Ticker de rutas ``/api/companies/<ticker>/...`` para logs de diagnóstico.
+
+    La ficha dispara su lectura en ráfaga sobre esas rutas; un 5xx sin el
+    ticker en el log no se puede acotar a una empresa.
+    """
+    parts = path.split("/")
+    if len(parts) >= 4 and parts[1] == "api" and parts[2] == "companies" and parts[3]:
+        return parts[3]
+    return None
+
 MSG_VALUE_OUT_OF_RANGE = "Valor fuera de rango para este campo."
 
 

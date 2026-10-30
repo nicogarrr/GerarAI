@@ -19,6 +19,7 @@ local/test callers keep working; production requires bound signatures.
 
 import hashlib
 import hmac
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -26,7 +27,10 @@ from dataclasses import dataclass
 from fastapi import Header, HTTPException, Request, status
 
 from app.core.config import get_settings
+from app.core.errors import exc_summary, ticker_from_path
 from app.core.replay import NonceBackendUnavailable, consume_nonce
+
+logger = logging.getLogger(__name__)
 
 EMPTY_BODY_HASH = hashlib.sha256(b"").hexdigest()
 
@@ -233,6 +237,15 @@ async def get_research_principal(
                 allow_local_fallback=not getattr(settings, "is_production", False),
             )
         except NonceBackendUnavailable as exc:
+            # Mismo ciego que el rate limiter: sin este log el 503 solo se ve
+            # en el access log y no se puede acotar a ruta/ticker.
+            logger.warning(
+                "auth_nonce_backend_unavailable method=%s path=%s ticker=%s cause=%s",
+                request.method,
+                request.url.path,
+                ticker_from_path(request.url.path) or "-",
+                exc_summary(exc),
+            )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Authentication backend unavailable",
