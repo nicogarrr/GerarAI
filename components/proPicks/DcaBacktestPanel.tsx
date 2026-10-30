@@ -63,10 +63,18 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
     const [result, setResult] = useState<DcaBacktest | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [baseError, setBaseError] = useState<string | null>(null);
+    const [rangeError, setRangeError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
 
     const run = (event: React.FormEvent) => {
         event.preventDefault();
+        // «YYYY-MM» ordena como texto: un inicio posterior al final no se envía
+        // (el backend respondía 422 y la tabla anterior seguía en pantalla).
+        if (start && end && start > end) {
+            setRangeError('«Hasta» debe ser igual o posterior a «Desde».');
+            return;
+        }
+        setRangeError(null);
         // La aportación es dinero: nunca se reinterpreta en silencio
         // (Number(base) || 100 convertía «abc», «0» o «-50» en 100 sin avisar).
         const parsed = parseLocalizedNumberDetailed(base);
@@ -133,7 +141,12 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                 </label>
                 <label className="text-xs text-gray-400">
                     Hasta (mes)
-                    <input type="month" value={end} onChange={(e) => setEnd(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    <input type="month" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} aria-invalid={rangeError !== null} aria-describedby={rangeError ? 'dca-range-error' : undefined} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    {rangeError && (
+                        <span id="dca-range-error" role="alert" className="mt-1 block text-xs text-red-400">
+                            {rangeError}
+                        </span>
+                    )}
                 </label>
                 <label className="text-xs text-gray-400">
                     Aportación base

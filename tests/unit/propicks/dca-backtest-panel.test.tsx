@@ -59,3 +59,29 @@ describe('DcaBacktestPanel aportación base', () => {
         expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 });
+
+describe('DcaBacktestPanel rango de meses', () => {
+    beforeEach(() => getDcaBacktest.mockReset().mockResolvedValue({ data: null, error: null }));
+
+    it('inicio posterior al final: aviso visible y no ejecuta', async () => {
+        render(<DcaBacktestPanel />);
+        fireEvent.change(screen.getByLabelText(/desde \(mes\)/i), { target: { value: '2022-06' } });
+        fireEvent.change(screen.getByLabelText(/hasta \(mes\)/i), { target: { value: '2020-01' } });
+        fireEvent.submit(screen.getByRole('button', { name: /ejecutar/i }).closest('form')!);
+        expect(await screen.findByRole('alert')).toHaveTextContent('«Hasta» debe ser igual o posterior a «Desde».');
+        expect(getDcaBacktest).not.toHaveBeenCalled();
+    });
+
+    it('mismo mes o rango corregido: ejecuta y limpia el aviso', async () => {
+        render(<DcaBacktestPanel />);
+        fireEvent.change(screen.getByLabelText(/desde \(mes\)/i), { target: { value: '2022-06' } });
+        fireEvent.change(screen.getByLabelText(/hasta \(mes\)/i), { target: { value: '2020-01' } });
+        fireEvent.submit(screen.getByRole('button', { name: /ejecutar/i }).closest('form')!);
+        expect(await screen.findByRole('alert')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText(/hasta \(mes\)/i), { target: { value: '2022-06' } });
+        fireEvent.submit(screen.getByRole('button', { name: /ejecutar/i }).closest('form')!);
+        await waitFor(() => expect(getDcaBacktest).toHaveBeenCalledTimes(1));
+        expect(getDcaBacktest.mock.calls[0][0]).toMatchObject({ start: '2022-06', end: '2022-06' });
+        expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+});
