@@ -38,6 +38,14 @@ type Props = {
   fxRates?: PortfolioFxRate[];
 };
 
+/**
+ * Cantidad de acciones: entera sin decimales y fraccionaria con hasta 4, como
+ * en Movimientos. Con 2 fijos, 0,004 acciones se leía «0,00» y 1,2345 «1,23».
+ */
+export function formatQuantity(quantity: number): string {
+  return formatNumber(quantity, { maximumFractionDigits: 4 });
+}
+
 /** Lista corta de símbolos para un toast: como mucho 5 en crudo y el resto contado. */
 function describeSymbols(symbols: string[]): string {
   const shown = symbols.slice(0, 5);
@@ -238,7 +246,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <TrackedAnalysisStatus analysis={holding.analysis} />
                     {holding.costReviewMessage ? <p role="status" className="mt-2 text-sm text-amber-300">{holding.costReviewMessage}</p> : null}
                     <dl className="mt-3 space-y-1.5 text-sm">
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">Cantidad</dt><dd className="text-gray-200">{formatQuantity(holding.quantity)}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Promedio</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">Actual</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? 'N/D' : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
                       <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
@@ -351,7 +359,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-gray-300">
-                        {formatNumber(holding.quantity, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatQuantity(holding.quantity)}
                       </TableCell>
                       <TableCell className="text-right text-gray-300">
                         {holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : NA}
