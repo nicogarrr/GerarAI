@@ -26,6 +26,14 @@ from app.services.plan_contribution_split import (
 TENANT = "tenant-test"
 
 
+@pytest.fixture(autouse=True)
+def _fixed_today(monkeypatch):
+    """Reloj fijo: los niveles de prueba son de 2026-10 y no deben caducar con el calendario."""
+    from app.services import plan_contribution_split as split_module
+
+    monkeypatch.setattr(split_module, "_today", lambda: date(2026, 10, 30))
+
+
 @pytest.fixture
 def db():
     engine = create_engine("sqlite:///:memory:")
@@ -240,3 +248,40 @@ def test_dca_split_exposes_same_savings_contract(db):
     assert projection['currency'] == result['currency'] == 'EUR'
     assert projection['scenarios'][2]['annual_total_return'] == .05
     assert projection['portfolio_included'] is False
+
+
+def test_stale_dca_level_does_not_drive_this_months_split(db):
+    """Un 4X de hace meses (ticker que dejo de evaluarse) no puede repartir el dinero de hoy."""
+    pool = _company(db, "POOL")
+    uber = _company(db, "UBER")
+    _plan(
+        db,
+        [
+            {"kind": "ticker", "label": "POOL", "target_pct": 50, "band_pct": 5},
+            {"kind": "ticker", "label": "UBER", "target_pct": 50, "band_pct": 5},
+        ],
+    )
+    db.add(_real_dca_row(tenant=TENANT, symbol="POOL", level=4, company_id=pool.id,
+                         status="confirmed", period="2026-03"))
+    db.add(_real_dca_row(tenant=TENANT, symbol="UBER", level=1, company_id=uber.id,
+                         status="confirmed", period="2026-09"))
+    db.commit()
+    result = build_contribution_split(db)
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["POOL"]["amount"] == 150.0 and rows["UBER"]["amount"] == 150.0
+    assert rows["POOL"]["dca_stale"] is True and rows["POOL"]["multiplier"] == 1
+    assert rows["POOL"]["dca_level"] is None and rows["POOL"]["dca_period"] == "2026-03"
+    assert "caducado" in rows["POOL"]["reason"]
+    assert rows["UBER"]["dca_stale"] is False and rows["UBER"]["dca_label"] == "1X DCA"
+    assert any("POOL" in note and "más de un mes" in note for note in result["notes"])
+
+
+def test_stale_trim_level_does_not_freeze_the_contribution(db):
+    pool = _company(db, "POOL")
+    _plan(db, [{"kind": "ticker", "label": "POOL", "target_pct": 100, "band_pct": 5}])
+    db.add(_real_dca_row(tenant=TENANT, symbol="POOL", level=-2, company_id=pool.id,
+                         status="confirmed", period="2025-12"))
+    db.commit()
+    result = build_contribution_split(db)
+    assert result["status"] == "ok"
+    assert result["allocations"][0]["amount"] == 300.0

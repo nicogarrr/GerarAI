@@ -22,6 +22,7 @@ cuota queda sin asignar (liquidez) y se dice.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
@@ -43,6 +44,24 @@ DCA_LABELS: dict[int, str] = {
     -2: "RECORTE FUERTE",
 }
 _CENT = Decimal("0.01")
+# Un nivel DCA vale para el mes en formacion o el ultimo confirmado. Uno mas
+# viejo (ticker que dejo de evaluarse, motor parado) no dice nada de este mes.
+DCA_MAX_AGE_MONTHS = 1
+
+
+def _today() -> date:
+    return date.today()
+
+
+def _months_old(period: str | None, today: date) -> int | None:
+    """Meses entre ``period`` (YYYY-MM) y el mes de ``today``; None si no se puede leer."""
+    try:
+        year, month = (int(part) for part in str(period).split("-")[:2])
+    except (TypeError, ValueError):
+        return None
+    if not 1 <= month <= 12:
+        return None
+    return (today.year - year) * 12 + (today.month - month)
 
 
 @dataclass(frozen=True)
@@ -52,6 +71,7 @@ class SplitCandidate:
     dca_level: int | None = None
     dca_period: str | None = None
     dca_status: str | None = None
+    dca_stale: bool = False
 
 
 def _money_es(value: Decimal) -> str:
@@ -68,6 +88,8 @@ def _multiplier(level: int | None) -> int:
 
 def _reason(candidate: SplitCandidate) -> str:
     level = candidate.dca_level
+    if candidate.dca_stale:
+        return f"nivel DCA caducado (mes {candidate.dca_period or 's/d'}): peso normal (1X) hasta reevaluar"
     if level is None:
         return "sin nivel DCA: peso normal (1X)"
     label = DCA_LABELS.get(int(level), f"nivel {level}")
@@ -113,6 +135,7 @@ def split_contribution(amount: Decimal, candidates: list[SplitCandidate]) -> dic
                 else None,
                 "dca_period": candidate.dca_period,
                 "dca_status": candidate.dca_status,
+                "dca_stale": candidate.dca_stale,
                 "multiplier": _multiplier(candidate.dca_level),
                 "reason": _reason(candidate),
             }
@@ -214,21 +237,36 @@ def build_contribution_split(db: Session) -> dict[str, Any]:
             "El motor DCA no está desplegado todavía: el reparto sigue solo los pesos del plan (todos como 1X)."
         )
 
+    today = _today()
     candidates: list[SplitCandidate] = []
     for ticker, weight in weights.items():
         company = companies.get(ticker)
         row = (by_company.get(company.id) if company else None) or by_symbol.get(ticker)
         level = int(row.level) if row is not None and row.level is not None else None
+        period = str(row.period) if row is not None and row.period is not None else None
+        stale = False
+        if level is not None:
+            age = _months_old(period, today)
+            # Sin mes legible o de hace mas de un mes: no se usa (pesa 1X).
+            stale = age is None or age > DCA_MAX_AGE_MONTHS
         candidates.append(
             SplitCandidate(
                 ticker=ticker,
                 base_weight=weight,
-                dca_level=level,
-                dca_period=str(row.period) if row is not None and row.period is not None else None,
+                dca_level=None if stale else level,
+                dca_period=period,
                 dca_status=str(row.status) if row is not None and row.status is not None else None,
+                dca_stale=stale,
             )
         )
-    if dca_available and candidates and all(c.dca_level is None for c in candidates):
+    stale_tickers = [c.ticker for c in candidates if c.dca_stale]
+    if stale_tickers:
+        notes.append(
+            "Nivel DCA de hace más de un mes en "
+            + ", ".join(stale_tickers)
+            + ": pesa como 1X hasta que se vuelva a evaluar."
+        )
+    if dca_available and candidates and all(c.dca_level is None and not c.dca_stale for c in candidates):
         notes.append("Ningún ticker del plan tiene nivel DCA calculado: todos pesan como 1X.")
 
     amount = Decimal(plan.monthly_contribution)
