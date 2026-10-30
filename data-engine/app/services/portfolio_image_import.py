@@ -22,6 +22,13 @@ from app.services.price_units import price_in_currency
 WORKFLOW = "portfolio_image_import"
 
 
+# Antiguedad maxima de la cotizacion: el ultimo cierre de la ultima sesion.
+# Con 24 h, el cierre del viernes caducaba el sabado y no se podia importar una
+# captura en fin de semana ni un lunes antes de la apertura; 4 dias cubren el
+# fin de semana mas un festivo (viernes al cierre -> martes por la manana).
+QUOTE_MAX_AGE_SECONDS = 4 * 86400
+
+
 class ConfirmedImageRow(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     ticker: str = Field(pattern=r"^[A-Z0-9.\-]{1,20}$")
@@ -73,7 +80,7 @@ async def review_rows(db: Session, image_hash: str, rows: list[ConfirmedImageRow
 
                 quote = ExtendedQuote(ticker=company.ticker, fetched_at=int(time.time()))
         price = None
-        if quote.price and quote.timestamp and quote.status != "unavailable" and 0 <= time.time() - quote.timestamp < 86400:
+        if quote.price and quote.timestamp and quote.status != "unavailable" and 0 <= time.time() - quote.timestamp < QUOTE_MAX_AGE_SECONDS:
             price = price_in_currency(Decimal(str(quote.price)), quote_currency=quote.currency, target_currency=row.currency, company=company)
         return {**row.model_dump(), "name": company.name, "exchange": company.exchange,
                 "price": str(price) if price else None, "timestamp": quote.timestamp if price else None,
@@ -128,7 +135,7 @@ def confirm_review(db: Session, review_id: int, confirmed: bool) -> dict:
     portfolio = fx.ensure_portfolio(db)
     ledger = PortfolioLedgerService()
     for (company, row), item in zip(pairs, payload["rows"], strict=True):
-        if not item["timestamp"] or not 0 <= time.time() - item["timestamp"] < 86400:
+        if not item["timestamp"] or not 0 <= time.time() - item["timestamp"] < QUOTE_MAX_AGE_SECONDS:
             raise ValueError("Cotización caducada. Vuelve a revisar")
         position = Position(tenant_id=tenant_id, company_id=company.id, portfolio_id=portfolio.id,
                             quantity=Decimal(row.quantity), average_cost=Decimal("0"), currency=row.currency,
