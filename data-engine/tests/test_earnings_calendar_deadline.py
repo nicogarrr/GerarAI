@@ -26,9 +26,11 @@ def _clean_module_cache(monkeypatch):
     # Los tests de deadline razonan con oleadas de 4 dias: se fija explicito.
     monkeypatch.setattr(connector, "RANGE_CONCURRENCY", 4)
     connector._day_cache.clear()  # noqa: SLF001 - estado de proceso del conector
+    connector._day_failures.clear()  # noqa: SLF001
     connector._day_inflight.clear()  # noqa: SLF001
     yield
     connector._day_cache.clear()  # noqa: SLF001
+    connector._day_failures.clear()  # noqa: SLF001
     connector._day_inflight.clear()  # noqa: SLF001
 
 

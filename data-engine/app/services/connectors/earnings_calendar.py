@@ -46,6 +46,12 @@ _MIN_DAY_BUDGET_S = 0.5
 # (tests) la cache queda fuera para que cada test controle su red.
 _DAY_CACHE_TTL_S = 3600.0
 _day_cache: dict[tuple[str, date], tuple[float, list[dict[str, Any]]]] = {}
+# Cache negativa breve: con NASDAQ caido o lento cada vista del calendario
+# (calendario, catalizadores, bloque del inicio) volvia a esperar a la red
+# hasta agotar el deadline del rango. Un dia que acaba de fallar se declara
+# «no disponible» al momento durante este rato y luego se reintenta.
+_DAY_FAILURE_TTL_S = 60.0
+_day_failures: dict[tuple[str, date], float] = {}
 _day_inflight: dict[tuple[int, str, date], asyncio.Task[list[dict[str, Any]] | None]] = {}
 
 # Pool HTTP compartido. Antes cada dia abria un AsyncClient nuevo (TLS nueva
@@ -193,6 +199,9 @@ async def _fetch_day_pooled(
     hit = _day_cache.get(key)
     if hit is not None and time.monotonic() - hit[0] < _DAY_CACHE_TTL_S:
         return hit[1]
+    failed_at = _day_failures.get(key)
+    if failed_at is not None and time.monotonic() - failed_at < _DAY_FAILURE_TTL_S:
+        return None
     # El singleflight es por event loop: una Task creada en otro loop no se
     # puede esperar desde este ("attached to a different loop").
     flight_key = (id(loop), kind, day)
@@ -204,6 +213,9 @@ async def _fetch_day_pooled(
     events = await task
     if events is not None:
         _day_cache[key] = (time.monotonic(), events)
+        _day_failures.pop(key, None)
+    else:
+        _day_failures[key] = time.monotonic()
     return events
 
 
