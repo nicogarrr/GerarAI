@@ -25,20 +25,33 @@ import { SYMBOL_VALIDATION } from '@/lib/constants';
 type DialogProps = {
   userId: string;
   onClose: () => void;
+  /** Símbolo ya elegido al abrir (enlace «Registrar compra o venta» de la ficha). */
+  initialSymbol?: string | null;
 };
 
-export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
+function validSymbol(raw: string | null | undefined): string | null {
+  const symbol = (raw ?? '').trim().toUpperCase();
+  return symbol.length >= SYMBOL_VALIDATION.MIN_LENGTH &&
+    symbol.length <= SYMBOL_VALIDATION.MAX_LENGTH &&
+    SYMBOL_VALIDATION.PATTERN.test(symbol)
+    ? symbol
+    : null;
+}
+
+export default function AddTransactionDialog({ userId, onClose, initialSymbol }: DialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  // Un símbolo de la URL con forma inválida se ignora (formulario vacío).
+  const [presetSymbol] = useState(() => validSymbol(initialSymbol));
+  const [searchQuery, setSearchQuery] = useState(presetSymbol ?? '');
   // true cuando el usuario eligio la divisa a mano: entonces cambiar de ticker no la toca.
   const [currencyChosen, setCurrencyChosen] = useState(false);
 
   const [formData, setFormData] = useState({
-    symbol: '',
+    symbol: presetSymbol ?? '',
     companyName: '',
     type: 'buy' as 'buy' | 'sell',
-    currency: NEW_TRANSACTION_CURRENCY,
+    currency: presetSymbol ? currencyForTicker(presetSymbol) : NEW_TRANSACTION_CURRENCY,
     quantity: '',
     price: '',
     fees: '',
@@ -56,11 +69,7 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
   // sugerencia. Igual que en la watchlist: el texto con forma de ticker se
   // puede usar tal cual.
   const manualSymbol = searchQuery.trim().toUpperCase();
-  const canUseManualSymbol =
-    !formData.symbol &&
-    manualSymbol.length >= SYMBOL_VALIDATION.MIN_LENGTH &&
-    manualSymbol.length <= SYMBOL_VALIDATION.MAX_LENGTH &&
-    SYMBOL_VALIDATION.PATTERN.test(manualSymbol);
+  const canUseManualSymbol = !formData.symbol && validSymbol(manualSymbol) !== null;
 
   const selectSymbol = (symbol: string, companyName: string) => {
     setFormData((prev) => ({

@@ -48,3 +48,25 @@ describe('Nueva inversión sin sugerencias del buscador', () => {
         expect(screen.queryByRole('button', { name: /como símbolo/ })).toBeNull();
     });
 });
+
+describe('Nueva inversión con el símbolo ya elegido (enlace desde la ficha)', () => {
+    it('llega con el símbolo fijado y la divisa de su bolsa', async () => {
+        addTransaction.mockReset();
+        render(<AddTransactionDialog userId="u" onClose={vi.fn()} initialSymbol="msft" />);
+        expect(screen.getByLabelText('buscador')).toHaveValue('MSFT');
+        expect(screen.getByText('MSFT')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /como símbolo/ })).toBeNull();
+        expect(screen.getByText(/Precio \(USD\)/)).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Cantidad'), { target: { value: '2' } });
+        fireEvent.change(screen.getByLabelText('Precio (USD)'), { target: { value: '410' } });
+        fireEvent.submit(screen.getByLabelText('Cantidad').closest('form')!);
+        await waitFor(() => expect(addTransaction).toHaveBeenCalledTimes(1));
+        expect(addTransaction.mock.calls[0][1]).toBe('MSFT');
+    });
+
+    it('un símbolo con forma inválida en la URL se ignora: formulario vacío', () => {
+        render(<AddTransactionDialog userId="u" onClose={vi.fn()} initialSymbol="<script>" />);
+        expect(screen.getByLabelText('buscador')).toHaveValue('');
+        expect(screen.queryByText('<SCRIPT>')).toBeNull();
+    });
+});
