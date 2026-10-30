@@ -73,7 +73,7 @@ de mergearla. Nunca dos ficheros con el mismo prefijo.
 
 - [ ] Antes de desplegar en producción: backup de Postgres (ver
       `docs/BACKUP_RESTORE.md`) y `alembic upgrade head` probado sobre una copia
-      restaurada. De `v0.9.0` a hoy hay 22 migraciones (`0061` → `0082`) más las de la cola.
+      restaurada. Desde la referencia histórica del 18-oct-2026 a la fecha de esta lista hay 22 migraciones (`0061` → `0082`) más las de la cola.
 
 ## 3. Smoke e2e
 
