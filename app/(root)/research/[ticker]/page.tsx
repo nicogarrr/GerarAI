@@ -8,6 +8,7 @@ import { ResearchHashScroll } from '@/components/research/ResearchHashScroll';
 import { formatResearchMetric } from '@/lib/research/metric-value';
 import { financialFormula, financialPeriod, financialVersionLabel } from '@/lib/research/financial-display';
 import { changeSummaryText } from '@/lib/research/change-copy';
+import { ownershipLimitations } from '@/lib/research/ownership-display';
 import ThesisAudioPlayer from '@/components/research/ThesisAudioPlayer';
 import MobileCollapse from '@/components/ui/mobile-collapse';
 import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
@@ -1608,7 +1609,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             )}
             <p className="mt-4 text-xs text-gray-500">
               {holders.managers_with_data} gestores con datos · {holders.managers_without_data} sin datos
-              {holders.managers_partial ? ` · ${holders.managers_partial} parciales` : ''} · {holders.limitations.join(' ')}
+              {holders.managers_partial ? ` · ${holders.managers_partial} parciales` : ''} · {ownershipLimitations(holders.limitations)}
             </p>
           </Panel>
         )}
