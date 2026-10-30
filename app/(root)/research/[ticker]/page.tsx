@@ -80,7 +80,8 @@ import { Badge } from '@/components/ui/badge';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { exchangeDisplayName } from '@/lib/exchangeName';
 import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
-import { companyTypeLabel, etiquetaTierFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
+import { companyTypeLabel, etiquetaTierFuente,
+  tierRankFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -1664,8 +1665,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 title: document.title,
                 url: safeHttpUrl(document.source_url),
                 tier: etiquetaTierFuente(document.source_tier),
+                tierRank: tierRankFuente(document.source_tier),
                 type: label(document.source_type),
                 published: document.published_at ? formatDate(document.published_at) : 'fecha desconocida',
+                publishedTs: document.published_at ?? null,
               }))}
             />
           ) : (

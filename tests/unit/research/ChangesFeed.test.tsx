@@ -42,7 +42,7 @@ describe('ExpectationsList / DocumentsList', () => {
     expect(screen.getByText('2030: 12')).toBeTruthy();
   });
   it('pagina y filtra documentos', () => {
-    const docs = Array.from({ length: 25 }, (_, i) => ({ id: i, title: i === 3 ? 'Informe 10-K especial' : `Doc ${i}`, url: null, tier: 'Oficial', type: 'sec filing', published: '2026' }));
+    const docs = Array.from({ length: 25 }, (_, i) => ({ id: i, title: i === 3 ? 'Informe 10-K especial' : `Doc ${i}`, url: null, tier: 'Oficial', tierRank: 0, type: 'sec filing', published: '2026', publishedTs: null }));
     render(<DocumentsList documents={docs} />);
     expect(screen.getAllByText(/^(Doc|Informe)/)).toHaveLength(10);
     fireEvent.change(screen.getByLabelText('Buscar documentos'), { target: { value: 'especial' } });
