@@ -73,6 +73,16 @@ _PROMPT = get_prompt("thesis_news_narrative", allow_remote=False)
 _SYSTEM = _PROMPT.text
 
 
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("thesis_news_narrative", allow_remote=False)
+
+
+
 _AGGREGATOR_HOSTS = ("news.google.com", "google.com")
 
 
@@ -174,7 +184,7 @@ def news_context(items: list[dict], now: datetime) -> list[dict]:
 
 def build_request(ticker: str, headlines: list[dict]) -> LLMRequest:
     return LLMRequest(
-        messages=[Message("system", _SYSTEM), Message("user", json.dumps(
+        messages=[Message("system", _prompt().text), Message("user", json.dumps(
             {"ticker": ticker, "noticias": headlines}, ensure_ascii=False,
         ))],
         # Con 1600 el razonamiento agotaba el tope (finish=length): 6000 deja
@@ -182,7 +192,7 @@ def build_request(ticker: str, headlines: list[dict]) -> LLMRequest:
         task="main_financial_analysis", temperature=0.2, max_tokens=6000,
         reasoning_effort=_effort("tesis_noticias", get_settings().thesis_news_narrative_reasoning_effort),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="thesis_news_narrative"),
-        metadata=_PROMPT.trace_metadata(),
+        metadata=_prompt().trace_metadata(),
     )
 
 

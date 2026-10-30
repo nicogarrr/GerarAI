@@ -17,6 +17,16 @@ from app.services.prompt_registry import get_prompt
 
 _PROMPT = get_prompt("public_headline_translation", allow_remote=False)
 
+
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("public_headline_translation", allow_remote=False)
+
+
 _cache: dict[tuple[int, str], tuple[float, dict]] = {}
 _slots = asyncio.Semaphore(2)
 
@@ -143,9 +153,9 @@ async def translate_external_headline(db, original: str, *, provider=None) -> di
             for candidate, model in chain:
                 try:
                     response = await asyncio.wait_for(candidate.complete(LLMRequest(
-                        model=model, messages=[Message("system", _PROMPT.text),
+                        model=model, messages=[Message("system", _prompt().text),
                                                Message("user", json.dumps({"headline": original}, ensure_ascii=False))],
-                        temperature=0, max_tokens=800, reasoning_effort=settings.reasoning_effort_for("traduccion_titular"), metadata={**_PROMPT.trace_metadata(), "tenant_id": str(tenant)}, response_format=ResponseFormat.json_object(),
+                        temperature=0, max_tokens=800, reasoning_effort=settings.reasoning_effort_for("traduccion_titular"), metadata={**_prompt().trace_metadata(), "tenant_id": str(tenant)}, response_format=ResponseFormat.json_object(),
                     )), timeout=20)
                 except Exception:
                     continue

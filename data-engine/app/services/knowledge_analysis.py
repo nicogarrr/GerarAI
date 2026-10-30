@@ -16,6 +16,16 @@ NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
 DISCLAIMER = "No es consejo financiero. Doctrina de la biblioteca, no datos actuales de empresas."
 PROMPT = get_prompt("knowledge_analysis", allow_remote=False)
 SYSTEM_PROMPT = PROMPT.text
+
+
+def current_prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("knowledge_analysis", allow_remote=False)
+
 _MAX_TEXT = 700
 
 
@@ -35,7 +45,7 @@ def build_messages(question: str, sources: dict) -> list[tuple[str, str]]:
         },
         ensure_ascii=False,
     )
-    return [("system", SYSTEM_PROMPT), ("user", user)]
+    return [("system", current_prompt().text), ("user", user)]
 
 
 def _numbers(text: str) -> set[str]:

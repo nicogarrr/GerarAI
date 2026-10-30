@@ -35,6 +35,16 @@ from app.services.prompt_registry import get_prompt
 
 _PROMPT = get_prompt("asts_llm_service", allow_remote=False)
 
+
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("asts_llm_service", allow_remote=False)
+
+
 MAX_LLM_SATELLITES = 150
 
 
@@ -130,7 +140,7 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
     )
     request = LLMRequest(
         messages=[
-            Message("system", _PROMPT.text),
+            Message("system", _prompt().text),
             Message("user", payload),
         ],
         task="asts_catalog_analysis",
@@ -142,7 +152,7 @@ async def _analyze_with_llm(payload: str, *, on_response=None, before_retry=None
         max_tokens=4000,
         reasoning_effort=settings.reasoning_effort_for("asts"),
         response_format=ResponseFormat.json_schema(_SCHEMA, name="asts_catalog_analysis"),
-        metadata=_PROMPT.trace_metadata(),
+        metadata=_prompt().trace_metadata(),
     )
     # Pin an approved model: task overrides may route to paid models.
     if not is_owner_approved_model(provider.model_router.resolve(request), settings):
