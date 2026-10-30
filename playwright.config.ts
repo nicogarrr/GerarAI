@@ -9,6 +9,9 @@ const apiPort = new URL(apiBaseURL).port || "8101";
 const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
 const e2eResearchSecret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const pythonBin = process.env.PYTHON_BIN ?? "python";
+// La suite de flujos calienta las rutas de `next dev` antes del primer test
+// (e2e/user-flows/global-setup.ts); el resto de suites no lo necesita.
+const runUserFlows = runUiE2E && process.env.E2E_USER_FLOWS === "1";
 export default defineConfig({
   testDir: "./e2e",
   // El repo arrastra GB de historial (snapshots versionados): el
@@ -16,6 +19,7 @@ export default defineConfig({
   // acumulando stdout en memoria y el runner muere con
   // "RangeError: Invalid string length" antes de correr un solo test.
   captureGitInfo: { commit: false, diff: false },
+  globalSetup: runUserFlows ? "./e2e/user-flows/global-setup.ts" : undefined,
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
