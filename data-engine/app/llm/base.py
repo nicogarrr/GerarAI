@@ -13,7 +13,13 @@ from typing import Any, Protocol
 import httpx
 
 from app.llm.contracts import LLMRequest, LLMResponse, ResponseFormat
-from app.llm.errors import LLMError, ProviderHTTPError, ProviderResponseError, ProviderTransportError
+from app.llm.errors import (
+    LLMError,
+    ProviderHTTPError,
+    ProviderResponseError,
+    ProviderTransportError,
+    StructuredOutputError,
+)
 from app.llm.json import parse_json_response
 from app.llm.run_guard import reserve_request
 
@@ -183,6 +189,24 @@ class LLMProvider(ABC):
     async def complete(self, request: LLMRequest) -> LLMResponse:
         raise NotImplementedError
 
+    async def evict_cached(self, response: Any) -> None:
+        """Borra de la cache la entrada de ``response`` si la hay (no-op por defecto).
+
+        Una respuesta que el llamador RECHAZA (JSON invalido, guard de salida)
+        no debe seguir sirviendose desde cache: el reintento y la siguiente
+        peticion identica tienen que llegar al proveedor. Los envoltorios
+        (cadenas de respaldo) delegan en los proveedores que contienen.
+        """
+        if not getattr(response, "cache_key", None):
+            return
+        for value in vars(self).values():
+            children = value if isinstance(value, (tuple, list)) else (value,)
+            for child in children:
+                if isinstance(child, tuple):
+                    child = child[0] if child else None
+                if isinstance(child, LLMProvider) and child is not self:
+                    await child.evict_cached(response)
+
     async def generate_json(
         self,
         request: LLMRequest,
@@ -196,7 +220,11 @@ class LLMProvider(ABC):
             else ResponseFormat.json_object()
         )
         response = await self.complete(replace(request, response_format=response_format))
-        return parse_json_response(response.text)
+        try:
+            return parse_json_response(response.text)
+        except StructuredOutputError:
+            await self.evict_cached(response)
+            raise
 
     async def _post_json(
         self,
