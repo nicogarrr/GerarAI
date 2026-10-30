@@ -183,6 +183,32 @@
         outline-offset: 2px;
     }
 
+    /*
+     * Objetivo tactil de los desplegables: un <summary> sin padding mide ~20 px
+     * de alto (el texto), por debajo de los 44 px que piden las guias de iOS y
+     * Android. Solo con puntero grueso (movil/tablet) y en la capa base: un
+     * `py-*` o `min-h-*` explicito del componente sigue mandando.
+     */
+    @media (pointer: coarse) {
+        summary {
+            padding-block: 0.75rem;
+        }
+    }
+
+    /*
+     * WCAG 2.2 SC 2.4.11 (foco no tapado): en movil la barra fija inferior
+     * (BottomNav, md:hidden) tapaba entero el control que recibe el foco con
+     * Tab si quedaba en los ultimos ~57 px de la pantalla (medido en Pixel 7:
+     * «Ver puntos, fuentes y Altman Z» de Cartera). Con scroll-padding el
+     * navegador lo deja por encima de la barra al enfocarlo o al saltar a un
+     * ancla. 4.5rem = el mismo hueco que el layout reserva bajo el contenido.
+     */
+    @media (max-width: 47.99rem) {
+        html:has(nav[data-bottom-nav]) {
+            scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom));
+        }
+    }
+
     /* Las anclas no deben quedar debajo del header sticky al navegar. */
     html {
         scroll-padding-top: calc(var(--shell-top) + 1rem);
