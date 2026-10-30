@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { parseLocalizedNumber, todayLocal } from '@/lib/format';
-import { currencyOptions, defaultCurrencyFor } from './transactionCurrencies';
+import { currencyForTicker, currencyOptions, NEW_TRANSACTION_CURRENCY } from './transactionCurrencies';
 
 type DialogProps = {
   userId: string;
@@ -30,12 +30,14 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  // true cuando el usuario eligio la divisa a mano: entonces cambiar de ticker no la toca.
+  const [currencyChosen, setCurrencyChosen] = useState(false);
 
   const [formData, setFormData] = useState({
     symbol: '',
     companyName: '',
     type: 'buy' as 'buy' | 'sell',
-    currency: 'USD',
+    currency: NEW_TRANSACTION_CURRENCY,
     quantity: '',
     price: '',
     fees: '',
@@ -78,7 +80,7 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
         symbol: '',
         companyName: '',
         type: 'buy',
-        currency: 'USD',
+        currency: NEW_TRANSACTION_CURRENCY,
         quantity: '',
         price: '',
         fees: '',
@@ -86,6 +88,7 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
         notes: '',
       });
       setSearchQuery('');
+      setCurrencyChosen(false);
       toast.success('Transacción registrada');
       router.refresh();
     } catch (error) {
@@ -126,12 +129,9 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
                   ...prev,
                   symbol: stock.symbol,
                   companyName: stock.name,
-                  // Solo se sobrescribe la divisa si el usuario aun tiene el default USD:
-                  // una eleccion manual previa se respeta.
-                  currency:
-                    prev.currency === 'USD'
-                      ? (defaultCurrencyFor(stock.symbol) ?? prev.currency)
-                      : prev.currency,
+                  // La divisa sigue al ticker (SAN.MC -> EUR, luego AAPL -> USD) salvo
+                  // que el usuario la haya elegido a mano: esa eleccion se respeta.
+                  currency: currencyChosen ? prev.currency : currencyForTicker(stock.symbol),
                 }));
                 setSearchQuery(stock.symbol);
               }}
@@ -153,7 +153,7 @@ export default function AddTransactionDialog({ userId, onClose }: DialogProps) {
 
           <div className="space-y-2">
             <Label htmlFor="currency" className="text-gray-300">Moneda de la operación</Label>
-            <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
+            <Select value={formData.currency} onValueChange={(currency) => { setCurrencyChosen(true); setFormData({ ...formData, currency }); }}>
               <SelectTrigger id="currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
               <SelectContent className="bg-gray-800 border-gray-700">
                 {currencyOptions(formData.currency).map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
