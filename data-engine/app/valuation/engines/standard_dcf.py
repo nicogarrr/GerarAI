@@ -41,6 +41,43 @@ MODEL_INPUT_METRICS = frozenset(
 )
 
 
+_SCENARIO_LABEL_ES = {"bear": "bajista", "base": "base", "bull": "alcista"}
+
+
+def _num_es(value: float, digits: int = 2) -> str:
+    """Cifra en formato español (coma decimal), sin notación científica."""
+    return f"{value:.{digits}f}".replace(".", ",")
+
+
+def _pct_es(ratio: float) -> str:
+    return f"{_num_es(ratio * 100)} %"
+
+
+def _scenario_nd_note(name: str, raw_value: float | None, scenario_margin: float) -> str:
+    """Por qué un escenario sale N/D (convención d2656966: una cifra <= 0 no
+    es una valoración publicable, igual que un P/E negativo no es un múltiplo).
+
+    El valor bruto se conserva en la traza (``value_per_share_raw``) y sigue
+    contando en el valor esperado ponderado: excluirlo inflaría el esperado y
+    rompería el orden bear <= base."""
+    label = _SCENARIO_LABEL_ES.get(name, name)
+    if raw_value is None:
+        return f"Escenario {label}: el modelo no produjo un valor por acción calculable: N/D."
+    if scenario_margin <= 0:
+        return (
+            f"Escenario {label}: con el margen FCF de este escenario ({_pct_es(scenario_margin)}) "
+            "la empresa quema más caja de la que genera y el valor por acción sale "
+            f"{_num_es(raw_value)}. Una cifra negativa no es una valoración publicable: N/D. "
+            "El valor esperado sí la tiene en cuenta."
+        )
+    return (
+        f"Escenario {label}: la deuda y las obligaciones superan el valor del negocio "
+        f"en este escenario y el valor por acción sale {_num_es(raw_value)}. "
+        "Una cifra negativa no es una valoración publicable: N/D. "
+        "El valor esperado sí la tiene en cuenta."
+    )
+
+
 class StandardDCFEngine(ValuationEngine):
     """DCF FCFF estándar sobre snapshot coherente.
 
@@ -241,12 +278,30 @@ class StandardDCFEngine(ValuationEngine):
                 "trace": result.trace,
             }
 
+        # El esperado se pondera con los valores BRUTOS (un bear negativo
+        # cuenta): excluirlo inflaría el esperado y rompería bear <= base.
         weighted = probability_weighted_value(
             [
                 Scenario(name, data["definition"]["probability"], data["value_per_share"])
                 for name, data in scenario_results.items()
             ]
         )
+
+        # Convención d2656966: un valor por acción <= 0 no es publicable; el
+        # escenario sale N/D con explicación, nunca como cifra negativa.
+        scenario_notes: dict[str, str] = {}
+        for scenario in scenarios:
+            data = scenario_results[scenario.name]
+            raw_value = data["value_per_share"]
+            if raw_value is not None and raw_value > 0:
+                continue
+            note = _scenario_nd_note(
+                scenario.name, raw_value, float(scenario.assumptions["fcf_margin"])
+            )
+            scenario_notes[scenario.name] = note
+            data["value_per_share_raw"] = raw_value
+            data["value_per_share"] = None
+            data["value_note"] = note
 
         # The DCF runs in the filing's share basis (ordinary shares), so the
         # quote has to be converted into that basis before margin of safety is
@@ -281,10 +336,21 @@ class StandardDCFEngine(ValuationEngine):
             wacc_values=[wacc - 0.01, wacc, wacc + 0.01],
         )
 
-        expected = weighted["expected_value"]
+        expected_raw = weighted["expected_value"]
         bear = scenario_results["bear"]["value_per_share"]
         base = scenario_results["base"]["value_per_share"]
         bull = scenario_results["bull"]["value_per_share"]
+        if expected_raw > 0:
+            expected: float | None = expected_raw
+        else:
+            # Mismo criterio que en los escenarios: un esperado <= 0 es N/D
+            # explicado, no una cifra negativa (el bruto queda en la traza).
+            expected = None
+            scenario_notes["expected"] = (
+                "El valor esperado (ponderado por probabilidad) sale "
+                f"{_num_es(expected_raw)} con estos supuestos: N/D, no se publica "
+                "una cifra negativa."
+            )
 
         # Terminal value share guard: a DCF where >80% of the EV is the terminal
         # value is not a 5-year forecast, it is a perpetuity assumption.
@@ -333,14 +399,15 @@ class StandardDCFEngine(ValuationEngine):
             "value_per_share_basis": "ordinary_share",
             "listed_share_values": (
                 {
-                    "bear": bear * ratio,
-                    "base": base * ratio,
-                    "bull": bull * ratio,
-                    "expected": expected * ratio,
+                    "bear": bear * ratio if bear is not None else None,
+                    "base": base * ratio if base is not None else None,
+                    "bull": bull * ratio if bull is not None else None,
+                    "expected": expected * ratio if expected is not None else None,
                 }
                 if ratio
                 else None
             ),
+            "scenario_notes": scenario_notes,
             "comparable_price_basis": "ordinary_share" if ratio else "listed_share",
             "reverse_dcf": reverse,
             "sensitivity": sensitivity,
@@ -370,6 +437,8 @@ class StandardDCFEngine(ValuationEngine):
                 "comparable_price": comparable_price,
                 "terminal_value_share": terminal_share,
                 "clamp_notes": clamp_notes,
+                "expected_value_raw": expected_raw,
+                "scenario_notes": scenario_notes,
                 "publication_blockers": publication_blockers,
                 "scenario_style": "fact_anchored_sensitivity",
                 "probability_method": "source_confidence_plus_company_financials",
