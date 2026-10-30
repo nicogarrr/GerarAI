@@ -73,12 +73,35 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
 export default function Link({ href, children, ...rest }) { return createElement('a', { href, ...rest }, children); }
 `,
         );
+        // Scaffold i18n: keys/format se compilan de verdad; messages es un
+        // stub generado desde los JSON reales de messages/es (el alias @/ no
+        // resuelve bajo node --test).
+        const { readdirSync } = await import('node:fs');
+        const esMerged: Record<string, unknown> = {};
+        for (const file of readdirSync('lib/i18n/messages/es')) {
+            if (file.endsWith('.json')) {
+                esMerged[file.replace(/\.json$/, '')] = JSON.parse(readFileSync(`lib/i18n/messages/es/${file}`, 'utf8'));
+            }
+        }
+        writeFileSync(`${dir}/i18n-keys.mjs`, compile('lib/i18n/keys.ts'));
+        writeFileSync(
+            `${dir}/i18n-format.mjs`,
+            compile('lib/i18n/format.ts').replaceAll('@/lib/format', './format.mjs'),
+        );
+        writeFileSync(
+            `${dir}/i18n-messages.mjs`,
+            `export const es = ${JSON.stringify(esMerged)};\nexport const dictionaries = { es };\nexport const DEFAULT_LOCALE = 'es';\n`,
+        );
         writeFileSync(
             `${dir}/forecast.mjs`,
             compile('components/portfolio/PortfolioForecast.tsx').replaceAll(
                 '@/components/ui/panel',
                 './panel.mjs',
-            ).replaceAll("'next/link'", "'./next-link.mjs'").replaceAll('@/lib/format', './format.mjs'),
+            ).replaceAll("'next/link'", "'./next-link.mjs'")
+                .replaceAll('@/lib/i18n/format', './i18n-format.mjs')
+                .replaceAll('@/lib/i18n/keys', './i18n-keys.mjs')
+                .replaceAll('@/lib/i18n/messages', './i18n-messages.mjs')
+                .replaceAll('@/lib/format', './format.mjs'),
         );
         const mod = await import(`${process.cwd()}/${dir}/forecast.mjs`);
         return renderToStaticMarkup(createElement(mod.default, { forecast: payload }));
@@ -104,7 +127,9 @@ describe('PortfolioForecast montado con react-dom/server', () => {
     it('los porcentajes se renderizan en formato es-ES con coma decimal', async () => {
         const { readFileSync } = await import('node:fs');
         const source = readFileSync('components/portfolio/PortfolioForecast.tsx', 'utf8');
-        assert.ok(source.includes("Intl.NumberFormat('es-ES'"), 'el formato usa es-ES');
+        assert.ok(source.includes('Intl.NumberFormat(f.intlLocale'), 'el formato usa el locale activo');
+        const i18nFormat = readFileSync('lib/i18n/format.ts', 'utf8');
+        assert.ok(i18nFormat.includes("'es-ES'"), 'es se resuelve a es-ES (coma decimal)');
         assert.ok(!source.includes('.toFixed('), 'toFixed rompe la coma decimal es-ES');
         assert.ok(source.includes('Number.isFinite'), 'Infinity/NaN se filtran a Sin datos');
     });

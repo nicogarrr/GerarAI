@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "title": "Exportación",
+    "description": "Descarga tu diario de decisiones en CSV o JSON, o tus tesis para Obsidian (.zip)."
+  },
+  "header": { "eyebrow": "Diario", "title": "Exportación" },
+  "journal": {
+    "title": "Diario de decisiones",
+    "description": "Decisiones de un año en CSV o JSON.",
+    "yearLabel": "Año",
+    "formatLabel": "Formato",
+    "formatCsv": "CSV (hoja de cálculo)",
+    "formatJson": "JSON (datos crudos)",
+    "exporting": "Exportando...",
+    "exportCta": "Exportar diario",
+    "preview": "Vista previa",
+    "success": "Exportación completada: {filename}"
+  },
+  "obsidian": {
+    "title": "Tesis para Obsidian",
+    "description": "Descarga tus tesis de cartera y watchlist en Markdown enlazado (.zip) para Obsidian.",
+    "downloading": "Descargando…",
+    "cta": "Descargar para Obsidian (.zip)",
+    "error": "No se pudo descargar el vault. Inténtalo de nuevo en unos segundos.",
+    "confirmTitle": "Descargar para Obsidian",
+    "confirmDescription": "¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?",
+    "confirmLabel": "Descargar"
+  }
+}

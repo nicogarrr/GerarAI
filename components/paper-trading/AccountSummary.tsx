@@ -1,7 +1,9 @@
+'use client';
+
 import { AlertTriangle, Info } from 'lucide-react';
 
 import { Stat } from '@/components/ui/stat';
-import { formatMoney } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 import type { Currency } from '@/lib/paper-trading/types';
 import type { DemoStateView } from './submit';
 
@@ -17,32 +19,34 @@ import type { DemoStateView } from './submit';
  * una sobreventa o un sobregiro, se muestra tal cual.
  */
 export function AccountSummary({ account }: { account: DemoStateView }) {
+    const ti = useT();
+    const f = useFormat();
     const cash: { label: string; value: number; currency: Currency }[] = [
-        { label: 'Efectivo EUR', value: account.cashEUR, currency: 'EUR' },
-        { label: 'Efectivo USD', value: account.cashUSD, currency: 'USD' },
+        { label: ti('paperTrading.account.cashEur'), value: account.cashEUR, currency: 'EUR' },
+        { label: ti('paperTrading.account.cashUsd'), value: account.cashUSD, currency: 'USD' },
     ];
     const realized: { label: string; value: number; currency: Currency }[] = [
-        { label: 'Realizado EUR', value: account.realizedEUR, currency: 'EUR' },
-        { label: 'Realizado USD', value: account.realizedUSD, currency: 'USD' },
+        { label: ti('paperTrading.account.realizedEur'), value: account.realizedEUR, currency: 'EUR' },
+        { label: ti('paperTrading.account.realizedUsd'), value: account.realizedUSD, currency: 'USD' },
     ];
     return (
-        <section aria-label="Saldo de la cuenta demo" className="space-y-3">
+        <section aria-label={ti('paperTrading.account.ariaLabel')} className="space-y-3">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {cash.map((bucket) => (
                     <Stat
                         key={bucket.label}
                         label={bucket.label}
                         size="sm"
-                        value={formatMoney(bucket.value, bucket.currency)}
+                        value={f.formatMoney(bucket.value, bucket.currency)}
                     />
                 ))}
                 {realized.map((bucket) => (
                     <Stat
                         key={bucket.label}
                         label={bucket.label}
-                        hint="antes de comisiones"
+                        hint={ti('paperTrading.account.realizedHint')}
                         size="sm"
-                        value={formatMoney(bucket.value, bucket.currency)}
+                        value={f.formatMoney(bucket.value, bucket.currency)}
                         tone={bucket.value > 0 ? 'good' : bucket.value < 0 ? 'bad' : 'default'}
                     />
                 ))}
@@ -54,7 +58,7 @@ export function AccountSummary({ account }: { account: DemoStateView }) {
                 >
                     <p className="flex items-center gap-2 font-semibold">
                         <AlertTriangle className="size-4 shrink-0" aria-hidden="true" />
-                        Incidencias de integridad en la cuenta demo
+                        {ti('paperTrading.account.violationsTitle')}
                     </p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-6">
                         {account.violations.map((violation) => (
@@ -67,7 +71,7 @@ export function AccountSummary({ account }: { account: DemoStateView }) {
                 <div className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">
                     <p className="flex items-center gap-2 font-semibold text-gray-300">
                         <Info className="size-4 shrink-0" aria-hidden="true" />
-                        Avisos de la cuenta demo
+                        {ti('paperTrading.account.noticesTitle')}
                     </p>
                     <ul className="mt-1 list-disc space-y-0.5 pl-6">
                         {account.notices.map((notice) => (

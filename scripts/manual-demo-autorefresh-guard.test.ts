@@ -47,7 +47,7 @@ describe('auto-refresco de la valoración demo', () => {
         assert.match(panel, /const refreshBusy = pending \|\| refreshing/);
         assert.match(panel, /pending=\{refreshBusy\}/);
         assert.match(panel, /disabled=\{refreshBusy\}/);
-        assert.match(panel, /refreshBusy \? 'Consultando…'/);
+        assert.match(panel, /refreshBusy \? ti\('paperTrading\.valuation\.refreshing'\)/);
     });
 
     it('puertas de sostenibilidad: visible, con posiciones, backoff exponencial ante fallos', () => {
@@ -74,7 +74,8 @@ describe('auto-refresco de la valoración demo', () => {
     });
 
     it('el botón manual se conserva como refresco inmediato y sin botón no-op', () => {
-        assert.match(panel, /Actualizar cotizaciones|Consultar cotizaciones/);
+        // i18n: las etiquetas viven en el diccionario (valuation.refresh/consult).
+        assert.match(panel, /paperTrading\.valuation\.refresh|paperTrading\.valuation\.consult/);
         assert.match(panel, /onClick=\{onRefresh\}/);
         // Sin refreshValuation no se ofrece botón que no hace nada.
         assert.match(panel, /onRefresh=\{refreshValuation \? onRefresh : null\}/);
@@ -85,14 +86,17 @@ describe('auto-refresco de la valoración demo', () => {
         // Cadencia aproximada y sin promesa exacta: el tick del intervalo no
         // está alineado con el fin de cada fetch y el backoff/Retry-After
         // alarga la espera a propósito. Nada de «cada minuto» a secas.
-        assert.match(panel, /Se actualiza aproximadamente cada minuto mientras esta pestaña está visible/);
-        assert.match(panel, /si el proveedor falla, espera más a propósito/);
-        assert.doesNotMatch(panel, /Se actualiza cada minuto mientras/);
+        // i18n: el copy vive en el diccionario; el panel referencia la clave.
+        assert.match(panel, /paperTrading\.valuation\.note/);
+        const dict = JSON.parse(readFileSync('lib/i18n/messages/es/paperTrading.json', 'utf8'));
+        assert.match(dict.valuation.note, /Se actualiza aproximadamente cada minuto mientras esta pestaña está visible/);
+        assert.match(dict.valuation.note, /si el proveedor falla, espera más a propósito/);
+        assert.doesNotMatch(dict.valuation.note, /Se actualiza cada minuto mientras/);
         // El botón y los estados sin valoración tampoco prometen plazo ni
         // inmediatez («al momento», «en el próximo minuto», «ahora»).
-        assert.match(panel, /También puedes solicitar una actualización con el botón/);
-        assert.match(panel, /Se reconsultan solas con la pestaña visible, o puedes pedirlo con el botón/);
-        assert.match(panel, /Se consultan solas con la pestaña visible, o puedes pedirlo con el botón/);
+        assert.match(dict.valuation.note, /También puedes solicitar una actualización con el botón/);
+        assert.match(dict.valuation.stale, /Se reconsultan solas con la pestaña visible, o puedes pedirlo con el botón/);
+        assert.match(dict.valuation.unavailable, /Se consultan solas con la pestaña visible, o puedes pedirlo con el botón/);
         assert.doesNotMatch(panel, /el botón la refresca al momento/);
         assert.doesNotMatch(panel, /en el próximo minuto/);
         assert.doesNotMatch(panel, /o ahora con el botón/);
@@ -101,6 +105,7 @@ describe('auto-refresco de la valoración demo', () => {
     it('el registro de operaciones sigue manual: nada de autoprellenar fills con cotización', () => {
         const ticket = readFileSync('components/paper-trading/OrderTicket.tsx', 'utf8');
         assert.doesNotMatch(ticket, /setPrice\(.*quote|setPrice\(.*valuation|markPrice/i);
-        assert.match(ticket, /no es una ejecución de\s+mercado/i);
+        // i18n: la advertencia vive en el diccionario (ticket.manualNote).
+        assert.match(ticket, /paperTrading\.ticket\.manualNote/);
     });
 });

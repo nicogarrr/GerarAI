@@ -3,18 +3,21 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useT } from "@/lib/i18n/client";
+import type { TranslationKey as Key } from "@/lib/i18n/keys";
 
-const TABS = [
-  ["/portfolio", "Cartera"],
-  ["/calendar/resultados", "Resultados"],
-  ["/calendar/suscripcion", "Suscribir"],
-  ["/calendar", "Catalizadores"],
-  ["/calendar/ipos", "IPOs"],
-  ["/macro-calendar", "Macro y 8-K"],
-  ["/corporate-actions", "Acciones corp."],
+const TABS: ReadonlyArray<readonly [string, Key]> = [
+  ["/portfolio", "calendar.tabs.portfolio"],
+  ["/calendar/resultados", "calendar.tabs.resultados"],
+  ["/calendar/suscripcion", "calendar.tabs.suscripcion"],
+  ["/calendar", "calendar.tabs.catalizadores"],
+  ["/calendar/ipos", "calendar.tabs.ipos"],
+  ["/macro-calendar", "calendar.tabs.macro"],
+  ["/corporate-actions", "calendar.tabs.corporate"],
 ] as const;
 
 export function CalendarTabs() {
+  const ti = useT();
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
   // Indicador de más pestañas fuera de pantalla: en 390px la tira de 5 pestañas
@@ -59,10 +62,10 @@ export function CalendarTabs() {
     <nav
       ref={navRef}
       onScroll={updateMore}
-      aria-label="Calendarios"
+      aria-label={ti('calendar.tabs.navAria')}
       className="flex w-full min-w-0 flex-nowrap gap-0.5 overflow-x-auto border-b border-gray-800 px-2 py-2 sm:gap-1 sm:px-6"
     >
-      {TABS.map(([href, label]) => {
+      {TABS.map(([href, labelKey]) => {
         const active = href === activeHref;
         return (
           <Link
@@ -72,7 +75,7 @@ export function CalendarTabs() {
             scroll={false}
             key={href}
           >
-            {label}
+            {ti(labelKey)}
           </Link>
         );
       })}
