@@ -151,3 +151,44 @@ describe('TaxesView posiciones y exportacion', () => {
         expect(toastSuccess).toHaveBeenCalledWith('Resumen fiscal 2025 exportado');
     });
 });
+
+describe('TaxesView libro de divisas', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('importes del libro de divisas en EUR con formato es-ES, nunca floats crudos', () => {
+        view({
+            initialReport: {
+                summary: {
+                    fiscal_year: 2025, base_currency: 'EUR',
+                    currency_ledger_status: 'computed',
+                    currency_ledger_gain_base: 1234.5678,
+                    currency_ledger_blocked_loss_base: 12.5,
+                    currency_ledger_by_currency: {
+                        USD: { status: 'computed', gain_base: 1234.5678, blocked_loss_base: 12.5, unconverted: 901.17 },
+                    },
+                },
+                generated_at: '2026-01-02T10:00:00Z',
+            },
+        });
+        const text = document.body.textContent ?? '';
+        expect(text).not.toContain('1234.5678');
+        expect(text).toMatch(/1\.234,57/);
+        expect(text).toMatch(/12,50/);
+        expect(text).toMatch(/901,17 USD/);
+    });
+
+    it('ganancia de divisa ausente sigue mostrando «No calculado»', () => {
+        view({
+            initialReport: {
+                summary: {
+                    fiscal_year: 2025, base_currency: 'EUR',
+                    currency_ledger_status: 'not_computed',
+                    currency_ledger_gain_base: null,
+                    currency_ledger_blocked_loss_base: null,
+                },
+                generated_at: '2026-01-02T10:00:00Z',
+            },
+        });
+        expect(screen.getAllByText('No calculado').length).toBeGreaterThan(0);
+    });
+});
