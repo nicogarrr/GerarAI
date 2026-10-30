@@ -139,6 +139,19 @@ TREATY_RATE_SOURCES = {
     "FR": "BOE-A-1997-12729 art. 10.2.a (convenio España-Francia 1995)",
 }
 
+# A16: texto para la persona (se muestra tal cual en la ficha fiscal).
+IRELAND_MANUAL_REVIEW_REASON = (
+    "Irlanda va a revisión manual a propósito, no por falta de datos: el "
+    "convenio España-Irlanda (BOE-A-1994-28597, art. 10.1) no fija un tipo "
+    "único para particulares. El 15 % del art. 10.1.b solo se aplica si "
+    "tienes derecho al crédito fiscal irlandés del dividendo; si no, el art. "
+    "10.1.c deja el dividendo exento en Irlanda y la retención irlandesa no "
+    "se deduce en la casilla 0588, sino que se reclama a Irlanda. Cuál de los "
+    "dos casos aplica depende de la ley irlandesa, así que GerarAI no calcula "
+    "esta deducción: revisa la retención en el certificado de tu bróker con "
+    "un asesor antes de incluirla."
+)
+
 UNKNOWN_COUNTRY = "??"
 
 # Tipos de pago especiales (en la acción cruda del bróker) que NO son un
@@ -522,6 +535,15 @@ def build_double_taxation(
             manual_review.append({
                 "ticker": bucket["ticker"],
                 "reason": "País de retención desconocido (sin domicilio del emisor); no se calcula deducción para este bloque.",
+            })
+            continue
+        if country == "IE":
+            # A16 (Nico 30-10-2026): Irlanda sigue en revisión manual a
+            # propósito; solo se explica el porqué (ver TREATY_DIVIDEND_RATES).
+            manual_review.append({
+                "ticker": bucket["ticker"],
+                "country": "IE",
+                "reason": IRELAND_MANUAL_REVIEW_REASON,
             })
             continue
         if country != "ES" and country not in TREATY_DIVIDEND_RATES:

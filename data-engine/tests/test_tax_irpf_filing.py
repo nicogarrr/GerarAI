@@ -343,6 +343,26 @@ def test_double_taxation_country_without_verified_treaty_is_manual_review():
     assert result["total_deduction_base"] is None
 
 
+def test_double_taxation_ireland_manual_review_explains_why():
+    # A16 (Nico 30-10-2026): Irlanda se queda en revisión manual (sin cambio
+    # de comportamiento), pero el mensaje dice por qué, citando el convenio.
+    dividends = [{
+        "ticker": "CRH", "dividends_base": 100.0, "withholding_base": 25.0,
+        "missing_fx": False, "payments": [],
+    }]
+    out = build_double_taxation(dividends, {"CRH": "IE"}, 2025, tme=Decimal("0.20"))
+    assert out["countries"] == []
+    assert out["partial"] is True
+    assert out["total_deduction_base"] is None
+    reason = out["manual_review"][0]["reason"]
+    assert out["manual_review"][0]["ticker"] == "CRH"
+    assert "Irlanda va a revisión manual a propósito" in reason
+    assert "BOE-A-1994-28597" in reason
+    assert "10.1.b" in reason and "10.1.c" in reason
+    assert "exento" in reason
+    assert "{" not in reason  # nunca el código de país crudo sin formatear
+
+
 def test_double_taxation_special_payment_types_are_manual_review():
     dividends = [{
         "ticker": "XYZ", "dividends_base": 50.0, "withholding_base": 7.5,
