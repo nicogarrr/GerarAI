@@ -12,6 +12,7 @@ test("research tools have one contextual navigation, not an obsolete sidebar foo
  assert.doesNotMatch(constants,/\/research\/workflows/);
  // Contrato del e2e research-tools-consolidation: la raiz de Research se
  // anuncia «Empresas» en el subnav (subnavLabel) sin renombrar la miga.
- assert.match(constants,/subnavLabel: 'Empresas'/);
- assert.match(nav,/item\.subnavLabel\?\?item\.label/);
+ assert.match(constants,/subnavLabelKey: 'nav.items.empresas'/);
+ assert.equal(JSON.parse(readFileSync("lib/i18n/messages/es/nav.json","utf8")).items.empresas,"Empresas");
+ assert.match(nav,/t\(item\.subnavLabelKey\?\?item\.labelKey\)/);
 });

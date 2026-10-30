@@ -6,10 +6,25 @@
   },
   "command": {
     "placeholder": "Search stocks, theses or documents...",
-    "error": "The search could not be completed"
+    "error": "The search could not be completed. Please try again.",
+    "title": "Search stocks",
+    "subtitle": "Search by symbol or company, or jump to a GerarAI section",
+    "inputPlaceholder": "Search stocks or command \"ASTS FA\"...",
+    "inputAria": "Search stocks or sections",
+    "loading": "Loading stocks...",
+    "noStocks": "No stocks available",
+    "resultsCount": "Search results ({n})",
+    "popular": "Popular stocks",
+    "unverifiedCoverage": "Stock page coverage not verified",
+    "tickerCommands": "{ticker} commands",
+    "stockPage": "Stock page",
+    "directSymbol": "Go directly by symbol"
   },
   "search": {
     "placeholder": "Search by name or symbol",
-    "noResults": "No results"
+    "noResults": "No results",
+    "addStock": "Add stock",
+    "openAria": "Open search",
+    "stocksPlaceholder": "Search stocks..."
   }
 }

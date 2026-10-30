@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
+import { useT } from '@/lib/i18n/client';
 
 export interface PublicNavLinkItem {
     href: string;
@@ -26,6 +27,7 @@ export interface PublicNavLinkItem {
  * puede quedar un hueco sin navegacion.
  */
 export default function PublicMobileNav({ links, cta }: { links: PublicNavLinkItem[]; cta?: PublicNavLinkItem }) {
+    const t = useT();
     const [open, setOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -99,7 +101,7 @@ export default function PublicMobileNav({ links, cta }: { links: PublicNavLinkIt
                 type="button"
                 ref={triggerRef}
                 onClick={() => setOpen(true)}
-                aria-label="Abrir menú de páginas"
+                aria-label={t('shell.publicNav.openMenu')}
                 aria-expanded={open}
                 aria-controls="public-mobile-nav-drawer"
                 className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white md:hidden"
@@ -120,10 +122,10 @@ export default function PublicMobileNav({ links, cta }: { links: PublicNavLinkIt
                         aria-modal="true"
                         aria-labelledby="public-mobile-nav-title"
                     >
-                        <h2 id="public-mobile-nav-title" className="sr-only">Menú de páginas</h2>
+                        <h2 id="public-mobile-nav-title" className="sr-only">{t('shell.publicNav.menuTitle')}</h2>
                         <button
                             type="button"
-                            aria-label="Cerrar menú por fondo"
+                            aria-label={t('shell.nav.closeBackdrop')}
                             onClick={close}
                             tabIndex={-1}
                             className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
@@ -138,7 +140,7 @@ export default function PublicMobileNav({ links, cta }: { links: PublicNavLinkIt
                                     type="button"
                                     ref={closeButtonRef}
                                     onClick={close}
-                                    aria-label="Cerrar menú de páginas"
+                                    aria-label={t('shell.publicNav.closeMenu')}
                                     className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                                 >
                                     <X className="h-6 w-6" aria-hidden="true" />
@@ -149,7 +151,7 @@ export default function PublicMobileNav({ links, cta }: { links: PublicNavLinkIt
                                 MobileNav). */}
                             <nav
                                 className="flex-1 overflow-y-auto px-3 py-3"
-                                aria-label="Páginas de GerarAI"
+                                aria-label={t('shell.publicNav.pagesAria')}
                                 onClick={(event) => {
                                     if ((event.target as HTMLElement).closest('a[href]')) close();
                                 }}

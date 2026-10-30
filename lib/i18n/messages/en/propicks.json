@@ -1,1 +1,5 @@
-{}
+{
+  "follow": "Follow",
+  "followed": "Following",
+  "noResults": "No results with these filters"
+}

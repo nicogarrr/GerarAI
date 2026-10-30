@@ -7,6 +7,7 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { isNavItemActive, isNavItemExact, NAV_SECTIONS, showsNavSectionTitle, type NavItem } from '@/lib/constants';
 
 import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/ui/sidebar-preference';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Navegacion de escritorio. Complementa a `components/MobileNav.tsx`, que usa
@@ -21,6 +22,7 @@ import { SIDEBAR_COLLAPSED_COOKIE } from '@/lib/ui/sidebar-preference';
  */
 export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: boolean }) {
     const pathname = usePathname();
+    const t = useT();
     const [collapsed, setCollapsed] = useState(initiallyCollapsed);
 
     const toggle = () => {
@@ -38,8 +40,8 @@ export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: 
         >
             <button
                 onClick={toggle}
-                title={collapsed ? 'Expandir menú' : 'Plegar menú'}
-                aria-label={collapsed ? 'Expandir menú' : 'Plegar menú'}
+                title={collapsed ? t('shell.menu.expand') : t('shell.menu.collapse')}
+                aria-label={collapsed ? t('shell.menu.expand') : t('shell.menu.collapse')}
                 aria-expanded={!collapsed}
                 className="m-2 flex h-9 w-fit items-center justify-center rounded-lg text-gray-300 hover:bg-gray-800 hover:text-teal-300"
             >
@@ -48,19 +50,19 @@ export default function Sidebar({ collapsed: initiallyCollapsed }: { collapsed: 
 
             <nav
                 className="scrollbar-hide-default min-h-0 flex-1 overflow-y-auto px-2 pb-4"
-                aria-label="Navegación principal"
+                aria-label={t('shell.nav.primaryAria')}
             >
                 <ul className="flex flex-col">
                     {NAV_SECTIONS.map((section) => {
                         const showTitle = showsNavSectionTitle(section);
                         return (
-                            <li key={section.title}>
+                            <li key={section.titleKey}>
                                 {showTitle && (
                                     collapsed ? (
                                         <div className="mx-2 my-3 border-t border-gray-700/50" aria-hidden="true" />
                                     ) : (
                                         <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                                            {section.title}
+                                            {section.titleKey ? t(section.titleKey) : null}
                                         </p>
                                     )
                                 )}
@@ -87,6 +89,7 @@ function ariaCurrent(active: boolean, exact: boolean): 'page' | 'true' | undefin
 }
 
 function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: string; collapsed: boolean }) {
+    const t = useT();
     const active = isNavItemActive(pathname, item.href);
     // Un padre se ilumina cuando la ruta cae en un hijo suyo, para que la
     // rama "Research" siga visible dentro de /research/news.
@@ -96,13 +99,13 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
         <>
             <IntentLink
                 href={item.href}
-                aria-label={item.label}
-                title={collapsed ? item.label : undefined}
+                aria-label={t(item.labelKey)}
+                title={collapsed ? t(item.labelKey) : undefined}
                 aria-current={ariaCurrent(active, isNavItemExact(pathname, item.href))}
                 className={linkClasses(active, collapsed, 'text-sm', branchActive)}
             >
                 {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
-                {!collapsed && <span className="truncate">{item.label}</span>}
+                {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
             </IntentLink>
             {item.children && (
                 <ul className={collapsed ? "mt-1 flex flex-col gap-1" : "mt-1 flex flex-col gap-1 border-l border-gray-700/50 pl-3"}>
@@ -112,12 +115,12 @@ function NavLink({ item, pathname, collapsed }: { item: NavItem; pathname: strin
                             <li key={child.href}>
                                 <IntentLink
                                     href={child.href}
-                                    aria-label={child.label}
-                                    title={collapsed ? child.label : undefined}
+                                    aria-label={t(child.labelKey)}
+                                    title={collapsed ? t(child.labelKey) : undefined}
                                     aria-current={ariaCurrent(childActive, isNavItemExact(pathname, child.href))}
                                     className={linkClasses(childActive, collapsed, 'text-sm')}
                                 >
-                                    {collapsed ? <child.icon aria-hidden="true" className="h-4 w-4 shrink-0" /> : <span className="truncate">{child.label}</span>}
+                                    {collapsed ? <child.icon aria-hidden="true" className="h-4 w-4 shrink-0" /> : <span className="truncate">{t(child.labelKey)}</span>}
                                 </IntentLink>
                             </li>
                         );
