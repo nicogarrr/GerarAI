@@ -78,3 +78,16 @@ describe('shared valuation', () => {
     expect(healthMissingLabel('denominador no positivo')).toBe('denominador no positivo');
   });
 });
+
+describe('valuation summary tap targets (mobile ≥44 px)', () => {
+  it('ticker link, methodology links and the details toggle are 44 px tall', () => {
+    render(<ValuationSummaryCard item={item} quote={quote} />);
+    const targets = [
+      screen.getByRole('link', { name: 'DEMO' }),
+      screen.getByRole('link', { name: 'Método Piotroski' }),
+      screen.getByRole('link', { name: 'Método Altman' }),
+      screen.getByText(/Ver puntos, fuentes/),
+    ];
+    for (const el of targets) expect(el.className).toMatch(/min-h-\[44px\]/);
+  });
+});
