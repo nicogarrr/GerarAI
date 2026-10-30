@@ -53,6 +53,12 @@ _day_cache: dict[tuple[str, date], tuple[float, list[dict[str, Any]]]] = {}
 _DAY_FAILURE_TTL_S = 60.0
 _day_failures: dict[tuple[str, date], float] = {}
 _day_inflight: dict[tuple[int, str, date], asyncio.Task[list[dict[str, Any]] | None]] = {}
+# Stale-while-revalidate: un dia caducado (mas de 1 h) pero de menos de 24 h
+# se sirve al momento y se refresca en segundo plano. Antes, cada hora, la
+# primera vista del calendario/catalizadores esperaba de nuevo a NASDAQ
+# (~3 s por dia, hasta el deadline de 8 s). Si el refresco falla se sigue
+# sirviendo la copia y la cache negativa evita reintentar en bucle.
+_DAY_STALE_MAX_S = 24 * 3600.0
 
 # Pool HTTP compartido. Antes cada dia abria un AsyncClient nuevo (TLS nueva
 # por consulta); el pool reutiliza conexiones entre dias y entre rangos.
@@ -197,26 +203,53 @@ async def _fetch_day_pooled(
     key = (kind, day)
     loop = asyncio.get_running_loop()
     hit = _day_cache.get(key)
-    if hit is not None and time.monotonic() - hit[0] < _DAY_CACHE_TTL_S:
-        return hit[1]
     failed_at = _day_failures.get(key)
-    if failed_at is not None and time.monotonic() - failed_at < _DAY_FAILURE_TTL_S:
+    recently_failed = failed_at is not None and time.monotonic() - failed_at < _DAY_FAILURE_TTL_S
+    if hit is not None:
+        age = time.monotonic() - hit[0]
+        if age < _DAY_CACHE_TTL_S:
+            return hit[1]
+        if age < _DAY_STALE_MAX_S:
+            if not recently_failed:
+                _day_flight(loop, kind, day, fetch_day)
+            return hit[1]
+    if recently_failed:
         return None
-    # El singleflight es por event loop: una Task creada en otro loop no se
-    # puede esperar desde este ("attached to a different loop").
-    flight_key = (id(loop), kind, day)
-    task = _day_inflight.get(flight_key)
-    if task is None:
-        task = asyncio.ensure_future(fetch_day(day, None))
-        _day_inflight[flight_key] = task
-        task.add_done_callback(lambda _t: _day_inflight.pop(flight_key, None))
-    events = await task
+    return await _day_flight(loop, kind, day, fetch_day)
+
+
+def _store_day(key: tuple[str, date], task: asyncio.Task[list[dict[str, Any]] | None]) -> None:
+    """Guarda el resultado de una consulta de dia (en primer o segundo plano)."""
+    if task.cancelled():  # p.ej. el loop de un asyncio.run que termina: no es un fallo de NASDAQ
+        return
+    events = None if task.exception() is not None else task.result()
     if events is not None:
         _day_cache[key] = (time.monotonic(), events)
         _day_failures.pop(key, None)
     else:
         _day_failures[key] = time.monotonic()
-    return events
+
+
+def _day_flight(
+    loop: asyncio.AbstractEventLoop, kind: str, day: date, fetch_day: Any
+) -> asyncio.Task[list[dict[str, Any]] | None]:
+    """Consulta compartida (singleflight) de un dia; guarda el resultado al acabar.
+
+    El singleflight es por event loop: una Task creada en otro loop no se
+    puede esperar desde este ("attached to a different loop").
+    """
+    flight_key = (id(loop), kind, day)
+    task = _day_inflight.get(flight_key)
+    if task is None:
+        task = asyncio.ensure_future(fetch_day(day, None))
+        _day_inflight[flight_key] = task
+
+        def _done(t: asyncio.Task[list[dict[str, Any]] | None]) -> None:
+            _day_inflight.pop(flight_key, None)
+            _store_day((kind, day), t)
+
+        task.add_done_callback(_done)
+    return task
 
 
 async def _fetch_days(
