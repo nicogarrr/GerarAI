@@ -72,9 +72,31 @@ def test_watchlist_con_margen_y_nivel_dca(db):
     assert rows["AAPL"]["mos"] == pytest.approx(-0.30)
     # IBRX no tiene ficha: se dice, no se inventa.
     assert "IBRX: aún sin ficha en GerarAI" in text
-    # CGEO.L: 4.200 (peniques) frente a 42,55 GBP → ratio 0,01: margen no calculado.
+    # CGEO.L: 4.200 sin unidad declarada en Londres (GBp o GBP): no hay
+    # precio verificable, ni se rotula «4.200,00 GBP» ni hay margen.
     assert rows["CGEO.L"]["mos"] is None
-    assert "margen no calculado: posible desajuste de unidades" in text
+    assert rows["CGEO.L"]["price"] is None
+    assert "CGEO.L (Georgia Capital), precio guardado sin unidad verificable" in text
+    assert "4.200,00 GBP" not in text
+
+
+def test_watchlist_londres_en_peniques_se_compara_en_libras(db):
+    from sqlalchemy import select
+
+    from app.models import Company, MarketPrice
+
+    company = db.scalar(select(Company).where(Company.ticker == "CGEO.L"))
+    for price in db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id)):
+        price.quote_currency = "GBp"
+    db.flush()
+    ctx = _ctx(db)
+    text = ctx.render()
+    rows = {row["ticker"]: row for row in ctx.blocks["watchlist"].rows}
+    # 4.200 GBp = 42,00 GBP; valor justo 42,55 GBP -> (42,55 − 42) / 42,55 = +1,29 %.
+    assert rows["CGEO.L"]["price"] == pytest.approx(42.0)
+    assert rows["CGEO.L"]["mos"] == pytest.approx((42.55 - 42) / 42.55)
+    assert "cierre 42,00 GBP" in text
+    assert "margen de seguridad +1,3 %" in text
 
 
 def test_sin_motor_dca_degrada_limpio(db):
