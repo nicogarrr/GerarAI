@@ -200,6 +200,7 @@ function number(value: number | string | null | undefined): number | null {
 
 /** Etiquetas en español para enums persistidos por el backend */
 const STATUS_LABELS: Record<string, string> = {
+  final: 'generada · pendiente de aprobación',
   draft: 'borrador',
   review: 'en revisión',
   approved: 'aprobada',
