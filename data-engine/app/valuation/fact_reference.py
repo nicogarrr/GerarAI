@@ -33,12 +33,14 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import FinancialFact
+from app.services.split_adjustment import split_factor_for_fact
 
 
 @dataclass(frozen=True)
@@ -52,9 +54,12 @@ class SourcedFact:
     confidence: float
     source_type: str
     is_reported: bool
+    # Splits posteriores al hecho ya aplicados a ``value`` (acciones x factor,
+    # importes por accion / factor). 1.0 = sin ajuste.
+    split_factor: float = 1.0
 
     def as_trace(self) -> dict:
-        return {
+        trace = {
             "metric": self.metric,
             "value": self.value,
             "fact_id": self.fact_id,
@@ -63,6 +68,9 @@ class SourcedFact:
             "source_type": self.source_type,
             "is_reported": self.is_reported,
         }
+        if self.split_factor != 1.0:
+            trace["split_factor"] = self.split_factor
+        return trace
 
 
 def _to_sourced(fact: FinancialFact) -> SourcedFact | None:
@@ -119,8 +127,44 @@ def latest_facts(db: Session, company_id: int, metrics: Sequence[str]) -> dict[s
             continue
         sourced = _to_sourced(row)
         if sourced is not None:
-            resolved[metric] = sourced
+            resolved[metric] = _split_adjusted(db, company_id, row, sourced)
     return resolved
+
+
+# Recuentos de acciones y magnitudes POR ACCION: un split posterior al hecho
+# cambia su escala frente al precio de hoy (el precio ya esta dividido).
+SHARE_COUNT_METRICS = frozenset({"shares_diluted", "shares_outstanding", "shares_basic"})
+PER_SHARE_METRICS = frozenset(
+    {
+        "eps",
+        "eps_diluted",
+        "eps_basic",
+        "dividend_per_share",
+        "dividends_per_share",
+        "annual_dividend_per_share",
+        "book_value_per_share",
+        "nav_per_share",
+    }
+)
+
+
+def _split_adjusted(db: Session, company_id: int, row: FinancialFact, sourced: SourcedFact) -> SourcedFact:
+    """Pone acciones y magnitudes por accion en la base del precio de hoy.
+
+    El precio de mercado ya refleja un split 4:1 posterior al ejercicio; el
+    hecho del 10-K no. Sin el ajuste un BPA de 8 frente a un precio de 25
+    (antes 100) daba PER 3 en vez de 12, y un DDM o un valor por accion x4.
+    Misma regla que el snapshot del DCF (split_factor_for_fact).
+    """
+    if sourced.metric not in SHARE_COUNT_METRICS and sourced.metric not in PER_SHARE_METRICS:
+        return sourced
+    factor = float(
+        split_factor_for_fact(db, company_id, period=row.period, filed=row.filed, cutoff=date.today())
+    )
+    if factor == 1.0 or factor <= 0:
+        return sourced
+    value = sourced.value * factor if sourced.metric in SHARE_COUNT_METRICS else sourced.value / factor
+    return replace(sourced, value=value, split_factor=factor)
 
 
 def resolve_aliases(

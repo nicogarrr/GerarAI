@@ -758,3 +758,37 @@ def test_relative_engine_converts_a_london_peer_quoted_in_pence(db):
     block = next(entry for entry in result["trace"]["peer_multiples"] if entry["multiple"] == "pe")
     values = {peer["ticker"]: peer["value"] for peer in block["peers"]}
     assert values["RELPLSE"] == pytest.approx(9.0)
+
+
+
+def test_relative_engine_adjusts_a_peer_split_after_its_fiscal_year(db):
+    """Par con BPA 8 del ejercicio 2024 y split 4:1 el 01-06-2025: el precio de
+    hoy (25) ya es post-split, el BPA comparable es 8 / 4 = 2 -> PER 12,5 (no 3,1)."""
+    from datetime import date
+    from decimal import Decimal
+
+    from app.models import CorporateAction
+
+    company = _subject(db)
+    _peers(db)
+    split_peer = _company(db, "RELPSPLIT")
+    _facts(
+        db,
+        split_peer,
+        {"eps": 8.0, "revenue": 1000.0, "free_cash_flow": 100.0, "total_debt": 200.0,
+         "cash_and_equivalents": 50.0, "shares_diluted": 100.0, "book_value": 400.0},
+        period="2024-12-31:FY",
+        fiscal_year=2024,
+    )
+    _price(db, split_peer, 25.0)
+    db.add(CorporateAction(company_id=split_peer.id, action_type="split",
+                           effective_date=date(2025, 6, 1), ratio=Decimal("4"), description="4:1"))
+    db.commit()
+    result = _value(db, company)
+
+    blocks = {entry["multiple"]: entry for entry in result["trace"]["peer_multiples"]}
+    pe = {peer["ticker"]: peer["value"] for peer in blocks["pe"]["peers"]}
+    assert pe["RELPSPLIT"] == pytest.approx(12.5)
+    # EV/ventas: 25 x 400 acciones post-split + 200 deuda - 50 caja = 10.150 / 1.000.
+    ev_sales = {peer["ticker"]: peer["value"] for peer in blocks["ev_to_sales"]["peers"]}
+    assert ev_sales["RELPSPLIT"] == pytest.approx(10.15)
