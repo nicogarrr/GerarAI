@@ -269,23 +269,28 @@ def build_casillas(dividends: list[dict], realized: list[dict], fiscal_year: int
                 gain_base = None
             if gain_base is None or proceeds_base is None or cost_base is None:
                 incomplete = True
-            rows.append({
+            row = {
                 "ticker": bucket["ticker"],
                 "date": sale["date"],
                 "transmission_base": _money(Decimal(str(proceeds_base))) if proceeds_base is not None else None,
                 "acquisition_base": _money(Decimal(str(cost_base))) if cost_base is not None else None,
                 "gain_base": _money(Decimal(str(gain_base))) if gain_base is not None else None,
                 "over_sell": over_sell,
-            })
-            if proceeds_base is not None:
-                transmission += Decimal(str(proceeds_base))
-            if cost_base is not None:
-                acquisition += Decimal(str(cost_base))
-            if gain_base is not None:
-                if gain_base >= 0:
-                    gains += Decimal(str(gain_base))
+            }
+            rows.append(row)
+            # Las sumas 0328/0331/0339/0340 son la suma de las filas tal como
+            # se teclean en Renta Web (en céntimos), no del importe sin
+            # redondear: así el total cuadra con lo que calcula el programa.
+            if row["transmission_base"] is not None:
+                transmission += Decimal(str(row["transmission_base"]))
+            if row["acquisition_base"] is not None:
+                acquisition += Decimal(str(row["acquisition_base"]))
+            if row["gain_base"] is not None:
+                row_gain = Decimal(str(row["gain_base"]))
+                if row_gain >= 0:
+                    gains += row_gain
                 else:
-                    losses += abs(Decimal(str(gain_base)))
+                    losses += -row_gain
 
     dividends_total = sum(
         # nosemgrep: gerarai-money-none-to-zero -- el total se publica como None si algun bloque es incompleto (dividend_incomplete, abajo)

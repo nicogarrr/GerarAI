@@ -126,6 +126,29 @@ def test_casillas_gains_losses_split():
     assert len(block["rows"]) == 2
 
 
+def test_casillas_totals_are_the_sum_of_the_rows_in_cents():
+    """Modelo 100 (Renta 2025, Orden HAC/277/2026), página 14 III: each
+    transmission is keyed in Renta Web in euros with two decimals and the
+    program adds those rows into 0328/0331/0339/0340. The totals must be
+    the sum of the ROUNDED rows, or the report disagrees with Renta Web.
+    Hand example: three sales of 10,004 € proceeds / 5,004 € cost / 5,000 €
+    gain -> each row 10,00 / 5,00 / 5,00; totals 30,00 / 15,00 / 15,00
+    (summing the raw amounts gave 30,01 / 15,01)."""
+    realized = [
+        _sale("A", "2025-03-01", 10.004, 5.004, 5.0),
+        _sale("B", "2025-03-02", 10.004, 5.004, 5.0),
+        _sale("C", "2025-03-03", 10.004, 5.004, 5.0),
+    ]
+    block = build_casillas([], realized, 2025)["acciones_negociadas"]
+    assert [r["transmission_base"] for r in block["rows"]] == [10.0, 10.0, 10.0]
+    assert block["0328_transmision_global"] == 30.0
+    assert block["0331_adquisicion_global"] == 15.0
+    assert block["0339_suma_ganancias"] == 15.0
+    # Losses too: three -0,005 € rows round to -0,01 each -> 0,03.
+    losses = [_sale(t, "2025-04-01", 1.0, 1.005, -0.005) for t in ("D", "E", "F")]
+    assert build_casillas([], losses, 2025)["acciones_negociadas"]["0340_suma_perdidas"] == 0.03
+
+
 def test_casillas_missing_fx_marks_incomplete_and_nulls_totals():
     realized = [_sale("NOFX", "2025-03-01", None, None, None)]
     casillas = build_casillas([], realized, 2025)
