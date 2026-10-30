@@ -13,6 +13,7 @@ import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 import { importRejection } from '@/lib/portfolio/import-rejection';
+import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -236,14 +237,14 @@ export async function getPortfolioTransactions(userId: string) {
     }));
 }
 
-export async function getPortfolioTransactionPage(userId: string, offset = 0) {
+export async function getPortfolioTransactionPage(userId: string, offset = 0, filters: TransactionFilters = {}) {
     // Sin binding: la llamada es el control de autorización (lanza si la
     // cartera pedida no es la del usuario autenticado); la página la sirve el
     // backend con la sesión.
     await resolveUserId(userId);
     const safeOffset = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
     const page = await researchRequest<{ items: ResearchPortfolioTransaction[]; total: number }>(
-        `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}`, { fast: true },
+        `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}${transactionFiltersQuery(filters)}`, { fast: true },
     );
     const items = page.items.map((transaction) => ({
         _id: String(transaction.id),
@@ -258,7 +259,7 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0) {
         createdAt: transaction.created_at,
         updatedAt: transaction.updated_at,
     }));
-    return { items, total: page.total, offset: safeOffset };
+    return { items, total: page.total, offset: safeOffset, filters };
 }
 
 
