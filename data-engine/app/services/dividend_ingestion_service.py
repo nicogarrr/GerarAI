@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import Company, DividendRecord, Position, WatchItem
-from app.services.dividend_records import resolve_yahoo_events
+from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
 
@@ -255,7 +255,9 @@ class DividendIngestionService(ProviderIngestionService):
             else:
                 value = float(position.market_value_base)
                 total_value += value
-            matching_currency = [r for r in records if r.currency == position.currency]
+            # GBX (dividendo Yahoo en peniques) frente a GBp/GBP de la posicion:
+            # misma moneda, se convierte sin FX; otra moneda no se mezcla.
+            matching_currency = records_in_position_currency(records, position.currency)
             ttm = sum(float(r.amount) for r in matching_currency)
             skipped_currency = len(records) - len(matching_currency)
             # Gate on the records actually USED, not on every record: with all
