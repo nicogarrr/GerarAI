@@ -17,6 +17,7 @@ from app.api.router import api_router as research_api_router
 from app.api.routes.health import router as health_router
 from app.core.auth import get_research_principal
 from app.core.config import get_settings
+from app.core.csrf import CSRFMiddleware
 from app.core.database import SessionLocal, init_db
 from app.core.i18n import bind_request_language
 from app.core.llm_tenant_scope import bind_llm_cache_tenant
@@ -147,6 +148,7 @@ app = FastAPI(
     openapi_url="/openapi.json" if _EXPOSE_SCHEMA else None,
 )
 
+app.add_middleware(CSRFMiddleware)
 app.add_middleware(
     RawBodyMiddleware,
     # Sin cabecera de firma el request no puede pasar la auth: tope de 1MB
@@ -168,7 +170,21 @@ app.add_middleware(
     allow_origins=get_settings().cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CavaAI-Tenant", "X-CavaAI-User", "X-CavaAI-Timestamp", "X-CavaAI-Nonce", "X-CavaAI-Method", "X-CavaAI-Path", "X-CavaAI-Body-Hash", "X-CavaAI-Signature"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-CavaAI-Tenant",
+        "X-CavaAI-User",
+        "X-CavaAI-Timestamp",
+        "X-CavaAI-Nonce",
+        "X-CavaAI-Method",
+        "X-CavaAI-Path",
+        "X-CavaAI-Body-Hash",
+        "X-CavaAI-Signature",
+        "X-CSRF-Token",
+        "X-CSRFToken",
+        "X-XSRF-Token",
+    ],
 )
 # #E5: latencia por endpoint. ASGI puro (no BaseHTTPMiddleware, que paga una
 # tarea extra por request), etiqueta por PLANTILLA de ruta y agrega por ventana
@@ -323,6 +339,14 @@ else:
 # /api/health es público (sin firma): lo montamos fuera del research API
 # para que orquestación/monitoreo pueda consultarlo sin identidad.
 app.include_router(health_router, prefix="/api")
+
+
+@app.get("/api/csrf-token", tags=["auth"])
+def get_csrf_token() -> dict[str, str]:
+    """Obtiene un token CSRF para peticiones mutantes sin firma Research OS."""
+    from app.core.csrf import generate_csrf_token
+
+    return {"csrf_token": generate_csrf_token()}
 
 from app.api.routes.telegram_link import relay_router  # noqa: E402
 

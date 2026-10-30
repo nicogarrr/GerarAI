@@ -771,6 +771,14 @@ def transactions_page(
     }
 
 
+@router.post("/add", status_code=201)
+def add_portfolio_transaction(
+    payload: PortfolioTransactionInput, db: Session = Depends(get_db)
+) -> dict:
+    """Añade una transacción/posición a la cartera (alias para contratos de API)."""
+    return create_transaction(payload, db)
+
+
 @router.post("/transactions", status_code=201)
 def create_transaction(
     payload: PortfolioTransactionInput, db: Session = Depends(get_db)
