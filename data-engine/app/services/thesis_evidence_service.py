@@ -40,7 +40,6 @@ from typing import Any
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
-from app.services.date_format import format_date_es
 from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import Company, Document, FinancialFact, MarketPrice, NewsEvent, Transcript
@@ -48,6 +47,7 @@ from app.services.connectors import earnings_calendar as earnings_calendar_conne
 from app.services.connectors import sec_edgar as sec_edgar_connector
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.ir import IRConnector
+from app.services.date_format import format_date_es
 from app.services.fact_deletion import delete_financial_facts
 
 logger = logging.getLogger(__name__)

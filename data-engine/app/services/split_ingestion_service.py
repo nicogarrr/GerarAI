@@ -20,13 +20,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.services.date_format import format_date_es
 from app.core.errors import redact_secrets
 from app.core.tenancy import tenant_filters
 from app.models import Company, CorporateAction, Position
 from app.services.company_resolver import resolve_company
 from app.services.connectors.fmp import FMPClient
 from app.services.connectors.yahoo import YahooFinanceClient
+from app.services.date_format import format_date_es
 from app.services.provenance import Coverage, SourceKind, provenance
 
 _SAME_EVENT_DAYS = 3
