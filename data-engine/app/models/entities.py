@@ -260,7 +260,7 @@ class Company(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     ticker: Mapped[str] = mapped_column(String(20), unique=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
+    name: Mapped[str] = mapped_column(String(200))
     exchange: Mapped[str] = mapped_column(String(50))
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     sector: Mapped[str] = mapped_column(String(120), default="Unknown")
@@ -288,6 +288,7 @@ class Company(Base, TimestampMixin):
     thesis_versions: Mapped[list["ThesisVersion"]] = relationship(back_populates="company")
     claims: Mapped[list["Claim"]] = relationship(back_populates="company")
     memory_items: Mapped[list["MemoryItem"]] = relationship(back_populates="company")
+    transactions: Mapped[list["Transaction"]] = relationship("Transaction", foreign_keys="[Transaction.company_id]")
 
 
 class Position(TenantOwnedMixin, Base, TimestampMixin):
@@ -381,6 +382,8 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
     currency: Mapped[str] = mapped_column(String(10), default="USD")
     external_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+
+    company: Mapped["Company"] = relationship("Company", foreign_keys=[company_id], overlaps="transactions")
 
 
 class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
@@ -559,7 +562,7 @@ class InsiderFiling(TenantOwnedMixin, Base, TimestampMixin):
     amends_accession: Mapped[str | None] = mapped_column(String(40), nullable=True)
     issuer_cik: Mapped[str] = mapped_column(String(20))
     issuer_ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    issuer_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    issuer_name: Mapped[str | None] = mapped_column(String(250), nullable=True)
     filing_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     report_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
     period_of_report: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -671,7 +674,7 @@ class Document(TenantOwnedMixin, Base, TimestampMixin):
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
     )
-    title: Mapped[str] = mapped_column(String(500))
+    title: Mapped[str] = mapped_column(String(400))
     source_type: Mapped[str] = mapped_column(String(80), index=True)
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     storage_uri: Mapped[str | None] = mapped_column(String(1000), nullable=True)
@@ -1206,7 +1209,7 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    title: Mapped[str] = mapped_column(String(500))
+    title: Mapped[str] = mapped_column(String(400))
     source: Mapped[str] = mapped_column(String(120), default="manual")
     url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     summary: Mapped[str] = mapped_column(Text, default="")
@@ -2206,7 +2209,7 @@ class KnowledgeDocument(TenantOwnedMixin, Base, TimestampMixin):
     source_document_id: Mapped[int | None] = mapped_column(
         ForeignKey("documents.id"), nullable=True, unique=True
     )
-    title: Mapped[str] = mapped_column(String(500))
+    title: Mapped[str] = mapped_column(String(400))
     author: Mapped[str | None] = mapped_column(String(240), nullable=True, index=True)
     document_type: Mapped[str] = mapped_column(String(80), index=True)
     source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)

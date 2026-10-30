@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
@@ -303,10 +303,14 @@ def portfolio_data_quality(db: Session = Depends(get_db)) -> dict:
 @router.get("/snapshots")
 def portfolio_snapshots(
     start: date | None = None,
-    limit: int = Query(default=1000, ge=1, le=5000),
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
     db: Session = Depends(get_db),
-) -> list[dict]:
-    return [
+) -> dict:
+    service = PortfolioSnapshotService()
+    # Get total count with the same filter
+    total = service.count_history(db, start=start)
+    items = [
         {
             "id": snapshot.id,
             "portfolio_id": snapshot.portfolio_id,
@@ -322,8 +326,9 @@ def portfolio_snapshots(
             "source": snapshot.source,
             "metadata": snapshot.metadata_,
         }
-        for snapshot in PortfolioSnapshotService().history(db, start=start, limit=limit)
+        for snapshot in service.history(db, start=start, page=page, page_size=page_size)
     ]
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
 @router.post("/snapshots/capture")
@@ -474,11 +479,15 @@ def update_portfolio_configuration(
 
 @router.get("/fx-rates")
 def list_fx_rates(
-    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
     db: Session = Depends(get_db),
-) -> list[dict]:
-    return [
+) -> dict:
+    offset = (page - 1) * page_size
+    total = db.scalar(
+        select(func.count()).select_from(FXRate).where(*tenant_filters(db, FXRate))
+    ) or 0
+    items = [
         {
             "id": row.id,
             "base_currency": row.base_currency,
@@ -490,10 +499,11 @@ def list_fx_rates(
         for row in db.scalars(
             select(FXRate)
             .order_by(desc(FXRate.rate_date), FXRate.base_currency, FXRate.quote_currency)
-            .limit(limit)
+            .limit(page_size)
             .offset(offset)
         ).all()
     ]
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
 @router.post("/fx-rates", status_code=201)
@@ -583,15 +593,22 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
 
 @router.get("/positions")
 def positions(
-    limit: Annotated[int, Query(ge=1, le=2000)] = 500,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
     db: Session = Depends(get_db),
-) -> list[dict]:
+) -> dict:
+    offset = (page - 1) * page_size
+    total = db.scalar(
+        select(func.count())
+        .select_from(Position)
+        .join(Company, Position.company_id == Company.id)
+        .where(*tenant_filters(db, Position))
+    ) or 0
     rows = db.execute(
         select(Position, Company)
         .join(Company, Position.company_id == Company.id)
         .order_by(Company.ticker)
-        .limit(limit)
+        .limit(page_size)
         .offset(offset)
     ).all()
     fiscal = _fiscal_info_batch(db, _holding_as_of(db, rows))
@@ -688,8 +705,9 @@ def positions(
         )
         if company.id in trade_price_fallbacks:
             payloads[-1].update(dict.fromkeys(_QUOTE_MISSING_PNL_KEYS))
-    return [mask_cost_under_review(payload, cost_checks.get(position.id))
+    items = [mask_cost_under_review(payload, cost_checks.get(position.id))
             for payload, (position, _) in zip(payloads, rows, strict=True)]
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
 def _trade_filters(ticker: str | None, action: str | None) -> list:
@@ -701,24 +719,34 @@ def _trade_filters(ticker: str | None, action: str | None) -> list:
 
 
 def _list_trades(db: Session, limit: int, offset: int, ticker: str | None = None, action: str | None = None) -> list[dict]:
-    rows = db.execute(
-        select(Transaction, Company)
+    rows = db.scalars(
+        select(Transaction)
         .join(Company, Transaction.company_id == Company.id)
-        .where(*_trade_filters(ticker, action))
+        .where(*_trade_filters(ticker, action), *tenant_filters(db, Transaction))
+        .options(selectinload(Transaction.company))
         .order_by(desc(Transaction.trade_date), desc(Transaction.created_at), desc(Transaction.id))
         .limit(limit)
         .offset(offset)
     ).all()
-    return [_transaction_payload(transaction, company) for transaction, company in rows]
+    return [_transaction_payload(transaction, transaction.company) for transaction in rows]
 
 
 @router.get("/transactions")
 def transactions(
-    limit: Annotated[int, Query(ge=1, le=1000)] = 200,
-    offset: Annotated[int, Query(ge=0)] = 0,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    ticker: Annotated[str | None, Query(max_length=32)] = None,
+    action: Annotated[Literal["buy", "sell"] | None, Query()] = None,
     db: Session = Depends(get_db),
-) -> list[dict]:
-    return _list_trades(db, limit, offset)
+) -> dict:
+    offset = (page - 1) * page_size
+    total = db.scalar(
+        select(func.count()).select_from(Transaction)
+        .join(Company, Transaction.company_id == Company.id)
+        .where(*_trade_filters(ticker, action), *tenant_filters(db, Transaction))
+    ) or 0
+    items = _list_trades(db, page_size, offset, ticker, action)
+    return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
 @router.get("/transactions/page")
@@ -827,6 +855,138 @@ def _reject_noncanonical_cash_row(payload: PortfolioTransactionInput) -> None:
                 f"{payload.quantity} is ambiguous)"
             ),
         )
+
+
+
+class PortfolioTransactionBatchInput(BaseModel):
+    transactions: list[PortfolioTransactionInput] = Field(min_length=1, max_length=1000)
+
+
+@router.post("/transactions/batch", status_code=201)
+def create_transaction_batch(
+    payload: PortfolioTransactionBatchInput, db: Session = Depends(get_db)
+) -> dict:
+    """Bulk transaction creation with atomic commit.
+    
+    All transactions are validated before any are inserted. If any transaction
+    fails validation or causes a ledger error (oversell, mixed currency), the
+    entire batch is rolled back.
+    
+    Returns the count of created transactions and their IDs.
+    """
+    service = PortfolioLedgerService()
+    
+    # Step 1: Validate all transactions upfront
+    for i, tx_input in enumerate(payload.transactions):
+        try:
+            _reject_noncanonical_cash_row(tx_input)
+        except HTTPException as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=400,
+                detail=f"Transaction {i}: {exc.detail}"
+            ) from exc
+    
+    # Step 2: Create all transactions in a single DB transaction
+    created_transactions: list[tuple[Transaction, Company]] = []
+    company_ids_for_analysis: set[int] = set()
+    company_ids_for_backfill: set[int] = set()
+    
+    try:
+        for i, tx_input in enumerate(payload.transactions):
+            try:
+                transaction = service.create_transaction(
+                    db,
+                    ticker=tx_input.ticker,
+                    action=tx_input.action,
+                    quantity=tx_input.quantity,
+                    price=tx_input.price,
+                    trade_date=tx_input.trade_date,
+                    fees=tx_input.fees,
+                    currency=tx_input.currency,
+                    notes=tx_input.notes,
+                )
+                company = db.get(Company, transaction.company_id)
+                assert company is not None
+                created_transactions.append((transaction, company))
+                
+                # Track companies for post-processing
+                if tx_input.action in {"buy", "sell"}:
+                    company_ids_for_analysis.add(company.id)
+                if tx_input.action == "buy":
+                    company_ids_for_backfill.add(company.id)
+                    
+            except (PortfolioOversellError, PortfolioMixedCurrencyError, ValueError) as exc:
+                db.rollback()
+                if isinstance(exc, PortfolioOversellError):
+                    status_code = 409
+                elif isinstance(exc, PortfolioMixedCurrencyError):
+                    status_code = 422
+                else:
+                    status_code = 400
+                raise HTTPException(
+                    status_code=status_code,
+                    detail=f"Transaction {i} ({tx_input.ticker} {tx_input.action}): {str(exc)}"
+                ) from exc
+        
+        # Commit the batch
+        db.commit()
+        
+        # Step 3: Refresh all created transactions
+        for transaction, _ in created_transactions:
+            db.refresh(transaction)
+        
+        # Step 4: Post-processing (journal links and analysis queue)
+        if company_ids_for_analysis:
+            try:
+                from app.services.journal_trade_link import auto_link_journal_trades_best_effort
+                auto_link_journal_trades_best_effort(db, company_ids_for_analysis)
+            except Exception:
+                db.rollback()
+        
+        if company_ids_for_backfill:
+            try:
+                from app.services.market_close_sync import enqueue_price_backfills
+                tenant_id = db.info["tenant_id"] if type(db.info.get("tenant_id")) is int else None
+                user_id = str(db.info["user_id"]) if db.info.get("user_id") else None
+                
+                # Batch all company IDs into a single call for better performance
+                enqueue_price_backfills(
+                    db,
+                    list(company_ids_for_backfill),
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                )
+            except Exception:  # noqa: BLE001
+                db.rollback()
+        
+        # Enqueue analysis for buy transactions
+        for company_id in company_ids_for_backfill:
+            try:
+                company = db.get(Company, company_id)
+                if company:
+                    enqueue_tracked_analysis(db, company.ticker)
+            except Exception:
+                db.rollback()
+        
+        # Return summary and transaction details
+        return {
+            "created": len(created_transactions),
+            "transaction_ids": [tx.id for tx, _ in created_transactions],
+            "transactions": [
+                _transaction_payload(transaction, company)
+                for transaction, company in created_transactions
+            ],
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Batch transaction failed: {str(exc)}"
+        ) from exc
 
 
 @router.put("/transactions/{transaction_id}")

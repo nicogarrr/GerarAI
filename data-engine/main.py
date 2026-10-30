@@ -78,6 +78,8 @@ async def lifespan(_: FastAPI):
         from app.core.pool_probe import install as _install_pool_probe
 
         _install_pool_probe(_engine)
+        from app.core.slow_query import install as _install_slow_query
+        _install_slow_query(_engine)
     if settings.app_env.lower() == "test":
         # Tests use an isolated disposable schema. Runtime environments migrate
         # with Alembic before the process starts.
