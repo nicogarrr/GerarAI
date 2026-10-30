@@ -8,6 +8,7 @@ import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import { NewsLoadingSkeleton } from '@/components/LoadingState';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
+import { getT } from '@/lib/i18n/server';
 
 // Forzar renderizado dinámico porque requiere datos de usuario
 export const dynamic = 'force-dynamic';
@@ -15,11 +16,13 @@ export const revalidate = 0;
 
 // La home es la raíz ("/"): el template de app/layout.tsx ("%s | GerarAI")
 // repetiría la marca, así que el título va absoluto.
-export const metadata: Metadata = {
-    title: { absolute: 'GerarAI · Research OS de inversión' },
-    description:
-        'Qué ha cambiado en tus posiciones, valor de cartera, alertas disparadas, watchlist y oportunidades por valor intrínseco.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return {
+        title: { absolute: t('home.metadata.title') },
+        description: t('home.metadata.description'),
+    };
+}
 
 async function getUserId(): Promise<string> {
     try {
