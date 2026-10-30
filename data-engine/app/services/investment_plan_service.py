@@ -496,6 +496,13 @@ class InvestmentPlanService:
         targets = plan.target_allocations or []
         suggestions = []
         deviations = []
+        # Un objetivo por ticker guardado en minusculas («nvda») tambien es NVDA:
+        # sin esto leia 0 % y sugeria comprar una posicion que ya existe.
+        ticker_weights_ci = {
+            "ticker:" + label.removeprefix("ticker:").upper(): weight
+            for label, weight in current_weights.items()
+            if label.startswith("ticker:")
+        }
         for target in targets:
             kind = target.get("kind", "sector")
             label = target.get("label", "")
@@ -505,7 +512,10 @@ class InvestmentPlanService:
             key = label if kind == "sector" else f"{kind}:{label}"
             target_pct = Decimal(str(target.get("target_pct", 0)))
             band_pct = Decimal(str(target.get("band_pct", DEFAULT_BAND)))
-            current = Decimal(str(current_weights.get(key, 0)))
+            weight = current_weights.get(key)
+            if weight is None and kind == "ticker":
+                weight = ticker_weights_ci.get(f"ticker:{str(label).strip().upper()}")
+            current = Decimal(str(weight if weight is not None else 0))
             deviation = current - target_pct
             lower = target_pct - band_pct
             upper = target_pct + band_pct
@@ -543,6 +553,12 @@ class InvestmentPlanService:
                     }
                 )
 
+        empty_portfolio = total <= 0 and not missing_fx
+        if empty_portfolio:
+            # Cartera vacia: no hay nada que reequilibrar y cada sugerencia
+            # saldria con importe 0. El reparto de la cuota del mes lo da
+            # /api/plan/contribution-split.
+            suggestions = []
         if missing_fx:
             # Con cobertura parcial los pesos y el total no son los de la cartera
             # real: no se publican importes de compra/venta calculados sobre ellos.
@@ -557,7 +573,7 @@ class InvestmentPlanService:
         )
         return {
             "plan_exists": True,
-            "status": "incomplete_fx" if missing_fx else "ok",
+            "status": "incomplete_fx" if missing_fx else "empty_portfolio" if empty_portfolio else "ok",
             "suggestions_blocked": bool(missing_fx),
             "base_currency": portfolio.base_currency,
             "portfolio_value_base": float(total.quantize(Decimal("0.01"))),

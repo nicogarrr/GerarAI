@@ -63,4 +63,11 @@ describe('PlanView: lectura del plan en es-ES', () => {
         expect(out).not.toContain('2026-04-30');
         expect(out).not.toContain('|eur|');
     });
+    it('una cartera vacía se explica en vez de mostrar «empty_portfolio»', () => {
+        const out = renderToStaticMarkup(
+            <PlanView initialPlan={plan} initialContributions={[]} initialDrift={{ ...drift, status: 'empty_portfolio', portfolio_value_base: 0, suggestions: [] }} />,
+        ).replace(/<[^>]*>/g, '|');
+        expect(out).toContain('Cartera vacía: nada que reequilibrar todavía');
+        expect(out).not.toContain('empty_portfolio');
+    });
 });
