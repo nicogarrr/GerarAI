@@ -18,15 +18,15 @@ describe('Biblioteca: flujo de lectura', () => {
     });
 
     it('abrir un documento salta a #fragmentos y conserva la página de la lista', () => {
-        expect(source).toContain("return `/knowledge?document=${id}${offset > 0 ? `&documentOffset=${offset}` : ''}#fragmentos`;");
+        expect(source).toContain("return `/knowledge?document=${id}${offset > 0 ? `&documentOffset=${offset}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}#fragmentos`;");
         expect(source).not.toContain('href={`/knowledge?document=${document.id}`}');
         // El título también abre el documento (tabla y tarjeta).
-        expect(bibliotecaTab.match(/href=\{documentReaderHref\(document\.id, documentOffset\)\}>\{document\.title\}<\/Link>/g)).toHaveLength(2);
+        expect(bibliotecaTab.match(/href=\{documentReaderHref\(document\.id, documentOffset, searchQuery\)\}>\{document\.title\}<\/Link>/g)).toHaveLength(2);
     });
 
     it('volver a la lista regresa a la misma página y al listado', () => {
-        expect(source).toContain('<Link href={libraryListHref(documentOffset)}>Volver a la lista</Link>');
-        expect(source).toContain("return `${offset > 0 ? `/knowledge?documentOffset=${offset}` : '/knowledge'}#documentos`;");
+        expect(source).toContain('<Link href={libraryListHref(documentOffset, searchQuery)}>Volver a la lista</Link>');
+        expect(source).toContain("return `/knowledge${params.size ? `?${params}` : ''}#documentos`;");
     });
 
     it('en móvil los fragmentos no van en una caja con scroll propio', () => {

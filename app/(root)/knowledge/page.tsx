@@ -33,6 +33,7 @@ import {
 import BackendOffline from '@/components/system/BackendOffline';
 import { DeleteCollectionButton } from '@/components/knowledge/DeleteCollectionButton';
 import { DeleteDocumentButton } from '@/components/knowledge/DeleteDocumentButton';
+import { LibrarySearchForm } from '@/components/knowledge/LibrarySearchForm';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent, NA } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
@@ -48,7 +49,7 @@ export const metadata: Metadata = {
 
 const KNOWLEDGE_PAGE_SIZE = 50;
 
-type PageProps = { searchParams: Promise<{ document?: string; status?: string; tab?: string; documentOffset?: string; principleOffset?: string }> };
+type PageProps = { searchParams: Promise<{ document?: string; status?: string; tab?: string; documentOffset?: string; principleOffset?: string; q?: string }> };
 
 /** Pestañas de la página. El estado vive en la URL (?tab=): los disparadores
  *  son enlaces, así que la vista se puede compartir, recargar y usar sin
@@ -139,13 +140,14 @@ function parserLabel(value: unknown): string {
 
 /** Abre el explorador de un documento sin perder la página de la lista y
  *  saltando directamente a él (#fragmentos). */
-function documentReaderHref(id: number, offset: number): string {
-  return `/knowledge?document=${id}${offset > 0 ? `&documentOffset=${offset}` : ''}#fragmentos`;
+function documentReaderHref(id: number, offset: number, q = ''): string {
+  return `/knowledge?document=${id}${offset > 0 ? `&documentOffset=${offset}` : ''}${q ? `&q=${encodeURIComponent(q)}` : ''}#fragmentos`;
 }
 
 /** Vuelve a la lista de documentos en la misma página en la que se estaba. */
-function libraryListHref(offset: number): string {
-  return `${offset > 0 ? `/knowledge?documentOffset=${offset}` : '/knowledge'}#documentos`;
+function libraryListHref(offset: number, q = ''): string {
+  const params = new URLSearchParams({ ...(offset > 0 ? { documentOffset: String(offset) } : {}), ...(q ? { q } : {}) });
+  return `/knowledge${params.size ? `?${params}` : ''}#documentos`;
 }
 
 function statusTone(status: string) {
@@ -161,9 +163,10 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
   const selectedDocumentId = Number.isSafeInteger(documentId) && documentId > 0 ? documentId : null;
   const documentOffset = Number.isSafeInteger(Number(query.documentOffset)) && Number(query.documentOffset) >= 0 ? Number(query.documentOffset) : 0;
   const principleOffset = Number.isSafeInteger(Number(query.principleOffset)) && Number(query.principleOffset) >= 0 ? Number(query.principleOffset) : 0;
+  const searchQuery = (query.q ?? '').trim().slice(0, 200);
   let library: Awaited<ReturnType<typeof getKnowledgeLibrary>>;
   try {
-    library = await getKnowledgeLibrary({ documentOffset, principleOffset, status: query.status });
+    library = await getKnowledgeLibrary({ documentOffset, principleOffset, status: query.status, q: searchQuery });
   } catch (error) {
     if (isBackendUnavailableError(error)) {
       return <BackendOffline feature={t('knowledge.library')} retryHref="/knowledge" />;
@@ -264,7 +267,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
       */}
       {selectedDocument ? (
         <section aria-labelledby="fragmentos-titulo" className="min-w-0 scroll-mt-24 rounded-xl border border-teal-900/50 bg-surface-1 p-4 sm:p-5" id="fragmentos">
-          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100" id="fragmentos-titulo">{selectedDocument.title}</h2></div><Button asChild className="h-11" size="sm" variant="outline"><Link href={libraryListHref(documentOffset)}>Volver a la lista</Link></Button></div>
+          <div className="mb-4 flex items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-teal-300">Explorador de fragmentos</p><h2 className="text-lg font-semibold text-gray-100" id="fragmentos-titulo">{selectedDocument.title}</h2></div><Button asChild className="h-11" size="sm" variant="outline"><Link href={libraryListHref(documentOffset, searchQuery)}>Volver a la lista</Link></Button></div>
           <ArchivedThesisNotice documentType={selectedDocument.document_type} />
           {/* Conexión 10a: asociar el documento a una empresa lo muestra en su ficha. Vacío = quitar. */}
           <MutationForm action={setKnowledgeDocumentTicker.bind(null, selectedDocument.id)} className="mb-4 flex flex-wrap items-end gap-2" successMessage="Ticker guardado">
@@ -307,8 +310,9 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
 
       <section className="min-w-0 scroll-mt-24 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5" id="documentos">
         <div className="mb-4 flex items-center gap-2"><BookOpen aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="text-lg font-semibold text-gray-100">{t('knowledge.documents')}</h2></div>
-        <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
-        {!documents.length ? <div className="py-2 text-sm text-gray-500"><p>No hay documentos en esta página.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
+        <LibrarySearchForm query={searchQuery} total={library.documentSearch?.total ?? null} />
+        <PageNavigation offset={documentOffset} count={documents.length} total={library.documentSearch?.total ?? library.documentTotal} parameter="documentOffset" tab="biblioteca" q={searchQuery} />
+        {!documents.length && !library.documentSearch ? <div className="py-2 text-sm text-gray-500"><p>No hay documentos en esta página.</p><Link className="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-md border border-teal-800 px-3 py-2 text-xs font-medium text-teal-300 hover:border-teal-600 hover:text-teal-200" href="/knowledge?tab=subir">Sube tu primer libro, carta o caso de estudio</Link></div> : null}
         <div aria-label="Documentos de conocimiento" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
           <table className="w-full min-w-[560px] text-left text-sm">
             <caption className="sr-only">Documentos de conocimiento ingeridos, con colección, tipo, extractor, estado y acciones de extracción</caption>
@@ -319,12 +323,12 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 const busy = job?.status === 'queued' || job?.status === 'running';
                 return (
                 <tr className="border-b border-gray-900" key={document.id}>
-                  <th className="py-3 pr-4 text-left text-sm font-normal" scope="row"><Link className="font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset)}>{document.title}</Link><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
+                  <th className="py-3 pr-4 text-left text-sm font-normal" scope="row"><Link className="font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link><div className="text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>{document.ticker ? <Link className="mt-1 inline-block text-xs font-medium text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(document.ticker)}?view=documents`}>{document.ticker}</Link> : null}</th>
                   <td className="py-3 pr-4 text-gray-400">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</td>
                   <td className="py-3 pr-4 text-gray-400">{documentTypeLabel(document.document_type)}</td>
                   <td className="py-3 pr-4 text-gray-500">{parserLabel(document.metadata.parser)}</td>
                   <td className="py-3 pr-4"><Badge className={statusTone(document.status)} variant="outline">{label(document.status)}</Badge></td>
-                  <td className="py-3"><div className="flex flex-wrap justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset)}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
+                  <td className="py-3"><div className="flex flex-wrap justify-end gap-2"><Button asChild size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset, searchQuery)}>Fragmentos</Link></Button><MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada"><Button disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button></MutationForm><DeleteDocumentButton documentId={document.id} title={document.title} /></div>{extractionResultText(job) ? <p className="mt-1 max-w-xs text-right text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}</td>
                 </tr>
                 );
               })}
@@ -337,7 +341,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             const busy = job?.status === 'queued' || job?.status === 'running';
             return (
               <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={document.id}>
-                <Link className="block min-w-0 font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset)}>{document.title}</Link>
+                <Link className="block min-w-0 font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link>
                 <div className="mt-1 text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</Badge>
@@ -347,7 +351,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
                 <div className="mt-2 text-xs text-gray-500">Extractor: {parserLabel(document.metadata.parser)}</div>
                 {extractionResultText(job) ? <p className="mt-2 text-xs text-gray-400" role="status">{extractionResultText(job)}</p> : null}
                 <div className="mt-4 grid grid-cols-1 gap-2">
-                  <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset)}>Fragmentos</Link></Button>
+                  <Button asChild className="h-11 w-full" size="sm" variant="outline"><Link href={documentReaderHref(document.id, documentOffset, searchQuery)}>Fragmentos</Link></Button>
                   <MutationForm action={extractKnowledgePrinciples.bind(null, document.id)} successMessage="Extracción encolada">
                     <Button className="h-11 w-full" disabled={busy} size="sm" type="submit"><Sparkles aria-hidden="true" className="h-4 w-4" />{busy ? label(job?.status) : 'Extraer'}</Button>
                   </MutationForm>
@@ -359,7 +363,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         </div>
       </section>
 
-      <PageNavigation offset={documentOffset} count={documents.length} total={library.documentTotal} parameter="documentOffset" tab="biblioteca" />
+      <PageNavigation offset={documentOffset} count={documents.length} total={library.documentSearch?.total ?? library.documentTotal} parameter="documentOffset" tab="biblioteca" q={searchQuery} />
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
         <h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>
@@ -548,10 +552,10 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
   );
 }
 
-function PageNavigation({ offset, count, total, parameter, tab, status }: {
-  offset: number; count: number; total: number; parameter: string; tab: string; status?: string;
+function PageNavigation({ offset, count, total, parameter, tab, status, q }: {
+  offset: number; count: number; total: number; parameter: string; tab: string; status?: string; q?: string;
 }) {
-  const href = (next: number) => `/knowledge?${new URLSearchParams({ tab, [parameter]: String(next), ...(status ? { status } : {}) })}`;
+  const href = (next: number) => `/knowledge?${new URLSearchParams({ tab, [parameter]: String(next), ...(status ? { status } : {}), ...(q ? { q } : {}) })}`;
   if (offset === 0 && offset + count >= total) return null;
   return <nav aria-label={tab === 'principios' ? 'Páginas de principios' : 'Páginas de documentos'} className="my-4 flex flex-wrap items-center gap-3 text-sm text-gray-400">
     <span>{count ? `${offset + 1}-${offset + count} de ${total}` : `0 de ${total}`}</span>

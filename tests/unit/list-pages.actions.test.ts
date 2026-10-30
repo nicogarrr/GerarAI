@@ -23,6 +23,24 @@ describe('bounded page actions', () => {
   expect(result.documentTotal).toBe(351); expect(result.proposedTotal).toBe(350);
   expect(result.documents).toHaveLength(1); expect(result.principles).toHaveLength(1);
  });
+ it('searches the library in the backend (tenant-scoped endpoint) and keeps library totals', async () => {
+  const urls: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+   urls.push(String(url));
+   const payload = url.includes('/documents/search') ? { items: [{ id: 7 }], total: 61, query: 'buffett carta' }
+    : url.includes('/documents/page') ? { items: [{ id: 1 }], total: 351, collection_counts: { 3: 351 } }
+    : url.includes('/principles/page') ? { items: [], total: 0, proposed_total: 0 } : [];
+   return new Response(JSON.stringify(payload));
+  }));
+  const result = await getKnowledgeLibrary({ documentOffset: 50, q: '  buffett carta ' });
+  expect(urls.some(url => url.endsWith('/documents/search?q=buffett%20carta&limit=50&offset=50'))).toBe(true);
+  expect(result.documents).toEqual([{ id: 7 }]);
+  expect(result.documentSearch).toEqual({ query: 'buffett carta', total: 61 });
+  expect(result.documentTotal).toBe(351);
+  urls.length = 0;
+  expect((await getKnowledgeLibrary({ q: '   ' })).documentSearch).toBeNull();
+  expect(urls.some(url => url.includes('/documents/search'))).toBe(false);
+ });
  it('resolves a document outside the visible page and keeps missing links harmless', async () => {
   const fetch = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({ id: 1, title: 'Old document' })))
    .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Not found' }), { status: 404 }));
