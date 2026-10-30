@@ -19,6 +19,8 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const src = readFileSync(join(root, 'components/NewsSection.tsx'), 'utf8');
+const es = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/home.json'), 'utf8'));
+const en = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/en/home.json'), 'utf8'));
 
 describe('newsBadge (semántica F149)', () => {
     it('artículo general con related=AAPL pero SIN AAPL en cartera: mencionada, nunca holding', () => {
@@ -43,7 +45,9 @@ describe('news section UI (F149)', () => {
     it('la UI usa el helper y nunca pinta related crudo como vínculo', () => {
         assert.ok(src.includes('newsBadge(article, symbols)'), 'la insignia debe salir del helper');
         assert.ok(src.includes('Mencionada · {badge.ticker}'), 'mención neutral sin afirmar cartera');
-        assert.ok(src.includes('Mercado general'), 'etiqueta para titulares sin ticker');
+        assert.ok(src.includes("t('home.news.generalMarket')"), 'etiqueta traducida para titulares sin ticker');
+        assert.equal(es.news.generalMarket, 'Mercado general');
+        assert.equal(en.news.generalMarket, 'General market');
         assert.ok(!src.includes('{article.related}'), 'related crudo del proveedor ya no se pinta como insignia');
     });
 
