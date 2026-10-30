@@ -26,7 +26,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
         return (
             <section aria-label="Noticias destacadas" className="w-full min-w-0 rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-center">
                 <p className="text-sm leading-6 text-amber-200">
-                    No se pudieron cargar las noticias. El resto del dashboard sigue funcionando.
+                    No se pudieron cargar las noticias. El resto de la página sigue funcionando.
                 </p>
                 <Link
                     className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-amber-400/30 px-4 text-sm text-amber-200 transition-colors hover:text-amber-100"

@@ -192,6 +192,8 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                             id="acceptTerms"
                             type="checkbox"
                             className="mt-0.5 size-5 shrink-0 accent-teal-500"
+                            aria-invalid={!!errors.acceptTerms}
+                            aria-describedby={errors.acceptTerms ? 'acceptTerms-error' : undefined}
                             {...register('acceptTerms', {
                                 required: 'Debes aceptar los Términos de uso y la Política de privacidad para crear la cuenta',
                             })}
@@ -219,7 +221,7 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                         </span>
                     </label>
                     {errors.acceptTerms ? (
-                        <p className="mt-2 text-sm text-red-400" role="alert">{errors.acceptTerms.message}</p>
+                        <p id="acceptTerms-error" className="mt-2 text-sm text-red-400" role="alert">{errors.acceptTerms.message}</p>
                     ) : null}
                 </div>
 
