@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, FinancialFact, MarketPrice
 from app.services.price_units import price_in_currency
+from app.services.split_adjustment import fact_split_factor, split_events_by_company
 from app.valuation.currency import fact_currency, listing_currency, normalize_currency
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 from app.valuation.period_bounds import parse_period_bounds, to_date
@@ -22,6 +23,15 @@ from app.valuation.period_bounds import parse_period_bounds, to_date
 # como maximo ordinario. 120 dias cubre ese maximo con margen: en la duda la
 # cifra llega tarde a la reconstruccion, nunca antes de ser publica.
 UNFILED_PUBLICATION_LAG_DAYS = 120
+
+# Ventana para localizar el salto de un split en la serie de cierres guardada.
+# El sync diario reescribe la ultima semana (ya ajustada por Yahoo), asi que
+# el salto puede quedar hasta ~7 dias ANTES de la fecha efectiva.
+SPLIT_JUMP_WINDOW_BEFORE_DAYS = 30
+SPLIT_JUMP_WINDOW_AFTER_DAYS = 7
+# Un salto de split es ratio x (movimiento de un dia de mercado): se acepta un
+# par como salto si su cociente esta a menos de un 15 % del ratio.
+SPLIT_JUMP_TOLERANCE = 0.15
 
 
 class HistoricalValuationService:
@@ -114,6 +124,27 @@ class HistoricalValuationService:
             str(tag).strip().lower() == "adr" or str(tag).strip().lower().startswith(ADR_TAG_PREFIX)
             for tag in (company.factor_tags or [])
         )
+        # Base de acciones comun (la ACTUAL a as_of): el cierre guardado esta en
+        # la base del dia en que se descargo (Yahoo ajusta por splits el
+        # historico; el sync diario guarda el cierre del dia) y el BPA guardado
+        # es la ultima cifra presentada, reexpresada si el 10-K salio tras el
+        # split. Mezclarlas dejaba el PER de los anos previos a un 4:1
+        # multiplicado por 4. Precio: se divide por el split si la serie
+        # muestra el salto; BPA y acciones: regla unica fact_split_factor.
+        splits = [
+            event
+            for event in split_events_by_company(db, [company.id]).get(company.id, [])
+            if event[0] <= as_of
+        ]
+        price_divisors = self._price_split_divisors(prices, splits)
+        split_basis_unknown: list[int] = []
+
+        def fact_factor(row: FinancialFact | None) -> Decimal:
+            if row is None or not splits:
+                return Decimal(1)
+            factor = fact_split_factor(splits, period=row.period, filed=row.filed)
+            return factor if factor > 0 else Decimal(1)
+
         series = []
         for year in sorted(annual_prices.keys() | annual_facts.keys()):
             price_row = annual_prices.get(year)
@@ -128,11 +159,26 @@ class HistoricalValuationService:
                 if price_row
                 else None
             )
+            if price is not None:
+                divisor = price_divisors.get(price_row.id, Decimal(1))
+                if divisor is None:
+                    # Cierre anterior a un split sin datos alrededor para saber
+                    # en que base esta: N/D antes que un multiplo x ratio.
+                    split_basis_unknown.append(year)
+                    price = None
+                else:
+                    price = price / divisor
             shares = self._value(year_facts, "shares_diluted")
+            if shares is not None:
+                shares = shares * fact_factor(year_facts.get("shares_diluted"))
             # Ingestion writes eps_diluted; "eps" is only a legacy alias (F376).
             eps = self._monetary_value(year_facts, "eps_diluted", currency)
+            eps_row = year_facts.get("eps_diluted")
             if eps is None:
                 eps = self._monetary_value(year_facts, "eps", currency)
+                eps_row = year_facts.get("eps")
+            if eps is not None:
+                eps = eps / fact_factor(eps_row)
             fcf = self._monetary_value(year_facts, "free_cash_flow", currency)
             revenue = self._monetary_value(year_facts, "revenue", currency)
             # A missing debt/cash fact is unknown, not zero: only a reported
@@ -197,6 +243,18 @@ class HistoricalValuationService:
                 ),
                 "missing_by_metric": missing,
             },
+            "split_basis": {
+                "rule": (
+                    "precio, BPA y acciones en la base de acciones actual a as_of: "
+                    "cierres anteriores al salto de un split / ratio; BPA y acciones "
+                    "solo si el hecho se presento antes del split"
+                ),
+                "splits": [
+                    {"effective_date": eff.isoformat(), "ratio": format(ratio.normalize(), "f")}
+                    for eff, ratio in splits
+                ],
+                "price_basis_unknown_years": split_basis_unknown,
+            },
             "point_in_time": {
                 "as_of": as_of.isoformat(),
                 "price_rule": "close dated on or before as_of",
@@ -211,7 +269,10 @@ class HistoricalValuationService:
                 "excluded_not_public": excluded_not_public,
             },
             "definitions": {
-                "price": "Last stored close on or before as_of in each calendar year",
+                "price": (
+                    "Last stored close on or before as_of in each calendar year, "
+                    "split-adjusted to the current share basis"
+                ),
                 "fcf_per_share": "Annual free cash flow / diluted shares",
                 "revenue_per_share": "Annual revenue / diluted shares",
                 "pe": "Price / EPS",
@@ -219,6 +280,55 @@ class HistoricalValuationService:
                 "ev_to_revenue": "(price * diluted shares + debt - cash) / revenue",
             },
         }
+
+    @staticmethod
+    def _price_split_divisors(
+        prices: list[MarketPrice], splits: list[tuple[date, Decimal]]
+    ) -> dict[int, Decimal | None]:
+        """Divisor por fila de precio para llevarla a la base actual.
+
+        Por cada split se busca el salto en la serie guardada: el par de cierres
+        consecutivos cerca de la fecha efectiva cuyo cociente se parece mas al
+        ratio que a 1 (en logaritmos) y queda a menos de SPLIT_JUMP_TOLERANCE. Las filas hasta el salto estan en la
+        base antigua y se dividen por el ratio; si no hay salto la serie ya
+        venia ajustada. Sin ningun par de cierres alrededor del split, las filas
+        anteriores quedan en base desconocida (None -> N/D).
+        """
+        import math
+
+        divisors: dict[int, Decimal | None] = {row.id: Decimal(1) for row in prices}
+        rows = [row for row in prices if row.close is not None and row.close > 0]
+        for effective, ratio in splits:
+            if ratio <= 0 or ratio == 1:
+                continue
+            earlier = [row for row in rows if row.date < effective]
+            if not earlier:
+                continue
+            start = effective - timedelta(days=SPLIT_JUMP_WINDOW_BEFORE_DAYS)
+            end = effective + timedelta(days=SPLIT_JUMP_WINDOW_AFTER_DAYS)
+            window = [row for row in rows if start <= row.date <= end]
+            target = math.log(float(ratio))
+            tolerance = math.log(1 + SPLIT_JUMP_TOLERANCE)
+            best: tuple[float, date] | None = None
+            for left, right in zip(window, window[1:], strict=False):
+                step = math.log(float(left.close) / float(right.close))
+                distance = abs(step - target)
+                if (
+                    distance < abs(step)
+                    and distance < tolerance
+                    and (best is None or distance < best[0])
+                ):
+                    best = (distance, left.date)
+            if best is not None:
+                last_old = best[1]
+                for row in rows:
+                    current = divisors.get(row.id)
+                    if row.date <= last_old and current is not None:
+                        divisors[row.id] = current * ratio
+            elif len(window) < 2:
+                for row in earlier:
+                    divisors[row.id] = None
+        return divisors
 
     @staticmethod
     def _known_on(row: FinancialFact) -> date | None:
