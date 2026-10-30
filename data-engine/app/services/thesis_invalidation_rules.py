@@ -30,7 +30,7 @@ from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -51,6 +51,7 @@ from app.services.split_adjustment import (
     split_after_price,
     split_events_by_company,
 )
+from app.services.ttm_fundamentals import FLOW_METRICS
 
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
@@ -60,6 +61,7 @@ MAX_RULES = 20
 COOLDOWN_SECONDS = 86_400
 
 PRICE = "precio"
+QUARTER_LABELS = ("Q1", "Q2", "Q3", "Q4")
 MARGIN_OF_SAFETY_PCT = "margen_seguridad_pct"
 CHANGE_SINCE_THESIS_PCT = "variacion_desde_tesis_pct"
 METRIC_PREFIX = "metrica:"
@@ -376,11 +378,23 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
                 "period": calculated.period,
                 "unit": calculated.unit,
             }
+        query = select(FinancialFact).where(
+            FinancialFact.company_id == rule.company_id, FinancialFact.metric == name
+        )
+        if name in FLOW_METRICS:
+            # Un flujo (ingresos, beneficio...) de un trimestre no es el del año:
+            # el 10-Q del Q1 tiene fiscal_year mas reciente que el ultimo 10-K y
+            # ganaba el orden, asi que «ingresos < X» comparaba un trimestre con
+            # un umbral anual. Solo cuentan los datos anuales.
+            query = query.where(
+                or_(
+                    FinancialFact.fiscal_quarter.is_(None),
+                    FinancialFact.fiscal_quarter.not_in(QUARTER_LABELS),
+                ),
+                ~or_(*(FinancialFact.period.like(f"%:{q}") for q in QUARTER_LABELS)),
+            )
         fact = db.scalar(
-            select(FinancialFact)
-            .where(FinancialFact.company_id == rule.company_id, FinancialFact.metric == name)
-            .order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at))
-            .limit(1)
+            query.order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at)).limit(1)
         )
         if fact is not None and fact.value is not None:
             return Decimal(fact.value), {
