@@ -57,6 +57,8 @@ EXPENSIVE_PATH_SUFFIXES = (
     "/extract-principles",
     "/knowledge/documents/upload",
     "/settings/llm/test",
+    # Traduce la pregunta con el LLM (y calcula embeddings) en cada consulta.
+    "/knowledge-rag/query",
 )
 
 EXEMPT_PATHS = {"/", "/health", "/health/live", "/health/ready"}
