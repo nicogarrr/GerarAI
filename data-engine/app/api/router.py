@@ -4,12 +4,14 @@ from app.api.routes import (
     alerts,
     asts,
     bottlenecks,
+    cache,
     calendar,
     chat,
     companies,
     company_events,
     corporate_actions,
     data_health,
+    db_metrics,
     earnings,
     export,
     filing_intelligence,
@@ -59,7 +61,9 @@ from app.api.routes import (
 
 api_router = APIRouter()
 api_router.include_router(bottlenecks.router, prefix="/bottlenecks", tags=["bottlenecks"])
+api_router.include_router(cache.router, prefix="/cache", tags=["cache"])
 api_router.include_router(data_health.router, prefix="/data-health", tags=["data-health"])
+api_router.include_router(db_metrics.router, tags=["admin"])
 api_router.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(telegram_link.router, prefix="/alerts", tags=["alerts"])
 api_router.include_router(calendar.router, prefix="/calendar", tags=["calendar"])
