@@ -411,6 +411,42 @@ export type SearchStocksResult =
  *  buscador global afirmaba "Sin resultados" para AAPL porque el error se
  *  tragaba y volvía como []. Aquí el fallo de proveedor/red es `error` y la
  *  UI lo dice en vez de mentir. */
+/** Item del master propio (GET /api/companies/search). */
+type MasterSearchItem = { ticker?: string; name?: string; exchange?: string; currency?: string };
+
+/**
+ * Busqueda en el master propio (backend), SIN cuota de proveedor: primera
+ * fuente del buscador. Devuelve tickers canonicos (SAN, no SAN.MC) con
+ * nombre/bolsa reales. Fallos -> []: el caller conserva la via Finnhub.
+ */
+async function searchMasterCompanies(query: string): Promise<StockWithWatchlistStatus[]> {
+    const backendUrl = process.env.FMP_BACKEND_URL;
+    const trimmed = foldSearchQuery(query);
+    if (!backendUrl || !trimmed) return [];
+    try {
+        const path = '/api/companies/search';
+        const identityHeaders = await researchIdentityHeaders({ method: 'GET', path });
+        const response = await fetch(`${backendUrl}${path}?q=${encodeURIComponent(trimmed)}&limit=15`, {
+            headers: identityHeaders,
+            signal: AbortSignal.timeout(2500),
+        });
+        if (!response.ok) return [];
+        const data = await response.json();
+        const rows: MasterSearchItem[] = Array.isArray(data?.results) ? data.results : [];
+        return rows
+            .filter((r) => r?.ticker && r?.name)
+            .map((r) => ({
+                symbol: String(r.ticker).toUpperCase(),
+                name: String(r.name),
+                exchange: (r.exchange ?? '').trim(),
+                type: 'Common Stock',
+                isInWatchlist: false,
+            }));
+    } catch {
+        return [];
+    }
+}
+
 export const searchStocksWithStatus = cache(async (query?: string): Promise<SearchStocksResult> => {
     await requireAuthenticatedUser();
     // Unsupported search input is an empty query result, not provider failure.
@@ -418,6 +454,12 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
         return { status: 'ok', stocks: [] };
     }
     const local = searchSpanishListings(query ?? '');
+    // Master propio primero: sin cuota de proveedor y con tickers canonicos.
+    // Cuando Finnhub agota su cuota free (60 req/min compartida por toda la
+    // app; la quema la propia watchlist, medido 2026-10-30) el buscador
+    // seguia fallando para cualquier empresa no espanola («Amzn» -> «fallo
+    // del proveedor») pese a tenerla en nuestro registro.
+    const master = await searchMasterCompanies(query ?? '');
     const coveredSymbols = new Set(local.map((row) => row.symbol.toUpperCase()));
     const withCoverage = (stocks: StockWithWatchlistStatus[]): StockWithWatchlistStatus[] =>
         stocks.map((stock) => ({
@@ -426,10 +468,13 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
         }));
     try {
         const remote = await withFetchDeadline(() => searchStocksOrThrow(query), 4500);
-        return { status: 'ok', stocks: withCoverage(mergeSpanishListings(query ?? '', local, remote)) };
+        return { status: 'ok', stocks: withCoverage(mergeSpanishListings(query ?? '', local, [...master, ...remote])) };
     } catch (err) {
         console.error('Error in stock search:', err);
-        if (local.length) return { status: 'ok', stocks: withCoverage(local) };
+        // Fallback local + master: ambos caminos conservan la anotacion de
+        // cobertura de ficha (withCoverage es idempotente).
+        const fallback = mergeSpanishListings(query ?? '', withCoverage(local), withCoverage(master));
+        if (fallback.length) return { status: 'ok', stocks: fallback };
         return { status: 'error', stocks: [] };
     }
 });

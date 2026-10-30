@@ -280,6 +280,32 @@ class CompanySnapshotsBatchOut(BaseModel):
     missing: list[str] = Field(default_factory=list)
 
 
+class CompanySearchItemOut(BaseModel):
+    """Identidad basica de una empresa del master para listados ligeros."""
+
+    ticker: str
+    name: str
+    exchange: str
+    currency: str
+
+
+class CompanySearchOut(BaseModel):
+    """Resultado de la busqueda local del master (sin proveedor externo)."""
+
+    results: list[CompanySearchItemOut]
+
+
+class CompanyBasicsBatchOut(BaseModel):
+    """Basics por lote keyed por ticker PEDIDO (normalizado).
+
+    ``missing`` lista los tickers pedidos sin company en el registro;
+    nunca se fabrican basics vacios para ellos.
+    """
+
+    items: dict[str, CompanySearchItemOut]
+    missing: list[str] = Field(default_factory=list)
+
+
 class ThesisGenerateRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
     force_new_version: bool = False

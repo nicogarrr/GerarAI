@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import desc, select
+from sqlalchemy import case, desc, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
@@ -29,8 +29,11 @@ from app.models import (
 from app.schemas import (
     CalculatedMetricOut,
     CalculatedMetricsResponse,
+    CompanyBasicsBatchOut,
     CompanyKPIOut,
     CompanyOut,
+    CompanySearchItemOut,
+    CompanySearchOut,
     CompanySnapshotOut,
     CompanySnapshotsBatchOut,
     FinancialFactOut,
@@ -617,8 +620,106 @@ def list_companies(
     )
 
 
+MAX_BASICS_BATCH_TICKERS = 100
+_COMPANY_SEARCH_DEFAULT_LIMIT = 15
+
+
+def _like_escape(term: str) -> str:
+    """Escapa los comodines LIKE para que la busqueda sea siempre literal."""
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+@router.get("/search", response_model=CompanySearchOut)
+def search_companies(
+    q: Annotated[str, Query(min_length=1, max_length=120)],
+    limit: Annotated[int, Query(ge=1, le=25)] = _COMPANY_SEARCH_DEFAULT_LIMIT,
+    db: Session = Depends(get_db),
+) -> CompanySearchOut:
+    """Busqueda de empresas en el master propio (ticker y nombre).
+
+    Primera fuente del buscador de la app: no consume la cuota del
+    proveedor externo (60 req/min en plan free, compartida por toda la
+    app) y devuelve los tickers CANONICOS del master. Orden: ticker
+    exacto, prefijo de ticker, prefijo de nombre y resto de parciales.
+    """
+    term = q.strip()
+    escaped = _like_escape(term)
+    contains = f"%{escaped}%"
+    prefix = f"{escaped}%"
+    rank = case(
+        (Company.ticker == term.upper(), 0),
+        (Company.ticker.ilike(prefix, escape="\\"), 1),
+        (Company.name.ilike(prefix, escape="\\"), 2),
+        else_=3,
+    )
+    rows = db.scalars(
+        select(Company)
+        .where(
+            or_(
+                Company.ticker.ilike(contains, escape="\\"),
+                Company.name.ilike(contains, escape="\\"),
+            )
+        )
+        .order_by(rank, Company.ticker)
+        .limit(limit)
+    ).all()
+    return CompanySearchOut(
+        results=[
+            CompanySearchItemOut(
+                ticker=c.ticker, name=c.name, exchange=c.exchange, currency=c.currency
+            )
+            for c in rows
+        ]
+    )
+
+
+@router.get("/basics", response_model=CompanyBasicsBatchOut)
+def companies_basics_batch(
+    tickers: Annotated[str, Query(min_length=1)],
+    db: Session = Depends(get_db),
+) -> CompanyBasicsBatchOut:
+    """Basics (ticker/nombre/bolsa/divisa) de varias empresas en UNA llamada.
+
+    Sustituye el fan-out de GET /{ticker} por simbolo de la watchlist
+    (20+ round trips por carga de pagina; medido 2026-10-30: oleada de 16
+    resolviendo en ~0,9 s desde el front). La resolucion va por ticker
+    con la MISMA funcion del endpoint individual (resolve_company), asi
+    la politica de alias (SAN.MC -> SAN) no puede divergir entre ambos;
+    son lecturas por clave primaria, baratas, y van en una sola peticion
+    HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el
+    canonico, para que el caller no reimplemente la resolucion.
+    """
+    requested: list[str] = []
+    seen: set[str] = set()
+    for raw in tickers.split(","):
+        normalized = raw.strip().upper()
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            requested.append(normalized)
+    if len(requested) > MAX_BASICS_BATCH_TICKERS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Maximo {MAX_BASICS_BATCH_TICKERS} tickers por llamada",
+        )
+    items: dict[str, CompanySearchItemOut] = {}
+    missing: list[str] = []
+    for ticker in requested:
+        company = resolve_company(db, ticker)
+        if company is None:
+            missing.append(ticker)
+        else:
+            items[ticker] = CompanySearchItemOut(
+                ticker=company.ticker,
+                name=company.name,
+                exchange=company.exchange,
+                currency=company.currency,
+            )
+    return CompanyBasicsBatchOut(items=items, missing=missing)
+
+
 @router.get("/{ticker}", response_model=CompanyOut)
 def get_company(ticker: str, db: Session = Depends(get_db)) -> Company:
+
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")

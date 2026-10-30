@@ -75,6 +75,39 @@ export async function getResearchCompanyBasics(ticker: string): Promise<Research
     }
 }
 
+/**
+ * Basics (ticker/nombre/bolsa/divisa) de varios simbolos en UNA peticion al
+ * backend (GET /api/companies/basics): sustituye el fan-out de
+ * getResearchCompanyBasics por simbolo de la watchlist (20+ round trips por
+ * carga; oleada de 16 medida en prod a ~0,9 s, 2026-10-30).
+ * Devuelve null si el backend aun no sirve el agregado (despliegue
+ * escalonado front/back): el caller cae a la oleada por simbolo.
+ */
+export async function getResearchCompaniesBasics(
+    tickers: string[],
+): Promise<Record<string, ResearchCompanyBasics | null> | null> {
+    const backendUrl = process.env.FMP_BACKEND_URL;
+    if (!backendUrl) return null;
+    const wanted = [...new Set(tickers.map((t) => t.trim().toUpperCase()).filter(Boolean))];
+    if (wanted.length === 0) return {};
+    try {
+        const path = `/api/companies/basics`;
+        const response = await fetch(`${backendUrl}${path}?tickers=${encodeURIComponent(wanted.join(','))}`, {
+            headers: await researchIdentityHeaders({ method: 'GET', path }),
+            signal: AbortSignal.timeout(4000),
+        });
+        if (!response.ok) return null;
+        const data = await response.json();
+        if (!data || typeof data !== 'object' || data.items === null || typeof data.items !== 'object') return null;
+        const items = data.items as Record<string, ResearchCompanyBasics>;
+        const out: Record<string, ResearchCompanyBasics | null> = {};
+        for (const t of wanted) out[t] = items[t] ?? null;
+        return out;
+    } catch {
+        return null;
+    }
+}
+
 export async function getCompanyMarketSnapshot(ticker: string): Promise<CompanyMarketSnapshot> {
     await requireAuthenticatedUser();
     const normalized = ticker.trim().toUpperCase();
