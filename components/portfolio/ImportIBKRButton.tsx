@@ -98,6 +98,30 @@ export function rowErrorDetail(errors: string[]): string {
     return rest > 0 ? `${shown}\n${plural(rest, 'aviso más', 'avisos más')}` : shown;
 }
 
+type ImportOutcome = ImportCounts & { message?: string | null };
+
+/**
+ * Avisos del resultado de una importación (Flex o fichero), los mismos en las
+ * dos vías. Antes la vía Flex enseñaba solo 3 avisos sin decir cuántos había y
+ * el fallo sin motivo salía como «Importación falló: rejected».
+ * Devuelve true si se importó.
+ */
+export function notifyImportResult(result: ImportOutcome): boolean {
+    if (result.status !== 'imported') {
+        toast.error(result.message || 'La importación no se completó. Revisa el fichero o la conexión con IBKR e inténtalo de nuevo.', { duration: 10000 });
+        return false;
+    }
+    toast.success(describeResult(result));
+    if (result.identity_warning) toast.warning(result.identity_warning);
+    if (result.row_errors?.length) {
+        toast.warning(
+            `${plural(result.row_errors.length, 'fila con avisos', 'filas con avisos')}. Primera: ${result.row_errors[0]}`,
+            { duration: 12000, description: rowErrorDetail(result.row_errors) }
+        );
+    }
+    return true;
+}
+
 export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
     const [isImporting, setIsImporting] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -108,17 +132,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
         try {
             setIsImporting(true);
             const result = await importFromIBKR(userId);
-
-            if (result.status !== 'imported') {
-                toast.error(result.message ?? `Importación falló: ${result.status}`, { duration: 10000 });
-                return;
-            }
-
-            toast.success(describeResult(result));
-            if (result.identity_warning) toast.warning(result.identity_warning);
-            if (result.row_errors?.length) {
-                toast.warning(`Filas con avisos:\n${result.row_errors.slice(0, 3).join('\n')}`);
-            }
+            if (!notifyImportResult(result)) return;
             router.refresh();
         } catch (error) {
             showErrorToast(error);
@@ -145,18 +159,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
             const result = isCsv
                 ? await importIBKRCsv(userId, text)
                 : await importIBKRXml(userId, text);
-            if (result.status !== 'imported') {
-                toast.error(result.message ?? `Importación falló: ${result.status}`, { duration: 10000 });
-                return;
-            }
-            toast.success(describeResult(result));
-            if (result.identity_warning) toast.warning(result.identity_warning);
-            if (result.row_errors?.length) {
-                toast.warning(
-                    `${plural(result.row_errors.length, 'fila con avisos', 'filas con avisos')}. Primera: ${result.row_errors[0]}`,
-                    { duration: 12000, description: rowErrorDetail(result.row_errors) }
-                );
-            }
+            if (!notifyImportResult(result)) return;
             router.refresh();
         } catch (error) {
             showErrorToast(error);
