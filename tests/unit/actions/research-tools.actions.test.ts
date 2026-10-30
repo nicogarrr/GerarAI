@@ -156,7 +156,9 @@ describe('biblioteca de conocimiento', () => {
         fetchMock.mockRejectedValue(new Error('sin backend'));
         const failed = await ingestLettersCorpusNow();
         expect(failed.success).toBe(false);
-        expect(failed.success === false && failed.message).toContain('ingest-async');
+        // El texto interno del cliente (ruta del motor, en inglés) ya no llega a la UI.
+        expect(failed.success === false && failed.message).not.toContain('ingest-async');
+        expect(failed.success === false && failed.message).toMatch(/[áéíóú]/);
     });
 
     it('getKnowledgeDocumentsForTicker usa la ruta de lecturas listas', async () => {

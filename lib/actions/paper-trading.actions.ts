@@ -2,6 +2,7 @@
 
 import { researchRequest } from '@/lib/research/client';
 import { AppError } from '@/lib/types/errors';
+import { spanishBackendMessage } from '@/lib/research/backend-error-es';
 
 export interface PaperTradeView {
     id: number; ticker: string; direction: 'long' | 'short'; horizon: 'short' | 'five_years';
@@ -52,7 +53,7 @@ export async function feedPaperProposalsNow(): Promise<PaperFeedResult> {
         return { success: true };
     } catch (error) {
         console.error('feedPaperProposalsNow error:', error);
-        return { success: false, message: error instanceof AppError ? error.message : 'No se pudo encolar la generación.' };
+        return { success: false, message: error instanceof AppError ? spanishBackendMessage(error.message) : 'No se pudo encolar la generación.' };
     }
 }
 

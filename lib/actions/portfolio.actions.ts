@@ -203,10 +203,10 @@ export async function addTransaction(
 ): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
-        throw new ValidationError('Quantity must be positive and price cannot be negative');
+        throw new ValidationError('La cantidad debe ser positiva y el precio no puede ser negativo.');
     }
     if (!Number.isFinite(fees) || fees < 0) {
-        throw new ValidationError('Fees cannot be negative');
+        throw new ValidationError('Las comisiones no pueden ser negativas.');
     }
     try {
         await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
@@ -429,10 +429,10 @@ export async function updateTransaction(
 ): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
-        throw new ValidationError('Quantity must be positive and price cannot be negative');
+        throw new ValidationError('La cantidad debe ser positiva y el precio no puede ser negativo.');
     }
     if (fees !== undefined && (!Number.isFinite(fees) || fees < 0)) {
-        throw new ValidationError('Fees cannot be negative');
+        throw new ValidationError('Las comisiones no pueden ser negativas.');
     }
     try {
         await researchRequest<ResearchPortfolioTransaction>(
