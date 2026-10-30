@@ -413,4 +413,16 @@ describe('getCompanyHolding: posición de la ficha con las cifras de Cartera', (
         researchRequest.mockRejectedValue(new AppError('sin sesión', 'RESEARCH_API_ERROR', 401));
         await expect(getCompanyHolding('AAPL')).rejects.toThrow('sin sesión');
     });
+    it('la fecha «Datos de tu cartera a …» es la de ESTA posición, no la más antigua de toda la cartera', async () => {
+        // El resumen agregado da la fecha mínima de todas las posiciones (MSFT,
+        // con cotización vieja); la ficha de AAPL debe mostrar la suya.
+        seedSummary(
+            [position({ as_of: '2026-10-29' }), position({ ticker: 'MSFT', as_of: '2026-10-20' })],
+            { data_as_of: '2026-10-20' },
+        );
+        const aapl = await getCompanyHolding('AAPL');
+        expect(aapl.status === 'held' && aapl.positionsAsOf).toBe('2026-10-29');
+        const msft = await getCompanyHolding('MSFT');
+        expect(msft.status === 'held' && msft.positionsAsOf).toBe('2026-10-20');
+    });
 });
