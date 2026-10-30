@@ -210,12 +210,17 @@ def test_derived_cap_adjusted_for_split_after_period(db):
     """Caso real AENA (medido en prod 19-oct-2026): split 10:1 tras el
     FY2025; precio post-split x acciones derivadas pre-split daba el cap
     10x bajo (3,93B en vez de ~39,3B). El recuento se expresa en acciones
-    actuales multiplicando por el factor acumulado, como el PER."""
+    actuales multiplicando por el factor acumulado, como el PER.
+
+    Nota (#3227 + este cambio): el split va ANTES del ultimo cierre (como en
+    el caso real: 25,70 ya era precio post-split). Antes el test ponia el
+    cierre un dia antes del split; ese hueco es ahora N/D porque la base de
+    ese cierre es desconocida (ver test_close_before_effective_split_is_nd)."""
     company = _company(db)
     _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
     _fact(db, company, "net_income", 1_972_000_000, year=2025)
     _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
-    _split(db, company, TODAY - timedelta(days=2), 10)
+    _split(db, company, TODAY - timedelta(days=4), 10)
     db.commit()
     result = refresh_derived_market_cap(db, company, today=TODAY)
     assert result["status"] == "ok"
@@ -276,7 +281,7 @@ def test_endpoint_declares_split_adjusted_derived_cap(db):
     _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
     _fact(db, company, "net_income", 1_972_000_000, year=2025)
     _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
-    _split(db, company, TODAY - timedelta(days=2), 10)
+    _split(db, company, TODAY - timedelta(days=4), 10)
     db.commit()
     payload = watchlist_metrics("aena", db)
     assert payload["market_cap"] == pytest.approx(
@@ -294,7 +299,7 @@ def test_endpoint_refreshes_existing_derived_row(db):
     _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
     _fact(db, company, "net_income", 1_972_000_000, year=2025)
     _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
-    _split(db, company, TODAY - timedelta(days=2), 10)
+    _split(db, company, TODAY - timedelta(days=4), 10)
     # Derivado antiguo erróneo (valor imposible: debe ser reemplazado),
     # envejecido más allá del TTL para que el refresco proceda:
     db.add(FinancialFact(
@@ -383,7 +388,7 @@ def test_wrong_fresh_row_corrected_despite_ttl(db):
     _price(db, company, Decimal("25.70"), TODAY - timedelta(days=3))
     _fact(db, company, "net_income", 1_972_000_000, year=2025)
     _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
-    _split(db, company, TODAY - timedelta(days=2), 10)
+    _split(db, company, TODAY - timedelta(days=4), 10)
     # Fila fresca pero errónea (escrita por el algoritmo anterior):
     db.add(FinancialFact(
         company_id=company.id, metric="market_cap",
@@ -518,7 +523,7 @@ def test_two_consecutive_refreshes_second_is_skipped(db):
     _price(db, company, Decimal("25.700001"), TODAY - timedelta(days=3))
     _fact(db, company, "net_income", 1_972_000_000, year=2025)
     _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
-    _split(db, company, TODAY - timedelta(days=2), 10)
+    _split(db, company, TODAY - timedelta(days=4), 10)
     db.commit()
     first = refresh_derived_market_cap(db, company, today=TODAY)
     assert first["status"] == "ok"
@@ -570,3 +575,43 @@ def test_adr_tag_without_ratio_no_cap(db):
     db.commit()
     result = refresh_derived_market_cap(db, company, today=TODAY)
     assert result == {"status": "unavailable", "reason": "adr_ratio_unknown"}
+
+
+def test_close_before_effective_split_is_nd(db):
+    """Ultimo cierre anterior a un split ya efectivo: ese precio puede estar
+    en la base vieja (25,70 x 10 acciones -> cap x10) o ya ajustado por el
+    proveedor; no se sabe. N/D, como el margen de seguridad y el DCF inverso
+    de la valoracion (#3227); y un derivado previo se borra, no se sirve."""
+    company = _company(db)
+    _price(db, company, Decimal("257.00"), TODAY - timedelta(days=3))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY - timedelta(days=2), 10)
+    db.add(FinancialFact(
+        company_id=company.id, metric="market_cap", value=Decimal("1"),
+        unit="EUR", period=(TODAY - timedelta(days=5)).isoformat(),
+        source_type="derived", is_reported=False, tenant_id=1,
+    ))
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result == {
+        "status": "unavailable", "reason": "price_basis_unknown_after_split"}
+    assert db.scalar(select(FinancialFact).where(
+        FinancialFact.company_id == company.id,
+        FinancialFact.metric == "market_cap")) is None
+
+
+def test_split_after_close_but_in_future_not_counted(db):
+    """Un split posterior a HOY (anunciado, no efectivo) no ajusta las
+    acciones ni bloquea: el cierre y el recuento siguen en la misma base."""
+    company = _company(db)
+    _price(db, company, Decimal("25.70"), TODAY - timedelta(days=1))
+    _fact(db, company, "net_income", 1_972_000_000, year=2025)
+    _fact(db, company, "eps_diluted", Decimal("12.89"), year=2025)
+    _split(db, company, TODAY + timedelta(days=5), 10)
+    db.commit()
+    result = refresh_derived_market_cap(db, company, today=TODAY)
+    assert result["status"] == "ok"
+    assert result["split_factor"] == 1.0
+    assert result["market_cap"] == pytest.approx(
+        25.70 * (1_972_000_000 / 12.89), rel=1e-6)

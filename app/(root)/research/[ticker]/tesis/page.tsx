@@ -39,6 +39,7 @@ const STATUS_LABELS: Record<string, string> = {
   draft: 'borrador',
   draft_failed_audit: 'borrador (auditoría no superada)',
   review: 'en revisión',
+  final: 'generada · pendiente de aprobación',
   approved: 'aprobada',
   published: 'publicada',
   rejected: 'rechazada',

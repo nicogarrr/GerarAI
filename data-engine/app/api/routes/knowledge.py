@@ -293,6 +293,17 @@ def documents_page(
     }
 
 
+@router.get("/documents/search")
+def search_documents(
+    q: Annotated[str, Query(max_length=200)] = "",
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    db: Session = Depends(get_db),
+) -> dict:
+    """Búsqueda de la Biblioteca por título, autor o ticker (sólo del tenant)."""
+    return KnowledgeLibraryService.search_documents(db, q, limit=limit, offset=offset)
+
+
 @router.get("/documents/{document_id}")
 def get_document(document_id: int, db: Session = Depends(get_db)) -> dict:
     document = KnowledgeLibraryService.get_document(db, document_id)

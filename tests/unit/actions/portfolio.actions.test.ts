@@ -276,8 +276,9 @@ describe('quickAddPosition / getPortfolioWithWeights', () => {
 });
 
 describe('refreshPortfolioHoldings: declara lo que SE ESCRIBIÓ', () => {
-    it('sin posiciones -> ValidationError', async () => {
-        await expect(refreshPortfolioHoldings([])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    it('sin posiciones: resultado vacío y tranquilo, nunca un error (en prod se veía «motor no responde»)', async () => {
+        await expect(refreshPortfolioHoldings([])).resolves.toEqual({ ok: true, updated: [], skipped: [], failed: [], holdings: [] });
+        expect(researchRequest).not.toHaveBeenCalled();
     });
 
     it('sin clave de proveedor: ok false, todo skipped, y NO se invalida nada', async () => {
@@ -412,5 +413,17 @@ describe('getCompanyHolding: posición de la ficha con las cifras de Cartera', (
         expect(await getCompanyHolding('AAPL')).toEqual({ status: 'error', message: 'No se pudo cargar tu posición en esta empresa.' });
         researchRequest.mockRejectedValue(new AppError('sin sesión', 'RESEARCH_API_ERROR', 401));
         await expect(getCompanyHolding('AAPL')).rejects.toThrow('sin sesión');
+    });
+    it('la fecha «Datos de tu cartera a …» es la de ESTA posición, no la más antigua de toda la cartera', async () => {
+        // El resumen agregado da la fecha mínima de todas las posiciones (MSFT,
+        // con cotización vieja); la ficha de AAPL debe mostrar la suya.
+        seedSummary(
+            [position({ as_of: '2026-10-29' }), position({ ticker: 'MSFT', as_of: '2026-10-20' })],
+            { data_as_of: '2026-10-20' },
+        );
+        const aapl = await getCompanyHolding('AAPL');
+        expect(aapl.status === 'held' && aapl.positionsAsOf).toBe('2026-10-29');
+        const msft = await getCompanyHolding('MSFT');
+        expect(msft.status === 'held' && msft.positionsAsOf).toBe('2026-10-20');
     });
 });

@@ -85,6 +85,8 @@ export type PortfolioHolding = {
     /** El valor en divisa base no está disponible (independiente del coste). */
     valueMissing: boolean;
     firstBuyDate: string | null;
+    /** Fecha de la valoración de ESTA posición (la del resumen es la mínima de todas). */
+    asOf?: string | null;
     holdingDays: number | null;
     fiscalBucket: 'corto_plazo' | 'largo_plazo' | null;
 };
@@ -317,6 +319,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             fxEffect: position.pnl_fx_effect_base ?? null,
             valueMissing: position.market_value_base === null,
             firstBuyDate: position.first_buy_date ?? null,
+            asOf: position.as_of ?? null,
             holdingDays: position.holding_days ?? null,
             fiscalBucket: position.fiscal_bucket ?? null,
         };
@@ -362,7 +365,8 @@ export type CompanyHoldingContext =
  * que la página de cartera (getPortfolioSummary, caché compartida): las cifras
  * no pueden divergir entre pantallas. El peso usa la regla del donut
  * «Distribución»: solo posiciones con valor conocido. Un fallo se devuelve
- * como error visible, nunca como «sin posición».
+ * como error visible, nunca como «sin posición». La fecha es la de esta
+ * posición: la del resumen es la más antigua de toda la cartera.
  */
 export async function getCompanyHolding(ticker: string): Promise<CompanyHoldingContext> {
     const user = await requireAuthenticatedUser();
@@ -377,7 +381,7 @@ export async function getCompanyHolding(ticker: string): Promise<CompanyHoldingC
         const slice = known.includes(holding)
             ? buildAllocationSlices(known).find((item) => item.symbol === holding.symbol)
             : undefined;
-        return { status: 'held', holding, weightPercent: slice?.percentage ?? null, positionsAsOf: summary.positionsAsOf ?? null };
+        return { status: 'held', holding, weightPercent: slice?.percentage ?? null, positionsAsOf: holding.asOf ?? summary.positionsAsOf ?? null };
     } catch (error) {
         if (error instanceof AppError && [401, 403].includes(error.statusCode)) throw error;
         return { status: 'error', message: 'No se pudo cargar tu posición en esta empresa.' };
@@ -694,7 +698,10 @@ export async function refreshPortfolioHoldings(holdings: PortfolioHolding[]): Pr
     const user = await requireAuthenticatedUser();
     const symbols = holdings.map((holding) => holding.symbol);
     if (symbols.length === 0) {
-        throw new ValidationError('No hay posiciones que actualizar');
+        // Cartera vacía: no es un error. Antes se lanzaba ValidationError y en
+        // producción Next oculta el mensaje de los errores de server action,
+        // así que el usuario nuevo veía «El motor de análisis no responde».
+        return { ok: true, updated: [], skipped: [], failed: [], holdings: [] };
     }
 
     // allSettled, no Promise.all: con all, si A se guardaba y B fallaba, la
