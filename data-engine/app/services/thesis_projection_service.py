@@ -511,7 +511,10 @@ class ThesisProjectionService:
         delta = -MARGIN_SPREAD if scenario == "bear" else MARGIN_SPREAD
         value = anchor.value + delta
         if scenario == "bull":
-            value = min(value, MARGIN_CAP)
+            # Techo del 45% para márgenes normales, pero nunca por debajo del
+            # base (misma regla que mechanical_dcf_scenarios tras #3008): con
+            # un base del 50% el bull salía al 45%, peor que el base.
+            value = min(value, max(MARGIN_CAP, anchor.value))
         return RateAssumption(
             value,
             LABEL_INFERIDO,

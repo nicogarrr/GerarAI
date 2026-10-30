@@ -276,6 +276,24 @@ def test_scenario_spread_and_burn_rule(db, valued):
     assert first["bear"]["etiqueta"] == "INFERIDO"
 
 
+def test_bull_margin_cap_never_below_a_high_base_margin(db, valued):
+    """Margen FCF base 50% (FCF 50 / ingresos 100): el techo del 45% del
+    bull no puede dejarlo por debajo del base. Esperado a mano: bull = 50%
+    (min(0,50 + 0,06; max(0,45; 0,50))); bear = 0,50 - 0,06 = 44%.
+    Un base del 40% sigue recortado al techo: min(0,46; 0,45) = 45%."""
+    fcf = db.scalar(select(FinancialFact).where(FinancialFact.metric == "free_cash_flow"))
+    fcf.value = Decimal("50")
+    db.commit()
+    first = {s: project(db)["escenarios"][s]["proyecciones"][0] for s in ("bear", "base", "bull")}
+    assert first["base"]["margen_fcf"]["valor"] == pytest.approx(0.50)
+    assert first["bull"]["margen_fcf"]["valor"] == pytest.approx(0.50)
+    assert first["bear"]["margen_fcf"]["valor"] == pytest.approx(0.44)
+    fcf.value = Decimal("40")
+    db.commit()
+    bull = project(db)["escenarios"]["bull"]["proyecciones"][0]
+    assert bull["margen_fcf"]["valor"] == pytest.approx(0.45)
+
+
 def test_target_price_uses_valuation_service_and_dated_price(db, valued):
     payload = project(db)
     targets = {
