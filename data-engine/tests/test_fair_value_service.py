@@ -201,3 +201,63 @@ def test_stale_thesis_is_dated_from_its_last_update(db):
     out = fvs.resolve_fair_values(db, [company])[company.id]
     assert out["source"] == "motor"
     assert out["value"] == 99.0
+
+
+
+# --- ADR: el valor justo se compara con el precio del ADR (base ADR) ---------
+# Cálculo independiente: ordinaria 10, ratio 8 ordinarias por ADR -> 80 por ADR.
+
+
+def _adr_engine_output(db, company, *, listed):
+    model = ValuationModel(company_id=company.id, model_type="dcf", version=1,
+                           status="final", calculation_trace={})
+    db.add(model)
+    db.flush()
+    payload = {"expected_value": 10.0, "base_value": 10.0, "adr_ratio": 8.0,
+               "value_per_share_basis": "ordinary_share"}
+    if listed:
+        payload["listed_share_values"] = {"base": 80.0, "expected": 80.0}
+    db.add(ValuationOutput(valuation_model_id=model.id, scenario="base",
+                           value_per_share=10.0, output_payload=payload))
+    db.flush()
+
+
+def test_adr_persisted_engine_value_is_per_adr_not_per_ordinary(db):
+    company = _company(db, "ADRX")
+    _adr_engine_output(db, company, listed=True)
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company])[company.id]
+    assert out["value"] == 80.0
+
+
+def test_adr_engine_without_listed_values_is_not_comparable(db):
+    company = _company(db, "ADRY")
+    _adr_engine_output(db, company, listed=False)
+    db.commit()
+    out = fvs.resolve_fair_values(db, [company])[company.id]
+    assert out["value"] is None
+
+
+def test_adr_thesis_value_uses_listed_share_basis(db):
+    company = _company(db, "ADRT")
+    db.add(ThesisVersion(company_id=company.id, version=1, status="published",
+                         expected_value=10, thesis_markdown="t", executive_summary="s",
+                         valuation_basis={"adr_ratio": 8.0, "value_per_share_basis": "ordinary_share",
+                                          "listed_share_values": {"base": 80.0, "expected": 80.0}}))
+    _publishable_model(db, company)
+    db.commit()
+    thesis = fvs.thesis_candidates(db, [company.id]).get(company.id)
+    assert thesis is not None and thesis.value == 80.0
+
+
+def test_adr_live_engine_value_is_per_adr(db, monkeypatch):
+    from app.services import valuation_service
+
+    company = _company(db, "ADRL")
+    db.commit()
+    monkeypatch.setattr(valuation_service.ValuationService, "value_company",
+                        lambda self, db, company: {"expected_value": 10.0, "adr_ratio": 8.0,
+                                                   "publishable": True,
+                                                   "listed_share_values": {"expected": 80.0}})
+    out = fvs.resolve_fair_value(db, company, live=True)
+    assert out["value"] == 80.0

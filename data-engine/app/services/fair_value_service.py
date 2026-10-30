@@ -148,7 +148,8 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
     for row in rows:
         if reasons[row.id]:
             continue  # el archivo no es evidencia de una valoración publicable actual
-        value = _positive(row.expected_value)
+        basis = row.valuation_basis if isinstance(row.valuation_basis, dict) else {}
+        value = _listed_value(basis, fallback={"expected_value": row.expected_value})
         if value is None:
             continue
         out[int(row.company_id)] = Candidate(
@@ -160,14 +161,38 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
     return out
 
 
-def _engine_value(payload: object) -> float | None:
-    if not isinstance(payload, dict):
+def _listed_value(source: object, *, fallback: dict | None) -> float | None:
+    """Valor por acción COTIZADA (lo que se compara con el precio del ticker).
+
+    Los motores calculan por acción ORDINARIA del filing; para un ADR
+    (``adr_ratio``) el valor comparable con su precio es ``listed_share_values``
+    (ordinaria x N). Antes se publicaba el valor por ordinaria como valor
+    justo del ADR y el margen de seguridad salía con error xN (BABA: 1/8).
+    Un ADR sin valores por ADR no tiene valor comparable: None (N/D).
+    """
+    if not isinstance(source, dict):
+        return None
+    listed = source.get("listed_share_values")
+    if isinstance(listed, dict):
+        for key in ("expected", "base"):
+            value = _positive(listed.get(key))
+            if value is not None:
+                return value
+    if source.get("adr_ratio"):
+        return None
+    if fallback is None:
         return None
     for key in ("expected_value", "base_value"):
-        value = _positive(payload.get(key))
+        value = _positive(fallback.get(key))
         if value is not None:
             return value
     return None
+
+
+def _engine_value(payload: object) -> float | None:
+    if not isinstance(payload, dict):
+        return None
+    return _listed_value(payload, fallback=payload)
 
 
 def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
