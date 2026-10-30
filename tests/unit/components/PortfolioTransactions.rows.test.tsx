@@ -123,3 +123,10 @@ describe('PortfolioTransactions eliminar', () => {
         await waitFor(() => expect(h.success).toHaveBeenCalled());
     });
 });
+
+describe('PortfolioTransactions: objetivo táctil', () => {
+    it('el enlace del ticker mide 44 px en móvil', () => {
+        render(<PortfolioTransactions transactions={[tx()]} userId="u" />);
+        expect(screen.getByRole('link', { name: 'AAPL' }).className).toMatch(/min-h-\[44px\]/);
+    });
+});

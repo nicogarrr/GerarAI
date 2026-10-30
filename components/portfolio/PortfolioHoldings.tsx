@@ -284,7 +284,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                     <div className="flex items-center justify-between gap-2">
                       <Link
                         href={`/research/${holding.symbol}`}
-                        className="flex items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
+                        className="flex min-h-[44px] items-center gap-2 font-mono text-lg font-bold text-teal-400 hover:text-teal-300"
                       >
                         <CompanyLogo ticker={holding.symbol} name={holding.symbol} className="size-8 shrink-0 rounded-lg" />
                         {holding.symbol}
