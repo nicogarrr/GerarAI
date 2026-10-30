@@ -222,12 +222,14 @@ function humanizeTaxReport(summary: DataRecord): DataRecord {
             display[label] = SECURITIES_FX_LABELS[String(value)] ?? String(value);
         } else if (key === 'currency_ledger_status') {
             display[label] = ({ not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' } as Record<string, string>)[String(value)] ?? String(value);
-        } else if (key === 'currency_ledger_gain_base') {
-            display[label] = value === null || value === undefined ? 'No calculado' : value;
+        } else if (key === 'currency_ledger_gain_base' || key === 'currency_ledger_blocked_loss_base') {
+            // Importe fiscal en EUR: formateado es-ES como el resto de
+            // importes; un float crudo («1234.5678») no es una cifra legible.
+            display[label] = value === null || value === undefined ? 'No calculado' : formatMoney(value as number | string, currency);
         } else if (key === 'currency_ledger_by_currency') {
             const byCurrency = (value ?? {}) as Record<string, { status?: string; gain_base?: number | null; unconverted?: number | null }>;
             const names: Record<string, string> = { not_computed: 'No calculado', incomplete: 'Incompleto', computed: 'Calculado' };
-            const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? 'No calculado' : `${v.gain_base} EUR`} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, sin convertir ${v.unconverted} ${cur}`})`);
+            const parts = Object.entries(byCurrency).map(([cur, v]) => `${cur}: ${v.gain_base === null || v.gain_base === undefined ? 'No calculado' : formatMoney(v.gain_base, 'EUR')} (${names[String(v.status)] ?? String(v.status)}${v.unconverted === null || v.unconverted === undefined ? '' : `, sin convertir ${formatNumber(v.unconverted, { maximumFractionDigits: 2 })} ${cur}`})`);
             display[label] = parts.length > 0 ? parts.join(' · ') : 'Sin conversiones';
         } else if (key === 'currency_ledger_reason') {
             display[label] = value ?? 'Ninguno';
