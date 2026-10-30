@@ -30,6 +30,7 @@ import sqlalchemy as sa
 from sqlalchemy import inspect, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import Company, Position
 from app.services.investment_plan_service import InvestmentPlanService
 
@@ -50,7 +51,8 @@ DCA_MAX_AGE_MONTHS = 1
 
 
 def _today() -> date:
-    return date.today()
+    # Mes del usuario (Europe/Madrid): el servidor corre en UTC.
+    return local_today()
 
 
 def _months_old(period: str | None, today: date) -> int | None:
