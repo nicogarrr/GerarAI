@@ -627,6 +627,18 @@ def parse_fx_trade(element: ElementTree.Element) -> dict | None:
     }
 
 
+def _prune_raw_rows_safely(db: Session) -> int:
+    """Retención de filas crudas (A7) en un savepoint: si falla, la importación sigue."""
+    from app.core.config import get_settings
+    from app.services.ibkr_raw_retention import prune_ibkr_raw_rows
+
+    try:
+        with db.begin_nested():
+            return prune_ibkr_raw_rows(db, keep_days=get_settings().ibkr_raw_rows_retention_days)
+    except Exception:  # noqa: BLE001 - la poda nunca rompe una importación válida
+        return 0
+
+
 def collect_raw_rows(root: ElementTree.Element) -> list[dict]:
     """Todas las filas con atributos de cada FlexStatement, tal cual vienen.
 
@@ -1584,6 +1596,7 @@ class IBKRImportService:
             p.company.ticker for p in checked_positions
             if cost_checks.get(p.id, {}).get("status") == "review_required"
         )
+        raw_rows_pruned = _prune_raw_rows_safely(db)
         db.commit()
         _auto_link_journal_after_import(db)
         # market_prices solo acumula hacia adelante: las companias que la
@@ -1618,6 +1631,7 @@ class IBKRImportService:
             "trades_imported": trades_imported,
             "raw_rows_stored": raw_rows_stored,
             "raw_rows_already_present": raw_rows_already_present,
+            "raw_rows_pruned": raw_rows_pruned,
             "fx_conversions_imported": fx_conversions_imported,
             "fx_conversions_skipped": fx_conversions_skipped,
             "trades_cancelled": trades_cancelled,
