@@ -1,4 +1,5 @@
-import { chartPriceUnit } from '@/lib/market/chart-price-units';
+// @ts-expect-error TS5097: extension explicita para node --experimental-strip-types (scripts/holding-signals.test.ts, sin alias «@/»).
+import { chartPriceUnit } from '../market/chart-price-units.ts';
 
 // Nivel DCA y valor justo por posición: mapeo PURO (sin red) para cartera e inicio.
 //
