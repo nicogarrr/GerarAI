@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-const h = vi.hoisted(() => ({ del: vi.fn(), refresh: vi.fn(), success: vi.fn(), showError: vi.fn() }));
+const h = vi.hoisted(() => ({ del: vi.fn(), refresh: vi.fn(), success: vi.fn(), error: vi.fn(), showError: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: h.refresh }) }));
 vi.mock('@/lib/actions/portfolio.actions', () => ({ deleteTransaction: h.del }));
 vi.mock('@/components/portfolio/EditTransactionDialog', () => ({ default: ({ transaction }: any) => <span>edit-{transaction._id}</span> }));
 vi.mock('@/components/portfolio/ImportIBKRButton', () => ({ default: () => <span>import-ibkr</span> }));
 vi.mock('@/components/portfolio/AddTransactionButton', () => ({ default: () => <span>add-tx</span> }));
 vi.mock('@/components/calendar/CompanyLogo', () => ({ CompanyLogo: () => null }));
-vi.mock('sonner', () => ({ toast: { success: h.success } }));
+vi.mock('sonner', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('@/lib/toast', () => ({ showErrorToast: h.showError }));
 import PortfolioTransactions from '@/components/portfolio/PortfolioTransactions';
 
@@ -107,6 +107,16 @@ describe('PortfolioTransactions eliminar', () => {
         await waitFor(() => expect(h.success).toHaveBeenCalledWith('Transacción eliminada'));
         expect(h.del).toHaveBeenCalledWith('u9', '77');
         expect(h.refresh).toHaveBeenCalled();
+    });
+
+    it('rechazo del ledger (una venta posterior se quedaría sin acciones): motivo en español, sin éxito ni refresh', async () => {
+        h.del.mockResolvedValue({ success: false, error: 'No se puede borrar: una venta posterior se quedaría sin acciones.' });
+        render(<PortfolioTransactions transactions={[tx()]} userId="u" />);
+        del();
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+        await waitFor(() => expect(h.error).toHaveBeenCalledWith('No se puede borrar: una venta posterior se quedaría sin acciones.'));
+        expect(h.success).not.toHaveBeenCalled();
+        expect(h.refresh).not.toHaveBeenCalled();
     });
 
     it('fallo: error con reintento, sin exito ni refresh', async () => {
