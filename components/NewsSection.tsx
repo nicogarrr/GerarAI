@@ -1,6 +1,7 @@
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { getNews } from '@/lib/actions/finnhub.actions';
 import { newsSummaryToShow } from '@/lib/news-summary';
+import { getT } from '@/lib/i18n/server';
 import { newsBadge } from '@/lib/newsBadge';
 import { stripLeadingTicker, stripSourceSuffix } from '@/lib/news-display';
 import { formatMarketDateTime } from '@/lib/format';
@@ -19,14 +20,15 @@ interface NewsSectionProps {
  * scroll sin coste de JS de cliente.
  */
 export default async function NewsSection({ symbols }: NewsSectionProps) {
+    const t = await getT();
     let news;
     try {
         news = await getNews(symbols);
     } catch {
         return (
-            <section aria-label="Noticias destacadas" className="w-full min-w-0 rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-center">
+            <section aria-label={t('home.news.title')} className="w-full min-w-0 rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-center">
                 <p className="text-sm leading-6 text-amber-200">
-                    No se pudieron cargar las noticias. El resto de la página sigue funcionando.
+                    {t('home.news.error')}
                 </p>
                 {/* «Reintentar» recarga Inicio (vuelve a pedir las noticias). Antes
                     llevaba a /research/news: el botón decía reintentar y
@@ -44,20 +46,20 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
     }
 
     return (
-            <section aria-label="Noticias destacadas" className="w-full min-w-0 h-full bg-surface-1 rounded-lg border border-gray-800 p-4 sm:p-6 overflow-y-auto">
+            <section aria-label={t('home.news.title')} className="w-full min-w-0 h-full bg-surface-1 rounded-lg border border-gray-800 p-4 sm:p-6 overflow-y-auto">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3 sm:mb-6">
-                    <h2 className="text-xl sm:text-2xl font-bold text-white break-words">Noticias destacadas</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-white break-words">{t('home.news.title')}</h2>
                     <Link
                         className="inline-flex min-h-[44px] items-center rounded-lg border border-teal-400/20 px-3 text-xs text-teal-400 transition-colors hover:text-teal-300"
                         href="/research/news"
                     >
-                        Ver el análisis de noticias
+                        {t('home.news.analysisLink')}
                     </Link>
                 </div>
 
                 {news.length === 0 ? (
                     <div className="flex items-center justify-center px-4 py-12 text-center text-sm text-gray-500">
-                        <p>No hay noticias disponibles en este momento.</p>
+                        <p>{t('home.news.empty')}</p>
                     </div>
                 ) : (
                     <div className="space-y-3 sm:space-y-4">
@@ -73,7 +75,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                 className="relative min-w-0 p-4 bg-surface-2 hover:bg-surface-1 rounded-lg border border-gray-800 transition-all duration-200 group"
                             >
                             <div className="mb-2 flex justify-end">
-                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">Mercado general</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Mencionada · {badge.ticker}</> : badge.ticker}</Link>}
+                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">{t('home.news.generalMarket')}</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Mencionada · {badge.ticker}</> : badge.ticker}</Link>}
                             </div>
                             <div>
                                 <div className="flex flex-col min-[420px]:flex-row gap-3 sm:gap-4">
@@ -123,7 +125,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                                         minute: '2-digit',
                                                     })}
                                                 </span>
-                                            ) : <span>Fecha no disponible</span>}
+                                            ) : <span>{t('home.news.noDate')}</span>}
                                         </div>
                                     </div>
                                 </div>

@@ -1,1 +1,43 @@
-{}
+{
+  "metadata": {
+    "title": "GerarAI · Investment research OS",
+    "description": "What changed in your positions, portfolio value, triggered alerts, watchlist and intrinsic-value opportunities."
+  },
+  "news": {
+    "title": "Top news",
+    "error": "News could not be loaded. The rest of the page keeps working.",
+    "analysisLink": "View news analysis",
+    "empty": "No news available at the moment.",
+    "generalMarket": "General market",
+    "noDate": "Date not available"
+  },
+  "attention": {
+    "title": "Needs attention",
+    "fullList": "Full list",
+    "subtitle": "Pending thesis changes and DCA levels from your chosen threshold. A DCA level is not a buy order.",
+    "loading": "Checking theses and DCA levels…",
+    "unavailableBoth": "Thesis changes and DCA levels could not be checked. Whatever is available is shown below.",
+    "unavailableThesis": "Thesis changes could not be checked. Whatever is available is shown below.",
+    "unavailableDca": "DCA levels could not be checked. Whatever is available is shown below.",
+    "emptyFiltered": "No items in the sources that could be checked.",
+    "empty": "No pending thesis changes or recent DCA levels from your threshold. Unevaluated or stale data is not shown as current signals.",
+    "truncated": "Showing the {n} most recent pending thesis changes. Also review the pages of your companies.",
+    "paginationAria": "Attention pagination",
+    "pageStatus": "{current} / {pages} · {n} items",
+    "ctaOf": "for",
+    "ctaReviewChange": "Review change",
+    "ctaReviewThesis": "Review thesis",
+    "reviewPending": "Pending review · {date}",
+    "dcaTitle": "DCA level {level}X",
+    "dcaInPortfolio": "Review the contribution to your position.",
+    "dcaNotInPortfolio": "Consider an entry, after reviewing the thesis.",
+    "dcaNote": "From {threshold}X · Close {date}",
+    "dcaForming": " · Forming month",
+    "dcaConfirmed": " · Confirmed",
+    "direction": {
+      "positive": "Thesis upgrade",
+      "negative": "Thesis downgrade",
+      "neutral": "Thesis change"
+    }
+  }
+}

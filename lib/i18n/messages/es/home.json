@@ -1,1 +1,43 @@
-{}
+{
+  "metadata": {
+    "title": "GerarAI · Research OS de inversión",
+    "description": "Qué ha cambiado en tus posiciones, valor de cartera, alertas disparadas, watchlist y oportunidades por valor intrínseco."
+  },
+  "news": {
+    "title": "Noticias destacadas",
+    "error": "No se pudieron cargar las noticias. El resto de la página sigue funcionando.",
+    "analysisLink": "Ver el análisis de noticias",
+    "empty": "No hay noticias disponibles en este momento.",
+    "generalMarket": "Mercado general",
+    "noDate": "Fecha no disponible"
+  },
+  "attention": {
+    "title": "Requieren atención",
+    "fullList": "Lista completa",
+    "subtitle": "Cambios de tesis pendientes y niveles DCA desde tu umbral elegido. Un nivel DCA no es una orden de compra.",
+    "loading": "Consultando tesis y niveles DCA…",
+    "unavailableBoth": "No se pudieron comprobar los cambios de tesis ni los niveles DCA. Lo disponible se muestra debajo.",
+    "unavailableThesis": "No se pudieron comprobar los cambios de tesis. Lo disponible se muestra debajo.",
+    "unavailableDca": "No se pudieron comprobar los niveles DCA. Lo disponible se muestra debajo.",
+    "emptyFiltered": "Sin elementos en las fuentes que se han podido comprobar.",
+    "empty": "Sin cambios de tesis pendientes ni niveles DCA recientes desde tu umbral. Los datos no evaluados o antiguos no se muestran como señales actuales.",
+    "truncated": "Se muestran los {n} cambios de tesis pendientes más recientes. Revisa también las fichas de tus empresas.",
+    "paginationAria": "Paginación de atención",
+    "pageStatus": "{current} / {pages} · {n} elementos",
+    "ctaOf": "de",
+    "ctaReviewChange": "Revisar cambio",
+    "ctaReviewThesis": "Revisar tesis",
+    "reviewPending": "Revisión pendiente · {date}",
+    "dcaTitle": "Nivel DCA {level}X",
+    "dcaInPortfolio": "Revisar la aportación a tu posición.",
+    "dcaNotInPortfolio": "Valorar una entrada, después de revisar la tesis.",
+    "dcaNote": "Desde {threshold}X · Cierre {date}",
+    "dcaForming": " · Mes en formación",
+    "dcaConfirmed": " · Confirmado",
+    "direction": {
+      "positive": "Mejora de tesis",
+      "negative": "Deterioro de tesis",
+      "neutral": "Cambio de tesis"
+    }
+  }
+}
