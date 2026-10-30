@@ -42,7 +42,7 @@ from app.services.owner_earnings import (
     WORKING_CAPITAL_SIGN_CONVENTION,
     owner_earnings,
 )
-from app.services.split_adjustment import fact_split_factor
+from app.services.split_adjustment import fact_split_factor, split_after_price
 from app.valuation.currency import fact_currency, resolve_fx
 from app.valuation.engines.base import (
     adr_ratio,
@@ -472,15 +472,28 @@ class LongTermModelService:
             | {metric for _f, inputs, _s in DERIVED_DRIVERS.values() for metric in inputs}
         }
         current_price, market_as_of, market_price_source = self._model_price(db, company)
+        splits = _split_events(db, company.id)
+        # Ultimo cierre anterior a un split ya efectivo: base desconocida (vieja
+        # o ya ajustada por el proveedor). Acciones en la base actual y el
+        # precio no se compara (DCF inverso N/D), como en ValuationService.
+        price_basis_unknown = split_after_price(
+            [
+                (split.effective_date, Decimal(str(split.ratio)))
+                for split in splits
+                if split.effective_date is not None and split.ratio is not None
+            ],
+            _iso_date(market_as_of),
+            date.today(),
+        )
+        if price_basis_unknown:
+            current_price = None
         fact_cache["shares_diluted"] = _adjust_share_facts(
             _with_shares_outstanding_proxies(
                 fact_cache["shares_diluted"], fact_cache["shares_outstanding"]
             ),
-            _split_events(db, company.id),
-            # Acciones en la base del precio con el que se comparan (escenarios
-            # por accion y DCF inverso): un cierre anterior al split esta en la
-            # base vieja.
-            cutoff=_iso_date(market_as_of),
+            splits,
+            # Acciones en la base del precio con el que se comparan.
+            cutoff=None if price_basis_unknown else _iso_date(market_as_of),
         )
         revenue_history = self._annual_by_year(fact_cache["revenue"])
         years = sorted(revenue_history)
@@ -604,9 +617,15 @@ class LongTermModelService:
                 )
                 scenarios[name]["driver_operating_model"] = driver_forecast
 
-        comparable_price, price_basis = self._reverse_dcf_price(
-            db, company, fact_cache=fact_cache, source_year=latest_year
-        )
+        if price_basis_unknown:
+            comparable_price, price_basis = None, {
+                "price_as_of": market_as_of,
+                "missing_inputs": ["price_basis_after_split"],
+            }
+        else:
+            comparable_price, price_basis = self._reverse_dcf_price(
+                db, company, fact_cache=fact_cache, source_year=latest_year
+            )
         reverse_dcf = self._reverse_dcf(
             current_price=comparable_price,
             assumptions=assumptions,

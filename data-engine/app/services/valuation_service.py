@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import redact_secrets
 from app.models import Company, MarketPrice, Position, ValuationModel, ValuationOutput
 from app.services.price_units import listing_price, price_in_currency
+from app.services.split_adjustment import split_after_price, split_events_by_company
 from app.valuation.currency import (
     listing_currency,
     listing_quote_unit,
@@ -332,6 +333,17 @@ class ValuationService:
             logger.warning("Model price lookup failed company_id=%s error=%s", company.id, price_error)
             resolved_price = None
         current_price = resolved_price.value if resolved_price is not None else None
+        # Ultimo cierre anterior a un split ya efectivo: su base de acciones es
+        # desconocida (vieja o ya ajustada por el proveedor). El valor por
+        # accion va en la base actual y el precio no se compara: MOS y DCF
+        # inverso N/D hasta que se guarde un cierre posterior al split.
+        price_basis_unknown = resolved_price is not None and split_after_price(
+            split_events_by_company(db, [company.id]).get(company.id, []),
+            resolved_price.as_of,
+            as_of or date.today(),
+        )
+        if price_basis_unknown:
+            current_price = None
         price_currency = (
             resolved_price.currency
             if resolved_price is not None
@@ -346,7 +358,11 @@ class ValuationService:
             company,
             current_price,
             as_of,
-            price_as_of=resolved_price.as_of if resolved_price is not None else None,
+            price_as_of=(
+                resolved_price.as_of
+                if resolved_price is not None and not price_basis_unknown
+                else None
+            ),
         )
 
         # Divisas: el motor trabaja en la divisa de REPORTE de los hechos (BABA:
@@ -430,7 +446,15 @@ class ValuationService:
         if price_error is not None:
             result["trace"]["price_error"] = price_error
 
-        if current_price is None:
+        if price_basis_unknown:
+            result["trace"]["price_status"] = "price_basis_unknown_after_split"
+            result["trace"]["price_basis_note"] = (
+                "El ultimo cierre guardado es anterior a un split ya efectivo: "
+                "no se sabe si esta en la base vieja o ya ajustada, asi que no "
+                "se compara con el valor por accion (N/D hasta el primer cierre "
+                "posterior al split)."
+            )
+        elif current_price is None:
             result["trace"]["price_status"] = "missing_market_price"
             if result.get("margin_of_safety") is not None:
                 # Keep MOS only when price exists; engines already return None.

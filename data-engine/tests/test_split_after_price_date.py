@@ -1,11 +1,10 @@
-"""Acciones en la base del PRECIO con el que se comparan.
+"""Acciones y precio en la misma base alrededor de un split.
 
-El ultimo cierre guardado puede ser anterior a un split (el refresco de precios
-aun no ha pasado): ese cierre esta en la base vieja. Ajustar las acciones del
-ultimo 10-K por ese split (corte = hoy) dividia el valor por accion entre el
-ratio frente a un precio sin dividir: con un 4:1, valor razonable /4 y margen
-de seguridad hundido; en el modelo a largo plazo, el DCF inverso resolvia con
-4x acciones.
+El corte de splits es la fecha del precio. Si el ultimo cierre guardado es
+anterior a un split ya efectivo, su base es desconocida (vieja si no hubo
+refresco; ya ajustada si un refresco reescribio la serie antes de la primera
+sesion nueva): el valor por accion va en la base actual y el precio no se
+compara (MOS y DCF inverso N/D).
 """
 
 from __future__ import annotations
@@ -91,7 +90,10 @@ def test_snapshot_uses_the_price_date_as_split_cutoff():
     assert fresh.value("shares_diluted") == pytest.approx(400.0)
 
 
-def test_valuation_with_a_pre_split_close_matches_the_unsplit_valuation():
+def test_valuation_with_a_pre_split_close_does_not_compare_the_price():
+    """Cierre del 30-05, split 4:1 del 02-06: ese cierre puede estar en la base
+    vieja (sin refresco) o ya ajustado (refresco antes de la primera sesion
+    nueva). Valor por accion en la base actual (400 acciones) y MOS N/D."""
     db, company = _db()
     try:
         before = ValuationService().value_company(db, company)
@@ -100,12 +102,32 @@ def test_valuation_with_a_pre_split_close_matches_the_unsplit_valuation():
     finally:
         db.close()
     assert before["expected_value"] is not None
-    # Mismo precio (20, base vieja) y mismas acciones (100): mismo valor y MOS.
-    assert after["expected_value"] == pytest.approx(before["expected_value"])
+    assert before["margin_of_safety"] is not None
+    assert after["expected_value"] == pytest.approx(before["expected_value"] / 4)
+    assert after["margin_of_safety"] is None
+    assert after["trace"]["price_status"] == "price_basis_unknown_after_split"
+
+
+def test_valuation_with_a_post_split_close_compares_in_the_new_basis():
+    db, company = _db()
+    try:
+        before = ValuationService().value_company(db, company)
+        _split(db, company)
+        db.add(MarketPrice(
+            company_id=company.id, date=SPLIT_DAY, open=Decimal("5"), high=Decimal("5"),
+            low=Decimal("5"), close=Decimal("5"), adj_close=Decimal("5"), volume=1000,
+            source="TEST",
+        ))
+        db.commit()
+        after = ValuationService().value_company(db, company)
+    finally:
+        db.close()
+    # 20 / 4 = 5 en la base nueva: mismo MOS que antes del split.
+    assert after["expected_value"] == pytest.approx(before["expected_value"] / 4)
     assert after["margin_of_safety"] == pytest.approx(before["margin_of_safety"])
 
 
-def test_long_term_reverse_dcf_with_a_pre_split_close_keeps_old_share_basis():
+def test_long_term_reverse_dcf_with_a_pre_split_close_is_not_evaluable():
     db, company = _db()
     try:
         before = LongTermModelService().build(db, company, commit=False)
@@ -113,9 +135,9 @@ def test_long_term_reverse_dcf_with_a_pre_split_close_keeps_old_share_basis():
         after = LongTermModelService().build(db, company, commit=False)
     finally:
         db.close()
-    growth_before = before["reverse_dcf"].get("required_revenue_growth")
-    assert growth_before is not None
-    assert after["reverse_dcf"]["required_revenue_growth"] == pytest.approx(growth_before)
+    assert before["reverse_dcf"].get("required_revenue_growth") is not None
+    assert after["reverse_dcf"]["status"] == "insufficient_data"
+    assert after["reverse_dcf"]["missing_inputs"] == ["price_basis_after_split"]
 
 
 def test_adjust_share_facts_ignores_splits_after_the_cutoff():
