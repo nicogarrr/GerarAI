@@ -8,7 +8,7 @@ import re
 from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree
 
 from sqlalchemy import select, union_all
@@ -689,6 +689,91 @@ def _flex_ticker(symbol: str, element: ElementTree.Element | None) -> str:
     return listing.ticker if listing else symbol.upper().strip()
 
 
+_FLEX_SPLIT_RATIO = re.compile(r"SPLIT\s+(\d+(?:\.\d+)?)\s+FOR\s+(\d+(?:\.\d+)?)", re.IGNORECASE)
+
+
+def _flex_split(element: ElementTree.Element, ca_type: str, symbol: str) -> dict | None:
+    """Split (FS) o contrasplit (RS) del Flex con ratio y fecha legibles, o None.
+
+    IBKR describe el evento como «SPLIT 10 FOR 1» (10 acciones nuevas por 1) o
+    «SPLIT 1 FOR 10» (contrasplit). El ratio guardado es acciones después /
+    antes, igual que ``SplitIngestionService``. SD/SO (dividendo en acciones,
+    escisión) no son un ratio sobre la misma empresa: siguen solo como aviso.
+    """
+    if ca_type not in {"FS", "RS"} or symbol == "?":
+        return None
+    match = _FLEX_SPLIT_RATIO.search(_attr(element, "description", "actionDescription") or "")
+    raw_date = re.sub(r"[^0-9]", "", (_attr(element, "dateTime", "reportDate", "date") or "").split(";", 1)[0])[:8]
+    if not match or len(raw_date) != 8:
+        return None
+    try:
+        effective = datetime.strptime(raw_date, "%Y%m%d").date()
+        numerator, denominator = Decimal(match.group(1)), Decimal(match.group(2))
+    except (ValueError, InvalidOperation):
+        return None
+    if numerator <= 0 or denominator <= 0:
+        return None
+    ratio = (numerator / denominator).quantize(Decimal("1e-10"))
+    # El tipo de IBKR y el ratio deben decir lo mismo; si no, solo aviso.
+    if (ca_type == "FS" and ratio <= 1) or (ca_type == "RS" and ratio >= 1):
+        return None
+    return {
+        "ticker": _flex_ticker(symbol, element),
+        "symbol": symbol,
+        "ca_type": ca_type,
+        "effective_date": effective,
+        "ratio": ratio,
+        "label": f"{match.group(1)} por {match.group(2)}",
+    }
+
+
+def _record_flex_splits(db: Session, splits: list[dict], row_errors: list[str]) -> None:
+    """A6: registra cada split del Flex como acción corporativa PENDIENTE.
+
+    No se aplica en la importación: aplicarlo reescribe cantidades y coste del
+    libro y, sin cierre post-split verificado, deja la posición en suspensión de
+    valoración. Ese paso es ``CorporateActionService.apply_action`` (un clic en
+    Acciones corporativas), que conserva el coste total. Mismo criterio de
+    duplicado que la ingesta de proveedores (±3 días, mismo ratio): un split ya
+    traído de Yahoo/FMP o de una importación anterior no se registra dos veces.
+    """
+    from app.models import CorporateAction
+    from app.services.company_resolver import resolve_company
+    from app.services.split_ingestion_service import SplitIngestionService
+
+    for split in splits:
+        company = resolve_company(db, split["ticker"])
+        where = f"{split['ca_type']} de {split['symbol']} ({split['effective_date'].isoformat()}, {split['label']})"
+        if company is None:
+            notice = (
+                f"Acción corporativa {where} no se aplica al libro de operaciones: "
+                "regístrala en Acciones corporativas para que el coste y el FIFO fiscal cuadren."
+            )
+        else:
+            existing = SplitIngestionService._existing_record(db, company, split)
+            if existing is None:
+                db.add(CorporateAction(
+                    company_id=company.id,
+                    action_type="split" if split["ratio"] > 1 else "reverse_split",
+                    effective_date=split["effective_date"],
+                    ratio=split["ratio"],
+                    description=f"IBKR Flex: split {split['label']}",
+                    applied=False,
+                    source="ibkr_flex",
+                ))
+                db.flush()
+                state = "registrada como pendiente"
+            else:
+                state = "ya aplicada" if existing.applied else "ya estaba pendiente"
+            notice = (
+                f"Acción corporativa {where} {state} en Acciones corporativas"
+                + ("." if existing is not None and existing.applied else
+                   ": aplícala allí para que el coste y el FIFO fiscal cuadren.")
+            )
+        if notice not in row_errors:
+            row_errors.append(notice)
+
+
 def _attr(element: ElementTree.Element, *names: str) -> str | None:
     lowered = {key.lower(): value for key, value in element.attrib.items()}
     for name in names:
@@ -1135,6 +1220,7 @@ class IBKRImportService:
         fx_conversions_imported = 0
         fx_conversions_skipped = 0
         fx_conversions_already_present = 0
+        flex_splits: list[dict] = []
         for element in elements:
             tag = _tag_name(element)
             if tag == "Trade" and (_attr(element, "assetCategory") or "").upper() == "CASH":
@@ -1162,6 +1248,12 @@ class IBKRImportService:
                 ca_symbol = _attr(element, "symbol", "underlyingSymbol") or "?"
                 ca_type = (_attr(element, "type", "activityType") or "").upper()
                 ca_date = _attr(element, "reportDate", "dateTime", "date") or "?"
+                split = _flex_split(element, ca_type, ca_symbol)
+                if split is not None:
+                    # A6: FS/RS con ratio legible se registra como acción corporativa
+                    # PENDIENTE al final de la importación (_record_flex_splits).
+                    flex_splits.append(split)
+                    continue
                 notice = (
                     f"Acción corporativa {ca_type} de {ca_symbol} ({ca_date}) no se aplica al "
                     "libro de operaciones: regístrala en Acciones corporativas para que "
@@ -1562,6 +1654,8 @@ class IBKRImportService:
                     existing_ids.add(external_id)
                 db.add(transaction)
                 dividends_imported += 1
+
+        _record_flex_splits(db, flex_splits, row_errors)
 
         if trades_only:
             db.flush()
