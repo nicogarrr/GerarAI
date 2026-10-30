@@ -221,6 +221,7 @@ class Modelo720Service:
             "short_positions": [],
             "stale_snapshots": [],
             "domestic_assets": [],
+            "zero_balance_accounts": [],
             "incomplete": False,
         }
 
@@ -509,6 +510,24 @@ class Modelo720Service:
             ]
             return q4_average_detail(points, fiscal_year)
 
+        # A17 (Nico 30-10-2026): una cuenta con saldo 0 a 31/12 que no entra
+        # en el total nunca se omite en silencio: se lista con su nombre y el
+        # motivo. Los umbrales del 720 no cambian.
+        portfolio_names = {p.id: p.name for p in tenant_portfolios}
+        zero_balance_accounts: list[dict] = []
+
+        def _zero_account(cash, reason: str) -> None:
+            name = portfolio_names.get(cash.portfolio_id)
+            account = f"Cuenta en {cash.currency}" + (f" (cartera «{name}»)" if name else "")
+            zero_balance_accounts.append({
+                "ticker": f"cash-{cash.currency}",
+                "account": account,
+                "currency": cash.currency,
+                "portfolio_id": cash.portfolio_id,
+                "snapshot_date": cash.snapshot_date.isoformat(),
+                "reason": reason,
+            })
+
         for cash in cash_rows:
             ticker = f"cash-{cash.currency}"
             # Los saldos NEGATIVOS se NETEAN con los positivos al evaluar el
@@ -518,13 +537,29 @@ class Modelo720Service:
                 # (p. ej. dólares convertidos a euros en diciembre).
                 custody_zero = custody_map.get(f"CASH:{cash.currency}".upper())
                 if custody_zero == "ES":
+                    _zero_account(cash, (
+                        "Saldo 0 a 31/12 y cuenta declarada en España: no es un "
+                        "bien en el extranjero, así que no entra en el 720."
+                    ))
                     continue
                 detail_zero = _q4_native(cash)
                 if detail_zero is None:
                     if cash.fx_rate is not None and custody_zero is not None:
                         q4_unknown.append(ticker)
+                    _zero_account(cash, (
+                        "Saldo 0 a 31/12 y sin capturas suficientes del 4.º "
+                        "trimestre para calcular su saldo medio: no se incluye en "
+                        "el total de cuentas. El 720 también mira el saldo medio "
+                        "del 4.º trimestre; si la cuenta tuvo saldo entre octubre "
+                        "y diciembre, compruébalo en los extractos del bróker."
+                    ))
                     continue
                 if detail_zero["average"] == 0:
+                    _zero_account(cash, (
+                        "Saldo 0 a 31/12 y saldo medio del 4.º trimestre también "
+                        "0: no suma nada al umbral de cuentas, por eso no se incluye "
+                        "en el total."
+                    ))
                     continue
                 # Saldo medio del 4T distinto de 0: nunca se omite en silencio.
                 # Mismo trato que un saldo ≠ 0 sin tipo de cambio o sin
@@ -834,6 +869,7 @@ class Modelo720Service:
             "short_positions": short_positions,
             "stale_snapshots": stale_snapshots,
             "domestic_assets": domestic_assets,
+            "zero_balance_accounts": zero_balance_accounts,
             "incomplete": incomplete,
             "notas": _notas(),
         })

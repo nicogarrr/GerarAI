@@ -330,6 +330,7 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
     const foreignUnverified = (thresholds.foreign_unverified ?? []) as DataRecord[];
     const shortPositions = (thresholds.short_positions ?? []) as DataRecord[];
     const unvalued = (thresholds.unvalued ?? []) as DataRecord[];
+    const zeroBalance = (thresholds.zero_balance_accounts ?? []) as DataRecord[];
     // El generador devuelve el contenido del fichero junto al recuento de
     // registros: la descarga es del contenido real, no de una reconstrucción.
     const content720 =
@@ -341,6 +342,8 @@ export function Modelo720Section({ thresholds, file720, unavailable }: {
         ...foreignUnverified.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
         ...shortPositions.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: posición corta, no cuenta como bien en el 720`),
         ...unvalued.map((item) => `${humanizeTaxText(String(item.ticker ?? ''))}: ${humanizeTaxText(String(item.reason ?? ''))}`),
+        // A17: una cuenta a 0 a 31/12 que no entra en el total se nombra con su motivo.
+        ...zeroBalance.map((item) => `${String(item.account ?? item.ticker ?? '')}: ${humanizeTaxText(String(item.reason ?? ''))}`),
     ];
     return (
         <Section
