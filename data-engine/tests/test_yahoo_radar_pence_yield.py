@@ -37,3 +37,23 @@ def test_yield_en_divisa_principal_prefiere_dividend_yield():
         currency="EUR", trailingAnnualDividendYield=0.023972603, dividendYield=2.42,
     ))
     assert c.dividend_yield == Decimal("0.0242")
+
+
+def test_pb_con_libro_en_otra_divisa_es_nd():
+    """HSBA.L real (30-oct): 1287,2 GBp, libro 7,554 USD, Yahoo P/B 1,70 = GBP/USD."""
+    [c] = parse_screener_quotes(_payload(
+        symbol="HSBA.L", currency="GBp", financialCurrency="USD",
+        priceToBook={"raw": 1.7039942}, dividendYield={"raw": 5.1},
+    ))
+    assert c.price_to_book is None
+
+
+def test_pb_con_libro_en_la_misma_divisa_se_mantiene():
+    # GBp (subunidad) y GBP son la misma divisa principal: P/B intacto.
+    [c] = parse_screener_quotes(_payload(
+        symbol="TSCO.L", currency="GBp", financialCurrency="GBP",
+        priceToBook={"raw": 2.9}, dividendYield={"raw": 2.78},
+    ))
+    assert c.price_to_book == Decimal("2.9")
+    [d] = parse_screener_quotes(_payload(symbol="X.L", currency="GBp", priceToBook={"raw": 1.2}))
+    assert d.price_to_book == Decimal("1.2")  # sin financialCurrency: no se sabe, se mantiene
