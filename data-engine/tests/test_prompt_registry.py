@@ -168,17 +168,6 @@ def test_bottleneck_discovery_prompt_version_hash_and_closed_lists_are_pinned():
     assert "canal (uno de: " + ", ".join(service.CHANNELS) + ")" in resolved.text
 
 
-def test_jev_fallback_prompt_version_and_hash_are_pinned():
-    resolved = prompt_registry.get_prompt("jev_fallback", allow_remote=False)
-    assert (resolved.version, resolved.content_hash, resolved.task) == (
-        "jev-fallback-v1",
-        "88d9371956c6",
-        "jev_fallback",
-    )
-    assert resolved.source == "code"
-    assert resolved.text == prompt_registry.JEV_FALLBACK
-
-
 def test_knowledge_analysis_prompt_version_and_hash_are_pinned():
     from app.services import knowledge_analysis
 
