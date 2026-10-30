@@ -117,9 +117,19 @@ export const HOLDING_SORT_LABELS: Record<HoldingSort, string> = {
  * (valor sin precio o sin tipo de cambio, G/P desconocida) van al final en vez
  * de contarse como 0 y mezclarse con las reales.
  */
+/**
+ * G/P mostrable: la MISMA regla que pinta la fila (sin coste, sin cotización o
+ * sin conversión la G/P es N/D). Antes el orden usaba otra: `gainPercent` vale
+ * 0 cuando no hay coste, así que una posición con G/P N/D se ordenaba como 0 %
+ * en medio de las reales en «Mejor/Peor rentabilidad».
+ */
+export function holdingGainKnown(h: PortfolioHolding): boolean {
+  return !h.fxMissing && !h.quoteMissing && h.cost > 0 && Number.isFinite(h.gainPercent);
+}
+
 export function sortHoldings(holdings: PortfolioHolding[], sort: HoldingSort): PortfolioHolding[] {
   const valueKnown = (h: PortfolioHolding) => !h.valueMissing && !h.fxMissing && h.currentPrice !== null && Number.isFinite(h.value);
-  const gainKnown = (h: PortfolioHolding) => valueKnown(h) && Number.isFinite(h.gainPercent);
+  const gainKnown = (h: PortfolioHolding) => valueKnown(h) && holdingGainKnown(h);
   const rows = [...holdings];
   if (sort === 'symbol') return rows.sort((a, b) => a.symbol.localeCompare(b.symbol, 'es'));
   const known = sort === 'value' ? valueKnown : gainKnown;
@@ -288,7 +298,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
             {/* Móvil: cards sin scroll horizontal */}
             <div className="space-y-3 md:hidden">
               {sortedHoldings.map((holding) => {
-                const gainKnown = !holding.fxMissing && !holding.quoteMissing && holding.cost > 0;
+                const gainKnown = holdingGainKnown(holding);
                 const isPositive = holding.gain >= 0;
                 return (
                   <div key={holding.symbol} className="rounded-xl border border-gray-700 p-4">
@@ -400,7 +410,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
               </TableHeader>
               <TableBody>
                 {sortedHoldings.map((holding) => {
-                  const gainKnown = !holding.fxMissing && !holding.quoteMissing && holding.cost > 0;
+                  const gainKnown = holdingGainKnown(holding);
                   const isPositive = holding.gain >= 0;
                   return (
                     <TableRow key={holding.symbol} className="border-gray-700 hover:bg-gray-800/50">

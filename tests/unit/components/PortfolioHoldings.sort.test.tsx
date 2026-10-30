@@ -65,3 +65,16 @@ describe('Posiciones: ordenar', () => {
         expect(screen.queryByLabelText('Ordenar por')).not.toBeInTheDocument();
     });
 });
+
+describe('sortHoldings: G/P desconocida va al final, no como 0 %', () => {
+    it('sin coste (G/P N/D en la fila) no se mezcla con las reales', () => {
+        const list = [
+            holding({ symbol: 'UP', gainPercent: 10 }),
+            holding({ symbol: 'NOCOST', cost: 0, gain: 0, gainPercent: 0, avgPrice: 0 }),
+            holding({ symbol: 'DOWN', gainPercent: -10 }),
+            holding({ symbol: 'NOQUOTE', quoteMissing: true, gainPercent: 0 }),
+        ];
+        expect(sortHoldings(list, 'best').map((x) => x.symbol)).toEqual(['UP', 'DOWN', 'NOCOST', 'NOQUOTE']);
+        expect(sortHoldings(list, 'worst').map((x) => x.symbol)).toEqual(['DOWN', 'UP', 'NOCOST', 'NOQUOTE']);
+    });
+});
