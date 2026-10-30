@@ -47,6 +47,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
+from app.services.price_units import close_in_company_currency
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.split_adjustment import (
     fact_split_factor,
@@ -132,8 +133,9 @@ def default_finnhub_yield_fetcher(ticker: str) -> Decimal | None:
 
 def _latest_price(
     db: Session, company_id: int, as_of: date
-) -> tuple[Decimal, date, str | None] | None:
-    """Ultimo cierre <= as_of con frescura <= PRICE_FRESHNESS_DAYS.
+) -> tuple[Decimal, date, str | None, str | None] | None:
+    """Ultimo cierre <= as_of con frescura <= PRICE_FRESHNESS_DAYS
+    (cierre, fecha, fuente, divisa de cotizacion).
 
     Nunca un precio posterior a as_of (point-in-time, precedente F370) ni un
     precio viejo presentado como actual (precedente del track record).
@@ -151,7 +153,7 @@ def _latest_price(
         return None
     if (as_of - row.date).days > PRICE_FRESHNESS_DAYS:
         return None
-    return close, row.date, getattr(row, "source", None)
+    return close, row.date, getattr(row, "source", None), getattr(row, "quote_currency", None)
 
 
 def _book_value_per_share(
@@ -342,6 +344,7 @@ def compute_valuation_metrics(
         "skipped": {
             "sin_precio_fresco": 0,
             "sin_libros": 0,
+            "sin_fx_cotizacion": 0,
             "sin_simbolo_yahoo": 0,
             "dividendos_fuente_fallo": 0,
         },
@@ -351,13 +354,26 @@ def compute_valuation_metrics(
         if price is None:
             stats["skipped"]["sin_precio_fresco"] += 1
             continue
-        close, price_date, price_source = price
+        close, price_date, price_source, quote_currency = price
 
         book = _book_value_per_share(db, company, as_of, price_date)
+        # Los libros van en Company.currency y el cierre en la divisa de
+        # cotizacion: TSCO.L cotiza en GBp y reporta en GBP (250 peniques son
+        # 2,50 GBP; sin pasar a libras el P/B salia x100); SHEL.L en GBp con
+        # cuentas en USD necesita FX point-in-time. Sin tipo valido: N/D.
+        pb_close = (
+            close_in_company_currency(
+                db, close, quote_currency=quote_currency, company=company, on=price_date,
+            )
+            if book is not None
+            else None
+        )
         if book is None:
             stats["skipped"]["sin_libros"] += 1
+        elif pb_close is None:
+            stats["skipped"]["sin_fx_cotizacion"] += 1
         else:
-            pb = close / book["bvps"]
+            pb = pb_close / book["bvps"]
             _upsert_metric(
                 db,
                 tenant_id=tenant_id,
@@ -372,7 +388,9 @@ def compute_valuation_metrics(
                 ),
                 trace={
                     "as_of": as_of.isoformat(),
-                    "price": str(close),
+                    "price": str(pb_close),
+                    "quote_close": str(close),
+                    "quote_currency": quote_currency,
                     "price_date": price_date.isoformat(),
                     "price_source": price_source,
                     "fiscal_year": book["fiscal_year"],
