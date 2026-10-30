@@ -4,45 +4,39 @@ import test from 'node:test';
 // @ts-expect-error TS5097: explicit extension for node strip-types.
 import { navItemMatchesSearch, navSectionMatchesSearch, normalizeNavSearchTerm } from '../lib/search/nav-search.ts';
 
-const icon = (() => null) as never;
-
-const carteraSection = {
-    title: 'Cartera',
-    items: [
-        { href: '/portfolio', label: 'Resumen', icon, hub: '/portfolio' },
-        { href: '/portfolio/intelligence', label: 'Inteligencia', icon, hub: '/portfolio' },
-        { href: '/risk', label: 'Exposiciones', icon, hub: '/portfolio' },
-        { href: '/taxes', label: 'Impuestos', icon, hub: '/portfolio' },
-    ],
-};
-
-const flatten = (sections: { items: unknown[] }[]) =>
-    sections.flatMap((section) => section.items.flatMap((raw) => { const item = raw as { children?: unknown[] }; return item.children ? [item, ...item.children] : [item]; })) as never[];
+// Tras la i18n el matcher recibe los textos YA RESUELTOS al locale activo
+// (las claves nav.* viven en lib/constants.ts y las traduce el componente).
+const carteraHaystacks = [
+    ['Cartera', 'Resumen'],
+    ['Cartera', 'Inteligencia'],
+    ['Cartera', 'Exposiciones'],
+    ['Cartera', 'Impuestos'],
+];
 
 test('escribir el nombre de la sección («cartera») encuentra su grupo', () => {
     // QA prod 19 oct: "cartera" devolvía "Sin resultados" aunque Cartera es un
-    // destino del menú principal; solo se miraba item.label.
-    assert.equal(navSectionMatchesSearch(carteraSection, 'cartera', flatten), true);
-    const visibles = flatten([carteraSection]).filter((item) => navItemMatchesSearch(carteraSection, item, 'cartera'));
+    // destino del menú principal; solo se miraba la etiqueta del destino.
+    assert.equal(navSectionMatchesSearch(carteraHaystacks, 'cartera'), true);
+    const visibles = carteraHaystacks.filter((haystacks) => navItemMatchesSearch(haystacks, 'cartera'));
     assert.ok(visibles.length > 0, 'el grupo Cartera debe ofrecer destinos al buscar «cartera»');
 });
 
 test('la etiqueta del destino y la descripción también casan, sin tildes', () => {
-    assert.equal(navItemMatchesSearch(carteraSection, carteraSection.items[3], 'impuestos'), true);
-    assert.equal(navItemMatchesSearch(carteraSection, carteraSection.items[2], 'exposicion'), true);
+    assert.equal(navItemMatchesSearch(carteraHaystacks[3], 'impuestos'), true);
+    assert.equal(navItemMatchesSearch(carteraHaystacks[2], 'exposicion'), true);
     assert.equal(normalizeNavSearchTerm('Inversión'), 'inversion');
-    assert.equal(navItemMatchesSearch(carteraSection, carteraSection.items[0], 'xyzq'), false);
+    assert.equal(navItemMatchesSearch(carteraHaystacks[0], 'xyzq'), false);
 });
 
-test('SearchCommand usa el matcher de secciones en vez de filtrar solo por label', () => {
+test('SearchCommand usa el matcher de secciones con textos resueltos por t()', () => {
     const view = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');
-    assert.match(view, /navSectionMatchesSearch\(section, searchTerm, flattenNavItems\)/);
-    assert.match(view, /navItemMatchesSearch\(section, item, searchTerm\)/);
+    assert.match(view, /navSectionMatchesSearch\(resolvedItems\.map/);
+    assert.match(view, /navItemMatchesSearch\(haystacks, searchTerm\)/);
     assert.doesNotMatch(view, /item\.label\.toLocaleLowerCase\(\)\.includes/);
 });
 
 test('el catálogo sigue teniendo una sección Cartera navegable', () => {
     const constants = readFileSync('lib/constants.ts', 'utf8');
-    assert.match(constants, /title: 'Cartera'/);
+    assert.match(constants, /titleKey: 'nav\.sections\.cartera'/);
     assert.match(constants, /href: '\/portfolio'/);
 });

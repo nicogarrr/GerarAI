@@ -9,6 +9,7 @@ import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { isNextRedirectError } from "@/lib/types/errors";
 import { flattenNavItems, ROUTE_CATALOG, SYMBOL_VALIDATION } from "@/lib/constants";
+import { useT } from "@/lib/i18n/client";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
 import { closeSearchCommand } from "@/lib/search/search-command-store";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
@@ -22,6 +23,7 @@ import { etiquetaTipoInstrumento } from "@/lib/labels";
  * inicial de TODAS las páginas autenticadas.
  */
 export default function SearchCommandDialog({ open, initialStocks, getFocusTarget }: SearchCommandDialogProps) {
+    const t = useT();
     const router = useRouter()
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
@@ -363,27 +365,45 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                 antes desaparecian con el primer caracter y cmdk no
                                 podia filtrarlas, asi que "ir a Temas" por teclado
                                 era imposible. */}
-                            {ROUTE_CATALOG.filter((section) => section.items.length > 1 && (!isSearchMode || navSectionMatchesSearch(section, searchTerm, flattenNavItems))).map((section) => (
+                            {ROUTE_CATALOG.filter((section) => section.items.length > 1).map((section) => {
+                                // Textos nav.* resueltos al locale activo: la
+                                // coincidencia del buscador y lo pintado son
+                                // siempre el mismo idioma.
+                                const sectionTitle = section.titleKey ? t(section.titleKey) : '';
+                                const resolvedItems = flattenNavItems([section]).map((item) => ({
+                                    item,
+                                    label: t(item.labelKey),
+                                    haystacks: [
+                                        sectionTitle,
+                                        t(item.labelKey),
+                                        item.subnavLabelKey ? t(item.subnavLabelKey) : '',
+                                        item.descriptionKey ? t(item.descriptionKey) : '',
+                                    ],
+                                }));
+                                const visibleItems = resolvedItems.filter(({ haystacks }) => !isSearchMode || navItemMatchesSearch(haystacks, searchTerm));
+                                if (isSearchMode && !navSectionMatchesSearch(resolvedItems.map(({ haystacks }) => haystacks), searchTerm)) return null;
+                                return (
                                 <CommandGroup
-                                    key={section.title}
-                                    heading={section.title}
+                                    key={section.titleKey ?? section.items[0]?.href}
+                                    heading={sectionTitle}
                                     className="[&_[cmdk-group-heading]]:px-4 [&_[cmdk-group-heading]]:py-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-gray-500"
                                 >
-                                    {flattenNavItems([section]).filter(item => !isSearchMode || navItemMatchesSearch(section, item, searchTerm)).map((item) => (
+                                    {visibleItems.map(({ item, label, haystacks }) => (
                                         <CommandItem
                                             key={item.href}
-                                            value={`ir ${item.label}`}
-                                            keywords={[section.title, ...(item.description ? [item.description] : [])]}
+                                            value={`ir ${label}`}
+                                            keywords={haystacks.filter(Boolean)}
                                             onSelect={() => go(item.href)}
                                             className="flex min-h-11 items-center gap-2 px-4"
                                         >
                                             {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 text-gray-500" />}
-                                            <span className="flex-1 truncate">{item.label}</span>
+                                            <span className="flex-1 truncate">{label}</span>
                                             <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
                                         </CommandItem>
                                     ))}
                                 </CommandGroup>
-                            ))}
+                                );
+                            })}
 
                         </>
                     )}
