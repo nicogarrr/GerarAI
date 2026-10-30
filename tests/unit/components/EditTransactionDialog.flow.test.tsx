@@ -23,6 +23,24 @@ const submit = async (d: ReturnType<typeof open>) => {
 beforeEach(() => { vi.clearAllMocks(); h.update.mockResolvedValue(undefined); });
 
 describe('EditTransactionDialog', () => {
+    it('cancelar descarta lo tecleado: al reabrir se ven los datos guardados', () => {
+        const d = open();
+        fireEvent.change(d.getByLabelText('Cantidad'), { target: { value: '99' } });
+        fireEvent.click(d.getByRole('button', { name: 'Cancelar' }));
+        fireEvent.click(screen.getByRole('button', { name: /Editar transacción/ }));
+        const again = within(screen.getByRole('dialog'));
+        expect((again.getByLabelText('Cantidad') as HTMLInputElement).value).toBe('10');
+        expect(h.update).not.toHaveBeenCalled();
+    });
+
+    it('divisa fuera de la lista corta (SEK): el selector la muestra y se conserva al guardar', async () => {
+        const d = open({ ...base, symbol: 'VOLV-B.ST', currency: 'SEK' });
+        expect(d.getByLabelText('Moneda de la operación').textContent).toContain('SEK');
+        await submit(d);
+        await waitFor(() => expect(h.update).toHaveBeenCalled());
+        expect(h.update.mock.calls[0][8]).toBe('SEK');
+    });
+
     it('precarga los datos y recorta la fecha a YYYY-MM-DD', () => {
         const d = open();
         expect((d.getByLabelText('Cantidad') as HTMLInputElement).value).toBe('10');

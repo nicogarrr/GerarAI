@@ -39,13 +39,10 @@ type Props = {
     userId: string;
 };
 
-export default function EditTransactionDialog({ transaction, userId }: Props) {
-    const router = useRouter();
-    const [open, setOpen] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [fieldErrors, setFieldErrors] = useState<TransactionFormErrors>({});
+const CURRENCIES = ['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'];
 
-    const [formData, setFormData] = useState({
+function initialForm(transaction: Transaction) {
+    return {
         symbol: transaction.symbol,
         type: transaction.type,
         quantity: formatNumberForInput(transaction.quantity),
@@ -54,8 +51,30 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
         fees: transaction.fees === undefined ? '' : formatNumberForInput(transaction.fees),
         date: transaction.date.slice(0, 10),
         notes: transaction.notes || '',
+        // La divisa guardada se conserva aunque no esté en la lista corta
+        // (SEK, DKK, NOK… de IBKR): antes el selector salía en blanco.
         currency: transaction.currency || 'USD',
-    });
+    };
+}
+
+export default function EditTransactionDialog({ transaction, userId }: Props) {
+    const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<TransactionFormErrors>({});
+
+    const [formData, setFormData] = useState(() => initialForm(transaction));
+    // Cada apertura parte de lo guardado: antes, cancelar tras tocar campos
+    // dejaba esos cambios sin guardar en el formulario y al reabrirlo parecían
+    // los datos reales del movimiento.
+    const handleOpenChange = (next: boolean) => {
+        if (next) {
+            setFormData(initialForm(transaction));
+            setFieldErrors({});
+        }
+        setOpen(next);
+    };
+    const currencyOptions = CURRENCIES.includes(formData.currency) ? CURRENCIES : [formData.currency, ...CURRENCIES];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -100,7 +119,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 <Button
                     variant="ghost"
@@ -149,7 +168,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                         <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
                             <SelectTrigger id="edit-currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
                             <SelectContent className="bg-gray-800 border-gray-700">
-                                {['USD', 'EUR', 'GBP', 'JPY', 'CNY', 'HKD', 'CHF', 'CAD', 'AUD'].map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
+                                {currencyOptions.map((currency) => <SelectItem value={currency} key={currency}>{currency}</SelectItem>)}
                             </SelectContent>
                         </Select>
                     </div>
