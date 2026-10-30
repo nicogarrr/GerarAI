@@ -5,7 +5,7 @@ import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-anal
 import type { Metadata } from 'next';
 import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
-import { getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
+import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { getProfile } from '@/lib/actions/finnhub.actions';
 import { isTickerNotFound, NOT_FOUND_LABEL, NOT_FOUND_TITLE } from '@/lib/watchlist/lookup-status';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
@@ -122,10 +122,18 @@ export default async function WatchlistPage({
     // un «sin datos» fabricado ni una espera ilimitada. Las lecturas siguen
     // en vuelo y calientan las cachés para la siguiente carga.
     const ENTRY_DATA_BUDGET_MS = 3000;
-    // El master (nombre, bolsa, divisa) se resuelve en oleada propia, fuera
-    // del presupuesto: es lectura rápida del backend y así la fila conserva
-    // nombre y divisa reales aunque la cotización agote los 3 s.
-    const basicsPromises = pageItems.map((item) => getResearchCompanyBasics(item.symbol.trim().toUpperCase()));
+    // El master (nombre, bolsa, divisa) en UNA petición agregada al backend,
+    // fuera del presupuesto: antes era un GET /api/companies/{ticker} por
+    // símbolo y carga (20+ round trips; oleada de 16 medida en prod a ~0,9 s,
+    // 2026-10-30). Si el backend aún no sirve el agregado (despliegue
+    // escalonado front/back) se mantiene la oleada por símbolo.
+    const batchedBasics = await getResearchCompaniesBasics(pageSymbols);
+    const basicsPromises = pageItems.map((item) => {
+        const symbol = item.symbol.trim().toUpperCase();
+        return batchedBasics
+            ? Promise.resolve(batchedBasics[symbol] ?? null)
+            : getResearchCompanyBasics(symbol);
+    });
     const entryPromises = pageItems.map((item, index) => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const basicsPromise = basicsPromises[index];
