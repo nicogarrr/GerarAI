@@ -108,8 +108,8 @@ def get_run(
     stmt = stmt.where(ProPickCandidate.run_id == run_id)
     if only_passed:
         stmt = stmt.where(ProPickCandidate.passed.is_(True))
-    # Orden declarado en los dos motores (SQLite pone NULL primero en DESC y
-    # Postgres al final): sin nulls_last() los descartados por el embudo
+    # Orden declarado en los dos motores (Postgres pone NULL primero en DESC y
+    # SQLite al final): sin nulls_last() los descartados por el embudo
     # (score NULL) se colaban por ENCIMA de los aptos fuera del top_n en
     # Postgres. Desempate por ticker: con rank y score NULL el orden era el
     # que devolviera el motor, inestable entre llamadas.
