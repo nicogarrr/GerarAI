@@ -41,7 +41,9 @@ from app.models import (
     ThesisVersion,
 )
 from app.services.claim_scope import latest_thesis_version
+from app.services.fair_value_service import listed_value
 from app.services.price_freshness import market_price_is_stale
+from app.services.price_units import listing_price
 
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
@@ -245,10 +247,23 @@ def _latest_price(db: Session, company_id: int) -> tuple[Decimal | None, dict[st
     )
     if price is None or price.close is None:
         return None, {"status": "missing", "missing": "precio"}
+    # El cierre se guarda como lo da el proveedor (Londres en peniques); la tesis
+    # (valor esperado, precio de la tesis) está en la divisa PRINCIPAL del
+    # listado. Sin unidad verificable no se compara (no dispara).
+    company = db.get(Company, company_id)
+    listed = (
+        listing_price(Decimal(price.close), quote_currency=price.quote_currency, company=company)
+        if company is not None
+        else None
+    )
+    if listed is None:
+        return None, {"status": "missing", "missing": "unidad_precio"}
+    value, currency = listed
     age_days = (date.today() - price.date).days
-    return Decimal(price.close), {
+    return value, {
         "market_price_id": price.id,
-        "price": str(price.close),
+        "price": str(value),
+        "currency": currency,
         "date": price.date.isoformat(),
         "age_days": age_days,
         "status": "stale" if market_price_is_stale(age_days, get_settings().market_price_max_age_days) else "fresh",
@@ -273,7 +288,13 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
         ) else None
         if thesis is None:
             return None, {**base, "status": "missing", "missing": "tesis"}
-        reference = thesis.expected_value if metric == MARGIN_OF_SAFETY_PCT else thesis.current_price
+        if metric == MARGIN_OF_SAFETY_PCT:
+            # Valor por acción COTIZADA: un ADR se compara con su valor por ADR.
+            basis = thesis.valuation_basis if isinstance(thesis.valuation_basis, dict) else {}
+            listed_reference = listed_value(basis, fallback={"expected_value": thesis.expected_value})
+            reference = Decimal(str(listed_reference)) if listed_reference is not None else None
+        else:
+            reference = thesis.current_price
         if reference is None or Decimal(reference) <= 0:
             missing = "valor_esperado" if metric == MARGIN_OF_SAFETY_PCT else "precio_tesis"
             return None, {**base, "status": "missing", "missing": missing}
