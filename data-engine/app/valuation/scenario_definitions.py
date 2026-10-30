@@ -65,7 +65,11 @@ def mechanical_dcf_scenarios(
             name="bear",
             probability=probabilities["bear"],
             assumptions={
-                "revenue_growth": growth if burn else max(growth - 0.08, -0.05),
+                # Suelo -5% solo para no exagerar el bear de una empresa que
+                # crece; si el base ya cae más del 5%, el suelo quedaba POR
+                # ENCIMA del base (bear con más crecimiento que el base y,
+                # con márgenes altos, valor bear > base). Nunca sobre el base.
+                "revenue_growth": growth if burn else min(growth, max(growth - 0.08, -0.05)),
                 # Sin suelo positivo: con margen base negativo, clampar el
                 # bear a +0.5% invertía el orden bear <= base.
                 "fcf_margin": margin - 0.06,
@@ -126,14 +130,16 @@ def speculative_causal_scenarios(
             name="execution_delay_funding_stress",
             probability=probabilities["bear"],
             assumptions={
-                "revenue_growth": growth if burn else max(growth - 0.12, -0.05),
+                "revenue_growth": growth if burn else min(growth, max(growth - 0.12, -0.05)),
                 # Sin suelo positivo: con margen base negativo (quema de
                 # caja), clampar el bear a +1% lo ponía por encima del
                 # base en valoración: bear MEJOR que base entrando en
                 # probability_weighted_value.
                 "fcf_margin": margin - 0.08,
                 "wacc": wacc if burn else wacc + 0.03,
-                "terminal_growth": terminal if burn else max(terminal - 0.005, 0.01),
+                # Mismo criterio: el suelo del 1% no puede subir el terminal
+                # del bear por encima del base.
+                "terminal_growth": terminal if burn else min(terminal, max(terminal - 0.005, 0.01)),
                 "extra_dilution_pct": max(dilution_pct, 0.15),
             },
             drivers=["launch_or_deployment_delay", "higher_capex", "equity_raise", "higher_cost_of_capital"],
@@ -184,7 +190,10 @@ def holding_company_scenarios(
         ScenarioDefinition(
             name="bear",
             probability=probabilities["bear"],
-            assumptions={"nav_per_share": nav_per_share, "holding_discount": min(holding_discount + 0.15, 0.45)},
+            # Tope 45% para ensanchar, pero nunca por debajo del descuento
+            # base: con un base del 50% el tope ESTRECHABA el descuento y el
+            # bear valía más que el base.
+            assumptions={"nav_per_share": nav_per_share, "holding_discount": max(holding_discount, min(holding_discount + 0.15, 0.45))},
             drivers=["wider_holding_discount", "asset_value_compression"],
             description="Wider conglomerate/holding discount.",
         ),
