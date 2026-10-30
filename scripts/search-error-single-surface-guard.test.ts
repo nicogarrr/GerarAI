@@ -27,5 +27,9 @@ void test('el estado de error inline se conserva en las dos vías de fallo', () 
 
 void test('la superficie inline sigue siendo un role="alert" con copy de reintento', () => {
     assert.match(source, /role="alert"/);
-    assert.match(source, /No se pudo completar la búsqueda\. Inténtalo de nuevo\./);
+    assert.match(source, /t\('ui.command.error'\)/);
+});
+
+test('translated error preserves Spanish honesty', () => {
+  assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/ui.json', 'utf8')).command.error, 'No se pudo completar la búsqueda. Inténtalo de nuevo.');
 });
