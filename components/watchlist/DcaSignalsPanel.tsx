@@ -7,6 +7,7 @@ import {
 } from '@/components/watchlist/LazyDcaControls';
 import { dcaRunSummary } from '@/lib/dca/format';
 import type { DcaSignalsResponse } from '@/lib/dca/types';
+import { formatCountEs } from '@/lib/format';
 
 interface DcaSignalsPanelProps {
     data: DcaSignalsResponse | null;
@@ -31,7 +32,7 @@ export default function DcaSignalsPanel({ data, unavailable }: DcaSignalsPanelPr
         <details className="group rounded-lg border border-gray-700 bg-gray-800/30" data-testid="dca-signals">
             <summary className="min-h-11 cursor-pointer rounded-lg px-4 py-3 text-sm font-semibold text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-400">
                 Avisos DCA e histórico
-                <span className="ml-2 text-xs font-normal text-gray-400">({data.items.length} empresas)</span>
+                <span className="ml-2 text-xs font-normal text-gray-400">({formatCountEs(data.items.length, 'empresa', 'empresas')})</span>
             </summary>
             <div className="space-y-3 px-4 pb-4">
                 <Link href="/settings#dca" className="inline-flex min-h-11 items-center text-sm text-teal-300 underline">Configurar avisos DCA en Ajustes →</Link>

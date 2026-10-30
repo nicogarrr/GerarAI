@@ -100,7 +100,7 @@ describe('dcaRunSummary', () => {
         expect(dcaRunSummary(run()).text).toContain('19 de 19 evaluados');
         const partial = dcaRunSummary(run({ evaluated: 17, skipped: 1, errors: 1 }));
         expect(partial.tone).toBe('warn');
-        expect(partial.text).toContain('1 omitidos');
+        expect(partial.text).toContain('1 omitido,');
         expect(partial.text).toContain('1 con error');
         expect(dcaRunSummary(run({ status: 'error', error: 'RuntimeError: x' }))).toMatchObject({ tone: 'error' });
         expect(dcaRunSummary(run({ status: 'interrupted' })).text).toContain('interrumpida');
@@ -122,7 +122,7 @@ describe('DcaLevelBadge sin nivel', () => {
 describe('DcaSignalsPanel última ejecución', () => {
     it('muestra la última ejecución', () => {
         render(<DcaSignalsPanel data={panel([item()], run({ evaluated: 18, skipped: 1 }))} unavailable={false} />);
-        expect(screen.getByTestId('dca-last-run').textContent).toContain('18 de 19 evaluados, 1 omitidos');
+        expect(screen.getByTestId('dca-last-run').textContent).toContain('18 de 19 evaluados, 1 omitido');
     });
     it('null = nunca ejecutado; ausente (backend viejo) = no inventa nada', () => {
         const { unmount } = render(<DcaSignalsPanel data={panel([item()], null)} unavailable={false} />);
@@ -130,5 +130,17 @@ describe('DcaSignalsPanel última ejecución', () => {
         unmount();
         render(<DcaSignalsPanel data={panel([item()], undefined)} unavailable={false} />);
         expect(screen.queryByTestId('dca-last-run')).toBeNull();
+    });
+});
+
+describe('DcaSignalsPanel concordancia', () => {
+    it('una sola empresa no dice «1 empresas»', () => {
+        render(<DcaSignalsPanel data={panel([item()], null)} unavailable={false} />);
+        expect(screen.getByTestId('dca-signals').textContent).toContain('(1 empresa)');
+        expect(screen.getByTestId('dca-signals').textContent).not.toContain('1 empresas');
+    });
+    it('un solo omitido va en singular', () => {
+        expect(dcaRunSummary(run({ evaluated: 2, skipped: 1 })).text).toContain('1 omitido');
+        expect(dcaRunSummary(run({ evaluated: 2, skipped: 1 })).text).not.toContain('1 omitidos');
     });
 });

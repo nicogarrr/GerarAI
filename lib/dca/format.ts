@@ -121,7 +121,7 @@ export function dcaRunSummary(run: DcaRun | null | undefined): { text: string; t
         return { text: `Última ejecución (${origin}, ${when}) falló${run.error ? `: ${run.error}` : ''}`, tone: 'error' };
     }
     const parts = [`${run.evaluated} de ${run.tracked} evaluados`];
-    if (run.skipped > 0) parts.push(`${run.skipped} omitidos`);
+    if (run.skipped > 0) parts.push(`${run.skipped} ${run.skipped === 1 ? 'omitido' : 'omitidos'}`);
     if (run.errors > 0) parts.push(`${run.errors} con error`);
     return { text: `Última ejecución (${origin}, ${when}): ${parts.join(', ')}`, tone: run.errors > 0 || run.evaluated < run.tracked ? 'warn' : 'ok' };
 }
