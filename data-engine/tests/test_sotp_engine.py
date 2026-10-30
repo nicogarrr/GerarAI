@@ -317,3 +317,14 @@ def test_sotp_blocks_segments_and_net_debt_in_different_currencies():
             db.execute(delete(Company).where(Company.id == cid))
         db.commit()
         db.close()
+
+
+def test_sotp_currency_inputs_preserve_segment_and_debt_units(monkeypatch):
+    from types import SimpleNamespace
+    from app.valuation.engines import sotp_engine
+    facts = {
+        'segment_services_operating_metric': SimpleNamespace(unit='USD'),
+        'net_debt': SimpleNamespace(unit='EUR'),
+    }
+    monkeypatch.setattr(sotp_engine, '_latest_facts_by_metric', lambda _: facts)
+    assert sotp_engine.SOTPEngine().currency_input_units(SimpleNamespace()) == ['USD', 'EUR']

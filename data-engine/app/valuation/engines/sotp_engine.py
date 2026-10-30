@@ -112,7 +112,7 @@ class SOTPEngine(ValuationEngine):
             for metric, fact in latest.items()
             if metric.startswith("segment_") and metric.endswith("_operating_metric")
         ]
-        units = list(segment_units)
+        units: list[str | None] = list(segment_units)
         if "net_debt" in latest:
             units.append(latest["net_debt"].unit)
         if not segment_units and is_reported_nav_entity(context.company) and "total_equity" in latest:
