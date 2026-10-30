@@ -26,6 +26,7 @@ from fastapi import Depends, HTTPException, Request, Response
 
 from app.core.auth import ResearchPrincipal, get_research_principal, sign_research_identity
 from app.core.config import get_settings
+from app.core.errors import exc_summary, ticker_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,16 @@ async def enforce_rate_limit(
             degrade_to_local=not settings.is_production,
         )
     except RateLimitBackendUnavailable as exc:
+        # Sin este log el 503 solo existia en el access log (rafaga AMZN del
+        # 30-oct, dos veces, sin rastro en los logs de la app).
+        logger.warning(
+            "rate_limit_backend_unavailable method=%s path=%s ticker=%s tier=%s cause=%s",
+            request.method,
+            request.url.path,
+            ticker_from_path(request.url.path) or "-",
+            _tier_for(request.url.path),
+            exc_summary(exc),
+        )
         raise HTTPException(
             status_code=503, detail="Rate limit backend unavailable"
         ) from exc
@@ -225,6 +236,12 @@ async def enforce_llm_test_rate_limit(
             degrade_to_local=not settings.is_production,
         )
     except RateLimitBackendUnavailable as exc:
+        logger.warning(
+            "llm_test_rate_limit_backend_unavailable method=%s path=%s cause=%s",
+            request.method,
+            request.url.path,
+            exc_summary(exc),
+        )
         raise HTTPException(
             status_code=503, detail="Rate limit backend unavailable"
         ) from exc
@@ -286,6 +303,13 @@ async def enforce_public_ip_rate_limit(request: Request) -> None:
             degrade_to_local=not settings.is_production,
         )
     except RateLimitBackendUnavailable as exc:
+        logger.warning(
+            "public_feed_rate_limit_backend_unavailable method=%s path=%s client=%s cause=%s",
+            request.method,
+            request.url.path,
+            client_ip,
+            exc_summary(exc),
+        )
         raise HTTPException(status_code=503, detail="Rate limit backend unavailable") from exc
     if count > PUBLIC_FEED_LIMIT_PER_MINUTE:
         raise HTTPException(
