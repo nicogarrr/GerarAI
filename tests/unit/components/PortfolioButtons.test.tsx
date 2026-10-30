@@ -95,7 +95,7 @@ describe('ImportIBKRButton (Flex)', () => {
         render(<ImportIBKRButton userId="u1" />);
         upload('flex.xml', '<x/>');
         await waitFor(() => expect(h.importXml).toHaveBeenCalledWith('u1', '<x/>'));
-        await waitFor(() => expect(h.warning).toHaveBeenCalledWith('2 filas con avisos. Primera: x1', { duration: 8000 }));
+        await waitFor(() => expect(h.warning).toHaveBeenCalledWith('2 filas con avisos. Primera: x1', { duration: 12000, description: 'x1\nx2' }));
     });
 
     it('subida rechazada por el backend: error y sin exito', async () => {
@@ -111,6 +111,50 @@ describe('ImportIBKRButton (Flex)', () => {
         fireEvent.change(document.querySelector('input[type=file]') as HTMLInputElement, { target: { files: [] } });
         expect(h.importCsv).not.toHaveBeenCalled();
         expect(h.importXml).not.toHaveBeenCalled();
+    });
+
+    it('muchas filas con avisos: el detalle lista 5 y cuenta el resto', async () => {
+        const errors = Array.from({ length: 8 }, (_, i) => `Fila ${i + 2}: error`);
+        h.importCsv.mockResolvedValue({ status: 'imported', trades_imported: 1, row_errors: errors });
+        render(<ImportIBKRButton userId="u1" />);
+        upload('t.csv', 'symbol');
+        await waitFor(() => expect(h.warning).toHaveBeenCalled());
+        const detail = h.warning.mock.calls[0][1].description as string;
+        expect(detail.split('\n')).toHaveLength(6);
+        expect(detail).toContain('Fila 6: error');
+        expect(detail).not.toContain('Fila 7: error');
+        expect(detail).toContain('3 avisos más');
+    });
+
+    function uploadSized(name: string, size: number) {
+        const input = document.querySelector('input[type=file]') as HTMLInputElement;
+        const file = new File(['x'], name);
+        Object.defineProperty(file, 'size', { value: size });
+        fireEvent.change(input, { target: { files: [file] } });
+    }
+
+    it('fichero de mas de 3,5 MB: aviso con el tamaño y no se sube', () => {
+        render(<ImportIBKRButton userId="u1" />);
+        uploadSized('flex.xml', 6 * 1024 * 1024);
+        expect(h.error).toHaveBeenCalledWith(expect.stringMatching(/pesa 6 MB y el máximo es 3,5 MB/), { duration: 10000 });
+        expect(h.importXml).not.toHaveBeenCalled();
+    });
+
+    it('fichero vacio: aviso y no se sube', () => {
+        render(<ImportIBKRButton userId="u1" />);
+        uploadSized('t.csv', 0);
+        expect(h.error).toHaveBeenCalledWith('El fichero está vacío.', { duration: 10000 });
+        expect(h.importCsv).not.toHaveBeenCalled();
+    });
+
+    it('fichero ilegible: error visible y el boton vuelve a estar disponible', async () => {
+        render(<ImportIBKRButton userId="u1" />);
+        const input = document.querySelector('input[type=file]') as HTMLInputElement;
+        const file = new File(['x'], 'a.xml');
+        Object.defineProperty(file, 'text', { value: () => Promise.reject(new Error('NotReadableError')) });
+        fireEvent.change(input, { target: { files: [file] } });
+        await waitFor(() => expect(h.showError).toHaveBeenCalled());
+        expect(screen.getByRole('button', { name: /Subir fichero/ })).not.toBeDisabled();
     });
 
     it('excepcion al subir', async () => {
