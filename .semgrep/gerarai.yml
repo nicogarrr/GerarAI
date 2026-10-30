@@ -12,6 +12,7 @@
 # directo falla el CI: usa public_fetch o, si el host es fijo, anadelo aqui con
 # su motivo.
 #   api/routes/companies.py: only catches httpx.HTTPStatusError from a service; no request here
+#   core/error_reporting.py: POST al DSN de ERROR_TRACKING_DSN (env del operador, nunca del usuario)
 #   api/routes/market.py: Yahoo/Finnhub quote+candles on fixed hosts (shared client, #2541)
 #   api/routes/screeners.py: fixed market-data hosts
 #   llm/adapters.py: LLM provider endpoint; custom URLs via egress_guard
@@ -87,6 +88,7 @@ rules:
     - data-engine/app/
     exclude:
     - /data-engine/app/api/routes/companies.py
+    - /data-engine/app/core/error_reporting.py
     - /data-engine/app/api/routes/market.py
     - /data-engine/app/api/routes/screeners.py
     - /data-engine/app/llm/adapters.py

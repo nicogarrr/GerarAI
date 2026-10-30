@@ -394,6 +394,12 @@ class Settings(BaseSettings):
     vapid_private_key: str | None = Field(default=None, repr=False)
     vapid_subject: str | None = None
     web_push_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    # Seguimiento de errores en produccion, sin dependencias ni proveedor de
+    # pago: un DSN con el protocolo de Sentry (GlitchTip autoalojado es gratis
+    # y lo habla). Apagado si no hay DSN. Env: ERROR_TRACKING_DSN,
+    # ERROR_TRACKING_ENVIRONMENT (por defecto APP_ENV).
+    error_tracking_dsn: str | None = Field(default=None, repr=False)
+    error_tracking_environment: str | None = None
     telegram_link_secret: str | None = Field(default=None, repr=False)
     telegram_enabled: bool = False
     telegram_bot_token: str | None = Field(default=None, repr=False)

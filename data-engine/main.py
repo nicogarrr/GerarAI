@@ -195,9 +195,20 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     """
     from app.core.errors import safe_detail
 
+    detail = safe_detail(exc, 500)
+    # nosemgrep: gerarai-broad-except-pass -- el seguimiento de errores nunca cambia la respuesta 500
+    try:
+        from app.core.error_reporting import report_exception
+
+        report_exception(
+            exc, ref=detail.rsplit("ref: ", 1)[-1].rstrip(")"),
+            method=request.method, path=request.url.path,
+        )
+    except Exception:  # noqa: BLE001
+        pass
     return JSONResponse(
         status_code=500,
-        content={"detail": safe_detail(exc, 500)},
+        content={"detail": detail},
     )
 
 
