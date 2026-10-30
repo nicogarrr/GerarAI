@@ -6,8 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
 import { getDcaBacktest } from '@/lib/actions/dca-signals.actions';
-import { parseLocalizedNumberDetailed } from '@/lib/format';
+import { formatMarketDate, parseLocalizedNumberDetailed } from '@/lib/format';
 import type { DcaBacktest, DcaBacktestPlan } from '@/lib/dca/types';
+
+/** «valorado al cierre de oct 2026» solo si el mes ha cerrado; si no, el último cierre con su fecha. */
+export function valuationLabel(result: Pick<DcaBacktest, 'valued_at_period' | 'valued_at_date' | 'valued_month_complete'>): string {
+    if (result.valued_month_complete === false && result.valued_at_date) {
+        return `valorado al último cierre disponible (${formatMarketDate(result.valued_at_date)}, mes en curso)`;
+    }
+    return `valorado al cierre de ${result.valued_at_period ?? 'N/D'}`;
+}
 
 const NUM = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 const pct = (v: number | null | undefined, sign = false) =>
@@ -150,7 +158,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
             {result?.available && (
                 <div className="space-y-5">
                     <p className="text-xs text-gray-500">
-                        {result.symbol} · señales {result.first_signal} – {result.last_signal} ({result.months} meses) · valorado al cierre de {result.valued_at_period}
+                        {result.symbol} · señales {result.first_signal} – {result.last_signal} ({result.months} meses) · {valuationLabel(result)}
                         {unit ? ` · precios en ${unit}` : ''} · fórmula {result.params_version}
                     </p>
                     <div className="overflow-x-auto">

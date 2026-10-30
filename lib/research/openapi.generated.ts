@@ -6913,8 +6913,12 @@ export interface components {
             reason?: string | null;
             /** Symbol */
             symbol: string;
+            /** Valued At Date */
+            valued_at_date?: string | null;
             /** Valued At Period */
             valued_at_period?: string | null;
+            /** Valued Month Complete */
+            valued_month_complete?: boolean | null;
         };
         /** DcaBacktestPlanOut */
         DcaBacktestPlanOut: {

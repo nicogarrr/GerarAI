@@ -2779,6 +2779,18 @@
             "title": "Symbol",
             "type": "string"
           },
+          "valued_at_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valued At Date"
+          },
           "valued_at_period": {
             "anyOf": [
               {
@@ -2789,6 +2801,17 @@
               }
             ],
             "title": "Valued At Period"
+          },
+          "valued_month_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valued Month Complete"
           }
         },
         "required": [

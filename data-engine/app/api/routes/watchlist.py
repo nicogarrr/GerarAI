@@ -478,6 +478,8 @@ class DcaBacktestOut(BaseModel):
     first_buy: date | None = None
     last_buy: date | None = None
     valued_at_period: str | None = None
+    valued_at_date: date | None = None
+    valued_month_complete: bool | None = None
     final_price: float | None = None
     months: int = 0
     base_amount: float = 100.0

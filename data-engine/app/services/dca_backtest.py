@@ -158,7 +158,9 @@ def backtest_dca(
     for bar in bars:
         if bar.close and bar.close > 0 and math.isfinite(bar.close):
             first_close.setdefault(_period_of(bar.day), (bar.day, float(bar.close)))
-    month_close = {key: close for key, _day, close, _low in monthly_closes(bars)}
+    monthly = monthly_closes(bars)
+    month_close = {key: close for key, _day, close, _low in monthly}
+    month_close_day = {key: day for key, day, _close, _low in monthly}
 
     def _next(period: str) -> str:
         n = _month_index(period) + 1
@@ -242,6 +244,11 @@ def backtest_dca(
         "first_buy": plan[0][2].isoformat(),
         "last_buy": plan[-1][2].isoformat(),
         "valued_at_period": last_buy_period,
+        # Fecha real del cierre usado. Si el mes aun no ha terminado no es «el
+        # cierre de 2026-10» sino el ultimo cierre disponible: se dice.
+        "valued_at_date": month_close_day[last_buy_period].isoformat(),
+        "valued_month_complete": _month_index(last_buy_period)
+        < _month_index(_period_of(today or date.today())),
         "final_price": round(final_price, 6),
         "months": len(plan),
         "base_amount": base_amount,
