@@ -80,6 +80,7 @@ from app.services.tax_irpf_filing import (
     build_double_taxation,
     build_interest,
     build_loss_compensation,
+    integrate_savings_base,
 )
 from app.services.tax_report_versioning import SECURITIES_FX_CRITERION, report_versioning
 from app.valuation.currency import normalize_currency
@@ -1192,7 +1193,11 @@ class TaxReportService:
             "wash_sale_window_open": sorted(
                 b["ticker"] for b in realized if b["wash_sale_window_open"]
             ),
-            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable) else _money(total_dividends + total_gain),
+            # Base del ahorro del ejercicio: art. 49.1 LIRPF, la pérdida
+            # patrimonial solo compensa dividendos hasta el 25 %. Antes era la
+            # suma directa (1.000 de dividendos y -10.000 de pérdidas daban
+            # -9.000; la base real es 750 y el resto se arrastra).
+            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable) else _money(integrate_savings_base(total_dividends, total_gain)),
             "dividend_count": len(dividends),
             "unattributed_tickers": sorted(
                 b["ticker"] for b in dividends if b.get("unattributed")
