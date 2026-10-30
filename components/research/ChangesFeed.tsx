@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
 import { formatUserDateTime } from '@/lib/format';
@@ -32,7 +32,7 @@ function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
 }
 
-function EventCard({ event, ticker }: { event: ChangeEvent; ticker: string }) {
+function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; ticker: string; open?: boolean; onToggle?: (open: boolean) => void }) {
   const lead = event.changes[0];
   const openReview = event.reviews.find((r) => isOpenReview(r.status));
   const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? 'Registro sin resumen');
@@ -43,7 +43,7 @@ function EventCard({ event, ticker }: { event: ChangeEvent; ticker: string }) {
     ...(event.claimCount ? [`${event.claimCount} ${event.claimCount === 1 ? 'afirmación' : 'afirmaciones'} de la tesis`] : []),
   ];
   return (
-    <li className="rounded-lg border border-gray-800 p-4" data-testid="change-event">
+    <li className="scroll-mt-24 rounded-lg border border-gray-800 p-4" data-testid="change-event" id={lead ? `thesis-change-${lead.id}` : undefined}>
       <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${DIRECTION_CLASS[event.direction]}`}>{DIRECTION_LABEL[event.direction]}</span>
         {lead ? <Badge variant="outline">{changeTypeLabel(lead.change_type)}</Badge> : null}
@@ -75,11 +75,11 @@ function EventCard({ event, ticker }: { event: ChangeEvent; ticker: string }) {
         <a className="text-xs text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Ver la tesis</a>
       </div>
       {records > 1 || event.reviews.length || event.alerts.length ? (
-        <details className="mt-3 text-sm text-gray-400">
+        <details className="mt-3 text-sm text-gray-400" onToggle={onToggle ? (e) => onToggle(e.currentTarget.open) : undefined} open={open ?? false}>
           <summary className="min-h-11 cursor-pointer text-xs text-gray-400 sm:min-h-0">Ver los {records} registros originales</summary>
           <div className="mt-2 space-y-2">
             {event.changes.map((c: ResearchThesisChange) => (
-              <p className="rounded border border-gray-800 p-2 text-xs" key={`c${c.id}`}><span className="text-gray-500">Cambio · {formatUserDateTime(c.created_at)} · materialidad {c.materiality_score}</span><br />{changeSummaryText(c.summary)}</p>
+              <p className="rounded border border-gray-800 p-2 text-xs" id={`thesis-change-${c.id}`} key={`c${c.id}`}><span className="text-gray-500">Cambio · {formatUserDateTime(c.created_at)} · materialidad {c.materiality_score}</span><br />{changeSummaryText(c.summary)}</p>
             ))}
             {groupReviews(event.reviews.map((r) => ({ id: r.id, title: r.title, created_at: r.created_at }))).map((g) => (
               <p className="rounded border border-gray-800 p-2 text-xs" key={`r${g.ids[0]}`}><span className="text-gray-500">Revisión{g.count > 1 ? ` ×${g.count}` : ''}{g.latest ? ` · ${formatUserDateTime(g.latest)}` : ''}</span><br />{g.title}</p>
@@ -108,9 +108,37 @@ export function ChangesFeed({ ticker, changes, reviews, alerts }: {
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [page, setPage] = useState(1);
+  const [openKeys, setOpenKeys] = useState<ReadonlySet<string>>(new Set());
   const events = useMemo(() => buildChangeEvents({ changes, reviews, alerts }), [changes, reviews, alerts]);
   const filtered = useMemo(() => events.filter((e) => filter === 'all' ? true : filter === 'reviews' ? e.hasOpenReview || e.requiresReview : e.alerts.length > 0), [events, filter]);
   const view = paginate(filtered, page, CHANGES_PAGE_SIZE);
+  // Anclas «Revisar cambio» de Inicio (?view=changes#thesis-change-<id>):
+  // el suceso puede quedar en OTRA página del paginador, y un cambio no
+  // líder solo existe como ancla dentro de «Ver los registros originales».
+  // Al llegar con ancla: saltar a la página del suceso y desplegar ese
+  // detalle; el scroll lo hace ResearchHashScroll. Cada hash se atiende una
+  // vez: después la paginación y el plegado vuelven a ser del usuario.
+  const handledHashRef = useRef<string | null>(null);
+  useEffect(() => {
+    const handle = () => {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#thesis-change-') || handledHashRef.current === hash) return;
+      const changeId = Number(hash.slice('#thesis-change-'.length));
+      if (!Number.isInteger(changeId)) return;
+      const index = filtered.findIndex((event) => event.changes.some((change) => change.id === changeId));
+      if (index < 0) return;
+      handledHashRef.current = hash;
+      const targetPage = Math.floor(index / CHANGES_PAGE_SIZE) + 1;
+      setPage((current) => (current === targetPage ? current : targetPage));
+      const event = filtered[index];
+      if (event.changes[0]?.id !== changeId) {
+        setOpenKeys((prev) => (prev.has(event.key) ? prev : new Set(prev).add(event.key)));
+      }
+    };
+    handle();
+    window.addEventListener('hashchange', handle);
+    return () => window.removeEventListener('hashchange', handle);
+  }, [filtered]);
   const counts = { all: events.length, reviews: events.filter((e) => e.hasOpenReview || e.requiresReview).length, alerts: events.filter((e) => e.alerts.length > 0).length };
   const chip = (id: Filter, text: string) => (
     <button
@@ -127,7 +155,19 @@ export function ChangesFeed({ ticker, changes, reviews, alerts }: {
         {chip('all', 'Todos')}{chip('reviews', 'Revisiones abiertas')}{chip('alerts', 'Alertas')}
       </div>
       {view.items.length ? (
-        <ul className="space-y-3">{view.items.map((event) => <EventCard event={event} key={event.key} ticker={ticker} />)}</ul>
+        <ul className="space-y-3">{view.items.map((event) => (
+          <EventCard
+            event={event}
+            key={event.key}
+            onToggle={(isOpen) => setOpenKeys((prev) => {
+              const next = new Set(prev);
+              if (isOpen) next.add(event.key); else next.delete(event.key);
+              return next;
+            })}
+            open={openKeys.has(event.key)}
+            ticker={ticker}
+          />
+        ))}</ul>
       ) : (
         <p className="text-sm text-gray-500">{events.length ? 'Ningún suceso coincide con este filtro.' : 'Sin cambios materiales registrados.'}</p>
       )}
