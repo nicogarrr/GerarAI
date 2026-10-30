@@ -189,6 +189,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   // pestañas, sondeo cada minuto y botón de refresco manual del panel /mercados.
   'components/markets/LiveMarketsPanel.tsx': 'useState, useEffect, useCallback, jsx-onClick',
   'components/media/YouTubeEmbed.tsx': 'useState, jsx-onClick',
+  'components/plan/DeleteContributionButton.tsx': 'useRouter, useState, jsx-onClick, importa cliente: components/ui/confirm-dialog.tsx',
+  'components/plan/PlanContributionDialog.tsx': 'useRouter, useState, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
   'components/plan/PlanSetupDialog.tsx': 'useRouter, useState, browser:document, jsx-onOpenChange, jsx-onSubmit, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/dialog.tsx, importa cliente: components/ui/label.tsx',
   'components/plan/PlanView.tsx': 'importa cliente: components/data/RecordViews.tsx, importa cliente: components/plan/PlanSetupDialog.tsx',
   'components/portfolio/AddTransactionButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (formulario de alta diferido en AddTransactionDialog)',

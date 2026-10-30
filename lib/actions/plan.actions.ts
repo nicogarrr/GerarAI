@@ -91,6 +91,53 @@ export async function upsertPlan(payload: PlanUpsertPayload): Promise<PlanUpsert
     return { ok: true };
 }
 
+export type PlanContributionInput = {
+    date: string;
+    amount: number;
+    currency: string;
+    note?: string;
+};
+
+/** Resultado de registrar/borrar una aportación: un Server Action en producción
+ *  oculta el mensaje de las excepciones, así que el rechazo viaja como dato. */
+export type PlanContributionResult = { ok: true } | { ok: false; message: string };
+
+/** POST /api/plan/contributions — registra una aportación al plan. Antes la UI
+ *  no tenía ninguna vía: «Aportaciones» y «En camino» solo se llenaban por API. */
+export async function addPlanContribution(input: PlanContributionInput): Promise<PlanContributionResult> {
+    await requireAuthenticatedUser();
+    try {
+        await researchRequest('/api/plan/contributions', {
+            method: 'POST',
+            body: JSON.stringify({
+                date: input.date,
+                amount: input.amount,
+                currency: input.currency.toUpperCase(),
+                note: (input.note ?? '').slice(0, 500),
+            }),
+        });
+    } catch {
+        return { ok: false, message: 'No se pudo registrar la aportación. Revisa la fecha, el importe y la divisa.' };
+    }
+    revalidatePath('/plan');
+    return { ok: true };
+}
+
+/** DELETE /api/plan/contributions/{id} — borra una aportación registrada por error. */
+export async function deletePlanContribution(contributionId: number): Promise<PlanContributionResult> {
+    await requireAuthenticatedUser();
+    if (!Number.isSafeInteger(contributionId) || contributionId <= 0) {
+        return { ok: false, message: 'Aportación no válida.' };
+    }
+    try {
+        await researchRequest(`/api/plan/contributions/${contributionId}`, { method: 'DELETE' });
+    } catch {
+        return { ok: false, message: 'No se pudo eliminar la aportación. Inténtalo de nuevo.' };
+    }
+    revalidatePath('/plan');
+    return { ok: true };
+}
+
 /** Read-only savings preview; it never changes the plan or places an order. */
 export async function getSavingsProjection(input?: import('@/lib/plan/savings-projection').SavingsPreviewInput): Promise<import('@/lib/plan/savings-projection').SavingsProjection> {
     await requireAuthenticatedUser();
