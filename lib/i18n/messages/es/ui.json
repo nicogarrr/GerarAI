@@ -58,28 +58,7 @@
     "firmsNone": "solo consenso agregado, sin detalle por firma",
     "convertedFrom": "(convertido de {currency})"
   },
-  "system": {
-    "badge": "Motor de análisis desconectado",
-    "unavailable": "{feature} no está disponible ahora mismo",
-    "needsServer": "Esta pantalla necesita el servidor de GerarAI.",
-    "failedDetail": "El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos."
-  },
-  "pwa": {
-    "title": "Instalar GerarAI",
-    "installed": "GerarAI ya está instalada en este dispositivo.",
-    "description": "Ábrela como una app, sin barra del navegador. Necesita conexión: no guarda tus tesis ni datos para leer sin red.",
-    "installButton": "Instalar la aplicación",
-    "iosPre": "En iPhone o iPad: toca",
-    "iosShare": "Compartir",
-    "iosMid": " y después",
-    "iosAddHome": "Añadir a pantalla de inicio",
-    "iosPost": ". Hazlo desde Safari.",
-    "manualInstructions": "Tu navegador no ofrece el botón de instalar aquí. En Chrome o Edge abre el menú y elige «Instalar GerarAI» (o «Añadir a la pantalla de inicio» en el móvil)."
-  },
-  "sectionError": {
-    "network": "No se pudo conectar con el servicio. Reintenta en unos segundos.",
-    "session": "Tu sesión ha caducado. Vuelve a entrar para ver esta sección.",
-    "server": "El servicio ha fallado. Reintenta en unos segundos.",
-    "generic": "No se pudieron cargar los datos. Reintenta en unos segundos."
-  }
+  "system": {},
+  "pwa": {},
+  "sectionError": {}
 }

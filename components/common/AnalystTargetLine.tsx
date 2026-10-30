@@ -72,9 +72,6 @@ export default function AnalystTargetLine({
         };
     }, [symbol, quoteSymbol]);
 
-    const t = useT();
-    const locale = useLocale();
-
     if (!settled) {
         return (
             <span className="text-gray-500" role="status" aria-label={t('ui.analystTargets.loading', { symbol })}>
