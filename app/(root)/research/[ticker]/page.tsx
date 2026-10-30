@@ -1829,7 +1829,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
           <div className="space-y-3">
-            {audits.length > 100 ? <p className="text-xs text-gray-500">Se muestran 100 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías.</p> : null}
+            {audits.length > 100 ? <p className="text-xs text-gray-500">Se muestran 100 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías: la última y hasta 99 anteriores.</p> : null}
             {/* Solo la auditoría más reciente a la vista; el historial de
                 versiones viejas queda plegado (era un muro de tarjetas casi
                 idénticas que se leía como bug). */}
