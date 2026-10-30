@@ -68,6 +68,36 @@ export function describeResult(result: ImportCounts): string {
     return parts.join(' · ');
 }
 
+/**
+ * Las subidas viajan como argumento de una server action, cuyo cuerpo está
+ * limitado a 4 MB (next.config.ts). Con margen para la serialización, un
+ * fichero mayor fallaba con un error genérico tras subirlo entero.
+ */
+export const MAX_UPLOAD_BYTES = 3.5 * 1024 * 1024;
+
+function megabytes(bytes: number): string {
+    return `${formatNumber(bytes / (1024 * 1024), { maximumFractionDigits: 1 })} MB`;
+}
+
+/** Motivo para no enviar el fichero, o null si se puede subir. */
+export function uploadProblem(file: { size: number }): string | null {
+    if (file.size === 0) return 'El fichero está vacío.';
+    if (file.size > MAX_UPLOAD_BYTES) {
+        return `El fichero pesa ${megabytes(file.size)} y el máximo es ${megabytes(MAX_UPLOAD_BYTES)}. ` +
+            'Exporta un periodo más corto o divídelo en varios ficheros.';
+    }
+    return null;
+}
+
+const ROW_ERRORS_SHOWN = 5;
+
+/** Detalle de las filas con avisos: hasta 5, y cuántas quedan. */
+export function rowErrorDetail(errors: string[]): string {
+    const shown = errors.slice(0, ROW_ERRORS_SHOWN).join('\n');
+    const rest = errors.length - ROW_ERRORS_SHOWN;
+    return rest > 0 ? `${shown}\n${plural(rest, 'aviso más', 'avisos más')}` : shown;
+}
+
 export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
     const [isImporting, setIsImporting] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -102,10 +132,16 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
         const file = event.target.files?.[0];
         event.target.value = '';
         if (!file) return;
-        const text = await file.text();
+        const problem = uploadProblem(file);
+        if (problem) {
+            toast.error(problem, { duration: 10000 });
+            return;
+        }
         const isCsv = file.name.toLowerCase().endsWith('.csv');
         setIsUploading(true);
         try {
+            // Dentro del try: un fichero ilegible (borrado, sin permisos) avisa en vez de no hacer nada.
+            const text = await file.text();
             const result = isCsv
                 ? await importIBKRCsv(userId, text)
                 : await importIBKRXml(userId, text);
@@ -118,7 +154,7 @@ export default function ImportIBKRButton({ userId }: ImportIBKRButtonProps) {
             if (result.row_errors?.length) {
                 toast.warning(
                     `${plural(result.row_errors.length, 'fila con avisos', 'filas con avisos')}. Primera: ${result.row_errors[0]}`,
-                    { duration: 8000 }
+                    { duration: 12000, description: rowErrorDetail(result.row_errors) }
                 );
             }
             router.refresh();
