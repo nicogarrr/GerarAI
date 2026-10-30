@@ -486,6 +486,10 @@ class NotificationService:
         if payload.get("type") == "macro_event":
             # Redactado en espanol con hora, fuente y etiqueta; sin ids tecnicos.
             return f"{payload.get('title') or ''}\n{payload.get('message') or ''}"[:4090]
+        if payload.get("type") == "earnings_reminder":
+            # Aviso de resultados ya redactado en espanol (fecha, estado de la
+            # fecha y fuente); sin ids tecnicos, igual que el recordatorio macro.
+            return f"{payload.get('title') or ''}\n{payload.get('message') or ''}"[:4090]
         # Non-filing/non-news alerts retain their established delivery format.
         text = (
             f"[{payload['severity'].upper()}] {payload['title']}\n"
