@@ -1,1 +1,23 @@
-{}
+{
+  "title": "Generate work product",
+  "description": "Produces an analysis document (memo, thesis, review...) from the research engine.",
+  "typeLabel": "Document type",
+  "types": {
+    "onePageMemo": "One-page memo",
+    "fullThesis": "Full thesis",
+    "earningsReview": "Earnings review",
+    "valuationMemo": "Valuation memo",
+    "capitalAllocation": "Capital allocation analysis",
+    "comparables": "Comparables",
+    "portfolioReview": "Portfolio review",
+    "riskReport": "Risk report"
+  },
+  "optional": "(optional)",
+  "yearsLabel": "Years of history",
+  "generate": "Generate document",
+  "generating": "Generating...",
+  "generated": "Work product generated",
+  "result": "Result",
+  "emptyContent": "The work product came back with no content.",
+  "loadingViewer": "Loading viewer..."
+}
