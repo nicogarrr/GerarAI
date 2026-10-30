@@ -206,6 +206,28 @@ export function formatConfidence(value: NumericInput, fallback: string = NA): st
 }
 
 /**
+ * Peniques (Yahoo «GBp», «GBX»): Intl no distingue mayúsculas en el código de
+ * divisa y pintaba 118,25 GBp como «118,25 GBP» (libras: x100). Se formatea
+ * con las reglas de GBP y se sustituye el símbolo por «p»: el importe se
+ * muestra en peniques, nunca se convierte en silencio.
+ */
+const PENCE_CODES = new Set(['GBp', 'GBX', 'GBx', 'GBPENCE']);
+
+function isPence(currency: string | null | undefined): boolean {
+  return typeof currency === 'string' && PENCE_CODES.has(currency.trim());
+}
+
+function formatCurrencyParts(value: number, currency: string, options: Intl.NumberFormatOptions): string {
+  if (!isPence(currency)) {
+    return new Intl.NumberFormat(FORMAT_LOCALE, { ...options, style: 'currency', currency }).format(value);
+  }
+  return new Intl.NumberFormat(FORMAT_LOCALE, { ...options, style: 'currency', currency: 'GBP' })
+    .formatToParts(value)
+    .map((part) => (part.type === 'currency' ? 'p' : part.value))
+    .join('');
+}
+
+/**
  * Importe monetario en es-ES para TODAS las divisas: 1.234,56 € · 1.234,56 US$.
  *
  * Antes el USD salía en inglés ($1,234.56) por una decisión deliberada de
@@ -220,13 +242,11 @@ export function formatMoney(
 ): string {
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
-    style: 'currency',
-    currency,
+  return formatCurrencyParts(parsed, currency, {
     maximumFractionDigits: 2,
     useGrouping: 'always',
     ...options,
-  }).format(parsed);
+  });
 }
 
 /**
@@ -245,15 +265,13 @@ export function formatPrice(
   const parsed = toFinite(value);
   if (parsed === null) return fallback;
   const small = parsed !== 0 && Math.abs(parsed) < 0.01;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
-    style: 'currency',
-    currency,
+  return formatCurrencyParts(parsed, currency, {
     useGrouping: 'always',
     ...(small
       ? { maximumSignificantDigits: 4 }
       : { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     ...options,
-  }).format(parsed);
+  });
 }
 
 /**
@@ -292,8 +310,9 @@ export function formatCompact(
   }).format(parsed);
 }
 
-/** Símbolo es-ES de una divisa («US$», «€», «GBP»); el código si Intl no la conoce. */
+/** Símbolo es-ES de una divisa («US$», «€», «GBP», «p» para peniques); el código si Intl no la conoce. */
 export function currencySymbolEs(currency: string): string {
+  if (isPence(currency)) return 'p';
   try {
     const part = new Intl.NumberFormat(FORMAT_LOCALE, { style: 'currency', currency })
       .formatToParts(1)
