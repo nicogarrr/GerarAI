@@ -1,5 +1,5 @@
 /**
- * Validación pura del formulario "Nueva Inversión" (cartera).
+ * Validación pura del formulario "Nueva inversión" (cartera).
  *
  * Regla de oro: ningún submit puede fallar en silencio. Esta función se
  * ejecuta en cliente ANTES de llamar a la server action y devuelve un

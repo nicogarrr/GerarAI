@@ -51,7 +51,7 @@ export default function PortfolioSummary({ summary }: Props) {
         <div className="absolute top-0 right-0 hidden p-4 opacity-10 transition-opacity group-hover:opacity-20 sm:block">
           <DollarSign className="h-12 w-12 text-teal-400" />
         </div>
-        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Valor Total (neto)</p>
+        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">Valor total (neto)</p>
         <p className="text-base min-[420px]:text-lg sm:text-2xl font-bold text-gray-100 tracking-tight break-words">
           {nothingYet ? NA : format(summary.totalValue)}
         </p>

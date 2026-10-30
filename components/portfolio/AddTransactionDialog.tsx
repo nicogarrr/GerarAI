@@ -147,7 +147,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
   return (
       <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-gray-100">Nueva Inversión</DialogTitle>
+          <DialogTitle className="text-gray-100">Nueva inversión</DialogTitle>
           <DialogDescription className="text-gray-400">
             Registra una compra o venta de acciones
           </DialogDescription>
@@ -156,7 +156,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           {/* Buscador con autocompletado: el componente compartido de la app
               (misma búsqueda del buscador global, gate F215 y debounce). */}
           <div className="space-y-2">
-            <Label htmlFor="symbol" className="text-gray-300">Buscar Acción</Label>
+            <Label htmlFor="symbol" className="text-gray-300">Buscar acción</Label>
             <TickerSearchInput
               id="symbol"
               placeholder="Buscar por nombre o símbolo (ej: Apple, AAPL)"
@@ -211,7 +211,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="type" className="text-gray-300">Tipo de Operación</Label>
+            <Label htmlFor="type" className="text-gray-300">Tipo de operación</Label>
             <Select
               value={formData.type}
               onValueChange={(value: 'buy' | 'sell') => setFormData({ ...formData, type: value })}
@@ -312,7 +312,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
               type="submit"
               disabled={loading}
             >
-              {loading ? 'Guardando...' : 'Guardar Inversión'}
+              {loading ? 'Guardando...' : 'Guardar inversión'}
             </Button>
           </div>
         </form>

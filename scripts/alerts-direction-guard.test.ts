@@ -1,7 +1,7 @@
 /**
  * Guard: la dirección de una alerta de precio no puede contradecir su etiqueta.
  *
- * El diálogo de alta ofrecía «Tipo de Alerta» (price_above/price_below/...) y un
+ * El diálogo de alta ofrecía «Tipo de alerta» (price_above/price_below/...) y un
  * select de «Operador» independiente con valor inicial '>'. Elegir «Precio por
  * debajo de» sin tocar el operador guardaba rule_type=price_below con
  * condition.operator='>': el motor evalúa el OPERADOR, así que la alerta saltaba

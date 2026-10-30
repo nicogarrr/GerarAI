@@ -105,8 +105,8 @@
     "noDate": "fecha no disponible"
   },
   "alerts": {
-    "create": "Crear Alerta",
-    "new": "Nueva Alerta",
+    "create": "Crear alerta",
+    "new": "Nueva alerta",
     "types": {
       "priceAbove": "Precio por encima de",
       "priceBelow": "Precio por debajo de",

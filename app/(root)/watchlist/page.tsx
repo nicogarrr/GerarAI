@@ -400,7 +400,7 @@ export default async function WatchlistPage({
                 <Card className="border-gray-700 bg-gray-800/50">
                     <CardContent className="flex flex-col items-center justify-center px-4 py-12 text-center sm:py-16">
                         <Eye className="mb-4 h-12 w-12 text-gray-500 sm:h-16 sm:w-16" aria-hidden="true" />
-                        <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">Tu Watchlist está vacía</h2>
+                        <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">Tu watchlist está vacía</h2>
                         <p className="mb-6 max-w-md text-sm text-gray-500 sm:text-base">
                             Pulsa &ldquo;Añadir empresa&rdquo; y búscala por nombre o símbolo para seguirla aquí.
                             {/* El atajo de teclado solo tiene sentido con teclado físico: en móvil se oculta. */}

@@ -73,7 +73,7 @@ test.describe("mobile flujo screener→watchlist→tesis→alerta solo con toque
     // 4. Tocar el enlace a research de la primera card ("Ver análisis").
     const watchCards = page.locator("article", { hasText: "Ver análisis" });
     if ((await watchCards.count()) === 0) {
-      await expect(page.getByText("Tu Watchlist está vacía")).toBeVisible();
+      await expect(page.getByText("Tu watchlist está vacía")).toBeVisible();
       await expectNoPageOverflow(page, "watchlist-vacia");
       return;
     }

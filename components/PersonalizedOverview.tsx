@@ -122,7 +122,7 @@ const EMPTY_RETRY_TOKENS: Record<SectionKey, number> = {
  */
 /**
  * Primeros pasos (auditoría UX 2026-10-27): con la cartera vacía, la tarjeta
- * «Tu Cartera Hoy» era un «Comienza tu viaje» genérico y el usuario nuevo no
+ * «Tu cartera hoy» era un «Comienza tu viaje» genérico y el usuario nuevo no
  * sabía por dónde empezar. Ocupa el mismo hueco que ya reservaba el esqueleto
  * de la tarjeta (no inserta nada encima del resto, así que no añade saltos de
  * maquetación) y marca como hecho lo que ya ha hecho.
@@ -510,7 +510,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Wallet aria-hidden="true" className="h-5 w-5 text-blue-400" />
-                        Tu Cartera Hoy
+                        Tu cartera hoy
                     </CardTitle>
                     <Link href="/portfolio" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
                         <span className="whitespace-nowrap">Ver detalles</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />

@@ -145,7 +145,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                 onOpenAutoFocus={(event) => event.preventDefault()}
             >
                 <DialogHeader>
-                    <DialogTitle className="text-gray-100">Editar Transacción</DialogTitle>
+                    <DialogTitle className="text-gray-100">Editar transacción</DialogTitle>
                     <DialogDescription className="text-gray-400">
                         Modifica los detalles de la transacción
                     </DialogDescription>
@@ -177,7 +177,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="type" className="text-gray-300">Tipo de Operación</Label>
+                        <Label htmlFor="type" className="text-gray-300">Tipo de operación</Label>
                         <Select
                             value={formData.type}
                             onValueChange={(value: 'buy' | 'sell') => setFormData({ ...formData, type: value })}
@@ -276,7 +276,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                             disabled={loading}
                             aria-busy={loading}
                         >
-                            {loading ? 'Guardando...' : 'Guardar Cambios'}
+                            {loading ? 'Guardando...' : 'Guardar cambios'}
                         </Button>
                     </div>
                 </form>

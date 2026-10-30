@@ -9,7 +9,7 @@ test.describe("investor alerts flow", () => {
     await page.goto("/alerts");
 
     await expect(page.getByRole("heading", { name: "Alertas", level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Nueva Alerta" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nueva alerta" })).toBeVisible();
 
     const researchLinks = page.getByRole("link", { name: /Ver research/ });
     if ((await researchLinks.count()) === 0) {
@@ -28,10 +28,10 @@ test.describe("investor alerts flow", () => {
   test("new alert dialog opens with symbol and create controls", async ({ page }) => {
     await page.goto("/alerts");
 
-    await page.getByRole("button", { name: "Nueva Alerta" }).click();
+    await page.getByRole("button", { name: "Nueva alerta" }).click();
     await expect(page.getByRole("dialog")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Crear Alerta" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Crear alerta" })).toBeVisible();
     await expect(page.getByLabel("Símbolo")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Crear Alerta" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Crear alerta" })).toBeVisible();
   });
 });

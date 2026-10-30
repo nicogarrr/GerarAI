@@ -64,18 +64,18 @@ describe('PortfolioSummary', () => {
         expect(screen.getByRole('status')).toHaveTextContent('diferencias entre el extracto');
         expect(cardValue('Coste de las posiciones')).toHaveTextContent('N/D');
         expect(cardValue('Ganancia/Pérdida')).toHaveTextContent('N/D');
-        expect(cardValue('Valor Total (neto)')).toHaveTextContent(money(1700));
+        expect(cardValue('Valor total (neto)')).toHaveTextContent(money(1700));
     });
     it('pinta valor neto, coste, G/P y rendimiento en la divisa base con formato es-ES', () => {
         render(<PortfolioSummary summary={summary()} />);
-        expect(cardValue('Valor Total (neto)')).toHaveTextContent(money(1700));
+        expect(cardValue('Valor total (neto)')).toHaveTextContent(money(1700));
         expect(screen.getByText(/Patrimonio neto: RV/)).toHaveTextContent(`RV ${money(1200)} + caja ${money(500)}`);
         expect(cardValue('Coste de las posiciones')).toHaveTextContent(money(1000));
         expect(cardValue('Ganancia/Pérdida')).toHaveTextContent(money(200));
         const rendimiento = screen.getByText('Rendimiento').nextElementSibling as HTMLElement;
         expect(rendimiento).toHaveTextContent(norm(formatPercent(20, { fromRatio: false, digits: 2, signDisplay: 'always' })));
         // es-ES: coma decimal y símbolo de euro, nunca "1,700.00".
-        expect(cardValue('Valor Total (neto)').textContent).toMatch(/1\.?700,00\s€/);
+        expect(cardValue('Valor total (neto)').textContent).toMatch(/1\.?700,00\s€/);
     });
 
     it('ganancia en verde y pérdida en rojo', () => {
@@ -107,13 +107,13 @@ describe('PortfolioSummary', () => {
 
     it('cartera vacía sin caja: Valor total es N/D, no 0,00 EUR, y sin línea de patrimonio', () => {
         render(<PortfolioSummary summary={summary({ holdings: [], totalValue: 0, totalCost: 0, totalGain: 0, totalGainPercent: 0, equityValue: 0, cash: 0 })} />);
-        expect(cardValue('Valor Total (neto)')).toHaveTextContent(/^N\/D$/);
+        expect(cardValue('Valor total (neto)')).toHaveTextContent(/^N\/D$/);
         expect(screen.queryByText(/Patrimonio neto: RV/)).not.toBeInTheDocument();
     });
 
     it('sin posiciones pero con caja: el valor total (la caja) sigue siendo un dato', () => {
         render(<PortfolioSummary summary={summary({ holdings: [], totalValue: 500, totalCost: 0, totalGain: 0, totalGainPercent: 0, equityValue: 0, cash: 500 })} />);
-        expect(cardValue('Valor Total (neto)').textContent).toMatch(/500,00\s€/);
+        expect(cardValue('Valor total (neto)').textContent).toMatch(/500,00\s€/);
         expect(screen.getByText(/Patrimonio neto: RV/)).toBeInTheDocument();
     });
 

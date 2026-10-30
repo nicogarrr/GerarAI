@@ -58,7 +58,7 @@ describe('WatchlistBuyAction', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
 
         expect(addTransaction).toHaveBeenCalledOnce();
@@ -75,7 +75,7 @@ describe('WatchlistBuyAction', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
 
         expect(addTransaction).toHaveBeenCalledOnce();

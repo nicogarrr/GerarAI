@@ -1,5 +1,5 @@
 /**
- * Guard F311: «Posiciones Fiscales» nunca muestra importes crudos
+ * Guard F311: «Posiciones fiscales» nunca muestra importes crudos
  * («3589.265983»). Las tres columnas monetarias pasan por formatMoney en
  * es-ES con la divisa de la propia fila; RecordList aplica formatColumns
  * antes de caer al String(value) genérico.

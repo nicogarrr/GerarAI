@@ -55,7 +55,7 @@ describe('a11y: titulares sin saltos de nivel (heading-order)', () => {
         expect(await headingOrder(container)).toEqual([]);
     });
 
-    it('/taxes: «Informe fiscal» y «Posiciones Fiscales» son h2 bajo el h1 «Impuestos»', async () => {
+    it('/taxes: «Informe fiscal» y «Posiciones fiscales» son h2 bajo el h1 «Impuestos»', async () => {
         const { container } = render(
             <main>
                 <h1>Impuestos</h1>
@@ -64,7 +64,7 @@ describe('a11y: titulares sin saltos de nivel (heading-order)', () => {
         );
         const found = levels(container);
         expect(found).toContain('h2 Informe fiscal 2026');
-        expect(found).toContain('h2 Posiciones Fiscales');
+        expect(found).toContain('h2 Posiciones fiscales');
         expect(await headingOrder(container)).toEqual([]);
     });
 });

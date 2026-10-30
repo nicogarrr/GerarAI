@@ -58,7 +58,7 @@ for (const vp of VIEWPORTS) {
       await resetWatchlist();
       await visit(page, "/watchlist");
       await expect(page.getByRole("heading", { name: "Watchlist", level: 1 })).toBeVisible();
-      await expect(page.getByText("Tu Watchlist está vacía")).toBeVisible();
+      await expect(page.getByText("Tu watchlist está vacía")).toBeVisible();
       await expectHealthyPage(page, "watchlist vacía");
 
       for (const symbol of SYMBOLS) await addBySymbol(page, symbol, symbol === "MC.PA" ? "enter" : "button");

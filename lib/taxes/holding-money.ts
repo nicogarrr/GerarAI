@@ -2,7 +2,7 @@
 import { formatMoney, NA } from '../format.ts';
 
 /**
- * F311: los importes de «Posiciones Fiscales» llegaban crudos a la tabla
+ * F311: los importes de «Posiciones fiscales» llegaban crudos a la tabla
  * («3589.265983») porque RecordList renderiza con String(value). Las tres
  * columnas monetarias se formatean en es-ES con la divisa de la PROPIA fila
  * (una cartera puede mezclar EUR y USD); sin divisa válida se asume EUR,
