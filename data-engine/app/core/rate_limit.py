@@ -39,6 +39,25 @@ EXPENSIVE_PATH_MARKERS = (
     "/snapshot/refresh",
 )
 
+# Rutas que llaman a un LLM (o a un servicio externo caro) en la propia
+# peticion, por final exacto de la ruta. Sin ellas caian en el tier estandar
+# (300/min) y un solo usuario podia agotar la cuota compartida del proveedor.
+# Las traducciones de titulares quedan fuera a proposito: la UI las pide solas
+# por cada titular visible, van al proveedor gratuito y se cachean.
+EXPENSIVE_PATH_SUFFIXES = (
+    "/second-order",
+    "/inferred-inputs/llm",
+    "/discoveries/run",
+    "/llm-proposals",
+    "/paper-trading/feed",
+    "/propicks/review",
+    "/debate",
+    "/research/assistant",
+    "/extract-principles",
+    "/knowledge/documents/upload",
+    "/settings/llm/test",
+)
+
 EXEMPT_PATHS = {"/", "/health", "/health/live", "/health/ready"}
 
 
@@ -72,6 +91,8 @@ def _tier_for(path: str) -> str:
     que las rafagas de lecturas de mercado (una llamada por ticker) no
     estrangulen el resto de la navegacion, ni al reves."""
     if any(marker in path for marker in EXPENSIVE_PATH_MARKERS):
+        return "expensive"
+    if path.rstrip("/").endswith(EXPENSIVE_PATH_SUFFIXES):
         return "expensive"
     if path.startswith("/api/market/"):
         return "market"
