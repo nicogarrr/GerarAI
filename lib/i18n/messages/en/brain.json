@@ -1,4 +1,13 @@
 {
   "name": "Brain",
-  "openAria": "Open the brain"
+  "openAria": "Open the brain",
+  "loading": "Loading the brain",
+  "greeting": "Hi! I'm the GerarAI brain. Ask me about your portfolio, your investment theses or whatever you're looking at.",
+  "hintLibrary": "Ask the library",
+  "hintBrain": "Ask the Brain",
+  "sources": {
+    "aria": "Sources for this answer",
+    "title": "Sources",
+    "page": " · Page {page}"
+  }
 }

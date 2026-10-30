@@ -1,4 +1,13 @@
 {
   "name": "Cerebro",
-  "openAria": "Abrir el cerebro"
+  "openAria": "Abrir el cerebro",
+  "loading": "Cargando el cerebro",
+  "greeting": "¡Hola! Soy el cerebro de GerarAI. Pregúntame sobre tu cartera, tus tesis de inversión o lo que estés viendo.",
+  "hintLibrary": "Pregunta a la biblioteca",
+  "hintBrain": "Pregunta al Cerebro",
+  "sources": {
+    "aria": "Fuentes de esta respuesta",
+    "title": "Fuentes",
+    "page": " · Página {page}"
+  }
 }
