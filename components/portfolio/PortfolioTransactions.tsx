@@ -103,12 +103,12 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
         {transactions.length > 0 ? (
           <p className="mt-1 text-[11px] leading-4 text-gray-500">
             El importe es el nocional del movimiento (cantidad × precio) y no descuenta las
-            comisiones que el ledger guarda aparte.
+            comisiones, que se muestran aparte en cada movimiento.
           </p>
         ) : null}
       </CardHeader>
       {page && page.total > 0 ? <nav aria-label="Páginas de movimientos" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
-        <span>{transactions.length ? `${page.offset + 1}-${page.offset + transactions.length} de ${page.total}` : `0 de ${page.total}`}</span>
+        <span>{transactions.length ? `${formatNumber(page.offset + 1)}-${formatNumber(page.offset + transactions.length)} de ${formatNumber(page.total)}` : `0 de ${formatNumber(page.total)}`}</span>
         {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${Math.max(0, page.offset - 50)}`}>Anteriores</Link></Button> : null}
         {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${page.offset + 50}`}>Siguientes</Link></Button> : null}
       </nav> : null}
@@ -180,6 +180,11 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                           <p className="text-xs text-gray-500 mt-0.5">
                             {formatUserDate(tx.date)}
                           </p>
+                          {tx.notes?.trim() ? (
+                            <p className="mt-0.5 max-w-[16rem] truncate text-xs text-gray-400" title={tx.notes}>
+                              {tx.notes}
+                            </p>
+                          ) : null}
                         </div>
                       </div>
                       <div className="pl-11 sm:pl-0 sm:text-right">
@@ -191,6 +196,13 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                           {formatNumber(tx.quantity, { maximumFractionDigits: 4 })} acc @{' '}
                           {currency ? formatPrice(tx.price, currency) : NA}
                         </p>
+                        {/* Las comisiones se guardaban (alta, edición, IBKR) pero no se
+                            veían en ningún sitio de Movimientos. */}
+                        {tx.fees !== undefined && Number.isFinite(tx.fees) && tx.fees > 0 ? (
+                          <p className="text-xs text-gray-500">
+                            Comisión {currency ? formatPrice(tx.fees, currency) : NA}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 
