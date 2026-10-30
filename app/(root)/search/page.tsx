@@ -10,6 +10,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { searchResearchLibrary } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent } from '@/lib/format';
+import { entityTypeDisplay, evidenceStatusDisplay, sourceDisplay, sourceTierDisplay } from '@/lib/research/source-display';
 import { t } from '@/lib/i18n/t';
 
 export const dynamic = 'force-dynamic';
@@ -124,10 +125,17 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
               <div className="flex flex-col gap-3 md:flex-row md:items-start">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-teal-950 text-sm font-semibold text-teal-300">{index + 1}</div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><Badge>{result.entity_type}</Badge>{result.ticker ? <Badge variant="outline">{result.ticker}</Badge> : null}<Badge variant="outline">{result.source_tier}</Badge><Badge variant="outline">{result.status}</Badge></div>
+                  {/* F2: los ids internos del motor (document_chunk, tier_1_regulatory,
+                      active) se etiquetan en es-ES; el localizador «entidad:id» y la
+                      puntuación del reranker son diagnóstico y van plegados. */}
+                  <div className="flex flex-wrap items-center gap-2"><Badge>{entityTypeDisplay(result.entity_type)}</Badge>{result.ticker ? <Badge variant="outline">{result.ticker}</Badge> : null}<Badge variant="outline">{sourceTierDisplay(result.source_tier)}</Badge><Badge variant="outline">{evidenceStatusDisplay(result.status)}</Badge></div>
                   <h2 className="mt-3 break-words text-lg font-semibold text-gray-100">{result.title}</h2>
                   <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-gray-300">{result.text}</p>
-                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.citation}</span><span>{result.collection ?? result.source_type}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'))}</span><span>confianza {formatPercent(result.source_trust, { digits: 0 })}</span><span>puntuación {formatNumber(result.scores.reranker, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span></div>
+                  <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.collection ?? sourceDisplay(result.source_type)}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'))}</span><span>confianza {formatPercent(result.source_trust, { digits: 0 })}</span></div>
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">Detalles técnicos</summary>
+                    <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>referencia {result.citation}</span><span>puntuación {formatNumber(result.scores.reranker, { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</span></div>
+                  </details>
                 </div>
               </div>
             </article>

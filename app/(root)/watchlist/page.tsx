@@ -94,7 +94,7 @@ export default async function WatchlistPage({
     const dir: 'asc' | 'desc' = query.dir === 'asc' ? 'asc' : 'desc';
     const SORT_LABELS: Record<SortKey, string> = {
         added: 'Recientes', symbol: 'Símbolo', price: 'Precio', change: 'Cambio sesión',
-        marketCap: 'Market Cap', pe: 'PER', earnings: 'Próx. resultados',
+        marketCap: 'Capitalización', pe: 'PER', earnings: 'Próx. resultados',
     };
     // Ordenar por métrica exige cotizar TODA la lista, no solo la página
     // visible: es una acción explícita del usuario y el coste se asume aquí.
@@ -276,7 +276,7 @@ export default async function WatchlistPage({
     const sortedStocks = sortWatchlistRows(watchlistStocks, sort, dir, metricValue);
     const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
 
-    // Market Cap N/D: una sola leyenda por página en vez de repetir el motivo en cada tarjeta/fila.
+    // Capitalización N/D: una sola leyenda por página en vez de repetir el motivo en cada tarjeta/fila.
     const marketCapGaps = (['timedOut', 'notApplicable', 'unverifiable'] as const)
         .map((reason) => ({
             reason,
@@ -293,7 +293,7 @@ export default async function WatchlistPage({
     const marketCapLegend = marketCapGaps.length > 0 ? (
         <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
             {marketCapGaps.map((group) => (
-                <p key={group.reason}>* Market Cap N/D en {group.symbols.length === displayStocks.length ? 'todas las empresas de esta página' : group.symbols.join(', ')}: {MARKET_CAP_GAP_TEXT[group.reason]}.</p>
+                <p key={group.reason}>* Capitalización N/D en {group.symbols.length === displayStocks.length ? 'todas las empresas de esta página' : group.symbols.join(', ')}: {MARKET_CAP_GAP_TEXT[group.reason]}.</p>
             ))}
         </div>
     ) : null;
@@ -314,17 +314,16 @@ export default async function WatchlistPage({
         sort === key ? (dir === 'asc' ? 'ascending' : 'descending') : undefined;
     const sortIndicator = (key: SortKey) =>
         sort === key ? <span aria-hidden="true" className="text-teal-400">{dir === 'asc' ? '▲' : '▼'}</span> : null;
-    // Solo cuentan tickers con valor justo ÚNICO (tesis publicada en la
-    // biblioteca o motor, misma cifra que inicio y screener); sin valoración
-    // no se juzga caro/barato.
+    // Solo cuentan tickers con valor justo ÚNICO (tesis publicada de K o motor,
+    // misma cifra que inicio y screener); sin valoración no se juzga caro/barato.
     const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
     const overvaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'sobrevalorada').length;
     const judged = watchlistStocks.filter((stock) => stock.monitor?.valuation_side);
     const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
     const byEngine = judged.length - byThesis;
     const fairValueSourceNote = [
-        byThesis > 0 ? `${byThesis} por tesis publicada` : null,
-        byEngine > 0 ? `${byEngine} por el motor de valoración` : null,
+        byThesis > 0 ? `${byThesis} con tesis publicada` : null,
+        byEngine > 0 ? `${byEngine} con el motor de valoración` : null,
     ].filter(Boolean).join(', ');
 
     // Un único formateador para móvil y desktop: sin dato -> NA ('N/D'),
@@ -480,7 +479,7 @@ export default async function WatchlistPage({
                                         <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}</dd>
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">Market Cap</dt>
+                                        <dt className="text-[11px] text-gray-500">Capitalización</dt>
                                         <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined}>
                                             {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· derivado</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </dd>
@@ -526,7 +525,7 @@ export default async function WatchlistPage({
                                         <Link href={sortHref('change')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Cambio sesión{sortIndicator('change')}</Link>
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('marketCap')}>
-                                        <Link href={sortHref('marketCap')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Market Cap{sortIndicator('marketCap')}</Link>
+                                        <Link href={sortHref('marketCap')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">Capitalización{sortIndicator('marketCap')}</Link>
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('pe')}>
                                         <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">PER{sortIndicator('pe')}</Link>

@@ -3,6 +3,10 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const page = readFileSync('app/(root)/research/sources/page.tsx', 'utf8');
+// Los tiers viven en el catálogo compartido (lo usa también la búsqueda
+// universal); los tipos de documento siguen curados en la página porque los
+// selects de subida solo ofrecen tipos elegibles por el usuario.
+const display = readFileSync('lib/research/source-display.ts', 'utf8');
 
 // Catálogo del backend: tipos de documento (ingesta SEC/ESEF/CNMV, subidas,
 // URLs, seeds, FMP, transcripts) y tiers de source_hierarchy_service.py.
@@ -29,8 +33,9 @@ test('F323: los mapas cubren el catalogo del backend', () => {
         assert.match(page, new RegExp(`${key}: '`), `falta source_type ${key}`);
     }
     for (const key of BACKEND_TIERS) {
-        assert.match(page, new RegExp(`${key}: '`), `falta tier ${key}`);
+        assert.match(display, new RegExp(`${key}: '`), `falta tier ${key}`);
     }
     assert.match(page, /SOURCE_TYPE_LABELS\[value\] \?\? sourceDisplay\(value\)/);
-    assert.match(page, /SOURCE_TIER_LABELS\[value\] \?\? sourceDisplay\(value\)/);
+    assert.match(page, /sourceTierDisplay\(value\)/);
+    assert.match(display, /SOURCE_TIER_LABELS\[value\] : value\.replaceAll/);
 });

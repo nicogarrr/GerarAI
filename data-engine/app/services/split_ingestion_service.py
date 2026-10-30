@@ -26,6 +26,7 @@ from app.models import Company, CorporateAction, Position
 from app.services.company_resolver import resolve_company
 from app.services.connectors.fmp import FMPClient
 from app.services.connectors.yahoo import YahooFinanceClient
+from app.services.date_format import format_date_es
 from app.services.provenance import Coverage, SourceKind, provenance
 
 _SAME_EVENT_DAYS = 3
@@ -230,7 +231,7 @@ class SplitIngestionService(ProviderIngestionService):
         else:
             tipo = f"Agrupación de acciones 1 por {1 / ratio:g}"
         return (
-            f"{tipo}. Dato de {proveedor}, importado el {fetched_at.date()}. "
+            f"{tipo}. Dato de {proveedor}, importado el {format_date_es(fetched_at.date())}. "
             "Aplicar ajusta tus acciones y el precio medio; el valor de la posición no cambia."
         )
 

@@ -11,7 +11,7 @@ test.describe("audit closure flows", () => {
 
   test("screener shows engine panel with offline fallback note", async ({ page }) => {
     await page.goto("/screener");
-    await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explorar acciones", level: 1 })).toBeVisible();
     await expect(page.getByText("Motor de análisis", { exact: true })).toBeVisible();
     // Motor caído (fallback Finnhub) o motor con filtros: uno de los dos estados honestos.
     const fallback = page.getByText("motor de filtros no disponible");

@@ -27,7 +27,7 @@ test.describe("mobile flujo screener→watchlist→tesis→alerta solo con toque
   }) => {
     // 1. Screener carga sin overflow.
     await page.goto("/screener");
-    await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explorar acciones", level: 1 })).toBeVisible();
     // La carga de precios es asíncrona: sin esta espera acotada, el test
     // decidía "sin datos" antes de que la página pintara su estado final.
     await waitForScreenerOutcome(page);

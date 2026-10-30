@@ -9,7 +9,7 @@ import { ScreenBreadcrumbName } from '@/components/screeners/ScreenBreadcrumbNam
 import { getScreenerWorkspace, runSavedScreen } from '@/lib/actions/research-tools.actions';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
-import { formatScreenRank } from '@/lib/screener-results';
+import { formatScreenCriterionRight, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel } from '@/lib/screener-results';
 
 // Sin metadata propia la pestaña heredaba el título genérico de la app y
 // todos los filtros guardados se llamaban igual (WCAG 2.4.2).
@@ -67,7 +67,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
       </header>
       {result.metrics_without_data && result.metrics_without_data.length > 0 ? (
         <p className="rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">
-          Ninguna empresa tiene dato de: {result.metrics_without_data.join(', ')}. Revisa el nombre de la métrica; el filtro no puede coincidir con ella.
+          Ninguna empresa tiene dato de: {screenMissingFieldsLabel(result.metrics_without_data)}. Revisa el nombre de la métrica; el filtro no puede coincidir con ella.
         </p>
       ) : null}
       {result.match_count === 0 && result.company_count > 0 && topMissing.length > 0 ? (
@@ -108,7 +108,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
             </div>
             {row.missing_fields.length ? (
               <p className="mt-3 text-sm text-amber-300">
-                {t('screener.missing')}: {row.missing_fields.join(', ')}
+                {t('screener.missing')}: {screenMissingFieldsLabel(row.missing_fields)}
               </p>
             ) : null}
             <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -118,7 +118,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
                     {criterion.passed ? 'CUMPLE' : 'NO CUMPLE'}
                   </span>
                   <span className="text-gray-300">
-                    {criterion.left} {criterion.operator} {criterion.right}
+                    {screenCriterionMetricLabel(criterion.left)} {criterion.operator} {formatScreenCriterionRight(criterion.right)}
                   </span>
                 </div>
               ))}

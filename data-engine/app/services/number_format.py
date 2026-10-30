@@ -63,3 +63,19 @@ def format_compact_es(value: NumericLike, maximum_fraction_digits: int = 2) -> s
         scaled = format_number_es(parsed / Decimal("1e6"), maximum_fraction_digits)
         return f"{scaled} M"
     return format_number_es(parsed, maximum_fraction_digits)
+
+
+def format_percent_es(ratio: NumericLike, fraction_digits: int = 2) -> str | None:
+    """Porcentaje es-ES a partir de un ratio: -0.006 -> «-0,60 %».
+
+    A diferencia de ``format_number_es`` conserva los decimales pedidos
+    (cero final incluido): en un porcentaje «-0,60 %» y «-0,6 %» no dicen la
+    misma precisión. None si no es numérico.
+    """
+    parsed = _to_decimal(ratio)
+    if parsed is None:
+        return None
+    text = f"{parsed * 100:.{fraction_digits}f}".replace(".", ",")
+    if text.startswith("-") and not any(ch in "123456789" for ch in text):
+        text = text[1:]
+    return f"{text} %"

@@ -45,6 +45,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, CorporateAction, Position
+from app.services.date_format import format_date_es
 from app.services.market_refresh_service import _us_listed
 
 SOURCE_NASDAQ = "Calendario público de NASDAQ"
@@ -85,6 +86,15 @@ _TIME_LABEL = {
 
 # Plazos de presentacion (dias tras el cierre del periodo), Form 10-Q / 10-K:
 # large accelerated 40/60, accelerated 40/75, resto 45/90.
+# Categorías de filer de la SEC traducidas; una categoría desconocida se
+# muestra tal cual (nunca se inventa la traducción).
+_FILER_CATEGORY_ES = {
+    "large accelerated filer": "emisor acelerado grande",
+    "accelerated filer": "emisor acelerado",
+    "non-accelerated filer": "emisor no acelerado",
+    "smaller reporting company": "empresa de información reducida",
+}
+
 _FILER_DEADLINES = {
     "large accelerated filer": (40, 60),
     "accelerated filer": (40, 75),
@@ -180,15 +190,15 @@ def filing_deadline_event(submissions: dict[str, Any], ticker: str) -> dict[str,
     days = (days_q_k or _MAX_DEADLINES)[1 if form == "10-K" else 0]
     deadline = _next_business_day(next_period + timedelta(days=days))
     basis = (
-        f"{days} días tras el cierre de periodo estimado ({next_period.isoformat()}) "
-        f"sobre el último informe periódico (cierre {periods[-1].isoformat()})"
+        f"{days} días tras el cierre de periodo estimado ({format_date_es(next_period)}) "
+        f"sobre el último informe periódico (cierre {format_date_es(periods[-1])})"
     )
     if approx:
         basis += "; emisor de 52/53 semanas: fecha aproximada (hasta ~1 semana)"
     if days_q_k is None:
-        basis += "; categoria de filer no disponible: se usa el plazo máximo de la regla"
+        basis += "; categoría de filer no disponible: se usa el plazo máximo de la regla"
     else:
-        basis += f"; categoria EDGAR: {submissions.get('category')}"
+        basis += f"; categoría EDGAR: {_FILER_CATEGORY_ES.get(category, submissions.get('category'))}"
     return {
         "date": deadline.isoformat(),
         "ticker": ticker.upper(),
