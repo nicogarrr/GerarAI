@@ -17,12 +17,13 @@ eventos de calendario y no se muestran.
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import date
 from typing import Any
 
 import httpx
 
-from app.services.connectors.earnings_calendar import _get_json
+from app.services.connectors.earnings_calendar import RANGE_DEADLINE_S, _get_json
 
 IPO_URL = "https://api.nasdaq.com/api/ipo/calendar"
 
@@ -105,13 +106,48 @@ def _payload_events(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return list(seen.values())
 
 
+# Cache de proceso por mes (solo en el camino de produccion, sin cliente
+# inyectado): /calendar/ipos pedia los dos meses a NASDAQ (~2 s) en CADA carga
+# y, si NASDAQ colgaba, esperaba el timeout de 20 s del cliente. Un mes que
+# responde vale una hora (las IPOs del mes cambian poco); uno que falla se
+# declara no disponible al momento durante un minuto y luego se reintenta.
+_MONTH_CACHE_TTL_S = 3600.0
+_MONTH_FAILURE_TTL_S = 60.0
+_month_cache: dict[date, tuple[float, dict[str, Any]]] = {}
+
+
 async def fetch_ipo_month(
     month: date,
     client: httpx.AsyncClient | None = None,
 ) -> dict[str, Any]:
     """Salidas a bolsa de un mes, o ``status="unavailable"`` si NASDAQ no responde."""
     first = first_of_month(month)
-    payload = await _get_json(IPO_URL, {"date": f"{first.year:04d}-{first.month:02d}"}, client)
+    if client is None:
+        hit = _month_cache.get(first)
+        if hit is not None:
+            ttl = _MONTH_CACHE_TTL_S if hit[1]["status"] == "ok" else _MONTH_FAILURE_TTL_S
+            if time.monotonic() - hit[0] < ttl:
+                return hit[1]
+        result = await _fetch_ipo_month(first, None)
+        now = time.monotonic()
+        # Datos publicos de NASDAQ, iguales para todos los usuarios: sin clave
+        # de tenant. Se podan los meses caducados para que no crezca.
+        for key in [k for k, (ts, _) in _month_cache.items() if now - ts >= _MONTH_CACHE_TTL_S]:
+            _month_cache.pop(key, None)
+        _month_cache[first] = (now, result)
+        return result
+    return await _fetch_ipo_month(first, client)
+
+
+async def _fetch_ipo_month(first: date, client: httpx.AsyncClient | None) -> dict[str, Any]:
+    try:
+        # Mismo tope que el resto del calendario: nunca los 20 s del cliente.
+        payload = await asyncio.wait_for(
+            _get_json(IPO_URL, {"date": f"{first.year:04d}-{first.month:02d}"}, client),
+            timeout=RANGE_DEADLINE_S,
+        )
+    except TimeoutError:
+        payload = None
     if not payload:
         return {
             "status": "unavailable",
