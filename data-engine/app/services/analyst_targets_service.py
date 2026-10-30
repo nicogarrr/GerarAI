@@ -168,11 +168,11 @@ def _fetch_consensus(symbol: str) -> dict[str, Any]:
 _NON_EQUITY_LABEL = {
     "ETF": "un ETF",
     "MUTUALFUND": "un fondo",
-    "INDEX": "un indice",
+    "INDEX": "un índice",
     "CURRENCY": "una divisa",
     "CRYPTOCURRENCY": "una criptomoneda",
     "FUTURE": "un futuro",
-    "OPTION": "una opcion",
+    "OPTION": "una opción",
 }
 
 
@@ -189,23 +189,33 @@ def non_equity_label(quote_type: str | None) -> str | None:
 def _fetch_currency_and_type(symbol: str) -> dict[str, str | None]:
     import yfinance as yf
 
-    # nosemgrep: gerarai-broad-except-pass -- divisa y tipo declarativos de yfinance: sin ellos quedan None (comentario en linea)
+    # Divisa y tipo se leen por separado: si quoteType falla (yfinance cambia
+    # sus claves a menudo), la divisa sigue valiendo y viceversa.
+    currency: str | None = None
+    quote_type: str | None = None
+    # nosemgrep: gerarai-broad-except-pass -- sin metadatos de yfinance ambos quedan None
     try:
         fast_info = yf.Ticker(symbol).fast_info
+    except Exception:  # noqa: BLE001 - ambos son declarativos; sin ellos, None
+        return {"currency": None, "quote_type": None}
+    # nosemgrep: gerarai-broad-except-pass -- divisa declarativa: sin ella queda None
+    try:
         raw_currency = fast_info.get("currency")
-        raw_type = fast_info.get("quoteType")
-        currency = None
         if raw_currency:
             raw = str(raw_currency).strip()
             # Yahoo cotiza Londres en peniques ("GBp") y Johannesburgo en centavos
             # ("ZAc"): los objetivos vienen en esa subunidad. Poner .upper() daba
             # "GBP" y los precios salian x100. Se distingue con un codigo propio.
             currency = _SUBUNIT_CURRENCY.get(raw) or raw.upper() or None
+    except Exception:  # noqa: BLE001 - declarativa; sin ella, None
+        currency = None
+    # nosemgrep: gerarai-broad-except-pass -- tipo declarativo: sin el queda None
+    try:
+        raw_type = fast_info.get("quoteType")
         quote_type = str(raw_type).strip().upper() if raw_type else None
-        return {"currency": currency, "quote_type": quote_type}
-    except Exception:  # noqa: BLE001 - ambos son declarativos; sin ellos, None
-        pass
-    return {"currency": None, "quote_type": None}
+    except Exception:  # noqa: BLE001 - declarativo; sin el, None
+        quote_type = None
+    return {"currency": currency, "quote_type": quote_type}
 
 
 def _fetch_sync(symbol: str) -> dict[str, Any]:
@@ -263,7 +273,7 @@ class AnalystTargetsService:
                 currency=data.get("currency"),
                 note=(
                     f"Yahoo Finance identifica {key} como {label}, no como una "
-                    "accion, asi que no hay precios objetivo de analistas que "
+                    "acción, así que no hay precios objetivo de analistas que "
                     "mostrar para una empresa con este ticker."
                 ),
             )
