@@ -11,8 +11,12 @@ name: user-flows E2E (smoke, no bloquea)
 # NaN/undefined/null/Infinity/[object Object] visibles.
 #
 # NO bloquea: job aparte (continue-on-error) que no está en el gate. El job
-# «Browser E2E» de ci.yml no la corre (exige E2E_USER_FLOWS=1). Presupuesto de
-# la suite: < 5 min (paso con timeout-minutes: 5). Sin red ni claves: backend
+# «Browser E2E» de ci.yml no la corre (exige E2E_USER_FLOWS=1). Antes del
+# primer test, e2e/user-flows/global-setup.ts compila en serie cada ruta de la
+# suite en `next dev` (sin eso, la primera compilación caía dentro de los
+# tests: timeouts y 500 «Manifest file is empty»). Presupuesto: ~5 min de
+# tests + calentamiento; el paso tiene timeout-minutes: 10 porque la suite ya
+# rondaba 4,4-4,8 min y un solo reintento de CI rompía el límite de 5. Sin red ni claves: backend
 # APP_ENV=test con SQLite nueva y SCREENER_QUOTE_VENDOR=offline (webServer de
 # playwright.config.ts).
 
@@ -82,7 +86,7 @@ jobs:
         timeout-minutes: 8
         run: npx playwright install chromium
       - name: Suite de flujos de usuario
-        timeout-minutes: 5
+        timeout-minutes: 10
         run: npx playwright test e2e/user-flows --workers=1
       - name: Informe y trazas
         if: ${{ always() }}

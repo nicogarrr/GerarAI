@@ -122,7 +122,15 @@ export async function expectHealthyPage(page: Page, context = "") {
 
 /** Navega y espera a que la página esté quieta (sin red ni hidratación pendiente). */
 export async function visit(page: Page, path: string) {
-  const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+  let response;
+  try {
+    response = await page.goto(path, { waitUntil: "domcontentloaded" });
+  } catch (err) {
+    // `next dev` puede abortar una navegación mientras recompila (ERR_ABORTED).
+    // Un reintento: si la app falla de verdad, el segundo intento lo dirá.
+    if (!/ERR_ABORTED|NS_BINDING_ABORTED/.test(String(err))) throw err;
+    response = await page.goto(path, { waitUntil: "domcontentloaded" });
+  }
   await page.waitForLoadState("networkidle", { timeout: 45_000 }).catch(() => undefined);
   return response;
 }
