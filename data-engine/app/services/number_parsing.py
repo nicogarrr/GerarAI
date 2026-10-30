@@ -48,6 +48,12 @@ _NUMBER_RUN = re.compile(r"\(?\s*[-+]?\d[\d.,]*\)?")
 # nonsense 20241.2345; the right side must be a group of exactly three digits,
 # so "12,5 % 3" and "1 2345" are left alone.
 _SPACE_THOUSANDS = re.compile(r"(?<!\d[.,])[ \u00a0](?=\d{3}(?!\d))")
+# Typographic minus signs. PDF, ESEF and CNMV text writes a negative figure with
+# U+2212 (or its small/full-width forms) rather than the ASCII hyphen, and the
+# numeric patterns only know ``-``: "−3,2 %" was read as +3,2, a silent sign
+# flip that let a wrong-signed KPI ground against the quote. Each maps to one
+# ASCII ``-`` so character offsets (the unit windows) are unchanged.
+_MINUS_SIGNS = str.maketrans({"\u2212": "-", "\ufe63": "-", "\uff0d": "-"})
 
 
 def _not_a_thousands_group(raw: str, separator: str) -> bool:
@@ -78,7 +84,7 @@ def find_number_tokens(text: object) -> list[str]:
     """
     if text is None:
         return []
-    joined = _SPACE_THOUSANDS.sub("", str(text))
+    joined = _SPACE_THOUSANDS.sub("", str(text).translate(_MINUS_SIGNS))
     return [token.strip() for token in _NUMBER_RUN.findall(joined)]
 
 
@@ -91,7 +97,7 @@ def parse_localized_number(value: object) -> tuple[Decimal, bool] | None:
     """
     if value is None:
         return None
-    raw = str(value).strip()
+    raw = str(value).strip().translate(_MINUS_SIGNS)
     if not raw:
         return None
     raw = raw.replace("\u00a0", " ").replace(" ", "")
@@ -156,7 +162,7 @@ def find_number_tokens_with_units(text: object, window: int = 25) -> list[tuple[
     """
     if text is None:
         return []
-    joined = _SPACE_THOUSANDS.sub("", str(text))
+    joined = _SPACE_THOUSANDS.sub("", str(text).translate(_MINUS_SIGNS))
     matches = list(_NUMBER_RUN.finditer(joined))
     result: list[tuple[str, str]] = []
     for index, match in enumerate(matches):
