@@ -19,6 +19,12 @@ from app.services.review_alert_service import ReviewAlertService
 from app.services.savings_projection import savings_contract
 
 
+def _money_es(value: str) -> str:
+    """«1500.50» -> «1.500,50». Solo el texto; la huella sigue usando ``plan_state``."""
+    text = f"{Decimal(value):,.2f}"
+    return text.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
 def plan_state(plan: InvestmentPlan | None) -> dict | None:
     if plan is None:
         return None
@@ -50,7 +56,7 @@ def emit_plan_notice(db: Session, plan: InvestmentPlan, *, changed: bool = False
     message = (
         'La aportación no tiene divisa registrada: no calculamos previsiones monetarias ni asumimos euros. '
         'Revisa el plan antes de interpretar un reparto DCA.' if missing_currency else
-        f"Aportación {state['monthly']} {state['currency']} al mes, horizonte {state['years']} años. "
+        f"Aportación {_money_es(state['monthly'])} {state['currency']} al mes, horizonte {state['years']} años. "
         'Cartera, Cerebro y reparto DCA leen el mismo plan. Revisa los escenarios de ahorro: '
         'son hipótesis, no promesas de rentabilidad ni instrucciones de compra.'
     )

@@ -92,3 +92,11 @@ def test_dismissed_notice_keeps_its_resolution_provenance(db):
     save(db, amount='200')
     assert dismissed.metadata_['resolved_by'] == 'user'
     assert 'superseded_by_fingerprint' not in dismissed.metadata_
+
+
+def test_notice_writes_the_amount_in_spanish_format(db):
+    """El aviso es texto para el usuario (es-ES): «1.500,50 EUR», no «1500.50 EUR»."""
+    save(db, amount='1500.5')
+    alert = db.scalars(select(ResearchAlert)).one()
+    assert 'Aportación 1.500,50 EUR al mes' in alert.message
+    assert '1500.50' not in alert.message
