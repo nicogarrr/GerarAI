@@ -79,9 +79,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { exchangeDisplayName } from '@/lib/exchangeName';
-import { auditScoreText, auditStatusLabel } from '@/lib/audit-status-copy';
-import { companyTypeLabel, etiquetaTierFuente,
-  tierRankFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
+import { auditScoreText, auditStatusLabel, sortAuditsRecentFirst } from '@/lib/audit-status-copy';
+import { companyTypeLabel, etiquetaTierFuente, tierRankFuente, etiquetaValor, sectorIndustryLine } from '@/lib/labels';
 import { Button } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
@@ -1708,8 +1707,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <Panel title="Auditorías de fuentes">
         {audits.length ? (
           <div className="space-y-3">
-            {audits.length > 100 ? <p className="text-xs text-gray-500">Se muestran 100 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías.</p> : null}
-            {audits.slice(0, 100).map((audit) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>)}</div>
+            {/* Solo la auditoría más reciente a la vista; el historial de
+                versiones viejas queda plegado (era un muro de tarjetas casi
+                idénticas que se leía como bug). */}
+            {(() => {
+              const ordered = sortAuditsRecentFirst(audits);
+              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>;
+              const previous = ordered.slice(1, 100);
+              return <>
+                {renderAudit(ordered[0])}
+                {ordered.length > 100 ? <p className="text-xs text-gray-400">Se muestran 100 de {formatNumber(ordered.length, { maximumFractionDigits: 0 })} auditorías: la última y hasta 99 anteriores.</p> : null}
+                {previous.length ? (
+                  <details className="rounded-lg border border-gray-800 p-4">
+                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? 'auditoría anterior' : 'auditorías anteriores'} de versiones viejas de la tesis</summary>
+                    <div className="mt-3 space-y-3">{previous.map(renderAudit)}</div>
+                  </details>
+                ) : null}
+              </>;
+            })()}
+          </div>
         ) : (
           <EmptyState
             action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}
