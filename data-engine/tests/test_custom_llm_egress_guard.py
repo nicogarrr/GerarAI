@@ -222,3 +222,17 @@ def test_public_literal_validator_and_backend_still_pass_public_host(net) -> Non
     with pytest.raises(httpcore.ConnectError):
         asyncio.run(egress_guard.PublicOnlyBackend().connect_tcp("llm.example.com", 443))
     assert connects == [("2001:4860:4860::8888", 443)]
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "::ffff:127.0.0.1", "::127.0.0.1", "::ffff:169.254.169.254", "::169.254.169.254",
+        "::ffff:10.0.0.1", "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe", "64:ff9b:1::a00:1",
+        "2002:7f00:1::", "2001:0:4136:e378:8000:63bf:80ff:fffe",
+    ],
+)
+def test_is_public_ip_rejects_ipv4_embedded_in_ipv6(address):
+    from app.llm.egress_guard import is_public_ip
+
+    assert is_public_ip(address) is False

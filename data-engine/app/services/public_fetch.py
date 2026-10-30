@@ -33,6 +33,8 @@ from urllib.parse import urljoin, urlparse, urlunparse
 import anyio
 import httpx
 
+from app.llm.egress_guard import is_public_ip
+
 MAX_REDIRECTS = 3
 DEFAULT_MAX_BYTES = 15 * 1024 * 1024
 DEFAULT_TIMEOUT_SECONDS = 30.0
@@ -143,7 +145,11 @@ def _validated_addresses(addresses: Iterable[Any]) -> tuple[str, ...]:
             parsed_ip = ipaddress.ip_address(address)
         except (IndexError, TypeError, ValueError) as exc:
             raise ValueError("URL resolved to an invalid address") from exc
-        if not parsed_ip.is_global:
+        # is_global solo no basta: ``::127.0.0.1`` (IPv4-compatible, ::/96) y
+        # ``64:ff9b::a9fe:a9fe`` (NAT64 -> 169.254.169.254) son "globales" para
+        # ipaddress y apuntan a loopback/metadata. Mismo criterio que el egress
+        # del LLM (IPv4 embebida en mapped/compatible/6to4/Teredo/NAT64).
+        if not is_public_ip(parsed_ip):
             raise ValueError("Private, loopback, link-local, or reserved URLs are not allowed")
         unique.add(str(parsed_ip))
     if not unique:
