@@ -9,7 +9,7 @@ vi.mock('@/lib/toast', () => ({ showErrorToast: h.showError }));
 vi.mock('@/components/search/TickerSearchInput', () => ({
     TickerSearchInput: (p: any) => (
         <div>
-            <input aria-label="q" value={p.value} disabled={p.disabled} onChange={(e) => p.onValueChange(e.target.value)} />
+            <input aria-label="q" value={p.value} disabled={p.disabled} onChange={(e) => p.onValueChange(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') p.onEnterWithoutResults?.(p.value); }} />
             <button onClick={() => p.onSelect({ symbol: 'SAN.MC', name: 'Santander', exchange: 'BME', type: 'EQ', isInWatchlist: false })}>pick-san</button>
             <button onClick={() => p.onSelect({ symbol: 'AAPL', name: '', exchange: '', type: '', isInWatchlist: false })}>pick-aapl</button>
             <output data-testid="disabled">{p.disabledSymbols.join(',')}</output>
@@ -105,6 +105,23 @@ describe('WatchlistAddButton alta manual por simbolo', () => {
         type(d, ' kkr ');
         fireEvent.click(d.getByRole('button', { name: 'Añadir «KKR» por su símbolo' }));
         await waitFor(() => expect(h.add).toHaveBeenCalledWith('KKR', undefined));
+    });
+
+    it('Enter sin sugerencias añade lo escrito por su símbolo (antes no hacía nada)', async () => {
+        h.add.mockResolvedValue({ success: true });
+        const d = await open();
+        type(d, ' kkr ');
+        fireEvent.keyDown(d.getByLabelText('q'), { key: 'Enter' });
+        await waitFor(() => expect(h.add).toHaveBeenCalledWith('KKR', undefined));
+    });
+
+    it('Enter con un texto que no es ticker o ya seguido no añade nada', async () => {
+        const d = await open(['AAPL']);
+        type(d, 'no es ticker!');
+        fireEvent.keyDown(d.getByLabelText('q'), { key: 'Enter' });
+        type(d, 'aapl');
+        fireEvent.keyDown(d.getByLabelText('q'), { key: 'Enter' });
+        expect(h.add).not.toHaveBeenCalled();
     });
 
     it.each([['', 0], ['   ', 0], ['no es ticker!', 0], ['a'.repeat(40), 0]])('%j no ofrece alta manual', async (value) => {

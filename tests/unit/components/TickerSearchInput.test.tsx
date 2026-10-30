@@ -126,4 +126,38 @@ describe('TickerSearchInput', () => {
         expect(screen.queryByRole('option')).not.toBeInTheDocument();
         expect(input).toHaveAttribute('aria-expanded', 'false');
     });
+
+    it('Enter con la búsqueda resuelta y sin sugerencias avisa al consumidor con el texto; en vuelo, no', async () => {
+        const onEnter = vi.fn();
+        searchStocksWithStatus.mockResolvedValueOnce({ status: 'ok', stocks: [] });
+        render(<TickerSearchInput onEnterWithoutResults={onEnter} />);
+        const input = screen.getByRole('combobox');
+        // Antes de que termine la búsqueda (debounce pendiente) Enter no actúa.
+        act(() => { input.focus(); });
+        fireEvent.change(input, { target: { value: ' kkr ' } });
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(onEnter).not.toHaveBeenCalled();
+        await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+        await flush();
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(onEnter).toHaveBeenCalledWith('kkr');
+
+        // Proveedor caído: también es «sin sugerencias».
+        searchStocksWithStatus.mockResolvedValueOnce({ status: 'error', stocks: [] });
+        await typeAndSettle(input, 'ZZZ');
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(onEnter).toHaveBeenLastCalledWith('ZZZ');
+    });
+
+    it('Enter con sugerencias sigue eligiendo la primera, no el texto', async () => {
+        const onEnter = vi.fn();
+        const onSelect = vi.fn();
+        searchStocksWithStatus.mockResolvedValue({ status: 'ok', stocks: [stock('AMZN', 'Amazon.com Inc')] });
+        render(<TickerSearchInput onEnterWithoutResults={onEnter} onSelect={onSelect} />);
+        const input = screen.getByRole('combobox');
+        await typeAndSettle(input, 'ama');
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ symbol: 'AMZN' }));
+        expect(onEnter).not.toHaveBeenCalled();
+    });
 });

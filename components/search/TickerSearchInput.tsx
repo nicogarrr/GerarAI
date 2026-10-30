@@ -24,6 +24,10 @@ interface TickerSearchInputProps {
     /** Selección de una sugerencia: el consumidor decide qué hacer (navegar,
      *  rellenar un campo de formulario...). */
     onSelect?: (stock: StockWithWatchlistStatus) => void;
+    /** Enter con la búsqueda ya resuelta y sin sugerencias (sin resultados o
+     *  proveedor caído): el consumidor decide qué hacer con el texto (p. ej.
+     *  la watchlist lo añade por su símbolo). Sin la prop, Enter no hace nada. */
+    onEnterWithoutResults?: (text: string) => void;
     placeholder?: string;
     id?: string;
     className?: string;
@@ -49,7 +53,7 @@ interface TickerSearchInputProps {
  *  (F215), debounce de 300 ms y deadline de 6 s (patrón de la watchlist).
  *  El dropdown usa el Popover existente con portal y colisiones: se superpone
  *  al contenido sin quedar recortado por el scroll de un diálogo. */
-export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide }: TickerSearchInputProps) {
+export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onEnterWithoutResults, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide }: TickerSearchInputProps) {
     const [localValue, setLocalValue] = useState(defaultValue);
     const value = controlledValue ?? localValue;
     const update = (next: string) => { setLocalValue(next); onValueChange?.(next); };
@@ -119,6 +123,9 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
         };
     }, [dropdownSide, open, measureBelowInput]);
 
+    // Última query cuya búsqueda terminó (con o sin sugerencias): Enter sin
+    // resultados solo actúa sobre una búsqueda resuelta, nunca en vuelo.
+    const settledQueryRef = useRef<string | null>(null);
     const runSearch = useCallback(async (query: string) => {
         const ticket = searchGateRef.current.begin();
         setLoading(true);
@@ -126,6 +133,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
         try {
             const result = options ? { status: 'ok', stocks: options.filter(stock => `${stock.symbol} ${stock.name}`.toLowerCase().includes(query.toLowerCase())).map(stock => ({...stock, exchange: '', type: '', isInWatchlist: false})) } : await withFetchDeadline(() => searchStocksWithStatus(query), 6000);
             if (!searchGateRef.current.isLatest(ticket)) return;
+            settledQueryRef.current = query;
             if (result.status === 'error') {
                 // Fallo del proveedor: no fingir "sin resultados" (F215).
                 setError(true);
@@ -223,6 +231,12 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                 }}
                 onKeyDown={(event) => {
                     if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); searchGateRef.current.invalidate(); if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); setOpen(false); setLoading(false); }
+                    if (event.key === 'Enter' && onEnterWithoutResults && !results.length && !loading
+                        && settledQueryRef.current === event.currentTarget.value.trim()) {
+                        event.preventDefault();
+                        onEnterWithoutResults(event.currentTarget.value.trim());
+                        return;
+                    }
                     if (!open || !results.length) return;
                     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                         event.preventDefault();

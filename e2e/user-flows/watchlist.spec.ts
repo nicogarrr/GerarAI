@@ -22,15 +22,23 @@ function rowsFor(page: Page) {
     : page.locator("main table tbody tr");
 }
 
-async function addBySymbol(page: Page, symbol: string) {
+async function addBySymbol(page: Page, symbol: string, via: "button" | "enter" = "button") {
   await page.getByRole("button", { name: "Añadir empresa" }).first().click();
   const dialog = page.getByRole("dialog", { name: "Añadir a la watchlist" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("combobox", { name: "Buscar acciones para añadir a la watchlist" }).fill(symbol);
+  const combobox = dialog.getByRole("combobox", { name: "Buscar acciones para añadir a la watchlist" });
+  await combobox.fill(symbol);
+  if (via === "enter") {
+    // Sin sugerencias (buscador sin proveedor), Enter añade lo escrito por su
+    // símbolo, igual que el buscador global abre la ficha (antes no hacía nada).
+    await expect(dialog.getByText(`Sin resultados para «${symbol}».`)).toBeVisible({ timeout: 20_000 });
+    await combobox.press("Enter");
+  } else {
   // Este caso prueba alta manual: salir del buscador cancela su debounce
   // y cierra sugerencias antes de pulsar el botón del símbolo escrito.
   await dialog.getByRole("heading", { name: "Añadir a la watchlist" }).click();
   await dialog.getByRole("button", { name: `Añadir «${symbol}» por su símbolo` }).click();
+  }
   await expect(page.getByText(`${symbol} añadido a la watchlist`)).toBeVisible({ timeout: 20_000 });
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -53,7 +61,7 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByText("Tu Watchlist está vacía")).toBeVisible();
       await expectHealthyPage(page, "watchlist vacía");
 
-      for (const symbol of SYMBOLS) await addBySymbol(page, symbol);
+      for (const symbol of SYMBOLS) await addBySymbol(page, symbol, symbol === "MC.PA" ? "enter" : "button");
       await page.reload();
       await page.waitForLoadState("networkidle").catch(() => undefined);
       const rows = rowsFor(page);
