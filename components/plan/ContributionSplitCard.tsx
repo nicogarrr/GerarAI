@@ -71,7 +71,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                         {split.notes.map((note) => <li key={note}>{note}</li>)}
                     </ul>
                 ) : null}
-                <p className="text-xs text-gray-600">4X pesa 4, 3X 3, 2X 2, 1X 1; las zonas de recorte no reciben dinero nuevo y sin nivel DCA se pesa como 1X.</p>
+                <p className="text-xs text-gray-500">4X pesa 4, 3X 3, 2X 2, 1X 1; las zonas de recorte no reciben dinero nuevo y sin nivel DCA se pesa como 1X.</p>
             </CardContent>
         </Card>
     );

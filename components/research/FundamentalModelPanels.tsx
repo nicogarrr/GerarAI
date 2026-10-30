@@ -195,7 +195,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
 
       <div className="mb-4 rounded-md border border-gray-800 bg-black/10 p-3 text-xs leading-5 text-gray-400">
         <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map(termLabel).join(' · ')}
-        <span className="mx-2 text-gray-700">|</span>
+        <span aria-hidden="true" className="mx-2 text-gray-700">|</span>
         <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map(termLabel).join(' · ')}
       </div>
 

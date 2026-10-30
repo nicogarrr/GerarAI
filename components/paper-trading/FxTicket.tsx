@@ -144,7 +144,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                     <Label htmlFor={`${uid}-amount`}>Importe ({from})</Label>
                     <Input
                         style={{ minHeight: 44 }}
-                        className="placeholder:text-gray-600"
+                        className="placeholder:text-gray-500"
                         id={`${uid}-amount`}
                         value={amount}
                         onChange={(event) => setAmount(event.target.value)}
@@ -159,7 +159,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                     </Label>
                     <Input
                         style={{ minHeight: 44 }}
-                        className="placeholder:text-gray-600"
+                        className="placeholder:text-gray-500"
                         id={`${uid}-rate`}
                         value={rate}
                         onChange={(event) => setRate(event.target.value)}

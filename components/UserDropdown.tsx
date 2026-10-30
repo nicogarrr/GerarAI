@@ -37,7 +37,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                     móvil el nombre se oculta a la vista pero no al lector. */}
                 <Button className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700">
                     <Avatar aria-hidden="true" className="h-8 w-8">
-                        <AvatarFallback className="bg-teal-500 text-teal-900 text-sm font-bold">
+                        <AvatarFallback className="bg-teal-500 text-gray-900 text-sm font-bold">
                             {user.name[0]}
                         </AvatarFallback>
                     </Avatar>
@@ -52,7 +52,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                 <DropdownMenuLabel>
                     <div className="flex items-center gap-3 py-2">
                         <Avatar className="h-10 w-10">
-                            <AvatarFallback className="bg-teal-500 text-teal-900 text-sm font-bold">
+                            <AvatarFallback className="bg-teal-500 text-gray-900 text-sm font-bold">
                                 {user.name[0]}
                             </AvatarFallback>
                         </Avatar>

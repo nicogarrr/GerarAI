@@ -71,7 +71,7 @@ export default function AnalystTargetLine({
 
     if (!settled) {
         return (
-            <span className="text-gray-600" role="status" aria-label={`Cargando precio objetivo de analistas de ${symbol}`}>
+            <span className="text-gray-500" role="status" aria-label={`Cargando precio objetivo de analistas de ${symbol}`}>
                 …
             </span>
         );
