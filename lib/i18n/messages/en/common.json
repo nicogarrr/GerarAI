@@ -1,0 +1,43 @@
+{
+  "na": "N/A",
+  "notRun": "Not run",
+  "actions": {
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "delete": "Delete",
+    "apply": "Apply",
+    "regenerate": "Regenerate",
+    "export": "Export",
+    "search": "Search"
+  },
+  "states": {
+    "loadingAlerts": "Loading alerts...",
+    "alertsLoadError": "Your alerts could not be loaded. Try again in a few seconds.",
+    "noAlerts": "You have no alerts set up",
+    "noAlertsHint": "Create your first alert to get real-time notifications",
+    "neverTriggered": "It has not triggered yet",
+    "loading": "Loading...",
+    "empty": "No data",
+    "noResults": "No results",
+    "error": "An unexpected error occurred",
+    "errorHint": "Try again. If the problem persists, check your connection.",
+    "backendOfflineTitle": "Service unavailable",
+    "alertsLoadErrorSession": "Your session has expired. Sign in again to see your alerts.",
+    "alertsLoadErrorForbidden": "You do not have permission to view these alerts.",
+    "alertsLoadErrorRate": "Too many requests. Wait a moment and try again."
+  },
+  "labels": {
+    "ticker": "Ticker",
+    "company": "Company",
+    "sector": "Sector",
+    "price": "Price",
+    "date": "Date",
+    "score": "Score",
+    "coverage": "Coverage",
+    "confidence": "Confidence",
+    "missing": "Missing",
+    "status": "Status"
+  }
+}

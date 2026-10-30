@@ -1,0 +1,9 @@
+{
+  "match": "coincidencia",
+  "noMatch": "sin coincidencia",
+  "newMatch": "nuevo",
+  "missing": "Faltantes",
+  "rank": "Ranking",
+  "coverage": "Cobertura",
+  "confidence": "Confianza"
+}

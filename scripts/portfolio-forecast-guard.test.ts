@@ -60,7 +60,13 @@ async function renderForecast(payload: PortfolioForecast): Promise<string> {
         }).outputText;
     try {
         writeFileSync(`${dir}/utils.mjs`, compile('lib/utils.ts'));
-        writeFileSync(`${dir}/format.mjs`, compile('lib/format.ts'));
+        // format.ts importa el registro de locales (i18n): se compila también
+        // y se reescribe la ruta al .mjs local, como con los demás stubs.
+        writeFileSync(`${dir}/locale.mjs`, compile('lib/i18n/locale.ts'));
+        writeFileSync(
+            `${dir}/format.mjs`,
+            compile('lib/format.ts').replaceAll("'./i18n/locale.ts'", "'./locale.mjs'"),
+        );
         writeFileSync(
             `${dir}/panel.mjs`,
             compile('components/ui/panel.tsx').replaceAll('@/lib/utils', './utils.mjs'),
