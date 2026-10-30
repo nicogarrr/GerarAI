@@ -10,12 +10,18 @@ import path from "node:path";
  * - E2E_UI_DATABASE_URL  DATABASE_URL del backend e2e (sqlite:///ruta). Relativa
  *                        = relativa a `data-engine/`, como la lee el backend.
  * - PYTHON_BIN           intérprete para las semillas directas en sqlite.
+ * - E2E_REDIS_URL        REDIS_URL del backend e2e (broker y cachés). En CI hay
+ *                        un Redis de servicio en localhost:6379; fuera de CI se
+ *                        apunta a uno propio en vez de llenar el log de
+ *                        «Connection refused».
  */
 export const DEFAULT_E2E_UI_BACKEND_URL = "http://127.0.0.1:8100";
 export const DEFAULT_E2E_UI_DATABASE_URL = "sqlite:///./cavaai_ui_e2e.db";
 
 export const E2E_UI_BACKEND_URL = process.env.E2E_UI_BACKEND_URL || DEFAULT_E2E_UI_BACKEND_URL;
 export const E2E_UI_DATABASE_URL = process.env.E2E_UI_DATABASE_URL || DEFAULT_E2E_UI_DATABASE_URL;
+export const DEFAULT_E2E_REDIS_URL = "redis://localhost:6379/0";
+export const E2E_REDIS_URL = process.env.E2E_REDIS_URL || DEFAULT_E2E_REDIS_URL;
 export const E2E_PYTHON_BIN = process.env.PYTHON_BIN || "python3";
 
 /** Ruta del fichero sqlite del backend e2e a partir de su DATABASE_URL. */
