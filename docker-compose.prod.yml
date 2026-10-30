@@ -139,6 +139,8 @@ services:
           memory: 64M
 
   postgres:
+    # Datos solo en la red Docker. !reset elimina publicaciones heredadas.
+    ports: !reset []
     image: postgres:17
     container_name: cavaai-postgres
     restart: unless-stopped
@@ -172,6 +174,8 @@ services:
           memory: 896M
 
   redis:
+    # Datos solo en la red Docker. !reset elimina publicaciones heredadas.
+    ports: !reset []
     image: redis:7-alpine
     container_name: cavaai-redis
     restart: unless-stopped
@@ -224,6 +228,8 @@ services:
           memory: 768M
 
   minio:
+    # Datos solo en la red Docker. !reset elimina publicaciones heredadas.
+    ports: !reset []
     # Build local desde el codigo fuente de MinIO (la imagen de quay ya no es publica): docker/minio/Dockerfile.
     build:
       context: ./docker/minio

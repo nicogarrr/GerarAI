@@ -226,3 +226,13 @@ def test_prod_requires_a_real_sec_user_agent():
     assert env.get("SEC_USER_AGENT", "").startswith("${SEC_USER_AGENT:?"), env.get(
         "SEC_USER_AGENT"
     )
+
+
+def test_data_services_explicitly_reset_inherited_host_ports():
+    """Omitting ports does not remove mappings from a merged base file."""
+    compose = _load_compose()
+    source = COMPOSE_PATH.read_text()
+    for name in ("postgres", "redis", "minio"):
+        assert compose["services"][name]["ports"] == []
+        section = re.split(r"\n  [A-Za-z_][\w-]*:", source.split(f"\n  {name}:\n", 1)[1], maxsplit=1)[0]
+        assert "ports: !reset []" in section
