@@ -1,5 +1,5 @@
 /**
- * Validación del formulario "Nueva Inversión": ningún submit falla en silencio.
+ * Validación del formulario "Nueva inversión": ningún submit falla en silencio.
  * Se ejecuta con: node --experimental-strip-types --test scripts/transaction-validation.test.ts
  */
 import { describe, it } from 'node:test';

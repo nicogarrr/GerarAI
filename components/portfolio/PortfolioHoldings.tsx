@@ -31,7 +31,7 @@ type Props = {
   holdings: PortfolioHolding[];
   userId: string;
   /** Caja total en divisa base; se muestra como línea propia para que
-   *  Valor Total = posiciones + caja cuadre a simple vista. */
+   *  Valor total = posiciones + caja cuadre a simple vista. */
   cash?: number | null;
   baseCurrency?: string;
   /** Tipos de cambio de la cartera: convierten el objetivo de analistas del ADR (USD) a la divisa de la fila. */

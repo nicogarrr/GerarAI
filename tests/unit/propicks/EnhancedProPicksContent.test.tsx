@@ -216,7 +216,7 @@ describe('EnhancedProPicksContent: actualizar y filtros', () => {
     it('Aplicar filtros consulta y el texto de cabecera refleja los filtros aplicados, no el borrador', async () => {
         generateEnhancedProPicksWithRun.mockResolvedValue(result([pick()]));
         render(<EnhancedProPicksContent initialPicks={[pick()]} generatedAt="2026-10-27" />);
-        fireEvent.click(screen.getByRole('button', { name: /Aplicar Filtros/ }));
+        fireEvent.click(screen.getByRole('button', { name: /Aplicar filtros/ }));
         expect(await screen.findByText(/Selección consultada: 1 empresa/)).toBeInTheDocument();
         expect(screen.getByText(/puntuación mínima de 70/)).toBeInTheDocument();
     });

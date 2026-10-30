@@ -93,7 +93,7 @@ for (const vp of VIEWPORTS) {
       // «Registrar compra o venta» abre el alta en Cartera con la empresa ya
       // elegida (sin volver a buscarla) y no deja el parámetro en la URL.
       await panel.getByRole("link", { name: "Registrar compra o venta" }).click();
-      const dialog = page.getByRole("dialog", { name: "Nueva Inversión" });
+      const dialog = page.getByRole("dialog", { name: "Nueva inversión" });
       await expect(dialog).toBeVisible({ timeout: 30_000 });
       await expect(dialog.getByPlaceholder(/Buscar por nombre o símbolo/)).toHaveValue(TICKER);
       await expect(dialog.getByText(/Precio \(USD\)/)).toBeVisible();

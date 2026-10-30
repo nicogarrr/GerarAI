@@ -1,5 +1,5 @@
 /**
- * F240: /taxes «Posiciones Fiscales» salía toda a «—» porque el backend
+ * F240: /taxes «Posiciones fiscales» salía toda a «—» porque el backend
  * devolvía cost_basis_base/unrealized_pnl_base y la UI lista cost_basis,
  * market_value, unrealized_pnl y currency. Las claves deben coincidir y los
  * null pasan como None (NA), nunca como 0 inventado.

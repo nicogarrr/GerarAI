@@ -39,7 +39,7 @@ async function openDialog() {
 }
 
 async function pickTicker(dialog: HTMLElement, query: string, symbol: string) {
-    const input = within(dialog).getByLabelText('Buscar Acción');
+    const input = within(dialog).getByLabelText('Buscar acción');
     act(() => input.focus());
     fireEvent.change(input, { target: { value: query } });
     await flush(300);
@@ -47,7 +47,7 @@ async function pickTicker(dialog: HTMLElement, query: string, symbol: string) {
     fireEvent.click(screen.getByRole('option', { name: new RegExp(symbol.replace('.', '\\.')) }));
 }
 
-describe('AddTransactionButton (Nueva Inversión)', () => {
+describe('AddTransactionButton (Nueva inversión)', () => {
     beforeAll(async () => {
         // Calienta el chunk diferido del diálogo (next/dynamic) en tiempo real,
         // antes de que los tests activen los timers fake: la primera resolución
@@ -71,7 +71,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '0' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '10' } });
         // submit directo: simula un navegador que no aplica `required`/`min`.
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
         const alerts = within(dialog).getAllByRole('alert').map((a) => a.textContent);
         expect(alerts).toContain('Busca y selecciona una acción de la lista.');
@@ -97,7 +97,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         // («Please fill out this field.») y los mensajes en español de
         // validateTransactionForm nunca llegan a pintarse.
         const dialog = await openDialog();
-        expect(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')).toHaveAttribute('novalidate');
+        expect(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')).toHaveAttribute('novalidate');
     });
 
     it('un ticker de Madrid (SAN.MC) fija la divisa en EUR y la operación se envía con los valores tecleados', async () => {
@@ -112,7 +112,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '12.5' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4.1234' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
 
         expect(addTransaction).toHaveBeenCalledTimes(1);
@@ -142,7 +142,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
-        const form = within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!;
+        const form = within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!;
 
         fireEvent.change(within(dialog).getByLabelText(/^Comisiones/), { target: { value: '-1' } });
         fireEvent.submit(form);
@@ -167,7 +167,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '10' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '4' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
         expect(addTransaction.mock.calls[0][8]).toBe(0);
     });
@@ -182,7 +182,7 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '1' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '200' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2999-01-01' } });
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
         expect(within(dialog).getByRole('alert')).toHaveTextContent('La fecha no puede ser futura.');
         expect(addTransaction).not.toHaveBeenCalled();
@@ -199,12 +199,12 @@ describe('AddTransactionButton (Nueva Inversión)', () => {
         fireEvent.change(within(dialog).getByLabelText('Cantidad'), { target: { value: '3' } });
         fireEvent.change(within(dialog).getByLabelText(/^Precio/), { target: { value: '150' } });
         fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-01-15' } });
-        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Inversión' }).closest('form')!);
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar inversión' }).closest('form')!);
         await flush();
         expect(addTransaction).toHaveBeenCalledTimes(1);
         expect(toastSuccess).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog')).toBeInTheDocument();
         expect(within(dialog).getByLabelText('Cantidad')).toHaveValue('3');
-        expect(within(dialog).getByRole('button', { name: 'Guardar Inversión' })).toBeEnabled();
+        expect(within(dialog).getByRole('button', { name: 'Guardar inversión' })).toBeEnabled();
     });
 });

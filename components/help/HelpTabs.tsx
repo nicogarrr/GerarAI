@@ -89,7 +89,7 @@ export default function HelpTabs() {
   return (
     <main id="content" tabIndex={-1} className="mx-auto w-full max-w-4xl px-4 py-12">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-100 mb-4">Centro de Ayuda</h1>
+        <h1 className="text-4xl font-bold text-gray-100 mb-4">Centro de ayuda</h1>
         <p className="text-xl text-gray-200 mb-4">
           Documentación, preguntas frecuentes y soporte
         </p>
@@ -169,7 +169,7 @@ export default function HelpTabs() {
 
           {/* Community FAQs */}
           <section className="mb-12">
-            <h2 className="text-3xl font-bold text-gray-100 mb-8 text-center">Preguntas Frecuentes</h2>
+            <h2 className="text-3xl font-bold text-gray-100 mb-8 text-center">Preguntas frecuentes</h2>
             <div className="space-y-4">
               {faqs.map((faq) => (
                 <div key={faq.question} className="bg-gray-800 rounded-lg shadow-sm p-6 border">

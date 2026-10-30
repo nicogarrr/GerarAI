@@ -1,5 +1,5 @@
 /**
- * F386: un backend caído no debe pintarse como "Tu Watchlist está vacía".
+ * F386: un backend caído no debe pintarse como "Tu watchlist está vacía".
  * Ejecución: node --experimental-strip-types --test scripts/watchlist-unavailable-guard.test.ts
  */
 import { describe, it } from 'node:test';
@@ -20,7 +20,7 @@ describe('watchlist: fallo del backend vs lista vacía', () => {
     it('la página muestra un estado no disponible antes del vacío', () => {
         const page = source('app/(root)/watchlist/page.tsx');
         assert.match(page, /getWatchlistState\(\)/);
-        assert.ok(page.indexOf('watchlist-unavailable') < page.indexOf('Tu Watchlist está vacía'));
+        assert.ok(page.indexOf('watchlist-unavailable') < page.indexOf('Tu watchlist está vacía'));
         assert.match(page, /No se pudo cargar tu watchlist/);
     });
 });

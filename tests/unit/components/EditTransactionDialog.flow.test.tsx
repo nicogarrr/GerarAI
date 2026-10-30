@@ -17,7 +17,7 @@ function open(tx: any = base) {
     return within(screen.getByRole('dialog'));
 }
 const submit = async (d: ReturnType<typeof open>) => {
-    await act(async () => { fireEvent.submit(d.getByRole('button', { name: 'Guardar Cambios' }).closest('form')!); });
+    await act(async () => { fireEvent.submit(d.getByRole('button', { name: 'Guardar cambios' }).closest('form')!); });
 };
 
 beforeEach(() => { vi.clearAllMocks(); h.update.mockResolvedValue(undefined); });
@@ -120,7 +120,7 @@ describe('EditTransactionDialog', () => {
         expect(h.success).not.toHaveBeenCalled();
         expect(h.refresh).not.toHaveBeenCalled();
         expect(screen.getByRole('dialog')).toBeInTheDocument();
-        expect(d.getByRole('button', { name: 'Guardar Cambios' })).not.toBeDisabled();
+        expect(d.getByRole('button', { name: 'Guardar cambios' })).not.toBeDisabled();
     });
 
     it('un redirect de Next se relanza y no se muestra como error', async () => {

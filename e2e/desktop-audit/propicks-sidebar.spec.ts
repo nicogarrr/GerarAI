@@ -16,7 +16,7 @@ for (const width of [1024, 1280]) {
     }
     const data = await page.evaluate(() => {
       const out: Record<string, unknown> = {};
-      const aplicar = [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Aplicar Filtros"));
+      const aplicar = [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Aplicar filtros"));
       const actualizar = [...document.querySelectorAll("button")].find((b) => b.textContent?.includes("Actualizar selección"));
       for (const [k, b] of [["aplicar", aplicar], ["actualizar", actualizar]] as const) {
         if (!b) { out[k] = null; continue; }

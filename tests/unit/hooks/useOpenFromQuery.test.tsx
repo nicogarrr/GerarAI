@@ -7,7 +7,7 @@ import { addTransactionHref } from '@/lib/portfolio/add-dialog-link';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 // Contenido mínimo con el DialogContent real: solo se ve si el diálogo está abierto.
 vi.mock('@/components/portfolio/AddTransactionDialog', () => ({
-    default: () => <DialogContent><DialogTitle>Nueva Inversión</DialogTitle></DialogContent>,
+    default: () => <DialogContent><DialogTitle>Nueva inversión</DialogTitle></DialogContent>,
 }));
 vi.mock('@/components/watchlist/WatchlistAddDialog', () => ({
     default: () => <DialogContent><DialogTitle>Añadir a la watchlist</DialogTitle></DialogContent>,
@@ -38,11 +38,11 @@ describe('enlaces «…?anadir=1» de Primeros pasos', () => {
         expect(window.location.search).toBe('');
     });
 
-    it('/portfolio?anadir=1 abre «Nueva Inversión» una sola vez aunque haya varios botones', async () => {
+    it('/portfolio?anadir=1 abre «Nueva inversión» una sola vez aunque haya varios botones', async () => {
         goTo('/portfolio?anadir=1');
         render(<><AddTransactionButton userId="u" /><AddTransactionButton userId="u" /></>);
         await waitFor(() => expect(screen.getAllByRole('dialog')).toHaveLength(1));
-        expect(screen.getByText('Nueva Inversión')).toBeInTheDocument();
+        expect(screen.getByText('Nueva inversión')).toBeInTheDocument();
         expect(window.location.search).toBe('');
     });
 

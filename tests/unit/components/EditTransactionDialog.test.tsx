@@ -50,7 +50,7 @@ describe('EditTransactionDialog comisiones', () => {
         expect(input.value).toBe('2,5');
         fireEvent.change(input, { target: { value: '3' } });
         await act(async () => {
-            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar cambios' }).closest('form')!);
         });
         expect(updateTransaction).toHaveBeenCalledTimes(1);
         expect(updateTransaction.mock.calls[0][9]).toBe(3);
@@ -59,7 +59,7 @@ describe('EditTransactionDialog comisiones', () => {
     it('guardar sin tocar la comisión conserva la existente (no la pone a 0)', async () => {
         const dialog = await open({ ...base, fees: 2.5 });
         await act(async () => {
-            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar cambios' }).closest('form')!);
         });
         expect(updateTransaction.mock.calls[0][9]).toBe(2.5);
     });
@@ -69,7 +69,7 @@ describe('EditTransactionDialog comisiones', () => {
         expect((within(dialog).getByLabelText('Cantidad') as HTMLInputElement).value).toBe('6,0572');
         expect((within(dialog).getByLabelText(/^Precio/) as HTMLInputElement).value).toBe('150,5');
         await act(async () => {
-            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar cambios' }).closest('form')!);
         });
         expect(updateTransaction).toHaveBeenCalledTimes(1);
         expect(updateTransaction.mock.calls[0][4]).toBeCloseTo(6.0572, 10);
@@ -81,7 +81,7 @@ describe('EditTransactionDialog comisiones', () => {
         const input = within(dialog).getByLabelText(/^Comisiones/) as HTMLInputElement;
         expect(input.value).toBe('');
         await act(async () => {
-            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar cambios' }).closest('form')!);
         });
         expect(updateTransaction).toHaveBeenCalledTimes(1);
         expect(updateTransaction.mock.calls[0]).toHaveLength(10);
@@ -92,7 +92,7 @@ describe('EditTransactionDialog comisiones', () => {
         const dialog = await open(base);
         fireEvent.change(within(dialog).getByLabelText(/^Comisiones/), { target: { value: '4' } });
         await act(async () => {
-            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar Cambios' }).closest('form')!);
+            fireEvent.submit(within(dialog).getByRole('button', { name: 'Guardar cambios' }).closest('form')!);
         });
         expect(updateTransaction.mock.calls[0][9]).toBe(4);
     });

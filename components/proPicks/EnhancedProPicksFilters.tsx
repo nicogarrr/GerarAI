@@ -108,10 +108,10 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           </div>
         </CardHeader>
         <CardContent className={`space-y-6 ${open ? '' : 'hidden'} xl:block`} id="propicks-filtros-cuerpo">
-          {/* Cantidad de Resultados */}
+          {/* Cantidad de resultados */}
           <div className="space-y-3">
             <Label id="propicks-filtro-limit-label" className="text-sm font-medium text-gray-200">
-              Cantidad de Acciones: {filters.limit}
+              Cantidad de acciones: {filters.limit}
             </Label>
             <Slider
               aria-labelledby="propicks-filtro-limit-label"
@@ -163,7 +163,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
               <SelectContent>
                 {sectors.map(sector => (
                   <SelectItem key={sector} value={sector}>
-                    {sector === 'all' ? 'Todos los Sectores' : etiquetaSector(sector)}
+                    {sector === 'all' ? 'Todos los sectores' : etiquetaSector(sector)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -197,7 +197,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
           {/* Botón Aplicar */}
           <Button onClick={onApply} className="min-h-11 w-full whitespace-normal text-center leading-tight">
             <Filter className="h-4 w-4 mr-2" />
-            Aplicar Filtros
+            Aplicar filtros
           </Button>
         </CardContent>
       </fieldset>

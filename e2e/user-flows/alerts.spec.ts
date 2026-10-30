@@ -15,7 +15,7 @@ async function deleteAllAlerts(page: Page) {
 }
 
 async function openCreate(page: Page) {
-  await page.getByRole("button", { name: /Nueva Alerta|Crear la primera alerta/ }).first().click();
+  await page.getByRole("button", { name: /Nueva alerta|Crear la primera alerta/ }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   return dialog;

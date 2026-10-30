@@ -39,7 +39,7 @@ for (const vp of VIEWPORTS) {
       await expect(page.getByRole("heading", { name: "Resumen", level: 1 })).toBeVisible();
       // Ningún total de cartera sigue en euros tras cambiar la divisa base.
       const summary = page.getByRole("tabpanel", { name: "Resumen" });
-      await expect(summary).not.toContainText(/Valor Total \(neto\)\s*[\d.,]+\s*€/);
+      await expect(summary).not.toContainText(/Valor total \(neto\)\s*[\d.,]+\s*€/);
       await expectHealthyPage(page, "cartera en USD");
 
       await visit(page, "/settings");

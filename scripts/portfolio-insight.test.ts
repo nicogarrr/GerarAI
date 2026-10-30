@@ -103,7 +103,7 @@ describe('guardas de regresion de /inicio', () => {
     assert.ok(
       overview.includes('<PortfolioValueBreakdown summary={portfolioSummary} />')
         && source('components/portfolio/PortfolioValueBreakdown.tsx').includes('formatMoney(totalValue, baseCurrency)'),
-      'el total de "Tu Cartera Hoy" debe usar portfolioSummary.baseCurrency',
+      'el total de "Tu cartera hoy" debe usar portfolioSummary.baseCurrency',
     );
   });
 });

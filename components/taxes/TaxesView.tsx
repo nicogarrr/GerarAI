@@ -378,7 +378,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
         ? []
         : Array.from({ length: 6 }, (_, index) => currentYear - index);
 
-    // [&>*]:min-w-0: a 768 px (md) la tarjeta «Posiciones Fiscales» (min-content
+    // [&>*]:min-w-0: a 768 px (md) la tarjeta «Posiciones fiscales» (min-content
     // 513 px) inflaba la vía implícita de esta grid y la página hacía scroll
     // horizontal; con min-w-0 cada tarjeta cabe y su tabla desliza dentro.
     return (
@@ -444,7 +444,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
 
             <RecordList
                 key={`holdings-${year}-${currentHoldingPage}`}
-                title="Posiciones Fiscales"
+                title="Posiciones fiscales"
                 titleAs="h2"
                 description="Posiciones con base de coste y plusvalías latentes. La divisa base del informe es EUR; cada importe usa la divisa de su fila si consta."
                 icon={<Receipt className="h-5 w-5 text-teal-400" />}

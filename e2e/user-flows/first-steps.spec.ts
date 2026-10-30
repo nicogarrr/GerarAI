@@ -52,7 +52,7 @@ for (const vp of VIEWPORTS) {
 
       await page.getByRole("link", { name: /Añadir\s*inversión/ }).click();
       await expect(page).toHaveURL(/\/portfolio(?!.*anadir)/, { timeout: 30_000 });
-      const dialog = page.getByRole("dialog", { name: "Nueva Inversión" });
+      const dialog = page.getByRole("dialog", { name: "Nueva inversión" });
       await expect(dialog).toBeVisible({ timeout: 30_000 });
 
       await dialog.getByPlaceholder(/Buscar por nombre o símbolo/).fill(SYMBOL.toLowerCase());
@@ -73,10 +73,10 @@ for (const vp of VIEWPORTS) {
       await page.getByRole("tab", { name: "Movimientos" }).click();
       const movimientos = page.getByRole("tabpanel", { name: "Movimientos" });
       await movimientos.getByRole("button", { name: `Editar transacción de ${SYMBOL}` }).first().click();
-      const edit = page.getByRole("dialog", { name: "Editar Transacción" });
+      const edit = page.getByRole("dialog", { name: "Editar transacción" });
       await expect(edit).toBeVisible();
       await edit.getByLabel("Cantidad").fill("15");
-      await edit.getByRole("button", { name: "Guardar Cambios" }).click();
+      await edit.getByRole("button", { name: "Guardar cambios" }).click();
       await expect(page.getByText("Transacción actualizada")).toBeVisible({ timeout: 30_000 });
       await expect(edit).toBeHidden();
       const edited = await backendCall("GET", "/api/portfolio/transactions");

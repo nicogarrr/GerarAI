@@ -100,7 +100,7 @@ export const glossary: Record<GlossaryKey, GlossaryEntry> = {
       'El caso adverso: ejecución por debajo, márgenes bajo presión y capital más caro. No es un cataclismo arbitrario: el precio corriendo con una prima de riesgo. Úsalo para medir cuánto puedes perder si la tesis se tuerce.',
   },
   base: {
-    term: 'Escenario Base (central)',
+    term: 'Escenario base (central)',
     short:
       'El caso más probable con supuestos normalizados: crecimiento y margen en línea con lo histórico de la compañía. Es el ancla de la valoración, pero no «el» valor: la realidad casi nunca coincide al punto.',
   },

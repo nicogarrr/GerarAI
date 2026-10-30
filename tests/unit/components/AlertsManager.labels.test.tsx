@@ -13,8 +13,8 @@ import AlertsManager from '@/components/alerts/AlertsManager';
 describe('Alert creation selector labels', () => {
     it('exposes the alert type selector by its visible label', async () => {
         render(<AlertsManager />);
-        await waitFor(() => expect(screen.getByRole('combobox', { name: 'Tipo de Alerta' })).toBeInTheDocument());
-        expect(screen.getByRole('combobox', { name: 'Tipo de Alerta' })).toHaveAttribute('id', 'type');
+        await waitFor(() => expect(screen.getByRole('combobox', { name: 'Tipo de alerta' })).toBeInTheDocument());
+        expect(screen.getByRole('combobox', { name: 'Tipo de alerta' })).toHaveAttribute('id', 'type');
     });
     it('exposes the operator selector by its visible label for percentage alerts', async () => {
         render(<AlertsManager />);

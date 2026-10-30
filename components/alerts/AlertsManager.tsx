@@ -332,7 +332,7 @@ function AlertsManager() {
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="type" className="text-gray-300">Tipo de Alerta</Label>
+                                <Label htmlFor="type" className="text-gray-300">Tipo de alerta</Label>
                                 <Select
                                     value={formData.type}
                                     onValueChange={(value: AlertType) =>

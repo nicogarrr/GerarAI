@@ -38,7 +38,7 @@ test.describe("investor watchlist flow", () => {
     const mobile = (page.viewportSize()?.width ?? 1440) < 768;
     const rows = page.locator(mobile ? "main article" : "table tbody tr");
     if ((await rows.count()) === 0) {
-      await expect(page.getByText("Tu Watchlist está vacía")).toBeVisible();
+      await expect(page.getByText("Tu watchlist está vacía")).toBeVisible();
       await expect(page.getByRole("link", { name: /Ir a buscar acciones/ })).toBeVisible();
       return;
     }
@@ -72,7 +72,7 @@ test.describe("investor watchlist flow", () => {
     if (!mobile) await rows.first().locator("summary").click();
     await rows.first().getByRole("button", { name: /^Eliminar .+ de la watchlist$/i }).click();
     if (initial === 1) {
-      await expect(page.getByText("Tu Watchlist está vacía")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("Tu watchlist está vacía")).toBeVisible({ timeout: 15_000 });
     } else {
       await expect(rows).toHaveCount(initial - 1, {
         timeout: 15_000,
