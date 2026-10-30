@@ -35,8 +35,8 @@ describe('canonicalRedirectTicker', () => {
 describe('chat intents', () => {
     it('el enlace codifica ticker y pregunta y apunta al ancla del chat', () => {
         const href = chatIntentHref('BRK/B', CHAT_INTENTS[0]);
-        expect(href.startsWith('/research/BRK%2FB?view=chat&chat=')).toBe(true);
-        expect(href.endsWith('#chat-empresa')).toBe(true);
+        expect(href.startsWith('/research/BRK%2FB?view=fuentes&chat=')).toBe(true);
+        expect(href.endsWith('#chat')).toBe(true);
         expect(decodeURIComponent(href.split('chat=')[1].split('#')[0])).toBe(CHAT_INTENTS[0].question('BRK/B'));
     });
     it('las tres intenciones mencionan el ticker', () => {
@@ -169,7 +169,7 @@ describe('view-outage', () => {
     });
     it('reintento conserva la vista activa', () => {
         expect(viewRetryHref('AAPL', 'overview')).toBe('/research/AAPL');
-        expect(viewRetryHref('BRK/B', 'holders')).toBe('/research/BRK%2FB?view=holders');
+        expect(viewRetryHref('BRK/B', 'holders')).toBe('/research/BRK%2FB?view=seguimiento#superinversores');
     });
 });
 

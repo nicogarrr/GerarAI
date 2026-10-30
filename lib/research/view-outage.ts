@@ -17,7 +17,11 @@ export function findUnavailableViewFailure(
   return null;
 }
 
+// El reintento apunta a la URL canónica de la pestaña (una fila de seis,
+// 29-oct-2026), no al ?view= de módulo histórico.
+import { MODULES, moduleHref } from '@/lib/research/research-views';
+
 export function viewRetryHref(ticker: string, activeView: string): string {
-  const view = activeView === 'overview' ? '' : `?view=${encodeURIComponent(activeView)}`;
-  return `/research/${encodeURIComponent(ticker)}${view}`;
+  const mod = MODULES.find((m) => m.key === activeView);
+  return mod ? moduleHref(ticker, mod) : `/research/${encodeURIComponent(ticker)}`;
 }

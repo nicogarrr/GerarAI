@@ -118,13 +118,14 @@ test.describe("ficha: panel de calidad financiera", () => {
   });
 });
 
-test("1280px: la barra de modulos no necesita scroll horizontal", async ({ page }) => {
+test("1280px: la fila de pestañas no necesita scroll horizontal", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/research/MSFT");
   await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
-  const nav = page.getByRole("navigation", { name: /Módulos de/ });
+  // Una sola fila de seis pestañas (29-oct-2026): ya no hay fila de módulos.
+  const nav = page.getByRole("navigation", { name: "Secciones de la empresa", exact: true });
   await expect(nav).toBeVisible();
   const medidas = await nav.evaluate((el) => ({ scroll: el.scrollWidth, cliente: el.clientWidth }));
-  console.log(`nav modulos a 1280px: scrollWidth=${medidas.scroll} clientWidth=${medidas.cliente}`);
+  console.log(`fila de pestañas a 1280px: scrollWidth=${medidas.scroll} clientWidth=${medidas.cliente}`);
   expect(medidas.scroll).toBeLessThanOrEqual(medidas.cliente + 1);
 });

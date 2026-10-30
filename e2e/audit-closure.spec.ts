@@ -66,6 +66,9 @@ test.describe("audit closure flows", () => {
       // sino uno de los tres estados honestos sin CTA.
       /Research aún no generado|todavía no tiene research|Identidad del ticker no verificada|No encontramos este ticker|No pudimos comprobar este ticker/,
     );
+    // La pestaña Tesis llega por streaming (otras secciones antes): espera a
+    // que se resuelva en uno de los estados antes de decidir cuál es.
+    await expect(debate.or(offline).or(noThesis).or(noThesis2).or(noResearch).first()).toBeVisible({ timeout: 30_000 });
     if ((await offline.count()) > 0 || (await noThesis.count()) > 0 || (await noThesis2.count()) > 0 || (await noResearch.count()) > 0) return;
     await expect(debate).toBeVisible();
     await expect(approve).toBeVisible();
@@ -78,13 +81,20 @@ test.describe("audit closure flows", () => {
     const noResearch = page.getByText(
       /Research aún no generado|todavía no tiene research|Identidad del ticker no verificada|No encontramos este ticker|No pudimos comprobar este ticker|backend/i,
     );
+    // La sección llega por streaming: espera a que se resuelva antes de contar.
+    await expect(field.or(noResearch).first()).toBeVisible({ timeout: 30_000 });
     if ((await field.count()) === 0) {
       expect(await noResearch.count()).toBeGreaterThan(0);
       return;
     }
-    await field.fill("deuda nivel");
-    await page.getByRole("button", { name: "Preguntar", exact: true }).click();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    // Antes de hidratar, «Preguntar» es un submit nativo sin handler: se
+    // reintenta hasta que el formulario abre el Cerebro.
+    await page.waitForLoadState("load");
+    await expect(async () => {
+      await field.fill("deuda nivel");
+      await page.getByRole("button", { name: "Preguntar", exact: true }).click();
+      await expect(page.getByRole("dialog")).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
   });
 
 });

@@ -51,8 +51,7 @@ from app.models import FinancialFact, MarketPrice
 from app.models.entities import Company
 from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
-    cumulative_split_factor_after,
-    period_end_date,
+    fact_split_factor,
     split_events_by_company,
 )
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
@@ -146,11 +145,14 @@ def _shares_outstanding(
     net_income/eps ESEF. El recuento se expresa en acciones ACTUALES: se
     multiplica por el factor acumulado de los splits posteriores al cierre
     del periodo del hecho (misma regla que long_term_model_service y que
-    el ajuste de EPS del PER)."""
+    el ajuste de EPS del PER). Un 10-K publicado tras el split ya viene
+    reexpresado: regla unica fact_split_factor (consciente del `filed`)."""
     events = split_events_by_company(db, [company.id]).get(company.id, [])
     shares = _latest_fact(db, company, "shares_outstanding")
     if shares is not None and shares.value and Decimal(shares.value) > 0:
-        factor = cumulative_split_factor_after(events, period_end_date(shares.period))
+        factor = fact_split_factor(
+            events, period=shares.period, filed=shares.filed
+        )
         return Decimal(shares.value) * factor, (
             "reported_shares_outstanding" + _split_note(factor)
         ), factor
@@ -169,7 +171,9 @@ def _shares_outstanding(
     ):
         # El periodo del EPS ancla el factor (mismo ejercicio que el
         # net_income por la guarda de arriba).
-        factor = cumulative_split_factor_after(events, period_end_date(eps.period))
+        factor = fact_split_factor(
+            events, period=eps.period, filed=eps.filed
+        )
         return Decimal(income.value) / Decimal(eps.value) * factor, (
             f"derived_net_income_over_eps FY{eps.fiscal_year}" + _split_note(factor)
         ), factor

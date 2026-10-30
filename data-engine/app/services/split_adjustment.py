@@ -70,6 +70,34 @@ def period_end_date(period: str | None) -> date | None:
         return None
 
 
+def fact_split_factor(
+    events: list[tuple[date, Decimal]],
+    *,
+    period: str | None,
+    filed: date | None,
+    cutoff: date | None = None,
+) -> Decimal:
+    """Factor de los splits que un hecho NO recoge todavia (regla unica).
+
+    Cuenta los splits efectivos despues del cierre del periodo y tambien
+    despues de la publicacion (``filed``): un 10-K publicado tras el split ya
+    viene reexpresado (ASC 260), y ajustarlo otra vez lo duplicaria. Un
+    recuento de portada (``:DEI``) es una foto a SU fecha: no se reexpresa, asi
+    que ahi solo cuenta esa fecha. Con ``cutoff`` (fecha del precio o del
+    as_of) solo entran splits con fecha <= cutoff: un split futuro respecto al
+    precio no cambia ese precio.
+    """
+    ref = period_end_date(period)
+    if ref is None:
+        return Decimal(1)
+    point_in_time = (period or "").upper().endswith(":DEI")
+    if filed is not None and filed > ref and not point_in_time:
+        ref = filed
+    if cutoff is not None:
+        events = [event for event in events if event[0] <= cutoff]
+    return cumulative_split_factor_after(events, ref)
+
+
 def split_factor_for_fact(
     db: Session,
     company_id: int,
@@ -78,22 +106,10 @@ def split_factor_for_fact(
     filed: date | None,
     cutoff: date,
 ) -> Decimal:
-    """Factor de los splits que el hecho NO recoge todavia.
-
-    Cuenta los splits efectivos despues del cierre del periodo y tambien
-    despues de la publicacion (``filed``): un 10-K publicado tras el split ya
-    viene reexpresado (ASC 260), y ajustarlo otra vez lo duplicaria. Solo
-    entran splits con fecha <= ``cutoff`` (la fecha del precio o del as_of):
-    un split futuro respecto al precio no cambia ese precio.
-    """
-    ref = period_end_date(period)
-    if ref is None:
-        return Decimal(1)
-    if filed is not None and filed > ref:
-        ref = filed
-    events = [
-        event
-        for event in split_events_by_company(db, [company_id]).get(company_id, [])
-        if event[0] <= cutoff
-    ]
-    return cumulative_split_factor_after(events, ref)
+    """``fact_split_factor`` leyendo los splits de la compania en BD."""
+    return fact_split_factor(
+        split_events_by_company(db, [company_id]).get(company_id, []),
+        period=period,
+        filed=filed,
+        cutoff=cutoff,
+    )

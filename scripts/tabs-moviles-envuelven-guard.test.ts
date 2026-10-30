@@ -22,5 +22,10 @@ test('las tres tiras envuelven en móvil', () => {
     assert.ok(SECTION.includes('<OverflowScrollRegion'), 'SectionNav: el scroll lo da la region con pista');
     assert.ok(PROPICKS.includes('flex-wrap justify-start gap-1'), 'TabsList ProPicks sin wrap');
     assert.ok(!PROPICKS.includes('snap-x'), 'TabsList ProPicks sigue con snap scroll');
-    assert.ok(RESEARCH.includes('className="flex flex-wrap gap-2"'), 'nav de módulos de la ficha sin wrap');
+    // Ficha (29-oct-2026, «Una fila, no tres menús»): UNA fila de seis
+    // pestañas que se desliza en horizontal en móvil (scroll nativo), sin
+    // cortar palabras (whitespace-nowrap + shrink-0 en cada pestaña).
+    assert.ok(RESEARCH.includes('overflow-x-auto'), 'ficha: la fila de pestañas se desliza en móvil');
+    assert.ok(RESEARCH.includes('whitespace-nowrap'), 'ficha: las pestañas no cortan palabras');
+    assert.ok(RESEARCH.includes('data-testid="company-navigation"'), 'ficha: una sola navegación');
 });

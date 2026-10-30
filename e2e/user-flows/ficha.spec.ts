@@ -35,19 +35,14 @@ for (const vp of VIEWPORTS) {
       // Tesis: sin tesis hay copy y la acción para generarla (no se pulsa: LLM).
       await expect(page.getByText(/Sin tesis todavía|Tesis/).filter({ visible: true }).first()).toBeVisible();
 
-      // «Diario de decisiones»: el enlace lleva al diario y lo deja a la vista.
-      const advanced = page.locator("details").filter({ has: page.getByTestId("decision-journal-entry") });
-      if (await advanced.count()) {
-        const open = await advanced.first().evaluate((el) => (el as HTMLDetailsElement).open);
-        if (!open) {
-          await advanced.first().locator("summary").scrollIntoViewIfNeeded();
-          await advanced.first().locator("summary").click();
-        }
-      }
+      // «Diario de decisiones»: vive en el menú de cabecera «Más acciones»
+      // (CompanyActionsMenu; antes en un <details>). El enlace lleva al
+      // diario de la pestaña Seguimiento y lo deja a la vista.
+      await page.getByRole("button", { name: "Más acciones" }).click();
       const link = page.getByTestId("decision-journal-entry");
       await expect(link).toBeVisible();
       await link.click();
-      await expect(page).toHaveURL(/view=changes.*#diario-decisiones|#diario-decisiones/);
+      await expect(page).toHaveURL(/view=seguimiento#diario-decisiones/);
       const journal = page.locator("#diario-decisiones");
       await expect(journal).toBeVisible({ timeout: 30_000 });
       await expect(journal).toBeInViewport({ timeout: 10_000 });

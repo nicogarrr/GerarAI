@@ -42,7 +42,8 @@ describe('chat de la ficha: asistente por intención', () => {
     it('los enlaces antiguos ?chat= abren el Cerebro y limpian el parametro', () => {
         assert.match(page, /<LegacyChatRedirect ticker=\{ticker\} question=\{query\.chat\} \/>/);
         assert.match(legacy, /openBrain\(\{ ticker, question: text\.slice\(0, 2000\) \}\)/);
-        assert.match(legacy, /router\.replace\(`\$\{pathname\}\?view=chat`/);
-        assert.match(chatIntentHref('AAPL', CHAT_INTENTS[0]), /^\/research\/AAPL\?view=chat&chat=/);
+        // El chat es la sección de la pestaña Fuentes desde el 29-oct-2026.
+        assert.match(legacy, /router\.replace\(`\$\{pathname\}\?view=fuentes#chat`/);
+        assert.match(chatIntentHref('AAPL', CHAT_INTENTS[0]), /^\/research\/AAPL\?view=fuentes&chat=/);
     });
 });
