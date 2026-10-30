@@ -841,11 +841,18 @@ def dca_backtest(
         fetched = svc.fetch_yahoo_history(yahoo)
     except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
         raise HTTPException(status_code=502, detail=f"No se pudo descargar el histórico de {key}") from exc
-    rows = svc.settled_rows(fetched.rows, datetime.now(UTC))
+    from zoneinfo import ZoneInfo
+
+    now = datetime.now(UTC)
+    rows = svc.settled_rows(fetched.rows, now)
     bars, _factor = svc.build_bars(rows)
     if not bars:
         return {"symbol": key, "available": False, "reason": "Sin histórico de precios para este ticker"}
-    result = backtest_dca(bars, start=start, end=end, base_amount=base, today=date.today())
+    # «Hoy» en Nueva York, como la señal diaria y ``settled_rows``: con la fecha
+    # del servidor (UTC), entre las 00:00 UTC del día 1 y la medianoche de NY el
+    # mes anterior se daba por cerrado sin su último cierre.
+    today = now.astimezone(ZoneInfo("America/New_York")).date()
+    result = backtest_dca(bars, start=start, end=end, base_amount=base, today=today)
     currency = fetched.currency or (company.currency if company is not None else None)
     out: dict = {
         "symbol": key,
