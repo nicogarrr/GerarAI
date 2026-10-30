@@ -11,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services.money_flows import FLOW_THEMES, build_theme_payload, theme_summaries
 
 router = APIRouter()
@@ -93,7 +94,7 @@ def list_flow_themes() -> list[FlowThemeSummaryOut]:
 def get_flow_theme(theme_id: str, db: Session = Depends(get_db)) -> FlowThemeOut:
     theme = FLOW_THEMES.get(theme_id)
     if theme is None:
-        raise HTTPException(status_code=404, detail="Tema de flujo no configurado")
+        raise HTTPException(status_code=404, detail=ui_error(404, "flow_topic_not_configured").detail)
     tenant = db.info.get("tenant_id")
     payload = build_theme_payload(db, theme, tenant if isinstance(tenant, int) else None)
     return FlowThemeOut(**payload)
