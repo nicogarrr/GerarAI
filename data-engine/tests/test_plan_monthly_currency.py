@@ -144,9 +144,12 @@ def test_partial_month_future_anniversary_is_pending_not_converted(db):
     pending = m["expected_periods"][1]
     assert pending["due_date"] == "2026-03-25"
     assert pending["rate"] is None and pending["rate_date"] is None and pending["source"] is None
-    assert m["expected_conversion_complete"] is False
-    assert m["expected_contributions_base"] is None
+    # La cuota del 25-mar aun no vence: no se debe y no bloquea el total
+    # (antes: None => «En camino» N/D hasta cada aniversario).
+    assert m["expected_conversion_complete"] is True
+    assert m["expected_contributions_base"] == pytest.approx(450)
     assert m["expected_missing_fx"] == []
+    assert m["on_track"] is not None
 
 
 def test_leap_day_and_month_end_anniversaries_are_deterministic(db):
@@ -316,3 +319,13 @@ def test_get_plan_without_plan_exposes_capability(db, monkeypatch):
     assert get_plan(db) == {"plan_exists": False, "currency_contract_enabled": True}
     monkeypatch.delenv("PLAN_CURRENCY_ENFORCED")
     assert get_plan(db)["currency_contract_enabled"] is False
+
+
+def test_fx_and_same_currency_agree_on_due_installments(db):
+    """Misma cuota, misma fecha: con tasa 1 la via FX debe exigir lo mismo que la via sin FX."""
+    service = InvestmentPlanService()
+    _usd_plan(service, db, date(2026, 1, 31))
+    _rate(db, "1", date(2026, 1, 1))
+    m = service.plan_metrics(db, today=date(2026, 4, 29))  # 30-abr aun no vence
+    assert m["expected_contributions_base"] == pytest.approx(1000)  # feb + mar
+    assert [p["status"] for p in m["expected_periods"]] == ["converted", "converted", "pending_due_date"]

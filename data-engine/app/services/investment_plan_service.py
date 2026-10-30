@@ -330,14 +330,12 @@ class InvestmentPlanService:
             return total, total, [], periods
         total = Decimal("0")
         missing: list[dict] = []
-        pending = False
         for period in range(1, months_elapsed + 1):
             due_date = self._add_months_clamped(plan.start_date, period)
             if due_date > today:
                 # Cuota contada por el calendario pero aun no vencida: no se
                 # convierte (ni FX futura ni la tasa de hoy atribuida a una
                 # fecha futura). Estado propio, distinto de «falta tasa».
-                pending = True
                 periods.append(
                     {
                         "period": period,
@@ -392,8 +390,11 @@ class InvestmentPlanService:
                     "direction": found["direction"],
                 }
             )
-        if missing or pending:
+        if missing:
             return None, total, missing, periods
+        # Una cuota con aniversario futuro aun no es exigible (igual que la via
+        # sin FX, `_due_periods`): queda listada como pending_due_date pero no
+        # bloquea el total. Antes dejaba «En camino» en N/D casi todo el mes.
         return total, total, [], periods
 
     @staticmethod
