@@ -89,6 +89,7 @@ def normalize_rows(
     *,
     reference_price: float | None,
     today: date | None = None,
+    listed_from: date | None = None,
 ) -> list[AnalystTargetRow]:
     """Ultima fila con objetivo por firma, de los ultimos 12 meses, mas reciente primero.
 
@@ -108,7 +109,7 @@ def normalize_rows(
             when = raw_date.date() if hasattr(raw_date, "date") else date.fromisoformat(str(raw_date)[:10])
         except ValueError:
             continue
-        if when.toordinal() < cutoff_ordinal:
+        if when.toordinal() < cutoff_ordinal or (listed_from is not None and when < listed_from):
             continue
         key = firm.casefold()
         current = latest.get(key)
@@ -164,7 +165,9 @@ def _fetch_consensus(symbol: str) -> dict[str, Any]:
 # accion (EQUITY) tiene precios objetivo de analistas con sentido: un ETF,
 # fondo o indice no es una empresa cubierta por analistas, y aceptar el
 # simbolo tal cual mostraba objetivos de OTRO instrumento con el mismo ticker
-# (informe UX 29-oct, punto 6: SPCX resolvia al ETF, no a la empresa).
+# El antiguo SPCX del ETF ahora es SPCK; SPCX corresponde a SpaceX desde
+# 2026-06-12. No se bloquea un ticker por su identidad historica.
+# https://nasdaqtrader.com/TraderNews.aspx?id=DTN2026-8
 _NON_EQUITY_LABEL = {
     "ETF": "un ETF",
     "MUTUALFUND": "un fondo",
@@ -281,7 +284,12 @@ class AnalystTargetsService:
             return result
         consensus_raw = data["consensus"]
         reference = _positive(consensus_raw.get("current"))
-        rows = normalize_rows(data["records"], reference_price=reference)
+        # Nasdaq DTN2026-8 explicitly forbids mixing the former ETF history
+        # with this new listing. Never remap the old records to SPCK here.
+        rows = normalize_rows(
+            data["records"], reference_price=reference,
+            listed_from=date(2026, 6, 12) if key == "SPCX" else None,
+        )
         consensus = AnalystConsensus(
             low=_positive(consensus_raw.get("low")),
             high=_positive(consensus_raw.get("high")),
