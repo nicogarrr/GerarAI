@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type ComponentPropsWithoutRef } from 'react';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n/client';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +17,7 @@ type FileUploadInputProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'on
 };
 
 export function FileUploadInput({ maxMB = MAX_UPLOAD_MB, className, id, name, ...props }: FileUploadInputProps) {
+  const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const [warning, setWarning] = useState<string | null>(null);
   // F142: el texto del input file nativo («Choose File / No file chosen»)
@@ -41,7 +43,7 @@ export function FileUploadInput({ maxMB = MAX_UPLOAD_MB, className, id, name, ..
         minimumFractionDigits: 1,
         maximumFractionDigits: 1,
       });
-      const message = `"${file.name}" pesa ${sizeMb} MB y el límite de subida es ${maxMB} MB: elige un archivo más pequeño o súbelo comprimido.`;
+      const message = t('errors.upload.tooBig', { name: file.name, sizeMb, maxMB });
       setWarning(message);
       event.target.setCustomValidity(message);
       toast.warning(message);
@@ -136,9 +138,9 @@ export function FileUploadInput({ maxMB = MAX_UPLOAD_MB, className, id, name, ..
             warning ? 'border-red-500' : null,
           )}
         >
-          Elegir archivo
+          {t('errors.upload.choose')}
         </label>
-        <span className="truncate text-sm text-gray-400">{fileName ?? 'Ningún archivo seleccionado'}</span>
+        <span className="truncate text-sm text-gray-400">{fileName ?? t('errors.upload.noFile')}</span>
       </div>
       {warning ? (
         <p id={warningId} role="alert" className="mt-1 text-xs text-red-400">

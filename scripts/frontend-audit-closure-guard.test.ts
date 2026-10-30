@@ -23,7 +23,9 @@ const read = (path: string) => readFileSync(path, 'utf8');
 test('el alta exige aceptar Términos y Privacidad con enlaces', () => {
     const form = read('components/forms/SignUpForm.tsx');
     assert.match(form, /register\('acceptTerms'/);
-    assert.ok(form.includes("required: 'Debes aceptar los Términos de uso"));
+    assert.ok(form.includes("required: t('auth.signUp.acceptTermsRequired')"), 'la validación consume la clave i18n');
+    const esAuth = JSON.parse(read('lib/i18n/messages/es/auth.json'));
+    assert.ok(esAuth.signUp.acceptTermsRequired.startsWith('Debes aceptar los Términos de uso'), 'copy de aceptación en el diccionario ES');
     assert.ok(form.includes('href="/terminos"'));
     assert.ok(form.includes('href="/privacidad"'));
     assert.ok(form.includes('errors.acceptTerms'));
@@ -41,9 +43,12 @@ test('los documentos legales llevan disclaimer y no se indexan ni se anuncian en
     const privacy = read('app/(public)/privacidad/page.tsx');
     const terms = read('app/(public)/terminos/page.tsx');
     const sitemap = read('app/sitemap.ts');
+    const esLanding = JSON.parse(read('lib/i18n/messages/es/landing.json'));
+    assert.ok(esLanding.privacidad.legalNote.includes('informativo y no constituye asesoramiento jurídico'));
+    assert.ok(esLanding.terminos.legalNote.includes('informativo y no constituye asesoramiento jurídico'));
     for (const page of [privacy, terms]) {
         assert.ok(page.includes('robots: { index: false, follow: false }'));
-        assert.ok(page.includes('informativo y no constituye asesoramiento jurídico'));
+        assert.ok(page.includes('legalNote'));
         assert.ok(!page.includes('[PENDIENTE]'));
         assert.ok(page.includes('role="note"'));
     }
@@ -66,8 +71,9 @@ test('la recuperación de contraseña no promete correo si falta SMTP', () => {
     const signInForm = read('components/forms/SignInForm.tsx');
     const signInPage = read('app/(auth)/sign-in/page.tsx');
     assert.ok(page.includes('emailConfigured ?'));
-    assert.ok(page.includes('no podemos'));
-    assert.match(form, /no se enviará ningún\s+enlace/);
+    const esCopy = read('lib/i18n/messages/es/landing.json') + read('lib/i18n/messages/es/auth.json');
+    assert.ok(esCopy.includes('no podemos'));
+    assert.match(esCopy, /no se enviará ningún\s+enlace/);
     assert.ok(form.includes('href="/help"'));
     assert.ok(signInForm.includes('passwordResetAvailable ?'));
     assert.ok(signInPage.includes('isPasswordResetEmailConfigured()'));
@@ -102,11 +108,13 @@ test('el screener distingue «sin filtros guardados» de «motor caído»', () =
 
 test('el copy de exportación dice qué incluye y qué no', () => {
     const settings = read('components/security/PrivacySettings.tsx');
-    const privacy = read('app/(public)/privacidad/page.tsx');
-    for (const source of [settings, privacy]) {
-        assert.ok(source.includes('datos estructurados'));
-        assert.ok(source.includes('originales de los documentos') || source.includes('archivos originales'));
-    }
+    assert.ok(settings.includes('datos estructurados'));
+    assert.ok(settings.includes('originales de los documentos') || settings.includes('archivos originales'));
+    // La página pública de privacidad consume el diccionario i18n (landing.json).
+    const esLanding = JSON.parse(read('lib/i18n/messages/es/landing.json'));
+    const exportCopy = esLanding.privacidad.s6.p1Post;
+    assert.ok(exportCopy.includes('datos estructurados'));
+    assert.ok(exportCopy.includes('originales de los documentos') || exportCopy.includes('archivos originales'));
 });
 
 test('tipos de empresa e industrias del master tienen etiqueta ES', () => {

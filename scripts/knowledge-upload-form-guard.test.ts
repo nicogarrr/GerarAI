@@ -51,8 +51,11 @@ describe('knowledge upload form guard (F142)', () => {
   });
 
   it('el selector de archivo habla español, no el idioma del navegador', () => {
-    assert.ok(upload.includes('Elegir archivo'), 'disparador en español');
-    assert.ok(upload.includes('Ningún archivo seleccionado'), 'estado vacío en español');
+    const esErrors = JSON.parse(readFileSync('lib/i18n/messages/es/errors.json', 'utf8'));
+    assert.equal(esErrors.upload.choose, 'Elegir archivo', 'disparador en español');
+    assert.ok(upload.includes("t('errors.upload.choose')"), 'el disparador consume la clave i18n');
+    assert.equal(esErrors.upload.noFile, 'Ningún archivo seleccionado', 'estado vacío en español');
+    assert.ok(upload.includes("t('errors.upload.noFile')"), 'el estado vacío consume la clave i18n');
     assert.match(upload, /className="sr-only"/, 'input nativo oculto pero accesible');
   });
 });

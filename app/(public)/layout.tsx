@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { SUPPORT_EMAIL } from '@/lib/config/brand';
 import PublicMobileNav from '@/components/PublicMobileNav';
 import { isPublicSignUpOpen } from '@/lib/config/product';
+import { getT } from '@/lib/i18n/server';
 
 /**
  * Shell de las paginas publicas: landing, metodologia y ayuda.
@@ -39,13 +40,6 @@ export const metadata: Metadata = {
     robots: { index: true, follow: true },
 };
 
-const legalLinks = [
-    { href: '/metodologia', label: 'Metodología' },
-    { href: '/help', label: 'Ayuda' },
-    { href: '/privacidad', label: 'Privacidad' },
-    { href: '/terminos', label: 'Términos' },
-];
-
 const Layout = async ({ children }: { children: React.ReactNode }) => {
     // Mismo criterio que `app/(auth)/layout.tsx`: en los e2e con
     // E2E_AUTH_BYPASS se acepta que no haya sesion real. El `.catch` importa:
@@ -62,19 +56,27 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
         signedIn = Boolean(session?.user);
     }
 
+    const t = await getT();
+    const legalLinks = [
+        { href: '/metodologia', label: t('landing.nav.methodology') },
+        { href: '/help', label: t('landing.nav.help') },
+        { href: '/privacidad', label: t('landing.nav.privacy') },
+        { href: '/terminos', label: t('landing.nav.terms') },
+    ];
+
     const signUpOpen = isPublicSignUpOpen() && !signedIn;
 
     return (
         <div className={`public-shell ${publicSans.className} ${publicEditorial.variable}`}>
-            <a href="#content" className="skip-link">Saltar al contenido</a>
+            <a href="#content" className="skip-link">{t('landing.shell.skipLink')}</a>
 
             <header className="sticky top-3 z-50 sm:top-4">
                 <div className="container">
                     <div className="public-header-inner rounded-2xl sm:rounded-full border border-gray-700/60 bg-surface-1/80 px-3 min-[360px]:px-4 shadow-lg shadow-black/30 backdrop-blur">
-                    <Link href="/" className="flex min-h-11 shrink-0 items-center" aria-label="GerarAI, inicio">
+                    <Link href="/" className="flex min-h-11 shrink-0 items-center" aria-label={t('landing.shell.wordmarkAria')}>
                         <GerarAIWordmark />
                     </Link>
-                    <nav aria-label="Páginas de GerarAI" className="public-nav">
+                    <nav aria-label={t('landing.nav.ariaLabel')} className="public-nav">
                         {legalLinks.map((link) => (
                             <Link key={link.href} href={link.href} className="public-nav-link">
                                 {link.label}
@@ -84,23 +86,23 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                     <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                         {signedIn ? (
                             <Button asChild className="h-11" size="sm">
-                                <Link href="/inicio">Ir a mi panel</Link>
+                                <Link href="/inicio">{t('landing.header.dashboard')}</Link>
                             </Button>
                         ) : (
                             <>
                                 <Button asChild className="h-11" size="sm" variant="outline">
-                                    <Link href="/sign-in">Iniciar sesión</Link>
+                                    <Link href="/sign-in">{t('landing.header.signIn')}</Link>
                                 </Button>
                                 {signUpOpen ? (
                                     <Button asChild className="h-11 hidden sm:inline-flex" size="sm">
-                                        <Link href="/sign-up">Crear cuenta</Link>
+                                        <Link href="/sign-up">{t('landing.header.signUp')}</Link>
                                     </Button>
                                 ) : null}
                             </>
                         )}
                         <PublicMobileNav
                             links={legalLinks}
-                            cta={signUpOpen ? { href: '/sign-up', label: 'Crear cuenta' } : undefined}
+                            cta={signUpOpen ? { href: '/sign-up', label: t('landing.header.signUp') } : undefined}
                         />
                     </div>
                     </div>
@@ -116,18 +118,17 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                     <div className="max-w-sm">
                         <p className="font-medium text-gray-300">GerarAI</p>
                         <p className="mt-1">
-                            Herramienta educativa de análisis: GerarAI no da asesoramiento de inversión y
-                            las decisiones son tuyas.
+                            {t('landing.footer.disclaimer')}
                         </p>
                         <p className="mt-1 text-xs">
-                            Gráficos interactivos por{' '}
+                            {t('landing.footer.chartsBy')}{' '}
                             <a className="inline-flex min-h-11 items-center public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
                                 TradingView
                             </a>
                             .
                         </p>
                     </div>
-                    <nav aria-label="Enlaces del pie" className="flex flex-col items-start gap-2 sm:items-end">
+                    <nav aria-label={t('landing.footer.navAria')} className="flex flex-col items-start gap-2 sm:items-end">
                         {legalLinks.map((link) => (
                             <Link key={link.href} href={link.href} className="inline-flex min-h-11 items-center public-footer-link">
                                 {link.label}

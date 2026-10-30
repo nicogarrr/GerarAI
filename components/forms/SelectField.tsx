@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useId } from 'react'
 import {Label} from "@/components/ui/label";
 import {Controller} from "react-hook-form";
@@ -8,8 +10,10 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import {useT} from "@/lib/i18n/client";
 
 const SelectField = ({name, label, placeholder, options, control, error, required = false}: SelectFieldProps) => {
+    const t = useT();
     const selectId = useId();
     const errorId = `${selectId}-error`;
 
@@ -21,7 +25,7 @@ const SelectField = ({name, label, placeholder, options, control, error, require
                 name={name}
                 control={control}
                 rules={{
-                    required: required ? `Por favor, selecciona ${label.toLowerCase()}` : false,
+                    required: required ? t('auth.fields.selectRequired', { label: label.toLowerCase() }) : false,
                 }}
                 render={({field}) => (
                     <>

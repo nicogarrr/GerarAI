@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { isPublicSignUpOpen } from '@/lib/config/product';
+import { getLocale, getT } from '@/lib/i18n/server';
 
 /**
  * Metadatos de la landing.
@@ -14,56 +15,57 @@ import { isPublicSignUpOpen } from '@/lib/config/product';
  * El título no incluye la marca porque la plantilla de `app/layout.tsx` ya
  * añade «| GerarAI».
  */
-export const metadata: Metadata = {
-    title: 'Research OS de inversión fundamental con fuentes trazables',
-    description:
-        'GerarAI convierte el research de una empresa en tesis trazables y versionadas: cada afirmación conserva su fuente y cada resultado revisa tu previsión.',
-    alternates: { canonical: '/' },
-    openGraph: {
-        type: 'website',
-        locale: 'es_ES',
-        siteName: 'GerarAI',
-        title: 'GerarAI: research de empresas con fuentes trazables y tesis versionadas',
-        description:
-            'Cada afirmación conserva su fuente, cada tesis tiene versión y cada resultado contrasta tu previsión. Metodología pública.',
-    },
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    const locale = await getLocale();
+    return {
+        title: t('landing.hero.metaTitle'),
+        description: t('landing.hero.metaDescription'),
+        alternates: { canonical: '/' },
+        openGraph: {
+            type: 'website',
+            locale: locale === 'en' ? 'en_US' : 'es_ES',
+            siteName: 'GerarAI',
+            title: t('landing.hero.ogTitle'),
+            description: t('landing.hero.ogDescription'),
+        },
+    };
+}
 
-export default function PublicLanding() {
+export default async function PublicLanding() {
+    const t = await getT();
     const signUpOpen = isPublicSignUpOpen();
 
     return (
         <main id="content" tabIndex={-1} className="w-full overflow-x-clip">
             <section className="container pb-16 pt-10 text-left sm:pb-28 sm:pt-20 sm:text-center">
                 <p className="inline-flex max-w-full items-center text-[10px] font-semibold uppercase leading-5 tracking-[0.16em] text-teal-300 sm:text-xs sm:tracking-[0.2em]">
-                    Research OS de inversión fundamental
+                    {t('landing.hero.kicker')}
                 </p>
                 <h1 style={{ fontFamily: "var(--font-editorial), Georgia, serif" }} className="mx-auto mt-4 max-w-3xl text-balance text-[clamp(2.7rem,11vw,3.1rem)] font-normal leading-[1.12] tracking-[-0.015em] text-gray-100 sm:mt-6 sm:text-7xl">
-                    Tesis <span className="text-teal-300">trazables</span> que se revisan contra la
-                    realidad
+                    {t('landing.hero.titlePre')}<span className="text-teal-300">{t('landing.hero.titleHighlight')}</span>{t('landing.hero.titlePost')}
                 </h1>
                 <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-gray-400 sm:mt-6 sm:text-balance sm:text-lg sm:leading-8">
-                    Cada afirmación conserva su documento y su fecha, y cada tesis tiene versión. Si un
-                    dato no está, GerarAI lo dice en lugar de inventarlo.
+                    {t('landing.hero.subtitle')}
                 </p>
                 <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
                     {signUpOpen ? (
                         <Button asChild size="lg">
                             <Link href="/sign-up">
-                                Empezar mi primera tesis
+                                {t('landing.hero.ctaStart')}
                                 <ArrowRight aria-hidden="true" />
                             </Link>
                         </Button>
                     ) : (
                         <Button asChild size="lg">
                             <Link href="/sign-up">
-                                Pedir acceso
+                                {t('landing.hero.ctaAccess')}
                                 <ArrowRight aria-hidden="true" />
                             </Link>
                         </Button>
                     )}
                     <Button asChild size="lg" variant="outline">
-                        <Link href="/metodologia">Ver la metodología</Link>
+                        <Link href="/metodologia">{t('landing.hero.ctaMethodology')}</Link>
                     </Button>
                 </div>
 
@@ -86,7 +88,7 @@ export default function PublicLanding() {
                         <div className="relative aspect-[16/9]">
                             <div className="absolute inset-x-0 -top-16 h-[calc(100%+4rem)]"><Image fill className="object-cover object-top"
                                 src="/landing/ficha-pc.png"
-                                alt="Ficha de empresa de GerarAI: precio con su fuente, variación y gráfico de evolución"
+                                alt={t('landing.hero.shotDesktopAlt')}
                                
                                 priority
                                 sizes="(min-width: 1024px) 1024px, 100vw"
@@ -105,7 +107,7 @@ export default function PublicLanding() {
                                 <div className="relative aspect-[4/3] overflow-hidden rounded-[0.7rem] bg-surface-1">
                                     <Image fill className="object-cover"
                                         src="/landing/ficha-tablet.png"
-                                        alt="GerarAI en tablet: la misma ficha adaptada a pantalla mediana"
+                                        alt={t('landing.hero.shotTabletAlt')}
                                         sizes="352px"
                                     />
                                     <div
@@ -146,7 +148,7 @@ export default function PublicLanding() {
                                     <div className="absolute inset-x-0 bottom-0 aspect-[390/844]">
                                         <Image fill className="object-cover"
                                             src="/landing/ficha-movil.png"
-                                            alt="GerarAI en móvil: precio y gráfico de la ficha de empresa"
+                                            alt={t('landing.hero.shotMobileAlt')}
                                             sizes="(min-width: 640px) 160px, 112px"
                                         />
                                     </div>
@@ -156,8 +158,7 @@ export default function PublicLanding() {
                     </figure>
                 </div>
                 <p className="mx-auto mt-16 max-w-xl text-xs text-gray-500">
-                    Capturas reales de la aplicación con datos de ejemplo. La interfaz declara de dónde
-                    sale cada cifra que muestra, o que no hay fuente disponible.
+                    {t('landing.hero.caption')}
                 </p>
             </section>
         </main>
