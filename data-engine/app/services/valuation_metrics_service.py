@@ -347,6 +347,7 @@ def compute_valuation_metrics(
             "sin_fx_cotizacion": 0,
             "sin_simbolo_yahoo": 0,
             "dividendos_fuente_fallo": 0,
+            "precio_anterior_a_split": 0,
         },
     }
     for company in companies:
@@ -412,6 +413,14 @@ def compute_valuation_metrics(
         events = dividend_fetcher(symbol)
         if events is None:
             stats["skipped"]["dividendos_fuente_fallo"] += 1
+            continue
+        # Cierre anterior a un split ya efectivo: Yahoo devuelve los
+        # dividendos ajustados al split y la base del cierre es desconocida
+        # (vieja o ya ajustada), asi que el yield podia salir x factor (un
+        # 10:1 daba 10 veces mas). N/D, como P/B, PER y la valoracion (#3227).
+        split_events = split_events_by_company(db, [company.id]).get(company.id, [])
+        if split_after_price(split_events, price_date, as_of):
+            stats["skipped"]["precio_anterior_a_split"] += 1
             continue
         ttm, used = ttm_dividend_per_share(events, as_of)
         yahoo_yield = ttm / close
