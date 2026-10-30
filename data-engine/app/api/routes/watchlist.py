@@ -838,7 +838,7 @@ def dca_backtest(
 
         yahoo = yahoo_symbol(company) or key
     try:
-        fetched = svc.fetch_yahoo_history(yahoo)
+        fetched = svc.fetch_yahoo_history_cached(yahoo)
     except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
         raise HTTPException(status_code=502, detail=f"No se pudo descargar el histórico de {key}") from exc
     from zoneinfo import ZoneInfo
