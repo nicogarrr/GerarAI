@@ -23,6 +23,12 @@ export default function Breadcrumbs() {
     if (saved) { try { const detail = JSON.parse(saved); queueMicrotask(() => setOverride(detail)); } catch { /* Ignore malformed display metadata. */ } }
     return () => window.removeEventListener('page-breadcrumb-name', listener);
   }, []);
+  // En la ficha de empresa no hay migas: una sola fila de seis pestañas es
+  // toda la navegación (opción 1, 29-oct-2026; el nivel «Análisis» fantasma
+  // desaparece). Las subrutas de la ficha (news, sources, assistant) las
+  // conservan porque son páginas aparte.
+  const fichaMatch = /^\/research\/([^/]+)\/?$/.exec(pathname);
+  if (fichaMatch && !['news', 'sources', 'assistant'].includes(fichaMatch[1])) return null;
   const crumbs: Crumb[] = buildCrumbs(pathname);
   if (override?.path === pathname && crumbs.length) crumbs[crumbs.length - 1].label = override.name;
   if (crumbs.length < 2) return null;

@@ -1,69 +1,39 @@
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
 
-import { DecisionJournalEntryLink } from '@/components/research/DecisionJournalEntryLink';
-import { MODULES, moduleHref, type View } from '@/lib/research/research-views';
-
-const PRIMARY = [
-  { label: 'Resumen', entry: 'overview', keys: ['overview', 'thesis', 'noticias'] },
-  { label: 'Finanzas', entry: 'financials', keys: ['financials', 'valuation'] },
-  { label: 'Fuentes', entry: 'documents', keys: ['documents', 'sources', 'chat'] },
-] as const;
-const ADVANCED = [
-  { label: 'Valorar el negocio', keys: ['model', 'supuestos', 'market-opportunity', 'peers', 'moat', 'capital', 'terminal'] },
-  { label: 'Contrastar y aprender', keys: ['changes', 'holders', 'directiva', 'lecciones'] },
-  { label: 'Señales específicas', keys: ['satellites'] },
-] as const;
+import { TABS, tabHref, tabOfView, type View } from '@/lib/research/research-views';
 
 /**
- * Same links and visual tokens, with specialist tools behind one disclosure.
- * Jerarquia: pestañas primarias subrayadas (la marca teal fina dice "estas
- * aqui", como la barra del sidebar) y modulos como control segmentado neutro:
- * antes eran botones con borde y relleno teal que competian con las acciones
- * de la cabecera.
+ * Navegación de la ficha de empresa: UNA fila de seis pestañas (decisión de
+ * Nico, 29-oct-2026, opción 1 de «Una fila, no tres menús»). Sin fila de
+ * módulos ni cajón «Análisis avanzado»: los módulos son secciones ancladas
+ * dentro de cada pestaña, a un toque desde esta fila.
+ *
+ * Móvil primero: la fila se desliza en horizontal si no cabe (scroll
+ * nativo, sin botones); desde sm sobra sitio para las seis. `scroll={false}`
+ * porque todas las pestañas son la MISMA ruta con otro `?view=`: sin el
+ * atributo Next devolvía al usuario al inicio de la página (bug del
+ * 19-oct-2026). La marca teal fina dice «estás aquí», como la barra del
+ * sidebar.
  */
 export function CompanyNavigation({ ticker, activeView }: { ticker: string; activeView: View }) {
-  const primary = PRIMARY.find((group) => group.keys.some((key) => key === activeView));
-  const advancedActive = ADVANCED.some((group) => group.keys.some((key) => key === activeView));
-  const link = (key: View, compact = false) => {
-    const item = MODULES.find((item) => item.key === key)!;
-    return <Link
-      aria-current={activeView === key ? 'page' : undefined}
-      className={compact
-        ? `flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm transition ${activeView === key ? 'bg-gray-800 font-medium text-gray-100' : 'text-gray-400 hover:text-gray-200'}`
-        : `inline-flex min-h-[44px] items-center rounded-lg px-3 py-2 text-sm transition ${activeView === key ? 'bg-gray-800 font-medium text-gray-100' : 'text-gray-400 hover:bg-gray-800/60 hover:text-gray-200'}`}
-      href={moduleHref(ticker, item)} key={key} scroll={'path' in item}
-    >{item.label}{compact ? <span aria-hidden="true">→</span> : null}</Link>;
-  };
-  return <div className="min-w-0 space-y-3" data-testid="company-navigation">
-    <nav aria-label="Secciones de la empresa" className="flex gap-x-6 border-b border-gray-800">
-      {PRIMARY.map((group) => <Link
-        aria-current={primary === group ? 'true' : undefined}
-        className={`inline-flex min-h-[44px] items-center border-b-2 py-2.5 text-sm font-medium transition ${primary === group ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
-        href={`/research/${encodeURIComponent(ticker)}?view=${group.entry}`} key={group.entry} scroll={false}
-      >{group.label}</Link>)}
+  const activeTab = tabOfView(activeView);
+  return (
+    <nav
+      aria-label="Secciones de la empresa"
+      className="-mx-1 flex gap-x-1 overflow-x-auto px-1 pb-px sm:gap-x-2"
+      data-testid="company-navigation"
+    >
+      {TABS.map((tab) => (
+        <Link
+          aria-current={activeTab === tab.key ? 'page' : undefined}
+          className={`inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${activeTab === tab.key ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
+          href={tabHref(ticker, tab.key)}
+          key={tab.key}
+          scroll={false}
+        >
+          {tab.label}
+        </Link>
+      ))}
     </nav>
-    {primary ? <nav aria-label={`Módulos de ${primary.label}`} className="flex flex-wrap gap-2">
-      {primary.keys.map((key) => link(key))}
-    </nav> : null}
-    <details className="group rounded-lg border border-gray-800" open={advancedActive}>
-      <summary className="flex min-h-[44px] cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200 [&::-webkit-details-marker]:hidden">
-        Análisis avanzado <ChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-gray-500 transition-transform group-open:rotate-180" />
-      </summary>
-      <nav aria-label="Análisis avanzado" className="grid gap-4 px-3 pb-3 md:grid-cols-3">
-        {ADVANCED.map((group) => {
-          const keys = group.keys.filter((key) => key !== 'satellites' || ticker === 'ASTS');
-          return keys.length ? <div key={group.label}>
-            <p className="mb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{group.label}</p>
-            {/* El enlace al diario apunta a un ancla y hace su propio scroll
-                (DecisionJournalEntryLink): el App Router no baja al ancla si la
-                página ya estaba desplazada (suite E2E 28/10). */}
-            {keys.map((key) => key === 'changes'
-              ? <div key={key}>{link(key, true)}<DecisionJournalEntryLink className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-200" ticker={ticker} /></div>
-              : link(key, true))}
-          </div> : null;
-        })}
-      </nav>
-    </details>
-  </div>;
+  );
 }

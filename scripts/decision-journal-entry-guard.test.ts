@@ -4,31 +4,27 @@ import { readFileSync } from 'node:fs';
 
 /** The journal stays reachable on mobile through the compact advanced menu. */
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-const navigation = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
+const menu = readFileSync('components/research/CompanyActionsMenu.tsx', 'utf8');
 const journalLink = readFileSync('components/research/DecisionJournalEntryLink.tsx', 'utf8');
 const panels = readFileSync('components/research/FundamentalModelPanels.tsx', 'utf8');
 
 describe('entrada al diario de decisiones desde la ficha', () => {
-    it('la ficha monta la navegación con el enlace compacto y su ancla', () => {
-        assert.match(page, /<CompanyNavigation ticker=\{ticker\} activeView=\{activeView\}/);
-        assert.match(navigation, /<DecisionJournalEntryLink\b/);
+    it('la ficha monta el menú de cabecera con el enlace compacto y su ancla', () => {
+        // Con la navegación de una fila (29-oct-2026) el enlace vive en el
+        // menú compacto de cabecera, accesible también en móvil.
+        assert.match(page, /<CompanyActionsMenu/);
+        assert.match(menu, /<DecisionJournalEntryLink className=\{ITEM\} ticker=\{ticker\} \/>/);
         assert.match(journalLink, /data-testid="decision-journal-entry"/);
         assert.match(journalLink, /DECISION_JOURNAL_ANCHOR = 'diario-decisiones'/);
-        assert.match(journalLink, /\?view=changes#\$\{DECISION_JOURNAL_ANCHOR\}/);
+        assert.match(journalLink, /\?view=seguimiento#\$\{DECISION_JOURNAL_ANCHOR\}/);
         assert.match(journalLink, /scrollToHashAnchor\(DECISION_JOURNAL_ANCHOR\)/);
         assert.match(journalLink, /Diario de decisiones/);
     });
-    it('el enlace está en avanzados accesible también en móvil', () => {
-        const entry = navigation.indexOf('<DecisionJournalEntryLink');
-        const tag = navigation.slice(entry, navigation.indexOf('/>', entry));
-        assert.doesNotMatch(tag, /\bhidden\b/);
+    it('el enlace sigue siendo un ancla con scroll gestionado por el llamador', () => {
         // Enlace a un ancla: con scroll={false} Next no baja hasta el diario.
         assert.doesNotMatch(journalLink.slice(journalLink.indexOf('return <Link')), /scroll=\{false\}/);
-        const details = navigation.indexOf('<details');
-        const summary = navigation.indexOf('<summary', details);
-        assert.ok(details >= 0 && summary > details && entry > summary);
-        assert.match(navigation, /Análisis avanzado/);
-        assert.match(navigation, /min-h-\[44px\]/);
+        // El área táctil la da la clase ITEM del menú (44px en móvil).
+        assert.match(menu, /const ITEM = 'flex min-h-\[44px\] items-center/);
     });
     it('el ancla existe en el panel que contiene el formulario «Decisión»', () => {
         assert.match(panels, /id="diario-decisiones"/);
