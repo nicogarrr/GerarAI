@@ -57,5 +57,8 @@
     "firmsOther": "{n} firmas con objetivo en 12 meses",
     "firmsNone": "solo consenso agregado, sin detalle por firma",
     "convertedFrom": "(convertido de {currency})"
-  }
+  },
+  "system": {},
+  "pwa": {},
+  "sectionError": {}
 }

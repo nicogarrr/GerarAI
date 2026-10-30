@@ -57,5 +57,8 @@
     "firmsOther": "{n} firms with 12-month targets",
     "firmsNone": "aggregate consensus only, no per-firm detail",
     "convertedFrom": "(converted from {currency})"
-  }
+  },
+  "system": {},
+  "pwa": {},
+  "sectionError": {}
 }
