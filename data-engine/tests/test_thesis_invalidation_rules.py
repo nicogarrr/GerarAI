@@ -147,7 +147,7 @@ def test_user_price_rules_are_not_touched_by_sync(db):
 
 def test_margin_of_safety_rule_triggers_one_alert(db):
     company = _company(db)
-    # Esperado 400; precio 480 -> margen = 400/480 - 1 = -16,67 % < -10 %.
+    # Esperado 400; precio 480 -> margen = (400 - 480) / 400 = -20 % < -10 %.
     _thesis(db, company, rules=[{"metric": "margen_seguridad_pct", "operator": "<",
                                  "threshold": -10, "description": "Sin margen de seguridad"}])
     _price(db, company, "480")
@@ -155,13 +155,13 @@ def test_margin_of_safety_rule_triggers_one_alert(db):
     thesis_results = [r for r in results if r["observation"].get("kind") == "thesis_metric"]
     assert len(thesis_results) == 1
     assert thesis_results[0]["status"] == "triggered"
-    assert Decimal(thesis_results[0]["observed"]).quantize(Decimal("0.01")) == Decimal("-16.67")
+    assert Decimal(thesis_results[0]["observed"]).quantize(Decimal("0.01")) == Decimal("-20.00")
     alerts = db.scalars(select(ResearchAlert)).all()
     assert len(alerts) == 1
     assert alerts[0].alert_type == RULE_TYPE
     assert "invalidación" in alerts[0].message
     assert "Sin margen de seguridad" in alerts[0].message
-    assert "−16,67 %" in alerts[0].message or "-16,67 %" in alerts[0].message
+    assert "−20,00 %" in alerts[0].message or "-20,00 %" in alerts[0].message
 
     # Segunda pasada dentro del cooldown: no duplica el aviso.
     AlertRuleService().evaluate_all(db)
@@ -319,25 +319,25 @@ def _london(db: Session) -> Company:
 def test_london_pence_close_is_compared_in_pounds(db):
     company = _london(db)
     # Tesis: precio 15 £, esperado 18 £. Hoy 1.500 GBp = 15 £.
-    # Variación = 15/15 - 1 = 0 %; margen = 18/15 - 1 = 20 %.
+    # Variación = 15/15 - 1 = 0 %; margen = (18 - 15) / 18 = 16,67 %.
     thesis = _thesis(db, company, price="15", expected="18")
     change, info = _observe(db, company, thesis, "variacion_desde_tesis_pct")
     assert change == Decimal("0")
     assert info["currency"] == "GBP"
     margin, _ = _observe(db, company, thesis, "margen_seguridad_pct")
-    assert margin.quantize(Decimal("0.01")) == Decimal("20.00")
+    assert margin.quantize(Decimal("0.01")) == Decimal("16.67")
 
 
 def test_adr_margin_uses_value_per_adr(db):
     company = _company(db, "ADRX")
     # Esperado 10 por ordinaria, ADR = 8 ordinarias -> 80 por ADR; ADR a 64.
-    # Margen = 80/64 - 1 = 25 % (no 10/64 - 1 = -84,375 %).
+    # Margen = (80 - 64) / 80 = 20 % (no (10 - 64) / 10 = -540 %).
     thesis = _thesis(db, company, expected="10", price="64")
     thesis.valuation_basis = {"adr_ratio": 8.0, "listed_share_values": {"expected": 80.0}}
     db.commit()
     _price(db, company, "64")
     margin, _ = _observe(db, company, thesis, "margen_seguridad_pct")
-    assert margin == Decimal("25")
+    assert margin == Decimal("20")
 
 
 def test_adr_without_listed_values_has_no_margin(db):

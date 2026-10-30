@@ -1270,10 +1270,11 @@ class ThesisService:
         base = valuation.get("base_value")
         price = valuation.get("current_price")
         # Criterio grounded en la relación precio/base ACTUAL con benchmark
-        # EXPLÍCITO: margin_of_safety es respecto al valor ESPERADO
+        # EXPLÍCITO: margin_of_safety es respecto al valor ESPERADO y con la
+        # convención única del producto (V - P) / V
         # (observado 2026-10-26: precio 642.62, base 565.21, esperado 656.45,
-        # mos = 656.45/642.62 - 1 = +2,2 %), no respecto al escenario base.
-        # Cada margen se declara con SU benchmark; ninguno se usa para
+        # mos = (656.45 - 642.62) / 656.45 = +2,1 %), no respecto al escenario
+        # base. Cada margen se declara con SU benchmark; ninguno se usa para
         # re-etiquetar el intento del modelo.
         if base is not None and price is not None:
             if price < base:
