@@ -159,21 +159,53 @@ def _fetch_consensus(symbol: str) -> dict[str, Any]:
         return {}
 
 
-def _fetch_currency(symbol: str) -> str | None:
+# Tipos de instrumento que Yahoo declara en fast_info (misma lectura de
+# metadatos que la divisa) y su nombre para la persona usuaria. Solo una
+# accion (EQUITY) tiene precios objetivo de analistas con sentido: un ETF,
+# fondo o indice no es una empresa cubierta por analistas, y aceptar el
+# simbolo tal cual mostraba objetivos de OTRO instrumento con el mismo ticker
+# (informe UX 29-oct, punto 6: SPCX resolvia al ETF, no a la empresa).
+_NON_EQUITY_LABEL = {
+    "ETF": "un ETF",
+    "MUTUALFUND": "un fondo",
+    "INDEX": "un indice",
+    "CURRENCY": "una divisa",
+    "CRYPTOCURRENCY": "una criptomoneda",
+    "FUTURE": "un futuro",
+    "OPTION": "una opcion",
+}
+
+
+def non_equity_label(quote_type: str | None) -> str | None:
+    """Nombre legible si el instrumento NO es una accion; None si lo es o no se sabe."""
+    if not quote_type:
+        return None
+    normalized = quote_type.strip().upper()
+    if normalized == "EQUITY":
+        return None
+    return _NON_EQUITY_LABEL.get(normalized, f"un instrumento de tipo {normalized}")
+
+
+def _fetch_currency_and_type(symbol: str) -> dict[str, str | None]:
     import yfinance as yf
 
-    # nosemgrep: gerarai-broad-except-pass -- divisa declarativa de yfinance: sin ella queda None (comentario en linea)
+    # nosemgrep: gerarai-broad-except-pass -- divisa y tipo declarativos de yfinance: sin ellos quedan None (comentario en linea)
     try:
-        raw_currency = yf.Ticker(symbol).fast_info.get("currency")
+        fast_info = yf.Ticker(symbol).fast_info
+        raw_currency = fast_info.get("currency")
+        raw_type = fast_info.get("quoteType")
+        currency = None
         if raw_currency:
             raw = str(raw_currency).strip()
             # Yahoo cotiza Londres en peniques ("GBp") y Johannesburgo en centavos
             # ("ZAc"): los objetivos vienen en esa subunidad. Poner .upper() daba
             # "GBP" y los precios salian x100. Se distingue con un codigo propio.
-            return _SUBUNIT_CURRENCY.get(raw) or raw.upper() or None
-    except Exception:  # noqa: BLE001 - la divisa es declarativa; sin ella, None
+            currency = _SUBUNIT_CURRENCY.get(raw) or raw.upper() or None
+        quote_type = str(raw_type).strip().upper() if raw_type else None
+        return {"currency": currency, "quote_type": quote_type}
+    except Exception:  # noqa: BLE001 - ambos son declarativos; sin ellos, None
         pass
-    return None
+    return {"currency": None, "quote_type": None}
 
 
 def _fetch_sync(symbol: str) -> dict[str, Any]:
@@ -186,11 +218,13 @@ def _fetch_sync(symbol: str) -> dict[str, Any]:
     with ThreadPoolExecutor(max_workers=3) as pool:
         records = pool.submit(_fetch_records, symbol)
         consensus = pool.submit(_fetch_consensus, symbol)
-        currency = pool.submit(_fetch_currency, symbol)
+        instrument = pool.submit(_fetch_currency_and_type, symbol)
+        declared = instrument.result()
         return {
             "records": records.result(),
             "consensus": consensus.result(),
-            "currency": currency.result(),
+            "currency": declared["currency"],
+            "quote_type": declared["quote_type"],
         }
 
 
@@ -215,6 +249,26 @@ class AnalystTargetsService:
                 fetched_at=fetched_at,
                 note="No se pudo consultar Yahoo Finance ahora; reintenta en unos minutos.",
             )
+        # Guard de identidad: si Yahoo dice que el ticker NO es una accion
+        # (ETF, fondo, indice...), sus "objetivos de analistas" pertenecen a
+        # otro instrumento con el mismo ticker. Mostrarlos en la ficha de la
+        # empresa seria un dato inventado por confusion de identidad.
+        label = non_equity_label(data.get("quote_type"))
+        if label is not None:
+            result = AnalystTargets(
+                symbol=key,
+                status="empty",
+                source_url=SOURCE_URL.format(symbol=key),
+                fetched_at=fetched_at,
+                currency=data.get("currency"),
+                note=(
+                    f"Yahoo Finance identifica {key} como {label}, no como una "
+                    "accion, asi que no hay precios objetivo de analistas que "
+                    "mostrar para una empresa con este ticker."
+                ),
+            )
+            self._cache[key] = (now, result)
+            return result
         consensus_raw = data["consensus"]
         reference = _positive(consensus_raw.get("current"))
         rows = normalize_rows(data["records"], reference_price=reference)

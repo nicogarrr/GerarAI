@@ -193,8 +193,8 @@ def test_fetch_sync_runs_the_three_yahoo_reads_concurrently(monkeypatch) -> None
 
     class _FastInfo:
         def get(self, key):
-            assert key == "currency"
-            return "GBp"
+            assert key in ("currency", "quoteType")
+            return {"currency": "GBp", "quoteType": "EQUITY"}.get(key)
 
     class _Ticker:
         def __init__(self, symbol: str) -> None:
@@ -222,3 +222,61 @@ def test_fetch_sync_runs_the_three_yahoo_reads_concurrently(monkeypatch) -> None
     assert data["records"] == []
     assert data["consensus"] == {"mean": 5000.0, "current": 4255.0}
     assert data["currency"] == "GBX"
+
+
+def test_non_equity_symbol_is_rejected_instead_of_showing_another_instruments_targets(
+    monkeypatch,
+) -> None:
+    """SPCX en Yahoo es un ETF, no la empresa: mostrar sus "objetivos" en la
+    ficha seria un dato de otro instrumento (informe UX 29-oct, punto 6)."""
+    monkeypatch.setattr(
+        svc,
+        "_fetch_sync",
+        lambda symbol: {
+            "records": [rec("Firma X", "2026-10-15 13:48:00", 90.0)],
+            "consensus": {"current": 30.0, "mean": 40.0},
+            "currency": "USD",
+            "quote_type": "ETF",
+        },
+    )
+    result = asyncio.run(svc.AnalystTargetsService().get("SPCX"))
+    assert result.status == "empty" and result.rows == [] and result.consensus is None
+    assert result.note and "ETF" in result.note and "SPCX" in result.note
+
+
+def test_equity_symbol_passes_the_guard(monkeypatch) -> None:
+    monkeypatch.setattr(
+        svc,
+        "_fetch_sync",
+        lambda symbol: {
+            "records": [rec("TD Cowen", "2026-10-15 13:48:00", 90.0)],
+            "consensus": {"current": 50.84},
+            "currency": "USD",
+            "quote_type": "EQUITY",
+        },
+    )
+    result = asyncio.run(svc.AnalystTargetsService().get("RKLB"))
+    assert result.status == "available" and result.rows
+
+
+def test_unknown_quote_type_fails_open(monkeypatch) -> None:
+    monkeypatch.setattr(
+        svc,
+        "_fetch_sync",
+        lambda symbol: {
+            "records": [rec("TD Cowen", "2026-10-15 13:48:00", 90.0)],
+            "consensus": {"current": 50.84},
+            "currency": "USD",
+            "quote_type": None,
+        },
+    )
+    result = asyncio.run(svc.AnalystTargetsService().get("RKLB"))
+    assert result.status == "available"
+
+
+def test_non_equity_label_names_known_types() -> None:
+    assert svc.non_equity_label("EQUITY") is None
+    assert svc.non_equity_label(None) is None
+    assert svc.non_equity_label("etf") == "un ETF"
+    assert svc.non_equity_label("MUTUALFUND") == "un fondo"
+    assert "WEIRDKIND" in (svc.non_equity_label("WEIRDKIND") or "")
