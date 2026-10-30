@@ -35,7 +35,9 @@ precio post-split 25,70 x acciones pre-split 153M = 3,93B en vez de
 long_term_model_service: se multiplica por el factor acumulado de los
 splits posteriores al cierre del periodo del hecho; sin CorporateAction
 registrado, factor 1 (nunca se adivina). El ajuste se declara:
-is_adjusted=True y la base lo nombra.
+is_adjusted=True y la base lo nombra. Si el ultimo cierre es anterior a un
+split ya efectivo, la base del precio es desconocida: N/D (como la
+valoracion, #3227), nunca un cap que puede salir x factor.
 """
 
 from __future__ import annotations
@@ -52,6 +54,7 @@ from app.models.entities import Company
 from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
     fact_split_factor,
+    split_after_price,
     split_events_by_company,
 )
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
@@ -139,19 +142,25 @@ def _split_note(factor: Decimal) -> str:
 
 
 def _shares_outstanding(
-    db: Session, company: Company
+    db: Session,
+    company: Company,
+    *,
+    events: list[tuple[date, Decimal]] | None = None,
+    cutoff: date | None = None,
 ) -> tuple[Decimal, str, Decimal] | None:
     """(acciones actuales, base, factor split): reported SEC dei o derivado
     net_income/eps ESEF. El recuento se expresa en acciones ACTUALES: se
     multiplica por el factor acumulado de los splits posteriores al cierre
     del periodo del hecho (misma regla que long_term_model_service y que
     el ajuste de EPS del PER). Un 10-K publicado tras el split ya viene
-    reexpresado: regla unica fact_split_factor (consciente del `filed`)."""
-    events = split_events_by_company(db, [company.id]).get(company.id, [])
+    reexpresado: regla unica fact_split_factor (consciente del `filed`).
+    ``cutoff`` = fecha del cierre: un split posterior al precio no entra."""
+    if events is None:
+        events = split_events_by_company(db, [company.id]).get(company.id, [])
     shares = _latest_fact(db, company, "shares_outstanding")
     if shares is not None and shares.value and Decimal(shares.value) > 0:
         factor = fact_split_factor(
-            events, period=shares.period, filed=shares.filed
+            events, period=shares.period, filed=shares.filed, cutoff=cutoff
         )
         return Decimal(shares.value) * factor, (
             "reported_shares_outstanding" + _split_note(factor)
@@ -172,7 +181,7 @@ def _shares_outstanding(
         # El periodo del EPS ancla el factor (mismo ejercicio que el
         # net_income por la guarda de arriba).
         factor = fact_split_factor(
-            events, period=eps.period, filed=eps.filed
+            events, period=eps.period, filed=eps.filed, cutoff=cutoff
         )
         return Decimal(income.value) / Decimal(eps.value) * factor, (
             f"derived_net_income_over_eps FY{eps.fiscal_year}" + _split_note(factor)
@@ -213,7 +222,15 @@ def refresh_derived_market_cap(
     if _vendor_market_cap_fresh(db, company, price.date):
         _drop_derived()
         return {"status": "skipped", "reason": "vendor_market_cap_fresh"}
-    shares = _shares_outstanding(db, company)
+    events = split_events_by_company(db, [company.id]).get(company.id, [])
+    # Cierre anterior a un split ya efectivo: su base es desconocida (vieja si
+    # no hubo refresco, ya ajustada si un refresco reescribio la serie), asi
+    # que precio x acciones no se calcula: N/D, como el margen de seguridad y
+    # el DCF inverso de la valoracion (misma regla split_after_price, #3227).
+    if split_after_price(events, price.date, today):
+        _drop_derived()
+        return {"status": "unavailable", "reason": "price_basis_unknown_after_split"}
+    shares = _shares_outstanding(db, company, events=events, cutoff=price.date)
     if shares is None:
         _drop_derived()
         return {"status": "unavailable", "reason": "no_shares"}
