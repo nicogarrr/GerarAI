@@ -50,6 +50,7 @@ from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.split_adjustment import (
     fact_split_factor,
+    split_after_price,
     split_events_by_company,
 )
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
@@ -214,8 +215,14 @@ def _book_value_per_share(
     # 10:1 dejaba el P/B dividido entre 10 (misma regla que el screener).
     # Un 10-K publicado DESPUES del split ya trae las acciones reexpresadas:
     # misma regla que el DCF (fact_split_factor, consciente del `filed`).
+    events = split_events_by_company(db, [company.id]).get(company.id, [])
+    # Cierre anterior a un split ya efectivo: base del precio desconocida
+    # (vieja o ya ajustada por el proveedor): P/B N/D, como la valoracion
+    # (#3227); nunca un P/B que puede salir x factor.
+    if price_date is not None and split_after_price(events, price_date, as_of):
+        return None
     split_factor = fact_split_factor(
-        split_events_by_company(db, [company.id]).get(company.id, []),
+        events,
         period=sh_period,
         filed=sh_filed,
         cutoff=price_date or as_of,
