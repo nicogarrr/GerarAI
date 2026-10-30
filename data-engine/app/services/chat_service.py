@@ -2144,7 +2144,10 @@ class ChatService:
         lot_texts = [
             f"{_fmt_date_es(lot.trade_date.isoformat() if lot.trade_date else None)}, "
             f"{_fmt_number_es(float(lot.quantity), 4)} acciones a {_price_display(lot.unit_cost_native, lot.currency)}"
-            + (f", coste {_fmt_money_es(float(lot.cost_eur))} €" if lot.cost_eur is not None else "")
+            + (
+                f", coste {_fmt_money_es(float(lot_cost))} €"
+                if (lot_cost := lot.cost_eur_dgt(res.sale_currency, res.sale_rate)) is not None else ""
+            )
             for lot in fifo_lots
         ]
         method = (
@@ -2272,8 +2275,17 @@ class ChatService:
         fifo = simulate_fifo_sale(
             db, tenant_id=tenant_id, company_id=company.id, quantity=qty, held_quantity=held, sale_date=today,
         )
-        fifo_cost = fifo.cost_eur if fifo is not None else None
         value_base = pos.market_value_base if (pos.base_currency or "EUR") == "EUR" else None
+        # Criterio del informe fiscal (DGT V0152-26): coste nativo de los lotes
+        # al cambio de la VENTA. Sin precio dado, el cambio es el implícito del
+        # valor guardado (valor en euros / valor en divisa).
+        sale_ccy = (pos.currency or company.currency or "EUR").upper()
+        native_value = pos.market_value_native if pos.market_value_native is not None else pos.market_value
+        sale_rate: Decimal | None = None
+        if sale_ccy == "EUR":
+            sale_rate = Decimal("1")
+        elif value_base is not None and native_value:
+            sale_rate = Decimal(value_base) / Decimal(native_value)
         explicit_sale = parse_sale_price(question)
         if explicit_sale is not None:
             from app.services.portfolio_fx_service import PortfolioFXService
@@ -2295,7 +2307,9 @@ class ChatService:
                     confidence=0.7, llm_trace=trace,
                 )
             value_base = price * held * rate
+            sale_ccy, sale_rate = currency.upper(), rate
             trace["sale_price_source"] = "usuario"
+        fifo_cost = fifo.cost_eur_dgt(sale_ccy, sale_rate) if fifo is not None else None
         avg_cost = pos.cost_basis_base if (pos.base_currency or "EUR") == "EUR" else None
         trace["method"] = "fifo" if fifo_cost is not None else "average_cost"
         if value_base is None or (fifo_cost is None and avg_cost is None):
@@ -2342,8 +2356,8 @@ class ChatService:
             lot_texts = [
                 f"{_fmt_date_es(lot.trade_date.isoformat() if lot.trade_date else None)}, "
                 f"{_fmt_number_es(float(lot.quantity), 4)} acciones, "
-                # nosemgrep: gerarai-money-none-to-zero -- lote FIFO ya casado: cost_eur siempre calculado para lotes casados; solo es texto
-                f"coste {_fmt_money_es(float(lot.cost_eur or 0))} €"
+                # nosemgrep: gerarai-money-none-to-zero -- lote FIFO ya casado: con fifo_cost conocido cada lote tiene coste; solo es texto
+                f"coste {_fmt_money_es(float(lot.cost_eur_dgt(sale_ccy, sale_rate) or 0))} €"
                 for lot in fifo.lots
             ]
             method = (

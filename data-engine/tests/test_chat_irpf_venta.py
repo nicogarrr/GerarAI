@@ -234,7 +234,12 @@ def test_perdida_sin_recompra_avisa_del_plazo(db):
     assert "siempre que no recompres NICO antes del" in resp.answer
 
 
-def test_lotes_en_dolares_al_tipo_de_la_fecha_de_compra(db):
+def test_lotes_en_dolares_al_cambio_de_la_venta(db):
+    """Same FX criterion as the tax report (DGT V0152-26, see
+    memory/gerarai_tax_facts and tax_report_service.replay_tax_fifo): the gain
+    is computed in the share's currency and converted ONCE at the sale-date
+    rate; the purchase-date rate (0,90) no longer prices the cost.
+    """
     comp = _company(db)
     db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date(2026, 3, 2),
                   rate=Decimal("0.90"), source="test"))
@@ -247,10 +252,12 @@ def test_lotes_en_dolares_al_tipo_de_la_fecha_de_compra(db):
     ))
     db.commit()
     resp = _ask(db, "¿Cuánto IRPF pagaría si vendo hoy todo UBER?")
-    # 30 × 75 $ × 0,90 = 2.025 € de coste; 2.400 − 2.025 = 375 €.
+    # Cambio de la venta implícito en la posición: 2.400 € / 2.700 $.
+    # Coste 2.250 $ × 2.400/2.700 = 2.000 €; ganancia 2.400 − 2.000 = 400 €
+    # (= (2.700 − 2.250) $ × 2.400/2.700). Antes: 2.250 × 0,90 = 2.025 € y 375 €.
     assert resp.llm_trace["method"] == "fifo"
-    assert "coste 2.025,00 €" in resp.answer
-    assert "ganancia de 375,00 €" in resp.answer
+    assert "coste 2.000,00 €" in resp.answer
+    assert "ganancia de 400,00 €" in resp.answer
 
 
 def test_sin_historial_de_lotes_lo_dice_y_usa_coste_medio(db):
@@ -365,7 +372,8 @@ def test_hipotetico_con_lotes_da_la_cifra_fifo(db):
     assert "en el orden en que me los das" in resp.answer
 
 
-def test_hipotetico_en_dolares_al_tipo_de_cada_fecha(db):
+def test_hipotetico_en_dolares_al_cambio_de_la_venta(db):
+    """DGT V0152-26 (criterion of the tax report): native gain × sale-date rate."""
     _aapl_con_cotizacion(db)
     db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=date(2024, 3, 1),
                   rate=Decimal("0.90"), source="test"))
@@ -373,13 +381,15 @@ def test_hipotetico_en_dolares_al_tipo_de_cada_fecha(db):
                   rate=Decimal("0.80"), source="test"))
     db.commit()
     resp = _ask(db, "IRPF si vendo AAPL: compré 10 acciones a 150 $ el 1 de marzo de 2024")
-    # Venta a la última cotización (230 $ × 10 × 0,80 = 1.840 €); coste 150 $ × 10 × 0,90 = 1.350 €.
+    # Venta a la última cotización (230 $ × 10 × 0,80 = 1.840 €); coste al
+    # cambio de la venta: 150 $ × 10 × 0,80 = 1.200 € (no 1.350 € al 0,90 de
+    # la compra). Ganancia 640 €; IRPF 19 % = 121,60 €.
     assert resp.llm_trace["hypothetical"] is True
     assert "última cotización guardada" in resp.answer
     assert "valor 1.840,00 €" in resp.answer
-    assert "coste 1.350,00 €" in resp.answer
-    assert "ganancia de 490,00 €" in resp.answer
-    assert "IRPF estimado: 93,10 €" in resp.answer
+    assert "coste 1.200,00 €" in resp.answer
+    assert "ganancia de 640,00 €" in resp.answer
+    assert "IRPF estimado: 121,60 €" in resp.answer
 
 
 def test_hipotetico_responde_a_la_oferta_del_turno_anterior(db):
