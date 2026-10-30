@@ -28,13 +28,17 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                 <p className="text-sm leading-6 text-amber-200">
                     No se pudieron cargar las noticias. El resto de la página sigue funcionando.
                 </p>
-                <Link
+                {/* «Reintentar» recarga Inicio (vuelve a pedir las noticias). Antes
+                    llevaba a /research/news: el botón decía reintentar y
+                    cambiaba de página. Enlace normal, no <Link>: la navegación
+                    cliente a la misma URL puede servirse de la caché del router. */}
+                <a
                     className="mt-3 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-amber-400/30 px-4 text-sm text-amber-200 transition-colors hover:text-amber-100"
-                    href="/research/news"
+                    href="/inicio"
                 >
                     <RefreshCcw aria-hidden="true" className="h-4 w-4" />
                     Reintentar
-                </Link>
+                </a>
             </section>
         );
     }
