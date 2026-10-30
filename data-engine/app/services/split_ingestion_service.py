@@ -282,7 +282,20 @@ class SplitIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _row_is_ingestible(row: dict[str, Any]) -> bool:
-        return row["effective_date"] is not None and row["ratio"] is not None
+        # Ratio 1 (1:1) no cambia el numero de acciones: Yahoo/FMP lo usan como
+        # marcador (spin-off, cambio de nominal). Guardarlo creaba una
+        # «Agrupación de acciones 1 por 1» pendiente de aplicar.
+        return (
+            row["effective_date"] is not None
+            and row["ratio"] is not None
+            and row["ratio"] != 1
+        )
+
+    @staticmethod
+    def _skip_reason(row: dict[str, Any]) -> str | None:
+        if row["effective_date"] is not None and row["ratio"] == 1:
+            return "ratio_1_no_split"
+        return None
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
