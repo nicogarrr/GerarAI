@@ -338,7 +338,16 @@ class ValuationService:
             else listing_currency(getattr(company, "ticker", None), getattr(company, "currency", None))
         )
         engine = resolve(company)
-        context = engine.build_context(db, company, current_price, as_of)
+        # Acciones en la base del PRECIO: un cierre guardado antes de un split
+        # (el refresco aun no ha pasado) sigue en la base vieja; ajustar las
+        # acciones por ese split dividia el valor por accion entre el ratio.
+        context = engine.build_context(
+            db,
+            company,
+            current_price,
+            as_of,
+            price_as_of=resolved_price.as_of if resolved_price is not None else None,
+        )
 
         # Divisas: el motor trabaja en la divisa de REPORTE de los hechos (BABA:
         # CNY) y el precio esta en la del LISTADO (ADR en USD). Comparar ambos

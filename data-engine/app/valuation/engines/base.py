@@ -219,10 +219,15 @@ class ValuationEngine(ABC):
         company: Company,
         current_price: float | None,
         as_of: date | None = None,
+        *,
+        price_as_of: date | None = None,
     ) -> ValuationContext:
         # El corte viaja al snapshot: solo hechos publicados (filed) hasta
         # as_of entran en la valoracion (V1). Sin as_of, comportamiento actual.
-        snapshot = FinancialSnapshotBuilder().build(db, company, as_of=as_of)
+        # price_as_of: fecha del precio, para poner las acciones en su base.
+        snapshot = FinancialSnapshotBuilder().build(
+            db, company, as_of=as_of, price_as_of=price_as_of
+        )
         return ValuationContext(
             db=db,
             company=company,

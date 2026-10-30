@@ -408,7 +408,12 @@ class FinancialSnapshotBuilder:
                 ]
 
     def build(
-        self, db: Session, company: Company, *, as_of: date | None = None
+        self,
+        db: Session,
+        company: Company,
+        *,
+        as_of: date | None = None,
+        price_as_of: date | None = None,
     ) -> FinancialSnapshot:
         excluded_future = 0
         excluded_unknown = 0
@@ -498,7 +503,10 @@ class FinancialSnapshotBuilder:
                             company.id,
                             period=match.period,
                             filed=match.filed,
-                            cutoff=as_of or date.today(),
+                            # Fecha del PRECIO con el que se comparan: un
+                            # cierre guardado antes del split esta en la base
+                            # vieja y las acciones tienen que ir en la misma.
+                            cutoff=price_as_of or as_of or date.today(),
                         )
                     )
                     if factor != 1.0:
