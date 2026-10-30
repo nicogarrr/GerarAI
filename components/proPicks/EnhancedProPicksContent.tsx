@@ -146,6 +146,13 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         [picks],
     );
 
+    // Un run existente con 0 candidatos aptos NO ofrece «Actualizar»: releer
+    // el mismo run vacío no cambia nada. La acción real es generar una
+    // selección nueva y la etiqueta tiene que decirlo. Una sola condición
+    // gobierna acción y etiqueta: antes el botón decía «Actualizar selección»
+    // pero lanzaba el embudo entero (handleGenerateRun).
+    const emptyStateNeedsRun = !lastGenerated || passedCount === 0;
+
     const getScoreColor = (score: number) => {
         if (score >= 80) return 'text-green-400 bg-green-500/10 border-green-500/20';
         if (score >= 70) return 'text-teal-400 bg-teal-500/10 border-teal-500/20';
@@ -274,7 +281,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                 `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (puntuación ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar la puntuación mínima o cambiar de sector.`}
                         </p>
                         <Button
-                            onClick={lastGenerated && passedCount !== 0 ? handleRefresh : handleGenerateRun}
+                            onClick={emptyStateNeedsRun ? handleGenerateRun : handleRefresh}
                             disabled={loading}
                             aria-busy={loading}
                             className="mt-4 h-11 w-full gap-2 sm:w-auto"
@@ -284,7 +291,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             ) : (
                                 <RefreshCw aria-hidden="true" className="h-4 w-4" />
                             )}
-<span>{lastGenerated ? (loading ? 'Actualizando selección...' : 'Actualizar selección') : (loading ? 'Generando selección...' : 'Generar selección ahora')}</span>
+<span>{emptyStateNeedsRun ? (loading ? 'Generando selección...' : 'Generar selección ahora') : (loading ? 'Actualizando selección...' : 'Actualizar selección')}</span>
                         </Button>
                     </Card>
                 ) : picks.length > 0 ? (

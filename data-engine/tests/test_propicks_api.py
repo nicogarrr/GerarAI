@@ -166,6 +166,86 @@ def test_propicks_run_endpoints(required_auth):
     db.close()
 
 
+def test_propicks_run_detail_ordering(required_auth):
+    """Orden del detalle del run: declarado y estable en los dos motores.
+
+    Regresión: con only_passed=false, Postgres (NULL primero en DESC) ponía a
+    los descartados por el embudo (score NULL) por ENCIMA de los aptos fuera
+    del top_n, y sin desempate las filas con rank y score NULL salían en el
+    orden que devolviera el motor, inestable entre llamadas. Contrato:
+    rankeados por rank asc, luego aptos sin rank por score desc, luego
+    descartados, con ticker como desempate final.
+    """
+    init_db()
+    suffix = uuid4().hex[:8]
+    tenant_ext = f"propicks-order-{suffix}"
+    db = SessionLocal()
+    tenant = Tenant(external_id=tenant_ext, name="ProPicks ordering test")
+    db.add(tenant)
+    db.commit()
+    db.refresh(tenant)
+    good_a = _seed_company(db, tenant.id, f"ORDA{suffix[:4]}", "0.20", "0.16")
+    good_b = _seed_company(db, tenant.id, f"ORDB{suffix[:4]}", "0.19", "0.15")
+    bad = _seed_company(db, tenant.id, f"ORDBAD{suffix[:2]}", "0.01", "0.01")
+    db.commit()
+    ids = {good_a.id, good_b.id, bad.id}
+    db.close()
+
+    client = TestClient(main.app)
+    user = "propicks-order-user"
+    # top_n=1: solo un apto con rank; el otro queda apto sin rank (score
+    # presente) y el descartado sin rank ni score.
+    created = signed_request(
+        client, SECRET, tenant_ext, user, "POST", "/api/propicks/runs",
+        params={"top_n": 1},
+    )
+    assert created.status_code == 201, created.text
+    run_id = created.json()["id"]
+
+    detail = signed_request(
+        client, SECRET, tenant_ext, user, "GET", f"/api/propicks/runs/{run_id}",
+        params={"only_passed": "false"},
+    )
+    assert detail.status_code == 200
+    candidates = detail.json()["candidates"]
+    ours = [c for c in candidates if c["company_id"] in ids]
+    assert len(ours) == 3
+    # La BD del test es compartida: otras suites pueden dejar empresas que
+    # también pasan el embudo, así que no se exige qué empresa lleva rank.
+    passed = [c for c in ours if c["passed"]]
+    not_passed = [c for c in ours if not c["passed"]]
+    assert len(passed) == 2 and len(not_passed) == 1
+    assert all(c["score"] is not None for c in passed)
+    assert not_passed[0]["score"] is None
+    # Los aptos (con o sin rank) van ANTES que el descartado (nulls_last
+    # declarado); sin la corrección, Postgres lo ponía por encima.
+    for c in passed:
+        assert candidates.index(c) < candidates.index(not_passed[0])
+
+    def order_key(c):
+        return (
+            c["rank"] is None,
+            c["rank"] if c["rank"] is not None else 0,
+            c["score"] is None,
+            -(c["score"] or 0.0),
+            c["ticker"],
+        )
+
+    keys = [order_key(c) for c in candidates]
+    assert keys == sorted(keys), "el detalle del run no sale en el orden declarado"
+
+    db = SessionLocal()
+    db.execute(delete(ProPickCandidate).where(ProPickCandidate.run_id == run_id))
+    db.execute(delete(ProPickRun).where(ProPickRun.id == run_id))
+    for cid in ids:
+        db.execute(delete(CalculatedMetric).where(CalculatedMetric.company_id == cid))
+        db.execute(delete(FinancialFact).where(FinancialFact.company_id == cid))
+        db.execute(delete(Company).where(Company.id == cid))
+    db.execute(delete(Tenant).where(Tenant.id == tenant.id))
+    db.commit()
+    db.close()
+
+
 def test_propicks_run_detail_prices(required_auth):
     """Detalle del run: current_price/price_as_of desde market_prices (None honesto sin precio)."""
     from datetime import date
