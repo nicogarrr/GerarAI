@@ -21,7 +21,6 @@ import {
     getPortfolioSummary,
     getPortfolioScores,
     quickAddPosition,
-    getPortfolioWithWeights,
     refreshPortfolioHoldings,
     updateAllPortfolioPrices,
     importFromIBKR,
@@ -273,20 +272,20 @@ describe('getPortfolioScores: null es ausencia, no un cero', () => {
     });
 });
 
-describe('quickAddPosition / getPortfolioWithWeights', () => {
+describe('pesos de cartera', () => {
+    it('no exporta getPortfolioWithWeights: su denominador incluía la caja y los pesos no sumaban 100 %', async () => {
+        const mod = await import('@/lib/actions/portfolio.actions');
+        expect('getPortfolioWithWeights' in mod).toBe(false);
+    });
+});
+
+describe('quickAddPosition', () => {
     it('quickAddPosition es una compra hoy', async () => {
         researchRequest.mockResolvedValue({});
         expect(await quickAddPosition('tenant-one', 'AAPL', 2, 100)).toEqual({ success: true });
         expect(JSON.parse(researchRequest.mock.calls[0][1].body).action).toBe('buy');
     });
 
-    it('pesos en % del valor total; cartera vacía -> 0', async () => {
-        seedSummary([position({ market_value_base: 1350 })], { total_value: 2700 });
-        const [h] = await getPortfolioWithWeights('tenant-one');
-        expect(h.weight).toBeCloseTo(50, 1);
-        seedSummary([], { total_value: 0 });
-        expect((await getPortfolioWithWeights('tenant-one')).length).toBe(0);
-    });
 });
 
 describe('refreshPortfolioHoldings: declara lo que SE ESCRIBIÓ', () => {
