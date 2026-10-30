@@ -521,7 +521,7 @@ class PortfolioLedgerService:
             position.market_value - position.quantity * position.average_cost
             if position.average_cost > 0 else Decimal("0")
         )
-        position.as_of = as_of or date.today()
+        position.as_of = as_of or local_today()
         position.market_value_native = position.market_value
         position.cost_basis_native = position.quantity * position.average_cost
         base_currency = position.base_currency or self.fx.base_currency(db)
