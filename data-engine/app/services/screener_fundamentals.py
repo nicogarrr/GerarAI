@@ -23,6 +23,7 @@ from app.services.split_adjustment import (
     period_end_date,
     split_events_by_company,
 )
+from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 
 _METRICS = {"eps_diluted", "total_equity", "shares_diluted", "net_income"}
 # QA inicio DCF: la tarjeta de oportunidades del inicio prueba candidatas del
@@ -41,6 +42,13 @@ def _ratio(value: Decimal | None) -> float | None:
         return None
     number = float(value)
     return round(number, 4) if isfinite(number) else None
+
+
+def _tagged_adr(company: Company) -> bool:
+    return any(
+        str(tag).strip().lower() == "adr" or str(tag).strip().lower().startswith(ADR_TAG_PREFIX)
+        for tag in (company.factor_tags or [])
+    )
 
 
 def _unit_currency(unit: str | None) -> str:
@@ -167,6 +175,16 @@ def load_screener_ratios(
             if close is None:
                 output[company.ticker.upper()] = metrics
                 continue
+        # Un ADR cotiza por ADR (N ordinarias) y el EPS / las acciones del
+        # filing son por ORDINARIA: sin el ratio el PER y el P/B salian N
+        # veces inflados. Precio por ordinaria = precio del ADR / N, como
+        # hacen los motores. Marcado ADR sin ratio valido: sin ratios.
+        ratio = adr_ratio(company)
+        if ratio is None and _tagged_adr(company):
+            output[company.ticker.upper()] = metrics
+            continue
+        if ratio:
+            close = close / Decimal(str(ratio))
         price_provenance = (
             {"source": live.get("source") or "live", "date": live.get("as_of"), "id": None}
             if use_live
@@ -174,6 +192,9 @@ def load_screener_ratios(
         )
         currency = (company.currency or "").upper()
         years = sorted({year for year, _ in facts_for_company}, reverse=True)
+        if ratio:
+            price_provenance["adr_ratio"] = ratio
+            price_provenance["basis"] = "ordinary_share (adr_close / adr_ratio)"
         provenance = {"price": price_provenance, "facts": {}}
 
         def pair(left: str, right: str):

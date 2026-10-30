@@ -300,3 +300,36 @@ def test_has_fundamentals_false_for_quarterly_only(db):
     _fact(db, company, "shares_diluted", "100", "shares", year=2025, quarter="Q1", period="2025-03-31:Q1")
     result = load_screener_ratios(db, {"AAPL"}, today=TODAY)["AAPL"]
     assert result["has_fundamentals"] is False
+
+
+def test_adr_ratios_use_price_per_ordinary_share(db):
+    """ADR 2:1 que reporta en USD (etiqueta adr:2). Hechos por ordinaria.
+
+    Cálculo independiente: ADR a 70 -> 35 por ordinaria; PER = 35 / 3,5 = 10
+    (en main 70 / 3,5 = 20); libros/ordinaria = 200 / 20 = 10 -> P/B = 3,5
+    (en main 7). El ROE no depende del precio: 30 / 200 = 15 %.
+    """
+    company = _company(db, "SHEL")
+    company.factor_tags = ["adr:2"]
+    db.flush()
+    _price(db, company, "70")
+    _fact(db, company, "eps_diluted", "3.5", "USD/share")
+    _fact(db, company, "total_equity", "200", "USD")
+    _fact(db, company, "shares_diluted", "20", "shares")
+    _fact(db, company, "net_income", "30", "USD")
+    result = load_screener_ratios(db, {"SHEL"}, today=TODAY)["SHEL"]
+    assert result["pe"] == pytest.approx(10.0)
+    assert result["pb"] == pytest.approx(3.5)
+    assert result["roe"] == pytest.approx(15.0)
+    assert result["ratioProvenance"]["price"]["adr_ratio"] == 2
+
+
+def test_adr_tag_without_ratio_has_no_price_ratios(db):
+    company = _company(db, "XADR")
+    company.factor_tags = ["adr"]
+    db.flush()
+    _price(db, company, "70")
+    _fact(db, company, "eps_diluted", "3.5", "USD/share")
+    result = load_screener_ratios(db, {"XADR"}, today=TODAY)["XADR"]
+    assert result["pe"] is None
+    assert result["pb"] is None
