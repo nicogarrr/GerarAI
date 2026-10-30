@@ -479,7 +479,7 @@ class UniversalSearchService:
                         key=f"decision:{row.id}",
                         entity_type="decision",
                         entity_id=row.id,
-                        title=f"Decision: {row.decision}",
+                        title=f"Decisión: {row.decision}",
                         text=f"{row.rationale} {' '.join(row.what_must_be_true)}",
                         company_id=row.company_id,
                         source_type="user",
@@ -515,7 +515,7 @@ class UniversalSearchService:
                 elif entity_type == "thesis_section":
                     title, text = row.title, row.body
                 else:
-                    title = f"Decision lesson: {row.taxonomy}"
+                    title = f"Lección de decisión: {row.taxonomy}"
                     text = " ".join(
                         (
                             row.expectation,

@@ -96,7 +96,7 @@ test("los eventos de noticias muestran En cartera / En watchlist", async ({ page
   // La cache de movers es de 45s en el servidor de frontend: si otro test
   // la calento antes de la semilla, recargamos hasta que expire.
   await page.goto("/screener?vista=subidas");
-  await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { name: "Explorar acciones", level: 1 })).toBeVisible({ timeout: 60_000 });
   await expect(async () => {
     await page.reload();
     const costMover = page.getByLabel("Mayores subidas").getByRole("row", { name: /COST/ });

@@ -36,6 +36,7 @@ from app.services.driver_operating_model import DriverOperatingModel
 from app.services.fundamental_model_repository import FundamentalModelRepository
 from app.services.inferred_input_service import MIN_WACC_TERMINAL_SPREAD, InferredInputService
 from app.services.market_opportunity_service import MarketOpportunityEngine
+from app.services.number_format import format_percent_es
 from app.services.owner_earnings import (
     OWNER_EARNINGS_FORMULA,
     WORKING_CAPITAL_SIGN_CONVENTION,
@@ -1209,7 +1210,7 @@ class LongTermModelService:
                 unit="decimal",
                 source_type=tax_rate.source_type,
                 basis=(
-                    f"tipo efectivo {raw_tax:.2%} acotado al rango [0 %, 60 %]: los tipos "
+                    f"tipo efectivo {format_percent_es(raw_tax)} acotado al rango [0 %, 60 %]: los tipos "
                     "negativos proceden de cargas no operativas e inflarían el NOPAT"
                     if clamped_tax != raw_tax
                     else tax_rate.basis

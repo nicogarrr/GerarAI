@@ -12,7 +12,7 @@ test.describe("investor screener flow", () => {
     // Resolucion acotada: filas o estado final honesto; la carga indefinida falla.
     await waitForScreenerOutcome(page);
 
-    await expect(page.getByRole("heading", { name: "Mercado", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explorar acciones", level: 1 })).toBeVisible();
     // El sector se elige con un <select> accesible (SectorSelect), ya no con chips-enlace.
     await expect(page.getByLabel("Filtrar por sector")).toBeVisible();
 

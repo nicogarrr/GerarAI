@@ -47,9 +47,20 @@ from app.services.connectors import earnings_calendar as earnings_calendar_conne
 from app.services.connectors import sec_edgar as sec_edgar_connector
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.ir import IRConnector
+from app.services.date_format import format_date_es
 from app.services.fact_deletion import delete_financial_facts
 
 logger = logging.getLogger(__name__)
+
+
+def _sec_filing_title(form: str | None, filed: str | None) -> str:
+    """Título es-ES de un filing SEC. Sin fecha reconocible se omite la
+    cláusula de fecha: nunca «… el None» ni la cadena cruda."""
+    label = form or "Documento"
+    date_es = format_date_es(filed)
+    if date_es:
+        return f"{label} presentado ante la SEC el {date_es}"
+    return f"{label} presentado ante la SEC"
 
 # Metrica -> (tags us-gaap por preferencia, unidad). Nunca se suman
 # tags. Gana el tag con el dato mas reciente: un tag preferido puede
@@ -716,7 +727,7 @@ class ThesisEvidenceService:
             db.add(
                 Document(
                     company_id=company.id,
-                    title=f"{company.ticker} {form} filed {filed}",
+                    title=_sec_filing_title(form, filed),
                     source_type="SEC",
                     source_url=url,
                     # Sin published_at la UI de Fuentes (orden por fecha de
