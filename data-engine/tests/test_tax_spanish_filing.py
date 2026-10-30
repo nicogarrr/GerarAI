@@ -190,6 +190,39 @@ def test_net_base_caps_loss_offset_at_25pct_of_dividends(db):
     assert summary["net_taxable_base"] == pytest.approx(750.0)
 
 
+def test_net_base_counts_interest_received_as_rcm(db):
+    """Interest received is capital-income of the savings base (art. 25.2 and
+    46.b LIRPF, BOE-A-2006-20764, casilla 0027), so it belongs in the RCM
+    balance that the art. 49.1.b 25 % cross-offset is measured against.
+    Hand example (EUR, no FX): dividends 1.000 + interest 200 = RCM 1.200;
+    GyP -10.000 -> offset min(10.000, 25 % x 1.200 = 300) -> base 900.
+    Before the fix the summary ignored the interest and showed 750.
+    """
+    _eur_portfolio(db)
+    div = _company(db, "DIV")
+    lose = _company(db, "LOSE")
+    _tx(db, div, date(2026, 3, 1), "dividend", 0, 1000, currency="EUR")
+    _tx(db, div, date(2026, 4, 1), "interest", 1, 200, currency="EUR")
+    _tx(db, lose, date(2026, 1, 10), "buy", 10, 1500, currency="EUR")
+    _tx(db, lose, date(2026, 9, 1), "sell", 10, 500, currency="EUR")
+
+    report = TaxReportService().compute_report(db, 2026)
+    assert report["filing"]["intereses"]["received"]["amount_base"] == pytest.approx(200.0)
+    assert report["summary"]["net_taxable_base"] == pytest.approx(900.0)
+
+
+def test_net_base_unknown_when_interest_has_no_eur_amount(db):
+    """A USD interest with no ECB rate leaves casilla 0027 unknown, so the
+    savings base cannot be published as exact (art. 46.b LIRPF)."""
+    _eur_portfolio(db)
+    div = _company(db, "DIV")
+    _tx(db, div, date(2026, 3, 1), "dividend", 0, 1000, currency="EUR")
+    _tx(db, div, date(2026, 4, 1), "interest", 1, 200, currency="USD")
+
+    summary = TaxReportService().compute_report(db, 2026)["summary"]
+    assert summary["net_taxable_base"] is None
+
+
 def test_integrate_savings_base_hand_cases():
     """Art. 49.1.a/b LIRPF: each block nets alone; cross offset ≤ 25 %."""
     from app.services.tax_irpf_filing import integrate_savings_base as f
