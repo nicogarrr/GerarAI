@@ -1,7 +1,10 @@
+'use client';
+
 import { FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatNumber } from '@/lib/format';
 import { citationKindLabel, toChatCitations, type ChatCitation } from '@/lib/chat/citations';
+import { useT } from '@/lib/i18n/client';
 
 interface CitationsListProps {
     citations: ChatCitation[];
@@ -20,6 +23,7 @@ interface CitationsListProps {
  * con la misma regla que lib/chat/citations.ts:toChatCitations).
  */
 export default function CitationsList({ citations, sources }: CitationsListProps) {
+    const t = useT();
     const derived: ChatCitation[] =
         citations.length > 0 || !sources ? citations : toChatCitations(sources);
 
@@ -28,7 +32,7 @@ export default function CitationsList({ citations, sources }: CitationsListProps
     return (
         <div className="mt-4 border-t border-gray-800 pt-3">
             <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                Citas y evidencia ({formatNumber(derived.length, { maximumFractionDigits: 0 })})
+                {t('chat.citations.title', { n: formatNumber(derived.length, { maximumFractionDigits: 0 }) })}
             </h4>
             <ul className="mt-2 space-y-2">
                 {derived.map((citation) => (
