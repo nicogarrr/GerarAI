@@ -55,6 +55,14 @@ describe('PortfolioHoldings estados y numeros', () => {
         expect(row.textContent).toContain('N/D');
     });
 
+    it('cantidad fraccionaria: hasta 4 decimales (no «0,00» para 0,004 acciones) y entera sin decimales', () => {
+        render(<PortfolioHoldings holdings={[holding({ symbol: 'FRAC', quantity: 0.0042 }), holding({ symbol: 'MSFT', quantity: 12 })]} userId="u" />);
+        const frac = desktop().getByText('FRAC').closest('tr')!;
+        expect(frac.querySelectorAll('td')[1].textContent).toBe('0,0042');
+        const whole = desktop().getByText('MSFT').closest('tr')!;
+        expect(whole.querySelectorAll('td')[1].textContent).toBe('12');
+    });
+
     it('caja 0 o null no pinta fila de caja', () => {
         render(<PortfolioHoldings holdings={[holding()]} userId="u" cash={0} />);
         expect(desktop().queryByText('Caja')).not.toBeInTheDocument();
