@@ -228,6 +228,16 @@ describe('PortfolioHoldings actualizar precios (el toast dice lo que se escribio
         await waitFor(() => expect(h.success).toHaveBeenCalledWith('2 precios actualizados'));
     });
 
+    it('sin nada que actualizar (la cartera se vació en otra pestaña): aviso tranquilo, ni error ni verde', async () => {
+        h.refreshPrices.mockResolvedValue({ ok: true, updated: [], skipped: [], failed: [], holdings: [] });
+        render(<PortfolioHoldings holdings={[holding()]} userId="u" />);
+        click();
+        await waitFor(() => expect(h.info).toHaveBeenCalledWith('No hay posiciones que actualizar todavía. Registra una compra para empezar.'));
+        expect(h.error).not.toHaveBeenCalled();
+        expect(h.success).not.toHaveBeenCalled();
+        expect(h.showError).not.toHaveBeenCalled();
+    });
+
     it('excepcion: toast de error', async () => {
         h.refreshPrices.mockRejectedValue(new Error('net'));
         render(<PortfolioHoldings holdings={[holding()]} userId="u" />);

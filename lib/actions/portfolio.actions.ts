@@ -698,7 +698,10 @@ export async function refreshPortfolioHoldings(holdings: PortfolioHolding[]): Pr
     const user = await requireAuthenticatedUser();
     const symbols = holdings.map((holding) => holding.symbol);
     if (symbols.length === 0) {
-        throw new ValidationError('No hay posiciones que actualizar');
+        // Cartera vacía: no es un error. Antes se lanzaba ValidationError y en
+        // producción Next oculta el mensaje de los errores de server action,
+        // así que el usuario nuevo veía «El motor de análisis no responde».
+        return { ok: true, updated: [], skipped: [], failed: [], holdings: [] };
     }
 
     // allSettled, no Promise.all: con all, si A se guardaba y B fallaba, la

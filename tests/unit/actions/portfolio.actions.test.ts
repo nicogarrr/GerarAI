@@ -276,8 +276,9 @@ describe('quickAddPosition / getPortfolioWithWeights', () => {
 });
 
 describe('refreshPortfolioHoldings: declara lo que SE ESCRIBIÓ', () => {
-    it('sin posiciones -> ValidationError', async () => {
-        await expect(refreshPortfolioHoldings([])).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
+    it('sin posiciones: resultado vacío y tranquilo, nunca un error (en prod se veía «motor no responde»)', async () => {
+        await expect(refreshPortfolioHoldings([])).resolves.toEqual({ ok: true, updated: [], skipped: [], failed: [], holdings: [] });
+        expect(researchRequest).not.toHaveBeenCalled();
     });
 
     it('sin clave de proveedor: ok false, todo skipped, y NO se invalida nada', async () => {
