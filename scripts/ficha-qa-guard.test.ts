@@ -54,9 +54,14 @@ describe('QA ficha: cabecera de panel sin solape en movil (6)', () => {
     });
 });
 
-describe('QA ficha: barra de modulos sin scrollbar en desktop (10)', () => {
-    it('el nav de modulos envuelve en todos los tamanos', () => {
+describe('QA ficha: navegación sin scrollbar ni niveles extra (10, revisado 29-oct-2026)', () => {
+    it('una sola fila de seis pestañas; sin barra de módulos', () => {
         const nav = readFileSync('components/research/CompanyNavigation.tsx', 'utf8');
-        assert.ok(nav.includes('aria-label={`Módulos de ${primary.label}`} className="flex flex-wrap gap-2"'), 'modulos envuelven (movil y desktop)');
+        // Seis pestañas a un toque alimentadas por TABS; en móvil la fila se
+        // desliza (scroll nativo) y en desktop sobra sitio: nada de una
+        // segunda barra de módulos que desbordaba a 1280px.
+        assert.ok(nav.includes('TABS.map'), 'la fila sale del mapa de pestañas');
+        assert.ok(nav.includes('overflow-x-auto'), 'la fila se desliza en móvil');
+        assert.ok(!nav.includes('Módulos de'), 'sin barra de módulos: son secciones ancladas');
     });
 });

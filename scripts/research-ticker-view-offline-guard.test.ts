@@ -18,7 +18,12 @@ const boFile = join(dir, 'backend-offline.ts');
 writeFileSync(boFile, readFileSync(join(root, 'lib/backend-offline.ts'), 'utf8').replace("'@/lib/types/errors'", `'${errorsUrl}'`));
 
 const { isBackendUnavailableError } = await import(pathToFileURL(boFile).href);
-const { findUnavailableViewFailure, viewRetryHref } = await import(pathToFileURL(join(root, 'lib/research/view-outage.ts')).href);
+// view-outage importa research-views por alias: se reescribe a URL de archivo
+// para poder ejecutarlo con node --experimental-strip-types.
+const viewsUrl = pathToFileURL(join(root, 'lib/research/research-views.ts')).href;
+const voFile = join(dir, 'view-outage.ts');
+writeFileSync(voFile, readFileSync(join(root, 'lib/research/view-outage.ts'), 'utf8').replace("'@/lib/research/research-views'", `'${viewsUrl}'`));
+const { findUnavailableViewFailure, viewRetryHref } = await import(pathToFileURL(voFile).href);
 const { AppError, ExternalAPIError } = await import(errorsUrl);
 
 const fail = (error: unknown) => [{ key: 'thesis', ok: false as const, reason: 'x', error }];
@@ -41,14 +46,16 @@ test('lecturas correctas o lista vacia no degradan', () => {
 
 test('retryHref conserva la vista y codifica el ticker', () => {
     assert.equal(viewRetryHref('ASTS', 'overview'), '/research/ASTS');
-    assert.equal(viewRetryHref('ASTS', 'thesis'), '/research/ASTS?view=thesis');
-    assert.equal(viewRetryHref('BRK.B', 'financials'), '/research/BRK.B?view=financials');
-    assert.equal(viewRetryHref('A B', 'model'), '/research/A%20B?view=model');
+    assert.equal(viewRetryHref('ASTS', 'thesis'), '/research/ASTS?view=tesis');
+    assert.equal(viewRetryHref('BRK.B', 'financials'), '/research/BRK.B?view=finanzas');
+    assert.equal(viewRetryHref('A B', 'model'), '/research/A%20B?view=valoracion#modelo');
 });
 
 test('la pagina usa el helper antes de viewData y viewData sigue relanzando', () => {
     const src = readFileSync(join(root, 'app/(root)/research/[ticker]/page.tsx'), 'utf8');
-    assert.match(src, /findUnavailableViewFailure\(viewSettled, isBackendUnavailableError\)/);
+    // Solo la lectura de la sección de ENTRADA degrada la página entera;
+    // el resto de secciones muestran su aviso inline (29-oct-2026).
+    assert.match(src, /findUnavailableViewFailure\(entrySettled, isBackendUnavailableError\)/);
     assert.ok(src.indexOf('findUnavailableViewFailure(viewSettled') < src.indexOf('const viewData = async'));
     assert.match(src.slice(src.indexOf('const viewData = async')), /throw failed\.error instanceof Error/);
 });
