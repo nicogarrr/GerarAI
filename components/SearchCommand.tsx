@@ -1,6 +1,7 @@
 "use client"
 
 import dynamic from 'next/dynamic';
+import { useT } from "@/lib/i18n/client";
 import { useEffect, useId, useRef, useSyncExternalStore } from "react"
 import { Search } from "lucide-react";
 import {
@@ -23,7 +24,9 @@ const SearchCommandDialog = dynamic(() => import('@/components/SearchCommandDial
 });
 const preloadDialog = () => void import('@/components/SearchCommandDialog');
 
-export default function SearchCommand({ renderAs = 'button', label = 'Añadir acción', initialStocks }: SearchCommandProps) {
+export default function SearchCommand({ renderAs = 'button', label, initialStocks }: SearchCommandProps) {
+    const t = useT();
+    const resolvedLabel = label ?? t('ui.search.addStock');
     // Guard de hidratación sin efecto: false en SSR y en el primer render
     // del cliente, true tras hidratar (useSyncExternalStore).
     const mounted = useSyncExternalStore(
@@ -81,7 +84,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
             );
         }
         if (renderAs === 'text') {
-            return <button type="button" tabIndex={-1} aria-hidden="true" className="search-text">{label}</button>;
+            return <button type="button" tabIndex={-1} aria-hidden="true" className="search-text">{resolvedLabel}</button>;
         }
         return (
             <button
@@ -91,7 +94,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                 className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800/60 px-4 py-2.5 text-sm text-gray-400 backdrop-blur-sm"
             >
                 <Search aria-hidden="true" className="h-4 w-4 text-gray-500" />
-                <span className="flex-1 text-left">Buscar acciones...</span>
+                <span className="flex-1 text-left">{t('ui.search.stocksPlaceholder')}</span>
                 <kbd className="hidden items-center gap-1 rounded border border-gray-600 bg-gray-900/50 px-2 py-0.5 text-xs text-gray-500 sm:inline-flex">
                     Ctrl+K
                 </kbd>
@@ -110,7 +113,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     className="search-text"
                     data-testid="search-command-trigger"
                 >
-                    {label}
+                    {resolvedLabel}
                 </button>
             ) : renderAs === 'icon' ? (
                 <button
@@ -118,7 +121,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     ref={triggerRef}
                     onClick={openSearch}
                     onPointerDown={preloadDialog}
-                    aria-label="Abrir buscador"
+                    aria-label={t('ui.search.openAria')}
                     data-testid="search-command-trigger"
                     className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                 >
@@ -135,7 +138,7 @@ export default function SearchCommand({ renderAs = 'button', label = 'Añadir ac
                     data-testid="search-command-trigger"
                 >
                     <Search aria-hidden="true" className="h-4 w-4 text-gray-500" />
-                    <span className="flex-1 text-left">Buscar acciones...</span>
+                    <span className="flex-1 text-left">{t('ui.search.stocksPlaceholder')}</span>
                     <kbd className="hidden items-center gap-1 rounded border border-gray-600 bg-gray-900/50 px-2 py-0.5 text-xs text-gray-500 sm:inline-flex">
                         Ctrl+K
                     </kbd>

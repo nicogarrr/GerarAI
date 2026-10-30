@@ -7,6 +7,7 @@ import { GerarAIWordmark } from '@/components/GerarAIWordmark';
 import NavItems from '@/components/NavItems';
 import SearchCommand from '@/components/SearchCommand';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
+import { useT } from '@/lib/i18n/client';
 
 type Props = {
     onClose: () => void;
@@ -20,6 +21,7 @@ type Props = {
  * bundle inicial de ninguna ruta. El gatillo hamburguesa queda eager.
  */
 export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: Props) {
+    const t = useT();
     const drawerRef = useRef<HTMLDivElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
     const dialogRef = useRef<HTMLDivElement>(null);
@@ -97,10 +99,10 @@ export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: 
             aria-modal="true"
             aria-labelledby="mobile-nav-title"
         >
-            <h2 id="mobile-nav-title" className="sr-only">Menú de navegación</h2>
+            <h2 id="mobile-nav-title" className="sr-only">{t('shell.nav.menuTitle')}</h2>
             <button
                 type="button"
-                aria-label="Cerrar menú por fondo"
+                aria-label={t('shell.nav.closeBackdrop')}
                 onClick={onClose}
                 tabIndex={-1}
                 className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
@@ -116,7 +118,7 @@ export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: 
                         type="button"
                         ref={closeButtonRef}
                         onClick={onClose}
-                        aria-label="Cerrar menú de navegación"
+                        aria-label={t('shell.nav.closeMenu')}
                         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                     >
                         <X className="h-6 w-6" aria-hidden="true" />
@@ -139,7 +141,7 @@ export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: 
                     cerraba el menu. */}
                 <nav
                     className="flex-1 overflow-y-auto"
-                    aria-label="Navegación móvil"
+                    aria-label={t('shell.nav.mobileAria')}
                     onClick={(event) => {
                         if ((event.target as HTMLElement).closest('a[href]')) onClose();
                     }}

@@ -5,7 +5,12 @@
   },
   "nav": {
     "primaryAria": "Main navigation",
-    "bottomAria": "Bottom navigation"
+    "bottomAria": "Bottom navigation",
+    "openMenu": "Open navigation menu",
+    "menuTitle": "Navigation menu",
+    "closeBackdrop": "Close menu via backdrop",
+    "closeMenu": "Close navigation menu",
+    "mobileAria": "Mobile navigation"
   },
   "sectionNav": {
     "sections": "Sections",
@@ -14,5 +19,32 @@
   },
   "breadcrumbs": {
     "aria": "Breadcrumb"
+  },
+  "header": {
+    "homeAria": "GerarAI, home",
+    "alerts": "Alerts"
+  },
+  "offline": {
+    "banner": "No connection. Some data may be outdated until the connection is restored."
+  },
+  "publicNav": {
+    "openMenu": "Open pages menu",
+    "menuTitle": "Pages menu",
+    "closeMenu": "Close pages menu",
+    "pagesAria": "GerarAI pages"
+  },
+  "user": {
+    "menuSuffix": ", user menu",
+    "aiModel": "AI model",
+    "settings": "Settings",
+    "security": "Security",
+    "signOut": "Sign out"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "An unexpected error occurred. Please try reloading the page.",
+    "devDetails": "Technical details (development only)",
+    "retry": "Try again",
+    "reload": "Reload page"
   }
 }
