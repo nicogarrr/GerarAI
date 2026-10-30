@@ -88,6 +88,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
 
+  'components/settings/LanguageForm.tsx':
+    'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
   'lib/i18n/client.tsx':
     'provider y hooks de locale (useT/useLocale/useFormat): contexto React de cliente por definición',
   'components/research/ValuationSummaryGrid.tsx': 'useState y useEffect para carga batch asíncrona y descarte de respuestas de selección anterior',

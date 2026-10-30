@@ -1,1 +1,46 @@
-{}
+{
+  "title": "Ajustes",
+  "navAria": "Secciones de ajustes",
+  "unavailable": "No disponible ahora. Recarga para volver a intentarlo.",
+  "sections": {
+    "language": "Idioma",
+    "ibkr": "IBKR",
+    "currency": "Divisa",
+    "telegram": "Telegram",
+    "dca": "Avisos DCA",
+    "llm": "IA",
+    "tax": "Fiscalidad"
+  },
+  "language": {
+    "title": "Idioma",
+    "description": "Idioma de la interfaz. Los datos de mercado y los nombres propios no cambian.",
+    "label": "Idioma de la app",
+    "optionEs": "Español",
+    "optionEn": "English",
+    "applying": "Aplicando…"
+  },
+  "ibkr": {
+    "title": "Conectar IBKR"
+  },
+  "currency": {
+    "title": "Divisa base",
+    "description": "Divisa en la que ves la cartera y sus totales. La fiscalidad sigue en euros."
+  },
+  "telegram": {
+    "title": "Telegram",
+    "body": "La vinculación de Telegram desde la app no está disponible todavía. En Alertas puedes consultar el estado del canal configurado en el servidor.",
+    "link": "Ver estado de Telegram y gestionar alertas"
+  },
+  "dca": {
+    "title": "Avisos DCA"
+  },
+  "llm": {
+    "title": "Modelo de IA",
+    "descriptionTenant": "Configuración con tu clave API.",
+    "descriptionPlatform": "Proveedor de GerarAI o tu propia clave API."
+  },
+  "tax": {
+    "title": "Datos fiscales del declarante",
+    "description": "Datos del declarante y custodia para el Modelo 720."
+  }
+}

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services.async_bridge import run_from_any_context
 from app.services.company_events_service import CompanyEventsService
 from app.services.company_resolver import resolve_company
@@ -84,7 +85,7 @@ async def get_company_events(ticker: str, db: Session = Depends(get_db)) -> Any:
     def _events() -> Any:
         company = resolve_company(db, ticker)
         if company is None:
-            raise HTTPException(status_code=404, detail=f"Empresa no encontrada: {ticker}")
+            raise HTTPException(status_code=404, detail=ui_error(404, "company_not_found_ticker", ticker=ticker).detail)
         return run_from_any_context(CompanyEventsService(db).get_events(company))
 
     # resolve + servicio (sqlalchemy sincrono entre awaits): hilo del pool.
@@ -96,7 +97,7 @@ async def get_company_filings(ticker: str, db: Session = Depends(get_db)) -> Any
     def _filings() -> Any:
         company = resolve_company(db, ticker)
         if company is None:
-            raise HTTPException(status_code=404, detail=f"Empresa no encontrada: {ticker}")
+            raise HTTPException(status_code=404, detail=ui_error(404, "company_not_found_ticker", ticker=ticker).detail)
         return run_from_any_context(CompanyEventsService(db).get_filings(company))
 
     return await run_in_threadpool(_filings)

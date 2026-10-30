@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services import catalyst_calendar_service as catalyst_service
 from app.services.connectors import earnings_calendar as calendar_connector
 from app.services.connectors import ipo_calendar as ipo_connector
@@ -298,7 +299,7 @@ def calendar_feed_public(filename: str) -> Response:
     from app.services.calendar_feed_service import feed_for_token
 
     token = filename[:-4] if filename.endswith(".ics") else ""
-    not_found = HTTPException(status_code=404, detail="Feed no encontrado")
+    not_found = ui_error(404, "feed_not_found")
     if not token.startswith("gfc_") or len(token) > 80 or not token.isascii():
         raise not_found
     db = SessionLocal()

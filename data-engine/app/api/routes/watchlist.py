@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.core.database import get_db
 from app.core.tenancy import tenant_filters
+from app.core.ui_errors import ui_error
 from app.models import (
     Company,
     DcaAlertOverride,
@@ -107,7 +108,7 @@ def upsert_watch_item(
 def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
     item = _find_watch_item(db, symbol.strip().upper())
     if item is None:
-        raise HTTPException(status_code=404, detail="Ese ticker no está en tu watchlist")
+        raise HTTPException(status_code=404, detail=ui_error(404, "ticker_not_in_watchlist").detail)
     db.delete(item)
     db.commit()
 
@@ -687,7 +688,7 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     policy = effective_policy(db)
     key = symbol.strip().upper()
     if key not in dca.tracked_symbols(db):
-        raise HTTPException(status_code=404, detail="El ticker no está en tu watchlist ni en tu cartera")
+        raise HTTPException(status_code=404, detail=ui_error(404, "ticker_not_in_watchlist_or_portfolio").detail)
     row = db.scalar(
         select(DcaAlertOverride).where(DcaAlertOverride.symbol == key, *tenant_filters(db, DcaAlertOverride))
     )
@@ -730,7 +731,7 @@ def enqueue_manual_dca(db: Session = Depends(get_db)) -> dict:
     from app.workers.dramatiq_app import evaluate_manual_dca
     tenant_id, user_id = db.info.get("tenant_id"), db.info.get("user_id")
     if tenant_id is None or not user_id:
-        raise HTTPException(status_code=401, detail="Se requiere identidad de cuenta para ejecutar en segundo plano.")
+        raise HTTPException(status_code=401, detail=ui_error(401, "account_identity_required_bg").detail)
     client = dca_manual_job.redis_client()
     token = None
     row = None
@@ -740,10 +741,10 @@ def enqueue_manual_dca(db: Session = Depends(get_db)) -> dict:
         try:
             token, wait = dca_manual.acquire_manual_gate(client, str(tenant_id))
         except redis.RedisError as exc:
-            raise HTTPException(status_code=503, detail="No se puede asegurar una ejecución única ahora.") from exc
+            raise HTTPException(status_code=503, detail=ui_error(409, "single_run_unavailable").detail) from exc
         if token is None:
             if wait == -1:
-                raise HTTPException(status_code=409, detail="Ya hay una evaluación DCA en curso en tu cuenta.")
+                raise HTTPException(status_code=409, detail=ui_error(409, "dca_evaluation_in_progress").detail)
             raise HTTPException(status_code=429, detail=f"Espera {wait} s antes de otra tanda.", headers={"Retry-After": str(wait)})
         pending = dca_manual.pending_symbols(db)
         requested = pending[:dca_manual.MAX_SYMBOLS]
@@ -765,7 +766,7 @@ def enqueue_manual_dca(db: Session = Depends(get_db)) -> dict:
         db.rollback()
         if row is not None:
             dca_run_log.finish_run(db, row, error="No se pudo confirmar el envío al worker.")
-        raise HTTPException(status_code=503, detail="No se pudo confirmar la ejecución; revisa su estado antes de repetir.") from exc
+        raise HTTPException(status_code=503, detail=ui_error(409, "run_confirmation_failed").detail) from exc
     finally:
         try:
             if token is not None and not sent and not enqueue_attempted:
@@ -781,7 +782,7 @@ def manual_dca_status(run_id: int, db: Session = Depends(get_db)) -> dict:
     row = db.scalar(select(DcaEvaluationRun).where(DcaEvaluationRun.id == run_id,
         DcaEvaluationRun.trigger == "manual", *tenant_filters(db, DcaEvaluationRun)))
     if row is None:
-        raise HTTPException(status_code=404, detail="Ejecución no encontrada en tu cuenta.")
+        raise HTTPException(status_code=404, detail=ui_error(404, "run_not_found").detail)
     payload = run_payload(row) or {}
     return {"run_id": row.id, "status": "running" if row.status == "queued" and datetime.now(UTC) - (row.started_at if row.started_at.tzinfo else row.started_at.replace(tzinfo=UTC)) < timedelta(minutes=40) else ("interrupted" if row.status == "queued" else payload.get("status", "interrupted")),
         "summary": (row.detail or {}).get("summary"), "error": payload.get("error")}
@@ -801,7 +802,7 @@ def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
         select(DcaSignalState).where(DcaSignalState.symbol == key, *tenant_filters(db, DcaSignalState))
     )
     if state is None:
-        raise HTTPException(status_code=404, detail="Ticker sin señal DCA evaluada (añádelo a watchlist o cartera)")
+        raise HTTPException(status_code=404, detail=ui_error(422, "ticker_without_dca_signal").detail)
     data = state.hit_rates or {}
     if not data.get("rows"):
         return {"symbol": key, "available": False, "reason": "Aún sin histórico calculado: se rellena en la próxima evaluación"}
@@ -844,9 +845,9 @@ def dca_backtest(
 
     key = symbol.strip().upper()
     if not key or len(key) > 24:
-        raise HTTPException(status_code=422, detail="Ticker inválido")
+        raise HTTPException(status_code=422, detail=ui_error(400, "ticker_invalid").detail)
     if start and end and start > end:
-        raise HTTPException(status_code=422, detail="El inicio va después del final")
+        raise HTTPException(status_code=422, detail=ui_error(400, "start_after_end").detail)
     company = db.scalar(select(Company).where(Company.ticker == key))
     yahoo = key
     if company is not None:
@@ -856,7 +857,7 @@ def dca_backtest(
     try:
         fetched = svc.fetch_yahoo_history_cached(yahoo)
     except Exception as exc:  # proveedor caido o ticker desconocido: se dice, no se inventa
-        raise HTTPException(status_code=502, detail=f"No se pudo descargar el histórico de {key}") from exc
+        raise HTTPException(status_code=502, detail=ui_error(502, "history_download_failed", key=key).detail) from exc
     from zoneinfo import ZoneInfo
 
     now = datetime.now(UTC)

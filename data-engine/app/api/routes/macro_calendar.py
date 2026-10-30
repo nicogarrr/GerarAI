@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.services import macro_calendar_service
 from app.services.eight_k_digest import eight_k_digest
 
@@ -44,5 +45,5 @@ def eight_k(
     db: Session = Depends(get_db),
 ) -> dict:
     if db.info.get("tenant_id") is None:
-        raise HTTPException(status_code=401, detail="Se requiere una identidad de Research")
+        raise HTTPException(status_code=401, detail=ui_error(401, "research_identity_required").detail)
     return eight_k_digest(db, page=page, page_size=page_size)
