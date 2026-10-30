@@ -4,6 +4,7 @@ import {
   TABS,
   asView,
   canonicalViewUrl,
+  legacyResearchRedirect,
   moduleHref,
   subrouteRedirect,
   tabHref,
@@ -120,5 +121,16 @@ describe('subrouteRedirect', () => {
         expect(subrouteRedirect('AAPL', 'management-credibility')).toBe('/research/AAPL?view=seguimiento#directiva');
         expect(subrouteRedirect('AAPL', 'decision-lessons')).toBe('/research/AAPL?view=seguimiento#lecciones');
         expect(subrouteRedirect('AAPL', 'news')).toBeNull();
+    });
+});
+
+
+describe('legacy research middleware routes', () => {
+    it.each(['assistant', 'news', 'sources'])('never redirects the static %s route', (route) => {
+        expect(legacyResearchRedirect(`/research/${route}`, '?view=thesis')).toBeNull();
+        expect(legacyResearchRedirect(`/research/${route}/share-capital`, '?view=terminal')).toBeNull();
+    });
+    it('continues redirecting a company legacy view', () => {
+        expect(legacyResearchRedirect('/research/AAPL', '?view=thesis')).toBe('/research/AAPL?view=tesis');
     });
 });
