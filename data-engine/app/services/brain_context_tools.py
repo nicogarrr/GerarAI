@@ -364,8 +364,21 @@ def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
                          [], "engine_valuation")
     ccy = company.currency
     link = f"/research/{quote(company.ticker, safe='')}?view=valuation"
-    values = [(label, result.get(key)) for label, key in (
-        ("bajista", "bear_value"), ("base", "base_value"), ("alcista", "bull_value"), ("esperado", "expected_value"))]
+    # Los motores valoran por accion ORDINARIA; el precio de un ADR es por ADR
+    # (N ordinarias). Junto al «Precio usado» del ADR van los escenarios por
+    # ADR (listed_share_values); antes salia base 25 USD frente a un precio de
+    # 160 USD con margen +25 % (BABA 8:1), cifras imposibles de cuadrar.
+    ratio = result.get("adr_ratio")
+    listed = result.get("listed_share_values") if isinstance(result.get("listed_share_values"), dict) else None
+    keys = (("bajista", "bear_value", "bear"), ("base", "base_value", "base"),
+            ("alcista", "bull_value", "bull"), ("esperado", "expected_value", "expected"))
+    if ratio and listed:
+        values = [(label, listed.get(short)) for label, _key, short in keys]
+        basis = f"Escenarios por ADR (1 ADR = {f"{float(ratio):g}".replace(".", ",")} acciones ordinarias): "
+    else:
+        values = [(label, result.get(key)) for label, key, _short in keys]
+        basis = ("Escenarios por acción ordinaria (el precio cotizado es por ADR): " if ratio
+                 else "Escenarios por acción: ")
     values = [(label, value) for label, value in values if value is not None]
     if not values:
         missing = ", ".join(result.get("missing_inputs") or []) or "datos suficientes"
@@ -375,7 +388,7 @@ def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
     publishable = bool(result.get("publishable"))
     head = (f"**Motor de valoración · {company.ticker}** ({result.get('model_type') or 'modelo'}"
             f"{'' if publishable else ', orientativo: algún input no tiene fuente datada'}).")
-    lines = [head, "Escenarios por acción: " + ", ".join(f"{label} {_fmt_close(float(value), ccy)}"
+    lines = [head, basis + ", ".join(f"{label} {_fmt_close(float(value), ccy)}"
                                                         for label, value in values) + "."]
     price = result.get("current_price")
     as_of = (result.get("trace") or {}).get("price_as_of")
