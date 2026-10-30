@@ -88,6 +88,18 @@ function FxEffectLine({ holding, format }: { holding: PortfolioHolding; format: 
   );
 }
 
+/**
+ * Borrar una posición borra TODAS sus filas del ledger (compras, ventas y
+ * dividendos, también de años ya declarados): el informe fiscal pierde esas
+ * ganancias y dividendos. El texto lo dice y señala la alternativa habitual.
+ */
+export function describeHoldingDeletion(symbol: string | null): string {
+  if (!symbol) return '';
+  return `Se borrarán todas las operaciones de ${symbol}: compras, ventas y dividendos, también los de años ya declarados. ` +
+    'El informe fiscal y la rentabilidad se recalcularán sin ellas y no se puede deshacer. ' +
+    'Si has vendido la posición, registra la venta en lugar de borrarla.';
+}
+
 export type HoldingSort = 'value' | 'best' | 'worst' | 'symbol';
 
 export const HOLDING_SORT_LABELS: Record<HoldingSort, string> = {
@@ -475,7 +487,8 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
         open={confirmSymbol !== null}
         onOpenChange={(next) => { if (!next) setConfirmSymbol(null); }}
         title="Eliminar posición"
-        description={confirmSymbol ? `¿Estás seguro de eliminar toda la posición en ${confirmSymbol}? Esto borrará todas las transacciones asociadas.` : ''}
+        description={describeHoldingDeletion(confirmSymbol)}
+        confirmLabel="Eliminar todo el historial"
         onConfirm={() => { if (confirmSymbol) handleDelete(confirmSymbol); }}
       />
     </Card>

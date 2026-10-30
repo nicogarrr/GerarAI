@@ -141,7 +141,8 @@ describe('PortfolioHoldings eliminar', () => {
     it('pide confirmacion y no borra si se cancela', () => {
         render(<PortfolioHoldings holdings={[holding()]} userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar posición en AAPL' }));
-        expect(screen.getByText(/toda la posición en AAPL/)).toBeInTheDocument();
+        expect(screen.getByText(/Se borrarán todas las operaciones de AAPL: compras, ventas y dividendos, también los de años ya declarados/)).toBeInTheDocument();
+        expect(screen.getByText(/registra la venta en lugar de borrarla/)).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
         expect(h.del).not.toHaveBeenCalled();
     });
@@ -150,7 +151,7 @@ describe('PortfolioHoldings eliminar', () => {
         h.del.mockResolvedValue(undefined);
         render(<PortfolioHoldings holdings={[holding()]} userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar posición en AAPL' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar todo el historial' }));
         await waitFor(() => expect(h.success).toHaveBeenCalledWith('Posición AAPL eliminada'));
         expect(h.del).toHaveBeenCalledWith('u1', 'AAPL');
         expect(h.routerRefresh).toHaveBeenCalled();
@@ -160,7 +161,7 @@ describe('PortfolioHoldings eliminar', () => {
         h.del.mockRejectedValue(new Error('x'));
         render(<PortfolioHoldings holdings={[holding()]} userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar posición en AAPL' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar todo el historial' }));
         await waitFor(() => expect(h.showError).toHaveBeenCalled());
         expect(h.success).not.toHaveBeenCalled();
     });
