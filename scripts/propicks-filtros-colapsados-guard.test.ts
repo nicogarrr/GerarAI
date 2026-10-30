@@ -22,9 +22,10 @@ test('un filtro activo nunca queda invisible con el panel colapsado', () => {
 
 test('el grid y el panel cambian juntos en xl para evitar una sidebar estrecha', () => {
     const content = readFileSync('components/proPicks/EnhancedProPicksContent.tsx', 'utf8');
-    for (const token of ['xl:grid-cols-4', 'xl:col-span-1', 'xl:col-span-3']) {
-        assert.ok(content.includes(token), `falta ${token}`);
-    }
+    // 30-oct: con xl:grid-cols-4 la sidebar medía ~165 px útiles a 1280 px y los
+    // selects se cortaban («Todos los secto…», «Puntuación ger…»). Ancho fijo de 18rem.
+    assert.ok(content.includes('xl:grid-cols-[18rem_minmax(0,1fr)]'), 'falta la columna fija de filtros');
+    assert.ok(!content.includes('xl:grid-cols-4'), 'la sidebar vuelve a ser 1/4 del ancho');
     assert.ok(!content.includes('lg:grid-cols-4'));
     assert.ok(!SRC.includes("hidden'} lg:block"));
 });
