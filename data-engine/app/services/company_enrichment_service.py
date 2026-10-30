@@ -283,6 +283,19 @@ class CompanyEnrichmentService:
         }
 
 
+def fill_default_currency(company: Company) -> None:
+    """Divisa de reserva si el proveedor no la dio: la del sufijo del ticker.
+
+    ``.CO`` -> DKK, ``.L`` -> GBX, sin sufijo conocido -> USD. Solo toca una
+    divisa vacía; nunca pisa la del proveedor ni la que mandó el cliente.
+    """
+    if (company.currency or "").strip():
+        return
+    from app.valuation.currency import listing_quote_unit
+
+    company.currency = listing_quote_unit(company.ticker)
+
+
 def ensure_company_stub(db: Session, ticker: str) -> Company:
     """Devuelve la Company para ticker, creando la ficha minima si no existe.
 
@@ -299,7 +312,9 @@ def ensure_company_stub(db: Session, ticker: str) -> Company:
         ticker=ticker,
         name=ticker,
         exchange="UNKNOWN",
-        currency="USD",
+        # Vacía a propósito: el enriquecimiento solo rellena la divisa vacía;
+        # con "USD" una DKK/EUR/GBX nueva se quedaba en USD para siempre.
+        currency="",
         sector="Unknown",
         industry="Unknown",
         company_type="research_candidate",
@@ -317,6 +332,7 @@ def ensure_company_stub(db: Session, ticker: str) -> Company:
         CompanyEnrichmentService().enrich(db, company)
     except Exception:  # noqa: BLE001 - el ensure nunca debe fallar por esto
         logger.warning("enrich fallo para %s", ticker, exc_info=True)
+    fill_default_currency(company)
     db.commit()
     db.refresh(company)
     return company
