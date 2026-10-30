@@ -1,4 +1,5 @@
 "use client"
+import { useT } from "@/lib/i18n/client";
 
 import * as React from "react"
 import { Command as CommandPrimitive } from "cmdk"
@@ -30,8 +31,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = "Paleta de comandos",
-  description = "Busca un comando para ejecutar...",
+  title,
+  description,
   children,
   className,
   showCloseButton = true,
@@ -48,11 +49,14 @@ function CommandDialog({
   overlayClassName?: string
   onCloseAutoFocus?: React.ComponentProps<typeof DialogContent>["onCloseAutoFocus"]
 }) {
+  const t = useT();
+  const resolvedTitle = title ?? t('ui.command.paletteTitle');
+  const resolvedDescription = description ?? t('ui.command.palettePlaceholder');
   return (
     <Dialog {...props}>
       <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        <DialogTitle>{resolvedTitle}</DialogTitle>
+        <DialogDescription>{resolvedDescription}</DialogDescription>
       </DialogHeader>
       <DialogContent
         className={cn("overflow-hidden p-0", className)}
