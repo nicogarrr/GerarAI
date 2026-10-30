@@ -20,7 +20,7 @@ from app.models import (
 )
 from app.services.notification_service import NotificationService
 from app.services.price_freshness import market_price_is_stale
-from app.services.price_units import listing_price
+from app.services.price_units import close_in_company_currency, listing_price
 from app.services.review_alert_service import ReviewAlertService
 
 # Operators the evaluator understands. `create()` did not validate the operator,
@@ -293,7 +293,16 @@ class AlertRuleService:
             )
             if prices:
                 age_days = (date.today() - prices[0].date).days
-                return Decimal(prices[0].close), {
+                # El umbral se pide «en <divisa de la empresa>» (ficha): el
+                # cierre va a esa misma unidad. TSCO.L cotiza en GBp y reporta
+                # en GBP: comparar 250,5 peniques con «3 GBP» disparaba al
+                # instante. Otra divisa sin tipo FX: sin observacion.
+                observed = self._price_in_threshold_unit(
+                    db, rule, Decimal(prices[0].close), unit=prices[0].quote_currency, on=prices[0].date
+                )
+                if observed is None:
+                    return None, {"kind": kind, "status": "mixed_units", "date": prices[0].date.isoformat()}
+                return observed, {
                     "kind": kind,
                     "market_price_id": prices[0].id,
                     "date": prices[0].date.isoformat(),
@@ -313,9 +322,18 @@ class AlertRuleService:
                 .order_by(desc(Position.as_of))
                 .limit(1)
             )
+            position_price = (
+                self._price_in_threshold_unit(
+                    db, rule, Decimal(position.market_price), unit=position.currency, on=position.as_of
+                )
+                if position and position.market_price is not None
+                else None
+            )
+            if position and position.market_price is not None and position_price is None:
+                return None, {"kind": kind, "status": "mixed_units", "position_id": position.id}
             return (
                 (
-                    Decimal(position.market_price),
+                    position_price,
                     {
                         "kind": kind,
                         "position_id": position.id,
@@ -471,6 +489,21 @@ class AlertRuleService:
                 else (None, {"kind": kind, "status": "missing"})
             )
         return None, {"kind": kind, "status": "unsupported_target"}
+
+    @staticmethod
+    def _price_in_threshold_unit(
+        db: Session, rule: AlertRule, value: Decimal, *, unit: str | None, on: date
+    ) -> Decimal | None:
+        """Precio en la divisa de la empresa, la unidad en la que se pide el umbral.
+
+        Sin unidad declarada (filas legacy) o con la misma unidad, tal cual.
+        """
+        if not unit:
+            return value
+        company = db.get(Company, rule.company_id)
+        if company is None:
+            return value
+        return close_in_company_currency(db, value, quote_currency=unit, company=company, on=on)
 
     @staticmethod
     def _matches(observed: Any, operator: str, expected: Any) -> bool:

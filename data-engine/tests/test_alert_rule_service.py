@@ -12,7 +12,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, MarketPrice, NewsEvent, ResearchAlert
+from app.models.entities import AlertRule, Base, Company, MarketPrice, NewsEvent, ResearchAlert
 from app.services.alert_rule_service import AlertRuleService
 
 
@@ -298,3 +298,46 @@ def test_price_change_with_legacy_rows_without_unit_still_compares(db):
     change, observation = AlertRuleService()._observe(db, rule)
     assert observation["status"] == "fresh"
     assert change == Decimal("-20")
+
+
+def _tesco_company(db: Session, currency: str = "GBP") -> Company:
+    company = Company(
+        ticker="TSCO.L", name="Tesco", exchange="LSE", currency=currency,
+        sector="Retail", industry="Retail", company_type="operating",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    return company
+
+
+def test_price_threshold_in_pounds_is_compared_with_the_close_in_pounds(db):
+    """TSCO.L reporta en GBP y cotiza en GBp: la ficha pide el umbral «en GBP».
+
+    250,5 peniques son 2,505 GBP: «por encima de 3 GBP» no debe dispararse
+    (antes comparaba 250,5 > 3 y avisaba al instante), «por debajo de 3» sí.
+    """
+    company = _tesco_company(db)
+    _london_price(db, company, day=date.today(), close="250.5", unit="GBp")
+    service = AlertRuleService()
+    observed, observation = service._observe(db, AlertRule(company_id=company.id, target={"kind": "market_price"}))
+    assert observed == Decimal("2.505")
+    assert observation["status"] == "fresh"
+    assert service._matches(observed, ">", 3) is False
+    assert service._matches(observed, "<", 3) is True
+
+
+def test_price_threshold_same_unit_or_legacy_row_is_unchanged(db):
+    company = _london_company(db)  # VOD.L en GBp, umbral «en GBp»
+    _london_price(db, company, day=date.today(), close="70", unit="GBp")
+    observed, _ = AlertRuleService()._observe(db, AlertRule(company_id=company.id, target={"kind": "market_price"}))
+    assert observed == Decimal("70")
+
+
+def test_price_threshold_without_fx_is_not_compared_across_moneys(db):
+    """Cuentas en USD y cotizacion en GBp sin tipo FX: sin observacion, nunca un precio en otra divisa."""
+    company = _tesco_company(db, currency="USD")
+    _london_price(db, company, day=date.today(), close="250.5", unit="GBp")
+    observed, observation = AlertRuleService()._observe(db, AlertRule(company_id=company.id, target={"kind": "market_price"}))
+    assert observed is None
+    assert observation["status"] == "mixed_units"
