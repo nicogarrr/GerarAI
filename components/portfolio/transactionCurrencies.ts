@@ -28,6 +28,14 @@ export function defaultCurrencyFor(symbol: string): string | null {
   return SUFFIX_CURRENCY[symbol.slice(idx + 1).toUpperCase()] ?? null;
 }
 
+/** Divisa inicial del formulario de alta: un ticker sin sufijo cotiza en EE. UU. */
+export const NEW_TRANSACTION_CURRENCY = 'USD';
+
+/** Divisa propuesta al elegir ticker: la de su bolsa, o la inicial si no tiene sufijo. */
+export function currencyForTicker(symbol: string): string {
+  return defaultCurrencyFor(symbol) ?? NEW_TRANSACTION_CURRENCY;
+}
+
 /** Opciones del selector: la divisa actual siempre aparece aunque no esté en la lista. */
 export function currencyOptions(current: string): string[] {
   return TRANSACTION_CURRENCIES.includes(current) ? TRANSACTION_CURRENCIES : [current, ...TRANSACTION_CURRENCIES];

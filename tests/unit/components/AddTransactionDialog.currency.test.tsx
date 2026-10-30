@@ -16,6 +16,8 @@ vi.mock('@/components/search/TickerSearchInput', () => ({
         <>
             <button type="button" onClick={() => onSelect({ symbol: 'VOLV-B.ST', name: 'Volvo' })}>pick-volvo</button>
             <button type="button" onClick={() => onSelect({ symbol: 'NOVO-B.CO', name: 'Novo Nordisk' })}>pick-novo</button>
+            <button type="button" onClick={() => onSelect({ symbol: 'SAN.MC', name: 'Santander' })}>pick-san</button>
+            <button type="button" onClick={() => onSelect({ symbol: 'AAPL', name: 'Apple' })}>pick-aapl</button>
         </>
     ),
 }));
@@ -33,5 +35,15 @@ describe('Nueva inversion: divisa por defecto de bolsas nordicas', () => {
         render(<AddTransactionDialog userId="u" onClose={() => {}} />);
         fireEvent.click(screen.getByText('pick-novo'));
         expect(screen.getByText(/Precio \(DKK\)/)).toBeInTheDocument();
+    });
+
+    it('al cambiar de ticker la divisa le sigue (SAN.MC EUR -> AAPL USD -> Volvo SEK)', () => {
+        render(<AddTransactionDialog userId="u" onClose={() => {}} />);
+        fireEvent.click(screen.getByText('pick-san'));
+        expect(screen.getByText(/Precio \(EUR\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('pick-aapl'));
+        expect(screen.getByText(/Precio \(USD\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('pick-volvo'));
+        expect(screen.getByText(/Precio \(SEK\)/)).toBeInTheDocument();
     });
 });
