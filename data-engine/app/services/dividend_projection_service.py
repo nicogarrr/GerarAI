@@ -54,7 +54,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import Company, DividendRecord, Position
-from app.services.dividend_records import resolve_cross_provider_events, resolve_yahoo_events
+from app.services.dividend_records import (
+    records_in_position_currency,
+    resolve_cross_provider_events,
+    resolve_yahoo_events,
+)
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_irpf_filing import calculate_savings_tax
 
@@ -242,11 +246,11 @@ class DividendProjectionService:
         yearly_a_cuenta: dict[tuple[int, str], Decimal] = defaultdict(lambda: Decimal("0"))
 
         for position, company in rows:
-            records = [
-                r
-                for r in records_by_company.get(company.id, [])
-                if r.currency == position.currency
-            ]
+            # Misma moneda en otra unidad (dividendo en GBX, posicion en GBp
+            # o GBP): se convierte sin FX; otra moneda se descarta, como antes.
+            records = records_in_position_currency(
+                records_by_company.get(company.id, []), position.currency
+            )
             trailing = [r for r in records if cutoff < r.ex_date <= today]
             future = [r for r in records if r.ex_date > today]
             for record in future:
