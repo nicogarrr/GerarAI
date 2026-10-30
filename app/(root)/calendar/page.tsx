@@ -97,9 +97,18 @@ export default async function CalendarPage({
             ) : null}
 
             {calendar.held_count === 0 && !calendar.watchlist_count ? (
-                <p className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
-                    No tienes posiciones abiertas ni watchlist, así que no hay catalizadores que seguir.
-                </p>
+                <div className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
+                    <p>No tienes posiciones abiertas ni watchlist, así que no hay catalizadores que seguir.</p>
+                    <p className="mt-1">Sigue una empresa o registra una compra y aquí verás sus resultados y dividendos.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        <Link href="/watchlist?anadir=1" className="inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300 hover:bg-teal-400/20">
+                            Añadir a la watchlist
+                        </Link>
+                        <Link href="/portfolio?anadir=1" className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-gray-300 hover:bg-gray-800 hover:text-gray-100">
+                            Añadir inversión
+                        </Link>
+                    </div>
+                </div>
             ) : groups.length === 0 && !degraded ? (
                 <p className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
                     Sin eventos en este rango. Los resultados y ex-dividendos en vivo solo cubren EE. UU. (USD);
