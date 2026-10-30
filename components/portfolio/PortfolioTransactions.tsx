@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import EditTransactionDialog from './EditTransactionDialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import ImportIBKRButton from './ImportIBKRButton';
+import AddTransactionButton from './AddTransactionButton';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 
@@ -55,10 +56,29 @@ export function isZeroCostBuy(tx: Pick<Transaction, 'type' | 'quantity' | 'price
   return tx.type === 'buy' && Number.isFinite(tx.quantity) && tx.quantity > 0 && tx.price === 0;
 }
 
+/**
+ * Texto del diálogo de borrado: nombra el movimiento exacto (tipo, cantidad,
+ * ticker, fecha y precio) para que no se borre uno parecido por error, y avisa
+ * de que no se puede deshacer.
+ */
+export function describeDeletion(tx: Transaction | undefined): string {
+  const tail = 'No se puede deshacer: la posición y la fiscalidad se recalculan sin él.';
+  if (!tx) return `¿Eliminar este movimiento? ${tail}`;
+  const currency = transactionCurrency(tx.currency);
+  const kind = tx.type === 'buy' ? 'la compra' : 'la venta';
+  const qty = formatNumber(tx.quantity, { maximumFractionDigits: 4 });
+  const price = currency ? formatPrice(tx.price, currency) : NA;
+  return `¿Eliminar ${kind} de ${qty} ${tx.symbol} del ${formatUserDate(tx.date)} a ${price}? ${tail}`;
+}
+
 export default function PortfolioTransactions({ transactions, userId, page }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const confirmTx = confirmId ? transactions.find((tx) => tx._id === confirmId) : undefined;
+  // Sin ningún movimiento (no solo esta página vacía): primer uso, se ofrecen
+  // las dos formas de empezar en vez de «Sin movimientos en esta página».
+  const noTransactionsAtAll = transactions.length === 0 && (!page || page.total === 0);
 
   const handleDelete = async (transactionId: string) => {
     setDeleting(transactionId);
@@ -87,7 +107,7 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
           </p>
         ) : null}
       </CardHeader>
-      {page ? <nav aria-label="Páginas de movimientos" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
+      {page && page.total > 0 ? <nav aria-label="Páginas de movimientos" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
         <span>{transactions.length ? `${page.offset + 1}-${page.offset + transactions.length} de ${page.total}` : `0 de ${page.total}`}</span>
         {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${Math.max(0, page.offset - 50)}`}>Anteriores</Link></Button> : null}
         {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${page.offset + 50}`}>Siguientes</Link></Button> : null}
@@ -98,10 +118,23 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
             <div className="h-10 w-10 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3">
               <span className="text-gray-500">?</span>
             </div>
-            <p className="text-gray-500 text-sm mb-4">Sin movimientos en esta página</p>
-            <div className="flex justify-center">
-              <ImportIBKRButton userId={userId} />
-            </div>
+            {noTransactionsAtAll ? (
+              <>
+                <p className="text-gray-300 text-sm font-medium mb-1">Aún no tienes movimientos</p>
+                <p className="text-gray-500 text-sm mb-4">Añade tu primera compra o importa tu historial desde IBKR.</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <AddTransactionButton userId={userId} />
+                  <ImportIBKRButton userId={userId} />
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-500 text-sm mb-4">Sin movimientos en esta página</p>
+                <Button asChild variant="outline" className="min-h-11">
+                  <Link href="/portfolio?tab=movimientos">Ir a la primera página</Link>
+                </Button>
+              </>
+            )}
           </div>
         ) : (
           <div className="overflow-y-auto h-full max-h-[400px] scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
@@ -186,7 +219,7 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
         open={confirmId !== null}
         onOpenChange={(next) => { if (!next) setConfirmId(null); }}
         title="Eliminar transacción"
-        description="¿Estás seguro de eliminar esta transacción?"
+        description={describeDeletion(confirmTx)}
         onConfirm={() => { if (confirmId) handleDelete(confirmId); }}
       />
     </Card>
