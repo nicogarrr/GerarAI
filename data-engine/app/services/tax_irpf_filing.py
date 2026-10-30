@@ -409,10 +409,21 @@ def build_double_taxation(
       (a) la retención extranjera soportada, con tope en el tipo del convenio
           sobre el íntegro de CADA dividendo (Σ min(retención_i, tipo ×
           bruto_i); solo países con tipo verificado en el BOE), y
-      (b) la cuota que correspondería en España, calculada con el TIPO MEDIO
-          EFECTIVO DE GRAVAMEN (TME) de la declaración COMPLETA: cuota
-          íntegra estatal y autonómica ×100 / base liquidable del ahorro,
-          expresado con dos decimales (Manual Renta 2025, cap. 18).
+      (b) la cuota que correspondería en España: el TIPO MEDIO EFECTIVO DE
+          GRAVAMEN del ahorro (TME) aplicado al dividendo ÍNTEGRO (bruto)
+          incluido en la base, criterio de Hacienda decidido por Nico el
+          30-10-2026 (no al neto de gastos de custodia). TME del ahorro según
+          el Manual Renta 2025 (cap. 18, ejemplo de la deducción): cuota
+          líquida total × (cuota íntegra del ahorro / cuota íntegra total) ÷
+          base liquidable del ahorro × 100, con dos decimales (art. 80.1.b
+          LIRPF).
+
+    Ambos límites se aplican POR PAÍS: el artículo de eliminación de la doble
+    imposición de cada convenio (p. ej. España-EE.UU., BOE-A-1990-30940, art.
+    24.1) limita la deducción a la parte del impuesto español que corresponde
+    a la renta gravada en ESE Estado; cada país devuelve su ``tme_limit_base``
+    (bruto × TME), su ``treaty_cap_base`` y cuál de los dos se aplicó
+    (``limit_applied``).
 
     El TME exige la declaración entera (bases general y del ahorro, cuotas),
     que GerarAI no tiene: sin ``tme`` la deducción queda
@@ -555,11 +566,15 @@ def build_double_taxation(
         creditable = data["creditable"]
         if data["withheld"] > creditable:
             any_excess = True  # hay exceso reclamable en origen: se señala
-        if tme is not None:
-            deduction = min(creditable, data["gross"] * tme)
+        tme_limit = data["gross"] * tme if tme is not None else None
+        if tme_limit is not None:
+            # Límite (b) sobre el BRUTO, como Hacienda: min(tope convenio, bruto × TME).
+            deduction = min(creditable, tme_limit)
+            limit_applied = "tope_convenio" if creditable <= tme_limit else "bruto_x_tme"
             status = "calculada_con_tme_manual"
         else:
             deduction = None
+            limit_applied = None
             status = "pendiente_tme"
         countries.append({
             "country": country,
@@ -569,6 +584,8 @@ def build_double_taxation(
             "treaty_rate": float(treaty_rate),
             "treaty_rate_source": TREATY_RATE_SOURCES[country],
             "treaty_cap_base": _money(creditable),
+            "tme_limit_base": _money(tme_limit) if tme_limit is not None else None,
+            "limit_applied": limit_applied,
             "deduction_base": _money(deduction) if deduction is not None else None,
             "status": status,
             "excess_reclaimable_base": _money(data["withheld"] - creditable),
@@ -584,6 +601,8 @@ def build_double_taxation(
     return {
         "casilla": CASILLA_DOBLE_IMPOSICION,
         "basis": "art-80-lirpf",
+        # Criterio del límite (b): TME del ahorro × dividendo ÍNTEGRO, por país.
+        "limit_basis": "bruto_x_tme_por_pais",
         "status": "calculada_con_tme_manual" if tme is not None else "pendiente_tme",
         "partial": partial,
         "countries": countries,
