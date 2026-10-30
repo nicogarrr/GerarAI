@@ -295,6 +295,8 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
     };
     const positions = extractPositions(dashboard);
     const alerts = extractAlerts(dashboard);
+    // Cartera nueva (valor 0 y sin posiciones): siguiente paso claro en vez de un «sin datos».
+    const isEmptyPortfolio = !!dashboard && Number(dashboard.total_value ?? NaN) === 0 && Number(dashboard.equity_value ?? 0) === 0;
     const highAlerts = alerts.filter(alert => alert.severity === 'high').length;
     const weightLabel = dashboard?.weight_basis === 'gross_equity'
         ? 'Peso (valor bruto)'
@@ -374,7 +376,17 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
-                    {positions.length === 0 ? (
+                    {positions.length === 0 && isEmptyPortfolio ? (
+                        <div className="py-8 text-center text-sm text-gray-400">
+                            <p>Aún no tienes posiciones. Registra tu primera compra para ver pesos, concentración y exposición por sector.</p>
+                            <Link
+                                href="/portfolio?anadir=1"
+                                className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300 hover:bg-teal-400/20"
+                            >
+                                Añadir inversión
+                            </Link>
+                        </div>
+                    ) : positions.length === 0 ? (
                         <p className="py-10 text-center text-sm text-gray-500">
                             Sin posiciones con exposición calculada.
                         </p>

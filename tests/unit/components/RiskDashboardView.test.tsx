@@ -83,6 +83,13 @@ describe('RiskDashboardView', () => {
         expect(screen.getByText('Incompleto: faltan tipos de cambio')).toBeInTheDocument();
     });
 
+    it('cartera nueva (valor 0, sin posiciones): ofrece «Añadir inversión» en vez de un callejón sin salida', () => {
+        render(<RiskDashboardView initialDashboard={{ ...base, total_value: 0, equity_value: 0, cash: {}, positions: [], alerts: [] }} />);
+        expect(screen.getByText(/Aún no tienes posiciones/)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: 'Añadir inversión' })).toHaveAttribute('href', '/portfolio?anadir=1');
+        expect(screen.queryByText('Sin posiciones con exposición calculada.')).not.toBeInTheDocument();
+    });
+
     it('dashboard nulo muestra estados vacíos', () => {
         render(<RiskDashboardView initialDashboard={null} />);
         expect(screen.getByText(/No hay métricas de riesgo disponibles/)).toBeInTheDocument();
