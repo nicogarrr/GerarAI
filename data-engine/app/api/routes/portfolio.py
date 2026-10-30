@@ -4,9 +4,10 @@ from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
@@ -22,6 +23,7 @@ from app.models import (
     FundamentalModelVersion,
     FXRate,
     MarketPrice,
+    Portfolio,
     Position,
     ThesisVersion,
     Transaction,
@@ -232,6 +234,11 @@ class PortfolioPriceInput(BaseModel):
     _as_of_not_future = field_validator("as_of")(_not_in_the_future)
 
 
+class CreatePortfolioInput(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    base_currency: str = Field(default="EUR", min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
+
+
 class PortfolioConfigurationInput(BaseModel):
     base_currency: str = Field(min_length=3, max_length=3, pattern=r"^[A-Za-z]{3}$")
 
@@ -261,6 +268,75 @@ def _transaction_payload(transaction: Transaction, company: Company) -> dict:
         "review_flag": ZERO_COST_REVIEW_LABEL if is_zero_cost_buy(transaction) else None,
         "created_at": transaction.created_at.isoformat(),
         "updated_at": transaction.updated_at.isoformat(),
+    }
+
+
+@router.get("", response_model=None)
+@router.get("/", response_model=None)
+def list_portfolios(db: Session = Depends(get_db)) -> list[dict]:
+    tenant_id = db.info.get("tenant_id")
+    query = select(Portfolio)
+    if tenant_id is not None:
+        query = query.where(Portfolio.tenant_id == tenant_id)
+    portfolios = list(db.scalars(query.order_by(Portfolio.id)).all())
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "base_currency": p.base_currency,
+            "is_default": p.is_default,
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+        }
+        for p in portfolios
+    ]
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=None)
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=None)
+def create_portfolio(
+    body: CreatePortfolioInput,
+    db: Session = Depends(get_db),
+) -> dict:
+    tenant_id = db.info.get("tenant_id")
+    clean_name = body.name.strip()
+    clean_currency = body.base_currency.strip().upper()
+
+    existing_query = select(Portfolio).where(Portfolio.name == clean_name)
+    if tenant_id is not None:
+        existing_query = existing_query.where(Portfolio.tenant_id == tenant_id)
+
+    existing = db.scalars(existing_query).first()
+    if existing is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cartera con este nombre para el usuario.",
+        )
+
+    portfolio = Portfolio(
+        name=clean_name,
+        base_currency=clean_currency,
+        is_default=False,
+    )
+    if tenant_id is not None:
+        portfolio.tenant_id = tenant_id
+
+    db.add(portfolio)
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Ya existe una cartera con este nombre para el usuario.",
+        ) from exc
+
+    db.refresh(portfolio)
+    return {
+        "id": portfolio.id,
+        "name": portfolio.name,
+        "base_currency": portfolio.base_currency,
+        "is_default": portfolio.is_default,
+        "created_at": portfolio.created_at.isoformat() if portfolio.created_at else None,
     }
 
 

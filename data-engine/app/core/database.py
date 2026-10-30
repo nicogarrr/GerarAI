@@ -108,6 +108,14 @@ def _engine_pool_kwargs(database_url: str, settings: Settings) -> dict:
     }
 
 
+def _engine_isolation_kwargs(database_url: str) -> dict:
+    """Nivel de aislamiento transaccional para Postgres (READ COMMITTED)."""
+    scheme = database_url.split(":", 1)[0].lower().split("+", 1)[0]
+    if scheme in {"postgres", "postgresql"}:
+        return {"isolation_level": "READ COMMITTED"}
+    return {}
+
+
 settings = get_settings()
 engine = create_engine(
     settings.database_url,
@@ -116,6 +124,7 @@ engine = create_engine(
     ),
     pool_pre_ping=True,
     **_engine_pool_kwargs(settings.database_url, settings),
+    **_engine_isolation_kwargs(settings.database_url),
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
