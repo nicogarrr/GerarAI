@@ -34,7 +34,7 @@ from app.services.knowledge_rag.extract import SUPPORTED_EXTENSIONS
 from app.services.knowledge_rag.store import KnowledgeStore
 from app.services.knowledge_rag.tokens import TokenCounter
 
-EMBED_BATCH = 32
+EMBED_BATCH = 5
 
 Extractor = Callable[[Path], ExtractedDocument]
 
