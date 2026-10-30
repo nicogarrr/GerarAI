@@ -13,9 +13,10 @@ dividend ingestion shares.
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, tzinfo
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -73,9 +74,19 @@ class ProviderIngestionService:
             return None
 
     @staticmethod
-    def _epoch_to_date(value: Any) -> date | None:
+    def _epoch_to_date(value: Any, timezone_name: Any = None) -> date | None:
+        """Fecha del evento en la zona de su bolsa (UTC si se desconoce).
+
+        Yahoo da el epoch de la apertura local: BHP.AX el 7-mar-2024 a las
+        10:00 de Sydney es el 6-mar a las 23:00 UTC."""
+        tz: tzinfo = UTC
+        if isinstance(timezone_name, str) and timezone_name.strip():
+            try:
+                tz = ZoneInfo(timezone_name.strip())
+            except (ZoneInfoNotFoundError, ValueError):
+                tz = UTC
         try:
-            return datetime.fromtimestamp(int(value), UTC).date()
+            return datetime.fromtimestamp(int(value), tz).date()
         except (TypeError, ValueError, OSError, OverflowError):
             return None
 
@@ -260,7 +271,9 @@ class SplitIngestionService(ProviderIngestionService):
             ], "fmp"
         return [
             {
-                "effective_date": self._epoch_to_date(row.get("date")),
+                "effective_date": self._epoch_to_date(
+                    row.get("date"), row.get("exchangeTimezoneName")
+                ),
                 "ratio": self._parse_ratio(row),
             }
             for row in payload

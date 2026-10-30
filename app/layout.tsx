@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import { LocaleProvider } from "@/lib/i18n/client";
+import { getLocale } from "@/lib/i18n/server";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -54,15 +56,19 @@ export const viewport: Viewport = {
   colorScheme: 'dark',
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Idioma de la interfaz: cookie `gerarai_locale` (selector en Ajustes),
+  // español por defecto. Leerla aquí hace dinámicas las rutas: el copy ya
+  // depende de la request.
+  const locale = await getLocale();
   return (
-    <html lang="es" className="dark" suppressHydrationWarning>
+    <html lang={locale} className="dark" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
-        {children}
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
         <Toaster />
         {/* Service worker (app shell + fallback offline). Solo en build de
             producción: en dev las cachés del SW estorban al hot-reload. */}

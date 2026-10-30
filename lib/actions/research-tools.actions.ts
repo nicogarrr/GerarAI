@@ -854,7 +854,7 @@ export async function reconcileManagementCredibility(ticker: string) {
 }
 
 export async function updateManagementExplanation(ticker: string, promiseId: number, formData: FormData) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/explanation`, {
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${assertPositiveInt(promiseId, 'promiseId')}/explanation`, {
     method: 'PUT',
     body: JSON.stringify({ explanation: required(formData, 'explanation', 'Explanation') }),
   });

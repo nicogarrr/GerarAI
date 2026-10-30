@@ -158,13 +158,22 @@ def parse_screener_quotes(payload: dict[str, Any]) -> list[RadarCandidate]:
         if yld is None and normalize_currency(str(currency or ""))[1] == 1:
             trailing = _raw_number(quote.get("trailingAnnualDividendYield"))
             yld = trailing if trailing is not None and trailing > 0 else None
+        # P/B: Yahoo divide el precio (divisa del listado, ya en principal)
+        # entre el valor contable en la divisa de REPORTE sin convertir
+        # (verificado 30-oct: HSBA.L 12,872 GBP / 7,554 USD = 1,70 en vez de
+        # ~2,28). Divisas distintas -> N/D (y no pasa el filtro P/B).
+        price_to_book = _first_number(quote, ("priceToBook",))
+        financial = normalize_currency(str(quote.get("financialCurrency") or ""))[0]
+        listing = normalize_currency(str(currency or ""))[0]
+        if financial and listing and financial != listing:
+            price_to_book = None
         out.append(
             RadarCandidate(
                 symbol=symbol,
                 name=quote.get("longName") or quote.get("shortName"),
                 exchange=str(exchange) if exchange else None,
                 currency=str(currency) if currency else None,
-                price_to_book=_first_number(quote, ("priceToBook",)),
+                price_to_book=price_to_book,
                 dividend_yield=yld,
                 yield_extremo_revisar=bool(yld is not None and yld > EXTREME_YIELD),
             )

@@ -285,9 +285,10 @@ class AlertRuleService:
         return result
 
     @staticmethod
-    def _exchange(db: Session, rule: AlertRule) -> str | None:
+    def _listing(db: Session, rule: AlertRule) -> tuple[str | None, str | None]:
+        """(bolsa, ticker) de la empresa de la regla, para la hora de cierre."""
         company = db.get(Company, rule.company_id) if rule.company_id is not None else None
-        return company.exchange if company is not None else None
+        return (company.exchange, company.ticker) if company is not None else (None, None)
 
     def _observe(self, db: Session, rule: AlertRule) -> tuple[Any, dict[str, Any]]:
         kind = str((rule.target or {}).get("kind") or "")
@@ -319,7 +320,10 @@ class AlertRuleService:
                     "status": (
                         "stale"
                         if close_is_stale(
-                            prices[0].date, self._exchange(db, rule), get_settings().market_price_max_age_days
+                            prices[0].date,
+                            self._listing(db, rule)[0],
+                            get_settings().market_price_max_age_days,
+                            ticker=self._listing(db, rule)[1],
                         )
                         else "fresh"
                     ),
@@ -354,8 +358,9 @@ class AlertRuleService:
                             "stale"
                             if close_is_stale(
                                 position.as_of,
-                                self._exchange(db, rule),
+                                self._listing(db, rule)[0],
                                 get_settings().market_price_max_age_days,
+                                ticker=self._listing(db, rule)[1],
                             )
                             else "fresh"
                         ),
@@ -444,6 +449,7 @@ class AlertRuleService:
                         prices[0].date,
                         company.exchange if company is not None else None,
                         get_settings().market_price_max_age_days,
+                        ticker=company.ticker if company is not None else None,
                     )
                     else "fresh"
                 ),

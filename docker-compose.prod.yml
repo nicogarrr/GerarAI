@@ -9,7 +9,7 @@
 # 10.240 MiB (10 GiB justos; el comentario decia 10.176, deriva de 64 MiB ya
 # existente). El resto de la VM queda para el kernel, page cache y una swap de
 # 2-4 GB (ver docs/oracle-setup.md). Los `cpus` son techos por servicio, no
-# reservas: la VM tiene 2 OCPU y varios servicios pueden turnarse. No se
+# reservas: la VM tiene 4 OCPU y varios servicios pueden turnarse. No se
 # supera este techo: el carril "computed" lo consume el worker-alerts (jobs
 # cortos y diarios) en vez de anadir un contenedor nuevo.
 #
@@ -412,7 +412,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "1.00"
+          cpus: "2.00"
           memory: 2G
 
   # worker: 3 threads (antes 6). Con 6 el proceso dramatiq llegaba al limite de 3G
@@ -493,7 +493,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.50"
+          cpus: "1.00"
           memory: 1280M
 
   # Dedicated lane: closes must not wait behind RSS/default backpressure.
