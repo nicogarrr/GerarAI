@@ -486,7 +486,7 @@ class LongTermModelService:
         )
         history = self._history_rows(fact_cache, years)
 
-        current_price, market_as_of, market_price_source = _current_price_with_date(db, company.id)
+        current_price, market_as_of, market_price_source = self._model_price(db, company)
         current = history[-1] if history else {
             "period": None,
             "fiscal_year": None,
@@ -1968,6 +1968,22 @@ class LongTermModelService:
             ],
             "unavailable_drivers": ["working_capital", "taxes_separately", "maintenance_capex", "growth_capex"],
         }
+
+    def _model_price(
+        self, db: Session, company: Company
+    ) -> tuple[float | None, str | None, str | None]:
+        """Precio del modelo en la divisa PRINCIPAL del listado, como ValuationService.
+
+        El cierre se guarda como lo da el proveedor (Londres en peniques): usarlo
+        crudo publicaba «precio del modelo 1.500 £» para una acción de 15 £.
+        """
+        from app.services.valuation_service import resolve_model_price
+
+        price = resolve_model_price(db, company.id)
+        if price is None:
+            return _current_price_with_date(db, company.id)
+        source = "market_price" if price.source == "market_close" else "position_mark"
+        return price.value, _date_value(price.as_of), source
 
     def _reverse_dcf_price(
         self,
