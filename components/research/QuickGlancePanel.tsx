@@ -20,7 +20,7 @@ function Row({ href, label, value, note }: { href: string; label: string; value:
       <Link className="group flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800/70 py-2 last:border-0" href={href} scroll={false}>
         <span className="min-w-0">
           <span className="block text-xs text-gray-500">{label}</span>
-          {note ? <span className="mt-0.5 block text-[11px] leading-4 text-gray-600">{note}</span> : null}
+          {note ? <span className="mt-0.5 block text-[11px] leading-4 text-gray-500">{note}</span> : null}
         </span>
         <span className="flex shrink-0 items-center gap-1 text-sm font-semibold text-gray-100 group-hover:text-teal-200">
           {value}
