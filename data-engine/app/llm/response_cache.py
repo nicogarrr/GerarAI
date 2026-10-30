@@ -599,6 +599,14 @@ class LLMResponseCache:
         self._trace("write", model=model, task=task, key=key)
         return True
 
+    async def evict(self, key: str) -> None:
+        """Retira una entrada que el llamador ha rechazado (fail-open)."""
+        client = await self._redis()
+        if client is None:
+            return
+        self._count("evict")
+        await self._discard(client, key)
+
     async def _discard(self, client, key: str) -> None:
         try:
             await client.delete(key)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -241,6 +241,7 @@ def _reconcile_currency(
     *,
     price_currency: str,
     on: date,
+    extra_units: Iterable[str | None] = (),
 ) -> dict:
     """Comprueba que hechos y precio estan en la misma divisa o se pueden convertir.
 
@@ -255,6 +256,8 @@ def _reconcile_currency(
     """
     facts = getattr(getattr(context, "snapshot", None), "facts", None) or {}
     units = [getattr(fact, "unit", None) for fact in facts.values()]
+    # Hechos que el motor lee fuera del snapshot (NAV publicado, segmentos).
+    units.extend(extra_units)
     found = reporting_currencies(units)
     base: dict = {
         "price_currency": price_currency,
@@ -375,7 +378,13 @@ class ValuationService:
             if resolved_price is not None and resolved_price.as_of is not None
             else (as_of or date.today())
         )
-        currency_gate = _reconcile_currency(db, context, price_currency=price_currency, on=fx_date)
+        currency_gate = _reconcile_currency(
+            db,
+            context,
+            price_currency=price_currency,
+            on=fx_date,
+            extra_units=engine.currency_input_units(context),
+        )
         if currency_gate["status"] == "blocked":
             result = _currency_blocked_result(engine, context, currency_gate)
         else:

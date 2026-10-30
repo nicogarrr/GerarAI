@@ -193,6 +193,56 @@ def compute_company_ttm(
     return results
 
 
+def _money_es(value: Decimal) -> str:
+    """Importe compacto en es-ES con la escala de la UI («-11,63 mil M», «35,7 M»)."""
+    amount = float(value)
+    absolute = abs(amount)
+    if absolute >= 1e9:
+        return f"{amount / 1e9:.2f}".replace(".", ",") + " mil M"
+    if absolute >= 1e6:
+        return f"{amount / 1e6:.2f}".replace(".", ",").rstrip("0").rstrip(",") + " M"
+    return f"{amount:,.0f}".replace(",", ".")
+
+
+def _fcf_capex_note(results: dict[str, TtmValue]) -> str | None:
+    """FCF negativo explicado (AMZN 30-oct-2026: «-11,63 mil M» sin contexto).
+
+    Solo cuando el FCF deriva de componentes del mismo periodo y unidad (la
+    regla de ``combine_ttm``): capex > flujo operativo, o flujo operativo ya
+    negativo. Nunca se inventa la causa si falta un componente.
+    """
+    fcf = results.get("free_cash_flow")
+    ocf = results.get("operating_cash_flow")
+    capex = results.get("capital_expenditure")
+    if (
+        fcf is None
+        or fcf.value is None
+        or fcf.value >= 0
+        or ocf is None
+        or ocf.value is None
+        or capex is None
+        or capex.value is None
+    ):
+        return None
+    unit = fcf.unit or ""
+    if fcf.basis == "TTM":
+        window = "en el TTM"
+    elif fcf.basis == "FY":
+        window = "en el último ejercicio"
+    else:
+        window = "en el último trimestre"
+    if ocf.value > 0:
+        return (
+            f"El capex ({_money_es(abs(capex.value))} {unit}) supera al flujo de caja operativo "
+            f"({_money_es(ocf.value)} {unit}) {window}: la inversión supera la caja que genera "
+            "el negocio y el flujo de caja libre sale negativo."
+        )
+    return (
+        f"El flujo de caja operativo ya es negativo ({_money_es(ocf.value)} {unit}) {window}; "
+        "el capex lo amplía y el flujo de caja libre sale negativo."
+    )
+
+
 def _serialize(value: TtmValue) -> dict[str, Any]:
     return {
         "metric": value.metric,
@@ -238,6 +288,10 @@ def build_company_ttm(db: Session, company: Company) -> dict[str, Any]:
     for value in results.values():
         if reviewed_ids.intersection(value.fact_ids):
             value.note = NOTE + ((" " + value.note) if value.note else "")
+    fcf_note = _fcf_capex_note(results)
+    if fcf_note:
+        fcf_value = results["free_cash_flow"]
+        fcf_value.note = (fcf_value.note + " " if fcf_value.note else "") + fcf_note
     ttm_ends = [v.period_end for v in results.values() if v.basis == "TTM" and v.period_end]
     return {
         "ticker": company.ticker,

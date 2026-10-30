@@ -220,6 +220,16 @@ class ValuationEngine(ABC):
     def value(self, context: ValuationContext) -> dict:
         raise NotImplementedError
 
+    def currency_input_units(self, context: ValuationContext) -> list[str | None]:
+        """Unidades de los hechos monetarios que el motor lee FUERA del snapshot.
+
+        El filtro de divisa del servicio solo ve el snapshot. Un motor que valora
+        con otros hechos (NAV publicado, segmentos) los declara aqui para que el
+        precio se convierta a su divisa, o la valoracion se bloquee si no hay
+        tipo de cambio.
+        """
+        return []
+
     def build_context(
         self,
         db: Session,

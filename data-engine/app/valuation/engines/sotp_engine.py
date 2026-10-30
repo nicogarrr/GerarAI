@@ -43,6 +43,19 @@ REPORTED_NAV_TICKERS = frozenset({"CGEO.L"})
 REPORTED_NAV_COMPANY_TYPE_MARKERS = ("investment_trust", "investment_entity")
 
 
+def _latest_facts_by_metric(context: ValuationContext) -> dict[str, FinancialFact]:
+    """Ultimo hecho de cada metrica (ejercicio mas reciente, luego el mas nuevo)."""
+    facts = context.db.scalars(
+        select(FinancialFact)
+        .where(FinancialFact.company_id == context.company.id)
+        .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
+    ).all()
+    latest_by_metric: dict[str, FinancialFact] = {}
+    for fact in facts:
+        latest_by_metric.setdefault(fact.metric, fact)
+    return latest_by_metric
+
+
 def is_reported_nav_entity(company) -> bool:
     ticker = (getattr(company, "ticker", "") or "").upper()
     if ticker in REPORTED_NAV_TICKERS:
@@ -86,6 +99,26 @@ class SOTPEngine(ValuationEngine):
 
     key = "sotp"
 
+    def currency_input_units(self, context: ValuationContext) -> list[str | None]:
+        """Divisa de lo que el SOTP valora: segmentos, deuda neta y NAV publicado.
+
+        Sin esto, una entidad sin hechos monetarios en el snapshot (PSH.L: NAV en
+        USD, cotiza en peniques) dejaba el filtro en "unknown" y el NAV en USD se
+        comparaba con el precio en libras sin convertir.
+        """
+        latest = _latest_facts_by_metric(context)
+        segment_units = [
+            fact.unit
+            for metric, fact in latest.items()
+            if metric.startswith("segment_") and metric.endswith("_operating_metric")
+        ]
+        units = list(segment_units)
+        if "net_debt" in latest:
+            units.append(latest["net_debt"].unit)
+        if not segment_units and is_reported_nav_entity(context.company) and "total_equity" in latest:
+            units.append(latest["total_equity"].unit)
+        return units
+
     def value(self, context: ValuationContext) -> dict:
         company = context.company
         snapshot = context.snapshot
@@ -100,16 +133,7 @@ class SOTPEngine(ValuationEngine):
             )
         comparable_price, ratio = adr_comparable_price(company, current_price)
 
-        facts = list(
-            context.db.scalars(
-                select(FinancialFact)
-                .where(FinancialFact.company_id == company.id)
-                .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
-            ).all()
-        )
-        latest_by_metric: dict[str, FinancialFact] = {}
-        for fact in facts:
-            latest_by_metric.setdefault(fact.metric, fact)
+        latest_by_metric = _latest_facts_by_metric(context)
         shares_fact = latest_by_metric.get("shares_diluted")
         net_debt_fact = latest_by_metric.get("net_debt")
         shares = (

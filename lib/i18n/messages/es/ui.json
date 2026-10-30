@@ -1,0 +1,15 @@
+{
+  "dialog": {
+    "close": "Cerrar diálogo",
+    "confirm": "Confirmar",
+    "cancel": "Cancelar"
+  },
+  "command": {
+    "placeholder": "Buscar acciones, tesis o documentos...",
+    "error": "No se pudo completar la búsqueda"
+  },
+  "search": {
+    "placeholder": "Buscar por nombre o símbolo",
+    "noResults": "Sin resultados"
+  }
+}

@@ -135,6 +135,7 @@ import { findUnavailableViewFailure, viewRetryHref } from '@/lib/research/view-o
 import QuickAlertButton from '@/components/research/QuickAlertButton';
 import ThesisMemo from '@/components/research/ThesisMemo';
 import { valuationScenarioDisplay } from '@/lib/research/listed-share-values';
+import { baseAssumptionsText, blockerLabel, reverseDcfText, scenarioNotesList } from '@/lib/research/valuation-display';
 import ThesisExportMenu from '@/components/research/ThesisExportMenu';
 import { NewsHeadline } from '@/components/research/NewsHeadline';
 import { ImpactBadge, NewsEventsFlow } from '@/components/research/NewsEventsFlow';
@@ -514,6 +515,9 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   const missingInputs = (valuation.missing_inputs ?? []).filter(Boolean);
   const engineNotice = typeof valuation.trace?.notice === 'string' ? valuation.trace.notice : null;
   const notPublishable = valuation.status !== 'ok' || valuation.publishable === false;
+  const scenarioNotes = scenarioNotesList(valuation.scenario_notes);
+  const reverseText = reverseDcfText(valuation.reverse_dcf);
+  const assumptionsText = baseAssumptionsText(valuation.trace);
   // F348: el precio del modelo es un snapshot persistido; el precio canónico
   // (en vivo) es el de la cabecera. El del modelo se rotula con su fecha,
   // nunca como precio actual.
@@ -543,7 +547,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
             Esta valoración no es publicable (estado {label(valuation.status ?? 'unknown')}): los números de
             abajo son una orientación del motor, no una valoración final ni un precio objetivo.
           </p>
-          {blockers.length ? <p className="mt-2 text-xs">Motivos registrados: {blockers.map(termLabel).join(', ')}.</p> : null}
+          {blockers.length ? <p className="mt-2 text-xs">Motivos registrados: {blockers.map(blockerLabel).join('; ')}.</p> : null}
           {missingInputs.length ? <p className="mt-2 text-xs">Entradas faltantes: {missingInputs.map(termLabel).join(', ')}.</p> : null}
           {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">Nota del motor: {engineNotice}</p> : null}
         </div>
@@ -552,6 +556,13 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
           <Stat label={`Base (orientación)${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
           <Stat label={`Bull (orientación)${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
         </div>
+        {scenarioNotes.length ? (
+          <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
+            {scenarioNotes.map((note) => <li key={note}>{note}</li>)}
+          </ul>
+        ) : null}
+        {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
+        {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
           Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
           El «valor por acción» del Modelo a largo plazo es otro cálculo (otra versión/fecha/motor).
@@ -568,6 +579,13 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         <Stat label={`Base${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
         <Stat label={`Bull${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
       </div>
+      {scenarioNotes.length ? (
+        <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
+          {scenarioNotes.map((note) => <li key={note}>{note}</li>)}
+        </ul>
+      ) : null}
+      {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
+      {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
         Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
         No es comparable 1:1 con el «valor por acción» del Modelo a largo plazo: ese es un cálculo interno

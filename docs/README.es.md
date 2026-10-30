@@ -12,7 +12,7 @@
 
 > Esto no es asesoramiento financiero. Los datos pueden llegar con retraso o estar incompletos según el proveedor.
 
-**Estado:** v0.9.0 (pre-release). La 1.0 se publicará cuando cierre la auditoría.
+**Estado:** v0.5.0 (pre-release), base de producción del 30 de octubre de 2026. Las mejoras y la revisión siguen en curso.
 
 ## Qué hace
 
@@ -225,7 +225,7 @@ Ver [docs/PRODUCT_VISION.md](PRODUCT_VISION.md) y la propia app en
 
 ## Producción
 
-- **Camino oficial para la 1.0**: frontend en Vercel + backend con
+- **Camino de despliegue**: frontend en Vercel + backend con
   `docker-compose.prod.yml` en Oracle Cloud. Es el único despliegue probado de
   punta a punta (healthchecks, reinicio automático y restore drill en CI).
 - **Oracle Cloud (Always Free)**: `docker-compose.prod.yml` levanta el stack 24/7

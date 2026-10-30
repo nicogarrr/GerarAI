@@ -4,11 +4,11 @@ Todos los cambios relevantes de GerarAI. Formato inspirado en
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado
 [SemVer](https://semver.org/lang/es/). Cada entrada enlaza a su PR.
 
-## [1.0.0] - sin publicar
+## Cambios sin publicar
 
-Desde `v0.9.0` (18-oct-2026) hasta `064bf816` en `main` (27-oct-2026): 980 merges.
+Desde la referencia histórica del 18-oct-2026 (numeración retirada) hasta `064bf816` en `main` (27-oct-2026): 980 merges.
 Las PRs que se mergeen después se añaden a esta sección antes de etiquetar
-(ver `docs/RELEASE_1_0.md`). Los títulos son los de cada PR, tal cual.
+(ver `docs/RELEASE_READINESS.md`). Los títulos son los de cada PR, tal cual.
 
 ### Lo más destacado
 
@@ -43,7 +43,7 @@ Las PRs que se mergeen después se añaden a esta sección antes de etiquetar
   `RETENTION_JOB_ENABLED`, `RETENTION_DRY_RUN`, `BIND_IP`,
   `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_SUPPORT_EMAIL`.
 - **Claves:** hay claves antiguas filtradas en el historial de Git que hay que rotar
-  antes de la 1.0 (`docs/ROTACION_CLAVES.md`).
+  antes del siguiente despliegue (`docs/ROTACION_CLAVES.md`).
 
 ### Novedades y mejoras (351)
 
@@ -1039,13 +1039,13 @@ Las PRs que se mergeen después se añaden a esta sección antes de etiquetar
 - chore(marca): sin email de soporte inventado, export gerarai-export, borra PortfolioChatSources sin uso (#1210)
 - test: make Yahoo token-leak test independent of foreign Client constructions (#1186)
 - chore(data-engine): elimina modules/ muerto (544 líneas) y sus tests exclusivos (#1162)
-- chore: version 0.9.0 (pre-release) to match the renamed GitHub release (#1174)
+- chore: historical pre-release version alignment (#1174; numbering retired)
 - test: debate probe fake accepts the db kwarg added by the budget wiring (#1143 x #1168) (#1175)
 - chore(finnhub): elimina 12 funciones muertas sin consumidores (#1158)
 
-## [0.9.0] - 2026-10-18
+## Historical baseline - 2026-10-18
 
-Primera versión etiquetada. Ver la etiqueta `v0.9.0` en GitHub.
+Primera referencia histórica; su numeración y etiqueta se retiraron el 30-oct-2026. La referencia vigente es v0.5.0 sobre el commit de producción fbfeeea2.
 
-[1.0.0]: https://github.com/nicogarrr/GerarAI/compare/v0.9.0...main
-[0.9.0]: https://github.com/nicogarrr/GerarAI/releases/tag/v0.9.0
+[Unreleased]: https://github.com/nicogarrr/GerarAI/compare/fbfeeea2df394af5f536992b27966e8c0ead3e54...main
+[0.5.0]: https://github.com/nicogarrr/GerarAI/releases/tag/v0.5.0

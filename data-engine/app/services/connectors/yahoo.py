@@ -33,6 +33,17 @@ def yahoo_chart_symbol(symbol: str) -> str:
     return f"{match.group(1)}-{match.group(2)}" if match else normalized
 
 
+
+def _with_exchange_timezone(rows: list[Any], meta: Any) -> list[dict[str, Any]]:
+    """Copia cada evento con la zona horaria de su bolsa.
+
+    Yahoo fecha los eventos con el epoch de la apertura LOCAL (10:00 en
+    Sydney = 23:00 UTC del dia anterior); sin la zona, la fecha UTC cae un
+    dia antes en ASX/NZX."""
+    tz = meta.get("exchangeTimezoneName") if isinstance(meta, dict) else None
+    tz = tz if isinstance(tz, str) and tz.strip() else None
+    return [{**row, "exchangeTimezoneName": tz} for row in rows if isinstance(row, dict)]
+
 class YahooFinanceClient:
     name = "yahoo"
     base_url = "https://query1.finance.yahoo.com/v8/finance/chart"
@@ -92,7 +103,7 @@ class YahooFinanceClient:
         node = await self._chart(ticker, events=True)
         events = node.get("events") or {}
         rows = list((events.get("dividends") or {}).values())
-        return [row for row in rows if isinstance(row, dict)]
+        return _with_exchange_timezone(rows, node.get("meta"))
 
     async def dividend_events(self, ticker: str) -> dict[str, Any]:
         """Dividendos crudos + divisa de cotizacion del LISTADO consultado.
@@ -107,7 +118,7 @@ class YahooFinanceClient:
         meta = node.get("meta") or {}
         currency = meta.get("currency") if isinstance(meta, dict) else None
         return {
-            "rows": [row for row in rows if isinstance(row, dict)],
+            "rows": _with_exchange_timezone(rows, meta),
             "currency": currency if isinstance(currency, str) and currency.strip() else None,
         }
 
@@ -116,4 +127,4 @@ class YahooFinanceClient:
         node = await self._chart(ticker, events=True)
         events = node.get("events") or {}
         rows = list((events.get("splits") or {}).values())
-        return [row for row in rows if isinstance(row, dict)]
+        return _with_exchange_timezone(rows, node.get("meta"))

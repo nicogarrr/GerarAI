@@ -1,7 +1,10 @@
-# Release 1.0.0: checklist
+# Checklist de revisión y despliegue
 
-Documento vivo para sacar la **1.0.0**. Marca cada casilla al cumplirla. La PR del
-bump de versión (#2340) está en *draft* y **no se mergea hasta el OK de Nico**.
+La versión vigente es **0.5.0**, fijada sobre el commit de producción
+`fbfeeea2df394af5f536992b27966e8c0ead3e54`. No hay un hito de lanzamiento futuro fijado.
+
+El inventario de abajo conserva su fecha histórica y no demuestra el estado actual.
+Cada nuevo despliegue requiere revisar CI, auditoría, backups y el entorno real.
 
 Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
 
@@ -17,7 +20,7 @@ Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
 
 Las casillas de abajo no se marcan sin un run en verde del commit de `main` que se vaya a etiquetar.
 
-## 0. Lo que falta para la 1.0 (bloqueantes)
+## 0. Inventario de revisión (corte histórico)
 
 | # | Qué | Quién | Dónde |
 |---|---|---|---|
@@ -73,7 +76,7 @@ de mergearla. Nunca dos ficheros con el mismo prefijo.
 
 - [ ] Antes de desplegar en producción: backup de Postgres (ver
       `docs/BACKUP_RESTORE.md`) y `alembic upgrade head` probado sobre una copia
-      restaurada. De `v0.9.0` a hoy hay 22 migraciones (`0061` → `0082`) más las de la cola.
+      restaurada. Desde la referencia histórica del 18-oct-2026 a la fecha de esta lista hay 22 migraciones (`0061` → `0082`) más las de la cola.
 
 ## 3. Smoke e2e
 
@@ -146,16 +149,10 @@ Las mismas variables de ambos bloques en `docker.env`, más las de
 - [ ] Render: variables que faltan en `render.yaml` añadidas en el panel (`SEC_USER_AGENT`, `FMP_API_KEY`, `LLM_*`, y `CORS_ORIGINS` si hace falta).
 - [ ] El data-engine arranca sin errores de validación en los logs.
 
-## 5. Publicar
+## 5. Preparar el siguiente despliegue
 
-- [ ] OK de Nico.
-- [ ] `CHANGELOG.md` (#2336) al día con lo mergeado después de su corte.
-- [ ] Mergear #2340 (versión 1.0.0).
-- [ ] Etiqueta y release:
-      ```bash
-      git checkout main && git pull
-      git tag -a v1.0.0 -m "GerarAI 1.0.0"
-      git push origin v1.0.0
-      gh release create v1.0.0 --title "GerarAI 1.0.0" --notes-file <sección 1.0.0 del CHANGELOG>
-      ```
-- [ ] Desplegar (Vercel sale solo desde `main`; Render redespliega al mergear) y repetir el smoke de la sección 3.
+- [ ] Confirmar el alcance y el commit exacto con Nico.
+- [ ] Revisar el changelog, CI y auditoría del commit elegido.
+- [ ] Verificar backup y restauración antes de cambiar producción.
+- [ ] Avisar a Nico, desplegar y repetir el smoke de la sección 3.
+- [ ] Solo crear una nueva etiqueta o release cuando Nico lo pida.

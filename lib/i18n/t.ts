@@ -1,19 +1,33 @@
 /**
- * i18n mínima del repo: un diccionario (es.json) y un accessor con tipos.
+ * i18n del repo: diccionarios por área en messages/<locale>/<area>.json y un
+ * accessor con tipos.
  *
- * Por qué NO next-intl: la app es íntegramente es-ES, no hay enrutado por
- * locale ni i18n de terceros. next-intl añade middleware, carga de mensajes
- * por request y un `NextIntlClientProvider` para precargar los mensajes,
- * que aquí no se usan. Con un JSON + una función tipada por `typeof es` se
- * consigue lo mismo (autocompletado de claves y error de compilación si
- * escribes una clave que no existe) sin dependencias.
+ * Por qué NO next-intl: no hay enrutado por locale y la carga de mensajes por
+ * request con un `NextIntlClientProvider` precargado no aporta nada aquí. Un
+ * registro de JSON + una función tipada por `typeof es` da lo mismo
+ * (autocompletado de claves y error de compilación si la clave no existe) sin
+ * dependencias.
+ *
+ * Este módulo es el accessor LEGACY síncrono, fijado al locale por defecto
+ * (es): existe para que las llamadas `t()` antiguas sigan compilando mientras
+ * los carriles migran. Código nuevo:
+ * - server components: `const t = await getT()` de `@/lib/i18n/server`;
+ * - client components: `const t = useT()` de `@/lib/i18n/client`.
  *
  * Módulo puro: se importa igual desde server y client components.
  */
 
-import es from './es.json';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { DEFAULT_LOCALE } from './locale.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { messages } from './messages/index.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { translateMessage, type TranslationVars } from './translate.ts';
 
-export { es };
+/** Diccionario de referencia (locale por defecto). */
+export const es = messages.es;
+
+export type { TranslationVars };
 
 type Leaves<T> = T extends string
   ? ''
@@ -24,23 +38,8 @@ type Leaves<T> = T extends string
 /** Claves aceptadas: "portfolio.tearsheet.maxDrawdown" (hoja del diccionario). */
 export type TranslationKey = Leaves<typeof es>;
 
-/** Variables `{name}` de una clave. */
-export type TranslationVars = Record<string, string | number>;
-
-function lookup(path: string): unknown {
-  return path
-    .split('.')
-    .reduce<unknown>(
-      (node, key) =>
-        node !== null && typeof node === 'object'
-          ? (node as Record<string, unknown>)[key]
-          : undefined,
-      es as unknown,
-    );
-}
-
 /**
- * Traduce una clave del diccionario.
+ * Traduce una clave del diccionario EN ESPAÑOL (locale por defecto).
  *
  * - Sustituye `{name}` por los valores de `vars`.
  * - En DESARROLLO lanza si la clave no existe o falta una variable: es un
@@ -50,26 +49,5 @@ function lookup(path: string): unknown {
  *   rompe la página por un texto que falta.
  */
 export function t(path: TranslationKey, vars?: TranslationVars): string {
-  return translate(path, vars);
-}
-
-function translate(path: string, vars?: TranslationVars): string {
-  const value = lookup(path);
-  if (typeof value !== 'string') {
-    if (process.env.NODE_ENV !== 'production') {
-      throw new Error(`[i18n] Falta la clave "${path}" en lib/i18n/es.json`);
-    }
-    return path;
-  }
-  if (!vars) return value;
-  return value.replace(/\{(\w+)\}/g, (match, name: string) => {
-    const replacement = vars[name];
-    if (replacement === undefined) {
-      if (process.env.NODE_ENV !== 'production') {
-        throw new Error(`[i18n] Falta la variable "{${name}}" para la clave "${path}"`);
-      }
-      return match;
-    }
-    return String(replacement);
-  });
+  return translateMessage(DEFAULT_LOCALE, path, vars);
 }

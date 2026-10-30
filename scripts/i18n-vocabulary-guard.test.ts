@@ -7,7 +7,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const es = readFileSync('lib/i18n/es.json', 'utf8');
+import { loadMessages } from './i18n-messages.mjs';
+
+const es = JSON.stringify(loadMessages('es').dict);
 const knowledge = readFileSync('app/(root)/knowledge/page.tsx', 'utf8');
 const insider = readFileSync('app/(root)/insider/page.tsx', 'utf8');
 
