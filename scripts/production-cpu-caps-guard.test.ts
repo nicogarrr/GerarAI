@@ -16,5 +16,9 @@ function limits(service: string): string {
 
 test('production backend and default worker preserve measured CPU caps and memory', () => {
     assert.match(limits('backend'), /limits:\s*\n\s*cpus: "2\.00"\s*\n\s*memory: 2G/);
-    assert.match(limits('worker'), /limits:\s*\n\s*cpus: "1\.00"\s*\n\s*memory: 1280M/);
+    assert.match(limits('worker'), /limits:\s*\n\s*cpus: "1\.00"\s*\n\s*memory: 3G/);
+});
+
+test('default worker does not overlap evidence scans', () => {
+    assert.ok(source.includes('"--threads", "1", "-Q", "default", "prices"'));
 });
