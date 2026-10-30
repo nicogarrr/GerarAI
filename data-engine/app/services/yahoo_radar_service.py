@@ -27,10 +27,13 @@ Verificado contra el Yahoo real el 28-oct-2026 (sondas minimas, sandbox):
 
 from __future__ import annotations
 
+import json
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
+from time import monotonic
 from typing import Any
 
 from sqlalchemy import select
@@ -167,8 +170,37 @@ def _via_cotejo(candidate: RadarCandidate) -> str | None:
     return None
 
 
+# Cache corta del screener: cada vista del radar repetia la sesion crumb de
+# Yahoo (2 peticiones) y el POST del screener. Datos publicos de Yahoo, iguales
+# para todos (el marcado contra el universo propio se hace despues, por
+# peticion). Un fallo no se cachea. La respuesta lleva ``_fetched_at`` para
+# que "generado en" diga cuando se consulto Yahoo de verdad.
+_SCREENER_TTL_S = 600.0
+_SCREENER_MAX_ENTRIES = 32
+_screener_lock = threading.Lock()
+_screener_cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
 def fetch_screener(query: dict[str, Any]) -> dict[str, Any]:
-    """POST real al screener de Yahoo con sesion crumb (red, solo runtime)."""
+    """Screener de Yahoo con cache de 10 min por query (red, solo runtime)."""
+    key = json.dumps(query, sort_keys=True, default=str)
+    now = monotonic()
+    with _screener_lock:
+        hit = _screener_cache.get(key)
+        if hit is not None and now - hit[0] < _SCREENER_TTL_S:
+            return hit[1]
+    payload = {**_post_screener(query), "_fetched_at": datetime.now(UTC).isoformat(timespec="seconds")}
+    with _screener_lock:
+        for stale in [k for k, (ts, _) in _screener_cache.items() if now - ts >= _SCREENER_TTL_S]:
+            _screener_cache.pop(stale, None)
+        if len(_screener_cache) >= _SCREENER_MAX_ENTRIES:
+            _screener_cache.pop(min(_screener_cache, key=lambda k: _screener_cache[k][0]), None)
+        _screener_cache[key] = (monotonic(), payload)
+    return payload
+
+
+def _post_screener(query: dict[str, Any]) -> dict[str, Any]:
+    """POST real al screener de Yahoo con sesion crumb."""
 
     from app.services.connectors.ca_insider_yahoo import yahoo_session
 
@@ -223,5 +255,6 @@ def run_radar(
         for candidate in candidates:
             candidate.en_universo_propio = candidate.symbol in known
             candidate.via_cotejo = _via_cotejo(candidate)
-    generado_en = datetime.now(UTC).isoformat(timespec="seconds")
+    fetched_at = payload.get("_fetched_at") if isinstance(payload, dict) else None
+    generado_en = fetched_at if isinstance(fetched_at, str) else datetime.now(UTC).isoformat(timespec="seconds")
     return candidates, generado_en, regs
