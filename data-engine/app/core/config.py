@@ -454,7 +454,7 @@ class Settings(BaseSettings):
     # Investing: ventanas de 7 dias, 1 dia y el propio dia sobre las fechas ya
     # refrescadas en earnings_dates. EARNINGS_ALERT_CHANNELS: canales base;
     # Telegram/push se anaden solo con la suscripcion "earnings" activa.
-    earnings_alerts_enabled: bool = True
+    earnings_alerts_enabled: bool = False
     earnings_alert_channels: str = "in_app,email"
     # Langfuse Cloud EU shadow tracing (stage 3): SOLO observabilidad.
     # Apagado por defecto; nunca es fuente de verdad de negocio (eso es
