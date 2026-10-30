@@ -13,6 +13,7 @@ import {
 
 export const PUSH_TYPE_LABELS: Record<PushEventType, string> = {
     macro_event: 'Eventos macro (IPC, empleo, FOMC): 24 h y 1 h antes',
+    earnings: 'Próximos resultados de cartera y watchlist: 7 días, 1 día y el mismo día',
     dca_levels: 'Niveles DCA de tu watchlist',
     new_filing: 'Nuevos documentos de la SEC',
     thesis_broken: 'Tesis en riesgo',
