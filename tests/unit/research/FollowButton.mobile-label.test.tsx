@@ -24,4 +24,21 @@ describe('FollowButton compacto (cabecera de ficha)', () => {
         render(<FollowButton compact symbol="ASTS" isFollowed={false} stateUnknown={false} />);
         expect(screen.getAllByText('Seguir').length).toBeGreaterThan(0);
     });
+
+    // WCAG 2.5.3 (axe label-content-name-mismatch): el nombre accesible debe
+    // contener el texto que se ve, en móvil («Siguiendo») y en escritorio.
+    it.each([
+        ['siguiendo', { isFollowed: true, stateUnknown: false }],
+        ['sin seguir', { isFollowed: false, stateUnknown: false }],
+        ['estado desconocido', { isFollowed: false, stateUnknown: true }],
+    ])('el nombre accesible incluye cada texto visible (%s)', (_label, props) => {
+        render(<FollowButton compact symbol="ASTS" {...props} />);
+        const button = screen.getByRole('button');
+        const ariaLabel = button.getAttribute('aria-label');
+        const visibleTexts = Array.from(button.querySelectorAll('span')).map((span) => span.textContent ?? '');
+        expect(visibleTexts.length).toBeGreaterThan(0);
+        for (const text of visibleTexts) {
+            if (ariaLabel !== null) expect(ariaLabel.toLowerCase()).toContain(text.toLowerCase());
+        }
+    });
 });

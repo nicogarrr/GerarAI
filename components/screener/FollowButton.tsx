@@ -83,7 +83,9 @@ export default function FollowButton({
       title={stateUnknown ? 'No se pudo comprobar tu watchlist. Recarga la página.' : undefined}
       aria-busy={busy}
       aria-pressed={followed}
-      aria-label={compact ? (stateUnknown ? 'Seguir (no disponible)' : followed ? 'Dejar de seguir' : 'Seguir') : undefined}
+      // Sin aria-label: el nombre accesible es el texto visible (WCAG 2.5.3).
+      // En móvil se ve «Siguiendo» y una etiqueta fija «Dejar de seguir» no lo
+      // contenía (axe label-content-name-mismatch en /research/<ticker>).
       className={compact ? 'h-11 gap-1.5 px-3 text-gray-300 hover:text-teal-300 sm:h-7 sm:w-auto sm:gap-1 sm:px-2 sm:text-xs' : 'min-h-[44px] px-3 py-2 text-sm text-gray-300 hover:text-teal-300 sm:h-7 sm:min-h-0 sm:px-2 sm:text-xs'}
     >
       {busy ? (
