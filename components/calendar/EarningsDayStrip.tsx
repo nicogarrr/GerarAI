@@ -6,8 +6,9 @@ import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
 import { formatMarketDate } from '@/lib/format';
 
 const DAYS_SHOWN = 7;
-// Logos grandes (como «Empresas seguidas»): con 112 px de tarjeta caben 2 de 36 px
-// y el «+N»; el resto de eventos se cuenta, no se encoge el logo.
+// Logos grandes (como «Empresas seguidas»): con 120 px de tarjeta caben 2 de 36 px
+// y el «+N» (que enlaza al día completo); el resto de eventos se cuenta, no se
+// encoge el logo.
 const LOGOS_SHOWN = 2;
 
 function addUtcDays(isoDate: string, days: number): string {
@@ -30,8 +31,8 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
         // aria-label el texto visible («28 Hoy Sin eventos») no estaba dentro del
         // nombre. Los logos son decorativos: la cuenta ya dice cuántos eventos hay.
         <Link
-            href="/calendar/resultados"
-            className="flex w-28 shrink-0 sm:w-32 2xl:w-auto flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
+            href={`/calendar/resultados#d-${isoDate}`}
+            className="flex w-30 shrink-0 snap-start sm:w-32 2xl:w-auto flex-col items-center gap-1.5 rounded-2xl border border-gray-800 bg-surface-1 px-2 py-3 transition-colors hover:border-gray-700 hover:bg-gray-900"
         >
             <span className="text-2xl font-bold leading-none text-gray-100">
                 <span className="sr-only">Resultados del</span>{' '}
@@ -50,7 +51,7 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
                         {events.length}{' '}
                         <span className="sr-only">{events.length === 1 ? 'evento' : 'eventos'}</span>
                     </span>
-                    <span aria-hidden="true" className="flex items-center justify-center gap-1.5" title={events.map((event) => event.ticker).join(", ")}>
+                    <span aria-hidden="true" className="flex items-center justify-center gap-1" title={events.map((event) => event.ticker).join(", ")}>
                         {events.slice(0, LOGOS_SHOWN).map((event) => (
                             <CompanyLogo
                                 key={event.ticker}
@@ -59,7 +60,7 @@ function DayCard({ isoDate, todayIso, events }: { isoDate: string; todayIso: str
                                 className="size-9 rounded-lg sm:size-10 2xl:size-12"
                             />
                         ))}
-                        {extra > 0 ? <span className="text-xs font-medium text-gray-400">+{extra}</span> : null}
+                        {extra > 0 ? <span className="text-sm font-semibold text-gray-200">+{extra}</span> : null}
                     </span>
                 </>
             )}
@@ -97,7 +98,7 @@ export default async function EarningsDayStrip() {
             {/* relative: bloque contenedor de las etiquetas sr-only (absolute)
                 de cada tarjeta; sin él se escapaban del overflow-x-auto y la
                 página entera se desplazaba en horizontal en móvil. */}
-            <div className="relative -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 2xl:grid 2xl:grid-cols-[repeat(7,minmax(0,1fr))] 2xl:overflow-visible">
+            <div className="relative -mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:scroll-pl-0 sm:px-0 2xl:grid 2xl:grid-cols-[repeat(7,minmax(0,1fr))] 2xl:overflow-visible">
                 {days.map((isoDate) => (
                     <DayCard key={isoDate} isoDate={isoDate} todayIso={today} events={byDate.get(isoDate) ?? []} />
                 ))}
