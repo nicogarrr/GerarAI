@@ -10,6 +10,7 @@ import {
     formatScreenCriterionValue,
     formatScreenRank,
     screenCriterionMetricLabel,
+    screenMissingDataEntry,
     screenMissingFieldsLabel,
 } from '@/lib/screener-results';
 
@@ -49,5 +50,18 @@ describe('regresión: formato de valores existente intacto', () => {
     });
     it('formatScreenRank con market_cap compacta', () => {
         expect(formatScreenRank('24000000', 'market_cap')).toBe('24 M');
+    });
+});
+
+describe('screenMissingDataEntry', () => {
+    it('métrica conocida con etiqueta legible y recuento es-ES', () => {
+        expect(screenMissingDataEntry('gross_margin', 12, 30)).toBe('Margen bruto (sin dato en 12 de 30 empresas)');
+        expect(screenMissingDataEntry('wacc', 3, 30)).toBe('WACC (sin dato en 3 de 30 empresas)');
+    });
+    it('slug desconocido humanizado, nunca snake_case crudo', () => {
+        expect(screenMissingDataEntry('custom_metric_x', 1, 2)).toBe('custom metric x (sin dato en 1 de 2 empresas)');
+    });
+    it('miles con separador es-ES', () => {
+        expect(screenMissingDataEntry('revenue', 1234, 5000)).toBe('Ingresos (sin dato en 1.234 de 5.000 empresas)');
     });
 });

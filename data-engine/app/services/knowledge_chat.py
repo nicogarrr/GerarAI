@@ -21,6 +21,16 @@ from app.services.prompt_registry import get_prompt
 
 _PROMPT = get_prompt("knowledge_chat", allow_remote=False)
 
+
+def _prompt():
+    """i18n B: resuelve el prompt en el idioma activo de la peticion.
+
+    La constante de modulo queda en espanol (los tests la fijan); cada
+    llamada pasa por ``get_prompt`` para heredar el idioma del scope.
+    """
+    return get_prompt("knowledge_chat", allow_remote=False)
+
+
 logger = logging.getLogger(__name__)
 STOP = frozenset([
     "que", "qué", "dice", "dicen", "sobre", "de", "del", "la", "el", "los", "las", "un", "una", "y", "en", "por", "para", "como", "cómo", "what", "does", "say", "about", "the", "and", "on", "is", "a", "an", "investment", "investing", "inversión", "inversor", "cartas", "carta", "biblioteca", "buffett", "magallanes",
@@ -244,7 +254,7 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
         if mode == "analisis":
             response = await provider.complete(LLMRequest(
                 model=model, task="chat", temperature=0, max_tokens=2600,
-                metadata=knowledge_analysis.PROMPT.trace_metadata(),
+                metadata=knowledge_analysis.current_prompt().trace_metadata(),
                 messages=[Message(role, content) for role, content in knowledge_analysis.build_messages(question, sources)],
                 response_format=ResponseFormat.json_object()))
             if response.degraded:
@@ -256,8 +266,8 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
             return result
         response = await provider.complete(LLMRequest(
             model=model, task="chat", temperature=0, max_tokens=1600,
-            metadata=_PROMPT.trace_metadata(),
-            messages=[Message("system", _PROMPT.text),
+            metadata=_prompt().trace_metadata(),
+            messages=[Message("system", _prompt().text),
                       Message("user", json.dumps({"question": question, "sources": [{"chunk_id": i, "text": source["text"], "author": source["citation"]["author"], "title": source["citation"]["title"]} for i, source in sources.items()]}, ensure_ascii=False))],
             response_format=ResponseFormat.json_object()))
         if response.degraded:

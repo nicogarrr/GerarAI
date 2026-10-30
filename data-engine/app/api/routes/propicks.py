@@ -108,8 +108,15 @@ def get_run(
     stmt = stmt.where(ProPickCandidate.run_id == run_id)
     if only_passed:
         stmt = stmt.where(ProPickCandidate.passed.is_(True))
+    # Orden declarado en los dos motores (Postgres pone NULL primero en DESC y
+    # SQLite al final): sin nulls_last() los descartados por el embudo
+    # (score NULL) se colaban por ENCIMA de los aptos fuera del top_n en
+    # Postgres. Desempate por ticker: con rank y score NULL el orden era el
+    # que devolviera el motor, inestable entre llamadas.
     stmt = stmt.order_by(
-        ProPickCandidate.rank.asc().nulls_last(), ProPickCandidate.score.desc()
+        ProPickCandidate.rank.asc().nulls_last(),
+        ProPickCandidate.score.desc().nulls_last(),
+        Company.ticker,
     )
     rows = db.execute(stmt).all()
     # Ultimo precio persistido por empresa (F2/yfinance); None honesto si aun no hay.

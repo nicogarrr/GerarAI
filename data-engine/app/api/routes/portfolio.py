@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
+from app.core.ui_errors import ui_error
 from app.models import (
     CashBalance,
     Company,
@@ -988,9 +989,9 @@ def _require_ibkr_owner(db: Session):
     settings = get_settings()
     owner = settings.ibkr_flex_tenant_id
     if type(owner) is not int or owner <= 0 or type(db.info.get("tenant_id")) is not int or db.info["tenant_id"] != owner:
-        raise HTTPException(status_code=403, detail="La importación Flex no está habilitada para esta cuenta.")
+        raise ui_error(403, "flex_import_disabled")
     if not (settings.ibkr_flex_account_id or "").strip():
-        raise HTTPException(status_code=503, detail="Falta configurar la cuenta IBKR esperada.")
+        raise ui_error(503, "ibkr_account_not_configured")
     from app.models import IBKRConnection
     if db.scalar(select(IBKRConnection.id).where(IBKRConnection.tenant_id == db.info.get("tenant_id"))) is not None:
         raise HTTPException(status_code=409, detail="Usa el conector IBKR de Ajustes para esta cartera.")

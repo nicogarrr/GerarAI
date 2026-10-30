@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.ui_errors import ui_error
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
 from app.schemas import ThesisGenerateRequest, ThesisGraphOut, ThesisOut
 from app.services import thesis_audio_service
@@ -612,11 +613,11 @@ async def debate_thesis_endpoint(ticker: str, db: Session = Depends(get_db)) -> 
     except FreeLLMUnavailable as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from None
     except TimeoutError:
-        raise HTTPException(status_code=503, detail="El debate tardó demasiado; vuelve más tarde") from None
+        raise ui_error(503, "debate_timeout") from None
     except BudgetExceededError:
-        raise HTTPException(status_code=503, detail="Presupuesto LLM agotado, vuelve más tarde") from None
+        raise ui_error(503, "llm_budget_exhausted") from None
     except (LLMError, ValueError):
-        raise HTTPException(status_code=503, detail="El debate devolvió una respuesta no válida; vuelve más tarde") from None
+        raise ui_error(503, "debate_invalid_response") from None
     def _persist_verdict() -> bool:
         try:
             section = db.scalar(

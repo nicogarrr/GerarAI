@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 const SRC = readFileSync('app/(root)/screeners/[screenId]/page.tsx', 'utf8');
+const RESULTS_SRC = readFileSync('lib/screener-results.ts', 'utf8');
 
 test('aviso de métricas sin dato en ninguna empresa', () => {
   assert.match(SRC, /metrics_without_data/);
@@ -14,7 +15,14 @@ test('aviso de métricas sin dato en ninguna empresa', () => {
 test('agrega missing_fields de criterios y los muestra con frecuencia', () => {
   assert.match(SRC, /criterion\.missing_fields/);
   assert.match(SRC, /Sin coincidencias por falta de dato, no por incumplimiento/);
-  assert.match(SRC, /sin dato en /);
+  // La composición de cada entrada vive en lib/screener-results.ts
+  // (screenMissingDataEntry): la página la usa y el helper lleva el literal.
+  assert.match(SRC, /screenMissingDataEntry/);
+  assert.match(RESULTS_SRC, /sin dato en /);
+});
+
+test('cada métrica del aviso va con etiqueta legible, no con el slug crudo', () => {
+  assert.match(RESULTS_SRC, /metricLabel\(field\)/);
 });
 
 test('el aviso es honesto: no inventa el dato', () => {

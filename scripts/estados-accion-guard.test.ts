@@ -44,6 +44,7 @@ test('propicks: sin run publicado el botón genera la selección, no relee el va
   assert.ok(src.includes('generateFunnelRunNow'));
   assert.ok(src.includes('Generar selección ahora'));
   assert.ok(src.includes('Actualizando selección...'), 'el botón anuncia la actualización en curso también en el estado vacío');
-  assert.ok(src.includes("onClick={lastGenerated && passedCount !== 0 ? handleRefresh : handleGenerateRun}"), 'con run publicado y aptas actualiza; sin run (o con 0 aptas) genera de nuevo');
+  assert.ok(src.includes("const emptyStateNeedsRun = !lastGenerated || passedCount === 0;"), 'una sola condición: sin run (o con 0 aptas) hay que generar de nuevo');
+  assert.ok(src.includes("onClick={emptyStateNeedsRun ? handleGenerateRun : handleRefresh}"), 'con run publicado y aptas actualiza; sin run (o con 0 aptas) genera de nuevo');
   assert.ok(read('lib/actions/propicks-funnel.actions.ts').includes("'/api/propicks/runs', { method: 'POST' }"));
 });

@@ -134,11 +134,21 @@ def test_reported_fcf_wins_over_inferred(engine):
         )
         values = dict(VALUES, free_cash_flow=-80_000_000.0)
         result = _value(db, company, values)
-        # El FCF reportado (negativo) gana: el inferido no lo sustituye y no se
-        # publica un valor por accion negativo.
-        assert result["status"] == "insufficient_data"
-        assert result.get("trace", {}).get("inferred_inputs", []) == []
-        assert result["base_value"] is None
+        # El FCF reportado (negativo) gana: el inferido nunca lo sustituye
+        # como dato. Con convergencia de margen el reportado es el PUNTO DE
+        # PARTIDA (hecho medido) y el inferido solo fija la madurez; la
+        # orientacion queda bloqueada y nunca se publica cifra negativa.
+        assert result["publishable"] is False
+        for key in ("bear_value", "base_value", "bull_value", "expected_value"):
+            value = result[key]
+            assert value is None or value > 0
+        if result["status"] == "insufficient_data":
+            assert result.get("trace", {}).get("inferred_inputs", []) == []
+        else:
+            assert "inferred_fcf_margin_target" in result["publication_blockers"]
+            assert result["trace"]["reported_fcf_margin"] == pytest.approx(
+                -80_000_000.0 / 70_918_000.0
+            )
 
 
 def test_inputs_facts_and_documents_all_stay_isolated(engine):
@@ -190,9 +200,20 @@ def test_reported_non_positive_fcf_blocks_both_paths(engine, coherent, reported)
             current_price=58.0, engine_key="pre_revenue",
         )
         result = PreRevenueScenarioEngine().value(context)
-        assert result["status"] == "insufficient_data"
+        # Contrato (30-oct-2026): el margen reportado NO positivo nunca se
+        # proyecta como dato. Con un objetivo de madurez inferido y validado
+        # puede ofrecerse una ORIENTACIÓN por convergencia de margen — el
+        # margen reportado sigue siendo el punto de partida (hecho medido) y
+        # el resultado queda bloqueado para publicación; si la convergencia
+        # no da escenarios positivos (p. ej. deuda neta enorme), se mantiene
+        # el N/D explicado. En ningún caso se publica una cifra negativa.
         assert result["publishable"] is False
-        assert "non_negative_fcf_margin" in result["missing_inputs"]
-        assert result.get("trace", {}).get("inferred_inputs", []) == []
         for key in ("bear_value", "base_value", "bull_value", "expected_value"):
-            assert result[key] is None
+            value = result[key]
+            assert value is None or value > 0
+        if result["status"] == "insufficient_data":
+            assert "non_negative_fcf_margin" in result["missing_inputs"]
+            assert result.get("trace", {}).get("inferred_inputs", []) == []
+        else:
+            assert "inferred_fcf_margin_target" in result["publication_blockers"]
+            assert result["trace"]["method"] == "fcff_dcf_margin_convergence"

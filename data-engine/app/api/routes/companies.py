@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import safe_detail
 from app.core.tenancy import tenant_filters
+from app.core.ui_errors import ui_error
 from app.models import (
     CalculatedMetric,
     Company,
@@ -1491,11 +1492,7 @@ async def refresh_fmp_financials(ticker: str, db: Session = Depends(get_db)) -> 
                 # algunos endpoints; mensaje accionable en vez de un error crudo.
                 raise HTTPException(
                     status_code=424,
-                    detail=(
-                        "El plan gratuito de FMP no cubre este mercado. "
-                        "Para emisores europeos usa la fuente ESEF y para "
-                        "americanos la SEC."
-                    ),
+                    detail=ui_error(424, "fmp_plan_market_uncovered").detail,
                 ) from None
             raise HTTPException(
                 status_code=424,
@@ -1599,5 +1596,5 @@ def company_share_capital(ticker: str, db: Session = Depends(get_db)) -> dict:
 
     company = resolve_company(db, ticker)
     if not company:
-        raise HTTPException(status_code=404, detail="Empresa no encontrada")
+        raise HTTPException(status_code=404, detail=ui_error(404, "company_not_found").detail)
     return build_share_capital(db, company)

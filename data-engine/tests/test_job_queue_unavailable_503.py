@@ -9,9 +9,9 @@ import pytest
 import redis.exceptions
 from fastapi.testclient import TestClient
 
-from app.workers import dramatiq_app
-from app.core.database import init_db
 from app.core.auth import ResearchPrincipal, get_research_principal
+from app.core.database import init_db
+from app.workers import dramatiq_app
 from main import app
 
 

@@ -467,6 +467,12 @@ class Settings(BaseSettings):
     # Env: LANGFUSE_ENABLED / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY /
     # LANGFUSE_HOST / LANGFUSE_SAMPLE_RATE.
     langfuse_enabled: bool = False
+    # Generación multidioma (i18n B). Apagado: TODO se genera en español,
+    # byte a byte como antes (prompts, validadores de idioma y detail= de
+    # HTTPException visibles). Encendido: la cabecera firmada
+    # X-GerarAI-Language (es/en) fija el idioma de generación de la petición.
+    # Env: I18N_GENERATION_ENABLED.
+    i18n_generation_enabled: bool = False
     langfuse_public_key: str | None = Field(default=None, repr=False)
     langfuse_secret_key: str | None = Field(default=None, repr=False)
     langfuse_host: str = "https://cloud.langfuse.com"
@@ -613,7 +619,6 @@ class Settings(BaseSettings):
     typesafe_api_key: str | None = None
     typesafe_base_url: str = "https://api.typesafe.ai"
     typesafe_model: str = "jev-latest"
-    typesafe_fallback: str = Field(default="instructor", pattern="^(instructor|off)$")
     llm_enabled: bool = True
     # Clave del cifrado en reposo de las API keys LLM por tenant. En
     # produccion es obligatoria (>=32 bytes); en local/test se deriva de

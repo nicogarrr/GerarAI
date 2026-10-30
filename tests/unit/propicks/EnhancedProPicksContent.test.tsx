@@ -161,6 +161,28 @@ describe('EnhancedProPicksContent: estados vacíos', () => {
         expect(screen.getByText(/La selección del .* no contiene candidatos/)).toBeInTheDocument();
     });
 
+    it('run sin candidatos aptos ofrece GENERAR la selección (no «Actualizar») y ejecuta el embudo', async () => {
+        // Regresión: con run existente y passedCount=0 el botón del estado
+        // vacío decía «Actualizar selección» pero lanzaba handleGenerateRun.
+        generateFunnelRunNow.mockResolvedValue({ passed_count: 2, universe_size: 500 });
+        generateEnhancedProPicksWithRun.mockResolvedValue(result([pick()], { passedCount: 2 }));
+        render(<EnhancedProPicksContent initialPicks={[]} generatedAt="2026-10-27" initialPassedCount={0} />);
+        expect(screen.getByText('Sin candidatos aptos')).toBeInTheDocument();
+        // El único «Actualizar selección» es el del panel lateral; el del
+        // estado vacío anuncia la acción real (generar).
+        expect(screen.getAllByRole('button', { name: 'Actualizar selección' })).toHaveLength(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Generar selección ahora' }));
+        expect(await screen.findByText('#1')).toBeInTheDocument();
+        expect(generateFunnelRunNow).toHaveBeenCalledTimes(1);
+        expect(generateEnhancedProPicksWithRun).toHaveBeenCalledTimes(1);
+    });
+
+    it('run con candidatos pero filtros que excluyen todo sí ofrece «Actualizar» (relee el run)', async () => {
+        render(<EnhancedProPicksContent initialPicks={[]} generatedAt="2026-10-27" initialPassedCount={12} />);
+        expect(screen.queryByRole('button', { name: 'Generar selección ahora' })).not.toBeInTheDocument();
+        expect(screen.getAllByRole('button', { name: 'Actualizar selección' })).toHaveLength(2);
+    });
+
     it('con run que seleccionó empresas pero filtros que excluyen todo, lo distingue de un embudo vacío', async () => {
         generateEnhancedProPicksWithRun.mockResolvedValue(result([], { passedCount: 12 }));
         render(<EnhancedProPicksContent initialPicks={[]} generatedAt="2026-10-27" initialPassedCount={12} />);

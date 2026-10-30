@@ -46,6 +46,15 @@ GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 
 _BACKUP_PROMPT = "Puedes opinar y razonar sobre posiciones y decisiones de inversión del usuario, siempre apoyándote en los datos y fuentes del contexto. Si falta un dato, dilo en vez de inventarlo. No atribuyas opiniones a un autor si no hay fragmentos de ese autor en el contexto; en ese caso explica el concepto en general y di que no tienes una fuente concreta para atribuírselo. No añadas porcentajes, umbrales o reglas numéricas sin fuente. No deduzcas una deuda neta alta del tamaño de la deuda bruta: si falta el dato neto, indica que no está disponible. Conserva exactamente el contrato JSON y las citas del contexto cuando se exijan. Escribe en prosa plana en español, en párrafos cortos y de unas 120 palabras como máximo: sin LaTeX, sin tablas, sin listas con viñetas y sin negritas ni otro formato markdown. No escribas cifras, rangos, porcentajes ni años que no aparezcan en el contexto; explica con palabras como bajo, alto o mayor que. No uses corchetes, enlaces ni nombres de páginas web. Responde directamente, sin razonar en voz alta."
 
+_BACKUP_PROMPT_EN = "You may give opinions and reason about the user's positions and investment decisions, always grounded in the data and sources in the context. If a data point is missing, say so instead of inventing it. Do not attribute opinions to an author unless there are fragments by that author in the context; otherwise explain the concept in general and say you have no specific source to attribute it to. Do not add percentages, thresholds or numeric rules without a source. Do not infer high net debt from the size of gross debt: if the net figure is missing, say it is not available. Keep the JSON contract and the context citations exactly when they are required. Write in plain English prose, in short paragraphs of about 120 words at most: no LaTeX, no tables, no bullet lists and no bold or other markdown formatting. Do not write figures, ranges, percentages or years that do not appear in the context; explain with words like low, high or higher than. Do not use brackets, links or website names. Answer directly, without thinking out loud."
+
+
+def _backup_prompt() -> str:
+    """Refuerzo de sistema del respaldo, en el idioma de la generacion (i18n B)."""
+    from app.core.i18n import current_language
+
+    return _BACKUP_PROMPT_EN if current_language() == "en" else _BACKUP_PROMPT
+
 
 #: Enfriamiento por (proveedor, modelo) tras un 429: el siguiente chat no
 #: pierde segundos en un miembro cuya cuota gratuita acaba de agotarse.
@@ -122,8 +131,9 @@ class ChatFallbackProvider(LLMProvider):
         if self.on_response is not None:
             self.on_response(response)
         if self.validator is not None and not backup:
+            from app.core.i18n import current_language
             from app.services.llm_output_guard import inspect_response_text
-            if inspect_response_text(response.text):
+            if inspect_response_text(response.text, expected_language=current_language()):
                 raise _LanguageRejected(response)
         try:
             if response.degraded or response.finish_reason == "length":
@@ -176,7 +186,7 @@ class ChatFallbackProvider(LLMProvider):
         for provider, model in ready:
             member_request = replace(
                 request, model=model,
-                messages=(*request.messages, Message("system", _BACKUP_PROMPT)),
+                messages=(*request.messages, Message("system", _backup_prompt())),
             )
             logger.info("chat backup attempt provider=%s model=%s", provider.name, model)
             try:
@@ -278,10 +288,33 @@ def _reason_es(reason: str) -> str:
     return f"error ({reason})"
 
 
-def fallback_notice(response: LLMResponse) -> str | None:
+def _reason_en(reason: str) -> str:
+    """Plain-English version of the Go failure reason (i18n B)."""
+    if reason == "timeout":
+        return "it did not respond in time"
+    if reason == "cooling":
+        return "it hit its usage limit a moment ago"
+    if reason.startswith("ProviderHTTPError"):
+        code = reason.removeprefix("ProviderHTTPError")
+        if code == "429":
+            return "usage limit reached (HTTP 429)"
+        if code.startswith("5"):
+            return f"server error (HTTP {code})"
+        return f"HTTP error {code}" if code else "HTTP error"
+    if reason.startswith("ProviderTransportError"):
+        return "connection error"
+    if reason == "_LanguageRejected":
+        return "its response was not in English"
+    if reason.startswith("ProviderResponseError"):
+        return "empty or incomplete response"
+    return f"error ({reason})"
+
+
+def fallback_notice(response: LLMResponse, *, lang: str = "es") -> str | None:
     """Aviso visible cuando respondio un respaldo porque OpenCode Go fallo.
 
     None si respondio Go (o una respuesta sin rastro de fallo de Go).
+    ``lang`` (i18n B) redacta el aviso en el idioma de la conversacion.
     """
     trail = getattr(response, "fallback_trail", ()) or ()
     if not trail or response.provider in _GO_PROVIDER_NAMES:
@@ -290,7 +323,10 @@ def fallback_notice(response: LLMResponse) -> str | None:
     if first.split(":", 1)[0] not in _GO_PROVIDER_NAMES:
         return None
     name = _PROVIDER_LABELS.get(response.provider, response.provider)
-    return f"Respondido por respaldo ({name}) porque OpenCode Go falló: {_reason_es(first.rsplit(':', 1)[-1])}."
+    reason = first.rsplit(":", 1)[-1]
+    if lang == "en":
+        return f"Answered by backup ({name}) because OpenCode Go failed: {_reason_en(reason)}."
+    return f"Respondido por respaldo ({name}) porque OpenCode Go falló: {_reason_es(reason)}."
 
 
 _TRANSIENT_TRANSPORT_REASONS = frozenset({"read_timeout", "connect_timeout", "write_timeout", "pool_timeout", "timeout"})
