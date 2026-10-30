@@ -38,7 +38,9 @@ def test_sin_eur_como_base_no_hay_capa_de_declaracion(db, base):
     assert set(filing) == {"available", "reason"}
 
 
-def test_arrastre_mira_los_cuatro_ejercicios_anteriores_sin_filing(db):
+def test_arrastre_mira_los_ocho_ejercicios_anteriores_sin_filing(db):
+    # 8 = ventana de 4 + los 4 previos, cuyas perdidas aun vivas consumieron
+    # ganancias de la ventana (art. 49.1.b LIRPF); solo se listan los 4 ultimos.
     service = TaxReportService()
     calls = []
 
@@ -54,7 +56,7 @@ def test_arrastre_mira_los_cuatro_ejercicios_anteriores_sin_filing(db):
     for summary in ({"base_currency": "EUR"}, {}):
         calls.clear()
         filing = service._build_filing(db, 2025, {**_empty(), "summary": summary})
-        assert calls == [(2021, False), (2022, False), (2023, False), (2024, False)]
+        assert calls == [(year, False) for year in range(2017, 2025)]
         carry = next(v for v in filing.values() if isinstance(v, dict) and "window_years" in v)
         assert carry["window_years"] == 4
         assert [row["year"] for row in carry["prior_losses"]] == [2021, 2022, 2023, 2024]

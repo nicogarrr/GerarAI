@@ -81,3 +81,41 @@ def test_declared_pending_still_authoritative():
     )
     assert out["estimativo"] is False
     assert out["prior_losses"][0]["pending_start_base"] == 1000.0
+
+
+def test_pre_window_loss_still_consumes_intermediate_gains():
+    """A loss already expired for this year still absorbed gains while alive.
+
+    Art. 49.1.b LIRPF (BOE-A-2006-20764): a negative balance "se compensará
+    ... en los cuatro años siguientes", and the AEAT Manual Renta 2025 (cap.
+    11, "Integración y compensación de rentas en la base imponible del
+    ahorro") requires compensating "en la cuantía máxima que permita cada
+    uno de los ejercicios siguientes", oldest balance first. So a 2020 loss
+    (alive 2021-2024) MUST absorb the 2022 gain before the 2021 loss does.
+
+    Hand example (Renta 2025, window 2021-2024):
+      2020: -10.000   2021: -5.000   2022: +8.000   2023: 0   2024: 0
+      2022 gain -> 8.000 of the 2020 loss (oldest); 2021 untouched.
+      => pending on 1/1/2025: 2021 = 5.000 (2020 has expired).
+    Before the fix the 2020 year was ignored, the 2022 gain ate the 2021
+    loss and the estimate said 0 pending (overstating the 2025 tax).
+    """
+    out = build_loss_compensation(
+        [
+            _prior(2020, -10000.0), _prior(2021, -5000.0), _prior(2022, 8000.0),
+            _prior(2023, 0.0), _prior(2024, 0.0),
+        ],
+        Decimal("6000"), Decimal("0"), 2025,
+    )
+    assert [(p["year"], p["pending_start_base"]) for p in out["prior_losses"]] == [(2021, 5000.0)]
+    assert out["applied_to_gains_total_base"] == 5000.0
+
+
+def test_pre_window_incomplete_year_is_not_listed_as_excluded():
+    """Only the four years whose balances can still be used are listed (art. 49.1.b LIRPF)."""
+    out = build_loss_compensation(
+        [_prior(2019, None, incomplete=True), _prior(2023, -100.0)],
+        Decimal("0"), Decimal("0"), 2025,
+    )
+    assert out["excluded_years"] == []
+    assert [(p["year"], p["pending_start_base"]) for p in out["prior_losses"]] == [(2023, 100.0)]

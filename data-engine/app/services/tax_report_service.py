@@ -74,6 +74,7 @@ from app.services.currency_ledger import (
 )
 from app.services.portfolio_fx_service import TAX_CURRENCY, PortfolioFXService
 from app.services.tax_irpf_filing import (
+    CARRYFORWARD_WINDOW_YEARS,
     SPECIAL_PAYMENT_TOKENS,
     build_casillas,
     build_double_taxation,
@@ -1502,10 +1503,12 @@ class TaxReportService:
             ):
                 country_by_ticker[company.ticker] = company.domicile_country
         summary = data.get("summary") or {}
-        # Saldos netos de los 4 ejercicios anteriores, recalculados en
+        # Saldos netos de los ejercicios anteriores, recalculados en
         # memoria sin la capa filing (evita recursion y dobles calculos).
+        # 8 y no 4: una perdida de fiscal_year-8 sigue viva en fiscal_year-4
+        # y consume ganancias de la ventana (art. 49.1.b LIRPF).
         prior_year_nets = []
-        for prior_year in range(fiscal_year - 4, fiscal_year):
+        for prior_year in range(fiscal_year - 2 * CARRYFORWARD_WINDOW_YEARS, fiscal_year):
             prior_data = self.compute_report(db, prior_year, include_filing=False)
             prior_summary = prior_data["summary"]
             # Rendimientos del ahorro del ejercicio previo (dividendos +

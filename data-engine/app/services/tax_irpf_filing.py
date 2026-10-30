@@ -703,11 +703,20 @@ def build_loss_compensation(
         # (primero su propia pérdida, casilla 0446). Arrastrar la pérdida
         # ENTERA, como si nada la hubiera consumido, sobrestimaba lo
         # pendiente y compensaba de más en el ejercicio actual.
+        #
+        # Los ejercicios ANTERIORES a la ventana también se simulan: su
+        # pérdida ya no se puede usar este año, pero mientras vivía tuvo que
+        # compensarse "en la cuantía máxima" en los ejercicios intermedios
+        # (art. 49.1.b LIRPF), antes que las más recientes. Ignorarlos dejaba
+        # que una ganancia intermedia se comiera una pérdida de la ventana que
+        # en realidad sigue pendiente. Al final solo quedan las de la ventana.
         for entry in sorted(prior_year_nets, key=lambda e: e["year"]):
             year = entry["year"]
-            if year < window_start or year >= fiscal_year:
-                continue  # fuera de la ventana de 4 ejercicios (expirado)
+            if year >= fiscal_year:
+                continue
             if entry.get("incomplete") or entry.get("net_gyp_base") is None:
+                if year < window_start:
+                    continue  # ya expirado: no es un saldo de este informe
                 excluded.append({
                     "year": year,
                     "reason": "Ejercicio con conversión de divisa incompleta: saldo no aprovechable en este informe.",
@@ -742,7 +751,10 @@ def build_loss_compensation(
                     "casilla_integracion": None,
                     "casilla_resto": None,
                 })
-        pending = [item for item in pending if item["pending"] > 0]
+        pending = [
+            item for item in pending
+            if item["pending"] > 0 and item["year"] >= window_start
+        ]
 
     incomplete = False
     saldo_gyp = None
