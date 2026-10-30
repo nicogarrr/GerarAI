@@ -1,3 +1,5 @@
+import { chartPriceUnit } from '@/lib/market/chart-price-units';
+
 // Nivel DCA y valor justo por posición: mapeo PURO (sin red) para cartera e inicio.
 //
 // - Valor justo: el ÚNICO del backend (/api/valuation/fair-value, tesis o motor)
@@ -96,6 +98,12 @@ export function fairValueGapPercent(
     fair: HoldingFairValue | null | undefined,
 ): number | null {
     if (!fair || price == null || !(price > 0) || !Number.isFinite(price)) return null;
-    if (!priceCurrency || !fair.currency || priceCurrency.toUpperCase() !== fair.currency.toUpperCase()) return null;
-    return ((fair.value - price) / price) * 100;
+    // Unidad, no solo divisa: «GBp» (peniques) no es «GBP». Pasar a mayúsculas
+    // igualaba 1.200 p con un valor justo de 15 £. El precio va a la unidad
+    // mayor; un valor justo rotulado en una subunidad no se compara.
+    const quoteUnit = chartPriceUnit(priceCurrency);
+    const fairUnit = chartPriceUnit(fair.currency);
+    if (!quoteUnit || !fairUnit || fairUnit.divisor !== 1 || quoteUnit.currency !== fairUnit.currency) return null;
+    const major = price / quoteUnit.divisor;
+    return ((fair.value - major) / major) * 100;
 }

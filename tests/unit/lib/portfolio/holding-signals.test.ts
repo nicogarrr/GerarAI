@@ -52,6 +52,14 @@ describe('fairValueGapPercent', () => {
     it('la comparación de divisa no distingue mayúsculas', () => {
         expect(fairValueGapPercent(5, 'eur', fair)).toBe(20);
     });
+    it('Londres en peniques se compara en libras, nunca GBp como GBP', () => {
+        // Valor justo 15 £; cotización 1.200 GBp = 12 £ -> (15 - 12) / 12 = 25 %.
+        const gbp: HoldingFairValue = { ...fair, value: 15, currency: 'GBP' };
+        expect(fairValueGapPercent(1200, 'GBp', gbp)).toBeCloseTo(25);
+        expect(fairValueGapPercent(1200, 'GBX', gbp)).toBeCloseTo(25);
+        expect(fairValueGapPercent(12, 'GBP', gbp)).toBeCloseTo(25);
+        expect(fairValueGapPercent(12, 'GBP', { ...gbp, currency: 'GBp' })).toBeNull();
+    });
     it.each([
         ['divisas distintas (nunca se mezclan)', 5, 'USD'],
         ['divisa del precio ausente', 5, null],
