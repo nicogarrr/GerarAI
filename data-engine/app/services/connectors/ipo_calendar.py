@@ -113,7 +113,46 @@ def _payload_events(payload: dict[str, Any]) -> list[dict[str, Any]]:
 # declara no disponible al momento durante un minuto y luego se reintenta.
 _MONTH_CACHE_TTL_S = 3600.0
 _MONTH_FAILURE_TTL_S = 60.0
+# Stale-while-revalidate: un mes bueno caducado (mas de 1 h, menos de 24 h)
+# se sirve al momento y se refresca en segundo plano, como los dias de
+# earnings. Si el refresco falla se sigue sirviendo la copia buena.
+_MONTH_STALE_MAX_S = 24 * 3600.0
 _month_cache: dict[date, tuple[float, dict[str, Any]]] = {}
+_month_refresh_failed: dict[date, float] = {}
+_month_refreshing: dict[tuple[int, date], asyncio.Task[dict[str, Any]]] = {}
+
+
+def _store_month(first: date, result: dict[str, Any]) -> None:
+    now = time.monotonic()
+    hit = _month_cache.get(first)
+    if result["status"] != "ok" and hit is not None and hit[1]["status"] == "ok" and now - hit[0] < _MONTH_STALE_MAX_S:
+        # Refresco fallido: se conserva la copia buena y se frena el reintento.
+        _month_refresh_failed[first] = now
+        return
+    # Datos publicos de NASDAQ, iguales para todos los usuarios: sin clave
+    # de tenant. Se podan los meses viejos para que no crezca.
+    for key in [k for k, (ts, _) in _month_cache.items() if now - ts >= _MONTH_STALE_MAX_S]:
+        _month_cache.pop(key, None)
+    _month_cache[first] = (now, result)
+    _month_refresh_failed.pop(first, None)
+
+
+def _refresh_month(first: date) -> None:
+    failed_at = _month_refresh_failed.get(first)
+    if failed_at is not None and time.monotonic() - failed_at < _MONTH_FAILURE_TTL_S:
+        return
+    flight = (id(asyncio.get_running_loop()), first)
+    if flight in _month_refreshing:
+        return
+    task = asyncio.ensure_future(_fetch_ipo_month(first, None))
+    _month_refreshing[flight] = task
+
+    def _done(t: asyncio.Task[dict[str, Any]]) -> None:
+        _month_refreshing.pop(flight, None)
+        if not t.cancelled() and t.exception() is None:
+            _store_month(first, t.result())
+
+    task.add_done_callback(_done)
 
 
 async def fetch_ipo_month(
@@ -125,17 +164,18 @@ async def fetch_ipo_month(
     if client is None:
         hit = _month_cache.get(first)
         if hit is not None:
-            ttl = _MONTH_CACHE_TTL_S if hit[1]["status"] == "ok" else _MONTH_FAILURE_TTL_S
-            if time.monotonic() - hit[0] < ttl:
+            age = time.monotonic() - hit[0]
+            if hit[1]["status"] == "ok":
+                if age < _MONTH_CACHE_TTL_S:
+                    return hit[1]
+                if age < _MONTH_STALE_MAX_S:
+                    _refresh_month(first)
+                    return hit[1]
+            elif age < _MONTH_FAILURE_TTL_S:
                 return hit[1]
         result = await _fetch_ipo_month(first, None)
-        now = time.monotonic()
-        # Datos publicos de NASDAQ, iguales para todos los usuarios: sin clave
-        # de tenant. Se podan los meses caducados para que no crezca.
-        for key in [k for k, (ts, _) in _month_cache.items() if now - ts >= _MONTH_CACHE_TTL_S]:
-            _month_cache.pop(key, None)
-        _month_cache[first] = (now, result)
-        return result
+        _store_month(first, result)
+        return _month_cache[first][1]
     return await _fetch_ipo_month(first, client)
 
 
