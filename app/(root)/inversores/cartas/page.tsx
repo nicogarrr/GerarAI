@@ -48,6 +48,9 @@ export default async function LettersPage({ searchParams }: PageProps) {
                     Volver a inversores
                 </Link>
             </header>
+            {groups.length > 0 ? (
+                <LibraryChat authors={groups.filter(group => group.name !== 'Sin autor').map(group => group.name)} label="Preguntar a las cartas" className="self-start" />
+            ) : null}
 
 
             {groups.length === 0 || !selected || !paged ? (
@@ -113,13 +116,6 @@ export default async function LettersPage({ searchParams }: PageProps) {
                     <Pagination basePath="/inversores/cartas" page={paged.page} params={{ autor: selected.key }} total={paged.total} />
                 </>
             )}
-
-            {groups.length > 0 ? (
-                <details className="rounded-lg border border-gray-800 p-4">
-                    <summary className="cursor-pointer text-sm text-gray-300">Consultar la biblioteca</summary>
-                    <div className="mt-4"><LibraryChat authors={groups.filter(group => group.name !== 'Sin autor').map(group => group.name)} /></div>
-                </details>
-            ) : null}
 
             <p className="text-xs text-gray-500">
                 Fuente: biblioteca de GerarAI. Las cartas son doctrina de inversión, no datos de las empresas. Si no hay fecha de

@@ -211,6 +211,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         title={t('knowledge.library')}
         description="Libros, cartas y casos de estudio, con principios aprobados a mano y trazables."
         actions={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
+          <LibraryChat scope="library" />
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/search"><FileSearch aria-hidden="true" className="h-4 w-4" />Buscar en todo</Link></Button>
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/knowledge-graph"><Library aria-hidden="true" className="h-4 w-4" />Grafo de conocimiento</Link></Button>
         </div>}
@@ -241,8 +242,6 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             </TabsTrigger>
           ))}
         </TabsList>
-
-        <LibraryChat scope="library" />
 
         <TabsContent className="mt-2 space-y-6" value={TABS.biblioteca}>
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">

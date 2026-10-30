@@ -58,7 +58,7 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
     const backHref = verifiedInvestor ? `/inversores/${encodeURIComponent(verifiedInvestor)}?vista=cartas` : author ? `/inversores/cartas?autor=${authorKey(author) || 'sin-autor'}` : '/inversores/cartas?autor=sin-autor';
 
     return (
-        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
+        <div className="min-w-0">
         {/* Miga con el titulo real: sin el override la ruta muestra el id crudo. */}
         <ScreenBreadcrumbName name={letter.title} />
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-8 overflow-x-clip py-6">
@@ -81,6 +81,9 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
                 ) : (
                     <span className="text-xs text-gray-500">Sin PDF original</span>
                 )}
+                {/* El Cerebro queda abajo a la derecha, plegado; este botón lo abre ya
+                    centrado en esta carta. */}
+                <LibraryChat scope="letters" authors={author ? [author] : []} documentId={letterId} documentTitle={letter.title} label="Preguntar sobre esta carta" className="self-start" />
             </header>
 
             {chunks.length === 0 ? (
@@ -106,7 +109,6 @@ export default async function LetterReaderPage({ params, searchParams }: PagePro
                 el PDF original manda). Es doctrina de inversión, no datos de las empresas.
             </p>
         </main>
-        <aside aria-label="Cerebro de la carta" className="min-w-0 xl:sticky xl:top-24 xl:self-start"><LibraryChat scope="letters" authors={author ? [author] : []} documentId={letterId} documentTitle={letter.title} placement="reader" /></aside>
         </div>
     );
 }
