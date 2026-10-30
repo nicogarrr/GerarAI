@@ -741,3 +741,20 @@ def test_relative_engine_measures_an_adr_peer_per_ordinary_share(db):
     assert "RELPBARE" not in values
     rejected = {entry["ticker"] for entry in result["trace"]["screens"]["pe"]["rejected_peers"]}
     assert "RELPBARE" in rejected
+
+
+def test_relative_engine_converts_a_london_peer_quoted_in_pence(db):
+    """Par de Londres: cierre 1.800 GBp = 18 GBP, EPS 2 GBP -> PER 9 (no 900)."""
+    company = _subject(db)
+    _peers(db)
+    london = _peer(db, "RELPLSE", price=1800.0, eps=2.0)
+    london.currency = "GBP"
+    db.flush()
+    row = db.query(MarketPrice).filter(MarketPrice.company_id == london.id).one()
+    row.quote_currency = "GBp"
+    db.commit()
+    result = _value(db, company)
+
+    block = next(entry for entry in result["trace"]["peer_multiples"] if entry["multiple"] == "pe")
+    values = {peer["ticker"]: peer["value"] for peer in block["peers"]}
+    assert values["RELPLSE"] == pytest.approx(9.0)
