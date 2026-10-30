@@ -70,19 +70,20 @@ def test_production_ignores_client_identity_on_create(monkeypatch):
     assert company.domicile_country is None
 
 
-def test_production_provider_identity_wins_over_client(monkeypatch):
+@pytest.mark.parametrize("currency", ["DKK", "EUR", "GBP", "GBX"])
+def test_production_provider_identity_wins_over_client(monkeypatch, currency):
     monkeypatch.setattr(companies_routes, "_trust_client_identity", lambda: False)
     monkeypatch.setattr(
         CompanyEnrichmentService,
         "_finnhub_profile",
-        lambda self, ticker: {"name": "QA Real Corp", "exchange": "NASDAQ NMS - GLOBAL MARKET", "finnhubIndustry": "Technology"},
+        lambda self, ticker: {"name": "QA Real Corp", "exchange": "NASDAQ NMS - GLOBAL MARKET", "finnhubIndustry": "Technology", "currency": currency},
     )
     response = TestClient(main.app).post("/api/companies/ensure", json=POISON)
     assert response.status_code in (200, 201)
     company = _stored()
     assert company.name == "QA Real Corp"
     assert company.exchange == "NASDAQ NMS - GLOBAL MARKET"
-    assert company.currency == "USD"
+    assert company.currency == currency
 
 
 def test_production_ignores_client_identity_on_existing_stub(monkeypatch):
