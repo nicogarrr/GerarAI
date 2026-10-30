@@ -210,10 +210,21 @@ class PortfolioTransactionInput(BaseModel):
         return value
 
 
+def _not_in_the_future(value: date | None) -> date | None:
+    # Un precio o un tipo de cambio fechado en el futuro (2062 por 2026) se
+    # guardaba sin aviso: la fila FX quedaba invisible hasta esa fecha y luego
+    # ganaba a las reales; el precio dejaba la posicion con fecha futura.
+    if value is not None and value > local_today():
+        raise ValueError("date cannot be in the future")
+    return value
+
+
 class PortfolioPriceInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
     price: Decimal = Field(gt=0)
     as_of: date | None = None
+
+    _as_of_not_future = field_validator("as_of")(_not_in_the_future)
 
 
 class PortfolioConfigurationInput(BaseModel):
@@ -226,6 +237,8 @@ class FXRateInput(BaseModel):
     rate: Decimal = Field(gt=0)
     rate_date: date
     source: str = Field(default="manual", min_length=1, max_length=80)
+
+    _rate_date_not_future = field_validator("rate_date")(_not_in_the_future)
 
 
 def _transaction_payload(transaction: Transaction, company: Company) -> dict:
