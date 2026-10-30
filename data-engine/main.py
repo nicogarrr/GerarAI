@@ -1,6 +1,7 @@
 """FastAPI bootstrap for the GerarAI data engine."""
 
 import asyncio
+import logging
 import math
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -285,6 +286,33 @@ def _upstream_network_errors() -> list[type[Exception]]:
 
 for _upstream_error in _upstream_network_errors():
     app.add_exception_handler(_upstream_error, upstream_network_error_handler)
+
+
+async def job_queue_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Redis (cola de trabajos) caído al encolar: 503 explícito, no 500 genérico.
+
+    Los endpoints «-async»/«refresh» encolan con Dramatiq; con Redis caído el
+    ``.send()`` lanzaba ``redis.exceptions.ConnectionError`` y la petición
+    acababa en un 500 «Internal server error» sin causa. No se ha encolado
+    nada, así que es un 503 reintentable y queda en el log con ruta y causa.
+    """
+    logging.getLogger("gerarai.job_queue").warning(
+        "job_queue_unavailable path=%s cause=%s", request.url.path, type(exc).__name__
+    )
+    return JSONResponse(
+        status_code=503,
+        content={"detail": "Background job queue unavailable; nothing was queued. Try again shortly."},
+        headers={"Retry-After": "30"},
+    )
+
+
+try:
+    import redis.exceptions as _redis_exceptions
+except ImportError:  # pragma: no cover - redis llega con dramatiq
+    pass
+else:
+    for _queue_error in (_redis_exceptions.ConnectionError, _redis_exceptions.TimeoutError):
+        app.add_exception_handler(_queue_error, job_queue_unavailable_handler)
 
 # /api/health es público (sin firma): lo montamos fuera del research API
 # para que orquestación/monitoreo pueda consultarlo sin identidad.
