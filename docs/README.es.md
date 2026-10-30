@@ -225,7 +225,7 @@ Ver [docs/PRODUCT_VISION.md](PRODUCT_VISION.md) y la propia app en
 
 ## Producción
 
-- **Camino oficial para la 1.0**: frontend en Vercel + backend con
+- **Camino de despliegue**: frontend en Vercel + backend con
   `docker-compose.prod.yml` en Oracle Cloud. Es el único despliegue probado de
   punta a punta (healthchecks, reinicio automático y restore drill en CI).
 - **Oracle Cloud (Always Free)**: `docker-compose.prod.yml` levanta el stack 24/7

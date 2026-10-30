@@ -26,7 +26,7 @@
 
 **Scope:** Interactive Brokers Flex is an import and reconciliation path, not an order-entry interface. Paper trades are not live broker orders. Tax outputs are drafts, not submitted returns. Provider availability, completeness and cost depend on your configuration and service plans.
 
-**Start here:** [Local setup](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Release checklist](docs/RELEASE_1_0.md) · [Security](SECURITY.md)
+**Start here:** [Local setup](#quick-start) · [Architecture](docs/ARCHITECTURE.md) · [Release checklist](docs/RELEASE_READINESS.md) · [Security](SECURITY.md)
 
 ## App preview
 
@@ -364,7 +364,7 @@ Operational notes:
 
 ## Roadmap
 
-- **1.0 release target, not a completion claim**: green CI, a single Alembic head, end-to-end smoke tests and per-deployment environment checklists ([docs/RELEASE_1_0.md](docs/RELEASE_1_0.md)).
+- **Deployment readiness, not a completion claim**: green CI, a single Alembic head, end-to-end smoke tests and per-deployment environment checklists ([docs/RELEASE_READINESS.md](docs/RELEASE_READINESS.md)).
 - Broader non-US coverage (ESEF and IFRS filers).
 - Better retrieval quality for Cerebro on the knowledge library and filings.
 
