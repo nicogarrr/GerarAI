@@ -281,3 +281,20 @@ def test_price_change_between_different_moneys_is_not_a_move(db):
     rule = module.AlertRule(company_id=company.id, target={"kind": "price_change_percent"})
     change, observation = AlertRuleService()._observe(db, rule)
     assert change is None and observation["status"] == "mixed_units"
+
+
+
+def test_price_change_with_legacy_rows_without_unit_still_compares(db):
+    """Dos cierres sin `quote_currency` (filas legacy) de Londres: misma unidad,
+    el cociente vale; #3162 no debe dejar mudas estas alertas."""
+    from app.services import alert_rule_service as module
+
+    company = _london_company(db)
+    for day, close in ((date.today() - timedelta(days=1), "100"), (date.today(), "80")):
+        db.add(MarketPrice(company_id=company.id, date=day, open=Decimal(close), high=Decimal(close),
+                           low=Decimal(close), close=Decimal(close), adj_close=Decimal(close), source="yahoo_finance"))
+    db.commit()
+    rule = module.AlertRule(company_id=company.id, target={"kind": "price_change_percent"})
+    change, observation = AlertRuleService()._observe(db, rule)
+    assert observation["status"] == "fresh"
+    assert change == Decimal("-20")
