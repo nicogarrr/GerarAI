@@ -75,6 +75,9 @@ const DEFINITIONS: Record<string, string> = {
   'Operating current assets less operating current liabilities.': 'Activos corrientes operativos menos pasivos corrientes operativos.',
   'Cash investment in property, plant and equipment.': 'Inversión en efectivo en inmovilizado material.',
   'Net income plus D&A less maintenance capex and normalized working-capital needs.': 'Beneficio neto más depreciación y amortización, menos inversión de mantenimiento y necesidades normalizadas de capital circulante.',
+  // Texto actual de financial_terminal_service.METRIC_DEFINITIONS_TEXT["owner_earnings"].
+  'Buffett owner earnings (Berkshire Hathaway 1986 letter): net income + D&A + change in working capital (cash-flow sign: negative when working capital absorbs cash) - maintenance capex (estimated as min(|capex|, D&A) when not reported).':
+    'Beneficio del propietario de Buffett (carta de Berkshire Hathaway de 1986): beneficio neto + depreciación y amortización + variación del capital circulante (con el signo del flujo de caja: negativa cuando el circulante absorbe caja) − inversión de mantenimiento (estimada como mínimo(|capex|, D&A) si no se publica).',
 };
 
 export function financialDefinition(value: string): string {
