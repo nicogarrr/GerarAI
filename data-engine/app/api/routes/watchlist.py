@@ -180,6 +180,9 @@ async def watchlist_monitor(
             "fair_value_label": reading["label"],
             "fair_value_as_of": reading["as_of"],
             "fair_value_publishable": reading["publishable"],
+            # Por que no hay cifra (p. ej. «faltan revenue, shares_diluted, fcf»);
+            # None cuando hay valor justo.
+            "fair_value_reason": reading.get("reason"),
             "valuation_side": side,
             "currency": company.currency,
             "next_earnings_date": None,

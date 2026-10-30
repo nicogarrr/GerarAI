@@ -16,6 +16,19 @@ misma precedencia (``PRECEDENCE``):
 4. ``motor_orientativo``: el motor tiene número pero no es publicable.
 
 Sin ninguno: ``value=None`` y ``source=None``. Nunca se inventa una cifra.
+
+Dos cortes adicionales del lado del motor (propuesta (b) del informe de valor
+justo, 2026-10-30):
+
+* Si la ULTIMA corrida persistida del motor es ``insufficient_data`` no se
+  sirve el numero de una corrida anterior: la ultima dice que con los datos
+  actuales no hay valor calculable. La lectura sale «Sin valor justo» con la
+  razon (los inputs que faltan, del ``calculation_trace``).
+* Un borrador orientativo (``draft``) caduca como una tesis: pasados
+  ``THESIS_MAX_AGE_DAYS`` dias sin recalcular no se sirve (un RKLB con
+  «VJ -94 % motor orient.» salia de un borrador viejo sin caducidad).
+  La lectura sale «Sin valor justo» con la razon. Las valoraciones
+  ``final`` (publicables) no caducan por esta regla.
 """
 
 from __future__ import annotations
@@ -48,6 +61,20 @@ class Candidate:
     thesis_version: int | None = None
 
 
+@dataclass(frozen=True)
+class EngineBlock:
+    """La ultima corrida del motor no sirvio cifra: motivo declarado.
+
+    ``kind``: "insufficient_data" (la corrida no pudo calcular) o
+    "draft_stale" (borrador orientativo mas viejo que ``max_age_days``).
+    """
+
+    kind: str
+    reason: str
+    missing_inputs: tuple[str, ...] = ()
+    as_of: date | None = None
+
+
 def _as_date(value: object) -> date | None:
     if isinstance(value, datetime):
         return value.date()
@@ -71,14 +98,28 @@ def choose(
     *,
     today: date | None = None,
     max_age_days: int = THESIS_MAX_AGE_DAYS,
+    engine_block: EngineBlock | None = None,
 ) -> dict:
-    """Aplica la precedencia. Función pura: la usan todos los consumidores."""
+    """Aplica la precedencia. Función pura: la usan todos los consumidores.
+
+    Un candidato de motor ORIENTATIVO (``publishable=False``) caduca a los
+    ``max_age_days`` como una tesis; sin fecha no se puede afirmar que sea
+    reciente y tampoco se sirve. ``engine_block`` documenta por que la
+    ultima corrida del motor no sirvio cifra (p. ej. ``insufficient_data``)
+    y su razon acompaña al «Sin valor justo».
+    """
     today = today or date.today()
     thesis_age = (
         (today - thesis.as_of).days if thesis is not None and thesis.as_of is not None else None
     )
     # Sin fecha no se puede afirmar que sea reciente: cuenta como antigua.
     thesis_fresh = thesis is not None and thesis_age is not None and thesis_age <= max_age_days
+    engine_age = (
+        (today - engine.as_of).days if engine is not None and engine.as_of is not None else None
+    )
+    engine_orientative_fresh = (
+        engine is not None and engine_age is not None and engine_age <= max_age_days
+    )
 
     if thesis is not None and thesis_fresh:
         return _reading("tesis", thesis, stale=False, rule="tesis_vigente")
@@ -86,8 +127,26 @@ def choose(
         return _reading("motor", engine, stale=False, rule="motor_publicable")
     if thesis is not None:
         return _reading("tesis", thesis, stale=True, rule="tesis_antigua")
-    if engine is not None:
+    if engine is not None and engine_orientative_fresh:
         return _reading("motor_orientativo", engine, stale=False, rule="motor_orientativo")
+    if engine_block is not None:
+        reason = engine_block.reason
+        missing_inputs = list(engine_block.missing_inputs)
+    elif engine is not None:
+        # Borrador orientativo caducado (o sin fecha): no se sirve el numero.
+        age_text = (
+            f" de hace {engine_age} dias (> {max_age_days})"
+            if engine_age is not None
+            else " sin fecha"
+        )
+        reason = (
+            f"La última valoración del motor es un borrador orientativo{age_text}: "
+            "no se sirve sin recalcular."
+        )
+        missing_inputs = []
+    else:
+        reason = None
+        missing_inputs = []
     return {
         "value": None,
         "source": None,
@@ -97,6 +156,8 @@ def choose(
         "thesis_version": None,
         "stale": False,
         "rule": None,
+        "reason": reason,
+        "missing_inputs": missing_inputs,
     }
 
 
@@ -119,6 +180,8 @@ def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> di
         "thesis_version": candidate.thesis_version,
         "stale": stale,
         "rule": rule,
+        "reason": None,
+        "missing_inputs": [],
     }
 
 
@@ -195,15 +258,48 @@ def _engine_value(payload: object) -> float | None:
     return listed_value(payload, fallback=payload)
 
 
-def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
-    """Última valoración PERSISTIDA del motor por empresa (lectura barata, por lotes).
+def _engine_block(model: ValuationModel) -> EngineBlock:
+    """Por que la ultima corrida ``insufficient_data`` no sirvio cifra.
+
+    Los inputs que faltan y el motivo los escribio el motor en el
+    ``calculation_trace`` al persistir (``insufficient_result``); se leen tal
+    cual, nunca se reconstruyen aqui.
+    """
+    trace = model.calculation_trace if isinstance(model.calculation_trace, dict) else {}
+    missing = tuple(str(item) for item in trace.get("missing_inputs") or [] if item)
+    detail = str(trace.get("reason") or "").strip()
+    if missing:
+        detail = "faltan " + ", ".join(missing)
+    if not detail:
+        detail = "el motor no pudo calcular un valor con los datos disponibles"
+    as_of = _as_date(model.created_at)
+    when = f" del {as_of.isoformat()}" if as_of else ""
+    return EngineBlock(
+        kind="insufficient_data",
+        reason=f"La última valoración del motor{when} no dio cifra: {detail}.",
+        missing_inputs=missing,
+        as_of=as_of,
+    )
+
+
+def persisted_engine_readings(
+    db: Session, company_ids: Iterable[int]
+) -> tuple[dict[int, Candidate], dict[int, EngineBlock]]:
+    """Última corrida PERSISTIDA del motor por empresa (lectura barata, por lotes).
 
     No recalcula: la watchlist pide hasta 60 tickers y el motor completo por
     ticker es caro. Para un solo ticker, ``resolve_fair_value(live=True)``.
+
+    La ultima corrida manda SEA CUAL SEA SU ESTADO: si es
+    ``insufficient_data`` no se resucita el numero de una corrida anterior
+    (un borrador viejo seguia sirviendose como «motor orientativo»); la
+    empresa queda sin candidato y con su :class:`EngineBlock`. La caducidad
+    de los borradores orientativos se aplica en ``choose`` (misma regla para
+    la via por lotes y la individual).
     """
     ids = list(company_ids)
     if not ids:
-        return {}
+        return {}, {}
     ranked = select(
         ValuationModel.id,
         func.row_number().over(
@@ -211,7 +307,7 @@ def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict
         ).label("rank"),
     ).where(
         ValuationModel.company_id.in_(ids),
-        ValuationModel.status.in_(("final", "draft")),
+        ValuationModel.status.in_(("final", "draft", "insufficient_data")),
         *tenant_filters(db, ValuationModel),
     ).subquery()
     models = db.scalars(
@@ -220,11 +316,20 @@ def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict
         .where(ranked.c.rank == 1)
     ).all()
     if not models:
-        return {}
-    by_model = {model.id: model for model in models}
-    outputs = db.scalars(
-        select(ValuationOutput).where(ValuationOutput.valuation_model_id.in_(list(by_model)))
-    ).all()
+        return {}, {}
+    blocks = {
+        int(model.company_id): _engine_block(model)
+        for model in models
+        if model.status == "insufficient_data"
+    }
+    by_model = {model.id: model for model in models if model.status != "insufficient_data"}
+    outputs = (
+        db.scalars(
+            select(ValuationOutput).where(ValuationOutput.valuation_model_id.in_(list(by_model)))
+        ).all()
+        if by_model
+        else []
+    )
     out: dict[int, Candidate] = {}
     for output in outputs:
         model = by_model[output.valuation_model_id]
@@ -239,7 +344,13 @@ def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict
             as_of=_as_date(model.created_at),
             publishable=model.status == "final",
         )
-    return out
+    return out, blocks
+
+
+def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
+    """Solo los candidatos de :func:`persisted_engine_readings` (contrato previo)."""
+    candidates, _blocks = persisted_engine_readings(db, company_ids)
+    return candidates
 
 
 def resolve_fair_values(
@@ -249,10 +360,15 @@ def resolve_fair_values(
     companies = list(companies)
     ids = [int(company.id) for company in companies]
     theses = thesis_candidates(db, ids)
-    engines = persisted_engine_candidates(db, ids)
+    engines, blocks = persisted_engine_readings(db, ids)
     out: dict[int, dict] = {}
     for company in companies:
-        reading = choose(theses.get(int(company.id)), engines.get(int(company.id)), today=today)
+        reading = choose(
+            theses.get(int(company.id)),
+            engines.get(int(company.id)),
+            today=today,
+            engine_block=blocks.get(int(company.id)),
+        )
         reading["ticker"] = str(company.ticker).upper()
         reading["currency"] = company.currency
         out[int(company.id)] = reading
@@ -270,6 +386,7 @@ def resolve_fair_value(
     today = today or date.today()
     thesis = thesis_candidates(db, [int(company.id)]).get(int(company.id))
     engine: Candidate | None = None
+    block: EngineBlock | None = None
     thesis_fresh = (
         thesis is not None
         and thesis.as_of is not None
@@ -290,9 +407,31 @@ def resolve_fair_value(
                     as_of=today,
                     publishable=bool(result.get("publishable")),
                 )
+            elif result.get("status") == "insufficient_data":
+                # El motor respondio: con los datos actuales no hay cifra.
+                # La razon (inputs que faltan) viaja con el «Sin valor justo».
+                trace = result.get("trace") if isinstance(result.get("trace"), dict) else {}
+                missing = tuple(
+                    str(item)
+                    for item in result.get("missing_inputs") or trace.get("missing_inputs") or []
+                    if item
+                )
+                detail = str(trace.get("reason") or "").strip()
+                if missing:
+                    detail = "faltan " + ", ".join(missing)
+                if not detail:
+                    detail = "el motor no pudo calcular un valor con los datos disponibles"
+                block = EngineBlock(
+                    kind="insufficient_data",
+                    reason=f"La última valoración del motor no dio cifra: {detail}.",
+                    missing_inputs=missing,
+                    as_of=today,
+                )
         else:
-            engine = persisted_engine_candidates(db, [int(company.id)]).get(int(company.id))
-    reading = choose(thesis, engine, today=today)
+            engines, blocks = persisted_engine_readings(db, [int(company.id)])
+            engine = engines.get(int(company.id))
+            block = blocks.get(int(company.id))
+    reading = choose(thesis, engine, today=today, engine_block=block)
     reading["ticker"] = str(company.ticker).upper()
     reading["currency"] = company.currency
     return reading
