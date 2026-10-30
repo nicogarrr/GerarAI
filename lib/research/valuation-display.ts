@@ -11,6 +11,7 @@ import { formatPercent } from '@/lib/format';
 const BLOCKER_LABELS: Record<string, string> = {
   traceable_wacc: 'WACC sin cálculo trazable',
   forecast_is_not_the_driver: 'el valor terminal es más del 95 % del valor: la previsión a 5 años no es el motor de esta valoración',
+  inferred_fcf_margin_target: 'margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final',
 };
 
 export function blockerLabel(id: string): string {
