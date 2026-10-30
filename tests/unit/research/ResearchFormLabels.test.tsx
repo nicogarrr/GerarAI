@@ -37,7 +37,8 @@ const cases = [
  ['terminal', async () => <FinancialTerminalSection metrics={undefined} periodicity="annual" terminal={await getFinancialTerminal('DEMO')} years={10} />, {'Métricas':'metrics','Años de historial (1-20)':'years','Periodicidad':'periodicity'}],
  ['management', async () => <ManagementCredibilitySection dashboard={await getManagementCredibility('DEMO')} ticker="DEMO" />, {'Promesa de la directiva':'promise','Fecha de la promesa':'promise_date','Periodo esperado':'expected_period','Métrica canónica (opcional)':'metric','Comparación con el objetivo':'operator','Valor objetivo (opcional)':'target_value','Unidad (opcional)':'unit','ID del documento fuente (opcional)':'source_document_id','Explicación de la directiva o contexto del analista':'explanation'}],
  ['drivers', async () => <DriverAssumptionsSection assumptions={await getDriverAssumptions('DEMO')} ticker="DEMO" />, {'Clave del driver':'driver_key','Año fiscal':'fiscal_year','Escenario':'scenario','Valor':'value','Confianza (0-1)':'confidence','Fuente o ajuste del analista':'source','Justificación':'rationale'}],
- ['knowledge', () => Knowledge({searchParams}), {'Nombre de la colección':'name','Tipo de colección':'collection_type','Descripción (opcional)':'description'}],
+ // «Nueva colección» vive en la pestaña Subir desde #3080.
+ ['knowledge', () => Knowledge({searchParams: Promise.resolve({tab: 'subir'})}), {'Nombre de la colección':'name','Tipo de colección':'collection_type','Descripción (opcional)':'description'}],
  ['graph', () => Graph({searchParams}), {'Tipos de nodo':'node_types'}],
  ['news', () => News({searchParams}), {'Noticias del lote (JSON)':'items'}],
 ] as const;
