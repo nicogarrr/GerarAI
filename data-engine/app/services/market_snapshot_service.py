@@ -118,7 +118,10 @@ def latest_snapshot(db: Session) -> dict:
         else "obsoleto"
         if age > 4
         else "disponible",
-        "coverage": "stale" if age > 4 else snapshot.coverage,
+        # «stale» solo sustituye a una cobertura real: un snapshot que nunca
+        # tuvo datos (coverage="unavailable") sigue declarando "unavailable"
+        # por viejo que sea; "stale" afirmaria que hubo datos que envejecieron.
+        "coverage": "stale" if age > 4 and snapshot.coverage != "unavailable" else snapshot.coverage,
         "date": snapshot.snapshot_date.isoformat(),
         "generated_at": snapshot.generated_at.isoformat(),
         "model_version": snapshot.model_version,
