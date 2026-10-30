@@ -91,7 +91,7 @@ const linkCartera = (
 );
 const FIELD_LABELS: Record<string, string> = {
     kind: 'Tipo', label: 'Objetivo', target_pct: 'Peso objetivo', band_pct: 'Banda de tolerancia',
-    direction: 'Acción', detail: 'Detalle', within_band: 'Dentro de la banda', current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
+    direction: 'Operación', detail: 'Detalle', within_band: 'Dentro de la banda', current_pct: 'Peso actual', deviation_pct: 'Desviación', action: 'Acción', amount_base: 'Importe',
     // Claves de missing_fx (drift y contributions_missing_fx): antes caían al
     // fallback y el usuario leía «quote currency», «as of» y «position» en crudo.
     quote_currency: 'Divisa de cotización', base_currency: 'Divisa base', as_of: 'Fecha', ticker: 'Ticker',
@@ -109,6 +109,11 @@ function planValue(value: unknown, currency?: string, weights = false): string {
         const heading = typeof record.kind === 'string' && typeof record.label === 'string'
             ? `${PLAN_KIND[record.kind] ?? record.kind}: ${record.label === 'Cash' ? 'Caja' : etiquetaSector(record.label)}` : null;
         const lines = Object.entries(value).filter(([key]) => !heading || (key !== 'kind' && key !== 'label')).map(([key, item]) => {
+        // El detalle llega del backend con la etiqueta cruda («Technology está…»):
+        // se sustituye por la misma etiqueta traducida que la cabecera.
+        if (key === 'detail' && heading && typeof item === 'string' && typeof record.label === 'string' && item.startsWith(record.label)) {
+            item = (record.label === 'Cash' ? 'Caja' : etiquetaSector(record.label)) + item.slice(record.label.length);
+        }
         const text = (weights || key.endsWith('_pct') || key.startsWith('ticker:') || key.startsWith('asset_class:')) ? formatPercent(item as number, { fromRatio: false, digits: 2 })
             : key === 'amount_base' ? (currency ? formatMoney(item as number, currency) : NA)
             : key === 'kind' ? PLAN_KIND[String(item)] ?? DRIFT_KIND[String(item)] ?? String(item)
@@ -158,7 +163,9 @@ const planExpectedPeriods = (value: unknown, record: DataRecord) => {
     if (record.currency_contract_enabled === true && record.monthly_currency_recorded !== true) {
         return 'No calculables: divisa no registrada';
     }
-    if (!Array.isArray(value)) return NA;
+    // Plan legacy: el backend no desglosa cuotas (lista vacía); «0 convertidas,
+    // 0 pendientes» contradecía las «Aportaciones previstas» de arriba.
+    if (!Array.isArray(value) || value.length === 0) return NA;
     const count = (status: string) => value.filter((p) => p && typeof p === 'object' && (p as Record<string, unknown>).status === status).length;
     const parts = [`${count('converted')} convertidas`, `${count('pending_due_date')} pendientes de vencimiento`];
     const missing = count('missing_rate');
@@ -176,7 +183,19 @@ const planExpectedMissingFx = (value: unknown) => {
         ? ` (vencidas del ${formatMarketDate(first.due_date)} al ${formatMarketDate(last.due_date)})` : '';
     return `${rows.length} ${rows.length === 1 ? 'cuota' : 'cuotas'} sin tipo de cambio${pair} en o antes del vencimiento${range}`;
 };
-const PLAN_FORMAT = {start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, expected_missing_fx: planExpectedMissingFx, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
+/** Aportaciones registradas que no se pueden convertir a la divisa base: resumen legible,
+ *  no «contribution id: 4 · quote currency: USD · as of: …». */
+const planContributionsMissingFx = (value: unknown) => {
+    if (!Array.isArray(value) || value.length === 0) return '—';
+    const rows = value.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object');
+    const pairs = [...new Set(rows
+        .filter((r) => typeof r.quote_currency === 'string' && typeof r.base_currency === 'string')
+        .map((r) => `${String(r.quote_currency).toUpperCase()}→${String(r.base_currency).toUpperCase()}`))];
+    const dates = rows.map((r) => (typeof r.as_of === 'string' ? formatMarketDate(r.as_of) : null)).filter(Boolean);
+    const shown = dates.length > 3 ? [...dates.slice(0, 3), `y ${dates.length - 3} más`] : dates;
+    return `${rows.length} ${rows.length === 1 ? 'aportación' : 'aportaciones'} sin tipo de cambio${pairs.length ? ` ${pairs.join(', ')}` : ''}${shown.length ? ` (${shown.join(', ')})` : ''}`;
+};
+const PLAN_FORMAT = {contributions_missing_fx: planContributionsMissingFx, start_date: (value: unknown) => formatMarketDate(value as string), monthly_contribution: planMonthly, next_contribution: planNext, expected_periods: planExpectedPeriods, expected_missing_fx: planExpectedMissingFx, ...Object.fromEntries(['expected_contributions_base', 'expected_contributions_converted_base', 'actual_contributions_base', 'actual_contributions_converted_base', 'gap_base', 'portfolio_value_base', 'cash_base'].map(key => [key, planMoney]))};
 const DETAIL_FORMAT = Object.fromEntries(['target_allocations', 'current_weights', 'deviations', 'suggestions', 'missing_fx', 'status'].map(key => [key, (value: unknown, record: DataRecord) => planValue(value, typeof record.base_currency === 'string' ? record.base_currency : undefined, key === 'current_weights')]));
 
 /** Extrae tickers del drift (current_weights "ticker:XXX", deviations kind ticker) y del plan (targets kind ticker) */
@@ -314,6 +333,8 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                 columns={['date', 'amount', 'currency', 'note']}
                 columnLabels={CONTRIBUTION_LABELS}
                 formatColumns={{
+                    date: (value) => formatMarketDate(value as string),
+                    currency: (value) => (typeof value === 'string' && value ? value.toUpperCase() : NA),
                     amount: (value, record) =>
                         formatMoney(value as number | string | null, typeof record.currency === 'string' ? record.currency : 'EUR'),
                 }}
