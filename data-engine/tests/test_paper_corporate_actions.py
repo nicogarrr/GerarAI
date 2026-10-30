@@ -191,3 +191,21 @@ def test_closed_net_includes_dividends(db):
     assert out["dividends_total"] == Decimal("1.0")
     assert out["dividends_count"] == 1
     assert out["dividends_source"] is not None
+
+
+
+def test_london_trade_in_pence_accrues_gbx_dividends(db):
+    """Yahoo cotiza Londres en GBp y la ingesta guarda el dividendo en GBX.
+
+    Es la misma moneda y la misma unidad (peniques): antes se contaba como
+    «divisa distinta» y el devengo quedaba en 0.
+    """
+    co = company(db, "VOD.L")
+    row = trade(ticker="VOD.L", proposal_key="run-1-VOD")
+    db.add(row)
+    apply_quote(row, quote(100, currency="GBp"), NOW, costs=COSTS)
+    dividend(db, co, NOW.date() + timedelta(days=1), "4.5", currency="GBX")
+    accrual = accrued_dividends(db, row, until=NOW.date() + timedelta(days=2))
+    assert accrual.wrong_currency == 0
+    assert accrual.count == 1
+    assert accrual.total == Decimal("9.0")  # 4,5 p x 2 acciones, en peniques

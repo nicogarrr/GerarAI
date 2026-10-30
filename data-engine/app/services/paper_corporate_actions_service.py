@@ -24,7 +24,11 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, CorporateAction, DividendRecord
 from app.models.paper_trading import PaperTrade
-from app.services.dividend_records import resolve_yahoo_events
+from app.services.dividend_records import (
+    amount_in_currency,
+    records_in_position_currency,
+    resolve_yahoo_events,
+)
 
 SPLIT_TYPES = ("split", "reverse_split")
 PENDING_SPLIT_WARNING = "split_pendiente_sin_ajustar"
@@ -66,13 +70,14 @@ def accrued_dividends(db: Session, row: PaperTrade, *, until: date) -> DividendA
     ).all()
     kept, uncertain = resolve_yahoo_events(records)
     sign = Decimal(1) if row.direction == "long" else Decimal(-1)
-    total, count, wrong_currency = Decimal(0), 0, 0
-    for record in kept:
-        if record.currency != row.currency:
-            wrong_currency += 1
-            continue
-        total += record.amount * row.quantity * sign
-        count += 1
+    # GBX (dividendo en peniques) y GBp (cotizacion Yahoo de Londres) son la
+    # misma moneda en la misma unidad: se convierten sin FX, no son «otra divisa».
+    wrong_currency = sum(
+        1 for record in kept if amount_in_currency(record.amount, record.currency, row.currency) is None
+    )
+    usable = records_in_position_currency(kept, row.currency)
+    total = sum((record.amount * row.quantity * sign for record in usable), Decimal(0))
+    count = len(usable)
     return DividendAccrual(total, count, len(uncertain), wrong_currency)
 
 

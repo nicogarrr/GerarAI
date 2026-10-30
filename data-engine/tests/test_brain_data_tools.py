@@ -530,3 +530,18 @@ def test_fecha_es_tolerates_non_iso_text():
     assert fecha_es(date(2026, 10, 18)) == "18 oct 2026"
     assert fecha_es("2026-10-18") == "18 oct 2026"
     assert fecha_es("finales de octubre") == "finales de octubre"
+
+
+
+def test_portfolio_dividends_london_position_uses_gbx_records(db):
+    """Dividendo Yahoo en GBX (peniques) y posicion en GBP: 0,10 GBP por accion."""
+    from app.models import DividendRecord
+
+    vod = company(db, "VOD.L")
+    today = date.today()
+    db.add(Position(tenant_id=1, company_id=vod.id, quantity=Decimal("100"), average_cost=Decimal("0.7"), currency="GBP", as_of=today, market_value=Decimal("70")))
+    db.add(DividendRecord(tenant_id=1, company_id=vod.id, ex_date=date(today.year, 1, 15), amount=Decimal("10"), currency="GBX", source="yahoo_finance"))
+    db.commit()
+    response = asyncio.run(ChatService().answer(db, "¿Qué dividendos cobrará mi cartera este año?", "portfolio", None))
+    assert "VOD.L: 1 pago(s)" in response.answer
+    assert "Sin dividendos guardados: VOD.L" not in response.answer
