@@ -5,7 +5,7 @@ import { test } from 'node:test';
 const source = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
 
 test('watchlist quotes only its bounded visible page', () => {
-    assert.match(source, /const PAGE_SIZE = 20/);
+    assert.match(source, /const PAGE_SIZE = 12/);
     assert.match(source, /orderedItems\.slice\(\(page - 1\) \* PAGE_SIZE, page \* PAGE_SIZE\)/);
     assert.match(source, /pageItems\.map\(async \(item(?:, index)?\)/);
     assert.doesNotMatch(source, /watchlistItems\.map\(async/);
