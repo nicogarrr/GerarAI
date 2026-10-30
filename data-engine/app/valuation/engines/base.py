@@ -363,6 +363,73 @@ def margin_of_safety_reference(valuation: dict[str, Any]) -> tuple[str, float] |
     return None
 
 
+_SCENARIO_LABEL_ES = {"bear": "bajista", "base": "base", "bull": "alcista"}
+
+
+def num_es(value: float, digits: int = 2) -> str:
+    """Cifra en formato español (coma decimal), sin notación científica."""
+    return f"{value:.{digits}f}".replace(".", ",")
+
+
+def scenario_value_or_nd(
+    name: str, value: float | None, *, cause: str | None = None
+) -> tuple[float | None, str | None]:
+    """(valor a publicar, nota) con la convención d2656966: un valor por acción
+    <= 0 no es una valoración publicable (igual que un P/E negativo no es un
+    múltiplo): el escenario sale N/D con explicación, nunca cifra negativa.
+
+    El bruto debe seguir ponderando el esperado: excluirlo lo inflaría y
+    rompería el orden bear <= base."""
+    if value is not None and value > 0:
+        return value, None
+    label = _SCENARIO_LABEL_ES.get(name, name)
+    if value is None:
+        return None, f"Escenario {label}: el modelo no produjo un valor por acción calculable: N/D."
+    detail = f" {cause}" if cause else " Con los supuestos de este escenario"
+    return None, (
+        f"Escenario {label}:{detail} el valor por acción sale {num_es(value)}. "
+        "Una cifra negativa no es una valoración publicable: N/D. "
+        "El valor esperado sí la tiene en cuenta."
+    )
+
+
+def expected_value_or_nd(expected_raw: float) -> tuple[float | None, str | None]:
+    """Mismo criterio para el esperado ponderado: <= 0 es N/D explicado."""
+    if expected_raw > 0:
+        return expected_raw, None
+    return None, (
+        "El valor esperado (ponderado por probabilidad) sale "
+        f"{num_es(expected_raw)} con estos supuestos: N/D, no se publica una cifra negativa."
+    )
+
+
+def normalize_scenario_display(
+    scenario_values: dict[str, float | None],
+    *,
+    causes: dict[str, str] | None = None,
+    scenario_traces: dict | None = None,
+) -> tuple[dict[str, float | None], dict[str, str]]:
+    """(valores a publicar, notas N/D) para bear/base/bull.
+
+    ``scenario_values`` conserva los brutos (el esperado se pondera con ellos).
+    Si se pasan ``scenario_traces`` (dicts por escenario con ``value_per_share``),
+    el bruto se mueve a ``value_per_share_raw`` y la nota a ``value_note``."""
+    display: dict[str, float | None] = {}
+    notes: dict[str, str] = {}
+    for name, raw in scenario_values.items():
+        display[name], note = scenario_value_or_nd(
+            name, raw, cause=(causes or {}).get(name)
+        )
+        if note is None:
+            continue
+        notes[name] = note
+        if scenario_traces is not None and name in scenario_traces:
+            scenario_traces[name]["value_per_share_raw"] = raw
+            scenario_traces[name]["value_per_share"] = None
+            scenario_traces[name]["value_note"] = note
+    return display, notes
+
+
 def apply_publication_blockers(result: dict[str, Any]) -> dict[str, Any]:
     """A valuation with publication blockers is not a publishable valuation.
 
