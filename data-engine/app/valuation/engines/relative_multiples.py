@@ -31,10 +31,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy import select
 
 from app.models import Company, FinancialFact, MarketPrice
+from app.services.price_units import close_in_company_currency
 from app.valuation.engines.base import (
     MODEL_VERSION,
     ValuationContext,
@@ -192,16 +194,27 @@ def _insufficient(
     return result
 
 
-def _latest_price(db, company_id: int) -> tuple[float | None, str | None]:
+def _latest_price(db, company: Company) -> tuple[float | None, str | None]:
+    """Ultimo cierre del par en la divisa de SUS cuentas (la de sus hechos).
+
+    Un par de Londres cotiza en GBp y reporta en GBP (o USD): el cierre crudo
+    en peniques contra un EPS en libras daba un PER x100 que entraba en la
+    mediana del grupo. Misma conversion que el screener; sin FX, sin precio.
+    """
     row = db.scalar(
         select(MarketPrice)
-        .where(MarketPrice.company_id == company_id)
+        .where(MarketPrice.company_id == company.id)
         .order_by(MarketPrice.date.desc())
         .limit(1)
     )
     if row is None or row.close is None:
         return None, None
-    price = float(row.close)
+    converted = close_in_company_currency(
+        db, Decimal(str(row.close)), quote_currency=row.quote_currency, company=company, on=row.date
+    )
+    if converted is None:
+        return None, None
+    price = float(converted)
     if price <= 0:
         return None, None
     return price, row.date.isoformat()
@@ -580,7 +593,7 @@ class RelativeMultiplesEngine(ValuationEngine):
         """Price + fundamentals + provider multiples for every peer, 3 queries."""
         tickers = [peer.ticker for peer in peers]
         prices: dict[int, tuple[float | None, str | None]] = {
-            peer.id: _latest_price(context.db, peer.id) for peer in peers
+            peer.id: _latest_price(context.db, peer) for peer in peers
         }
         fundamentals: dict[int, dict[str, float]] = {
             peer.id: _fundamentals(context.db, peer.id) for peer in peers
