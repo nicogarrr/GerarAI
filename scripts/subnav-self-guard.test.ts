@@ -35,5 +35,9 @@ test('la subnav anuncia el overflow horizontal con la pista del patron y conserv
 test('la pista del componente es parametrizable sin romper el texto de tablas', () => {
     const region = readFileSync('components/ui/overflow-scroll-region.tsx', 'utf8');
     assert.match(region, /hint\?: string/, 'prop hint opcional');
-    assert.match(region, /hint = 'Desliza para ver más columnas'/, 'default intacto para tablas');
+    assert.ok(region.includes("hint ?? t('ui.scrollRegion.hintColumns')"), 'default traducido intacto para tablas');
+    assert.match(region, /\{resolvedHint\}/);
+    for (const [locale, expected] of [['es', 'Desliza para ver más columnas'], ['en', 'Scroll to see more columns']]) {
+        assert.equal(JSON.parse(readFileSync(`lib/i18n/messages/${locale}/ui.json`, 'utf8')).scrollRegion.hintColumns, expected);
+    }
 });

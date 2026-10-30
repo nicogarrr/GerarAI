@@ -1,7 +1,7 @@
 /**
  * Quick win UX 2: los muros de metodología (/propicks, /risk, backtesting)
  * quedan colapsados en un desplegable nativo, cerrado por defecto en todos
- * los viewports y sin JS de cliente.
+ * los viewports; el cliente solo resuelve el texto traducido.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -12,8 +12,12 @@ const propicks = readFileSync('app/(root)/propicks/page.tsx', 'utf8');
 const risk = readFileSync('app/(root)/risk/page.tsx', 'utf8');
 const walkforward = readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8');
 
-test('el desplegable es nativo, sin JS y cerrado por defecto', () => {
-    assert.ok(!disclosure.includes("'use client'"), 'el desplegable no necesita JS de cliente');
+test('el desplegable es nativo, sin estado de apertura JS y cerrado por defecto', () => {
+    assert.doesNotMatch(disclosure, /useState|useReducer|onClick|onToggle|onKeyDown/, 'la apertura es nativa, no controlada por JS');
+    assert.ok(disclosure.includes("title ?? t('ui.methodologyDisclosure')"));
+    for (const [locale, expected] of [['es', 'Metodología y límites'], ['en', 'Methodology and limits']]) {
+        assert.equal(JSON.parse(readFileSync(`lib/i18n/messages/${locale}/ui.json`, 'utf8')).methodologyDisclosure, expected);
+    }
     assert.match(disclosure, /<details className="group /);
     assert.match(disclosure, /<summary /);
     assert.ok(!/<details[^>]*\bopen\b/.test(disclosure), 'no debe abrirse por defecto en ningún viewport');

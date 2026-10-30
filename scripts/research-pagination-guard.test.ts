@@ -61,7 +61,10 @@ test('el componente paginador es cliente, accesible y conserva el estado', () =>
   const component = readFileSync(PAGINATION, 'utf8');
   assert.match(component, /'use client'/);
   assert.match(component, /useState\(1\)/);
-  assert.match(component, /aria-label=\{`Paginación: \$\{label\}`\}/);
+  assert.ok(component.includes("aria-label={t('ui.pagination.aria', { label })}"));
+  for (const [locale, expected] of [['es', 'Paginación: {label}'], ['en', 'Pagination: {label}']]) {
+    assert.equal(JSON.parse(readFileSync(`lib/i18n/messages/${locale}/ui.json`, 'utf8')).pagination.aria, expected);
+  }
   assert.match(component, /aria-current="page"/);
   assert.match(component, /pageLabel\(current, pages\)/);
   assert.match(component, /onPageChange\(current - 1\)/);

@@ -18,8 +18,13 @@ describe('ajustes', () => {
   it('la pagina ofrece datos fiscales, modelo de IA y Telegram', () => {
     assert.match(route, /requireAuthenticatedUser/);
     assert.match(route, /SettingsContent/);
-    assert.match(page, /Datos fiscales del declarante/);
-    assert.match(page, /title="Modelo de IA"/);
+    assert.ok(page.includes("title={t('settings.tax.title')}"));
+    assert.ok(page.includes("title={t('settings.llm.title')}"));
+    for (const [locale, tax, llm] of [['es', 'Datos fiscales del declarante', 'Modelo de IA'], ['en', 'Declarant tax details', 'AI model']]) {
+      const messages = JSON.parse(read(`lib/i18n/messages/${locale}/settings.json`));
+      assert.equal(messages.tax.title, tax);
+      assert.equal(messages.llm.title, llm);
+    }
     assert.match(page, /id="llm"/);
     assert.match(page, /LlmSettingsForm/);
     assert.match(page, /href="\/alerts"/);
