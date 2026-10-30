@@ -163,3 +163,42 @@ def test_negative_earnings_or_fcf_multiples_are_nd_and_stay_out_of_statistics(db
     assert result["statistics"]["pe"]["median"] == pytest.approx(Decimal("15"))
     assert result["statistics"]["ev_to_fcf"]["median"] == pytest.approx(Decimal("15"))
     assert 2023 in result["coverage"]["missing_by_metric"]["pe"]
+
+
+def _adr_seed(db, tags):
+    company = _company(db)
+    company.factor_tags = tags
+    db.add(MarketPrice(
+        company_id=company.id, date=date(2024, 12, 31),
+        open=Decimal("200"), high=Decimal("200"), low=Decimal("200"),
+        close=Decimal("200"), adj_close=Decimal("200"), source="Finnhub",
+    ))
+    db.commit()
+    for metric, value in (("eps", "10"), ("shares_diluted", "100"), ("free_cash_flow", "1000"),
+                          ("revenue", "4000"), ("total_debt", "300"), ("cash_and_equivalents", "100")):
+        _fact(db, company, metric=metric, fiscal_year=2024, value=value)
+    return company
+
+
+def test_adr_multiples_use_price_per_ordinary_share(db):
+    """ADR 2:1 (adr:2); hechos por ordinaria. Precio por ordinaria 200 / 2 = 100.
+
+    PER = 100 / 10 = 10 (en main 20); cap = 100 x 100 = 10.000;
+    EV = 10.000 + 300 − 100 = 10.200 -> EV/FCF 10,2 y EV/ventas 2,55.
+    El precio mostrado sigue siendo el del ADR (200).
+    """
+    company = _adr_seed(db, ["adr:2"])
+    result = HistoricalValuationService().build(db, company, as_of=date(2026, 9, 23))
+    point = next(p for p in result["series"] if p["year"] == 2024)
+    assert point["price"] == pytest.approx(Decimal("200"))
+    assert point["pe"] == pytest.approx(Decimal("10"))
+    assert point["ev_to_fcf"] == pytest.approx(Decimal("10.2"))
+    assert point["ev_to_revenue"] == pytest.approx(Decimal("2.55"))
+    assert result["adr_ratio"] == 2
+
+
+def test_adr_tag_without_ratio_has_no_multiples(db):
+    company = _adr_seed(db, ["adr"])
+    result = HistoricalValuationService().build(db, company, as_of=date(2026, 9, 23))
+    point = next(p for p in result["series"] if p["year"] == 2024)
+    assert point["pe"] is None and point["ev_to_fcf"] is None and point["ev_to_revenue"] is None
