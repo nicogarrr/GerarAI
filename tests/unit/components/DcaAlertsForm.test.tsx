@@ -12,7 +12,7 @@ describe('global DCA directional settings', () => {
         expect(screen.getByLabelText('Al subir, avisar desde')).toHaveValue('3');
         expect(screen.getByLabelText('Al bajar, avisar hasta')).toHaveValue('1');
         expect(screen.getByText(/No cambia el veredicto ni realiza órdenes/)).toBeInTheDocument();
-        expect(screen.getByText(/se conservan, pero no se aplican/)).toBeInTheDocument();
+        expect(screen.getByText(/Tienes 2 ajustes antiguos por empresa: se conservan, pero ya no se aplican/)).toBeInTheDocument();
     });
     it('saves independent thresholds, reports success only after persistence', async () => {
         save.mockResolvedValue({ ...initial, configured: true, up_min_level: 4, down_max_level: 0 });
@@ -32,5 +32,12 @@ describe('global DCA directional settings', () => {
         expect(await screen.findByRole('alert')).toBeInTheDocument();
         expect(screen.getByText(/Valores activos: subida desde 3X/)).toBeInTheDocument();
         expect(screen.getByRole('status')).toHaveTextContent('desactivados en el servidor');
+    });
+    it('without legacy overrides it does not talk about «(0)» of them', async () => {
+        save.mockResolvedValue({ ...initial, legacy_override_count: 0, configured: true });
+        render(<DcaAlertsForm initial={{ ...initial, legacy_override_count: 0 }} />);
+        expect(screen.queryByText(/ajustes? antiguos? por empresa/)).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Guardar avisos DCA' }));
+        expect(await screen.findByRole('status')).toHaveTextContent(/^Avisos DCA guardados para todas tus empresas\.$/);
     });
 });
