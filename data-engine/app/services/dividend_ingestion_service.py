@@ -11,6 +11,7 @@ The provider-to-record skeleton is inherited from ``ProviderIngestionService``.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -19,7 +20,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models import Company, DividendRecord, Position, WatchItem
+from app.models import Company, CorporateAction, DividendRecord, Position, WatchItem
+from app.services.company_resolver import resolve_company
 from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
@@ -32,6 +34,10 @@ class DividendIngestionService(ProviderIngestionService):
         "declared per-share figure); reconcile against issuer/regulator "
         "notices for material decisions."
     )
+
+    def __init__(self, fmp: Any = None, yahoo: Any = None) -> None:
+        super().__init__(fmp=fmp, yahoo=yahoo)
+        self._last_provider_rows: tuple[int, list[dict[str, Any]]] | None = None
 
     @staticmethod
     def _parse_amount(payload: dict) -> Decimal | None:
@@ -63,6 +69,17 @@ class DividendIngestionService(ProviderIngestionService):
         return None
 
     async def _fetch_rows(
+        self, company: Company
+    ) -> tuple[list[dict[str, Any]], str]:
+        """Cachea la ultima descarga Yahoo del run: la usa la curacion de splits."""
+        rows, source = await self._fetch_provider_rows(company)
+        if source == "yahoo_finance":
+            self._last_provider_rows = (company.id, rows)
+        else:
+            self._last_provider_rows = None
+        return rows, source
+
+    async def _fetch_provider_rows(
         self, company: Company
     ) -> tuple[list[dict[str, Any]], str]:
         """Normalized (ex_date, amount, pay_date, currency) rows + source label.
@@ -118,6 +135,13 @@ class DividendIngestionService(ProviderIngestionService):
         """Como la base, pero «sin divisa, no ingerido» es DESCONOCIDO: no un
         exito fresco con 0 filas."""
         result = await super().sync_company(db, ticker=ticker)
+        if result.get("status") == "ok":
+            company = resolve_company(db, ticker)
+            if company is not None:
+                healed = self._heal_split_readjustments(db, company)
+                if healed:
+                    db.commit()
+                    result["split_readjustments_healed"] = healed
         unknown = (result.get("skipped") or {}).get("unknown_currency", 0)
         if result.get("status") == "ok" and unknown:
             result["currency_unknown_rows"] = unknown
@@ -128,6 +152,81 @@ class DividendIngestionService(ProviderIngestionService):
                     "no se ingirio nada y el estado no esta actualizado"
                 )
         return result
+
+    _SPLIT_HEAL_TOLERANCE = Decimal("0.005")
+
+    @staticmethod
+    def _split_factor_since(db: Session, company_id: int, ex_date: date, until: date) -> Decimal:
+        """Producto de los ratios de split ingeridos entre ex_date (excluido) y until."""
+        stmt = select(CorporateAction.ratio).where(
+            CorporateAction.company_id == company_id,
+            CorporateAction.action_type.in_(["split", "reverse_split"]),
+            CorporateAction.effective_date > ex_date,
+            CorporateAction.effective_date <= until,
+        )
+        factor = Decimal("1")
+        for ratio in db.scalars(stmt):
+            factor *= Decimal(ratio)
+        return factor
+
+    def _heal_split_readjustments(self, db: Session, company: Company) -> int:
+        """Borra filas Yahoo viejas sin reajustar cuando un split ingerido las explica.
+
+        Doble evidencia exigida (nunca ratio a solas): el proveedor sirve HOY el
+        importe reajustado para ese ex_date Y un split ingerido entre el ex_date y
+        hoy explica la relacion vieja/nueva dentro de la tolerancia. Solo se tocan
+        grupos donde TODA fila que no coincide con el proveedor encaja con el
+        factor; si hay cualquier otra discrepancia el grupo queda intacto y
+        `resolve_yahoo_events` lo sigue marcando incierto.
+        """
+        cached = self._last_provider_rows
+        if not cached or cached[0] != company.id:
+            return 0
+        provider_amounts: dict[tuple[date, str | None], set[Decimal]] = defaultdict(set)
+        for row in cached[1]:
+            if row["ex_date"] is not None and row["amount"] is not None:
+                provider_amounts[(row["ex_date"], row["currency"])].add(Decimal(row["amount"]))
+        records = db.scalars(
+            select(DividendRecord).where(
+                DividendRecord.company_id == company.id,
+                DividendRecord.source == "yahoo_finance",
+            )
+        ).all()
+        groups: dict[tuple[date, str], list[Any]] = defaultdict(list)
+        for rec in records:
+            groups[(rec.ex_date, rec.currency)].append(rec)
+        healed = 0
+        today = date.today()
+        for (ex_date, currency), recs in groups.items():
+            amounts = {Decimal(rec.amount) for rec in recs}
+            if len(amounts) < 2:
+                continue
+            currents = provider_amounts.get((ex_date, currency))
+            if not currents:
+                continue
+            factor = self._split_factor_since(db, company.id, ex_date, today)
+            if factor <= 1:
+                continue
+            stale = [
+                rec
+                for rec in recs
+                if Decimal(rec.amount) not in currents
+                and any(
+                    current > 0
+                    and abs(Decimal(rec.amount) / current - factor) <= factor * self._SPLIT_HEAL_TOLERANCE
+                    for current in currents
+                )
+            ]
+            unexplained = [
+                rec
+                for rec in recs
+                if Decimal(rec.amount) not in currents and rec not in stale
+            ]
+            if stale and not unexplained:
+                for rec in stale:
+                    db.delete(rec)
+                healed += len(stale)
+        return healed
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:

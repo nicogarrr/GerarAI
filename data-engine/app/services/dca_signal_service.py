@@ -564,9 +564,11 @@ def evaluate_watchlist(
             summary["skipped"].append({"symbol": symbol, "reason": reason, "daily_bars": len(bars)})
             continue
         last_row = max(rows, key=lambda r: r.day)
-        currency = history.currency if source == "yahoo" and history.currency else (
-            item.company.currency if item.company is not None else None
-        )
+        # La unidad real de las filas USADAS, no la divisa general de la ficha:
+        # el respaldo de market_prices normaliza a la unidad declarada (p. ej.
+        # peniques GBp); etiquetarlas con company.currency (GBP) mostraba el
+        # cierre en peniques como libras (x100) en el estado, la UI y el correo.
+        currency = history.currency or (item.company.currency if item.company is not None else None)
         level_prices = {key: _scaled(value, factor) for key, value in verdict.level_prices.items()}
         state = states.get(symbol)
         previous_level = state.level if state is not None else None

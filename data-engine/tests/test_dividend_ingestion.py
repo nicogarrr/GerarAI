@@ -355,3 +355,115 @@ def test_portfolio_sync_coverage_is_partial_with_unknown_currency(db, monkeypatc
     out = asyncio.run(service.sync_portfolio(db))
     assert out["currency_unknown"] == 1 and out["unavailable"] == 1
     assert out["provenance"]["coverage"] != "ok"
+
+
+# --- Curacion de filas Yahoo sin reajustar tras un split (caso real: BN 3:2 2025-10-10) ---
+
+from datetime import UTC, datetime  # noqa: E402
+
+from app.models.entities import CorporateAction  # noqa: E402
+
+_SPLIT_EX_DATE = date(2025, 9, 12)
+
+
+def _epoch(day: date) -> int:
+    return int(datetime(day.year, day.month, day.day, tzinfo=UTC).timestamp())
+
+
+def _stale_row(db: Session, company: Company, amount: str) -> None:
+    db.add(
+        DividendRecord(
+            company_id=company.id,
+            ex_date=_SPLIT_EX_DATE,
+            amount=Decimal(amount),
+            currency="USD",
+            source="yahoo_finance",
+        )
+    )
+    db.commit()
+
+
+def _split(db: Session, company: Company, ratio: str = "1.5") -> None:
+    db.add(
+        CorporateAction(
+            company_id=company.id,
+            action_type="split",
+            effective_date=date(2025, 10, 10),
+            ratio=Decimal(ratio),
+            source="yahoo_finance",
+        )
+    )
+    db.commit()
+
+
+def test_split_readjusted_stale_yahoo_row_is_healed(db):
+    """BN pago 0.09 pre-split; tras el 3:2 Yahoo sirve 0.06 para el mismo
+    ex_date. Con el split ingerido y el proveedor confirmando 0.06 hoy, la
+    copia vieja sin reajustar se borra y el grupo deja de ser ambiguo."""
+    company = _company(db, "BN")
+    _split(db, company)
+    _stale_row(db, company, "0.09")
+    service = DividendIngestionService(
+        fmp=FakeFMP(),
+        yahoo=FakeYahoo(payload=[{"date": _epoch(_SPLIT_EX_DATE), "amount": 0.06}]),
+    )
+    result = asyncio.run(service.sync_company(db, ticker="BN"))
+    assert result["status"] == "ok"
+    assert result.get("split_readjustments_healed") == 1
+    rows = db.scalars(select(DividendRecord)).all()
+    assert len(rows) == 1
+    assert Decimal(rows[0].amount) == Decimal("0.06")
+
+
+def test_split_ratio_alone_is_not_evidence(db):
+    """Sin split ingerido la relacion 0.09/0.06 = 1.5 no basta: ambas filas
+    conviven y resolve_yahoo_events sigue marcando el grupo incierto."""
+    company = _company(db, "BN")
+    _stale_row(db, company, "0.09")
+    service = DividendIngestionService(
+        fmp=FakeFMP(),
+        yahoo=FakeYahoo(payload=[{"date": _epoch(_SPLIT_EX_DATE), "amount": 0.06}]),
+    )
+    result = asyncio.run(service.sync_company(db, ticker="BN"))
+    assert result["status"] == "ok"
+    assert "split_readjustments_healed" not in result
+    amounts = {Decimal(r.amount) for r in db.scalars(select(DividendRecord)).all()}
+    assert amounts == {Decimal("0.09"), Decimal("0.06")}
+
+
+def test_ratio_mismatch_leaves_group_untouched(db):
+    """Split ingerido pero el proveedor sirve 0.07: 0.09/0.07 no es el factor
+    1.5, asi que la discrepancia no se explica y nada se borra."""
+    company = _company(db, "BN")
+    _split(db, company)
+    _stale_row(db, company, "0.09")
+    service = DividendIngestionService(
+        fmp=FakeFMP(),
+        yahoo=FakeYahoo(payload=[{"date": _epoch(_SPLIT_EX_DATE), "amount": 0.07}]),
+    )
+    result = asyncio.run(service.sync_company(db, ticker="BN"))
+    assert result["status"] == "ok"
+    assert "split_readjustments_healed" not in result
+    amounts = {Decimal(r.amount) for r in db.scalars(select(DividendRecord)).all()}
+    assert amounts == {Decimal("0.09"), Decimal("0.07")}
+
+
+def test_ordinary_plus_special_same_ex_date_survives(db):
+    """Dos importes reales el mismo ex_date (ordinaria + especial) reajustados
+    por el proveedor: ambos encajan con el proveedor y no se toca nada."""
+    company = _company(db, "BN")
+    _split(db, company)
+    service = DividendIngestionService(
+        fmp=FakeFMP(),
+        yahoo=FakeYahoo(
+            payload=[
+                {"date": _epoch(_SPLIT_EX_DATE), "amount": 0.06},
+                {"date": _epoch(_SPLIT_EX_DATE), "amount": 0.09},
+            ]
+        ),
+    )
+    result = asyncio.run(service.sync_company(db, ticker="BN"))
+    assert result["status"] == "ok"
+    assert "split_readjustments_healed" not in result
+    amounts = {Decimal(r.amount) for r in db.scalars(select(DividendRecord)).all()}
+    assert amounts == {Decimal("0.06"), Decimal("0.09")}
