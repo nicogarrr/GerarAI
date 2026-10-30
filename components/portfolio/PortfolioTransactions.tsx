@@ -86,7 +86,12 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
   const handleDelete = async (transactionId: string) => {
     setDeleting(transactionId);
     try {
-      await deleteTransaction(userId, transactionId);
+      const result = await deleteTransaction(userId, transactionId);
+      // Rechazo del ledger (una venta posterior se quedaría sin acciones): motivo en español, sin «Reintentar».
+      if (result?.success === false) {
+        toast.error(result.error ?? 'No se pudo eliminar la transacción.');
+        return;
+      }
       toast.success('Transacción eliminada');
       router.refresh();
     } catch (error) {

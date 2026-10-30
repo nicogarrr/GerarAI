@@ -433,9 +433,16 @@ export async function updateTransaction(
 
 export async function deleteTransaction(userId: string, transactionId: string): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
-    await researchRequest<void>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`, {
-        method: 'DELETE',
-    });
+    try {
+        await researchRequest<void>(`/api/portfolio/transactions/${encodeURIComponent(transactionId)}`, {
+            method: 'DELETE',
+        });
+    } catch (error) {
+        // Borrar una compra que respalda una venta posterior → 409 del ledger.
+        const rejection = ledgerRejection(error, 'delete');
+        if (rejection) return { success: false, error: rejection };
+        throw error;
+    }
     invalidatePortfolioReads(canonicalUserId);
     return { success: true };
 }

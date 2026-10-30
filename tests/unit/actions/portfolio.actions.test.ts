@@ -120,6 +120,12 @@ describe('addTransaction / updateTransaction', () => {
 });
 
 describe('deleteTransaction / deleteHolding', () => {
+    it('borrar una compra que respalda una venta posterior (409) vuelve como resultado en español', async () => {
+        researchRequest.mockRejectedValueOnce(new AppError('Insufficient shares for sale', 'RESEARCH_API_ERROR', 409));
+        const result = await deleteTransaction('tenant-one', '7');
+        expect(result).toEqual({ success: false, error: expect.stringMatching(/^No se puede borrar: una venta posterior/) });
+        expect(invalidate).not.toHaveBeenCalled();
+    });
     it('borra y reinvalida', async () => {
         researchRequest.mockResolvedValue({});
         await deleteTransaction('tenant-one', '7');

@@ -9,6 +9,7 @@ describe('ledgerRejection', () => {
         expect(ledgerRejection(api('Insufficient shares for sale', 409))).toMatch(/^No puedes vender más acciones/);
         expect(ledgerRejection(api('Position cannot mix transaction currencies', 422))).toMatch(/otra divisa/);
         expect(ledgerRejection(api('Transaction not found', 404))).toMatch(/ya no existe/);
+        expect(ledgerRejection(api('Insufficient shares for sale', 409), 'delete')).toMatch(/^No se puede borrar: una venta posterior/);
     });
     it('lo demás no es un rechazo conocido (se relanza)', () => {
         expect(ledgerRejection(api('boom', 500))).toBeNull();
