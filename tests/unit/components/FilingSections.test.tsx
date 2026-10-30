@@ -179,6 +179,15 @@ describe('Modelo720Section', () => {
         expect(screen.getByText(/SHRT: posición corta/)).toBeInTheDocument();
     });
 
+    it('A17: una cuenta con saldo 0 a 31/12 se nombra con el motivo, no se omite', () => {
+        render(<Modelo720Section thresholds={{ ...thresholds, zero_balance_accounts: [{
+            ticker: 'cash-USD', account: 'Cuenta en USD (cartera «Main»)', currency: 'USD',
+            reason: 'Saldo 0 a 31/12 y saldo medio del 4.º trimestre también 0: no suma nada al umbral de cuentas, por eso no se incluye en el total.',
+        }] }} file720={null} />);
+        expect(screen.getByText(/Cuenta en USD \(cartera «Main»\): Saldo 0 a 31\/12/)).toBeInTheDocument();
+        expect(screen.getByText(/no se incluye en el total/)).toBeInTheDocument();
+    });
+
     it('estado desconocido no muestra un importe inventado', () => {
         render(<Modelo720Section thresholds={thresholds} file720={null} />);
         const row = screen.getByText('Cuentas en el extranjero').parentElement!;
