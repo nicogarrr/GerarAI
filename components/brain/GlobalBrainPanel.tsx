@@ -2,7 +2,6 @@
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -43,7 +42,6 @@ export interface BrainMessage {
 export interface GlobalBrainPanelProps {
     userId: string;
     knowledge: KnowledgeBrainContext | null;
-    librarySlot: HTMLElement | null;
     /** Handoff de apertura (evento gerarai:open-brain o sessionStorage): el
         shell lo recibe siempre montado y lo pasa con un contador para que el
         panel lo aplique aunque llegue con el panel ya abierto. */
@@ -64,12 +62,13 @@ type ContextEcho = {
 /**
  * Panel del cerebro global: chunk diferido que GlobalBrain (shell siempre
  * montado en el layout) carga al abrirlo. Panel lateral en escritorio, hoja
- * sobre la BottomNav en móvil, o incrustado en el slot de la biblioteca.
+ * sobre la BottomNav en móvil; en la biblioteca y las cartas, el mismo panel
+ * flotante con el contexto de doctrina de la página.
  * Cada pregunta lleva el contexto de página explícito (pastilla "Viendo X");
  * el eco que devuelve el servidor (IDs resueltos y permisos aplicados allí)
  * manda sobre la etiqueta local. Solo lectura.
  */
-export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, messages, setMessages, onClose, onClearKnowledge }: GlobalBrainPanelProps) {
+export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setMessages, onClose, onClearKnowledge }: GlobalBrainPanelProps) {
     const pathname = usePathname();
     const page = brainPageContext(pathname);
     // El panel solo se monta al abrirlo (chunk diferido desde GlobalBrain):
@@ -127,7 +126,7 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
         }
     }
 
-    // Al cambiar el contexto de conocimiento (slot de biblioteca o handoff) el
+    // Al cambiar el contexto de conocimiento (página de biblioteca o handoff) el
     // modo guía se reinicia: es lo que hacía el shell antes del split. Ajuste
     // durante el render (reset al cambiar un valor), no efecto.
     const [previousKnowledge, setPreviousKnowledge] = useState(knowledge);
@@ -151,7 +150,7 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
         if (scrollRef.current) {
             scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
         }
-    }, [messages, isMaximized, librarySlot]);
+    }, [messages, isMaximized]);
 
     // Al cambiar de página el eco viejo deja de ser válido: vuelve la etiqueta
     // local. Ajuste durante el render (reset al cambiar un valor), no efecto.
@@ -171,7 +170,6 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
      * por si solo.
      */
     useEffect(() => {
-        if (librarySlot) return;
         const dialog = dialogRef.current;
         if (!dialog) return;
 
@@ -254,7 +252,7 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
             if (previous && previous.isConnected && previous.getClientRects().length > 0) previous.focus();
             else (document.activeElement as HTMLElement | null)?.blur?.();
         };
-    }, [librarySlot]);
+    }, []);
 
     async function handleSend() {
         if (!input.trim() || loading) return;
@@ -328,11 +326,11 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
         <Card
             ref={dialogRef}
             tabIndex={-1}
-            role={librarySlot ? "region" : "dialog"}
-            aria-modal={librarySlot ? undefined : true}
+            role="dialog"
+            aria-modal
             aria-labelledby="global-brain-title"
             aria-busy={loading}
-            className={`${librarySlot ? 'relative h-[min(780px,80dvh)] min-h-[520px] w-full' : 'fixed z-50'} flex flex-col border-indigo-500/30 bg-slate-950/95 backdrop-blur-md shadow-2xl transition-all duration-300 ${librarySlot ? '' : isMaximized
+            className={`fixed z-50 flex flex-col border-indigo-500/30 bg-slate-950/95 backdrop-blur-md shadow-2xl transition-all duration-300 ${isMaximized
             ? 'top-4 bottom-4 left-4 right-4 w-auto h-auto'
             : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
@@ -389,7 +387,7 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
                         )
                     )}
                 </div>
-                {!librarySlot && <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -408,7 +406,7 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
                     >
                         <X aria-hidden="true" className="h-4 w-4" />
                     </Button>
-                </div>}
+                </div>
             </CardHeader>
 
             {knowledge && <div className="shrink-0 flex flex-col gap-2 border-b border-slate-700 p-3 text-sm">
@@ -546,5 +544,5 @@ export function GlobalBrainPanel({ userId, knowledge, librarySlot, openDetail, m
             </CardFooter>
         </Card>
     );
-    return librarySlot ? createPortal(panel, librarySlot) : panel;
+    return panel;
 }

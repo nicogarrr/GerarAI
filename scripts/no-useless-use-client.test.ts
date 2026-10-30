@@ -96,7 +96,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/HomeAttention.tsx':
     'useEffect loads independent attention sources; useState controls retries and bounded pagination',
   'app/(root)/inversores/_components/LibraryChat.tsx':
-    'useSyncExternalStore retrasa el slot hasta hidratar la pagina; evita insertar el portal del layout en HTML SSR aun sin hidratar',
+    'onClick del botón compacto abre el Cerebro flotante (openBrain) con el contexto de la biblioteca; se importa desde páginas server',
   'components/research/DecisionJournalEntryLink.tsx':
     'Client boundary for onClick and browser hash scrolling via scrollToHashAnchor; imported from server CompanyNavigation.',
   'components/research/ResearchHashScroll.tsx':
@@ -515,10 +515,10 @@ describe('la lista de excepciones no crece sin motivo', () => {
 });
 
 describe('el escaner y el guard cuentan lo mismo', () => {
-  it('LibraryChat justifica su directiva por montaje del slot tras hidratacion', () => {
+  it('LibraryChat justifica su directiva por el botón que abre el Cerebro', () => {
     const row = byRel.get('app/(root)/inversores/_components/LibraryChat.tsx');
     assert.ok(row);
-    assert.equal(row.hasUseClient, true, 'el slot se monta tras hidratar; solo GlobalBrain mantiene estado de conversacion');
+    assert.equal(row.hasUseClient, true, 'el botón abre el Cerebro; solo GlobalBrain mantiene estado de conversacion');
     assert.equal(row.justified, true);
   });
 
