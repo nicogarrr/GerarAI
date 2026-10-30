@@ -1,10 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
+import { E2E_UI_BACKEND_URL, E2E_PYTHON_BIN, e2eUiDatabasePath } from "./fixtures/e2e-env";
 
 const runUiE2E = process.env.E2E_UI_RUN === "1";
 
-const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+const uiBackendURL = E2E_UI_BACKEND_URL;
 const e2eResearchSecret =
   process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 
@@ -71,11 +72,12 @@ test.beforeAll(async () => {
   // misma BD) acaba dispatch_failed; el boton lo refleja ocupado
   // honestamente («Generando en segundo plano…») y el spec asume estado
   // ocioso. Se borran los runs GenerateThesisWorkflow de MSFT en la BD E2E.
-  execFileSync("python3", [
+  execFileSync(E2E_PYTHON_BIN, [
     "-c",
     `
 import sqlite3
-db = sqlite3.connect("data-engine/cavaai_ui_e2e.db")
+import sys
+db = sqlite3.connect(sys.argv[1])
 cur = db.cursor()
 ids = [r[0] for r in cur.execute(
     "SELECT id FROM workflow_runs WHERE workflow_name = 'GenerateThesisWorkflow' "
@@ -87,6 +89,7 @@ for rid in ids:
 db.commit()
 db.close()
 `,
+    e2eUiDatabasePath(),
   ]);
 });
 
@@ -149,7 +152,8 @@ test.describe("research thesis workspace", () => {
     ]);
     const pyScript = `
 import sqlite3
-db = sqlite3.connect("data-engine/cavaai_ui_e2e.db")
+import sys
+db = sqlite3.connect(sys.argv[1])
 cur = db.cursor()
 tenant = cur.execute("SELECT id FROM tenants WHERE external_id = ?", ("e2e-browser-user",)).fetchone()
 company = cur.execute("SELECT id FROM companies WHERE ticker = ?", ("E2ENAR",)).fetchone()
@@ -169,7 +173,7 @@ cur.execute(
 db.commit()
 db.close()
 `.replace("SECTIONS_JSON", JSON.stringify(sections));
-    execFileSync("python3", ["-c", pyScript]);
+    execFileSync(E2E_PYTHON_BIN, ["-c", pyScript, e2eUiDatabasePath()]);
 
     await page.goto("/research/E2ENAR?view=thesis");
     await expect(

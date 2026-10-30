@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { seedFxRates } from "./fixtures/fx-rates";
 import { seedMarketPrices } from "./fixtures/market-prices";
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 // Barrido axe-core (via @axe-core/playwright, axe 4.14) de las pantallas
 // firmadas principales con datos sembrados, en escritorio y a 375 px.
@@ -29,7 +30,7 @@ test.describe.configure({ mode: "serial" });
 
 const apiSecret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const apiUser = "e2e-browser-user";
-const apiBase = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+const apiBase = E2E_UI_BACKEND_URL;
 
 function signedHeaders(method: string, path: string, body: Buffer = Buffer.alloc(0)) {
   const timestamp = Math.floor(Date.now() / 1000).toString();

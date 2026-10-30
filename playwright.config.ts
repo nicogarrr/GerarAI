@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { E2E_UI_BACKEND_URL, E2E_UI_DATABASE_URL, e2eUiBackendPort } from "./e2e/fixtures/e2e-env";
 
 const runE2E = process.env.E2E_RUN === "1";
 const runUiE2E = process.env.E2E_UI_RUN === "1";
@@ -6,7 +7,9 @@ const apiBaseURL = process.env.E2E_API_URL ?? "http://127.0.0.1:8101";
 const uiBaseURL = process.env.E2E_UI_URL ?? "http://127.0.0.1:3100";
 const uiPort = new URL(uiBaseURL).port || "3100";
 const apiPort = new URL(apiBaseURL).port || "8101";
-const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+// Backend y BD del e2e de UI: e2e/fixtures/e2e-env.ts (mismos valores por
+// defecto que CI, configurables por entorno para correr fuera de ese layout).
+const uiBackendURL = E2E_UI_BACKEND_URL;
 const e2eResearchSecret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const pythonBin = process.env.PYTHON_BIN ?? "python";
 // La suite de flujos calienta las rutas de `next dev` antes del primer test
@@ -38,11 +41,11 @@ export default defineConfig({
   webServer: runUiE2E
     ? [
       {
-        command: `${pythonBin} -m uvicorn main:app --host 127.0.0.1 --port 8100`,
+        command: `${pythonBin} -m uvicorn main:app --host 127.0.0.1 --port ${e2eUiBackendPort()}`,
         cwd: "data-engine",
         env: {
           APP_ENV: "test",
-          DATABASE_URL: "sqlite:///./cavaai_ui_e2e.db",
+          DATABASE_URL: E2E_UI_DATABASE_URL,
           RESEARCH_AUTH_REQUIRED: "true",
           RESEARCH_AUTH_SECRET: e2eResearchSecret,
           RESEARCH_AUTH_MAX_AGE_SECONDS: "3600",

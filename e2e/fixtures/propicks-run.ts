@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { e2eUiDatabasePath } from "./e2e-env";
 
 /**
  * Semilla de un run del embudo ProPicks para Browser E2E, SIN endpoint de
@@ -18,7 +19,7 @@ export function seedProPicksRun(
   candidates: SeedProPicksCandidate[],
   asOf: string,
 ): void {
-  const dbPath = path.join(process.cwd(), "data-engine", "cavaai_ui_e2e.db");
+  const dbPath = e2eUiDatabasePath();
   const pythonBin = process.env.PYTHON_BIN ?? "python";
   const script = `
 import json, sqlite3, sys

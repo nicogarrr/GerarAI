@@ -27,7 +27,7 @@ for (const width of [1440, 390]) {
         await expect(header.getByText('Más detalle', { exact: true })).toHaveCount(0);
         await expect(header.getByText('Cierre regular:', { exact: false })).toHaveCount(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: `/downloads/extended-quote-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `test-results/extended-quote-${width}.png`, fullPage: true });
         const initialCalls = calls;
         response = { ...quote, session: 'pre', price_session: 'pre', status: 'retrasado' };
         await page.clock.fastForward(60000);
@@ -35,13 +35,13 @@ for (const width of [1440, 390]) {
         response = { ...quote, session: 'cerrado', change: null, change_percent: null };
         await page.clock.fastForward(60000);
         await expect(header.getByText('Último post-cierre del 8 oct · 00:05', { exact: true })).toBeVisible();
-        await page.screenshot({ path: `/downloads/extended-quote-closed-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `test-results/extended-quote-closed-${width}.png`, fullPage: true });
         await expect(header.getByText('-1,28%', { exact: true })).not.toBeVisible();
         response = { status: 'unavailable' };
         await page.clock.fastForward(60000);
         await expect(header.locator('.text-4xl')).toHaveText('N/D');
         expect(calls).toBe(initialCalls + 3);
-        await page.screenshot({ path: `/downloads/extended-quote-nd-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `test-results/extended-quote-nd-${width}.png`, fullPage: true });
         const beforeHidden = calls;
         await page.evaluate(() => Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }));
         await page.clock.fastForward(120000);
@@ -67,7 +67,7 @@ test('real authenticated proxy serves the gated E2E fixture without Yahoo', asyn
     await expect(header.getByText('+2,34', { exact: false })).toBeVisible();
     await expect(header.getByText('Más detalle', { exact: true })).toHaveCount(0);
     await expect(header.getByText(/Sesión regular del/)).toHaveCount(0);
-    await page.screenshot({ path: '/downloads/extended-quote-test-fixture.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/extended-quote-test-fixture.png', fullPage: true });
 });
 
 for (const width of [1440, 390]) {
@@ -83,6 +83,6 @@ for (const width of [1440, 390]) {
         await expect(header.locator('.text-4xl')).toHaveText('523,00 US$');
         expect(calls).toBe(1);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-        await page.screenshot({ path: `/downloads/quote-recovered-${width}.png`, fullPage: true });
+        await page.screenshot({ path: `test-results/quote-recovered-${width}.png`, fullPage: true });
     });
 }
