@@ -53,9 +53,11 @@ def universal_search(
             page_size=payload.page_size,
         ).model_dump()
         # Preserve original search metadata
-        paginated["query"] = result["query"]
-        paginated["filters"] = result["filters"]
-        paginated["retrieval"] = result["retrieval"]
+        paginated["query"] = result.get("query", payload.query)
+        paginated["filters"] = result.get("filters", {})
+        paginated["retrieval"] = result.get("retrieval", {})
+        if "status" in result:
+            paginated["status"] = result["status"]
         return paginated
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

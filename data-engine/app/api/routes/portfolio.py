@@ -12,6 +12,7 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import get_settings
 from app.core.database import get_db
+from app.core.errors import safe_detail
 from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.core.ui_errors import ui_error
@@ -1034,7 +1035,7 @@ def create_transaction_batch(
         db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Batch transaction failed: {str(exc)}"
+            detail=safe_detail(exc, 500)
         ) from exc
 
 
