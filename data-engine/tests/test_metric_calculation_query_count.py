@@ -99,3 +99,51 @@ def test_la_cache_no_sobrevive_a_calculate_all():
     db.commit()
     hechos = service._facts_for_metric(db, company, "revenue")
     assert hechos[0].fiscal_year == 2025
+
+
+def test_calculate_all_precarga_los_insumos_en_pocas_consultas():
+    """Una consulta precarga los insumos de todas las metricas (con su tope de
+    20 por metrica); solo los alias fuera de esa lista consultan aparte.
+    Antes: una consulta por insumo (~25 por empresa)."""
+    engine, db, company = _sesion()
+    vistas, _ = _consultas_de_hechos(engine)
+    MetricCalculationService().calculate_all(db, company, persist=False)
+    assert 1 <= len(vistas) <= 2, f"{len(vistas)} consultas de financial_facts"
+
+
+def test_precarga_respeta_tope_orden_y_tenant():
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    mine = Session(engine)
+    mine.info["tenant_id"] = 1
+    company = Company(
+        ticker="TEN", name="Tenant", exchange="NYSE", currency="USD", sector="Tech",
+        industry="Software", company_type="standard", valuation_model="standard_dcf",
+        special_sources=[], special_risks=[], factor_tags=[],
+    )
+    mine.add(company)
+    mine.flush()
+    # 35 ejercicios de revenue (tope 20) en el tenant 1.
+    for year in range(1990, 2025):
+        mine.add(FinancialFact(
+            company_id=company.id, metric="revenue", value=Decimal(year), unit="USD",
+            period=f"FY{year}", fiscal_year=year, source_type="sec_companyfacts", is_reported=True,
+        ))
+    mine.commit()
+    other = Session(engine)
+    other.info["tenant_id"] = 2
+    other.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("999999"), unit="USD",
+        period="FY2030", fiscal_year=2030, source_type="sec_companyfacts", is_reported=True,
+    ))
+    other.commit()
+
+    service = MetricCalculationService()
+    single = service._facts_for_metric(mine, company, "revenue")  # noqa: SLF001
+    cache: dict = {}
+    service._prefetch_facts(mine, company, cache)  # noqa: SLF001
+    pre = cache[(company.id, "revenue")]
+    assert [f.id for f in pre] == [f.id for f in single]
+    assert len(pre) == 20 and pre[0].fiscal_year == 2024
+    assert all(f.tenant_id == 1 for f in pre)
+    assert cache[(company.id, "goodwill")] == []
