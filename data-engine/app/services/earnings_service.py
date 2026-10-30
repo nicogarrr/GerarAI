@@ -20,14 +20,29 @@ from app.models import (
 from app.services.claim_intelligence_service import ClaimIntelligenceService
 from app.services.review_alert_service import ReviewAlertService
 
+# Do not let prose separators swallow a sign, currency marker, or an
+# accounting parenthesis. Unsupported accounting notation is omitted rather
+# than staged as a positive candidate. Commas must be complete thousands groups.
+_NUMBER = r"(?:[0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)(?:\.[0-9]+)?(?![0-9,]|\.[0-9])"
+_MONEY = rf"((?:[+−-]?\s*\$?\s*|\$\s*[+−-]?\s*){_NUMBER})"
+_SCALE = r"\s*(billion|million|bn|m)?"
 METRIC_PATTERNS = {
-    "revenue": r"\b(?:revenue|sales)\b[^.$]{0,80}\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(billion|million|bn|m)?",
-    "operating_income": r"\boperating income\b[^.$]{0,80}\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(billion|million|bn|m)?",
-    "net_income": r"\bnet income\b[^.$]{0,80}\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(billion|million|bn|m)?",
-    "free_cash_flow": r"\bfree cash flow\b[^.$]{0,80}\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(billion|million|bn|m)?",
-    "gross_margin": r"\bgross margin\b[^0-9]{0,40}([0-9]+(?:\.[0-9]+)?)\s*%",
-    "operating_margin": r"\boperating margin\b[^0-9]{0,40}([0-9]+(?:\.[0-9]+)?)\s*%",
+    metric: rf"\b{label}\b[^0-9.$+−\-()]{{0,80}}{_MONEY}{_SCALE}"
+    for metric, label in {
+        "revenue": r"(?:revenue|sales)",
+        "operating_income": "operating income",
+        "net_income": "net income",
+        "free_cash_flow": "free cash flow",
+    }.items()
 }
+METRIC_PATTERNS.update({
+    metric: rf"\b{label}\b[^0-9+−\-()]{{0,40}}([+−-]?\s*{_NUMBER})\s*%"
+    for metric, label in {
+        "gross_margin": "gross margin",
+        "operating_margin": "operating margin",
+    }.items()
+})
+
 POSITIVE_TONE = {
     "confident",
     "strong",
@@ -49,7 +64,7 @@ NEGATIVE_TONE = {
 
 
 def _scaled_value(raw: str, scale: str | None, metric: str) -> Decimal:
-    value = Decimal(raw)
+    value = Decimal(re.sub(r"[,$\s]", "", raw).replace("−", "-"))
     if metric.endswith("margin"):
         return value / Decimal("100")
     if scale and scale.lower() in {"billion", "bn"}:

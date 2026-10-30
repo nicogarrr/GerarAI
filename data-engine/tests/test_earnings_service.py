@@ -71,3 +71,33 @@ def test_tone_lexical_contract():
     neutral = service._tone("")
     assert neutral["label"] == "neutral"
     assert neutral["score"] == 0
+
+
+def test_signed_and_grouped_earnings_numbers_keep_their_value():
+    service = EarningsWorkflowService()
+    cases = [
+        ("Operating margin was -12.5%.", "operating_margin", Decimal("-0.125")),
+        ("Net income was -$25 million.", "net_income", Decimal("-25000000")),
+        ("Net income was $-25 million.", "net_income", Decimal("-25000000")),
+        ("Net income was $25.", "net_income", Decimal("25")),
+        ("Net income was $1,250 million.", "net_income", Decimal("1250000000")),
+        ("Free cash flow was -1,250.5 million.", "free_cash_flow", Decimal("-1250500000")),
+        ("Operating margin was −12.5%.", "operating_margin", Decimal("-0.125")),
+        ("Gross margin was +12.5%.", "gross_margin", Decimal("0.125")),
+    ]
+    for text, metric, expected in cases:
+        candidates = {row["metric"]: row for row in service._extract_metrics(text, {9: text})}
+        assert metric in candidates, text
+        assert Decimal(candidates[metric]["value"]) == expected, text
+        assert candidates[metric]["source_document_id"] == 9
+        assert candidates[metric]["status"] == "candidate_pending_reconciliation"
+
+
+def test_accounting_parentheses_are_not_silently_read_as_positive():
+    text = "Operating margin was (12.5)%. Net income was ($25 million)."
+    assert EarningsWorkflowService()._extract_metrics(text, {1: text}) == []
+
+
+def test_incomplete_numeric_groups_do_not_create_truncated_candidates():
+    for text in ("Net income was $1,25 million.", "Net income was $12.5.3 million."):
+        assert EarningsWorkflowService()._extract_metrics(text, {1: text}) == []
