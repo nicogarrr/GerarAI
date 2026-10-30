@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n/client';
 
 import * as React from 'react';
 
@@ -30,16 +31,17 @@ export type PaginationProps = {
  * entera en cliente solo para paginar dos listados.
  */
 export function Pagination({ page, pages, onPageChange, label, className, hasMore = false, busy = false }: PaginationProps) {
+  const t = useT();
   const current = clampPage(page, pages);
   if (pages <= 1 && !hasMore) return null;
 
   return (
     <nav
-      aria-label={`Paginación: ${label}`}
+      aria-label={t('ui.pagination.aria', { label })}
       className={cn('flex flex-wrap items-center justify-between gap-3 text-sm', className)}
     >
       <Button
-        aria-label={`Página anterior: ${label}`}
+        aria-label={t('ui.pagination.prevAria', { label })}
         disabled={busy || current <= 1}
         onClick={() => onPageChange(current - 1)}
         size="sm"
@@ -49,10 +51,10 @@ export function Pagination({ page, pages, onPageChange, label, className, hasMor
         Anterior
       </Button>
       <span aria-current="page" className="text-xs text-gray-500">
-        {busy ? 'Cargando…' : hasMore ? `${pageLabel(current, pages)}+` : pageLabel(current, pages)}
+        {busy ? t('common.states.loading') : hasMore ? `${pageLabel(current, pages)}+` : pageLabel(current, pages)}
       </span>
       <Button
-        aria-label={`Página siguiente: ${label}`}
+        aria-label={t('ui.pagination.nextAria', { label })}
         disabled={busy || (current >= pages && !hasMore)}
         onClick={() => onPageChange(current + 1)}
         size="sm"

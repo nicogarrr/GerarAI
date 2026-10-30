@@ -18,7 +18,9 @@
     "unverifiedCoverage": "Cobertura de ficha no comprobada",
     "tickerCommands": "Comandos de {ticker}",
     "stockPage": "Ficha",
-    "directSymbol": "Ir directo por símbolo"
+    "directSymbol": "Ir directo por símbolo",
+    "paletteTitle": "Paleta de comandos",
+    "palettePlaceholder": "Busca un comando para ejecutar..."
   },
   "search": {
     "placeholder": "Buscar por nombre o símbolo",
@@ -26,5 +28,34 @@
     "addStock": "Añadir acción",
     "openAria": "Abrir buscador",
     "stocksPlaceholder": "Buscar acciones..."
+  },
+  "methodologyDisclosure": "Metodología y límites",
+  "nameAvatar": {
+    "photo": "Foto de {name}"
+  },
+  "scrollRegion": {
+    "hintColumns": "Desliza para ver más columnas"
+  },
+  "pagination": {
+    "aria": "Paginación: {label}",
+    "prevAria": "Página anterior: {label}",
+    "nextAria": "Página siguiente: {label}",
+    "prev": "Anterior",
+    "next": "Siguiente"
+  },
+  "panel": {
+    "collapse": "Contraer",
+    "expand": "Expandir"
+  },
+  "analystTargets": {
+    "loading": "Cargando precio objetivo de analistas de {symbol}",
+    "noData": "Sin precios objetivo por analista para este valor.",
+    "fetched": " · obtenido {date}",
+    "convertedNote": " · objetivos en {from} convertidos a {to} con el tipo de cambio de la cartera",
+    "unconvertedNote": " · objetivos en {from}, la fila cotiza en {to}: sin tipo de cambio, sin recorrido por no mezclar divisas",
+    "firmsOne": "{n} firma con objetivo en 12 meses",
+    "firmsOther": "{n} firmas con objetivo en 12 meses",
+    "firmsNone": "solo consenso agregado, sin detalle por firma",
+    "convertedFrom": "(convertido de {currency})"
   }
 }
