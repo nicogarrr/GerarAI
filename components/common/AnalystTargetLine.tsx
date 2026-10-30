@@ -6,6 +6,7 @@ import { getListingAnalystTargets, type ListingAnalystTargets } from '@/lib/acti
 import { requestCache } from '@/lib/cache/requestCache';
 import { formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { convertWithPortfolioFx, sameTargetUnit, unconvertedTargetLabel, type TargetFxRate } from '@/lib/analyst-target-currency';
+import { useLocale, useT } from '@/lib/i18n/client';
 
 /**
  * Consenso de precios objetivo de analistas para las listas (watchlist y
@@ -46,6 +47,8 @@ export default function AnalystTargetLine({
     fxRates?: readonly TargetFxRate[] | null;
     baseCurrency?: string | null;
 }) {
+    const t = useT();
+    const locale = useLocale();
     const [settled, setSettled] = useState(false);
     const [data, setData] = useState<ListingAnalystTargets | null>(null);
 
@@ -71,14 +74,14 @@ export default function AnalystTargetLine({
 
     if (!settled) {
         return (
-            <span className="text-gray-500" role="status" aria-label={`Cargando precio objetivo de analistas de ${symbol}`}>
+            <span className="text-gray-500" role="status" aria-label={t('ui.analystTargets.loading', { symbol })}>
                 …
             </span>
         );
     }
     if (!data || data.status !== 'available' || data.mean === null) {
         return (
-            <span className="text-gray-500" title={data?.note ?? 'Sin precios objetivo por analista para este valor.'}>
+            <span className="text-gray-500" title={data?.note ?? t('ui.analystTargets.noData')}>
                 {NA}
             </span>
         );
@@ -97,14 +100,19 @@ export default function AnalystTargetLine({
             ? (shownMean / referencePrice - 1) * 100
             : null;
     const fetchedNote = data.fetchedAt
-        ? ` · obtenido ${new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(data.fetchedAt * 1000))}`
+        ? t('ui.analystTargets.fetched', {
+              date: new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'es-ES', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(data.fetchedAt * 1000)),
+          })
         : '';
     const mismatchNote = !currencyMismatch
         ? ''
         : converted !== null
-          ? ` · objetivos en ${data.currency} convertidos a ${rowCurrency} con el tipo de cambio de la cartera`
-          : ` · objetivos en ${data.currency}, la fila cotiza en ${rowCurrency}: sin tipo de cambio, sin recorrido por no mezclar divisas`;
-    const firmsNote = data.firms > 0 ? `${data.firms} ${data.firms === 1 ? 'firma' : 'firmas'} con objetivo en 12 meses` : 'solo consenso agregado, sin detalle por firma';
+          // currencyMismatch garantiza ambas divisas no nulas en esta rama.
+          ? t('ui.analystTargets.convertedNote', { from: data.currency ?? '', to: rowCurrency ?? '' })
+          : t('ui.analystTargets.unconvertedNote', { from: data.currency ?? '', to: rowCurrency ?? '' });
+    const firmsNote = data.firms > 0
+        ? t(data.firms === 1 ? 'ui.analystTargets.firmsOne' : 'ui.analystTargets.firmsOther', { n: data.firms })
+        : t('ui.analystTargets.firmsNone');
     const title = `${data.source} · ${firmsNote}${fetchedNote}${mismatchNote}`;
     return (
         <span title={title}>
@@ -117,7 +125,7 @@ export default function AnalystTargetLine({
             </span>
             {currencyMismatch && data.currency ? (
                 <span className="ml-1 text-[10px] text-gray-500">
-                    {converted !== null ? `(convertido de ${data.currency})` : unconvertedTargetLabel(data.currency)}
+                    {converted !== null ? t('ui.analystTargets.convertedFrom', { currency: data.currency }) : unconvertedTargetLabel(data.currency)}
                 </span>
             ) : null}
             {upside !== null ? (

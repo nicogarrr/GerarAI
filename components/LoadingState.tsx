@@ -1,12 +1,12 @@
+'use client';
+
+import { useT } from '@/lib/i18n/client';
 import { Skeleton } from '@/components/ui/skeleton';
 
 /**
- * Server Component: solo pinta esqueletos estaticos, sin estado, sin refs y
- * sin handlers, asi que no necesita 'use client'. Ambos usos son de servidor
- * (`app/(root)/inicio/page.tsx` lo usa como fallback de <Suspense> y
- * `app/(root)/research/[ticker]/loading.tsx` como loading de ruta), asi que
- * la directiva solo anadia un modulo de JS al paquete del cliente para pintar
- * HTML que ya venia en el SSR.
+ * Client component desde la i18n ES/EN: el texto sr-only de carga se
+ * resuelve con useT() desde el contexto de locale. Los consumidores
+ * existentes conservan una API síncrona para sus fallbacks de Suspense.
  *
  * Reusable loading states for better UX
  * Improves perceived performance during data fetching
@@ -19,9 +19,10 @@ import { Skeleton } from '@/components/ui/skeleton';
  */
 
 export function NewsLoadingSkeleton() {
+    const t = useT();
     return (
         <div className="w-full min-w-0 h-full bg-surface-1 rounded-lg border border-gray-800 p-4 sm:p-6">
-            <span className="sr-only" role="status">Cargando…</span>
+            <span className="sr-only" role="status">{t('common.states.loading')}</span>
             <div aria-hidden>
                 <Skeleton className="h-8 w-48 max-w-full mb-4 sm:mb-6" />
                 <div className="space-y-3 sm:space-y-4">
@@ -49,9 +50,10 @@ export function NewsLoadingSkeleton() {
 }
 
 export function StockCardSkeleton() {
+    const t = useT();
     return (
         <div className="bg-surface-1 rounded-lg border border-gray-700 p-4">
-            <span className="sr-only" role="status">Cargando…</span>
+            <span className="sr-only" role="status">{t('common.states.loading')}</span>
             <div aria-hidden>
                 <div className="flex justify-between items-start mb-4">
                     <div className="space-y-2">

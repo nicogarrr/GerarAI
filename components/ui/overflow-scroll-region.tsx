@@ -1,4 +1,5 @@
 'use client';
+import { useT } from '@/lib/i18n/client';
 
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
@@ -22,7 +23,9 @@ type OverflowScrollRegionProps = {
  *  - desaparece al llegar al final (nunca anuncia scroll que no existe),
  *  - se enlaza con aria-describedby para lectores de pantalla.
  */
-export function OverflowScrollRegion({ label, className, regionClassName, hint = 'Desliza para ver más columnas', children }: OverflowScrollRegionProps) {
+export function OverflowScrollRegion({ label, className, regionClassName, hint, children }: OverflowScrollRegionProps) {
+    const t = useT();
+    const resolvedHint = hint ?? t('ui.scrollRegion.hintColumns');
     const ref = useRef<HTMLDivElement>(null);
     const hintId = useId();
     const [moreRight, setMoreRight] = useState(false);
@@ -53,7 +56,7 @@ export function OverflowScrollRegion({ label, className, regionClassName, hint =
         <div className={className}>
             {moreRight ? (
                 <p className="mb-2 text-xs text-gray-500" id={hintId}>
-                    {hint} <span aria-hidden="true">→</span>
+                    {resolvedHint} <span aria-hidden="true">→</span>
                 </p>
             ) : null}
             <div
