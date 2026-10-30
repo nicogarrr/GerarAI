@@ -43,20 +43,20 @@ describe('ImportIBKRButton (Flex)', () => {
         expect(h.refresh).not.toHaveBeenCalled();
     });
 
-    it('sin mensaje usa el estado', async () => {
+    it('sin mensaje: aviso en español, sin el estado interno', async () => {
         h.importIbkr.mockResolvedValue({ status: 'pending' });
         render(<ImportIBKRButton userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: /Importar IBKR/ }));
-        await waitFor(() => expect(h.error).toHaveBeenCalledWith('Importación falló: pending', { duration: 10000 }));
+        await waitFor(() => expect(h.error).toHaveBeenCalledWith(expect.stringMatching(/^La importación no se completó/), { duration: 10000 }));
     });
 
-    it('avisos de identidad y filas con avisos (maximo 3)', async () => {
+    it('avisos de identidad y filas con avisos (cuántas y detalle, como al subir fichero)', async () => {
         h.importIbkr.mockResolvedValue({ status: 'imported', positions_imported: 1, identity_warning: 'Cuenta distinta', row_errors: ['a', 'b', 'c', 'd'] });
         render(<ImportIBKRButton userId="u1" />);
         fireEvent.click(screen.getByRole('button', { name: /Importar IBKR/ }));
         await waitFor(() => expect(h.warning).toHaveBeenCalledTimes(2));
         expect(h.warning).toHaveBeenCalledWith('Cuenta distinta');
-        expect(h.warning).toHaveBeenCalledWith('Filas con avisos:\na\nb\nc');
+        expect(h.warning).toHaveBeenCalledWith('4 filas con avisos. Primera: a', { duration: 12000, description: 'a\nb\nc\nd' });
     });
 
     it('recuentos no numericos no se inventan: faltantes son 0 y NaN se ignora', async () => {
