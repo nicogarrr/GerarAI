@@ -7,12 +7,14 @@ import { RefreshCw } from 'lucide-react';
 import { updateAllPortfolioPrices } from '@/lib/actions/portfolio.actions';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import { useT } from '@/lib/i18n/client';
 
 interface RefreshPortfolioButtonProps {
     userId: string;
 }
 
 export default function RefreshPortfolioButton({ userId }: RefreshPortfolioButtonProps) {
+    const ti = useT();
     const [isRefreshing, setIsRefreshing] = useState(false);
     const router = useRouter();
 
@@ -32,7 +34,7 @@ export default function RefreshPortfolioButton({ userId }: RefreshPortfolioButto
             // El toast dice lo que pasó: lecturas rehechas contra el servidor.
             // «Cartera actualizada» afirmaba precios nuevos que este botón no
             // puede pedir.
-            toast.success('Lecturas de cartera actualizadas');
+            toast.success(ti('portfolio.refresh.toast'));
 
         } catch (error) {
             showErrorToast(error, { onRetry: handleFullRefresh });
@@ -49,8 +51,8 @@ export default function RefreshPortfolioButton({ userId }: RefreshPortfolioButto
             onClick={handleFullRefresh}
             disabled={isRefreshing}
             aria-busy={isRefreshing}
-            aria-label={isRefreshing ? 'Actualizando lecturas' : 'Actualizar lecturas'}
-            title="Vuelve a leer posiciones y KPIs del servidor, sin caché. No fuerza cotizaciones nuevas: los precios son los últimos que guardó el servidor."
+            aria-label={isRefreshing ? ti('portfolio.refresh.ariaUpdating') : ti('portfolio.refresh.ariaUpdate')}
+            title={ti('portfolio.refresh.title')}
             className="h-11 w-11 shrink-0 border-gray-600 text-gray-200 hover:bg-gray-700 sm:h-9 sm:w-9"
         >
             <RefreshCw aria-hidden="true" className={isRefreshing ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />

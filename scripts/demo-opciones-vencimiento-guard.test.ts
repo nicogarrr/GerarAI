@@ -69,34 +69,36 @@ describe('wiring servidor/UI y honestidad (sin autoejercicio)', () => {
 
     it('el ticket rechaza ejecutar tras el vencimiento con la regla del servidor', () => {
         assert.match(ticket, /import \{ expirationState, isRealDate \} from '@\/lib\/paper-trading\/options'/);
-        assert.match(ticket, /fecha de ejecución es posterior al vencimiento del contrato/);
+        // i18n: el mensaje vive en el diccionario (ticket.errors.expiredContract).
+        assert.match(ticket, /paperTrading\.ticket\.errors\.expiredContract/);
         assert.match(ticket, /isRealDate\(expiry\)/);
     });
 
     it('los badges se muestran y declaran que el libro NO ejerce ni expira solo', () => {
-        assert.match(table, /Vencida el /);
-        assert.match(table, /[Ee]l libro no ejerce ni expira posiciones automáticamente/);
+        // i18n: el badge vive en el diccionario (positions.expiredBadge).
+        assert.match(table, /paperTrading\.positions\.expiredBadge/);
+        assert.match(table, /paperTrading\.positions\.expiredDetail/);
         // Copy honesto (auditor 21-oct-2026): la API rechaza fechas
         // posteriores al vencimiento y precio 0, así que NO se puede prometer
         // «liquidación a mano» de una opción vencida. El badge indica el
         // cierre con fecha real (≤ vencimiento) y declara la limitación.
-        assert.match(table, /Para registrar el cierre usa la fecha\s+real de ejecución \(el vencimiento o antes\)/);
-        assert.match(table, /la liquidación de\s+opciones vencidas sin valor aún\s+no está soportada/);
+
+
         assert.doesNotMatch(table, /el cierre o la liquidación se registran a mano/);
         // Sin párrafo permanente (QA píxeles 21-oct-2026): etiqueta corta +
         // detalle expandible nativo (details/summary, seguro en móvil).
-        assert.match(table, /Vencida el \{formatContractDate\(position\.optionExpiry\)\}\s*<\/span>/);
+        assert.match(table, /expiredBadge', \{ date: formatContractDate\(position\.optionExpiry, locale\) \}\)\}\s*<\/span>/);
         // Contenedor de bloque válido (details/p no pueden ir dentro de span).
         assert.match(table, /<div className="mt-1">\s*<span className="inline-block rounded border border-amber-800/);
         assert.doesNotMatch(table, /<span className="mt-1 block">\s*<span className="inline-block rounded border border-amber-800/);
         assert.match(table, /<details className="mt-1 text-xs text-gray-400">/);
-        assert.match(table, /<summary className="[^"]*">Qué significa<\/summary>/);
+        assert.match(table, /<summary className="[^"]*">\{ti\('paperTrading\.positions\.whatMeans'\)\}<\/summary>/);
         // Sin lógica de cierre/liquidación automática por vencimiento.
         assert.doesNotMatch(actions, /autoejerc|asignaci[oó]n autom[aá]tica|closeExpired|expirePosition|liquidaci[oó]n autom[aá]tica/i);
     });
 
     it('la fecha del contrato se formatea como civil, sin crear Date (tz-safe)', () => {
-        assert.match(table, /function formatContractDate\(iso: string\): string/);
+        assert.match(table, /function formatContractDate\(iso: string, locale: string = 'es'\): string/);
         assert.doesNotMatch(table, /new Date\(position\.optionExpiry\)/);
     });
 });

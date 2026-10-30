@@ -18,9 +18,14 @@ const source = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
 
 void test('la sección explica la mezcla y el componente etiqueta', () => {
     const feed = source('components/insider/InsiderFeed.tsx');
-    assert.ok(feed.includes('Institucional'), 'badge Institucional');
+    // Las cadenas visibles viven en el diccionario i18n (carril C); el
+    // componente las referencia por clave. El guard verifica ambos extremos.
+    const esFeed = JSON.parse(source('lib/i18n/messages/es/insider.json')).feed;
+    assert.ok(feed.includes('insider.feed.institutional'), 'referencia al badge Institucional');
+    assert.equal(esFeed.institutional, 'Institucional');
     assert.ok(feed.includes('isInstitutionalInsiderName'), 'usa el detector');
-    assert.ok(feed.includes('no insiders personales'), 'nota aclaratoria');
+    assert.ok(feed.includes('insider.feed.bigBuysNote'), 'referencia a la nota aclaratoria');
+    assert.ok(esFeed.bigBuysNote.includes('no insiders personales'), 'nota aclaratoria');
 });
 
 void test('detecta entidades y no personas', () => {

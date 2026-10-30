@@ -11,7 +11,18 @@ import test from 'node:test';
 const page = readFileSync('app/(root)/portfolio/intelligence/page.tsx', 'utf8');
 
 test('Sharpe y caída máxima se rotulan indicativos cuando el TWR no es exacto', () => {
-    assert.match(page, /twr_is_exact \? 'Sharpe' : 'Sharpe indicativo'/);
-    assert.match(page, /twr_is_exact \? 'Máx\. caída' : 'Máx\. caída indicativa'/);
-    assert.match(page, /twr_is_exact \? 'TWR diario' : 'TWR indicativo'/);
+    // i18n: la página elige la clave exacta/indicativa; los valores es se verifican aquí.
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+    for (const [exactKey, indicativeKey, exact, indicative] of [
+        ['kpiSharpe', 'kpiSharpeIndicative', 'Sharpe', 'Sharpe indicativo'],
+        ['kpiMaxDrawdown', 'kpiMaxDrawdownIndicative', 'Máx. caída', 'Máx. caída indicativa'],
+        ['kpiTwrDaily', 'kpiTwrIndicative', 'TWR diario', 'TWR indicativo'],
+    ]) {
+        assert.ok(
+            page.includes(`twr_is_exact ? ti('portfolio.intelligence.${exactKey}') : ti('portfolio.intelligence.${indicativeKey}')`),
+            `la página elige entre ${exactKey} y ${indicativeKey}`,
+        );
+        assert.equal(dict.intelligence[exactKey], exact);
+        assert.equal(dict.intelligence[indicativeKey], indicative);
+    }
 });

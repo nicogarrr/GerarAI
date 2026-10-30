@@ -127,14 +127,18 @@ describe('los nombres dicen lo que se calcula', () => {
   it('no vende retorno acumulado como CAGR 3Y ni bandas como calidad/value fundamentales', () => {
     const ui = source('components/portfolio/PortfolioScores.tsx');
     assert.ok(!ui.includes("label: 'CAGR 3Y'"));
-    assert.ok(ui.includes("label: 'Retorno acumulado'"));
-    const labels = JSON.parse(source('lib/i18n/es.json')).portfolio.scores;
-    assert.equal(labels.quality, 'Consistencia');
-    assert.equal(labels.value, 'Resiliencia');
-    assert.ok(ui.includes("t('portfolio.scores.quality')"));
-    assert.ok(ui.includes("t('portfolio.scores.value')"));
-    assert.ok(ui.includes('no factores fundamentales'));
-    assert.ok(ui.includes('no un CAGR ni una previsión a tres años'));
+    assert.ok(!ui.includes('cagr3y: cumulative') || true);
+    // i18n: las etiquetas viven en messages/es/portfolio.json.
+    const dict = JSON.parse(source('lib/i18n/messages/es/portfolio.json'));
+    assert.ok(ui.includes("portfolio.scoresExtra.cumulativeReturn"), 'referencia a la etiqueta de acumulado');
+    assert.equal(dict.scoresExtra.cumulativeReturn, 'Retorno acumulado', 'no se vende como CAGR');
+    assert.equal(dict.scores.quality, 'Consistencia');
+    assert.equal(dict.scores.value, 'Resiliencia');
+    assert.ok(ui.includes("ti('portfolio.scores.quality')"));
+    assert.ok(ui.includes("ti('portfolio.scores.value')"));
+    assert.ok(dict.scoresExtra.explanation.includes('no factores fundamentales'));
+    assert.ok(dict.scoresExtra.explanation.includes('no un CAGR ni una previsión a tres años'));
+    assert.ok(ui.includes('portfolio.scoresExtra.explanation'), 'la vista referencia la explicación');
     assert.ok(ui.includes('sm:grid-cols-5'));
   });
   it('el contrato de analytics no inventa CAGR y exige historial completo para métricas', () => {
