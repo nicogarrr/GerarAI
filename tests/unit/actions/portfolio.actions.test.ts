@@ -33,6 +33,7 @@ import {
     getPortfolioDataQuality,
     syncPortfolioDividends,
     getCompanyHolding,
+    getPortfolioFxContext,
 } from '@/lib/actions/portfolio.actions';
 
 const position = (over: object = {}) => ({
@@ -438,5 +439,17 @@ describe('getCompanyHolding: posición de la ficha con las cifras de Cartera', (
         expect(aapl.status === 'held' && aapl.positionsAsOf).toBe('2026-10-29');
         const msft = await getCompanyHolding('MSFT');
         expect(msft.status === 'held' && msft.positionsAsOf).toBe('2026-10-20');
+    });
+});
+
+describe('getPortfolioFxContext (A9: objetivo de ADR en la watchlist)', () => {
+    it('devuelve los tipos de la cartera y su divisa base para convertir el objetivo', async () => {
+        const fx_rates = [{ scope: 'positions', currency: 'USD', rate: 0.9, as_of: '2026-10-29' }];
+        seedSummary([], { fx_rates, base_currency: 'EUR' });
+        await expect(getPortfolioFxContext('tenant-one')).resolves.toEqual({ fxRates: fx_rates, baseCurrency: 'EUR' });
+    });
+    it('con el motor caído no rompe la watchlist: lista vacía y vuelve la etiqueta «(ADR, USD)»', async () => {
+        researchRequest.mockRejectedValue(new AppError('caído', 'RESEARCH_API_ERROR', 503));
+        await expect(getPortfolioFxContext('tenant-one')).resolves.toEqual({ fxRates: [], baseCurrency: null });
     });
 });

@@ -279,6 +279,27 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0, fi
 }
 
 
+/**
+ * Tipos de cambio de la cartera para páginas que no cargan la cartera entera
+ * (watchlist): misma lectura cacheada del resumen que usa Cartera, así el
+ * objetivo de analistas de un ADR se convierte igual en las dos (auditoría
+ * A9). Nunca rompe la página: sin cartera o con el motor caído devuelve una
+ * lista vacía y la línea vuelve a la etiqueta «(ADR, USD)».
+ */
+export async function getPortfolioFxContext(userId: string): Promise<{ fxRates: PortfolioFxRate[]; baseCurrency: string | null }> {
+    try {
+        const canonicalUserId = await resolveUserId(userId);
+        const summary = await cachedFetch(
+            `portfolio:${canonicalUserId}:summary`,
+            () => researchRequest<ResearchPortfolioSummaryResponse>('/api/portfolio/summary', { fast: true }),
+            15,
+        );
+        return { fxRates: summary.fx_rates ?? [], baseCurrency: summary.base_currency || null };
+    } catch {
+        return { fxRates: [], baseCurrency: null };
+    }
+}
+
 export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
     const canonicalUserId = await resolveUserId(userId);
     const [positions, backendSummary, quality] = await Promise.all([
