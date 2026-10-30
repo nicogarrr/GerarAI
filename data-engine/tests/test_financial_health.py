@@ -90,3 +90,21 @@ def test_health_calculation_does_not_mutate_evidence():
     first = calc(facts)
     assert facts == original
     assert calc(facts) == first
+
+
+def test_formulas_shown_on_ficha_use_spanish_labels():
+    """La notación de las fórmulas se muestra en la ficha: etiquetas en
+    español, no abreviaturas inglesas (GP, sales, CFO, LTD, CA/CL,
+    common_stock_issued, book_equity...)."""
+    import re
+
+    out = calc()
+    formulas = [s["formula"] for s in out["piotroski"]["signals"]]
+    formulas.append(out["altman"]["formula"])
+    english = re.compile(
+        r"\b(GP|sales|NI|CFO|LTD|avgA|CA|CL|WC|RE|A)\(|\b(common_stock_issued|book_equity|liabilities|sales)\b|/A\b"
+    )
+    leaks = [f for f in formulas if english.search(f)]
+    assert leaks == []
+    assert any("Beneficio bruto(t) / Ventas(t)" in f for f in formulas)
+    assert any("Emisión de acciones ordinarias(t) = 0" in f for f in formulas)
