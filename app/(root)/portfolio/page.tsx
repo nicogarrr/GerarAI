@@ -1,6 +1,7 @@
 import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import type { Metadata } from 'next';
 import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
+import { getT } from '@/lib/i18n/server';
 import { parseTransactionFilters } from '@/lib/portfolio/transaction-filters';
 import { getPortfolioSummary, getPortfolioTransactionPage, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
@@ -8,7 +9,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { isAuthError } from '@/lib/types/errors';
-import { sectionError } from '@/lib/section-error';
+import { sectionErrorKey } from '@/lib/section-error';
 import { spanishBackendMessage } from '@/lib/research/backend-error-es';
 
 // Forzar renderizado dinámico
@@ -74,7 +75,8 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       result = [summaryResult.value, transactionsResult.value, scoresResult.value, tearsheetResult.value, forecastResult.value, dividendsResult.value];
       const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
         .filter((error): error is string => Boolean(error));
-      partialMessage = secondaryErrors.length ? `Algunas secciones no respondieron: ${[...new Set(secondaryErrors.map((error) => sectionError(new Error(error))))].join(' · ')}` : null;
+      const t = await getT();
+      partialMessage = secondaryErrors.length ? `Algunas secciones no respondieron: ${[...new Set(secondaryErrors.map((error) => t(sectionErrorKey(new Error(error)))))].join(' · ')}` : null;
     }
   } catch (error) {
     if (!isBackendUnavailableError(error)) throw error;
