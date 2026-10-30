@@ -24,4 +24,17 @@ describe('FollowButton compacto (cabecera de ficha)', () => {
         render(<FollowButton compact symbol="ASTS" isFollowed={false} stateUnknown={false} />);
         expect(screen.getAllByText('Seguir').length).toBeGreaterThan(0);
     });
+
+    it('sin aria-label: el nombre accesible es el texto visible (label-content-name-mismatch a 375 px)', () => {
+        // Barrido axe 30-oct-2026, /research/MSFT a 375 px: el compacto
+        // mostraba «Siguiendo» pero el aria-label decía «Dejar de seguir»
+        // (violación seria WCAG 2.5.3). El nombre sale del contenido: en cada
+        // breakpoint solo un span es visible y el otro lleva display:none.
+        const { rerender } = render(<FollowButton compact symbol="ASTS" isFollowed stateUnknown={false} />);
+        expect(screen.getByRole('button')).not.toHaveAttribute('aria-label');
+        rerender(<FollowButton compact symbol="ASTS" isFollowed={false} stateUnknown={false} />);
+        expect(screen.getByRole('button')).not.toHaveAttribute('aria-label');
+        rerender(<FollowButton compact symbol="ASTS" isFollowed={false} stateUnknown />);
+        expect(screen.getByRole('button')).not.toHaveAttribute('aria-label');
+    });
 });
