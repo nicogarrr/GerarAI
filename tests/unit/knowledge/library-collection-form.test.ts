@@ -10,7 +10,7 @@ const source = readFileSync('app/(root)/knowledge/page.tsx', 'utf8');
 describe('Biblioteca: formulario de nueva colección', () => {
     it('muestra la lista de colecciones antes que el formulario de alta', () => {
         const list = source.indexOf('<h2 className="mb-3 font-semibold text-gray-100">Colecciones</h2>');
-        const form = source.indexOf('action={createKnowledgeCollection}');
+        const form = source.indexOf('action={createKnowledgeCollectionResult}');
         expect(list).toBeGreaterThan(-1);
         expect(form).toBeGreaterThan(list);
     });

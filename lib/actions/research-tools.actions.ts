@@ -6,7 +6,7 @@ import { normalizeResearchBody, researchIdentityHeaders } from '@/lib/auth/resea
 import { parseLocalizedNumberDetailed } from '@/lib/format';
 import { RESEARCH_TIMEOUTS, requestSignal } from '@/lib/research/client';
 import { researchErrorDetail } from '@/lib/research/error-detail';
-import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
+import { AppError, ExternalAPIError, ValidationError, isNextRedirectError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 import { spanishBackendMessage } from '@/lib/research/backend-error-es';
@@ -571,6 +571,64 @@ export async function uploadKnowledgeDocument(formData: FormData) {
   revalidatePath('/knowledge');
 }
 
+/** Resultado de una mutacion de formulario con validacion de negocio. */
+export type FormMutationResult =
+  | { ok: true }
+  | { ok: false; cause: 'validation'; message: string };
+
+/** @deprecated Alias de compatibilidad; usa FormMutationResult. */
+export type KnowledgeMutationResult = FormMutationResult;
+
+/**
+ * Las validaciones de formulario de la Biblioteca vuelven como RESULTADO,
+ * no como throw: en produccion Next enmascara el error lanzado por una
+ * server action (mensaje generico + digest) y MutationForm lo clasificaba
+ * como motor caido («El motor de analisis no responde…») cuando el problema
+ * era el propio formulario (documento sin elegir, nombre vacio). El
+ * ValidationError trae `field`; el mensaje en español se decide aqui, en
+ * servidor, sin tocar los literales lanzados (contrato del carril B:
+ * createAlertResult). El resto de fallos (motor caido, sesion, redirect)
+ * sigue lanzando para que el cliente ofrezca reintentar o navegue.
+ */
+async function formMutationResult(
+  action: () => Promise<unknown>,
+  fieldMessages: Record<string, string>,
+): Promise<FormMutationResult> {
+  try {
+    await action();
+    return { ok: true };
+  } catch (error) {
+    if (isNextRedirectError(error)) throw error;
+    if (error instanceof ValidationError) {
+      return {
+        ok: false,
+        cause: 'validation',
+        message: fieldMessages[error.field ?? ''] ?? 'Revisa el formulario: falta un campo obligatorio.',
+      };
+    }
+    throw error;
+  }
+}
+
+export async function uploadKnowledgeDocumentResult(formData: FormData): Promise<KnowledgeMutationResult> {
+  return formMutationResult(() => uploadKnowledgeDocument(formData), {
+    file: 'Elige un documento para subir.',
+  });
+}
+
+export async function createKnowledgeCollectionResult(formData: FormData): Promise<KnowledgeMutationResult> {
+  return formMutationResult(() => createKnowledgeCollection(formData), {
+    name: 'Ponle un nombre a la colección.',
+  });
+}
+
+export async function reviseKnowledgePrincipleResult(principleId: number, formData: FormData): Promise<KnowledgeMutationResult> {
+  return formMutationResult(() => reviseKnowledgePrinciple(principleId, formData), {
+    principle: 'El principio no puede quedar vacío.',
+    category: 'Indica la categoría del principio.',
+  });
+}
+
 export async function extractKnowledgePrinciples(documentId: number) {
   await requestJson(`/api/knowledge/documents/${assertPositiveInt(documentId, 'documentId')}/extract-principles`, { method: 'POST' });
   revalidatePath('/knowledge');
@@ -881,3 +939,59 @@ export async function getKnowledgeNeighborhood(nodeId: number, depth = 2): Promi
   return requestJson(`/api/knowledge-graph/nodes/${assertPositiveInt(nodeId, 'nodeId')}/neighbors?depth=${Math.max(1, Math.min(4, depth))}`);
 }
 
+export async function createCustomMetricResult(formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => createCustomMetric(formData), {
+    metric_key: 'Dale una clave a la métrica (p. ej. margen_neto).',
+    name: 'Ponle un nombre a la métrica.',
+    formula: 'Escribe la fórmula de la métrica.',
+  });
+}
+
+export async function createSavedScreenResult(formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => createSavedScreen(formData), {
+    name: 'Ponle un nombre al filtro.',
+    criteria_json: 'Define al menos un criterio.',
+    left: 'Cada criterio necesita los dos lados.',
+    left_2: 'Cada criterio necesita los dos lados.',
+    left_3: 'Cada criterio necesita los dos lados.',
+  });
+}
+
+export async function updateSavedScreenResult(formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => updateSavedScreen(formData), {
+    name: 'Ponle un nombre al filtro.',
+  });
+}
+
+export async function createDriverAssumptionResult(ticker: string, formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => createDriverAssumption(ticker, formData), {
+    driver_key: 'Elige el driver del supuesto.',
+    fiscal_year: 'Indica el año fiscal.',
+    source: 'Indica la fuente del supuesto.',
+    rationale: 'Explica el porqué del supuesto.',
+  });
+}
+
+export async function updateDecisionLessonResult(ticker: string, lessonId: number, formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => updateDecisionLesson(ticker, lessonId, formData), {
+    taxonomy: 'Elige la taxonomía de la lección.',
+    cause: 'Describe la causa raíz.',
+    error: 'Describe el error de decisión.',
+    lesson: 'Escribe la lección duradera.',
+    future_application: 'Indica cómo cambia las decisiones futuras.',
+  });
+}
+
+export async function createManagementPromiseResult(ticker: string, formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => createManagementPromise(ticker, formData), {
+    promise: 'Escribe la promesa registrada.',
+    promise_date: 'Indica la fecha de la promesa.',
+    expected_period: 'Indica el periodo de cumplimiento esperado.',
+  });
+}
+
+export async function updateManagementExplanationResult(ticker: string, promiseId: number, formData: FormData): Promise<FormMutationResult> {
+  return formMutationResult(() => updateManagementExplanation(ticker, promiseId, formData), {
+    explanation: 'Escribe la explicación.',
+  });
+}
