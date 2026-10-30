@@ -450,6 +450,12 @@ class Settings(BaseSettings):
     # Cierre mas antiguo (dias naturales) con el que aun se emite una senal DCA.
     dca_max_data_age_days: int = Field(default=14, ge=1, le=90)
     dca_alert_channels: str = "in_app,email"
+    # Avisos de proximos resultados (earnings) de watchlist + cartera, estilo
+    # Investing: ventanas de 7 dias, 1 dia y el propio dia sobre las fechas ya
+    # refrescadas en earnings_dates. EARNINGS_ALERT_CHANNELS: canales base;
+    # Telegram/push se anaden solo con la suscripcion "earnings" activa.
+    earnings_alerts_enabled: bool = True
+    earnings_alert_channels: str = "in_app,email"
     # Langfuse Cloud EU shadow tracing (stage 3): SOLO observabilidad.
     # Apagado por defecto; nunca es fuente de verdad de negocio (eso es
     # Postgres). Sin payloads: solo metadatos de la allowlist. Muestreo del
