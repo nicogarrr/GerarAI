@@ -1,3 +1,4 @@
+import { getT } from '@/lib/i18n/server';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card } from '@/components/ui/card';
 
@@ -6,10 +7,11 @@ import { Card } from '@/components/ui/card';
  * pintar; sin esto la pantalla se quedaba en blanco hasta el final.
  * Mismo patrón accesible que components/LoadingState.tsx.
  */
-export default function Loading() {
+export default async function Loading() {
+  const ti = await getT();
   return (
     <main id="content" tabIndex={-1} aria-busy="true" className="mx-auto flex w-full min-w-0 max-w-7xl flex-col overflow-x-clip">
-      <span className="sr-only" role="status">Cargando…</span>
+      <span className="sr-only" role="status">{ti('common.states.loading')}</span>
       <div aria-hidden="true">
         <Skeleton className="mb-2 h-8 w-48" />
         <Skeleton className="mb-6 h-4 w-full max-w-md" />

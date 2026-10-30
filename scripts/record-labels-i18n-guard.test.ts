@@ -46,8 +46,12 @@ const planRoute = source('data-engine/app/api/routes/plan.py');
 
 /** Claves declaradas en un `const X: Record<string, string> = { ... };`. */
 function labelMapKeys(view: string): Set<string> {
+  // Los mapas de etiquetas viven dentro del componente (carril C: necesitan
+  // la t() del hook) o en funciones que la reciben: cierre indentado y
+  // forma `function f(...): Record<string, string> { return {...}; }`.
   const blocks = [
-    ...[...view.matchAll(/Record<string, string>\s*=\s*\{([\s\S]*?)\n\};/g)].map((match) => match[1]),
+    ...[...view.matchAll(/Record<string, string>\s*=\s*\{([\s\S]*?)\n\s*\};/g)].map((match) => match[1]),
+    ...[...view.matchAll(/Record<string, string> \{\s*return \{([\s\S]*?)\n\s*\};/g)].map((match) => match[1]),
     ...[...view.matchAll(/columnLabels=\{\{([\s\S]*?)\}\}/g)].map((match) => match[1]),
   ];
   const keys = new Set<string>();

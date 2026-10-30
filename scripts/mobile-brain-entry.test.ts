@@ -16,6 +16,9 @@ test('cartera reserva espacio inferior y etiqueta el periodo de análisis', () =
   const layout = readFileSync('app/(root)/portfolio/layout.tsx', 'utf8');
   const page = readFileSync('app/(root)/portfolio/intelligence/page.tsx', 'utf8');
   assert.ok(layout.includes('pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0'));
-  assert.ok(page.includes('Periodo de análisis (años)'));
+  // i18n: la etiqueta vive en messages/<locale>/portfolio.json.
+  assert.ok(page.includes('portfolio.intelligence.yearsLabel'));
+  const portfolioEs = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+  assert.equal(portfolioEs.intelligence.yearsLabel, 'Periodo de análisis (años)');
   assert.ok(page.includes('htmlFor="intelligence-years"'));
 });
