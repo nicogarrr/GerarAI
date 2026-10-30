@@ -236,3 +236,19 @@ def test_data_services_explicitly_reset_inherited_host_ports():
         assert compose["services"][name]["ports"] == []
         section = re.split(r"\n  [A-Za-z_][\w-]*:", source.split(f"\n  {name}:\n", 1)[1], maxsplit=1)[0]
         assert "ports: !reset []" in section
+
+
+def test_prod_redis_requires_auth_and_all_clients_switch_together():
+    compose = _load_compose()
+    redis = compose["services"]["redis"]
+    assert "${REDIS_PASSWORD:?" in _service_env(compose, "redis")["REDIS_PASSWORD"]
+    command = "\n".join(redis["command"])
+    assert "requirepass %s" in command
+    assert "umask 077" in command
+    assert "exec redis-server /tmp/redis-auth.conf" in command
+    assert "--requirepass" not in command
+    health = " ".join(redis["healthcheck"]["test"])
+    assert "REDISCLI_AUTH" in health and "grep -qx PONG" in health
+    for service in APP_SERVICES:
+        url = _service_env(compose, service).get("REDIS_URL", "")
+        assert url.startswith("redis://:${REDIS_PASSWORD:?") and url.endswith("@redis:6379/0"), service
