@@ -314,15 +314,16 @@ export default async function WatchlistPage({
         sort === key ? (dir === 'asc' ? 'ascending' : 'descending') : undefined;
     const sortIndicator = (key: SortKey) =>
         sort === key ? <span aria-hidden="true" className="text-teal-400">{dir === 'asc' ? '▲' : '▼'}</span> : null;
-    // Solo cuentan tickers con valor justo ÚNICO (tesis publicada de K o motor,
-    // misma cifra que inicio y screener); sin valoración no se juzga caro/barato.
+    // Solo cuentan tickers con valor justo ÚNICO (tesis publicada en la
+    // biblioteca o motor, misma cifra que inicio y screener); sin valoración
+    // no se juzga caro/barato.
     const undervaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'infravalorada').length;
     const overvaluedCount = watchlistStocks.filter((stock) => stock.monitor?.valuation_side === 'sobrevalorada').length;
     const judged = watchlistStocks.filter((stock) => stock.monitor?.valuation_side);
     const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
     const byEngine = judged.length - byThesis;
     const fairValueSourceNote = [
-        byThesis > 0 ? `${byThesis} por tesis publicada de K` : null,
+        byThesis > 0 ? `${byThesis} por tesis publicada` : null,
         byEngine > 0 ? `${byEngine} por el motor de valoración` : null,
     ].filter(Boolean).join(', ');
 
