@@ -131,3 +131,14 @@ describe('PortfolioSummary', () => {
         expect(screen.getByText(/valoración pendiente tras un split.*\(KRKNF\)/)).toBeInTheDocument();
     });
 });
+
+describe('PortfolioSummary: posiciones fuera del coste', () => {
+    it('dice cuántas posiciones quedan fuera de coste y rendimiento', () => {
+        render(<PortfolioSummary summary={summary({ totalsExcluded: 2, holdings: [holding(), holding({ symbol: 'NOFX', fxMissing: true, valueMissing: true })] })} />);
+        expect(screen.getByText(/No incluye 2 posiciones sin precio, tipo de cambio o en revisión/)).toBeInTheDocument();
+    });
+    it('sin exclusiones no añade la nota', () => {
+        render(<PortfolioSummary summary={summary()} />);
+        expect(screen.queryByText(/No incluye/)).toBeNull();
+    });
+});
