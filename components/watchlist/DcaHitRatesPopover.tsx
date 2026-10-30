@@ -6,14 +6,23 @@ import DcaHitRatesCard from '@/components/watchlist/DcaHitRatesCard';
 import { getDcaHitRates } from '@/lib/actions/dca-signals.actions';
 import type { DcaHitRates } from '@/lib/dca/types';
 
-/** Abre el histórico «¿cuántas veces estaba más arriba?» del ticker bajo demanda. */
+/** Abre el histórico «¿cuántas veces estaba más arriba?» del ticker bajo demanda.
+    Solo se guarda una respuesta buena: si el servicio no estaba disponible (o la
+    llamada falló por red), al volver a abrir se reintenta en vez de quedarse en
+    «no disponible» hasta recargar la página. */
 export default function DcaHitRatesPopover({ symbol }: { symbol: string }) {
     const [data, setData] = useState<DcaHitRates | null | undefined>(undefined);
     const [pending, startTransition] = useTransition();
     const load = (open: boolean) => {
-        if (!open || data !== undefined) return;
+        if (!open || data || pending) return;
         startTransition(async () => {
-            setData(await getDcaHitRates(symbol));
+            let next: DcaHitRates | null = null;
+            try {
+                next = await getDcaHitRates(symbol);
+            } catch {
+                next = null;
+            }
+            setData(next);
         });
     };
     return (

@@ -37,6 +37,19 @@ describe('DCA historical evidence display',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Histórico de señales DCA de TEST'}));
   expect(await screen.findByTestId('dca-hit-rates')).toBeVisible();expect(mocks.load).toHaveBeenCalledOnce();
  });
+ it('retries on reopen after an unavailable or failed load instead of caching it',async()=>{
+  mocks.load.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce(null).mockResolvedValueOnce(data());
+  render(<DcaHitRatesPopover symbol="TEST"/>);
+  const trigger=()=>screen.getByRole('button',{name:'Histórico de señales DCA de TEST'});
+  const close=async()=>{fireEvent.keyDown(screen.getByRole('dialog'),{key:'Escape'});await waitFor(()=>expect(screen.queryByRole('dialog')).not.toBeInTheDocument());};
+  fireEvent.click(trigger());
+  expect(await screen.findByText('Histórico de señales no disponible ahora mismo.')).toBeVisible();
+  await close();fireEvent.click(trigger());
+  expect(await screen.findByText('Histórico de señales no disponible ahora mismo.')).toBeVisible();
+  await close();fireEvent.click(trigger());
+  expect(await screen.findByTestId('dca-hit-rates')).toBeVisible();
+  expect(mocks.load).toHaveBeenCalledTimes(3);
+ });
  it('shows unavailable when the action returns null',async()=>{
   mocks.load.mockResolvedValue(null);render(<DcaHitRatesPopover symbol="TEST"/>);
   fireEvent.click(screen.getByRole('button',{name:'Histórico de señales DCA de TEST'}));
