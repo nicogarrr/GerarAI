@@ -362,3 +362,12 @@ describe('inteligencia y grafo', () => {
         expect(revalidatePath).toHaveBeenCalledWith('/knowledge-graph');
     });
 });
+
+describe('ids en la ruta del backend (server action con argumentos del cliente)', () => {
+    it('updateManagementExplanation rechaza un promiseId que no es entero positivo y no llama al backend', async () => {
+        const f = form({ explanation: 'x' });
+        await expect(updateManagementExplanation('AAPL', '../../../portfolio/holdings/1' as unknown as number, f)).rejects.toThrow();
+        await expect(updateManagementExplanation('AAPL', -1, f)).rejects.toThrow();
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+});
