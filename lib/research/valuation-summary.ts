@@ -1,3 +1,5 @@
+import { metricLabel } from '@/lib/research/metric-labels';
+
 export type HealthEvidence = { fact_id: number; metric: string; value: number; unit: string; period_end: string; source_url: string; source_type: string };
 export type FinancialHealth = {
   status: string; reason?: string; period_end?: string; notice: string;
@@ -16,4 +18,17 @@ export function safetyMargin(price: number | null, currency: string | null, fair
   if (!fair.publishable || !fair.value || !Number.isFinite(fair.value) || fair.value <= 0 || price == null || !Number.isFinite(price) || price <= 0) return null;
   if (!currency || !fair.currency || currency.toUpperCase() !== fair.currency.toUpperCase()) return null;
   return (fair.value - price) / fair.value;
+}
+
+/**
+ * El backend (financial_health.py) señala el dato que falta como «métrica:FYaaaa»
+ * («total_assets:FY2024»). Se muestra con la etiqueta española y el ejercicio;
+ * los motivos que ya vienen redactados («periodos no comparables») pasan tal cual.
+ */
+export function healthMissingLabel(raw: string): string {
+  const text = raw.trim();
+  const dated = /^([a-z][a-z0-9_]*):FY(\d{4})$/.exec(text);
+  if (dated) return `${metricLabel(dated[1])} (ejercicio ${dated[2]})`;
+  if (/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/.test(text)) return metricLabel(text);
+  return raw;
 }
