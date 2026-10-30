@@ -6,8 +6,7 @@
 # que aqui NO va ni frontend ni MongoDB.
 #
 # Presupuesto de memoria: la suma de `memory` de TODOS los servicios es
-# 10.240 MiB (10 GiB justos; el comentario decia 10.176, deriva de 64 MiB ya
-# existente). El resto de la VM queda para el kernel, page cache y una swap de
+# 12.032 MiB (11,75 GiB); worker default con 3 GiB tras OOM medido. El resto de la VM queda para el kernel, page cache y una swap de
 # 2-4 GB (ver docs/oracle-setup.md). Los `cpus` son techos por servicio, no
 # reservas: la VM tiene 4 OCPU y varios servicios pueden turnarse. No se
 # supera este techo: el carril "computed" lo consume el worker-alerts (jobs
