@@ -313,3 +313,15 @@ def test_dispatch_failure_is_recorded_and_alert_kept(db, monkeypatch):
 def test_no_followed_companies_and_utc_fallback(db):
     assert er.due_reminders(db, NOW) == []
     assert er._market_today(None, NOW) == NOW.date()
+
+
+def test_earnings_reminders_are_opt_in_by_default(monkeypatch):
+    from pathlib import Path
+
+    from app.core.config import Settings
+
+    monkeypatch.delenv("EARNINGS_ALERTS_ENABLED", raising=False)
+    assert Settings(_env_file=None).earnings_alerts_enabled is False
+    example = Path(__file__).resolve().parents[2] / "docker.env.example"
+    assert "EARNINGS_ALERTS_ENABLED=false" in example.read_text()
+    assert "EARNINGS_ALERTS_ENABLED=true" not in example.read_text()
