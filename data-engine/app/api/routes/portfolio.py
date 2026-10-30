@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.schemas.pagination import PaginatedResponse
 from app.services.async_bridge import run_from_any_context
+from app.services.audit_service import record_audit_event
 from app.services.company_resolver import resolve_company
 from app.services.connectors.ibkr import IBKRFlexClient
 from app.services.dividend_ingestion_service import DividendIngestionService
@@ -331,6 +332,14 @@ def create_portfolio(
         ) from exc
 
     db.refresh(portfolio)
+    record_audit_event(
+        db,
+        action="portfolio_created",
+        resource_type="portfolio",
+        resource_id=str(portfolio.id),
+        after_state={"name": portfolio.name, "base_currency": portfolio.base_currency},
+    )
+    db.commit()
     return {
         "id": portfolio.id,
         "name": portfolio.name,

@@ -203,7 +203,12 @@ def _assign_tenant_to_new_rows(session: Session, _flush_context, _instances) -> 
     tenant_id = session.info.get("tenant_id")
     from sqlalchemy import inspect as sa_inspect
 
-    from app.models.entities import InferredInput, TenantOwnedMixin
+    from app.models.entities import AuditLog, InferredInput, TenantOwnedMixin
+
+    # AuditLog es append-only: nunca se permite modificar ni borrar registros de auditoria.
+    for instance in [*session.dirty, *session.deleted]:
+        if isinstance(instance, AuditLog):
+            raise RuntimeError("AuditLog is append-only and cannot be updated or deleted")
 
     # Also reject attached/privileged-loaded cross-tenant mutations and deletes.
     # Do not rely only on SELECT filters to protect an already-loaded object.
