@@ -415,7 +415,9 @@ services:
           cpus: "2.00"
           memory: 2G
 
-  # worker: 3 threads (antes 6). Con 6 el proceso dramatiq llegaba al limite de 3G
+  # worker: 1 thread evita solapar reconciliaciones de evidencia.
+  # OOM confirmado 30-oct-2026 con 3 refresh_bottlenecks y limite 1280M.
+  # 3G aporta margen, no demuestra ausencia de fuga. Historico: 3 threads (antes 6). Con 6 el proceso dramatiq llegaba al limite de 3G
   # (OOM de cgroup 24/10 19:09 y 19:13): el hijo muere por SIGKILL. Causa medida:
   # refresh_bottlenecks cargaba todos los chunks del tenant en memoria
   # (stored_evidence), y la concurrencia/redelivery de esos jobs sumaba memoria.
@@ -424,7 +426,7 @@ services:
     image: cavaai-backend:prod
     container_name: cavaai-worker
     restart: unless-stopped
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "3", "-Q", "default", "prices"]
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "1", "-Q", "default", "prices"]
     environment:
       <<: [*app-env, *worker-db-env, *llm-env]
       EIA_API_KEY: ${EIA_API_KEY:-}
@@ -494,7 +496,7 @@ services:
       resources:
         limits:
           cpus: "1.00"
-          memory: 1280M
+          memory: 3G
 
   # Dedicated lane: closes must not wait behind RSS/default backpressure.
   worker-official-closes:
