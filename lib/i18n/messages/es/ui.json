@@ -6,10 +6,25 @@
   },
   "command": {
     "placeholder": "Buscar acciones, tesis o documentos...",
-    "error": "No se pudo completar la búsqueda"
+    "error": "No se pudo completar la búsqueda. Inténtalo de nuevo.",
+    "title": "Buscar acciones",
+    "subtitle": "Busca por símbolo o empresa, o salta a una sección de GerarAI",
+    "inputPlaceholder": "Buscar acciones o comando «ASTS FA»...",
+    "inputAria": "Buscar acciones o secciones",
+    "loading": "Cargando acciones...",
+    "noStocks": "No hay acciones disponibles",
+    "resultsCount": "Resultados de búsqueda ({n})",
+    "popular": "Acciones populares",
+    "unverifiedCoverage": "Cobertura de ficha no comprobada",
+    "tickerCommands": "Comandos de {ticker}",
+    "stockPage": "Ficha",
+    "directSymbol": "Ir directo por símbolo"
   },
   "search": {
     "placeholder": "Buscar por nombre o símbolo",
-    "noResults": "Sin resultados"
+    "noResults": "Sin resultados",
+    "addStock": "Añadir acción",
+    "openAria": "Abrir buscador",
+    "stocksPlaceholder": "Buscar acciones..."
   }
 }

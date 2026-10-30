@@ -3,6 +3,7 @@
 import IntentLink from '@/components/layout/IntentLink'
 import {usePathname} from 'next/navigation'
 import {isNavItemActive, isNavItemExact, NAV_SECTIONS, showsNavSectionTitle, type NavItem} from '@/lib/constants'
+import {useT} from '@/lib/i18n/client'
 
 /**
  * Version movil del menu. Comparte arbol, reglas de estado activo y titulos con
@@ -11,14 +12,15 @@ import {isNavItemActive, isNavItemExact, NAV_SECTIONS, showsNavSectionTitle, typ
  */
 const NavItems = () => {
     const pathname = usePathname()
+    const t = useT()
 
     return (
         <ul className="flex max-w-full flex-col p-2 text-sm font-medium">
             {NAV_SECTIONS.map((section) => (
-                <li key={section.title}>
+                <li key={section.titleKey}>
                     {showsNavSectionTitle(section) && (
                         <p className="px-1 pb-1 pt-4 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                            {section.title}
+                            {section.titleKey ? t(section.titleKey) : null}
                         </p>
                     )}
                     <ul className="flex flex-col gap-1">
@@ -40,6 +42,7 @@ function ariaCurrent(active: boolean, exact: boolean): 'page' | 'true' | undefin
 }
 
 function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
+    const t = useT()
     const active = isNavItemActive(pathname, item.href)
     const branchActive = active || (item.children ?? []).some((child) => isNavItemActive(pathname, child.href))
 
@@ -51,7 +54,7 @@ function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
                 className={classes(active, 'text-base', branchActive)}
             >
                 {item.icon && <item.icon aria-hidden="true" className="h-4 w-4 shrink-0" />}
-                <span className="truncate">{item.label}</span>
+                <span className="truncate">{t(item.labelKey)}</span>
             </IntentLink>
             {item.children && (
                 <ul className="mt-1 flex flex-col gap-1 border-l border-gray-700/50 pl-3">
@@ -64,7 +67,7 @@ function ItemLink({item, pathname}: {item: NavItem; pathname: string}) {
                                     aria-current={ariaCurrent(childActive, isNavItemExact(pathname, child.href))}
                                     className={classes(childActive, 'text-base')}
                                 >
-                                    <span className="truncate">{child.label}</span>
+                                    <span className="truncate">{t(child.labelKey)}</span>
                                 </IntentLink>
                             </li>
                         )

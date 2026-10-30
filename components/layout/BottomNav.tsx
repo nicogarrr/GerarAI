@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { MOBILE_TAB_ITEMS, isNavItemActive, isNavItemExact } from '@/lib/constants';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Barra inferior del movil: cinco destinos con etiqueta y el Cerebro como
@@ -13,6 +14,7 @@ import { MOBILE_TAB_ITEMS, isNavItemActive, isNavItemExact } from '@/lib/constan
  */
 export default function BottomNav() {
     const pathname = usePathname();
+    const t = useT();
     const middle = Math.ceil(MOBILE_TAB_ITEMS.length / 2);
     const items: Array<(typeof MOBILE_TAB_ITEMS)[number] | 'cerebro'> = [
         ...MOBILE_TAB_ITEMS.slice(0, middle),
@@ -22,7 +24,7 @@ export default function BottomNav() {
 
     return (
         <nav
-            aria-label="Navegación inferior"
+            aria-label={t('shell.nav.bottomAria')}
             data-bottom-nav
             className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-800 bg-gray-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
         >
@@ -32,13 +34,13 @@ export default function BottomNav() {
                         return (
                             <li key="cerebro">
                                 <button
-                                    aria-label="Abrir el cerebro"
+                                    aria-label={t('brain.openAria')}
                                     className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-teal-300 transition-colors hover:text-teal-200"
                                     onClick={() => window.dispatchEvent(new Event('gerarai:open-brain'))}
                                     type="button"
                                 >
                                     <BrainGlassesIcon aria-hidden="true" className="h-5 w-5" />
-                                    <span>Cerebro</span>
+                                    <span>{t('brain.name')}</span>
                                 </button>
                             </li>
                         );
@@ -54,7 +56,7 @@ export default function BottomNav() {
                                 }`}
                             >
                                 <item.icon aria-hidden="true" className="h-5 w-5" />
-                                <span>{item.label}</span>
+                                <span>{t(item.labelKey)}</span>
                             </Link>
                         </li>
                     );

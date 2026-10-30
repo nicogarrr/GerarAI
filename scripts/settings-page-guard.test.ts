@@ -54,7 +54,8 @@ describe('ajustes', () => {
     const dropdown = read('components/UserDropdown.tsx');
     assert.match(dropdown, /router\.push\("\/settings"\)/);
     assert.match(dropdown, /router\.push\("\/settings#llm"\)/);
-    assert.match(dropdown, /Modelo de IA/);
+    assert.match(dropdown, /t\('shell.user.aiModel'\)/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/shell.json', 'utf8')).user.aiModel, 'Modelo de IA');
     assert.match(read('next.config.ts'), /source: '\/research\/settings', destination: '\/settings'/);
   });
 });

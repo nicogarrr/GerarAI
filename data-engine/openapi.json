@@ -7054,6 +7054,46 @@
         "title": "LLMTestResponse",
         "type": "object"
       },
+      "LanguageOut": {
+        "properties": {
+          "generation_enabled": {
+            "title": "Generation Enabled",
+            "type": "boolean"
+          },
+          "language": {
+            "title": "Language",
+            "type": "string"
+          },
+          "supported": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supported",
+            "type": "array"
+          }
+        },
+        "required": [
+          "language",
+          "supported",
+          "generation_enabled"
+        ],
+        "title": "LanguageOut",
+        "type": "object"
+      },
+      "LanguageUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "language": {
+            "title": "Language",
+            "type": "string"
+          }
+        },
+        "required": [
+          "language"
+        ],
+        "title": "LanguageUpdate",
+        "type": "object"
+      },
       "LibraryQuestion": {
         "properties": {
           "author": {
@@ -12032,7 +12072,14 @@
             "anyOf": [
               {
                 "additionalProperties": {
-                  "type": "number"
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "type": "object"
               },
@@ -12088,6 +12135,14 @@
             "additionalProperties": true,
             "default": {},
             "title": "Reverse Dcf",
+            "type": "object"
+          },
+          "scenario_notes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Scenario Notes",
             "type": "object"
           },
           "sensitivity": {
@@ -61238,6 +61293,336 @@
           }
         },
         "summary": "Sync Ibkr Connection",
+        "tags": [
+          "settings"
+        ]
+      }
+    },
+    "/api/settings/language": {
+      "get": {
+        "operationId": "read_language_api_settings_language_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Language",
+        "tags": [
+          "settings"
+        ]
+      },
+      "put": {
+        "operationId": "update_language_api_settings_language_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LanguageUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LanguageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Language",
         "tags": [
           "settings"
         ]
