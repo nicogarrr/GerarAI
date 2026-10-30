@@ -42,7 +42,7 @@ def _money(value, currency) -> str:
 
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
-from app.services.dividend_records import resolve_yahoo_events
+from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
 
 
 def _link(company: Company, view: str = "financials") -> str:
@@ -153,7 +153,8 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
         if uncertain:
             uncertain_tickers.append(comp.ticker)
             continue
-        records = sorted((r for r in kept if r.currency == position.currency), key=lambda r: r.ex_date)
+        # GBX (peniques) frente a GBp/GBP de la posicion: misma moneda, sin FX.
+        records = records_in_position_currency(kept, position.currency)
         if not records:
             without.append(comp.ticker)
             continue

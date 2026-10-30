@@ -139,7 +139,7 @@ def records_in_position_currency(records: Iterable[Any], position_currency: str 
         unit = position_currency if position_currency in groups else sorted(groups)[0]
         for record, per_share in groups[unit]:
             out.append(SimpleNamespace(
-                company_id=record.company_id, ex_date=record.ex_date, pay_date=record.pay_date,
+                id=getattr(record, "id", None), company_id=record.company_id, ex_date=record.ex_date, pay_date=record.pay_date,
                 amount=per_share, currency=position_currency, source=record.source,
                 fetched_at=getattr(record, "fetched_at", None),
             ))
