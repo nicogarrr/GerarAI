@@ -385,8 +385,18 @@ def _has_unexplained_share_jump(series: list[dict[str, Any]]) -> bool:
     return False
 
 
+def _iso_date(value: str | None) -> date | None:
+    try:
+        return date.fromisoformat((value or "")[:10])
+    except ValueError:
+        return None
+
+
 def _adjust_share_facts(
-    facts: list[FinancialFact], splits: list[CorporateAction]
+    facts: list[FinancialFact],
+    splits: list[CorporateAction],
+    *,
+    cutoff: date | None = None,
 ) -> list[Any]:
     """Multiplica cada recuento historico por el factor acumulado de los
     splits posteriores al cierre de su periodo (ratio = acciones despues /
@@ -406,7 +416,7 @@ def _adjust_share_facts(
         # DESPUES del split ya viene reexpresado (ASC 260) y no se multiplica
         # otra vez; solo se ajustan las cifras publicadas antes del split.
         factor = fact_split_factor(
-            events, period=fact.period, filed=getattr(fact, "filed", None)
+            events, period=fact.period, filed=getattr(fact, "filed", None), cutoff=cutoff
         )
         if factor == 1 or fact.value is None:
             adjusted.append(fact)
@@ -461,11 +471,16 @@ class LongTermModelService:
             }
             | {metric for _f, inputs, _s in DERIVED_DRIVERS.values() for metric in inputs}
         }
+        current_price, market_as_of, market_price_source = self._model_price(db, company)
         fact_cache["shares_diluted"] = _adjust_share_facts(
             _with_shares_outstanding_proxies(
                 fact_cache["shares_diluted"], fact_cache["shares_outstanding"]
             ),
             _split_events(db, company.id),
+            # Acciones en la base del precio con el que se comparan (escenarios
+            # por accion y DCF inverso): un cierre anterior al split esta en la
+            # base vieja.
+            cutoff=_iso_date(market_as_of),
         )
         revenue_history = self._annual_by_year(fact_cache["revenue"])
         years = sorted(revenue_history)
@@ -493,7 +508,6 @@ class LongTermModelService:
         )
         history = self._history_rows(fact_cache, years)
 
-        current_price, market_as_of, market_price_source = self._model_price(db, company)
         current = history[-1] if history else {
             "period": None,
             "fiscal_year": None,
