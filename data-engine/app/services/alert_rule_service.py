@@ -19,7 +19,7 @@ from app.models import (
     ResearchAlert,
 )
 from app.services.notification_service import NotificationService
-from app.services.price_freshness import market_price_is_stale
+from app.services.price_freshness import close_is_stale
 from app.services.price_units import close_in_company_currency, listing_price
 from app.services.review_alert_service import ReviewAlertService
 from app.services.trading_sessions import missing_sessions
@@ -284,6 +284,11 @@ class AlertRuleService:
             db.refresh(rule)
         return result
 
+    @staticmethod
+    def _exchange(db: Session, rule: AlertRule) -> str | None:
+        company = db.get(Company, rule.company_id) if rule.company_id is not None else None
+        return company.exchange if company is not None else None
+
     def _observe(self, db: Session, rule: AlertRule) -> tuple[Any, dict[str, Any]]:
         kind = str((rule.target or {}).get("kind") or "")
         if kind == "market_price":
@@ -313,7 +318,9 @@ class AlertRuleService:
                     "age_days": age_days,
                     "status": (
                         "stale"
-                        if market_price_is_stale(age_days, get_settings().market_price_max_age_days)
+                        if close_is_stale(
+                            prices[0].date, self._exchange(db, rule), get_settings().market_price_max_age_days
+                        )
                         else "fresh"
                     ),
                 }
@@ -345,8 +352,9 @@ class AlertRuleService:
                         "age_days": (date.today() - position.as_of).days,
                         "status": (
                             "stale"
-                            if market_price_is_stale(
-                                (date.today() - position.as_of).days,
+                            if close_is_stale(
+                                position.as_of,
+                                self._exchange(db, rule),
                                 get_settings().market_price_max_age_days,
                             )
                             else "fresh"
@@ -432,7 +440,11 @@ class AlertRuleService:
                 "age_days": age_days,
                 "status": (
                     "stale"
-                    if market_price_is_stale(age_days, get_settings().market_price_max_age_days)
+                    if close_is_stale(
+                        prices[0].date,
+                        company.exchange if company is not None else None,
+                        get_settings().market_price_max_age_days,
+                    )
                     else "fresh"
                 ),
             }
