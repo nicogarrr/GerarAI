@@ -4,7 +4,7 @@ import { backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visi
  * Primer uso: desde «Primeros pasos» de Inicio, «Añadir» abre directamente el
  * alta en destino (sin un segundo clic), una compra se registra aunque el
  * buscador no devuelva sugerencias (CI y local van sin proveedor de búsqueda:
- * «Usar «KO» como símbolo») y se borra desde Movimientos.
+ * «Usar «KO» como símbolo»), se corrige y se borra desde Movimientos.
  */
 const SYMBOL = "KO";
 
@@ -34,10 +34,14 @@ for (const vp of VIEWPORTS) {
     test.use(vp.use);
     test.describe.configure({ mode: "serial" });
 
-    test("Inicio → «Añadir» inversión abre el alta, registra una compra sin sugerencias y la borra", async ({ page }) => {
+    test("Inicio → «Añadir» inversión abre el alta, registra una compra sin sugerencias, la edita y la borra", async ({ page }) => {
       await resetAll();
       await visit(page, "/inicio");
       await expect(page.getByText("Primeros pasos")).toBeVisible({ timeout: 30_000 });
+      // Sin fuente de noticias (CI y local) Inicio dice «no hay noticias», no
+      // un aviso de error con un «Reintentar» que no arregla nada.
+      await expect(page.getByRole("heading", { name: "Noticias destacadas" })).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByText("No se pudieron cargar las noticias")).toHaveCount(0);
       await expectHealthyPage(page, "inicio vacío");
 
       await page.getByRole("link", { name: /Añadir\s*inversión/ }).click();
@@ -59,13 +63,26 @@ for (const vp of VIEWPORTS) {
       expect(mine.map((t) => [Number(t.quantity), Number(t.price)])).toEqual([[12, 58.25]]);
       await expectHealthyPage(page, "tras registrar la compra");
 
+      // Se corrige desde Movimientos (editar) y el cambio llega al backend.
+      await page.getByRole("tab", { name: "Movimientos" }).click();
+      const movimientos = page.getByRole("tabpanel", { name: "Movimientos" });
+      await movimientos.getByRole("button", { name: `Editar transacción de ${SYMBOL}` }).first().click();
+      const edit = page.getByRole("dialog", { name: "Editar Transacción" });
+      await expect(edit).toBeVisible();
+      await edit.getByLabel("Cantidad").fill("15");
+      await edit.getByRole("button", { name: "Guardar Cambios" }).click();
+      await expect(page.getByText("Transacción actualizada")).toBeVisible({ timeout: 30_000 });
+      await expect(edit).toBeHidden();
+      const edited = await backendCall("GET", "/api/portfolio/transactions");
+      expect((edited.json as Array<{ ticker: string; quantity: string | number }>).filter((t) => t.ticker === SYMBOL).map((t) => Number(t.quantity))).toEqual([15]);
+
       // Y se borra desde Movimientos (con confirmación), también por la UI: así
       // la caché de lecturas de cartera se invalida igual que en uso real.
       await page.getByRole("tab", { name: "Movimientos" }).click();
       const panel = page.getByRole("tabpanel", { name: "Movimientos" });
       await panel.getByRole("button", { name: "Eliminar transacción" }).first().click();
       const confirm = page.getByRole("alertdialog").or(page.getByRole("dialog", { name: "Eliminar transacción" })).first();
-      await expect(confirm).toContainText(`12 ${SYMBOL}`);
+      await expect(confirm).toContainText(`15 ${SYMBOL}`);
       await confirm.getByRole("button", { name: "Eliminar" }).click();
       await expect(page.getByText("Transacción eliminada")).toBeVisible({ timeout: 30_000 });
       const after = await backendCall("GET", "/api/portfolio/transactions");
