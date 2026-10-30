@@ -27,6 +27,9 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 
+/** Cartera sin posiciones: estado tranquilo, no un fallo del motor. */
+const EMPTY_REFRESH_MESSAGE = 'No hay posiciones que actualizar todavía. Registra una compra para empezar.';
+
 type Props = {
   holdings: PortfolioHolding[];
   userId: string;
@@ -175,6 +178,10 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   };
 
   const handleRefresh = async () => {
+    if (currentHoldings.length === 0) {
+      toast.info(EMPTY_REFRESH_MESSAGE);
+      return;
+    }
     setRefreshing(true);
     try {
       const result = await refreshPortfolioHoldings(currentHoldings);
@@ -191,6 +198,10 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
       setCurrentHoldings(result.holdings);
       router.refresh();
       const attempted = result.updated.length + result.skipped.length + result.failed.length;
+      if (attempted === 0) {
+        toast.info(EMPTY_REFRESH_MESSAGE);
+        return;
+      }
       if (result.failed.length > 0) {
         // Parcial con escrituras fallidas: se dice qué se guardó y qué falló,
         // y si además la relectura falló se declara en el mismo aviso (la
