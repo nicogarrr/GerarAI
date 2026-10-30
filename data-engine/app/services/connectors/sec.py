@@ -39,6 +39,11 @@ _json_cache: dict[str, tuple[float, dict]] = {}
 # Indice ticker -> CIK ligado a la entrada de cache del mapa de la SEC de la
 # que salio: se reconstruye solo cuando esa entrada cambia o caduca.
 _cik_index: tuple[tuple[float, dict] | None, CikIndex] | None = None
+# Singleflight por (event loop, URL): con la cache fria, N peticiones
+# concurrentes a la misma URL (p. ej. los cik_for_ticker en paralelo de los
+# catalizadores) compartian el reloj de la SEC y descargaban N veces el mapa
+# de tickers (~1 MB). Ahora la primera descarga y las demas esperan.
+_json_inflight: dict[tuple[int, str], asyncio.Task[dict]] = {}
 
 
 EFTS_FALLBACK_SOURCE = "efts-full-text-search"
@@ -91,6 +96,7 @@ def reset_sec_client_state() -> None:
         _next_slot_at = 0.0
     with _cache_lock:
         _json_cache.clear()
+    _json_inflight.clear()
 
 
 def _cache_get(url: str) -> dict | None:
@@ -227,6 +233,27 @@ class SECClient:
         cached = _cache_get(url) if self.use_cache else None
         if cached is not None:
             return cached
+        if not self.use_cache:
+            return await self._fetch_json(url)
+        flight_key = (id(asyncio.get_running_loop()), url)
+        task = _json_inflight.get(flight_key)
+        if task is None:
+            task = asyncio.ensure_future(self._fetch_json(url))
+            _json_inflight[flight_key] = task
+
+            def _done(t: asyncio.Task[dict]) -> None:
+                _json_inflight.pop(flight_key, None)
+                if not t.cancelled():
+                    t.exception()  # recogida: sin "exception was never retrieved"
+
+            task.add_done_callback(_done)
+            # ``shield``: si este llamador se cancela (deadline), la descarga
+            # sigue para los demas y llena la cache.
+            return await asyncio.shield(task)
+        # Quien se suma a una descarga en vuelo recibe su propia copia.
+        return copy.deepcopy(await asyncio.shield(task))
+
+    async def _fetch_json(self, url: str) -> dict:
         try:
             payload = (await self._get(url)).json()
             if self.use_cache:
