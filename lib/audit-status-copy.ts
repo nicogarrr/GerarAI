@@ -51,3 +51,18 @@ export function auditFixLabel(fix: string): string {
     return fix.replace(/\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b/g,
         (token) => METRIC_LABELS[token] ?? SOURCE_LABELS[token] ?? token.replaceAll('_', ' '));
 }
+
+/**
+ * Auditorías recientes primero (created_at desc, id desc de desempate). El
+ * panel de la ficha muestra solo la más reciente y pliega el historial: un
+ * muro de versiones viejas repetía el mismo texto y se leía como bug
+ * (informe UX 29-oct, punto 4).
+ */
+export function sortAuditsRecentFirst<T extends { id: number; created_at?: string | null }>(audits: readonly T[]): T[] {
+    return [...audits].sort((left, right) => {
+        const leftTs = left.created_at ?? '';
+        const rightTs = right.created_at ?? '';
+        if (leftTs !== rightTs) return leftTs < rightTs ? 1 : -1;
+        return right.id - left.id;
+    });
+}
