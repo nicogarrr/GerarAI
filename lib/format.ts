@@ -6,6 +6,15 @@
  * garantiza separadores de miles/meses españoles en todos los viewports.
  */
 
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { DEFAULT_LOCALE, intlLocale, type Locale } from './i18n/locale.ts';
+
+/**
+ * Locale Intl por defecto (el del idioma por defecto de la app, es).
+ * LEGACY: código nuevo recibe el locale como parámetro final opcional o usa
+ * createFormatters()/useFormat()/getFormat(), que ligan cada función al
+ * locale activo.
+ */
 export const FORMAT_LOCALE = 'es-ES';
 
 /** Zona del mercado de referencia: cierres, velas y datos de cotizaciones. */
@@ -31,6 +40,23 @@ export const NA = 'N/D';
  * distinguir "GerarAI está roto" de "todavía no lo has pedido".
  */
 export const NO_CORRIDO = 'No corrido';
+
+/** Placeholder de valor ausente por idioma. */
+const PLACEHOLDER_NA: Record<Locale, string> = { es: NA, en: 'N/A' };
+
+/** Placeholder de flujo no corrido por idioma. */
+const PLACEHOLDER_NOT_RUN: Record<Locale, string> = { es: NO_CORRIDO, en: 'Not run' };
+
+/** NA del locale («N/D» es, «N/A» en). */
+export function naFor(locale: Locale = DEFAULT_LOCALE): string {
+  return PLACEHOLDER_NA[locale];
+}
+
+/** NO_CORRIDO del locale («No corrido» es, «Not run» en). */
+export function noCorridoFor(locale: Locale = DEFAULT_LOCALE): string {
+  return PLACEHOLDER_NOT_RUN[locale];
+}
+
 
 function toFinite(value: NumericInput): number | null {
   if (value === null || value === undefined || value === '') return null;
@@ -65,6 +91,7 @@ const INT_GROUPS_ES = /^\d{1,3}(?:\.\d{3})+$/;
  */
 export function parseLocalizedNumberDetailed(
   value: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): { ok: true; value: number } | { ok: false; error: LocalizedNumberError } {
   const trimmed = value.trim();
   if (!trimmed) return { ok: false, error: 'empty' };
@@ -76,6 +103,21 @@ export function parseLocalizedNumberDetailed(
       ? { ok: true as const, value: signed }
       : { ok: false as const, error: 'invalid' as const };
   };
+
+  if (locale === 'en') {
+    // Gramática en-US: la coma es SOLO separador de miles en grupos de 3
+    // («1,234», «1,234.56») y el punto es el decimal («32.5», «.5», «5.»).
+    // Misma regla de honestidad que en es-ES: lo ambiguo se rechaza («32,5»,
+    // «1.234,56», «1.234.567»), nunca se reinterpreta.
+    const match = /^(\d{1,3}(?:,\d{3})*|\d+)?(?:\.(\d*))?$/.exec(body);
+    if (match && (match[1] !== undefined || (match[2] ?? '') !== '')) {
+      const intPart = (match[1] ?? '').replace(/,/g, '');
+      const decPart = match[2] ?? '';
+      if (intPart === '' && decPart === '') return { ok: false, error: 'invalid' };
+      return finish(Number(`${intPart || '0'}.${decPart || '0'}`));
+    }
+    return { ok: false, error: /[.,]/.test(body) ? 'ambiguous' : 'invalid' };
+  }
 
   const commaParts = body.split(',');
   if (commaParts.length > 2) return { ok: false, error: 'ambiguous' };
@@ -124,8 +166,8 @@ export function parseLocalizedNumberDetailed(
  * mejor un error visible que un factor 1000 silencioso en dinero). Para
  * distinguir el motivo y mensajear al usuario, usa parseLocalizedNumberDetailed.
  */
-export function parseLocalizedNumber(value: string): number | null {
-  const result = parseLocalizedNumberDetailed(value);
+export function parseLocalizedNumber(value: string, locale: Locale = DEFAULT_LOCALE): number | null {
+  const result = parseLocalizedNumberDetailed(value, locale);
   return result.ok ? result.value : null;
 }
 
@@ -137,9 +179,9 @@ export function parseLocalizedNumber(value: string): number | null {
  * Sin separador de miles para no estorbar al editar; hasta 12 decimales para
  * que el valor sobreviva al round-trip guardar-sin-tocar. No finito -> ''.
  */
-export function formatNumberForInput(value: number): string {
+export function formatNumberForInput(value: number, locale: Locale = DEFAULT_LOCALE): string {
   if (!Number.isFinite(value)) return '';
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     useGrouping: false,
     maximumFractionDigits: 12,
   }).format(value);
@@ -166,11 +208,12 @@ function toDate(value: string | number | Date | null | undefined): Date | null {
 export function formatNumber(
   value: NumericInput,
   options: Intl.NumberFormatOptions = {},
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  if (parsed === null) return fallback ?? naFor(locale);
+  return new Intl.NumberFormat(intlLocale(locale), {
     maximumFractionDigits: 2,
     useGrouping: 'always',
     // Una cifra que redondea a cero es cero, sin signo: -0,0004 salía «-0»
@@ -216,11 +259,12 @@ export function formatMoney(
   value: NumericInput,
   currency = 'USD',
   options: Intl.NumberFormatOptions = {},
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  if (parsed === null) return fallback ?? naFor(locale);
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
@@ -240,12 +284,13 @@ export function formatPrice(
   value: NumericInput,
   currency = 'USD',
   options: Intl.NumberFormatOptions = {},
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
+  if (parsed === null) return fallback ?? naFor(locale);
   const small = parsed !== 0 && Math.abs(parsed) < 0.01;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: 'currency',
     currency,
     useGrouping: 'always',
@@ -267,23 +312,35 @@ export function formatPrice(
 export function formatCompact(
   value: NumericInput,
   options: Intl.NumberFormatOptions = {},
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
+  if (parsed === null) return fallback ?? naFor(locale);
   const abs = Math.abs(parsed);
   const { maximumFractionDigits = 2, ...rest } = options;
+  if (locale === 'en') {
+    // en-US sí renderiza la escala compacta de forma consistente («4.9B»),
+    // así que no hace falta la escala fija «mil M» del español.
+    return new Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      maximumFractionDigits,
+      useGrouping: 'always',
+      signDisplay: 'negative',
+      ...rest,
+    }).format(parsed);
+  }
   // La escala se elige con la cifra YA redondeada (ECMA-402, notation
   // «compact»): 999.999.999 redondea a 1.000 M y debe salir «1 mil M».
   const digits = Math.min(Math.max(Math.trunc(maximumFractionDigits), 0), 20);
   const roundsTo = (scaled: number) => Number(scaled.toFixed(digits));
   if (abs >= 1e9 || roundsTo(abs / 1e6) >= 1000) {
-    return `${formatNumber(parsed / 1e9, { maximumFractionDigits, ...rest }, fallback)} mil M`;
+    return `${formatNumber(parsed / 1e9, { maximumFractionDigits, ...rest }, fallback, locale)} mil M`;
   }
   if (abs >= 1e6 || roundsTo(abs) >= 1e6) {
-    return `${formatNumber(parsed / 1e6, { maximumFractionDigits, ...rest }, fallback)} M`;
+    return `${formatNumber(parsed / 1e6, { maximumFractionDigits, ...rest }, fallback, locale)} M`;
   }
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     notation: 'compact',
     maximumFractionDigits,
     useGrouping: 'always',
@@ -293,9 +350,9 @@ export function formatCompact(
 }
 
 /** Símbolo es-ES de una divisa («US$», «€», «GBP»); el código si Intl no la conoce. */
-export function currencySymbolEs(currency: string): string {
+export function currencySymbolEs(currency: string, locale: Locale = DEFAULT_LOCALE): string {
   try {
-    const part = new Intl.NumberFormat(FORMAT_LOCALE, { style: 'currency', currency })
+    const part = new Intl.NumberFormat(intlLocale(locale), { style: 'currency', currency })
       .formatToParts(1)
       .find((p) => p.type === 'currency');
     return part?.value ?? currency;
@@ -313,11 +370,21 @@ export function formatMoneyCompact(
   value: NumericInput,
   currency: string,
   options: Intl.NumberFormatOptions = {},
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
-  return `${formatCompact(parsed, { maximumFractionDigits: 2, ...options }, fallback)}\u00a0${currencySymbolEs(currency)}`;
+  if (parsed === null) return fallback ?? naFor(locale);
+  if (locale === 'en') {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+      notation: 'compact',
+      maximumFractionDigits: 2,
+      ...options,
+    }).format(parsed);
+  }
+  return `${formatCompact(parsed, { maximumFractionDigits: 2, ...options }, fallback, locale)}\u00a0${currencySymbolEs(currency, locale)}`;
 }
 
 /**
@@ -325,8 +392,8 @@ export function formatMoneyCompact(
  * Solo presentación: el llamante garantiza que el importe ya está en dólares.
  * No usar para volúmenes o cantidades de acciones.
  */
-export function formatMarketCapUsd(value: NumericInput, fallback: string = NA): string {
-  return formatMoneyCompact(value, 'USD', {}, fallback);
+export function formatMarketCapUsd(value: NumericInput, fallback?: string, locale: Locale = DEFAULT_LOCALE): string {
+  return formatMoneyCompact(value, 'USD', {}, fallback, locale);
 }
 
 /**
@@ -337,20 +404,20 @@ export function formatMarketCapUsd(value: NumericInput, fallback: string = NA): 
  * Capitalización en la divisa real de la compañía (backend research la
  * conoce; USD solo cuando la divisa consta como USD). Compacta.
  */
-export function formatMarketCap(value: NumericInput, currency: string | null, fallback: string = NA): string {
+export function formatMarketCap(value: NumericInput, currency: string | null, fallback?: string, locale: Locale = DEFAULT_LOCALE): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
+  if (parsed === null) return fallback ?? naFor(locale);
   // Sin divisa real no se asume USD: numero compacto pelado, sin simbolo.
   if (!currency) {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat(intlLocale(locale), {
       notation: 'compact',
       maximumFractionDigits: 2,
     }).format(parsed);
   }
   // USD con la misma escala es-ES fija que formatMarketCapUsd («4,87 mil M US$»).
-  if (currency.toUpperCase() === 'USD') return formatMoneyCompact(parsed, 'USD', {}, fallback);
+  if (currency.toUpperCase() === 'USD') return formatMoneyCompact(parsed, 'USD', {}, fallback, locale);
   try {
-    return new Intl.NumberFormat('es-ES', {
+    return new Intl.NumberFormat(intlLocale(locale), {
       style: 'currency',
       currency,
       minimumFractionDigits: 0,
@@ -358,22 +425,23 @@ export function formatMarketCap(value: NumericInput, currency: string | null, fa
       maximumFractionDigits: 2,
     }).format(parsed);
   } catch {
-    return formatNumber(parsed, {}, fallback);
+    return formatNumber(parsed, {}, fallback, locale);
   }
 }
 
 export function formatPercent(
   value: NumericInput,
   { fromRatio = true, digits = 1, signDisplay }: { fromRatio?: boolean; digits?: number; signDisplay?: 'auto' | 'always' | 'never' } = {},
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const parsed = toFinite(value);
-  if (parsed === null) return fallback;
+  if (parsed === null) return fallback ?? naFor(locale);
   const rawRatio = fromRatio ? parsed : parsed / 100;
   // A displayed zero is neutral, even if a tiny signed value rounds to zero.
   const roundedZero = Math.abs(rawRatio * 100) < 0.5 * 10 ** -digits;
   const ratio = roundedZero ? 0 : rawRatio;
-  return new Intl.NumberFormat(FORMAT_LOCALE, {
+  return new Intl.NumberFormat(intlLocale(locale), {
     style: 'percent',
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
@@ -386,8 +454,8 @@ export function formatPercent(
  * -> «1 posición»; formatCountEs(5, 'posición', 'posiciones') ->
  * «5 posiciones». El número lleva separador de miles es-ES.
  */
-export function formatCountEs(value: number, singular: string, pluralForm: string): string {
-  return `${formatNumber(value, { maximumFractionDigits: 0 })} ${value === 1 ? singular : pluralForm}`;
+export function formatCountEs(value: number, singular: string, pluralForm: string, locale: Locale = DEFAULT_LOCALE): string {
+  return `${formatNumber(value, { maximumFractionDigits: 0 }, undefined, locale)} ${value === 1 ? singular : pluralForm}`;
 }
 
 /**
@@ -399,11 +467,12 @@ export function formatCountEs(value: number, singular: string, pluralForm: strin
 export function formatDate(
   value: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const date = toDate(value);
-  if (!date) return fallback;
-  return new Intl.DateTimeFormat(FORMAT_LOCALE, options).format(date);
+  if (!date) return fallback ?? naFor(locale);
+  return new Intl.DateTimeFormat(intlLocale(locale), options).format(date);
 }
 
 /** Cadena de solo fecha `YYYY-MM-DD`: dia de calendario, no instante. */
@@ -421,16 +490,17 @@ const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 export function formatMarketDate(
   value: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const dateOnly = typeof value === 'string' ? DATE_ONLY_RE.exec(value) : null;
   if (dateOnly) {
     const literal = new Date(
       Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])),
     );
-    return new Intl.DateTimeFormat(FORMAT_LOCALE, { ...options, timeZone: 'UTC' }).format(literal);
+    return new Intl.DateTimeFormat(intlLocale(locale), { ...options, timeZone: 'UTC' }).format(literal);
   }
-  return formatDate(value, { ...options, timeZone: MARKET_TZ }, fallback);
+  return formatDate(value, { ...options, timeZone: MARKET_TZ }, fallback, locale);
 }
 
 /**
@@ -439,7 +509,8 @@ export function formatMarketDate(
 export function formatUserDate(
   value: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   // Un string YYYY-MM-DD ya ES el dia de calendario (asOf de una tesis,
   // fecha de transaccion): renderizarlo literal, sin pasar por ninguna zona
@@ -449,9 +520,9 @@ export function formatUserDate(
     const literal = new Date(
       Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])),
     );
-    return new Intl.DateTimeFormat(FORMAT_LOCALE, { ...options, timeZone: 'UTC' }).format(literal);
+    return new Intl.DateTimeFormat(intlLocale(locale), { ...options, timeZone: 'UTC' }).format(literal);
   }
-  return formatDate(value, { ...options, timeZone: USER_TZ }, fallback);
+  return formatDate(value, { ...options, timeZone: USER_TZ }, fallback, locale);
 }
 
 /**
@@ -466,9 +537,10 @@ export function formatDateTime(
     hour: '2-digit',
     minute: '2-digit',
   },
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  return formatDate(value, options, fallback);
+  return formatDate(value, options, fallback, locale);
 }
 
 /** Fecha + hora en la zona del mercado (hora de cierre de sesión). */
@@ -481,9 +553,10 @@ export function formatMarketDateTime(
     hour: '2-digit',
     minute: '2-digit',
   },
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  return formatDate(value, { ...options, timeZone: MARKET_TZ }, fallback);
+  return formatDate(value, { ...options, timeZone: MARKET_TZ }, fallback, locale);
 }
 
 /** Fecha + hora en la zona del usuario. */
@@ -498,11 +571,12 @@ export function formatMarketDateTime(
 export function formatGeneratedDate(
   value: string | number | Date | null | undefined,
   options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' },
+  locale: Locale = DEFAULT_LOCALE,
 ): string | null {
   if (value === null || value === undefined) return null;
   const parsed = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
-  return formatUserDate(parsed, options);
+  return formatUserDate(parsed, options, undefined, locale);
 }
 
 export function formatUserDateTime(
@@ -514,7 +588,8 @@ export function formatUserDateTime(
     hour: '2-digit',
     minute: '2-digit',
   },
-  fallback: string = NA,
+  fallback?: string,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   // "YYYY-MM-DD" es un día de calendario, no un instante: toDate() lo parsea como
   // medianoche en la zona del PROCESO (UTC en el servidor, Madrid en el navegador),
@@ -526,9 +601,9 @@ export function formatUserDateTime(
       Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])),
     );
     const { hour: _hour, minute: _minute, second: _second, ...dayOnly } = options;
-    return new Intl.DateTimeFormat(FORMAT_LOCALE, { ...dayOnly, timeZone: 'UTC' }).format(literal);
+    return new Intl.DateTimeFormat(intlLocale(locale), { ...dayOnly, timeZone: 'UTC' }).format(literal);
   }
-  return formatDate(value, { ...options, timeZone: USER_TZ }, fallback);
+  return formatDate(value, { ...options, timeZone: USER_TZ }, fallback, locale);
 }
 
 /**
@@ -563,6 +638,7 @@ export function todayLocal(): string {
 export function formatTimeAgo(
   timestamp: number | string | Date | null | undefined,
   now: number | Date = Date.now(),
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
   const date =
     timestamp instanceof Date || typeof timestamp === 'string'
@@ -570,12 +646,18 @@ export function formatTimeAgo(
       : toFinite(timestamp) !== null
         ? new Date(toFinite(timestamp)! * 1000)
         : null;
-  if (!date) return NA;
+  if (!date) return naFor(locale);
   const reference = now instanceof Date ? now.getTime() : now;
   const diffInMs = reference - date.getTime();
   const diffInMinutes = Math.max(0, Math.floor(diffInMs / (1000 * 60)));
   const diffInHours = Math.floor(diffInMinutes / 60);
   const diffInDays = Math.floor(diffInHours / 24);
+  if (locale === 'en') {
+    if (diffInDays > 0) return `${diffInDays} ${diffInDays === 1 ? 'day' : 'days'} ago`;
+    if (diffInHours >= 1) return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffInMinutes >= 1) return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+    return 'just now';
+  }
   if (diffInDays > 0) return `hace ${diffInDays} ${diffInDays === 1 ? 'día' : 'días'}`;
   if (diffInHours >= 1) return `hace ${diffInHours} ${diffInHours === 1 ? 'hora' : 'horas'}`;
   if (diffInMinutes >= 1) {
@@ -592,12 +674,13 @@ export function formatTimeAgo(
 export function marginOfSafetyDisplay(
     margin: number | string | null | undefined,
     base: number | string | null | undefined,
+    locale: Locale = DEFAULT_LOCALE,
 ): string {
     const baseNum = typeof base === 'string' ? Number(base) : base;
-    if (baseNum !== null && baseNum !== undefined && !Number.isNaN(baseNum) && baseNum <= 0) return NA;
+    if (baseNum !== null && baseNum !== undefined && !Number.isNaN(baseNum) && baseNum <= 0) return naFor(locale);
     const m = typeof margin === 'string' ? Number(margin) : margin;
-    if (m === null || m === undefined || Number.isNaN(m)) return NA;
-    return formatPercent(m);
+    if (m === null || m === undefined || Number.isNaN(m)) return naFor(locale);
+    return formatPercent(m, {}, naFor(locale), locale);
 }
 
 
@@ -613,9 +696,9 @@ const NAME_SUFFIXES: Record<string, string> = {
  * respeta tal cual; si viene todo en mayúsculas se pasa a «Apple Inc», dejando
  * las siglas de hasta tres letras (IBM, AMD) sin tocar.
  */
-export function formatCompanyName(value: string | null | undefined): string {
+export function formatCompanyName(value: string | null | undefined, locale: Locale = DEFAULT_LOCALE): string {
   const raw = (value ?? '').trim();
-  if (!raw) return NA;
+  if (!raw) return naFor(locale);
   if (raw !== raw.toUpperCase()) return raw;
   const fixWord = (word: string): string => {
     if (!word) return word;
@@ -638,4 +721,85 @@ export function formatCompanyName(value: string | null | undefined): string {
     .join('');
   // Solo la ÚLTIMA palabra, sin guion/barra delante: «… LT» es «Ltd» recortado.
   return /\s+LT$/.test(raw) ? formatted.replace(/\s+LT$/, ' Ltd') : formatted;
+}
+
+/** Entrada de fecha aceptada por las funciones de formato de fechas. */
+export type FormatDateInput = string | number | Date | null | undefined;
+
+/**
+ * Funciones de formato ligadas a un locale concreto. Es la vía recomendada
+ * en código con idioma activo: en servidor `await getFormat()` y en cliente
+ * `useFormat()` (ambas en @/lib/i18n/server y @/lib/i18n/client).
+ */
+export type Formatters = {
+  locale: Locale;
+  /** Placeholder de valor ausente en el locale («N/D» / «N/A»). */
+  na: string;
+  /** Placeholder de flujo no corrido en el locale («No corrido» / «Not run»). */
+  noCorrido: string;
+  parseLocalizedNumber: (value: string) => number | null;
+  parseLocalizedNumberDetailed: (
+    value: string,
+  ) => { ok: true; value: number } | { ok: false; error: LocalizedNumberError };
+  formatNumberForInput: (value: number) => string;
+  formatNumber: (value: NumericInput, options?: Intl.NumberFormatOptions, fallback?: string) => string;
+  formatMoney: (value: NumericInput, currency?: string, options?: Intl.NumberFormatOptions, fallback?: string) => string;
+  formatPrice: (value: NumericInput, currency?: string, options?: Intl.NumberFormatOptions, fallback?: string) => string;
+  formatCompact: (value: NumericInput, options?: Intl.NumberFormatOptions, fallback?: string) => string;
+  formatMoneyCompact: (value: NumericInput, currency: string, options?: Intl.NumberFormatOptions, fallback?: string) => string;
+  formatMarketCapUsd: (value: NumericInput, fallback?: string) => string;
+  formatMarketCap: (value: NumericInput, currency: string | null, fallback?: string) => string;
+  formatPercent: (
+    value: NumericInput,
+    options?: { fromRatio?: boolean; digits?: number; signDisplay?: 'auto' | 'always' | 'never' },
+    fallback?: string,
+  ) => string;
+  formatConfidence: (value: NumericInput, fallback?: string) => string;
+  formatCount: (value: number, singular: string, pluralForm: string) => string;
+  currencySymbol: (currency: string) => string;
+  formatDate: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions, fallback?: string) => string;
+  formatMarketDate: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions, fallback?: string) => string;
+  formatUserDate: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions, fallback?: string) => string;
+  formatDateTime: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions, fallback?: string) => string;
+  formatMarketDateTime: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions, fallback?: string) => string;
+  formatUserDateTime: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions, fallback?: string) => string;
+  formatGeneratedDate: (value: FormatDateInput, options?: Intl.DateTimeFormatOptions) => string | null;
+  formatTimeAgo: (timestamp: number | string | Date | null | undefined, now?: number | Date) => string;
+  marginOfSafety: (margin: number | string | null | undefined, base: number | string | null | undefined) => string;
+  formatCompanyName: (value: string | null | undefined) => string;
+  todayLocal: () => string;
+};
+
+/** Crea las funciones de formato ligadas a `locale` (por defecto es). */
+export function createFormatters(locale: Locale = DEFAULT_LOCALE): Formatters {
+  return {
+    locale,
+    na: naFor(locale),
+    noCorrido: noCorridoFor(locale),
+    parseLocalizedNumber: (value) => parseLocalizedNumber(value, locale),
+    parseLocalizedNumberDetailed: (value) => parseLocalizedNumberDetailed(value, locale),
+    formatNumberForInput: (value) => formatNumberForInput(value, locale),
+    formatNumber: (value, options, fallback) => formatNumber(value, options, fallback, locale),
+    formatMoney: (value, currency, options, fallback) => formatMoney(value, currency, options, fallback, locale),
+    formatPrice: (value, currency, options, fallback) => formatPrice(value, currency, options, fallback, locale),
+    formatCompact: (value, options, fallback) => formatCompact(value, options, fallback, locale),
+    formatMoneyCompact: (value, currency, options, fallback) => formatMoneyCompact(value, currency, options, fallback, locale),
+    formatMarketCapUsd: (value, fallback) => formatMarketCapUsd(value, fallback, locale),
+    formatMarketCap: (value, currency, fallback) => formatMarketCap(value, currency, fallback, locale),
+    formatPercent: (value, options, fallback) => formatPercent(value, options, fallback, locale),
+    formatConfidence: (value, fallback) => formatConfidence(value, fallback),
+    formatCount: (value, singular, pluralForm) => formatCountEs(value, singular, pluralForm, locale),
+    currencySymbol: (currency) => currencySymbolEs(currency, locale),
+    formatDate: (value, options, fallback) => formatDate(value, options, fallback, locale),
+    formatMarketDate: (value, options, fallback) => formatMarketDate(value, options, fallback, locale),
+    formatUserDate: (value, options, fallback) => formatUserDate(value, options, fallback, locale),
+    formatDateTime: (value, options, fallback) => formatDateTime(value, options, fallback, locale),
+    formatMarketDateTime: (value, options, fallback) => formatMarketDateTime(value, options, fallback, locale),
+    formatUserDateTime: (value, options, fallback) => formatUserDateTime(value, options, fallback, locale),
+    formatGeneratedDate: (value, options) => formatGeneratedDate(value, options, locale),
+    formatTimeAgo: (timestamp, now) => formatTimeAgo(timestamp, now, locale),
+    marginOfSafety: (margin, base) => marginOfSafetyDisplay(margin, base, locale),
+    formatCompanyName: (value) => formatCompanyName(value, locale),
+    todayLocal,
+  };
 }

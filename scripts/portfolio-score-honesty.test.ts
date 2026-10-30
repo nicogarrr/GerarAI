@@ -17,6 +17,7 @@ import { formatNumber, formatPercent } from '../lib/format.ts';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { loadMessages } from './i18n-messages.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -128,7 +129,7 @@ describe('los nombres dicen lo que se calcula', () => {
     const ui = source('components/portfolio/PortfolioScores.tsx');
     assert.ok(!ui.includes("label: 'CAGR 3Y'"));
     assert.ok(ui.includes("label: 'Retorno acumulado'"));
-    const labels = JSON.parse(source('lib/i18n/es.json')).portfolio.scores;
+    const labels = (loadMessages('es').dict as Record<string, { scores: Record<string, string> }>).portfolio.scores;
     assert.equal(labels.quality, 'Consistencia');
     assert.equal(labels.value, 'Resiliencia');
     assert.ok(ui.includes("t('portfolio.scores.quality')"));

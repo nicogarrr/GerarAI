@@ -1,0 +1,15 @@
+{
+  "dialog": {
+    "close": "Close dialog",
+    "confirm": "Confirm",
+    "cancel": "Cancel"
+  },
+  "command": {
+    "placeholder": "Search stocks, theses or documents...",
+    "error": "The search could not be completed"
+  },
+  "search": {
+    "placeholder": "Search by name or symbol",
+    "noResults": "No results"
+  }
+}

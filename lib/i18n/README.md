@@ -1,36 +1,29 @@
-# i18n mínima (es-ES)
+# Interface languages (ES/EN)
 
-## Añadir una clave
+Spanish is the default. `gerarai_locale` selects `es` or `en`, without URL prefixes.
+`app/layout.tsx` reads the request cookie and supplies the client locale context.
+This makes request routes dynamic. There is no process-global locale.
 
-1. Añade el texto (el español que ya existe en el código) a `es.json` bajo el
-   namespace que toque: `common.*`, `nav`, `ui.*`, o el del módulo
-   (`portfolio.*`, `screener`, `propicks`, `insider`, `taxes`, `plan`, ...).
-2. Sustituye el literal por `t('namespace.clave')`. Con variables:
-   `t('portfolio.fxMissingNotice', { n: 2 })` y `{n}` en el valor de `es.json`.
-3. Regla de entrada: **solo** claves que aparecen en 2+ sitios o en estados
-   críticos (vacío / error / cargando / label de tabla). El resto sigue siendo
-   un literal en su componente: un diccionario de 400 claves no se mantiene.
+## Messages
 
-`TranslationKey` se deriva de `typeof es`, así que una clave mal escrita no
-compila. En desarrollo `t()` **lanza** si la clave o una variable no existen
-(para que no salga `{n}` en pantalla ni un "N/D" silencioso); en producción
-devuelve la clave.
+Messages live in `messages/<locale>/<area>.json`. The filename supplies the area
+prefix, for example `common.json` contains `actions.save`, not `common.actions.save`.
+The central registry is `messages/index.ts`. `TranslationKey` follows Spanish leaves.
 
-## Por qué no next-intl
+Use `await getT()` / `await getFormat()` from `lib/i18n/server` in server components.
+Use `useT()` / `useFormat()` from `lib/i18n/client` in client components.
+The legacy `t()` export remains Spanish while callers migrate.
 
-La app es íntegramente es-ES: no hay enrutado por locale ni idiomas
-paralelos. next-intl aporta middleware, carga de mensajes por request y un
-provider de cliente que aquí no se usan. `es.json` + `t()` da lo único que
-hace falta (teclado, error temprano) sin dependencia ni bundle extra.
+English areas that are still empty fall back to Spanish. Populated areas must
+match Spanish keys and interpolation placeholders; `npm run check:i18n` checks this.
+Missing keys or interpolation variables throw in development. Production preserves
+unresolved keys or placeholders so evidence of missing copy is not hidden.
 
-## Qué NO traducir
+Formatters accept an explicit locale or can be bound with `createFormatters(locale)`.
+Legacy calls preserve Spanish output. Dates retain their market/user timezones.
+Number input parsing uses the selected locale and rejects incompatible syntax.
 
-- **Anglicismos aceptados** (son el vocabulario del producto): Watchlist,
-  Screeners, Screener, ProPicks, Research OS, Movers, Sharpe, Sortino,
-  Drawdown, CAGR, PER (TTM), Market Cap, IBKR, EDGAR, Monte Carlo,
-  walk-forward, backtest, Ticker.
-- **Claves de datos del backend**: `LIMITATION_LABELS` en
-  `app/(root)/ownership/page.tsx` usa la frase inglesa como clave y el español
-  como valor (documentado en un comentario del propio archivo).
-- `console.error`/`console.warn`, nombres de variables, `defaultValue="en"`
-  del input de knowledge (es el idioma del documento que se ingesta, no copy).
+New orphan keys still fail the guard. Temporary migration reservations are a
+finite key list, not exemptions for entire areas. Remove reservations when their
+consumers land. Backend field names, tickers, source text and accepted financial
+terms are not interface copy and must not be silently translated.

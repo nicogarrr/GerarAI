@@ -1,0 +1,11 @@
+{
+  "create": "Crear alerta",
+  "new": "Nueva alerta",
+  "types": {
+    "priceAbove": "Precio por encima de",
+    "priceBelow": "Precio por debajo de",
+    "priceChange": "Cambio de precio %",
+    "news": "Nueva noticia",
+    "earnings": "Informe de ganancias"
+  }
+}

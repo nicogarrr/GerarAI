@@ -1,0 +1,9 @@
+{
+  "searchPlaceholder": "Ticker",
+  "signal": "Señal",
+  "insider": "Insider",
+  "date": "Fecha",
+  "value": "Valor",
+  "detail": "Detalle",
+  "noSignals": "sin señales de compra insider en los últimos filings"
+}
