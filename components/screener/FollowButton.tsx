@@ -84,7 +84,7 @@ export default function FollowButton({
       aria-busy={busy}
       aria-pressed={followed}
       aria-label={compact ? (stateUnknown ? 'Seguir (no disponible)' : followed ? 'Dejar de seguir' : 'Seguir') : undefined}
-      className={compact ? 'size-11 p-0 text-gray-300 hover:text-teal-300 sm:h-7 sm:w-auto sm:gap-1 sm:px-2 sm:text-xs' : 'min-h-[44px] px-3 py-2 text-sm text-gray-300 hover:text-teal-300 sm:h-7 sm:min-h-0 sm:px-2 sm:text-xs'}
+      className={compact ? 'h-11 gap-1.5 px-3 text-gray-300 hover:text-teal-300 sm:h-7 sm:w-auto sm:gap-1 sm:px-2 sm:text-xs' : 'min-h-[44px] px-3 py-2 text-sm text-gray-300 hover:text-teal-300 sm:h-7 sm:min-h-0 sm:px-2 sm:text-xs'}
     >
       {busy ? (
         <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin sm:h-3.5 sm:w-3.5" />
@@ -95,7 +95,11 @@ export default function FollowButton({
       )}
       {(() => {
         const text = busy ? 'Guardando…' : stateUnknown ? 'Seguir (no disponible)' : followed ? 'Dejar de seguir' : 'Seguir';
-        return compact ? <span className="hidden sm:inline">{text}</span> : text;
+        if (!compact) return text;
+        // En móvil una ✓ sola no dice que el estado es «siguiendo» ni que el
+        // toque lo quita (informe UX 29-oct, punto 12): etiqueta corta visible.
+        const short = busy ? 'Guardando…' : stateUnknown ? 'No disponible' : followed ? 'Siguiendo' : 'Seguir';
+        return <><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{text}</span></>;
       })()}
     </Button>
   );
