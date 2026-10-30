@@ -359,7 +359,8 @@ def _trust_client_identity() -> bool:
 @router.post("/ensure", response_model=CompanyOut)
 def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db)) -> Company:
     ticker = payload.ticker.strip().upper()
-    if not _trust_client_identity():
+    trust_client_identity = _trust_client_identity()
+    if not trust_client_identity:
         payload = CompanyEnsureRequest(ticker=payload.ticker)
     company = db.scalar(select(Company).where(Company.ticker == ticker))
     if company is None:
@@ -367,7 +368,7 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
             ticker=ticker,
             name=(payload.name or ticker).strip(),
             exchange=(payload.exchange or "UNKNOWN").strip().upper(),
-            currency=(payload.currency or "USD").strip().upper(),
+            currency=(payload.currency or ("USD" if trust_client_identity else "")).strip().upper(),
             sector=(payload.sector or "Unknown").strip(),
             industry=(payload.industry or "Unknown").strip(),
             domicile_country=(
