@@ -58,3 +58,17 @@ def test_route_answers_422_before_touching_the_db():
     ]))
     assert response.status_code == 422
     assert "sector suman 110" in response.text
+
+
+def test_ticker_labels_are_stored_trimmed_and_uppercase():
+    plan = PlanUpsertInput.model_validate(_payload([
+        {"kind": "ticker", "label": " nvda ", "target_pct": 30},
+        {"kind": "sector", "label": " Technology ", "target_pct": 50},
+    ]))
+    labels = [t.label for t in plan.target_allocations]
+    assert labels == ["NVDA", "Technology"]
+
+
+def test_blank_label_is_rejected():
+    with pytest.raises(ValidationError, match="no puede estar vacía"):
+        PlanUpsertInput.model_validate(_payload([{"kind": "ticker", "label": "   ", "target_pct": 10}]))
