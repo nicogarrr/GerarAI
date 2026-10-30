@@ -317,8 +317,7 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
         # regla que el screener (_unit_currency): sin coincidencia, N/D.
         from app.services.screener_fundamentals import _unit_currency
         from app.services.split_adjustment import (
-            cumulative_split_factor_after,
-            period_end_date,
+            fact_split_factor,
             split_events_by_company,
         )
 
@@ -334,9 +333,13 @@ def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
 
         # El cierre es de hoy: EPS en acciones actuales o el PER sale
         # inflado por el factor de cualquier split posterior al ejercicio.
-        split_factor = cumulative_split_factor_after(
+        # Un 10-K publicado tras el split ya viene reexpresado: regla unica
+        # fact_split_factor (consciente del `filed`), hasta la fecha del cierre.
+        split_factor = fact_split_factor(
             split_events_by_company(db, [company.id]).get(company.id, []),
-            period_end_date(eps_row.period),
+            period=eps_row.period,
+            filed=eps_row.filed,
+            cutoff=price_row.date,
         )
         # Cierre cotizado en otra divisa que las cuentas (SHEL.L en GBp con
         # EPS en USD): FX point-in-time a la divisa de la compania; sin tipo,

@@ -49,8 +49,7 @@ from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.split_adjustment import (
-    cumulative_split_factor_after,
-    period_end_date,
+    fact_split_factor,
     split_events_by_company,
 )
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
@@ -167,6 +166,7 @@ def _book_value_per_share(
             FinancialFact.unit,
             FinancialFact.source_type,
             FinancialFact.period,
+            FinancialFact.filed,
         )
         .where(
             FinancialFact.company_id == company.id,
@@ -178,13 +178,15 @@ def _book_value_per_share(
         )
         .order_by(FinancialFact.fiscal_year.desc(), FinancialFact.created_at.desc())
     ).all()
-    by_metric: dict[str, tuple[int, Decimal, str, str, str | None]] = {}
-    for metric, fy, value, unit, source_type, period in rows:
-        by_metric.setdefault(metric, (fy, Decimal(str(value)), unit or "", source_type or "", period))
+    by_metric: dict[str, tuple[int, Decimal, str, str, str | None, date | None]] = {}
+    for metric, fy, value, unit, source_type, period, filed in rows:
+        by_metric.setdefault(
+            metric, (fy, Decimal(str(value)), unit or "", source_type or "", period, filed)
+        )
     if "total_equity" not in by_metric or "shares_diluted" not in by_metric:
         return None
-    eq_fy, equity, eq_unit, eq_src, _eq_period = by_metric["total_equity"]
-    sh_fy, shares, sh_unit, sh_src, sh_period = by_metric["shares_diluted"]
+    eq_fy, equity, eq_unit, eq_src, _eq_period, _eq_filed = by_metric["total_equity"]
+    sh_fy, shares, sh_unit, sh_src, sh_period, sh_filed = by_metric["shares_diluted"]
     if eq_fy != sh_fy:
         return None  # equity y acciones de ejercicios distintos: no se mezclan
     if equity <= 0 or shares <= 0:
@@ -210,12 +212,14 @@ def _book_value_per_share(
     # posterior (efectivo entre el cierre y la fecha del precio) cambia el
     # recuento: acciones actuales = filing x factor acumulado. Sin ajuste un
     # 10:1 dejaba el P/B dividido entre 10 (misma regla que el screener).
-    cutoff = price_date or as_of
-    events = [
-        event for event in split_events_by_company(db, [company.id]).get(company.id, [])
-        if event[0] <= cutoff
-    ]
-    split_factor = cumulative_split_factor_after(events, period_end_date(sh_period))
+    # Un 10-K publicado DESPUES del split ya trae las acciones reexpresadas:
+    # misma regla que el DCF (fact_split_factor, consciente del `filed`).
+    split_factor = fact_split_factor(
+        split_events_by_company(db, [company.id]).get(company.id, []),
+        period=sh_period,
+        filed=sh_filed,
+        cutoff=price_date or as_of,
+    )
     bvps = equity / (shares * split_factor) * (Decimal(str(ratio)) if ratio else Decimal(1))
     return {
         "bvps": bvps,

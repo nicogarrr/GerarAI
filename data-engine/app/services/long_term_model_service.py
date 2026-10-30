@@ -42,6 +42,7 @@ from app.services.owner_earnings import (
     WORKING_CAPITAL_SIGN_CONVENTION,
     owner_earnings,
 )
+from app.services.split_adjustment import fact_split_factor
 from app.valuation.currency import fact_currency, resolve_fx
 from app.valuation.engines.base import (
     adr_ratio,
@@ -395,13 +396,18 @@ def _adjust_share_facts(
     if not splits:
         return list(facts)
     adjusted: list[Any] = []
+    events = [
+        (split.effective_date, Decimal(str(split.ratio)))
+        for split in splits
+        if split.effective_date is not None and split.ratio is not None
+    ]
     for fact in facts:
-        end = _period_end_date(fact)
-        factor = Decimal(1)
-        if end is not None:
-            for split in splits:
-                if split.effective_date > end:
-                    factor *= Decimal(split.ratio)
+        # Regla unica (fact_split_factor): el recuento de un 10-K publicado
+        # DESPUES del split ya viene reexpresado (ASC 260) y no se multiplica
+        # otra vez; solo se ajustan las cifras publicadas antes del split.
+        factor = fact_split_factor(
+            events, period=fact.period, filed=getattr(fact, "filed", None)
+        )
         if factor == 1 or fact.value is None:
             adjusted.append(fact)
             continue
