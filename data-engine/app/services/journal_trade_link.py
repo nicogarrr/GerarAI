@@ -29,6 +29,7 @@ from app.models import (
     ValuationOutput,
 )
 from app.schemas.api import valuation_uses_inferred_inputs
+from app.services.fair_value_service import listed_value
 
 logger = logging.getLogger(__name__)
 
@@ -122,6 +123,12 @@ def trade_summary(trade: Transaction) -> dict[str, Any]:
     }
 
 
+def _thesis_value(row: ThesisVersion) -> float | None:
+    """Valor de la tesis por acción COTIZADA (ADR: ``listed_share_values``)."""
+    basis = row.valuation_basis if isinstance(row.valuation_basis, dict) else {}
+    return listed_value(basis, fallback={"expected_value": row.expected_value})
+
+
 def fair_value_on(
     db: Session,
     company: Company,
@@ -139,7 +146,7 @@ def fair_value_on(
             .order_by(desc(ThesisVersion.version))
         ).all()
         if _known_on(row, day)
-        and _positive(row.expected_value)
+        and _thesis_value(row) is not None
         and not valuation_uses_inferred_inputs(row.valuation_basis)
     ]
     thesis = theses[0] if theses else None
@@ -154,7 +161,9 @@ def fair_value_on(
         output = db.scalar(
             select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id).limit(1)
         )
-        value = _positive((output.output_payload or {}).get("expected_value")) if output else None
+        payload = output.output_payload if output and isinstance(output.output_payload, dict) else None
+        # Valor por acción COTIZADA: un ADR se compara con su valor por ADR.
+        value = listed_value(payload, fallback=payload) if payload else None
         if value is not None:
             engine_row = (model, value)
             break
@@ -162,7 +171,7 @@ def fair_value_on(
     def from_thesis(row: ThesisVersion, *, stale: bool) -> dict[str, Any]:
         as_of = _as_date(row.created_at)
         return {
-            "value": _positive(row.expected_value),
+            "value": _thesis_value(row),
             "source": "tesis",
             "version": row.version,
             "as_of": as_of.isoformat() if as_of else None,

@@ -149,7 +149,7 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
         if reasons[row.id]:
             continue  # el archivo no es evidencia de una valoración publicable actual
         basis = row.valuation_basis if isinstance(row.valuation_basis, dict) else {}
-        value = _listed_value(basis, fallback={"expected_value": row.expected_value})
+        value = listed_value(basis, fallback={"expected_value": row.expected_value})
         if value is None:
             continue
         out[int(row.company_id)] = Candidate(
@@ -161,7 +161,7 @@ def thesis_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Cand
     return out
 
 
-def _listed_value(source: object, *, fallback: dict | None) -> float | None:
+def listed_value(source: object, *, fallback: dict | None) -> float | None:
     """Valor por acción COTIZADA (lo que se compara con el precio del ticker).
 
     Los motores calculan por acción ORDINARIA del filing; para un ADR
@@ -192,7 +192,7 @@ def _listed_value(source: object, *, fallback: dict | None) -> float | None:
 def _engine_value(payload: object) -> float | None:
     if not isinstance(payload, dict):
         return None
-    return _listed_value(payload, fallback=payload)
+    return listed_value(payload, fallback=payload)
 
 
 def persisted_engine_candidates(db: Session, company_ids: Iterable[int]) -> dict[int, Candidate]:
