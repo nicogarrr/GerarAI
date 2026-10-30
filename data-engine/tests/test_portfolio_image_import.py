@@ -241,3 +241,38 @@ def test_week_old_quote_still_blocks(db, quote, monkeypatch):
     monkeypatch.setattr(imports.extended_quote_service, "get",
                         AsyncMock(return_value=quote.model_copy(update={"timestamp": week_old})))
     assert not asyncio.run(review_rows(db, "f" * 64, rows()))["can_confirm"]
+
+
+
+def test_london_holding_in_pounds_imports_against_pence_listing(db, monkeypatch):
+    """Una compañía de Londres cotiza en GBp y la captura muestra GBP.
+
+    La fila solo admite tres mayúsculas (GBp no cabe), así que exigir divisa
+    idéntica impedía importar cualquier posición de Londres. GBP es la misma
+    moneda: el precio en peniques se convierte a libras.
+    """
+    import asyncio
+
+    from app.services.extended_quote_service import ExtendedQuote
+
+    db.add(Company(ticker="VOD.L", name="Vodafone Group", currency="GBp", exchange="LSE", sector="Telecom", industry="Telecom", company_type="standard", valuation_model="standard_dcf"))
+    db.commit()
+    now = int(datetime.now(UTC).timestamp())
+    monkeypatch.setattr(imports.extended_quote_service, "get", AsyncMock(return_value=ExtendedQuote(
+        ticker="VOD.L", status="available", price=70, currency="GBp", timestamp=now, fetched_at=now)))
+    row = ConfirmedImageRow(ticker="VOD.L", quantity="1000", currency="GBP", confirmed=True)
+    result = asyncio.run(review_rows(db, "b" * 64, [row]))
+    assert Decimal(result["rows"][0]["price"]) == Decimal("0.7")  # libras, no 70
+    assert confirm_review(db, result["review_id"], True)["positions_imported"] == 1
+    position = db.scalar(select(Position))
+    assert position.currency == "GBP" and position.market_price == Decimal("0.7")
+
+
+def test_other_money_or_other_subunit_is_still_rejected(db):
+    db.add(Company(ticker="VOD.L", name="Vodafone Group", currency="GBp", exchange="LSE", sector="Telecom", industry="Telecom", company_type="standard", valuation_model="standard_dcf"))
+    db.commit()
+    for currency in ("USD", "EUR"):
+        with pytest.raises(ValueError, match="divisa no coincide"):
+            imports.validate_rows(db, [ConfirmedImageRow(ticker="VOD.L", quantity="1", currency=currency, confirmed=True)])
+    with pytest.raises(ValueError, match="divisa no coincide"):
+        imports.validate_rows(db, [ConfirmedImageRow(ticker="ASTS", quantity="1", currency="GBP", confirmed=True)])
