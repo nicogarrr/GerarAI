@@ -553,6 +553,23 @@ def _missing_position_fields(element: ElementTree.Element) -> list[str]:
     return missing
 
 
+def _missing_date_notice(
+    tag: str, symbol: str | None, element: ElementTree.Element, raw_date: str | None = None
+) -> str:
+    """Aviso de fila omitida por fecha ausente o ilegible (nunca se usa «hoy»)."""
+    ref = _attr(element, "tradeID", "transactionID", "trxID", "id")
+    what = f"{tag} {symbol or '?'}" + (f" {ref}" if ref else "")
+    if raw_date is None:
+        return (
+            f"{what}: falta la fecha (tradeDate/dateTime). Esa fila se omite para no "
+            "inventar una fecha; incluye la columna de fecha en la Flex Query."
+        )
+    return (
+        f"{what}: la fecha '{raw_date}' no tiene un formato reconocido (usa AAAA-MM-DD). "
+        "Esa fila se omite; corrige el valor o excluye la fila."
+    )
+
+
 def _date(value: str | None) -> date:
     if not value:
         return date.today()
@@ -1257,6 +1274,10 @@ class IBKRImportService:
                     or not _is_date(raw_date)
                 ):
                     rows_skipped += 1
+                    if raw_date is None:
+                        # Sin fecha el validador no tiene nada que senalar y la fila
+                        # desaparecia sin motivo (rows_skipped sin row_errors).
+                        row_errors.append(_missing_date_notice("Trade", symbol, element))
                     continue
                 external_id = _attr(element, "tradeID", "transactionID", "ibExecID")
                 if external_id and external_id in existing_ids:
@@ -1341,6 +1362,10 @@ class IBKRImportService:
                     or not _is_date(raw_date)
                 ):
                     rows_skipped += 1
+                    if raw_date is None:
+                        row_errors.append(
+                            _missing_date_notice("CashTransaction", _attr(element, "symbol"), element)
+                        )
                     continue
                 type_attr = (_attr(element, "type", "transactionType", "activityType") or "").lower()
                 if "withholding" in type_attr or "tax" in type_attr:
@@ -1423,6 +1448,9 @@ class IBKRImportService:
                 raw_date = _attr(element, "dateTime", "date", "tradeDate")
                 if raw_date is None or not _is_date(raw_date):
                     rows_skipped += 1
+                    row_errors.append(_missing_date_notice(
+                        "CorporateAction", _attr(element, "symbol", "underlyingSymbol"), element, raw_date,
+                    ))
                     continue
                 symbol = _attr(element, "symbol", "underlyingSymbol")
                 company_id = None
