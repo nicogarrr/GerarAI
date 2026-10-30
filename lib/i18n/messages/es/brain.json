@@ -9,5 +9,48 @@
     "aria": "Fuentes de esta respuesta",
     "title": "Fuentes",
     "page": " · Página {page}"
+  },
+  "guide": {
+    "header": "Guía de {kind} · Sin escritura: solo lectura, no modifica nada.",
+    "kindCompany": "empresa",
+    "kindExploration": "exploración",
+    "insufficientTitle": "Datos insuficientes",
+    "insufficientBody": "La evidencia disponible no permite una conclusión confirmada.",
+    "emptyAnswerInsufficient": "El asistente no ha escrito una conclusión: la evidencia disponible no permite confirmar una conclusión. Revisa «Datos que faltan» más abajo para ver si se indica qué falta.",
+    "emptyAnswer": "El asistente ha devuelto la respuesta sin texto: no hay nada que mostrar como respuesta. Revisa las secciones y las fuentes disponibles más abajo.",
+    "emptySectionInsufficient": "Esta sección no contiene texto. La respuesta está marcada como «Datos insuficientes», pero no indica el motivo de este apartado vacío.",
+    "emptySection": "Sección sin cuerpo: el asistente la ha enviado vacía. Sin texto no hay nada que leer.",
+    "sourceN": "Fuente {n}",
+    "unnamedSource": "Fuente sin nombre",
+    "referenceDate": "Fecha de referencia: {date}",
+    "originalExcerpt": "Extracto original",
+    "sourceRef": "Fuente {n}: {name}",
+    "missingRef": "Referencia sin fuente disponible: no se puede comprobar esta cita.",
+    "noCitations": "Sin citas para esta sección: comprueba sus afirmaciones antes de usarlas.",
+    "sectionSourcesAria": "Fuentes de esta sección",
+    "missingTitle": "Datos que faltan",
+    "missingEmpty": "El asistente no ha indicado qué información falta. Puedes preguntar por el dato y el periodo que necesitas comprobar.",
+    "nextSteps": "Próximos pasos sugeridos",
+    "citationsTitle": "Citas y fuentes ({n})",
+    "noSources": "El asistente no ha adjuntado fuentes. No puedes comprobar esta respuesta desde aquí.",
+    "sections": {
+      "facts": "Hechos",
+      "calculations": "Cálculos",
+      "hypotheses": "Hipótesis",
+      "inferences": "Inferencias",
+      "contradictions": "Contradicciones",
+      "insufficientData": "Datos insuficientes",
+      "conclusion": "Conclusión",
+      "unclassified": "Sección sin clasificar"
+    },
+    "citations": {
+      "newsEvent": "Noticia atribuida",
+      "financialFact": "Dato financiero",
+      "documentChunk": "Documento",
+      "claimEvidence": "Evidencia de afirmación",
+      "marketObservation": "Observación de mercado",
+      "thesisRecord": "Tesis guardada",
+      "unclassified": "Fuente sin clasificar"
+    }
   }
 }

@@ -9,5 +9,48 @@
     "aria": "Sources for this answer",
     "title": "Sources",
     "page": " · Page {page}"
+  },
+  "guide": {
+    "header": "{kind} guide · Read-only: it doesn't modify anything.",
+    "kindCompany": "Company",
+    "kindExploration": "Exploration",
+    "insufficientTitle": "Insufficient data",
+    "insufficientBody": "The available evidence does not allow a confirmed conclusion.",
+    "emptyAnswerInsufficient": "The assistant did not write a conclusion: the available evidence cannot confirm one. Check \"Missing data\" below to see if it says what is missing.",
+    "emptyAnswer": "The assistant returned the answer with no text: there is nothing to show as an answer. Check the sections and available sources below.",
+    "emptySectionInsufficient": "This section contains no text. The answer is marked as \"Insufficient data\" but does not say why this section is empty.",
+    "emptySection": "Section with no body: the assistant sent it empty. With no text there is nothing to read.",
+    "sourceN": "Source {n}",
+    "unnamedSource": "Unnamed source",
+    "referenceDate": "Reference date: {date}",
+    "originalExcerpt": "Original excerpt",
+    "sourceRef": "Source {n}: {name}",
+    "missingRef": "Reference with no available source: this citation cannot be verified.",
+    "noCitations": "No citations for this section: verify its claims before using them.",
+    "sectionSourcesAria": "Sources for this section",
+    "missingTitle": "Missing data",
+    "missingEmpty": "The assistant did not say what information is missing. You can ask for the data point and period you need to check.",
+    "nextSteps": "Suggested next steps",
+    "citationsTitle": "Citations and sources ({n})",
+    "noSources": "The assistant attached no sources. You cannot verify this answer from here.",
+    "sections": {
+      "facts": "Facts",
+      "calculations": "Calculations",
+      "hypotheses": "Hypotheses",
+      "inferences": "Inferences",
+      "contradictions": "Contradictions",
+      "insufficientData": "Insufficient data",
+      "conclusion": "Conclusion",
+      "unclassified": "Unclassified section"
+    },
+    "citations": {
+      "newsEvent": "Attributed news",
+      "financialFact": "Financial fact",
+      "documentChunk": "Document",
+      "claimEvidence": "Claim evidence",
+      "marketObservation": "Market observation",
+      "thesisRecord": "Saved thesis",
+      "unclassified": "Unclassified source"
+    }
   }
 }
