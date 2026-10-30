@@ -8,6 +8,8 @@ import { RecordDetail, RecordList, type DataRecord } from '@/components/data/Rec
 import { getPlan, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import PlanSetupDialog from '@/components/plan/PlanSetupDialog';
 import ContributionSplitCard from '@/components/plan/ContributionSplitCard';
+import PlanContributionDialog from '@/components/plan/PlanContributionDialog';
+import DeleteContributionButton from '@/components/plan/DeleteContributionButton';
 import type { ContributionSplit } from '@/lib/plan/contribution-split';
 import { formatDate, formatMoney, formatNumber, formatPercent, formatMarketDate, NA } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
@@ -249,6 +251,17 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
         );
     }
 
+    // Divisa por defecto de una aportación: la registrada en el plan; si no, la base.
+    const planCurrency = typeof initialPlan.monthly_contribution_currency === 'string' && initialPlan.monthly_contribution_currency
+        ? initialPlan.monthly_contribution_currency
+        : typeof initialPlan.base_currency === 'string' ? initialPlan.base_currency : 'EUR';
+    const contributionDialog = (
+        <PlanContributionDialog
+            defaultAmount={typeof initialPlan.monthly_contribution === 'number' ? initialPlan.monthly_contribution : null}
+            defaultCurrency={planCurrency}
+        />
+    );
+
     return (
         <div className="grid gap-6">
             <RecordDetail
@@ -324,6 +337,9 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
             />
 
             <RecordList
+                // RecordList guarda sus filas en estado local: al alta/baja,
+                // router.refresh() trae props nuevas y la clave fuerza a pintarlas.
+                key={initialContributions.map((row) => String(row.id ?? '')).join(',')}
                 title="Aportaciones"
                 titleAs="h2"
                 description="Historial de contribuciones al plan"
@@ -339,6 +355,14 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
                         formatMoney(value as number | string | null, typeof record.currency === 'string' ? record.currency : 'EUR'),
                 }}
                 emptyMessage="Todavía no has registrado aportaciones a tu plan."
+                emptyAction={contributionDialog}
+                footer={initialContributions.length > 0 ? <div className="flex justify-end">{contributionDialog}</div> : undefined}
+                rowActions={(record) => typeof record.id === 'number' ? (
+                    <DeleteContributionButton
+                        contributionId={record.id}
+                        label={`${formatMarketDate(String(record.date ?? ''))} · ${formatMoney(record.amount as number | string | null, typeof record.currency === 'string' && record.currency ? record.currency.toUpperCase() : 'EUR')}`}
+                    />
+                ) : null}
             />
         </div>
     );
