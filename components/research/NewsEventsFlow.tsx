@@ -247,6 +247,11 @@ export function NewsEventsFlow({
 }) {
   const portfolioSet = new Set(portfolioTickers);
   const watchlistSet = new Set(watchlistTickers);
+  // Carril macro sin frescura: la API sirve el archivo reciente (fuente
+  // caída). Se anuncia con la fecha real del evento más reciente; nunca se
+  // finge frescura (medido en prod 30-oct-2026: GDELT >72h sin responder).
+  const macroArchive = lane === 'macro' && events.length > 0 && events.every((event) => event.archive);
+  const macroArchiveDate = macroArchive && events[0] ? eventDateText(events[0].date) : null;
   return (
     <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
@@ -282,6 +287,12 @@ export function NewsEventsFlow({
           </span>
         </nav>
         )}
+        {macroArchive ? (
+          <p className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/40 p-3 text-sm text-amber-200">
+            La fuente macro no aporta datos nuevos desde el {macroArchiveDate}; la ingesta sigue
+            reintentándose. Mostrando el archivo reciente con su fecha real.
+          </p>
+        ) : null}
         {/* F176: sin contain, Chrome propaga el overflow horizontal de la
             tabla al documento entero (zoom-out y recorte en movil) aunque la
             region ya scrolla por dentro; layout+paint lo contiene aqui. */}
@@ -289,7 +300,7 @@ export function NewsEventsFlow({
             tabla de 5 columnas solo se usa desde md; en pantallas estrechas
             cortaba titulares y partia el layout. */}
         {events.length === 0 ? <div className="rounded-lg border border-gray-800 p-4 md:hidden">
-          <EmptyState title="Sin eventos de noticias todavía." description="Este carril todavía no tiene noticias disponibles." action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>} />
+          <EmptyState title={lane === 'macro' ? 'Sin eventos macro disponibles.' : 'Sin eventos de noticias todavía.'} description={lane === 'macro' ? 'La fuente macro no aporta datos nuevos ahora mismo; la ingesta sigue reintentándose.' : 'Este carril todavía no tiene noticias disponibles.'} action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>} />
         </div> : null}
         <ul aria-label="Eventos de noticias" className="flex flex-col gap-3 md:hidden">
           {events.map((event) => (
@@ -405,10 +416,13 @@ export function NewsEventsFlow({
                     <EmptyState
                       action={<EmptyLink href="/research/sources">Importa una fuente o analiza una noticia manual</EmptyLink>}
                       className="rounded-none border-0 p-6"
+                      description={lane === 'macro' ? 'La fuente macro no aporta datos nuevos ahora mismo; la ingesta sigue reintentándose.' : undefined}
                       title={
                         lane === 'para-ti' && !portfolioTickers.length && !watchlistTickers.length
                           ? 'Sin empresas en tu cartera ni watchlist.'
-                          : 'Sin eventos de noticias todavía.'
+                          : lane === 'macro'
+                            ? 'Sin eventos macro disponibles.'
+                            : 'Sin eventos de noticias todavía.'
                       }
                     />
                   </td>

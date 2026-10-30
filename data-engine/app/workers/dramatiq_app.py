@@ -2967,6 +2967,95 @@ def reconcile_alert_analyses(tenant_id: int | None = None, user_id: str | None =
         db.close()
 
 
+# --- Carril macro: dedupe entre tenants y disyuntor ante GDELT caído ---
+#
+# Medido en prod (30-oct-2026): GDELT inalcanzable desde la VM (HTTP 000 y
+# 429 sostenido), 0 eventos macro en 72h y cada ciclo horario quemaba 13
+# timeouts por tenant. Dos frenos:
+# - Cache Redis por tema (TTL < 1h): el primer tenant que sondea un tema
+#   cachea el lote; el resto de tenants ingiere desde cache sin red. N->1
+#   llamadas GDELT por ciclo. Fail-open: sin Redis, comportamiento previo.
+# - Disyuntor: 2 fallos de transporte seguidos (no-429: timeout, DNS,
+#   conexión) abortan el ciclo en vez de quemar las 13 consultas contra una
+#   fuente caída. El 429 tipado sigue su vía (reencolar tras la ventana).
+_GDELT_MACRO_CACHE_TTL_SECONDS = 55 * 60
+_GDELT_MACRO_CIRCUIT_THRESHOLD = 2
+
+
+def _gdelt_macro_cache_key(theme: str) -> str:
+    return f"gdelt:macro:last:{theme}"
+
+
+def _gdelt_macro_cache_get(client, theme: str):
+    """Lote cacheado de un tema, o None (sin Redis, miss o payload corrupto)."""
+    if client is None:
+        return None
+    try:
+        raw = client.get(_gdelt_macro_cache_key(theme))
+    except Exception:  # noqa: BLE001 — cache fail-open
+        return None
+    if not raw:
+        return None
+    try:
+        import json as _json
+
+        from app.services.connectors.base import ConnectorItem, ConnectorResult
+
+        payload = _json.loads(raw)
+        items = [
+            ConnectorItem(
+                source=item.get("source", "gdelt"),
+                title=item.get("title", ""),
+                url=item.get("url"),
+                summary=item.get("summary", ""),
+                published_at=(
+                    datetime.fromisoformat(item["published_at"])
+                    if item.get("published_at")
+                    else None
+                ),
+                ticker=item.get("ticker"),
+                item_type=item.get("item_type", "news"),
+                external_id=item.get("external_id"),
+                headline_from_source=item.get("headline_from_source", True),
+                metadata=item.get("metadata") or {},
+            )
+            for item in payload.get("items", [])
+        ]
+        return ConnectorResult(
+            source=payload.get("source", "gdelt"),
+            items=items,
+            errors=list(payload.get("errors", [])),
+            metadata={**(payload.get("metadata") or {}), "macro_cache": "hit"},
+        )
+    except Exception:  # noqa: BLE001 — payload corrupto: como un miss
+        return None
+
+
+def _gdelt_macro_cache_set(client, theme: str, result) -> None:
+    """Cachea el lote (también vacío: una respuesta fresca sin items)."""
+    if client is None:
+        return
+    try:
+        import json as _json
+
+        payload = {
+            "source": result.source,
+            "errors": list(result.errors),
+            "metadata": dict(result.metadata or {}),
+            "items": [
+                {**item.as_dict(), "headline_from_source": item.headline_from_source}
+                for item in result.items
+            ],
+        }
+        client.setex(
+            _gdelt_macro_cache_key(theme),
+            _GDELT_MACRO_CACHE_TTL_SECONDS,
+            _json.dumps(payload, ensure_ascii=False),
+        )
+    except Exception:  # noqa: BLE001 — cache fail-open
+        return
+
+
 @dramatiq.actor(max_retries=6, min_backoff=60_000, max_backoff=900_000, queue_name=GDELT_QUEUE_NAME)
 @_coalesce_on_success("refresh_macro_news", 50 * 60, ("tenant_id",))
 def refresh_macro_news(
@@ -3002,41 +3091,66 @@ def refresh_macro_news(
             service = FeedIngestionService()
             processed = ingested = 0
             errors: list[dict] = []
+            consecutive_failures = 0
+            try:
+                cache_client = _redis_client()
+            except Exception:  # noqa: BLE001 — cache fail-open
+                cache_client = None
             for theme, query in iter_macro_queries():
-                try:
-                    result = _run(
-                        service.poll_gdelt(query, ticker=None, max_records=max_records)
-                    )
-                    if result.errors:
-                        errors.extend(
-                            {"theme": theme, "source": "gdelt", "message": error}
-                            for error in result.errors
+                result = _gdelt_macro_cache_get(cache_client, theme)
+                if result is None:
+                    try:
+                        result = _run(
+                            service.poll_gdelt(query, ticker=None, max_records=max_records)
                         )
-                    ingestion = service.ingest_news_result(
-                        db,
-                        result,
-                        ticker=None,
-                        news_lane=MACRO_NEWS_LANE,
-                        macro_theme=theme,
-                        detect_company=False,
-                    )
-                    if result.status != "error":
-                        processed += 1
-                    ingested += int(ingestion.get("created", 0))
-                except Exception as exc:
-                    _rollback(db)
-                    from app.services.connectors.gdelt import GdeltRateLimited
+                    except Exception as exc:
+                        _rollback(db)
+                        from app.services.connectors.gdelt import GdeltRateLimited
 
-                    if isinstance(exc, GdeltRateLimited):
-                        _raise_gdelt_retry(exc)
-                    errors.append(
-                        {
-                            "theme": theme,
-                            "source": "gdelt",
-                            "type": type(exc).__name__,
-                            "message": str(exc),
-                        }
+                        if isinstance(exc, GdeltRateLimited):
+                            _raise_gdelt_retry(exc)
+                        consecutive_failures += 1
+                        errors.append(
+                            {
+                                "theme": theme,
+                                "source": "gdelt",
+                                "type": type(exc).__name__,
+                                "message": str(exc),
+                            }
+                        )
+                        if consecutive_failures >= _GDELT_MACRO_CIRCUIT_THRESHOLD:
+                            errors.append(
+                                {
+                                    "theme": None,
+                                    "source": "gdelt",
+                                    "type": "circuit_open",
+                                    "message": (
+                                        "GDELT no responde: ciclo abortado tras "
+                                        f"{consecutive_failures} fallos seguidos; "
+                                        "los temas restantes quedan para el próximo tick"
+                                    ),
+                                }
+                            )
+                            break
+                        continue
+                    consecutive_failures = 0
+                    _gdelt_macro_cache_set(cache_client, theme, result)
+                if result.errors:
+                    errors.extend(
+                        {"theme": theme, "source": "gdelt", "message": error}
+                        for error in result.errors
                     )
+                ingestion = service.ingest_news_result(
+                    db,
+                    result,
+                    ticker=None,
+                    news_lane=MACRO_NEWS_LANE,
+                    macro_theme=theme,
+                    detect_company=False,
+                )
+                if result.status != "error":
+                    processed += 1
+                ingested += int(ingestion.get("created", 0))
             return {
                 "status": _batch_status(processed, errors),
                 "actor": actor_name,
