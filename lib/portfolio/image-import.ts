@@ -2,6 +2,19 @@ export type ImageRow = { raw: string; identity: string; quantity: string | null;
 export type ConfirmedImageRow = { ticker: string; quantity: string; currency: string; confirmed: boolean };
 export type ImagePreview = { image_hash: string; rows: ImageRow[]; message: string };
 export type ImageInstrument = { ticker: string; name: string; exchange: string; currency: string };
+/**
+ * Resultado de las server actions de importación por imagen. En producción Next
+ * oculta el mensaje de cualquier error lanzado desde una server action, así que
+ * los motivos en español del backend («Usa una imagen PNG, JPEG o WebP…»,
+ * «Cotización caducada. Vuelve a revisar») se devuelven como dato.
+ */
+export type ImageActionResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+export function unwrapImageResult<T>(result: ImageActionResult<T>): T {
+    if (result.ok) return result.data;
+    throw new Error(result.error);
+}
+
 export type ImageReview = { review_id: number; can_confirm: boolean; base_currency: string; already_imported: boolean; rows: Array<ConfirmedImageRow & { name: string; exchange: string; price: string | null; timestamp: number | null; source: string; value_native: string | null; value_base: string | null; weight_percent: string | null }> };
 
 export function imageFileError(file: Pick<File, 'size' | 'type'>): string | null {

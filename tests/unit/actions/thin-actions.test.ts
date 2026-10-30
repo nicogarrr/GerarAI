@@ -109,8 +109,8 @@ describe('risk y share-capital', () => {
 
 describe('portfolio-image', () => {
     it('imagen vacía o de más de 2 MB -> error antes de llamar', async () => {
-        await expect(previewPortfolioImage('')).rejects.toThrow('2 MB');
-        await expect(previewPortfolioImage('x'.repeat(2_796_205))).rejects.toThrow('2 MB');
+        expect(await previewPortfolioImage('')).toEqual({ ok: false, error: expect.stringContaining('2 MB') });
+        expect(await previewPortfolioImage('x'.repeat(2_796_205))).toEqual({ ok: false, error: expect.stringContaining('2 MB') });
         expect(researchRequest).not.toHaveBeenCalled();
     });
 
@@ -122,6 +122,18 @@ describe('portfolio-image', () => {
         expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/image/review', { method: 'POST', body: JSON.stringify({ image_hash: 'hash', rows: [] }), timeoutMs: 30000 });
     });
 
+    it('los motivos del backend (422/503, en español) vuelven como dato: Next los ocultaría en prod si se lanzaran', async () => {
+        researchRequest.mockRejectedValueOnce(new AppError('Usa una imagen PNG, JPEG o WebP sin animación', 'RESEARCH_API_ERROR', 422));
+        expect(await previewPortfolioImage('aW1hZ2Vu')).toEqual({ ok: false, error: 'Usa una imagen PNG, JPEG o WebP sin animación' });
+        researchRequest.mockRejectedValueOnce(new AppError('Hay otra captura en lectura. Vuelve a intentarlo en unos segundos', 'RESEARCH_API_ERROR', 503));
+        expect(await previewPortfolioImage('aW1hZ2Vu')).toEqual({ ok: false, error: expect.stringMatching(/^Hay otra captura/) });
+        researchRequest.mockRejectedValueOnce(new AppError('Cotización caducada. Vuelve a revisar', 'RESEARCH_API_ERROR', 422));
+        expect(await confirmPortfolioImage(9)).toEqual({ ok: false, error: 'Cotización caducada. Vuelve a revisar' });
+        expect(requestCacheInvalidate).not.toHaveBeenCalled();
+        researchRequest.mockRejectedValueOnce(new AppError('Rate limit exceeded', 'RESEARCH_API_ERROR', 429));
+        expect(await searchImageInstrument('ASTS')).toEqual({ ok: false, error: expect.stringMatching(/^Demasiadas peticiones/) });
+    });
+
     it('búsqueda de instrumento acotada a 80 caracteres', async () => {
         researchRequest.mockResolvedValue([]);
         await searchImageInstrument('a'.repeat(200));
@@ -130,7 +142,7 @@ describe('portfolio-image', () => {
 
     it('confirm invalida las 7 lecturas de cartera del usuario', async () => {
         researchRequest.mockResolvedValue({ status: 'ok', positions_imported: 4 });
-        expect(await confirmPortfolioImage(9)).toMatchObject({ positions_imported: 4 });
+        expect(await confirmPortfolioImage(9)).toMatchObject({ ok: true, data: { positions_imported: 4 } });
         for (const suffix of ['positions', 'summary', 'transactions', 'scores', 'tearsheet', 'dividends', 'quality']) {
             expect(requestCacheInvalidate).toHaveBeenCalledWith(`portfolio:user-1:${suffix}`);
         }

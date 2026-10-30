@@ -5,10 +5,10 @@ import { imageFileError, imageRowsPending, normalizeImageQuantity } from '@/lib/
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/lib/actions/portfolio-image.actions', () => ({
-    previewPortfolioImage: vi.fn(async () => ({ image_hash: 'a'.repeat(64), rows: [{raw:'ASTS 12 USD',identity:'ASTS',quantity:'12',currency:'USD',warning:'Revisa'}], message:'Revisa las filas' })),
-    searchImageInstrument: vi.fn(async () => [{ ticker:'ASTS',name:'AST SpaceMobile',exchange:'NASDAQ',currency:'USD' }]),
-    reviewPortfolioImage: vi.fn(async () => ({review_id:1,can_confirm:true,base_currency:'EUR',already_imported:false,rows:[]})),
-    confirmPortfolioImage: vi.fn(async () => ({status:'imported',positions_imported:1})),
+    previewPortfolioImage: vi.fn(async () => ({ ok: true, data: { image_hash: 'a'.repeat(64), rows: [{raw:'ASTS 12 USD',identity:'ASTS',quantity:'12',currency:'USD',warning:'Revisa'}], message:'Revisa las filas' } })),
+    searchImageInstrument: vi.fn(async () => ({ ok: true, data: [{ ticker:'ASTS',name:'AST SpaceMobile',exchange:'NASDAQ',currency:'USD' }] })),
+    reviewPortfolioImage: vi.fn(async () => ({ ok: true, data: {review_id:1,can_confirm:true,base_currency:'EUR',already_imported:false,rows:[]} })),
+    confirmPortfolioImage: vi.fn(async () => ({ ok: true, data: {status:'imported',positions_imported:1} })),
 }));
 import { confirmPortfolioImage, previewPortfolioImage, reviewPortfolioImage } from '@/lib/actions/portfolio-image.actions';
 
@@ -61,5 +61,12 @@ describe('captura de cartera', () => {
         expect(normalizeImageQuantity('abc')).toBeNull();
         expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '1,2,3' }])).toBe('Falta: 1 cantidad no válida.');
         expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '3' }])).toBeNull();
+    });
+    it('un rechazo del backend se ve con su motivo en español (no el mensaje genérico de Next)', async () => {
+        vi.mocked(previewPortfolioImage).mockResolvedValueOnce({ ok: false, error: 'No se pudo leer la captura. Prueba con un recorte más nítido o importa un fichero' } as never);
+        render(<ImportImageButton />);
+        fireEvent.click(screen.getByRole('button', {name:'Importar captura'}));
+        fireEvent.change(screen.getByLabelText('Elegir captura'), {target:{files:[new File(['png'], 'test.png', {type:'image/png'})]}});
+        expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo leer la captura. Prueba con un recorte más nítido');
     });
 });
