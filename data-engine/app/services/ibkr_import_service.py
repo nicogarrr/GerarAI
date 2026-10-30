@@ -1043,6 +1043,62 @@ def _collapse_lot_positions(elements: list[ElementTree.Element]) -> list[Element
     return collapsed
 
 
+_FALLBACK_ID_FIELDS = {
+    "Trade": (
+        "accountId", "conid", "symbol", "buySell", "quantity", "tradePrice",
+        "tradeDate", "dateTime", "currency", "ibCommission",
+    ),
+    "CashTransaction": (
+        "accountId", "conid", "symbol", "type", "amount", "netCash",
+        "dateTime", "date", "settleDate", "currency", "description",
+    ),
+}
+
+
+def _fallback_key(tag: str, payload) -> list[str]:
+    return [tag] + [str(payload.get(field) or "") for field in _FALLBACK_ID_FIELDS[tag]]
+
+
+def _fallback_external_id(element: ElementTree.Element, counts: dict[str, int]) -> str:
+    """Id estable para una fila Flex sin tradeID/transactionID (columna no elegida
+    en la query). Sin el, reimportar el mismo extracto duplicaba la operacion o el
+    dividendo. Fila economica canonica + ocurrencia: dos ejecuciones identicas en
+    el mismo fichero siguen siendo dos."""
+    key = _fallback_key(_tag_name(element), element.attrib)
+    fingerprint = hashlib.sha256(json.dumps(key).encode()).hexdigest()[:40]
+    counts[fingerprint] = counts.get(fingerprint, 0) + 1
+    return f"ibkr-xml-{fingerprint}-{counts[fingerprint]}"
+
+
+def _fallback_already_imported(
+    db: Session, element: ElementTree.Element, external_id: str, trade_date: date, adopted: set[int]
+) -> bool:
+    if db.scalar(
+        select(Transaction.id).where(
+            Transaction.external_id == external_id, *tenant_filters(db, Transaction)
+        )
+    ) is not None:
+        return True
+    # Filas importadas antes de este id se guardaron con external_id NULL y el
+    # atributo crudo completo: se adoptan (una por ocurrencia) en vez de duplicarlas.
+    key = _fallback_key(_tag_name(element), element.attrib)
+    for legacy in db.scalars(
+        select(Transaction)
+        .where(
+            Transaction.external_id.is_(None),
+            Transaction.trade_date == trade_date,
+            *tenant_filters(db, Transaction),
+        )
+        .order_by(Transaction.id)
+    ):
+        if legacy.id in adopted or _fallback_key(_tag_name(element), legacy.raw_payload or {}) != key:
+            continue
+        adopted.add(legacy.id)
+        legacy.external_id = external_id
+        return True
+    return False
+
+
 class IBKRImportService:
     def import_flex_xml(self, db: Session, xml_text: str, **options) -> dict:
         """Importa un Flex Query (ver ``_import_flex_xml``).
@@ -1215,6 +1271,8 @@ class IBKRImportService:
         # vengan en el orden que vengan, para poder neutralizar a su original.
         elements.sort(key=lambda e: 1 if _tag_name(e) == "Trade" and _is_cancel_trade(e) else 0)
         file_trades: list[Transaction] = []
+        fallback_counts: dict[str, int] = {}
+        fallback_adopted: set[int] = set()
         trades_cancelled = 0
         cash_misc_skipped = 0
         fx_conversions_imported = 0
@@ -1457,6 +1515,12 @@ class IBKRImportService:
                         row_errors.append(_missing_date_notice("Trade", symbol, element))
                     continue
                 external_id = _attr(element, "tradeID", "transactionID", "ibExecID")
+                if not external_id:
+                    external_id = _fallback_external_id(element, fallback_counts)
+                    if _fallback_already_imported(
+                        db, element, external_id, _date(raw_date), fallback_adopted
+                    ):
+                        existing_ids.add(external_id)
                 if external_id and external_id in existing_ids:
                     trades_already_present += 1
                     continue
@@ -1576,6 +1640,16 @@ class IBKRImportService:
                     cash_misc_skipped += 1
                     continue
                 external_id = _attr(element, "trxID", "transactionID", "id")
+                if not external_id:
+                    external_id = _fallback_external_id(element, fallback_counts)
+                    if _fallback_already_imported(
+                        db,
+                        element,
+                        external_id,
+                        _date(_attr(element, "dateTime", "date", "tradeDate")),
+                        fallback_adopted,
+                    ):
+                        existing_ids.add(external_id)
                 if external_id and external_id in existing_ids:
                     continue
                 amount = _decimal(_attr(element, "amount", "netCash", "proceeds"))
