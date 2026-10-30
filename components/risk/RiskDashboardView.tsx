@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RecordDetail, formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
-import { formatDate, formatUserDateTime, formatMoney, formatNumber, formatPercent, NA } from '@/lib/format';
+import { useT, useFormat, type TFunction } from '@/lib/i18n/client';
+import type { Formatters } from '@/lib/i18n/format';
 import { sourceDisplay } from '@/lib/research/source-display';
 import { getRiskDashboard } from '@/lib/actions/risk.actions';
 
@@ -41,18 +42,18 @@ function extractAlerts(dashboard: DataRecord | null): DataRecord[] {
  * aplica reglas de concentración y liquidez (portfolio_risk.py): sin VaR ni
  * drawdown, y aquí se dice junto a cada alerta.
  */
-function thresholdExplanation(alert: DataRecord): string {
+function thresholdExplanation(t: TFunction, alert: DataRecord): string {
     const threshold = alert.threshold;
     if (threshold === 0.2) {
-        return 'Umbral 20% del valor de la cartera: por encima, una sola posición concentra el riesgo. Regla de concentración, no un VaR ni una probabilidad de pérdida.';
+        return t('risk.thresholds.t20');
     }
     if (threshold === 0.1) {
-        return 'Umbral 10% para empresas pre-FCF (todavía no generan caja libre): el doble de estricto que el 20% general.';
+        return t('risk.thresholds.t10');
     }
     if (threshold === 0) {
-        return 'La caja de esta divisa está en negativo (saldo deudor). Revisa los saldos o las operaciones en esa divisa; el umbral es no bajar de cero.';
+        return t('risk.thresholds.t0');
     }
-    return 'Alerta disparada al superar el umbral indicado junto al valor medido.';
+    return t('risk.thresholds.generic');
 }
 
 /** Resumen sin arrays anidados (positions/alerts se muestran en su propia tabla) */
@@ -64,39 +65,41 @@ function headlineRecord(dashboard: DataRecord | null): DataRecord | null {
     return rest;
 }
 
-const RISK_LABELS: Record<string, string> = {
-    total_value: 'Valor total',
-    equity_value: 'Valor en renta variable',
-    cash: 'Caja',
-    top_1_weight: 'Peso de la mayor posición',
-    top_5_weight: 'Peso de las 5 mayores',
-    weight_basis: 'Base de los pesos',
-    cash_assets_base: 'Caja a favor',
-    margin_debt_base: 'Deuda de margen',
-    sector_exposure: 'Exposición por sector',
-    factor_exposure: 'Exposición por factor',
-    status: 'Datos del cálculo',
-    base_currency: 'Divisa base',
-    cash_native: 'Caja en divisa original',
-    missing_fx: 'Sin tipo de cambio para',
-    data_as_of: 'Datos a fecha de',
-    provenance: 'Fuente',
-    cash_as_of: 'Caja a fecha de',
-    fx_rates: 'Tipos de cambio usados',
-    valuation_dates_differ: 'Fechas de valoración',
-    valuation_hold: 'Valoración en suspenso',
+const RISK_LABEL_KEYS: Record<string, string> = {
+    total_value: 'totalValue',
+    equity_value: 'equityValue',
+    cash: 'cash',
+    top_1_weight: 'top1Weight',
+    top_5_weight: 'top5Weight',
+    weight_basis: 'weightBasis',
+    cash_assets_base: 'cashAssetsBase',
+    margin_debt_base: 'marginDebtBase',
+    sector_exposure: 'sectorExposure',
+    factor_exposure: 'factorExposure',
+    status: 'status',
+    base_currency: 'baseCurrency',
+    cash_native: 'cashNative',
+    missing_fx: 'missingFx',
+    data_as_of: 'dataAsOf',
+    provenance: 'provenance',
+    cash_as_of: 'cashAsOf',
+    fx_rates: 'fxRates',
+    valuation_dates_differ: 'valuationDatesDiffer',
+    valuation_hold: 'valuationHold',
 };
 
-const RISK_STATUS_LABELS: Record<string, string> = {
-    ok: 'Completos',
-    incomplete_fx: 'Incompleto: faltan tipos de cambio',
-    insufficient_data: 'Datos insuficientes',
-    incomplete_valuation: 'Incompleto: valoración en suspenso',
-};
+function riskStatusLabels(t: TFunction): Record<string, string> {
+    return {
+        ok: t('risk.status.ok'),
+        incomplete_fx: t('risk.status.incompleteFx'),
+        insufficient_data: t('risk.status.insufficientData'),
+        incomplete_valuation: t('risk.status.incompleteValuation'),
+    };
+}
 
-function humanizeRiskKey(key: string): string {
-    const known = RISK_LABELS[key];
-    if (known) return known;
+function humanizeRiskKey(t: TFunction, key: string): string {
+    const known = RISK_LABEL_KEYS[key];
+    if (known) return t(`risk.labels.${known}` as Parameters<TFunction>[0]);
     const words = key.replaceAll('_', ' ').trim();
     return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -106,23 +109,23 @@ function isRecord(value: unknown): value is DataRecord {
 }
 
 /** Mapa divisa -> importe ("EUR: 0") como texto "0 € · 12,50 US$". */
-function currencyRecord(value: unknown): string {
-    if (!isRecord(value)) return NA;
+function currencyRecord(t: TFunction, f: Formatters, value: unknown): string {
+    if (!isRecord(value)) return t('common.na');
     const entries = Object.entries(value);
-    if (!entries.length) return 'Sin saldos';
+    if (!entries.length) return t('risk.values.noBalances');
     return entries
-        .map(([currency, amount]) => formatMoney(amount as number | string, currency))
+        .map(([currency, amount]) => f.formatMoney(amount as number | string, currency))
         .join(' · ');
 }
 
 /** Mapa etiqueta -> peso (ratio) como "Tecnología 45,0 % · Salud 20,0 %". */
-function exposureRecord(value: unknown, labelName: (name: string) => string = (name) => name): string {
-    if (!isRecord(value)) return NA;
+function exposureRecord(t: TFunction, f: Formatters, value: unknown, labelName: (name: string) => string = (name) => name): string {
+    if (!isRecord(value)) return t('common.na');
     const entries = Object.entries(value);
-    if (!entries.length) return 'Sin datos';
+    if (!entries.length) return t('risk.values.noData');
     return entries
         .map(([name, weight]) =>
-            `${labelName(name)} ${typeof weight === 'number' ? formatPercent(weight, { fromRatio: true, digits: 1 }) : NA}`,
+            `${labelName(name)} ${typeof weight === 'number' ? f.formatPercent(weight, { fromRatio: true, digits: 1 }) : t('common.na')}`,
         )
         .join(' · ');
 }
@@ -130,36 +133,36 @@ function exposureRecord(value: unknown, labelName: (name: string) => string = (n
 /** F41: el resumen llega con claves internas y JSON crudo; se presenta con
  *  etiquetas en español y valores formateados. Nunca se inventa: null -> NA,
  *  vacios -> estado honesto, claves desconocidas -> humanizadas tal cual. */
-function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null {
+function humanizeRiskDashboard(t: TFunction, f: Formatters, dashboard: DataRecord | null): DataRecord | null {
     if (!dashboard) return null;
     const baseCurrency = typeof dashboard.base_currency === 'string' && dashboard.base_currency
         ? dashboard.base_currency
         : 'EUR';
     const display: DataRecord = {};
     for (const [key, value] of Object.entries(dashboard)) {
-        const label = humanizeRiskKey(key);
+        const label = humanizeRiskKey(t, key);
         if (key === 'total_value' || key === 'equity_value') {
             display[label] = value === null || value === undefined
-                ? `${NA} (faltan tipos de cambio)`
-                : formatMoney(value as number | string, baseCurrency);
+                ? `${t('common.na')} ${t('risk.values.missingFxNote')}`
+                : f.formatMoney(value as number | string, baseCurrency);
         } else if (key === 'top_1_weight' || key === 'top_5_weight') {
-            display[label] = typeof value === 'number' ? formatPercent(value, { fromRatio: true, digits: 1 }) : NA;
+            display[label] = typeof value === 'number' ? f.formatPercent(value, { fromRatio: true, digits: 1 }) : t('common.na');
         } else if (key === 'weight_basis') {
             display[label] = value === 'gross_equity'
-                ? 'Valor bruto de las posiciones (la caja es negativa)'
-                : 'Total con caja';
+                ? t('risk.values.weightBasisGross')
+                : t('risk.values.weightBasisTotal');
         } else if (key === 'cash_assets_base' || key === 'margin_debt_base') {
-            display[label] = typeof value === 'number' ? formatMoney(value, baseCurrency) : NA;
+            display[label] = typeof value === 'number' ? f.formatMoney(value, baseCurrency) : t('common.na');
         } else if (key === 'cash' || key === 'cash_native') {
-            display[label] = currencyRecord(value);
+            display[label] = currencyRecord(t, f, value);
         } else if (key === 'sector_exposure') {
             // F208: las claves de sector llegan en inglés del backend y la
             // cabecera las pintaba tal cual; las posiciones ya usan etiquetaSector.
-            display[label] = exposureRecord(value, etiquetaSector);
+            display[label] = exposureRecord(t, f, value, etiquetaSector);
         } else if (key === 'factor_exposure') {
-            display[label] = exposureRecord(value, etiquetaFactor);
+            display[label] = exposureRecord(t, f, value, etiquetaFactor);
         } else if (key === 'status') {
-            display[label] = RISK_STATUS_LABELS[String(value)] ?? String(value);
+            display[label] = riskStatusLabels(t)[String(value)] ?? String(value);
         } else if (key === 'missing_fx') {
             // Sin faltas no se pinta la fila: "Sin tipo de cambio para: Ninguno" confundia.
             if (!Array.isArray(value) || value.length === 0) continue;
@@ -174,39 +177,45 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
                 .map((item) => {
                     if (!isRecord(item)) return String(item);
                     const reason = typeof item.reason === 'string' && item.reason ? `: ${item.reason}` : '';
-                    const since = typeof item.effective_date === 'string' && item.effective_date ? ` · ${formatDate(item.effective_date)}` : '';
+                    const since = typeof item.effective_date === 'string' && item.effective_date ? ` · ${f.formatDate(item.effective_date)}` : '';
                     return `${String(item.ticker ?? '?')}${reason}${since}`;
                 })
                 .join(' · ');
         } else if (key === 'cash_as_of') {
-            display[label] = typeof value === 'string' && value ? formatDate(value) : NA;
+            display[label] = typeof value === 'string' && value ? f.formatDate(value) : t('common.na');
         } else if (key === 'fx_rates') {
             if (!Array.isArray(value) || value.length === 0) continue;
             display[label] = value
                 .map((item) => {
-                    if (!isRecord(item) || typeof item.rate !== 'number') return NA;
-                    const scope = item.scope === 'cash' ? 'Caja' : 'Posiciones';
-                    return `${scope}: 1 ${String(item.currency)} = ${formatNumber(item.rate, { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${baseCurrency} (${typeof item.as_of === 'string' ? formatDate(item.as_of) : NA})`;
+                    if (!isRecord(item) || typeof item.rate !== 'number') return t('common.na');
+                    const scope = item.scope === 'cash' ? t('risk.values.fxScopeCash') : t('risk.values.fxScopePositions');
+                    return t('risk.values.fxRateLine', {
+                        scope,
+                        currency: String(item.currency),
+                        rate: f.formatNumber(item.rate, { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+                        base: baseCurrency,
+                        date: typeof item.as_of === 'string' ? f.formatDate(item.as_of) : t('common.na'),
+                    });
                 })
                 .join(' · ');
         } else if (key === 'valuation_dates_differ') {
             if (value !== true) continue;
-            display[label] = 'Posiciones y caja a fechas distintas: el total combina ambas';
+            display[label] = t('risk.values.valuationDatesDiffer');
         } else if (key === 'data_as_of') {
-            display[label] = typeof value === 'string' && value ? formatUserDateTime(value) : NA;
+            display[label] = typeof value === 'string' && value ? f.formatUserDateTime(value) : t('common.na');
         } else if (key === 'provenance') {
             if (isRecord(value)) {
                 const rawSource = typeof value.source === 'string' ? value.source : null;
-                const source = rawSource === null ? 'Fuente interna' : rawSource === 'CavaAI Postgres' ? 'Base de datos de GerarAI' : sourceDisplay(rawSource);
+                const source = rawSource === null ? t('risk.values.sourceInternal') : rawSource === 'CavaAI Postgres' ? t('risk.values.sourceCava') : sourceDisplay(rawSource);
                 const fetched = typeof value.fetched_at === 'string' && value.fetched_at
-                    ? ` · ${formatUserDateTime(value.fetched_at)}`
+                    ? t('risk.values.fetchedSuffix', { date: f.formatUserDateTime(value.fetched_at) })
                     : '';
                 display[label] = `${source}${fetched}`;
             } else {
-                display[label] = NA;
+                display[label] = t('common.na');
             }
         } else if (typeof value === 'boolean') {
-            display[label] = value ? 'Sí' : 'No';
+            display[label] = value ? t('risk.values.yes') : t('risk.values.no');
         } else {
             display[label] = value;
         }
@@ -217,26 +226,26 @@ function humanizeRiskDashboard(dashboard: DataRecord | null): DataRecord | null 
 /** F43: el valor de mercado llega en divisa base (risk_service.py: value_base)
  *  y se mostraba como numero crudo; el sector llega en ingles y se pintaba tal
  *  cual. Formato monetario con la divisa base y sector con etiqueta ES. */
-function positionValueText(position: DataRecord, baseCurrency: string): string {
+function positionValueText(t: TFunction, f: Formatters, position: DataRecord, baseCurrency: string): string {
     const value = position.market_value;
-    if (value === null || value === undefined || value === '') return NA;
+    if (value === null || value === undefined || value === '') return t('common.na');
     const numeric = typeof value === 'number' ? value : Number(value);
-    if (!Number.isFinite(numeric)) return NA;
-    return formatMoney(numeric, baseCurrency);
+    if (!Number.isFinite(numeric)) return t('common.na');
+    return f.formatMoney(numeric, baseCurrency);
 }
 
-function positionSectorText(position: DataRecord): string {
+function positionSectorText(t: TFunction, position: DataRecord): string {
     const sector = position.sector;
-    if (sector === null || sector === undefined || sector === '') return NA;
+    if (sector === null || sector === undefined || sector === '') return t('common.na');
     return etiquetaSector(String(sector));
 }
 
-function weightText(position: DataRecord): string {
+function weightText(t: TFunction, f: Formatters, position: DataRecord): string {
     const weight = position.weight;
     if (typeof weight === 'number' && Number.isFinite(weight)) {
-        return formatPercent(weight, { fromRatio: true, digits: 2 });
+        return f.formatPercent(weight, { fromRatio: true, digits: 2 });
     }
-    return NA;
+    return t('common.na');
 }
 
 /** Ticker de la posición, enlazado a su ficha de research si se puede resolver. */
@@ -277,6 +286,8 @@ function alertKey(alert: DataRecord): string {
 }
 
 export default function RiskDashboardView({ initialDashboard }: RiskDashboardViewProps) {
+    const t = useT();
+    const f = useFormat();
     const [dashboard, setDashboard] = useState(initialDashboard);
     // Sincroniza el snapshot si el servidor revalida: ajuste durante el
     // render, no efecto con setState síncrono.
@@ -291,7 +302,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
         // Si falla, no sustituimos el snapshot anterior por datos vacíos.
         const next = await getRiskDashboard();
         setDashboard(next);
-        return humanizeRiskDashboard(headlineRecord(next));
+        return humanizeRiskDashboard(t, f, headlineRecord(next));
     };
     const positions = extractPositions(dashboard);
     const alerts = extractAlerts(dashboard);
@@ -299,10 +310,10 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
     const isEmptyPortfolio = !!dashboard && Number(dashboard.total_value ?? NaN) === 0 && Number(dashboard.equity_value ?? 0) === 0;
     const highAlerts = alerts.filter(alert => alert.severity === 'high').length;
     const weightLabel = dashboard?.weight_basis === 'gross_equity'
-        ? 'Peso (valor bruto)'
+        ? t('risk.positions.weightGross')
         : ['total_with_cash', 'with_cash'].includes(String(dashboard?.weight_basis))
-            ? 'Peso (con caja)'
-            : 'Peso (base no disponible)';
+            ? t('risk.positions.weightWithCash')
+            : t('risk.positions.weightUnknown');
     // F43: misma regla que en el resumen - la divisa base viene del dashboard.
     const baseCurrency = dashboard && typeof dashboard.base_currency === 'string' && dashboard.base_currency
         ? dashboard.base_currency
@@ -318,9 +329,9 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                         <Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />
                         <div>
                             <CardTitle as="h2" className="text-lg font-semibold text-gray-100">
-                                Alertas de concentración y liquidez
+                                {t('risk.alerts.title')}
                             </CardTitle>
-                            {highAlerts > 0 ? <p className="mt-1 text-sm text-amber-300">{highAlerts} {highAlerts === 1 ? 'alerta alta' : 'alertas altas'}</p> : null}
+                            {highAlerts > 0 ? <p className="mt-1 text-sm text-amber-300">{f.formatCount(highAlerts, t('risk.alerts.highOne'), t('risk.alerts.highMany'))}</p> : null}
                         </div>
                     </div>
                 </CardHeader>
@@ -328,8 +339,8 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                     {alerts.length === 0 ? (
                         <p className="py-6 text-center text-sm text-gray-500">
                             {dashboard?.status === 'ok'
-                                ? 'Sin alertas de concentración o liquidez en los datos calculados.'
-                                : 'No hay alertas en los datos disponibles. La cobertura incompleta no permite descartar alertas en el resto de la cartera.'}
+                                ? t('risk.alerts.emptyOk')
+                                : t('risk.alerts.emptyIncomplete')}
                         </p>
                     ) : (
                         <div className="space-y-3">
@@ -339,7 +350,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                         <Badge variant="outline">{etiquetaSeveridad(formatRecordValue(alert.severity))}</Badge>
                                         <span className="text-sm text-gray-200">{formatRecordValue(alert.message)}</span>
                                     </div>
-                                    <p className="mt-2 text-xs leading-5 text-gray-400">{thresholdExplanation(alert)}</p>
+                                    <p className="mt-2 text-xs leading-5 text-gray-400">{thresholdExplanation(t, alert)}</p>
                                 </div>
                             ))}
                         </div>
@@ -348,14 +359,14 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
             </Card>
 
             <RecordDetail
-                title="Exposiciones de cartera"
+                title={t('risk.summary.title')}
                 titleAs="h2"
                 icon={<Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />}
-                record={humanizeRiskDashboard(headlineRecord(dashboard))}
+                record={humanizeRiskDashboard(t, f, headlineRecord(dashboard))}
                 fetchRecord={refreshDashboard}
                 maxKeys={32}
                 hiddenKeys={['trace']}
-                emptyMessage="No hay métricas de riesgo disponibles. Comprueba que tu cartera tiene posiciones."
+                emptyMessage={t('risk.summary.empty')}
             />
 
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
@@ -364,7 +375,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                         <Briefcase className="h-5 w-5 text-teal-400" aria-hidden="true" />
                         <div>
                             <CardTitle as="h2" className="text-lg font-semibold text-gray-100">
-                                Exposición por posición
+                                {t('risk.positions.title')}
                             </CardTitle>
                         </div>
                     </div>
@@ -372,36 +383,36 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                         href="/portfolio"
                         className="text-sm font-semibold text-teal-300 hover:text-teal-200"
                     >
-                        Ver cartera →
+                        {t('risk.positions.viewPortfolio')}
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
                     {positions.length === 0 && isEmptyPortfolio ? (
                         <div className="py-8 text-center text-sm text-gray-400">
-                            <p>Aún no tienes posiciones. Registra tu primera compra para ver pesos, concentración y exposición por sector.</p>
+                            <p>{t('risk.positions.emptyPortfolio')}</p>
                             <Link
                                 href="/portfolio?anadir=1"
                                 className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300 hover:bg-teal-400/20"
                             >
-                                Añadir inversión
+                                {t('risk.positions.addInvestment')}
                             </Link>
                         </div>
                     ) : positions.length === 0 ? (
                         <p className="py-10 text-center text-sm text-gray-500">
-                            Sin posiciones con exposición calculada.
+                            {t('risk.positions.empty')}
                         </p>
                     ) : (
                         <>
                             {/* Escritorio: tabla completa, con la región de scroll enfocada por teclado */}
                             <div className="hidden overflow-x-auto md:block">
-                                <Table regionLabel="Exposición por posición">
-                                    <TableCaption className="sr-only">Exposición por posición: valor de mercado y peso de cada holding</TableCaption>
+                                <Table regionLabel={t('risk.positions.tableRegion')}>
+                                    <TableCaption className="sr-only">{t('risk.positions.tableCaption')}</TableCaption>
                                     <TableHeader>
                                         <TableRow className="border-gray-700 hover:bg-transparent">
-                                            <TableHead className="text-xs font-semibold uppercase text-gray-500">Ticker</TableHead>
-                                            <TableHead className="text-xs font-semibold uppercase text-gray-500">Nombre</TableHead>
-                                            <TableHead className="text-xs font-semibold uppercase text-gray-500">Sector</TableHead>
-                                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">Valor</TableHead>
+                                            <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('risk.positions.colTicker')}</TableHead>
+                                            <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('risk.positions.colName')}</TableHead>
+                                            <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('risk.positions.colSector')}</TableHead>
+                                            <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{t('risk.positions.colValue')}</TableHead>
                                             <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{weightLabel}</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -413,13 +424,13 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                                     {formatRecordValue(position.name)}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-gray-400">
-                                                    {positionSectorText(position)}
+                                                    {positionSectorText(t, position)}
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm text-gray-200">
-                                                    {positionValueText(position, baseCurrency)}
+                                                    {positionValueText(t, f, position, baseCurrency)}
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm font-semibold text-gray-100">
-                                                    {weightText(position)}
+                                                    {weightText(t, f, position)}
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -433,20 +444,20 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                         {positionLink(position)}
                                         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">Nombre</dt>
+                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colName')}</dt>
                                                 <dd className="break-words text-sm text-gray-300">{formatRecordValue(position.name)}</dd>
                                             </div>
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">Sector</dt>
-                                                <dd className="break-words text-sm text-gray-400">{positionSectorText(position)}</dd>
+                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colSector')}</dt>
+                                                <dd className="break-words text-sm text-gray-400">{positionSectorText(t, position)}</dd>
                                             </div>
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">Valor</dt>
-                                                <dd className="break-words text-right text-sm text-gray-200">{positionValueText(position, baseCurrency)}</dd>
+                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colValue')}</dt>
+                                                <dd className="break-words text-right text-sm text-gray-200">{positionValueText(t, f, position, baseCurrency)}</dd>
                                             </div>
                                             <div className="min-w-0">
                                                 <dt className="text-[11px] uppercase tracking-wide text-gray-500">{weightLabel}</dt>
-                                                <dd className="break-words text-right text-sm font-semibold text-gray-100">{weightText(position)}</dd>
+                                                <dd className="break-words text-right text-sm font-semibold text-gray-100">{weightText(t, f, position)}</dd>
                                             </div>
                                         </dl>
                                     </li>
