@@ -83,6 +83,8 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/brain/BrainGuideAnswer.tsx': 'useT y useId: etiquetas de locale e identificadores de citas accesibles',
+  'components/brain/BrainLibraryAnswer.tsx': 'useT para etiquetas de respuesta de biblioteca',
   'components/brain/BrainSources.tsx': 'useT lee locale para etiquetas de las citas',
   'components/chat/CitationsList.tsx': 'useT lee locale para encabezados de fuentes y páginas',
   'components/LoadingState.tsx': 'useT lee el contexto de locale para estados de carga accesibles',

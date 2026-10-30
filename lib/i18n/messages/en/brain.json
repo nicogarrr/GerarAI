@@ -52,5 +52,19 @@
       "thesisRecord": "Saved thesis",
       "unclassified": "Unclassified source"
     }
+  },
+  "library": {
+    "unregisteredAuthor": "Author not recorded",
+    "pageN": "Page {n}",
+    "chunkN": "Chunk {n}",
+    "viewChunk": "View chunk",
+    "original": "Original",
+    "thesis": "Thesis",
+    "whatWouldProveMeWrong": "What would prove me wrong",
+    "scenarios": "Scenarios",
+    "trigger": "Trigger: {trigger}",
+    "mentalModels": "Mental models",
+    "whatIDontKnow": "What I don't know",
+    "textOnlyNote": "Text search. Try terms in the original language too."
   }
 }

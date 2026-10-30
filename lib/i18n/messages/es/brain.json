@@ -52,5 +52,19 @@
       "thesisRecord": "Tesis guardada",
       "unclassified": "Fuente sin clasificar"
     }
+  },
+  "library": {
+    "unregisteredAuthor": "Autor no registrado",
+    "pageN": "Página {n}",
+    "chunkN": "Fragmento {n}",
+    "viewChunk": "Ver fragmento",
+    "original": "Original",
+    "thesis": "Tesis",
+    "whatWouldProveMeWrong": "Qué me haría equivocarme",
+    "scenarios": "Escenarios",
+    "trigger": "Disparador: {trigger}",
+    "mentalModels": "Modelos mentales",
+    "whatIDontKnow": "Lo que no sé",
+    "textOnlyNote": "Búsqueda por texto. Prueba también términos del idioma original."
   }
 }
