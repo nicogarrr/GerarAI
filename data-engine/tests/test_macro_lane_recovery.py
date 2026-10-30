@@ -254,3 +254,59 @@ def test_bea_item_con_nombre_de_empresa_queda_sin_company_id(monkeypatch):
     assert (event.metadata_ or {}).get("news_lane") == "macro"
     db.close()
     engine.dispose()
+
+
+def test_carril_nuevo_nace_cerrado_por_defecto(monkeypatch):
+    """Diseño invertido (auditoría #3114): cualquier carril (lane no None)
+    es fail-closed salvo que se abra explícitamente. Un carril desconocido
+    ingiere con company_id NULL aunque el titular nombre una empresa."""
+    from sqlalchemy import select
+
+    from app.models.entities import Company
+    from app.services.feed_ingestion_service import FeedIngestionService, RSSFeed
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine, expire_on_commit=False)()
+    tenant = Tenant(external_id="t", name="T", metadata_={}, status="active")
+    db.add(tenant)
+    db.flush()
+    db.add(Company(ticker="AAPL", name="Apple", exchange="NASDAQ", currency="USD",
+                   company_type="tech", valuation_model="standard_dcf"))
+    db.commit()
+    db.info["tenant_id"] = tenant.id
+
+    class _FakePollService(FeedIngestionService):
+        async def poll_rss(self, url, *, ticker=None, source_label=None):
+            return ConnectorResult(
+                source="rss",
+                items=[
+                    ConnectorItem(
+                        source="Fuente X",
+                        title="Apple bate expectativas trimestrales",
+                        url="https://fuentex.example/1",
+                        published_at=NOW,
+                    )
+                ],
+            )
+
+    import app.services.feed_ingestion_service as fis
+
+    monkeypatch.setattr(fis, "FeedIngestionService", _FakePollService)
+    monkeypatch.setattr(
+        fis,
+        "all_rss_feeds",
+        # Carril hipotético no declarado en el conjunto de detección permitida.
+        lambda: [RSSFeed("https://fuentex.example/rss", label="Fuente X", lane="carril_futuro")],
+    )
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: db)
+    monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: None)
+
+    result = dramatiq_app.refresh_rss_feeds(tenant_id=tenant.id, user_id="u1")
+
+    assert result["status"] == "ok"
+    event = db.scalars(select(NewsEvent)).one()
+    assert event.company_id is None
+    assert (event.metadata_ or {}).get("news_lane") == "carril_futuro"
+    db.close()
+    engine.dispose()
