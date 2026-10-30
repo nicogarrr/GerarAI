@@ -1,5 +1,6 @@
 import { execFileSync } from "node:child_process";
 import path from "node:path";
+import { E2E_UI_DATABASE_URL } from "../fixtures/e2e-env";
 
 import { backendCall, expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 
@@ -52,7 +53,7 @@ function seedThesis() {
       ...process.env,
       APP_ENV: "test",
       PYTHONPATH: ".",
-      DATABASE_URL: process.env.E2E_UI_DATABASE_URL ?? "sqlite:///./cavaai_ui_e2e.db",
+      DATABASE_URL: E2E_UI_DATABASE_URL,
     },
     stdio: "pipe",
     timeout: 60_000,

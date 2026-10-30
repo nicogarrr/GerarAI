@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { seedMarketPrices } from "./fixtures/market-prices";
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 // F339: a 390px la acción Cerebro vive en BottomNav; el FAB desktop
 // queda oculto y no puede tapar la leyenda del donut.
@@ -16,7 +17,7 @@ test.skip(!process.env.E2E_UI_RUN, "Set E2E_UI_RUN=1 to run browser tests.");
 
 const apiSecret = process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 const apiUser = "e2e-browser-user"; // el bypass E2E firma tenant=user.id
-const apiBase = "http://127.0.0.1:8100";
+const apiBase = E2E_UI_BACKEND_URL;
 
 function signedHeaders(method: string, path: string, body: Buffer) {
   const timestamp = Math.floor(Date.now() / 1000).toString();
