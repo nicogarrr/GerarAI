@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import delete, desc, select
+from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -464,16 +464,35 @@ class PortfolioSnapshotService:
                 current.cumulative_twr = None
         db.flush()
 
+    def count_history(
+        self,
+        db: Session,
+        *,
+        start: date | None = None,
+    ) -> int:
+        """Count total snapshots matching the filter."""
+        portfolio = self.fx.portfolio(db)
+        if portfolio is None:
+            return 0
+        statement = select(func.count()).select_from(PortfolioDailySnapshot).where(
+            PortfolioDailySnapshot.portfolio_id == portfolio.id
+        )
+        if start:
+            statement = statement.where(PortfolioDailySnapshot.snapshot_date >= start)
+        return db.scalar(statement) or 0
+
     def history(
         self,
         db: Session,
         *,
         start: date | None = None,
-        limit: int = 5000,
+        page: int = 1,
+        page_size: int = 20,
     ) -> list[PortfolioDailySnapshot]:
         portfolio = self.fx.portfolio(db)
         if portfolio is None:
             return []
+        offset = (page - 1) * page_size
         statement = select(PortfolioDailySnapshot).where(
             PortfolioDailySnapshot.portfolio_id == portfolio.id
         )
@@ -481,7 +500,7 @@ class PortfolioSnapshotService:
             statement = statement.where(PortfolioDailySnapshot.snapshot_date >= start)
         return list(
             db.scalars(
-                statement.order_by(PortfolioDailySnapshot.snapshot_date).limit(limit)
+                statement.order_by(PortfolioDailySnapshot.snapshot_date).limit(page_size).offset(offset)
             ).all()
         )
 

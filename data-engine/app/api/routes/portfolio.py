@@ -2,6 +2,7 @@ import math
 from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field, field_validator
@@ -24,6 +25,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
+from app.schemas.pagination import PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.company_resolver import resolve_company
 from app.services.connectors.ibkr import IBKRFlexClient
@@ -887,33 +889,68 @@ def create_transaction_batch(
                 detail=f"Transaction {i}: {exc.detail}"
             ) from exc
     
-    # Step 2: Create all transactions in a single DB transaction
+    # Step 2: Insert all transactions without rebuilding positions (for performance)
     created_transactions: list[tuple[Transaction, Company]] = []
+    company_ids_for_rebuild: set[int] = set()
     company_ids_for_analysis: set[int] = set()
     company_ids_for_backfill: set[int] = set()
     
     try:
+        portfolio = service.fx.ensure_portfolio(db)
+        
         for i, tx_input in enumerate(payload.transactions):
             try:
-                transaction = service.create_transaction(
-                    db,
-                    ticker=tx_input.ticker,
-                    action=tx_input.action,
+                # Validate and create company
+                company = service.ensure_company(db, tx_input.ticker)
+                normalized_action = tx_input.action.lower()
+                
+                # Validation checks (from PortfolioLedgerService.create_transaction)
+                if normalized_action in {"buy", "sell"}:
+                    snapshot_position = db.scalar(
+                        select(Position).where(
+                            Position.company_id == company.id,
+                            *tenant_filters(db, Position),
+                            Position.source == "screenshot_confirmed",
+                        )
+                    )
+                    if snapshot_position is not None:
+                        raise ValueError(
+                            "Esta posición procede de una captura sin historial. "
+                            "Importa primero el fichero del bróker para conciliar antes de añadir compras o ventas"
+                        )
+                
+                # Oversell validation for sells
+                if normalized_action == "sell":
+                    held = service._held_quantity(db, company.id)
+                    if tx_input.quantity > held:
+                        raise PortfolioOversellError(
+                            f"Cannot sell {tx_input.quantity} {tx_input.ticker.upper()}: only {held} shares are "
+                            "available on the ledger."
+                        )
+                
+                # Create transaction without rebuilding position
+                transaction = Transaction(
+                    portfolio_id=portfolio.id,
+                    company_id=company.id,
+                    trade_date=tx_input.trade_date,
+                    action=normalized_action,
                     quantity=tx_input.quantity,
                     price=tx_input.price,
-                    trade_date=tx_input.trade_date,
                     fees=tx_input.fees,
-                    currency=tx_input.currency,
-                    notes=tx_input.notes,
+                    currency=canonical_currency_code(tx_input.currency),
+                    external_id=f"manual-{uuid4().hex}",
+                    raw_payload={"notes": tx_input.notes} if tx_input.notes else {},
                 )
-                company = db.get(Company, transaction.company_id)
-                assert company is not None
+                db.add(transaction)
+                db.flush()
+                
                 created_transactions.append((transaction, company))
+                company_ids_for_rebuild.add(company.id)
                 
                 # Track companies for post-processing
-                if tx_input.action in {"buy", "sell"}:
+                if normalized_action in {"buy", "sell"}:
                     company_ids_for_analysis.add(company.id)
-                if tx_input.action == "buy":
+                if normalized_action == "buy":
                     company_ids_for_backfill.add(company.id)
                     
             except (PortfolioOversellError, PortfolioMixedCurrencyError, ValueError) as exc:
@@ -929,14 +966,26 @@ def create_transaction_batch(
                     detail=f"Transaction {i} ({tx_input.ticker} {tx_input.action}): {str(exc)}"
                 ) from exc
         
+        # Step 3: Rebuild positions once per company (batch optimization)
+        for company_id in company_ids_for_rebuild:
+            service.rebuild_position(db, company_id)
+        
+        # Enqueue fundamentals seed for new companies
+        from app.services.fundamentals_seed_service import enqueue_fundamentals_seed
+        for transaction, company in created_transactions:
+            try:
+                enqueue_fundamentals_seed(db, company.ticker)
+            except Exception:  # noqa: BLE001
+                pass  # Never block batch on seed queue failures
+        
         # Commit the batch
         db.commit()
         
-        # Step 3: Refresh all created transactions
+        # Step 4: Refresh all created transactions
         for transaction, _ in created_transactions:
             db.refresh(transaction)
         
-        # Step 4: Post-processing (journal links and analysis queue)
+        # Step 5: Post-processing (journal links and analysis queue)
         if company_ids_for_analysis:
             try:
                 from app.services.journal_trade_link import auto_link_journal_trades_best_effort

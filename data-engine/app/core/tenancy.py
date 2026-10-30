@@ -16,6 +16,13 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models.entities import TenantOwnedMixin
 
+# Re-export tenant_cache_scope from llm.response_cache for backward compatibility
+try:
+    from app.llm.response_cache import tenant_cache_scope
+except ImportError:
+    # Fallback if llm module not available yet during import
+    tenant_cache_scope = None  # type: ignore[assignment]
+
 
 def tenant_filters(
     db: Session, *models: type[TenantOwnedMixin]
