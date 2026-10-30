@@ -1,6 +1,7 @@
 import ValuationSummaryGrid from '@/components/research/ValuationSummaryGrid';
 import type { Metadata } from 'next';
 import { redirectToSignIn } from '@/lib/auth/sign-in-redirect';
+import { parseTransactionFilters } from '@/lib/portfolio/transaction-filters';
 import { getPortfolioSummary, getPortfolioTransactionPage, getPortfolioScores, getPortfolioForecast, getPortfolioTearsheet, getPortfolioDividendProjection } from '@/lib/actions/portfolio.actions';
 import PortfolioTabs from '@/components/portfolio/PortfolioTabs';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -21,8 +22,9 @@ export const metadata: Metadata = {
     'Posiciones, movimientos, factores de calidad y tearsheet de tu cartera, con base de coste y tipos de cambio por transacción.',
 };
 
-export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ transactionOffset?: string }> }) {
+export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ transactionOffset?: string; ticker?: string; type?: string }> }) {
   const query = await searchParams;
+  const transactionFilters = parseTransactionFilters(query);
   const offset = Number.isSafeInteger(Number(query.transactionOffset)) && Number(query.transactionOffset) >= 0 ? Number(query.transactionOffset) : 0;
   let userId: string;
 
@@ -47,7 +49,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     // transactions y tearsheet son lecturas tolerantes a falta de historial.
     const [summaryResult, transactionsResult, scoresResult, tearsheetResult, forecastResult, dividendsResult] = await Promise.all([
       getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? error.message : 'No se pudo cargar la cartera', cause: error as unknown })),
-      getPortfolioTransactionPage(userId, offset).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? error.message : 'No se pudieron cargar los movimientos' })),
+      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? error.message : 'No se pudieron cargar los movimientos' })),
       // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
       // desconocidos, y la UI los pinta como "no disponible" en vez de
       // "0,00", que es lo que se veia cuando el backend no respondia.
@@ -89,7 +91,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     <PortfolioTabs
       summary={summary}
       transactions={transactions.items}
-      transactionPage={{ total: transactions.total, offset: transactions.offset }}
+      transactionPage={{ total: transactions.total, offset: transactions.offset, filters: transactions.filters }}
       scores={scores}
       tearsheet={tearsheet}
       forecast={forecast}

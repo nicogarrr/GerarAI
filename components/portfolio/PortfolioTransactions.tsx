@@ -15,6 +15,7 @@ import ImportIBKRButton from './ImportIBKRButton';
 import AddTransactionButton from './AddTransactionButton';
 import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
+import { hasTransactionFilters, transactionsHref, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
 type Transaction = {
   _id: string;
@@ -30,7 +31,7 @@ type Transaction = {
 
 type Props = {
   transactions: Transaction[];
-  page?: { total: number; offset: number };
+  page?: { total: number; offset: number; filters?: TransactionFilters };
   userId: string;
 };
 
@@ -78,7 +79,9 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
   const confirmTx = confirmId ? transactions.find((tx) => tx._id === confirmId) : undefined;
   // Sin ningún movimiento (no solo esta página vacía): primer uso, se ofrecen
   // las dos formas de empezar en vez de «Sin movimientos en esta página».
-  const noTransactionsAtAll = transactions.length === 0 && (!page || page.total === 0);
+  const filters = page?.filters;
+  const filtered = hasTransactionFilters(filters);
+  const noTransactionsAtAll = transactions.length === 0 && (!page || page.total === 0) && !filtered;
 
   const handleDelete = async (transactionId: string) => {
     setDeleting(transactionId);
@@ -107,10 +110,34 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
           </p>
         ) : null}
       </CardHeader>
+      {page && (page.total > 0 || filtered) ? (
+        // Formulario GET: los filtros viven en la URL (se pueden compartir y
+        // la paginación los conserva) y el backend filtra antes de paginar.
+        <form method="get" action="/portfolio" role="search" aria-label="Filtrar movimientos" className="flex flex-wrap items-end gap-2 border-b border-gray-800/50 px-4 py-3 text-sm">
+          <input type="hidden" name="tab" value="movimientos" />
+          <label className="grid gap-1 text-xs text-gray-400">
+            Ticker
+            <input name="ticker" defaultValue={filters?.ticker ?? ''} placeholder="Todos" autoCapitalize="characters" maxLength={32}
+              className="min-h-11 w-28 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100 md:min-h-9" />
+          </label>
+          <label className="grid gap-1 text-xs text-gray-400">
+            Tipo
+            <select name="type" defaultValue={filters?.type ?? ''} className="min-h-11 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100 md:min-h-9">
+              <option value="">Todos</option>
+              <option value="buy">Compras</option>
+              <option value="sell">Ventas</option>
+            </select>
+          </label>
+          <Button type="submit" variant="outline" className="min-h-11 md:min-h-9">Filtrar</Button>
+          {filtered ? (
+            <Button asChild variant="ghost" className="min-h-11 md:min-h-9"><Link href={transactionsHref(undefined)}>Quitar filtros</Link></Button>
+          ) : null}
+        </form>
+      ) : null}
       {page && page.total > 0 ? <nav aria-label="Páginas de movimientos" className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm text-gray-400">
         <span>{transactions.length ? `${formatNumber(page.offset + 1)}-${formatNumber(page.offset + transactions.length)} de ${formatNumber(page.total)}` : `0 de ${formatNumber(page.total)}`}</span>
-        {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${Math.max(0, page.offset - 50)}`}>Anteriores</Link></Button> : null}
-        {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={`/portfolio?tab=movimientos&transactionOffset=${page.offset + 50}`}>Siguientes</Link></Button> : null}
+        {page.offset > 0 ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, Math.max(0, page.offset - 50))}>Anteriores</Link></Button> : null}
+        {page.offset + transactions.length < page.total ? <Button asChild variant="outline" className="min-h-11"><Link href={transactionsHref(filters, page.offset + 50)}>Siguientes</Link></Button> : null}
       </nav> : null}
       <CardContent className="p-0 flex-1 overflow-hidden">
         {transactions.length === 0 ? (
@@ -128,12 +155,21 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                 </div>
               </>
             ) : (
-              <>
-                <p className="text-gray-500 text-sm mb-4">Sin movimientos en esta página</p>
-                <Button asChild variant="outline" className="min-h-11">
-                  <Link href="/portfolio?tab=movimientos">Ir a la primera página</Link>
-                </Button>
-              </>
+              filtered && page?.total === 0 ? (
+                <>
+                  <p className="text-gray-500 text-sm mb-4">Ningún movimiento coincide con estos filtros</p>
+                  <Button asChild variant="outline" className="min-h-11">
+                    <Link href={transactionsHref(undefined)}>Quitar filtros</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-gray-500 text-sm mb-4">Sin movimientos en esta página</p>
+                  <Button asChild variant="outline" className="min-h-11">
+                    <Link href={transactionsHref(filters)}>Ir a la primera página</Link>
+                  </Button>
+                </>
+              )
             )}
           </div>
         ) : (

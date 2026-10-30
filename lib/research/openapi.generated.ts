@@ -19847,6 +19847,8 @@ export interface operations {
             query?: {
                 limit?: number;
                 offset?: number;
+                ticker?: string | null;
+                action?: ("buy" | "sell") | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;

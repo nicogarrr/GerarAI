@@ -135,6 +135,13 @@ describe('lecturas de transacciones', () => {
             expect(researchRequest).toHaveBeenLastCalledWith('/api/portfolio/transactions/page?limit=50&offset=0', { fast: true });
         }
     });
+
+    it('pasa los filtros de ticker y tipo al backend (que filtra antes de paginar)', async () => {
+        researchRequest.mockResolvedValue({ items: [], total: 0 });
+        const page = await getPortfolioTransactionPage('tenant-one', 50, { ticker: 'SAN.MC', type: 'sell' });
+        expect(researchRequest).toHaveBeenLastCalledWith('/api/portfolio/transactions/page?limit=50&offset=50&ticker=SAN.MC&action=sell', { fast: true });
+        expect(page.filters).toEqual({ ticker: 'SAN.MC', type: 'sell' });
+    });
 });
 
 describe('getPortfolioSummary: dinero y suspensión de valoración', () => {
