@@ -138,6 +138,13 @@ def _best_by_period(
     return out
 
 
+def _as_outflow(value: TtmValue) -> TtmValue:
+    """El capex es una salida de caja: valor negativo sea cual sea su signo guardado."""
+    if value.value is None:
+        return value
+    return replace(value, value=-abs(value.value))
+
+
 def compute_company_ttm(
     facts: list[FinancialFact],
     split_events=None,
@@ -157,10 +164,12 @@ def compute_company_ttm(
         results[metric] = latest_point(metric, quarters, annuals)
     # Derivadas: solo si los componentes son del mismo periodo y unidad.
     # El capex se guarda en negativo (salida de caja): FCF = flujo op. + capex.
+    # Un capex guardado en positivo (hechos antiguos sin normalizar) sumaba en
+    # vez de restar: FCF = OCF - |capex| siempre.
     results["free_cash_flow"] = combine_ttm(
         "free_cash_flow",
         results["operating_cash_flow"],
-        results["capital_expenditure"],
+        _as_outflow(results["capital_expenditure"]),
         op="add",
     )
     results["net_debt"] = combine_ttm(
