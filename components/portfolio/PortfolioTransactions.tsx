@@ -43,6 +43,18 @@ function transactionCurrency(currency: string | undefined): string | null {
   return isValidCurrencyCode(currency) ? currency : null;
 }
 
+/** Mismo texto que `ZERO_COST_REVIEW_LABEL` del backend (informe fiscal). */
+export const ZERO_COST_REVIEW_LABEL = 'Coste 0 (regalo / spin-off): revisar';
+
+/**
+ * Compra con cantidad positiva a precio 0 (regalo, spin-off, liberadas): la
+ * misma regla que `is_zero_cost_buy` del backend. Se acepta, pero su base de
+ * coste 0 cambia la ganancia fiscal de la venta, así que se marca para revisar.
+ */
+export function isZeroCostBuy(tx: Pick<Transaction, 'type' | 'quantity' | 'price'>): boolean {
+  return tx.type === 'buy' && Number.isFinite(tx.quantity) && tx.quantity > 0 && tx.price === 0;
+}
+
 export default function PortfolioTransactions({ transactions, userId, page }: Props) {
   const router = useRouter();
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -124,6 +136,14 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                               {tx.type === 'buy' ? 'Compra' : 'Venta'}
                             </span>
                           </div>
+                          {isZeroCostBuy(tx) ? (
+                            <p
+                              className="mt-1 inline-flex rounded bg-amber-500/10 px-1.5 py-0.5 text-xs text-amber-300"
+                              title="Compra a precio 0: si fue un spin-off o acciones liberadas, edita el precio para repartir el coste de la matriz; si fue un regalo, el coste es el valor de mercado en la fecha."
+                            >
+                              {ZERO_COST_REVIEW_LABEL}
+                            </p>
+                          ) : null}
                           <p className="text-xs text-gray-500 mt-0.5">
                             {formatUserDate(tx.date)}
                           </p>
