@@ -190,7 +190,7 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
     return out
 
 
-def _listed(value, unit, company) -> tuple[Decimal, str] | None:
+def _listed(value, unit, company) -> tuple[Decimal, str | None] | None:
     if value is None:
         return None
     amount = Decimal(str(value))
