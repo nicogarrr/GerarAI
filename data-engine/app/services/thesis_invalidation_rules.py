@@ -48,8 +48,10 @@ from app.services.price_freshness import close_is_stale
 from app.services.price_units import listing_price
 from app.services.split_adjustment import (
     cumulative_split_factor_after,
+    period_end_date,
     split_after_price,
     split_events_by_company,
+    split_factor_for_fact,
 )
 from app.services.ttm_fundamentals import FLOW_METRICS
 
@@ -65,6 +67,20 @@ QUARTER_LABELS = ("Q1", "Q2", "Q3", "Q4")
 MARGIN_OF_SAFETY_PCT = "margen_seguridad_pct"
 CHANGE_SINCE_THESIS_PCT = "variacion_desde_tesis_pct"
 METRIC_PREFIX = "metrica:"
+# Datos por accion y recuentos de acciones: cambian de base con un split. Un
+# BPA anual de antes de un 10:1 es 10 veces el de hoy; se reexpresa a la base
+# actual (regla unica fact_split_factor) antes de compararlo con el umbral.
+PER_SHARE_METRICS = frozenset(
+    {
+        "eps_diluted",
+        "eps_basic",
+        "fcf_per_share",
+        "revenue_per_share",
+        "ttm_dividend_per_share",
+        "loss_per_share",
+    }
+)
+SHARE_COUNT_METRICS = frozenset({"shares_diluted", "shares_outstanding"})
 
 METRIC_LABELS: dict[str, str] = {
     PRICE: "precio",
@@ -370,6 +386,22 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
             .limit(1)
         )
         if calculated is not None and calculated.value is not None:
+            if name in PER_SHARE_METRICS or name in SHARE_COUNT_METRICS:
+                # Sin fecha de publicacion no se sabe si el calculo ya recoge
+                # un split posterior al cierre del periodo: N/D, nunca x10.
+                events = split_events_by_company(db, [rule.company_id]).get(
+                    rule.company_id, []
+                )
+                end = period_end_date(calculated.period)
+                if events and (
+                    end is None or any(end < day <= date.today() for day, _r in events)
+                ):
+                    return None, {
+                        **base,
+                        "status": "missing",
+                        "missing": "split_posterior_al_periodo",
+                        "period": calculated.period,
+                    }
             return Decimal(calculated.value), {
                 **base,
                 "status": "fresh",
@@ -397,7 +429,17 @@ def observe(db: Session, rule: AlertRule) -> tuple[Decimal | None, dict[str, Any
             query.order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.created_at)).limit(1)
         )
         if fact is not None and fact.value is not None:
-            return Decimal(fact.value), {
+            value = Decimal(fact.value)
+            if name in PER_SHARE_METRICS or name in SHARE_COUNT_METRICS:
+                factor = split_factor_for_fact(
+                    db,
+                    rule.company_id,
+                    period=getattr(fact, "period", None),
+                    filed=getattr(fact, "filed", None),
+                    cutoff=date.today(),
+                )
+                value = value / factor if name in PER_SHARE_METRICS else value * factor
+            return value, {
                 **base,
                 "status": "fresh",
                 "source": "financial_fact",
