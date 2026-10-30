@@ -285,6 +285,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/common/AnalystTargetLine.tsx': 'useState, useEffect: pide el consenso de objetivos tras el primer pintado (fuera del render de servidor)',
   'components/common/ExtendedHoursLine.tsx': 'useState, useEffect: pide la cotización extendida tras el primer pintado (fuera del render de servidor)',
   'components/watchlist/WatchlistAddButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (contenido del alta diferido en WatchlistAddDialog)',
+  'components/watchlist/WatchlistBuyAction.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (formulario del alta diferido en AddTransactionDialog)',
   'components/watchlist/WatchlistAddDialog.tsx': 'useState, useRouter, jsx-onClick, libreria cliente: sonner, importa cliente: components/search/TickerSearchInput.tsx (chunk diferido: solo se descarga al abrir el alta)',
   'components/watchlist/WatchlistRemoveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
   'components/work-products/WorkProductButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/dialog.tsx, dynamic (diálogo de generación diferido en WorkProductDialog)',

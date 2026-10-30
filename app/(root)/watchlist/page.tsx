@@ -4,6 +4,7 @@ import { TrackedAnalysisStatus } from '@/components/common/TrackedAnalysisStatus
 import type { TrackedAnalysisStatus as AnalysisStatus } from '@/lib/tracked-analysis-status';
 import type { Metadata } from 'next';
 import { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
+import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { getWatchlistState, getWatchlistEntryData, getWatchlistMonitor, type WatchlistEntryData, type WatchlistMonitorItem } from '@/lib/actions/watchlist.actions';
 import { getResearchCompaniesBasics, getResearchCompanyBasics, type ResearchCompanyBasics } from '@/lib/actions/market-workspace.actions';
 import { getProfile } from '@/lib/actions/finnhub.actions';
@@ -13,6 +14,7 @@ import { Eye, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { WatchlistMembership, WatchlistEntry, WatchlistCount } from '@/components/watchlist/WatchlistMembership';
 import WatchlistRemoveButton from '@/components/watchlist/WatchlistRemoveButton';
+import WatchlistBuyAction from '@/components/watchlist/WatchlistBuyAction';
 import WatchlistAddButton from '@/components/watchlist/WatchlistAddButton';
 import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
@@ -79,6 +81,9 @@ export default async function WatchlistPage({
 }) {
     // Señales DCA (watchlist + cartera) en paralelo con el resto de la página.
     const dcaPromise = getDcaSignals();
+    // userId para el alta de «Registrar compra» (misma sesión cacheada por
+    // petición que usan las acciones de esta página).
+    const { id: userId } = await requireAuthenticatedUser();
     const [{ items: watchlistItems, unavailable }, query] = await Promise.all([getWatchlistState(), searchParams]);
     const requestedPage = /^\d+$/.test(query.page ?? '') ? Number(query.page) : 1;
     const totalPages = Math.max(1, Math.ceil(watchlistItems.length / PAGE_SIZE));
@@ -510,6 +515,7 @@ export default async function WatchlistPage({
                                         Ver análisis
                                         <ArrowRight className="h-4 w-4" aria-hidden="true" />
                                     </Link>
+                                    <WatchlistBuyAction userId={userId} symbol={stock.symbol} companyName={stock.name} currency={stock.currency} variant="button" />
                                     <WatchlistRemoveButton symbol={stock.symbol} />
                                 </div>
                             </WatchlistEntry>
@@ -579,6 +585,7 @@ export default async function WatchlistPage({
                                                     <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={`Opciones de ${stock.symbol}`}>Opciones</summary>
                                                     <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
                                                         <Link href={`/research/${stock.symbol}`} className="flex min-h-11 items-center px-3 py-2 text-xs text-teal-300">Ver análisis</Link>
+                                                        <WatchlistBuyAction userId={userId} symbol={stock.symbol} companyName={stock.name} currency={stock.currency} variant="menu-item" />
                                                     </div>
                                                 </details>
                                                 {/* Quitar siempre visible (QA 2026-10-19): antes iba dentro de «Opciones» y en escritorio no se descubría; en móvil ya era visible. */}

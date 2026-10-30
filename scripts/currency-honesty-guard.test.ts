@@ -139,6 +139,7 @@ const ALLOWED: Array<{ file: string; snippet: string; why: string }> = [
         snippet: "transaction.currency || 'USD'",
         why: "Semilla del SELECTOR de moneda del formulario de edición (editable por el usuario entre 9 divisas), no un importe pintado.",
     },
+
 ];
 
 /** El permiso cubre el fragmento, no el fichero entero: el hallazgo cae

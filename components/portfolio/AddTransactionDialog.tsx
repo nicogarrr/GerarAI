@@ -27,6 +27,9 @@ type DialogProps = {
   onClose: () => void;
   /** Símbolo ya elegido al abrir (enlace «Registrar compra o venta» de la ficha). */
   initialSymbol?: string | null;
+  initialCompanyName?: string;
+  /** Verified listing currency from the source view, never an inferred display amount. */
+  initialCurrency?: string | null;
 };
 
 function validSymbol(raw: string | null | undefined): string | null {
@@ -38,7 +41,7 @@ function validSymbol(raw: string | null | undefined): string | null {
     : null;
 }
 
-export default function AddTransactionDialog({ userId, onClose, initialSymbol }: DialogProps) {
+export default function AddTransactionDialog({ userId, onClose, initialSymbol, initialCompanyName, initialCurrency }: DialogProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   // Un símbolo de la URL con forma inválida se ignora (formulario vacío).
@@ -49,9 +52,11 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol }:
 
   const [formData, setFormData] = useState({
     symbol: presetSymbol ?? '',
-    companyName: '',
+    companyName: presetSymbol ? initialCompanyName ?? '' : '',
     type: 'buy' as 'buy' | 'sell',
-    currency: presetSymbol ? currencyForTicker(presetSymbol) : NEW_TRANSACTION_CURRENCY,
+    currency: (presetSymbol && initialCurrency?.trim())
+      ? initialCurrency.trim().toUpperCase()
+      : presetSymbol ? currencyForTicker(presetSymbol) : NEW_TRANSACTION_CURRENCY,
     quantity: '',
     price: '',
     fees: '',
@@ -164,6 +169,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol }:
                   setFormData({ ...formData, symbol: '', companyName: '' });
                 }
               }}
+              initialSelectedValue={presetSymbol ?? undefined}
               onSelect={(stock) => selectSymbol(stock.symbol, stock.name)}
               className="bg-gray-800 border-gray-700 text-gray-100 w-full"
             />
