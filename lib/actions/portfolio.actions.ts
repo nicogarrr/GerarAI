@@ -317,9 +317,9 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     const totalValue = backendSummary.total_value;
     // Coste y ganancia solo sobre las posiciones con valor Y coste en base conocidos:
     // el backend ya deja fuera del valor RV las que no tienen precio, FX o están en
-    // suspensión. Sumar su coste sin su ganancia diluía el rendimiento (coste 2.000,
+    // suspensión (y un coste IBKR pendiente de revisión no es base fiable). Sumar su coste sin su ganancia diluía el rendimiento (coste 2.000,
     // ganancia 500 → +25 % en vez de +50 %) y descuadraba Cartera con /inicio.
-    const valued = holdings.filter((holding) => !holding.fxMissing && holding.cost > 0);
+    const valued = holdings.filter((holding) => !holding.fxMissing && holding.cost > 0 && !holding.costReviewMessage);
     const totalCost = valued.reduce((sum, holding) => sum + holding.cost, 0);
     const totalGain = valued.reduce((sum, holding) => sum + holding.gain, 0);
     return {

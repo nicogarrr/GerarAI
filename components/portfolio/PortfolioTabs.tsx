@@ -251,6 +251,10 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                                         </p>
                                         <AddTransactionButton userId={userId} />
                                     </div>
+                                ) : summary.holdings.some((holding) => Boolean(holding.costReviewMessage)) ? (
+                                    <p className="text-sm text-amber-300">
+                                        Rentabilidad pendiente de revisión: hay costes importados por verificar (detalle en Resumen y Posiciones).
+                                    </p>
                                 ) : !hasCostBasis(summary) ? (
                                     <p className="text-sm text-gray-500">
                                         Rentabilidad no disponible: falta una base de coste válida. La cifra superior es el valor neto, no el beneficio del periodo.

@@ -197,3 +197,11 @@ describe('Cartera: corte de la reconstrucción del TWR', () => {
         expect(screen.queryByTestId('twr-rebuild-reset')).not.toBeInTheDocument();
     });
 });
+
+describe('PortfolioTabs: cabecera con coste pendiente de revisión', () => {
+    it('no muestra «G/P desde compra» si una posición tiene el coste por revisar (igual que el Resumen)', () => {
+        renderTabs({ summary: summary({ holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25, costReviewMessage: 'Divisa del coste sin verificar' }] }) });
+        expect(screen.getByText(/Rentabilidad pendiente de revisión/)).toBeInTheDocument();
+        expect(screen.queryByText(/G\/P desde compra/)).toBeNull();
+    });
+});
