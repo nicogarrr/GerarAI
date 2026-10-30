@@ -40,7 +40,15 @@ data-engine/.ruff_cache/
 data-engine/.mypy_cache/
 .git
 .github
-e2e/
+# Los tests unitarios se compilan en `npm run build` (tsconfig incluye **/*.ts)
+# y tests/unit/e2e/user-flows-warmup.test.ts importa este helper; sin el, el
+# build de la imagen frontend-prod falla con TS2307 (+TS7006 derivado).
+# Forma escalonada (dir a dir) para que la re-inclusion funcione aunque el
+# matcher no descienda en directorios excluidos.
+e2e/*
+!e2e/user-flows/
+e2e/user-flows/*
+!e2e/user-flows/warmup-routes.ts
 
 # Debug
 npm-debug.log*

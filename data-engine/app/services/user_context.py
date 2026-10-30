@@ -457,7 +457,7 @@ def _watchlist_block(
         else:
             parts.append("sin precio guardado")
         fair_major = normalize_currency(currency)[0]
-        if close is not None and (fair_major is None or listed[1] != fair_major):
+        if close is not None and listed is not None and (fair_major is None or listed[1] != fair_major):
             close_for_mos = None
         else:
             close_for_mos = close

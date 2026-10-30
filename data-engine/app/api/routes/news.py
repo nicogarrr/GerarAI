@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, false, select
+from sqlalchemy import Select, desc, false, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -136,7 +136,7 @@ def news_events(
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == lane)
     elif lane == "macro":
         stmt = stmt.where(NewsEvent.metadata_["news_lane"].as_string() == "macro")
-    def _scan(ordered_stmt) -> tuple[list, dict, list]:
+    def _scan(ordered_stmt: Select[NewsEvent, Company]) -> tuple[list, dict, list]:
         """Filas visibles (con clustering) de una consulta ordenada."""
         # Lectura: se ocultan filas etiquetadas con un ticker cuyo titular y resumen
         # no citan a la empresa (ticker pegado delante, nada mas). Criterio sin LLM;

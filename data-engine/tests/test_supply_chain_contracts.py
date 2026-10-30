@@ -306,10 +306,22 @@ def test_la_misconfiguration_se_evalua_sobre_los_dockerfiles_y_el_compose():
 def test_la_puerta_recibe_el_resultado_del_build_y_el_outcome_de_cada_escaner():
     """fail-closed: "no lo he podido comprobar" tiene que llegar al gate."""
     run = str(_gate_step()["run"])
-    # Un needs/outcome vacio llegaria como "" y argparse saldria con 2 (sin
-    # veredicto de escaneo). El fallback "skipped" lo convierte en gate ROJO
-    # (exit 1): vacio nunca se lee como "success".
-    assert '--build-result "${{ needs.build.result || \'skipped\' }}"' in run
+    # El resultado del build es POR IMAGEN: needs.build.result es el
+    # agregado de la matriz y una imagen rota marcaba las cuatro
+    # (30-oct-2026, run 41005146082). El paso build_result lo deriva del
+    # artefacto digest-<imagen>, que solo existe si ESE build fue bien. Si no
+    # dejara salida, el gate recibiria "" (!= "success") y saldria ROJO:
+    # vacio nunca se lee como "success".
+    assert '--build-result "${{ steps.build_result.outputs.result }}"' in run
+    descarga_digest = [
+        step
+        for step in _steps("scan")
+        if "download-artifact" in str(step.get("uses", ""))
+        and str(step.get("with", {}).get("pattern", "")) == "digest-${{ matrix.name }}"
+    ]
+    assert descarga_digest, "el scan deriva el build de su propia imagen del artefacto digest"
+    paso_resultado = next(step for step in _steps("scan") if step.get("id") == "build_result")
+    assert 'digests/${{ matrix.name }}.tsv' in str(paso_resultado["run"])
     fuentes = {
         "vuln": "steps.trivy_vuln.outcome",
         "secret": "steps.trivy_secret.outcome",

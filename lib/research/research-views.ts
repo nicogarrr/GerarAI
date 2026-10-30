@@ -149,6 +149,56 @@ export function canonicalViewUrl(ticker: string, requested: string | undefined):
 }
 
 /**
+ * Redirección 307 de las URLs históricas de la ficha (`?view=thesis`,
+ * `/research/T/share-capital`...), aplicada por `middleware.ts` ANTES de
+ * renderizar. No puede vivir en `page.tsx`: allí `redirect()` se lanza con la
+ * carcasa de `loading.tsx` ya enviada y React degrada la redirección a
+ * cliente («Switched to client rendering because the server rendering
+ * errored: NEXT_REDIRECT»); sin JS, o con los chunks aún en vuelo, la ficha
+ * se queda en «Cargando…» para siempre (medido 30-oct-2026, run CI 11603,
+ * e2e/research-controls-hydration.spec.ts con `?view=thesis`).
+ *
+ * Conserva los demás parámetros (`?chat=`, `?pagina=`) como hacía la página;
+ * la subruta del terminal conserva solo sus controles (metrics/years/
+ * periodicity), la misma lista que aplicaba la página retirada.
+ */
+export function legacyResearchRedirect(pathname: string, search: string): string | null {
+  const match = /^\/research\/([^/]+?)(?:\/([^/]+))?\/?$/.exec(pathname);
+  if (!match) return null;
+  const ticker = decodeURIComponent(match[1]);
+  const subroute = match[2];
+  const params = new URLSearchParams(search);
+  if (subroute !== undefined) {
+    const target = subrouteRedirect(ticker, subroute);
+    if (!target) return null;
+    if (subroute !== 'financial-terminal') return target;
+    const kept = new URLSearchParams();
+    for (const key of ['metrics', 'years', 'periodicity']) {
+      const value = params.get(key);
+      if (value !== null) kept.set(key, value);
+    }
+    const hashAt = target.indexOf('#');
+    const base = hashAt >= 0 ? target.slice(0, hashAt) : target;
+    const hash = hashAt >= 0 ? target.slice(hashAt) : '';
+    const glue = base.includes('?') ? '&' : '?';
+    return `${base}${kept.size ? `${glue}${kept.toString()}` : ''}${hash}`;
+  }
+  const canonical = canonicalViewUrl(ticker, params.get('view') ?? undefined);
+  if (!canonical) return null;
+  // Misma recomposición que aplicaba page.tsx: `view` primero, resto igual.
+  const hashAt = canonical.indexOf('#');
+  const hash = hashAt >= 0 ? canonical.slice(hashAt) : '';
+  const withoutHash = hashAt >= 0 ? canonical.slice(0, hashAt) : canonical;
+  const [pathnamePart, viewPart] = withoutHash.split('?view=');
+  const rebuilt = new URLSearchParams();
+  if (viewPart) rebuilt.set('view', viewPart);
+  for (const [key, value] of params) {
+    if (key !== 'view') rebuilt.set(key, value);
+  }
+  return `${pathnamePart}${rebuilt.size ? `?${rebuilt.toString()}` : ''}${hash}`;
+}
+
+/**
  * Destino de una subruta histórica de la ficha (`/research/T/share-capital`)
  * dentro de su pestaña, o null si la subruta no era un módulo de la ficha.
  */

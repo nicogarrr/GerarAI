@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { REQUESTED_PATH_HEADER, signInUrlFor } from '@/lib/auth/safe-redirect';
 import { requiresSession } from '@/lib/auth/session-gate';
 import { buildContentSecurityPolicy } from '@/lib/security/csp';
+import { legacyResearchRedirect } from '@/lib/research/research-views';
 
 /**
  * Dos responsabilidades por petición, en este orden:
@@ -46,6 +47,18 @@ export function middleware(request: NextRequest) {
     // layout (`redirectToSignIn`), y sin esta cabecera no sabría a dónde
     // volver. Se sobrescribe siempre: lo que mande el cliente no llega.
     requestHeaders.set(REQUESTED_PATH_HEADER, `${request.nextUrl.pathname}${request.nextUrl.search}`);
+
+    // URLs históricas de la ficha de empresa (?view=thesis, /share-capital…):
+    // 307 real, ANTES de renderizar. En page.tsx el redirect() saltaba con la
+    // carcasa de loading.tsx ya enviada y React la degradaba a redirección de
+    // cliente («Switched to client rendering»): sin JS la ficha se quedaba en
+    // «Cargando…» para siempre (E2E de hidratación, 30-oct-2026).
+    const researchTarget = legacyResearchRedirect(request.nextUrl.pathname, request.nextUrl.search);
+    if (researchTarget) {
+        const redirect = NextResponse.redirect(new URL(researchTarget, request.url), 307);
+        redirect.headers.set('Content-Security-Policy', csp);
+        return redirect;
+    }
 
     // Bypass de los tests de navegador: mismas tres condiciones que
     // lib/auth/require-user.ts (las tres juntas, siempre).
