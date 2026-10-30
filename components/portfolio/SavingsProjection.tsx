@@ -8,6 +8,8 @@ import { formatMoney, formatNumber, formatNumberForInput, parseLocalizedNumber, 
 import type { SavingsProjection as Projection } from '@/lib/plan/savings-projection';
 
 const control = 'min-h-[44px] w-full rounded-lg border border-gray-600 bg-gray-950 px-3 py-2 text-gray-100';
+// Divisas habituales; la del plan (SEK, DKK, NOK...) se añade si no está, como en PlanSetupDialog.
+const CURRENCY_OPTIONS = ['EUR', 'USD', 'GBP', 'CHF', 'JPY'];
 const panel = 'rounded-xl border border-gray-800 bg-gray-900/40 p-4';
 
 export default function SavingsProjection() {
@@ -83,7 +85,7 @@ export default function SavingsProjection() {
                 <p className="text-sm text-teal-300">{plan ? 'Conectado a tu plan de inversión' : 'Ejemplo editable · no guardado'}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
                     <label className="grid gap-1 text-sm">Aportación mensual<input className={control} inputMode="decimal" value={monthly} onChange={(e) => { setMonthly(e.target.value); edit(); }} /></label>
-                    <label className="grid gap-1 text-sm">Divisa de la aportación<select className={control} value={currency} onChange={(e) => { setCurrency(e.target.value); edit(); }}><option value="">Elige divisa</option>{['EUR', 'USD', 'GBP', 'CHF', 'JPY'].map((c) => <option key={c}>{c}</option>)}</select></label>
+                    <label className="grid gap-1 text-sm">Divisa de la aportación<select className={control} value={currency} onChange={(e) => { setCurrency(e.target.value); edit(); }}><option value="">Elige divisa</option>{(currency && !CURRENCY_OPTIONS.includes(currency) ? [currency, ...CURRENCY_OPTIONS] : CURRENCY_OPTIONS).map((c) => <option key={c}>{c}</option>)}</select></label>
                 </div>
                 <fieldset><legend className="mb-2 text-sm">Horizonte</legend><div className="grid grid-cols-4 gap-2">{Array.from(new Set([5, 10, 20, 30, years])).sort((a, b) => a - b).map((y) => <button key={y} type="button" disabled={loading} aria-pressed={years === y} className={`min-h-[44px] rounded-lg border px-2 text-sm ${years === y ? 'border-teal-500 bg-teal-950 text-teal-200' : 'border-gray-700'}`} onClick={() => { setYears(y); edit(); }}>{y} años</button>)}</div></fieldset>
                 <details><summary className="min-h-[44px] cursor-pointer py-2 text-sm text-teal-300">Supuestos de dividendos e inflación</summary><div className="grid gap-3 sm:grid-cols-2">
