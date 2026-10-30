@@ -39,9 +39,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.valuation.currency import normalize_currency
-
 from app.models import Company
+from app.valuation.currency import normalize_currency
 
 YAHOO_SCREENER_URL = "https://query1.finance.yahoo.com/v1/finance/screener"
 YAHOO_LABEL = "Yahoo Finance (fuente no oficial)"
