@@ -2021,7 +2021,11 @@ class LongTermModelService:
 
         price = resolve_model_price(db, company.id)
         if price is None:
-            return _current_price_with_date(db, company.id)
+            # resolve_model_price ya mira cierres y marks; None significa que no
+            # hay precio o que no se puede pasar a la divisa del listado (cierre
+            # en USD de una ficha en EUR sin tipo FX). Caer al cierre crudo
+            # publicaba 250 USD como precio en EUR: N/D, como ValuationService.
+            return None, None, None
         source = "market_price" if price.source == "market_close" else "position_mark"
         return price.value, _date_value(price.as_of), source
 
