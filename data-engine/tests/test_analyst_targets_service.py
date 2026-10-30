@@ -227,8 +227,7 @@ def test_fetch_sync_runs_the_three_yahoo_reads_concurrently(monkeypatch) -> None
 def test_non_equity_symbol_is_rejected_instead_of_showing_another_instruments_targets(
     monkeypatch,
 ) -> None:
-    """SPCX en Yahoo es un ETF, no la empresa: mostrar sus "objetivos" en la
-    ficha seria un dato de otro instrumento (informe UX 29-oct, punto 6)."""
+    """SPCK es el ETF; sus objetivos no son los de una accion individual."""
     monkeypatch.setattr(
         svc,
         "_fetch_sync",
@@ -239,9 +238,9 @@ def test_non_equity_symbol_is_rejected_instead_of_showing_another_instruments_ta
             "quote_type": "ETF",
         },
     )
-    result = asyncio.run(svc.AnalystTargetsService().get("SPCX"))
+    result = asyncio.run(svc.AnalystTargetsService().get("SPCK"))
     assert result.status == "empty" and result.rows == [] and result.consensus is None
-    assert result.note and "ETF" in result.note and "SPCX" in result.note
+    assert result.note and "ETF" in result.note and "SPCK" in result.note
 
 
 def test_equity_symbol_passes_the_guard(monkeypatch) -> None:
@@ -306,3 +305,36 @@ def test_quote_type_failure_keeps_the_currency(monkeypatch) -> None:
 def test_non_equity_labels_carry_spanish_accents() -> None:
     assert svc.non_equity_label("INDEX") == "un índice"
     assert svc.non_equity_label("OPTION") == "una opción"
+
+
+def test_spcx_listed_equity_is_not_blocked_by_former_etf_identity(monkeypatch) -> None:
+    """Nasdaq DTN2026-8: SpaceX uses SPCX from 2026-06-12, not the former ETF."""
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: {
+        "records": [rec("Example firm", "2026-10-15 13:48:00", 190.0)],
+        "consensus": {"current": 150.0},
+        "currency": "USD",
+        "quote_type": "EQUITY",
+    })
+    result = asyncio.run(svc.AnalystTargetsService().get("SPCX"))
+    assert result.status == "available"
+    assert result.rows[0].price_target == 190.0
+
+
+def test_stale_provider_etf_metadata_is_not_overridden_for_spcx(monkeypatch) -> None:
+    monkeypatch.setattr(svc, "_fetch_sync", lambda symbol: {
+        "records": [rec("Example firm", "2026-10-15 13:48:00", 40.0)],
+        "consensus": {"current": 30.0, "mean": 40.0},
+        "currency": "USD",
+        "quote_type": "ETF",
+    })
+    result = asyncio.run(svc.AnalystTargetsService().get("SPCX"))
+    assert result.status == "empty"
+    assert not result.rows and result.consensus is None
+
+
+def test_reused_symbol_discards_pre_listing_rows() -> None:
+    rows = svc.normalize_rows([
+        rec("Former ETF", "2026-06-11 13:00:00", 40.0),
+        rec("New equity", "2026-06-12 13:00:00", 190.0),
+    ], reference_price=150.0, today=TODAY, listed_from=date(2026, 6, 12))
+    assert [row.firm for row in rows] == ["New equity"]
