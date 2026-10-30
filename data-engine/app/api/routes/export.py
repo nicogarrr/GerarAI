@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.routes.portfolio import _trade_price_fallbacks
 from app.core.database import get_db
 from app.models import (
     Company,
@@ -25,6 +26,7 @@ from app.models import (
     TaxReport,
     Transaction,
 )
+from app.services.ibkr_cost_reconciliation import mask_cost_under_review, reconcile_ibkr_costs
 from app.services.investment_plan_service import InvestmentPlanService
 from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_report_service import (
@@ -91,23 +93,43 @@ def export_year(
     positions = db.execute(
         select(Position, Company).join(Company, Position.company_id == Company.id)
     ).all()
-    position_rows = [
-        {
+    position_list = [position for position, _ in positions]
+    # Mismas reglas de veracidad que /portfolio/positions: sin cotizacion real
+    # (precio = ultima operacion) la plusvalia es desconocida (A3) y un coste
+    # IBKR pendiente de conciliar no se exporta como dato.
+    quote_fallbacks = _trade_price_fallbacks(db, position_list)
+    cost_checks = reconcile_ibkr_costs(db, position_list)
+    position_rows = []
+    for p, company in positions:
+        held = bool(p.valuation_hold_reason)
+        quote_missing = company.id in quote_fallbacks
+        pnl_known = not held and not quote_missing and p.average_cost > 0
+        row = {
             "ticker": company.ticker,
             "quantity": float(p.quantity),
-            "average_cost": float(p.average_cost),
-            "market_price": None if p.valuation_hold_reason else float(p.market_price),
+            "average_cost": _num(p.average_cost),
+            "market_price": None if held else float(p.market_price),
             "valuation_hold_reason": p.valuation_hold_reason,
+            "quote_missing": quote_missing,
+            # Importes nativos (en `currency`) y en divisa base (`base_currency`)
+            # por separado: el CSV ponia el valor en base junto a la divisa nativa.
+            "market_value_native": None if held else _num(
+                p.market_value_native if p.market_value_native is not None else p.market_value
+            ),
+            "cost_basis_native": _num(p.cost_basis_native),
+            "unrealized_pnl_native": _num(p.unrealized_pnl) if pnl_known else None,
             "market_value_base": _num(p.market_value_base),
             "cost_basis_base": _num(p.cost_basis_base),
-            "unrealized_pnl_base": _num(p.unrealized_pnl_base),
+            "unrealized_pnl_base": _num(p.unrealized_pnl_base) if pnl_known else None,
             "currency": p.currency,
+            "base_currency": p.base_currency,
             # as_of opcional: None es 'sin fecha', nunca cadena vacía ni crash.
             "as_of": p.as_of.isoformat() if p.as_of else None,
         }
-        for p, company in positions
-    ]
-
+        mask_cost_under_review(row, cost_checks.get(p.id))
+        review = row.pop("cost_reconciliation", None)
+        row["cost_review_status"] = review.get("status") if review else None
+        position_rows.append(row)
     journal_rows = []
     entries = db.scalars(
         select(DecisionJournalEntry).where(
@@ -200,7 +222,7 @@ def export_year(
         )
     for row in position_rows:
         writer.writerow(
-            [_csv_cell(cell) for cell in ["position", row["as_of"], row["ticker"], row["quantity"], row["average_cost"], row["market_value_base"], row["currency"], row["unrealized_pnl_base"]]]
+            [_csv_cell(cell) for cell in ["position", row["as_of"], row["ticker"], row["quantity"], row["average_cost"], row["market_value_native"], row["currency"], row["unrealized_pnl_native"]]]
         )
     for row in contributions:
         writer.writerow([_csv_cell(cell) for cell in ["contribution", row["date"], "", row["amount"], row["currency"], row["note"], "", ""]])
