@@ -288,7 +288,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
             {/* Móvil: cards sin scroll horizontal */}
             <div className="space-y-3 md:hidden">
               {sortedHoldings.map((holding) => {
-                const gainKnown = !holding.fxMissing && holding.cost > 0;
+                const gainKnown = !holding.fxMissing && !holding.quoteMissing && holding.cost > 0;
                 const isPositive = holding.gain >= 0;
                 return (
                   <div key={holding.symbol} className="rounded-xl border border-gray-700 p-4">
@@ -400,7 +400,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
               </TableHeader>
               <TableBody>
                 {sortedHoldings.map((holding) => {
-                  const gainKnown = !holding.fxMissing && holding.cost > 0;
+                  const gainKnown = !holding.fxMissing && !holding.quoteMissing && holding.cost > 0;
                   const isPositive = holding.gain >= 0;
                   return (
                     <TableRow key={holding.symbol} className="border-gray-700 hover:bg-gray-800/50">

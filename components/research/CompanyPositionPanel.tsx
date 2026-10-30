@@ -32,8 +32,8 @@ export function CompanyPositionPanel({ context }: { context: CompanyHoldingConte
     const nativeCostKnown = !holding.costReviewMessage && holding.avgPrice > 0;
     const costKnown = nativeCostKnown && holding.cost > 0;
     const value = valueKnown ? money(holding.value, base) : null;
-    const gain = valueKnown && costKnown ? money(holding.gain, base) : null;
-    const nativeGain = nativeCostKnown && !holding.valuationHold && native !== base ? money(holding.nativeGain, native) : null;
+    const gain = valueKnown && costKnown && !holding.quoteMissing ? money(holding.gain, base) : null;
+    const nativeGain = nativeCostKnown && !holding.valuationHold && !holding.quoteMissing && native !== base ? money(holding.nativeGain, native) : null;
     const asOf = positionsAsOf ? formatDate(positionsAsOf) : null;
     return <Panel density="compact" description={asOf ? `Datos de tu cartera a ${asOf}.` : 'Datos de tu cartera.'} title="Tu posición">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
@@ -50,6 +50,7 @@ export function CompanyPositionPanel({ context }: { context: CompanyHoldingConte
             {holding.firstBuyDate ? <div><dt className="text-gray-500">Primera compra</dt><dd className="font-semibold text-gray-100">{formatDate(holding.firstBuyDate)}</dd></div> : null}
         </dl>
         {holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">Valoración en suspensión: {holding.valuationHold.reason}</p> : null}
+        {holding.quoteMissing && !holding.valuationHold ? <p className="mt-3 text-xs text-amber-200" role="status">Sin cotización real: el valor usa el precio de tu última operación. La plusvalía no se puede calcular hasta tener una cotización.</p> : null}
         {!holding.valuationHold && holding.valueMissing ? <p className="mt-3 text-xs text-amber-200" role="status">Sin valor en {base}: falta el precio o el tipo de cambio.</p> : null}
         {!nativeCostKnown && !holding.costReviewMessage ? <p className="mt-3 text-xs text-amber-200" role="status">Coste de adquisición desconocido. No se puede calcular la plusvalía.</p> : null}
         {nativeCostKnown && !costKnown ? <p className="mt-3 text-xs text-amber-200" role="status">Sin coste en {base}: falta el tipo de cambio de alguna compra. No se puede calcular la plusvalía en {base}.</p> : null}

@@ -18,6 +18,7 @@ from app.models import (
     Company,
     FundamentalModelVersion,
     FXRate,
+    MarketPrice,
     Position,
     ThesisVersion,
     Transaction,
@@ -359,6 +360,58 @@ def _pnl_effects(position: Position, *, held: bool, has_cost: bool) -> dict:
     return {"pnl_price_effect_base": price_effect, "pnl_fx_effect_base": fx_effect}
 
 
+_QUOTE_MISSING_PNL_KEYS = (
+    "unrealized_pnl",
+    "unrealized_pnl_native",
+    "unrealized_pnl_base",
+    "pnl_price_effect_base",
+    "pnl_fx_effect_base",
+)
+
+
+def _trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
+    """Posiciones del ledger cuyo «precio de mercado» es el de su última operación.
+
+    Sin cotización guardada, rebuild_position valora con el precio de la última
+    compra/venta: con una sola compra la plusvalía sale exactamente 0, un dato
+    que parece real y no lo es (auditoría A3). Señal sin columna nueva: fuente
+    ledger, precio igual al de la última operación y ninguna cotización
+    (MarketPrice) desde esa fecha. Un precio manual idéntico al de compra cae
+    aquí también; rotularlo «sin cotización real» es inocuo.
+    """
+    candidates = {
+        position.company_id: position
+        for position in positions
+        if position.source == "postgres_ledger" and not position.valuation_hold_reason
+    }
+    if not candidates:
+        return set()
+    last_trade: dict[int, Transaction] = {}
+    for transaction in db.scalars(
+        select(Transaction)
+        .where(
+            *tenant_filters(db, Transaction),
+            Transaction.company_id.in_(candidates),
+            Transaction.action.in_(["buy", "sell"]),
+        )
+        .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
+    ):
+        last_trade[transaction.company_id] = transaction
+    fallbacks: set[int] = set()
+    for company_id, transaction in last_trade.items():
+        position = candidates[company_id]
+        if position.market_price != transaction.price:
+            continue
+        quoted = db.scalar(
+            select(MarketPrice.id)
+            .where(MarketPrice.company_id == company_id, MarketPrice.date >= transaction.trade_date)
+            .limit(1)
+        )
+        if quoted is None:
+            fallbacks.add(company_id)
+    return fallbacks
+
+
 def _fx_source(db: Session, base_currency: str) -> dict:
     """Etiqueta de la fuente FX: de donde salen los tipos y de que fecha."""
     row = db.execute(
@@ -545,6 +598,7 @@ def positions(
     from app.services.ibkr_cost_reconciliation import mask_cost_under_review, reconcile_ibkr_costs
 
     cost_checks = reconcile_ibkr_costs(db, [position for position, _ in rows])
+    trade_price_fallbacks = _trade_price_fallbacks(db, [position for position, _ in rows])
     payloads = []
     for position, company in rows:
         fiscal_info = fiscal.get(company.id) or _fiscal_info(db, company.id, local_today())
@@ -625,8 +679,14 @@ def positions(
             "first_buy_date": fiscal_info["first_buy_date"],
             "holding_days": fiscal_info["holding_days"],
             "fiscal_bucket": fiscal_info["fiscal_bucket"],
+            # A3: el precio es el de la última operación, no una cotización. El
+            # valor se conserva (es la mejor estimación), pero la plusvalía es
+            # desconocida: null, nunca un 0 que parece medido.
+            "quote_missing": company.id in trade_price_fallbacks,
             }
         )
+        if company.id in trade_price_fallbacks:
+            payloads[-1].update(dict.fromkeys(_QUOTE_MISSING_PNL_KEYS))
     return [mask_cost_under_review(payload, cost_checks.get(position.id))
             for payload, (position, _) in zip(payloads, rows, strict=True)]
 

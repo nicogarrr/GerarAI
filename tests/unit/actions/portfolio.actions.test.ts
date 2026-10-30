@@ -177,6 +177,19 @@ describe('getPortfolioSummary: dinero y suspensión de valoración', () => {
         expect(summary.quality).toBeNull(); // data-quality caída -> null, no rompe
     });
 
+    it('A3: una posición sin cotización real no entra en coste ni plusvalía totales', async () => {
+        seedSummary([
+            position(),
+            position({ ticker: 'SINCOT', quote_missing: true, unrealized_pnl: null, unrealized_pnl_native: null, unrealized_pnl_base: null }),
+        ]);
+        const summary = await getPortfolioSummary('tenant-one');
+        expect(summary.holdings.find((h) => h.symbol === 'SINCOT')?.quoteMissing).toBe(true);
+        expect(summary.holdings.find((h) => h.symbol === 'AAPL')?.quoteMissing).toBe(false);
+        // Solo AAPL: su coste 900 sin el de SINCOT (que diluía la rentabilidad con una ganancia 0 inventada).
+        expect(summary.totalCost).toBe(900);
+        expect(summary.totalGain).toBe(450);
+    });
+
     it('valoración en suspensión: currentPrice null y fxMissing declarado, nunca un precio rancio', async () => {
         seedSummary([position({ valuation_hold: { reason: 'split sin verificar', effective_date: '2026-10-01', since: null } })]);
         const [h] = (await getPortfolioSummary('tenant-one')).holdings;
