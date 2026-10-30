@@ -16,6 +16,7 @@ import {
 } from '@/lib/actions/research.actions';
 import { thesisMoney } from '@/lib/research/thesis-number-format';
 import { cleanThesisText } from '@/lib/research/thesis-text';
+import { readingSections } from '@/lib/research/thesis-reading-sections';
 import { isValidCurrencyCode } from '@/lib/format';
 import PrintButton from '@/components/research/PrintButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
@@ -145,19 +146,21 @@ type ThesisLike = {
   executive_summary?: string | null;
   hypothesis?: string | null;
   narrative_sections?: { titulo: string; parrafos: string[] }[] | null;
+  thesis_markdown?: string | null;
   catalysts?: { label?: string | null; date?: string | null }[] | null;
   invalidation_criteria?: string[] | null;
 };
 
 const narrativeId = (index: number) => `seccion-${index + 1}`;
 
-function tocFor(thesis: ThesisLike, extra: { provenance: boolean }): TocItem[] {
+function tocFor(thesis: ThesisLike, extra: { provenance: boolean; fromMarkdown?: boolean }): TocItem[] {
+  const sections = extra.fromMarkdown ? readingSections(thesis) : (thesis.narrative_sections ?? []);
   return [
     thesis.executive_summary ? { id: 'resumen', title: 'Resumen ejecutivo' } : null,
     thesis.hypothesis ? { id: 'hipotesis', title: 'Hipótesis' } : null,
     { id: 'escenarios', title: 'Escenarios y valoración' },
     extra.provenance ? { id: 'procedencia', title: 'Procedencia de las cifras' } : null,
-    ...(thesis.narrative_sections ?? []).map((section, index) => ({ id: narrativeId(index), title: section.titulo })),
+    ...sections.map((section, index) => ({ id: narrativeId(index), title: section.titulo })),
     (thesis.catalysts ?? []).length > 0 ? { id: 'catalizadores', title: 'Catalizadores' } : null,
     (thesis.invalidation_criteria ?? []).length > 0 ? { id: 'invalidacion', title: 'Qué invalidaría la tesis' } : null,
   ].filter((item): item is TocItem => item !== null);
@@ -266,7 +269,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   }
 
   const toc = published
-    ? tocFor(published, { provenance: Boolean(provenance && provenance.length > 0) })
+    ? tocFor(published, { provenance: Boolean(provenance && provenance.length > 0), fromMarkdown: true })
     : latest
       ? tocFor(latest, { provenance: false })
       : [];
@@ -577,7 +580,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               </section>
             ) : null}
 
-            {(published.narrative_sections ?? []).map((section, index) => (
+            {/* A10: una tesis antigua sin secciones se lee desde su memo markdown. */}
+            {readingSections(published).map((section, index) => (
               <section key={section.titulo}>
                 <SectionTitle id={narrativeId(index)}>{section.titulo}</SectionTitle>
                 {section.parrafos.map((parrafo, paragraphIndex) => (
