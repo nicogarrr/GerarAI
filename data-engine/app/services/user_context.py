@@ -33,6 +33,7 @@ import math
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import func, select
@@ -51,6 +52,8 @@ from app.models import (
     ThesisVersion,
     WatchItem,
 )
+from app.services.price_units import listing_price
+from app.valuation.currency import normalize_currency
 
 SECTIONS: tuple[str, ...] = ("cartera", "watchlist", "tesis", "avisos", "diario", "plan", "fiscal")
 DEFAULT_SECTIONS: tuple[str, ...] = ("cartera", "watchlist", "tesis", "avisos", "diario", "plan")
@@ -277,7 +280,7 @@ def _dca_text(levels: dict[str, Any] | None, symbol: str) -> tuple[str, int | No
 # ------------------------------------------------------------------ bloques
 
 
-def _latest_closes(db: Session, company_ids: Iterable[int]) -> dict[int, tuple[float, date]]:
+def _latest_closes(db: Session, company_ids: Iterable[int]) -> dict[int, tuple[float, date, str | None]]:
     ids = sorted({int(i) for i in company_ids})
     if not ids:
         return {}
@@ -288,15 +291,15 @@ def _latest_closes(db: Session, company_ids: Iterable[int]) -> dict[int, tuple[f
         .subquery()
     )
     rows = db.execute(
-        select(MarketPrice.company_id, MarketPrice.close, MarketPrice.date).join(
+        select(MarketPrice.company_id, MarketPrice.close, MarketPrice.date, MarketPrice.quote_currency).join(
             latest, (latest.c.company_id == MarketPrice.company_id) & (latest.c.d == MarketPrice.date)
         )
     ).all()
-    out: dict[int, tuple[float, date]] = {}
-    for company_id, close, day in rows:
+    out: dict[int, tuple[float, date, str | None]] = {}
+    for company_id, close, day, quote_currency in rows:
         value = _f(close)
         if value is not None and value > 0:
-            out[int(company_id)] = (value, day)
+            out[int(company_id)] = (value, day, quote_currency)
     return out
 
 
@@ -422,22 +425,39 @@ def _watchlist_block(
         parts = [f"- {symbol} ({_short(comp.name, 40)})"]
         reading = fair.get(int(comp.id)) or {}
         value = _f(reading.get("value"))
-        close = closes.get(int(comp.id))
+        raw_close = closes.get(int(comp.id))
         currency = comp.currency
-        if close is not None:
-            parts.append(f"cierre {num_es(close[0])} {currency} ({_day(close[1])})")
+        # El cierre guardado va en la unidad de SU cotizacion (Londres: GBp).
+        # Se pasa a la unidad mayor antes de rotularlo y compararlo con el
+        # valor justo; sin unidad verificable no hay precio (antes: «1200 GBP»).
+        close = None
+        listed = (
+            listing_price(Decimal(str(raw_close[0])), quote_currency=raw_close[2], company=comp)
+            if raw_close is not None
+            else None
+        )
+        if raw_close is not None and listed is not None:
+            close = (float(listed[0]), raw_close[1])
+            parts.append(f"cierre {num_es(close[0])} {listed[1]} ({_day(close[1])})")
             row["price"] = close[0]
+        elif raw_close is not None:
+            parts.append("precio guardado sin unidad verificable")
         else:
             parts.append("sin precio guardado")
+        fair_major = normalize_currency(currency)[0]
+        if close is not None and (fair_major is None or listed[1] != fair_major):
+            close_for_mos = None
+        else:
+            close_for_mos = close
         if value is not None:
             label = reading.get("label") or "valor justo"
-            parts.append(f"valor justo {num_es(value)} {currency} ({label})")
+            parts.append(f"valor justo {num_es(value)} {normalize_currency(currency)[0] or currency} ({label})")
             row["fair_value"] = value
         else:
             parts.append("sin valor justo (ni tesis publicada ni motor)")
-        mos = margin_of_safety(value, close[0] if close else None)
-        if mos is not None and value is not None and close is not None:
-            ratio = value / close[0]
+        mos = margin_of_safety(value, close_for_mos[0] if close_for_mos else None)
+        if mos is not None and value is not None and close_for_mos is not None:
+            ratio = value / close_for_mos[0]
             if ratio > _MOS_SANE_RATIO or ratio < 1 / _MOS_SANE_RATIO:
                 parts.append("margen no calculado: posible desajuste de unidades o divisa entre precio y valor")
             else:
