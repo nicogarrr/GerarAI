@@ -467,8 +467,10 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
         return { status: 'ok', stocks: withCoverage(mergeSpanishListings(query ?? '', local, [...master, ...remote])) };
     } catch (err) {
         console.error('Error in stock search:', err);
-        const fallback = mergeSpanishListings(query ?? '', local, master);
-        if (fallback.length) return { status: 'ok', stocks: withCoverage(fallback) };
+        // Fallback local + master: ambos caminos conservan la anotacion de
+        // cobertura de ficha (withCoverage es idempotente).
+        const fallback = mergeSpanishListings(query ?? '', withCoverage(local), withCoverage(master));
+        if (fallback.length) return { status: 'ok', stocks: fallback };
         return { status: 'error', stocks: [] };
     }
 });

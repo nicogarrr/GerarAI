@@ -650,6 +650,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/basics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Companies Basics Batch
+         * @description Basics (ticker/nombre/bolsa/divisa) de varias empresas en UNA llamada.
+         *
+         *     Sustituye el fan-out de GET /{ticker} por simbolo de la watchlist
+         *     (20+ round trips por carga de pagina; medido 2026-10-30: oleada de 16
+         *     resolviendo en ~0,9 s desde el front). La resolucion va por ticker
+         *     con la MISMA funcion del endpoint individual (resolve_company), asi
+         *     la politica de alias (SAN.MC -> SAN) no puede divergir entre ambos;
+         *     son lecturas por clave primaria, baratas, y van en una sola peticion
+         *     HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el
+         *     canonico, para que el caller no reimplemente la resolucion.
+         */
+        get: operations["companies_basics_batch_api_companies_basics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/ensure": {
         parameters: {
             query?: never;
@@ -682,6 +711,31 @@ export interface paths {
          *     crea una ficha; la creación exige el POST (acción explícita del usuario).
          */
         get: operations["get_identity_verification_api_companies_identity_verification_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/companies/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Companies
+         * @description Busqueda de empresas en el master propio (ticker y nombre).
+         *
+         *     Primera fuente del buscador de la app: no consume la cuota del
+         *     proveedor externo (60 req/min en plan free, compartida por toda la
+         *     app) y devuelve los tickers CANONICOS del master. Orden: ticker
+         *     exacto, prefijo de ticker, prefijo de nombre y resto de parciales.
+         */
+        get: operations["search_companies_api_companies_search_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -6555,6 +6609,21 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * CompanyBasicsBatchOut
+         * @description Basics por lote keyed por ticker PEDIDO (normalizado).
+         *
+         *     ``missing`` lista los tickers pedidos sin company en el registro;
+         *     nunca se fabrican basics vacios para ellos.
+         */
+        CompanyBasicsBatchOut: {
+            /** Items */
+            items: {
+                [key: string]: components["schemas"]["CompanySearchItemOut"];
+            };
+            /** Missing */
+            missing?: string[];
+        };
         /** CompanyEnsureRequest */
         CompanyEnsureRequest: {
             /** Currency */
@@ -6672,6 +6741,28 @@ export interface components {
             ticker: string;
             /** Valuation Model */
             valuation_model: string;
+        };
+        /**
+         * CompanySearchItemOut
+         * @description Identidad basica de una empresa del master para listados ligeros.
+         */
+        CompanySearchItemOut: {
+            /** Currency */
+            currency: string;
+            /** Exchange */
+            exchange: string;
+            /** Name */
+            name: string;
+            /** Ticker */
+            ticker: string;
+        };
+        /**
+         * CompanySearchOut
+         * @description Resultado de la busqueda local del master (sin proveedor externo).
+         */
+        CompanySearchOut: {
+            /** Results */
+            results: components["schemas"]["CompanySearchItemOut"][];
         };
         /**
          * CompanySnapshotOut
@@ -11529,6 +11620,46 @@ export interface operations {
             };
         };
     };
+    companies_basics_batch_api_companies_basics_get: {
+        parameters: {
+            query: {
+                tickers: string;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyBasicsBatchOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ensure_company_api_companies_ensure_post: {
         parameters: {
             query?: never;
@@ -11598,6 +11729,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IdentityVerificationResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_companies_api_companies_search_get: {
+        parameters: {
+            query: {
+                q: string;
+                limit?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanySearchOut"];
                 };
             };
             /** @description Validation Error */
