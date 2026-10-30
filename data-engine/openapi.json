@@ -16562,10 +16562,10 @@
         ]
       }
     },
-    "/api/cache/cache/invalidate/all": {
+    "/api/cache/invalidate/all": {
       "post": {
         "description": "Invalidate all cache entries for current tenant.",
-        "operationId": "invalidate_all_api_cache_cache_invalidate_all_post",
+        "operationId": "invalidate_all_api_cache_invalidate_all_post",
         "parameters": [
           {
             "in": "header",
@@ -16704,7 +16704,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Invalidate All Api Cache Cache Invalidate All Post",
+                  "title": "Response Invalidate All Api Cache Invalidate All Post",
                   "type": "object"
                 }
               }
@@ -16724,15 +16724,14 @@
         },
         "summary": "Invalidate All",
         "tags": [
-          "cache",
           "cache"
         ]
       }
     },
-    "/api/cache/cache/invalidate/dca": {
+    "/api/cache/invalidate/dca": {
       "post": {
         "description": "Invalidate DCA schedule cache for current tenant.",
-        "operationId": "invalidate_dca_api_cache_cache_invalidate_dca_post",
+        "operationId": "invalidate_dca_api_cache_invalidate_dca_post",
         "parameters": [
           {
             "in": "header",
@@ -16871,7 +16870,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Invalidate Dca Api Cache Cache Invalidate Dca Post",
+                  "title": "Response Invalidate Dca Api Cache Invalidate Dca Post",
                   "type": "object"
                 }
               }
@@ -16891,15 +16890,14 @@
         },
         "summary": "Invalidate Dca",
         "tags": [
-          "cache",
           "cache"
         ]
       }
     },
-    "/api/cache/cache/invalidate/market-data": {
+    "/api/cache/invalidate/market-data": {
       "post": {
         "description": "Invalidate all market data cache entries.",
-        "operationId": "invalidate_market_data_api_cache_cache_invalidate_market_data_post",
+        "operationId": "invalidate_market_data_api_cache_invalidate_market_data_post",
         "parameters": [
           {
             "in": "header",
@@ -17038,7 +17036,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Invalidate Market Data Api Cache Cache Invalidate Market Data Post",
+                  "title": "Response Invalidate Market Data Api Cache Invalidate Market Data Post",
                   "type": "object"
                 }
               }
@@ -17058,15 +17056,14 @@
         },
         "summary": "Invalidate Market Data",
         "tags": [
-          "cache",
           "cache"
         ]
       }
     },
-    "/api/cache/cache/invalidate/portfolio": {
+    "/api/cache/invalidate/portfolio": {
       "post": {
         "description": "Invalidate portfolio valuation cache for current tenant.",
-        "operationId": "invalidate_portfolio_api_cache_cache_invalidate_portfolio_post",
+        "operationId": "invalidate_portfolio_api_cache_invalidate_portfolio_post",
         "parameters": [
           {
             "in": "header",
@@ -17205,7 +17202,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Invalidate Portfolio Api Cache Cache Invalidate Portfolio Post",
+                  "title": "Response Invalidate Portfolio Api Cache Invalidate Portfolio Post",
                   "type": "object"
                 }
               }
@@ -17225,15 +17222,14 @@
         },
         "summary": "Invalidate Portfolio",
         "tags": [
-          "cache",
           "cache"
         ]
       }
     },
-    "/api/cache/cache/stats": {
+    "/api/cache/stats": {
       "get": {
         "description": "Get cache statistics including hit rates.\n\nReturns cache hits, misses, and hit rate percentage for:\n- market_data: Market prices, quotes, history\n- portfolio_valuation: Portfolio snapshots and valuations\n- dca_schedule: DCA signals and schedules\n\nExpected hit rate >70% for repeated requests.",
-        "operationId": "get_stats_api_cache_cache_stats_get",
+        "operationId": "get_stats_api_cache_stats_get",
         "parameters": [
           {
             "in": "header",
@@ -17370,7 +17366,7 @@
               "application/json": {
                 "schema": {
                   "additionalProperties": true,
-                  "title": "Response Get Stats Api Cache Cache Stats Get",
+                  "title": "Response Get Stats Api Cache Stats Get",
                   "type": "object"
                 }
               }
@@ -17390,15 +17386,14 @@
         },
         "summary": "Get Stats",
         "tags": [
-          "cache",
           "cache"
         ]
       }
     },
-    "/api/cache/cache/stats/reset": {
+    "/api/cache/stats/reset": {
       "post": {
         "description": "Reset cache statistics counters (for testing).",
-        "operationId": "reset_stats_api_cache_cache_stats_reset_post",
+        "operationId": "reset_stats_api_cache_stats_reset_post",
         "parameters": [
           {
             "in": "header",
@@ -17537,7 +17532,7 @@
                   "additionalProperties": {
                     "type": "string"
                   },
-                  "title": "Response Reset Stats Api Cache Cache Stats Reset Post",
+                  "title": "Response Reset Stats Api Cache Stats Reset Post",
                   "type": "object"
                 }
               }
@@ -17557,7 +17552,6 @@
         },
         "summary": "Reset Stats",
         "tags": [
-          "cache",
           "cache"
         ]
       }

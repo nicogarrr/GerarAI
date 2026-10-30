@@ -1,7 +1,7 @@
 """Optimize database schema: reduce VARCHAR sizes
 
-Revision ID: 0104_optimize_schema
-Revises: 0103_transaction_fees_4dp
+Revision ID: 0105_optimize_schema
+Revises: 0104_sec_filing_news_identity
 Create Date: 2026-10-30T19:05:21.808Z
 
 Conservative VARCHAR size reductions for performance optimization:
@@ -24,8 +24,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '0104_optimize_schema'
-down_revision = '0103_transaction_fees_4dp'
+revision = '0105_optimize_schema'
+down_revision = '0104_sec_filing_news_identity'
 branch_labels = None
 depends_on = None
 

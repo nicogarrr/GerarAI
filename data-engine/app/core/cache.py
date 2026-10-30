@@ -262,6 +262,7 @@ def cached(
                 try:
                     tenant_id = extract_tenant(args, kwargs)  # type: ignore[arg-type]
                 except Exception:
+                    # nosemgrep: gerarai-broad-except-pass -- extraccion opcional de tenant_id; degrada a None de forma segura
                     pass
             
             # Filtrar self y Session para una clave determinista entre requests

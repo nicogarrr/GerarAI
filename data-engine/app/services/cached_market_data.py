@@ -109,9 +109,9 @@ class CachedMarketDataService:
         self, db: Session, company_id: int, days: int = 30
     ) -> list[dict[str, Any]]:
         """Obtiene historia de precios con cache."""
-        from datetime import datetime, timedelta
+        from datetime import date, timedelta
         
-        cutoff = datetime.now().date() - timedelta(days=days)
+        cutoff = date.today() - timedelta(days=days)
         
         prices = db.scalars(
             select(MarketPrice)

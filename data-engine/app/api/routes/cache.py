@@ -16,7 +16,7 @@ from app.core.cache import (
 )
 from app.core.database import get_db
 
-router = APIRouter(prefix="/cache", tags=["cache"])
+router = APIRouter()
 
 
 @router.get("/stats")

@@ -1,7 +1,7 @@
 """Add foreign key ON DELETE CASCADE rules for portfolio relationships.
 
-Revision ID: 0106_add_fk_cascades
-Revises: 0105_add_critical_indexes
+Revision ID: 0107_add_fk_cascades
+Revises: 0106_add_critical_indexes
 Create Date: 2026-10-30T20:30:00.000Z
 
 Adds ON DELETE CASCADE behavior to portfolio foreign keys:
@@ -18,8 +18,8 @@ Fulfills: VAL-SEC-007, VAL-DB-001
 
 from alembic import op
 
-revision = "0106_add_fk_cascades"
-down_revision = "0105_add_critical_indexes"
+revision = "0107_add_fk_cascades"
+down_revision = "0106_add_critical_indexes"
 branch_labels = None
 depends_on = None
 

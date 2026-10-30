@@ -17,8 +17,8 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0105_add_critical_indexes"
-down_revision = "0104_optimize_schema"
+revision = "0106_add_critical_indexes"
+down_revision = "0105_optimize_schema"
 branch_labels = None
 depends_on = None
 
