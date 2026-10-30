@@ -400,3 +400,22 @@ def test_english_rejection_does_not_use_cjk_hook():
     out = asyncio.run(g.complete_guarded(p, _req(), source="t"))
     assert out.retried and len(p.calls) == 2
     assert "t.cjk_backup_retry" not in g.guard_stats()
+
+
+def test_rejected_cached_response_is_awaited_and_evicted():
+    from types import SimpleNamespace
+    seen = []
+    class Provider:
+        async def evict_cached(self, response):
+            seen.append(response.cache_key)
+    asyncio.run(g._evict(Provider(), SimpleNamespace(cache_key='rejected')))
+    assert seen == ['rejected']
+
+
+def test_cache_eviction_failure_is_nonfatal():
+    from types import SimpleNamespace
+    class Provider:
+        async def evict_cached(self, response):
+            raise RuntimeError('cache unavailable')
+    asyncio.run(g._evict(Provider(), SimpleNamespace(cache_key='rejected')))
+    asyncio.run(g._evict(object(), SimpleNamespace(cache_key='rejected')))

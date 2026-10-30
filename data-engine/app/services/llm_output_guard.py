@@ -447,7 +447,7 @@ async def _evict(provider: Any, response: Any) -> None:
     evict = getattr(provider, "evict_cached", None)
     if callable(evict) and getattr(response, "cache_key", None):
         try:
-            await evict(response)
+            await cast(Callable[[Any], Awaitable[Any]], evict)(response)
         except Exception:  # noqa: BLE001 - la cache nunca rompe la llamada
             logger.debug("llm_output_guard: no se pudo retirar la entrada de cache", exc_info=True)
 

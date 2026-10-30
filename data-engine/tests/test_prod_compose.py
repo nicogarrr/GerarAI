@@ -154,15 +154,20 @@ def test_scheduler_receives_retention_and_storage_configuration():
     assert env.get("QDRANT_URL") == "http://qdrant:6333"
 
 
-def test_memory_limits_fit_the_12gb_vm():
-    """La suma anterior (~23,5 GiB) hacia OOM en una VM de 12 GB."""
+def test_memory_limits_fit_the_24gb_vm_with_host_reserve():
+    """24 GB host verified 2026-10-30; reserve at least 8 GiB outside this stack.
+
+    Old 10 GiB ceiling described the replaced 12 GB host and contradicted the
+    documented 24 GB deployment. Keep a bounded 16 GiB stack ceiling rather
+    than deriving the budget from the configured limits themselves.
+    """
     compose = _load_compose()
     total = 0
     for name, service in compose["services"].items():
         limit = service.get("deploy", {}).get("resources", {}).get("limits", {})
         assert "memory" in limit, f"{name} sin limite de memoria"
         total += _memory_mib(limit["memory"])
-    assert total <= 10240, f"los limites suman {total} MiB (> 10 GiB)"
+    assert total <= 16384, f"los limites suman {total} MiB (> 16 GiB; host reserve < 8 GiB)"
 
 
 def test_every_service_has_cpu_limits_and_rotated_logs():
