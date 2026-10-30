@@ -260,20 +260,45 @@ def _yahoo_symbol_for(item: TrackedSymbol) -> str | None:
 
 
 def _db_history(db: Session, company: Company | None) -> FetchedHistory:
+    """Cierres guardados en UNA sola unidad, sin FX.
+
+    ``market_prices`` puede mezclar unidades de un mismo listado (TSCO.L en
+    GBp de un proveedor y en GBP de otro): leidos tal cual, 250 peniques
+    seguidos de 2,52 libras parecen una caida del 99 % y el motor daria 4X.
+    La unidad es la ``quote_currency`` de la fila mas reciente que la declara
+    (si ninguna, la divisa de la empresa, como antes). Cada fila se pasa a esa
+    unidad solo si es la misma moneda (GBp <-> GBP, exacto); una fila en otra
+    moneda se descarta. Una fila heredada sin unidad se lee en la divisa de la
+    empresa, como siempre.
+    """
     if company is None:
         return FetchedHistory(rows=[])
-    rows = [
-        PriceRow(
-            day=price.date,
-            close=float(price.close),
-            adj_close=float(price.adj_close) if price.adj_close else None,
-        )
+    from app.valuation.currency import normalize_currency
+
+    prices = [
+        price
         for price in db.scalars(
             select(MarketPrice).where(MarketPrice.company_id == company.id).order_by(MarketPrice.date)
         )
         if price.close and float(price.close) > 0
     ]
-    return FetchedHistory(rows=rows, currency=company.currency)
+    declared = [price.quote_currency for price in prices if price.quote_currency]
+    unit = declared[-1] if declared else company.currency
+    unit_major, unit_divisor = normalize_currency(unit)
+    rows: list[PriceRow] = []
+    for price in prices:
+        major, divisor = normalize_currency(price.quote_currency or company.currency)
+        if major != unit_major:
+            continue  # otra moneda (o unidad desconocida frente a una declarada): nunca a la par
+        scale = unit_divisor / divisor
+        rows.append(
+            PriceRow(
+                day=price.date,
+                close=float(price.close) * scale,
+                adj_close=float(price.adj_close) * scale if price.adj_close else None,
+            )
+        )
+    return FetchedHistory(rows=rows, currency=unit)
 
 
 def settled_rows(rows: Sequence[PriceRow], now: datetime) -> list[PriceRow]:

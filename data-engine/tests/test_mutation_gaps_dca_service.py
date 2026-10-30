@@ -31,12 +31,12 @@ from tests.test_dca_signal_service import (  # noqa: F401  (fixture db)
 )
 
 
-def _price(db, company, day, close, adj=None):
+def _price(db, company, day, close, adj=None, quote=None):
     value = None if close is None else Decimal(str(close))
     db.add(MarketPrice(
         company_id=company.id, date=day, open=value, high=value, low=value,
         close=value, adj_close=None if adj is None else Decimal(str(adj)),
-        volume=10, source="test",
+        volume=10, source="test", quote_currency=quote,
     ))
 
 
@@ -53,6 +53,32 @@ def test_db_history_ordenado_sin_cierres_no_positivos_y_con_divisa(db):
         (date(2026, 10, 3), 0.5, 0.25),  # un cierre < 1 (peniques) sigue valiendo
     ]
     assert svc._db_history(db, None).rows == []
+
+
+def test_db_history_no_mezcla_peniques_y_libras(db):
+    """250 GBp seguidos de 2,52 GBP no son una caida del 99 % (que daria 4X)."""
+    company = _company(db, "TSCO.L", currency="GBp", exchange="LSE")
+    _price(db, company, date(2026, 9, 30), 250.0, adj=240.0, quote="GBp")
+    _price(db, company, date(2026, 10, 1), 2.52, quote="GBP")
+    _price(db, company, date(2026, 10, 2), 2.55)  # heredada sin unidad: divisa de la empresa (GBp)
+    db.flush()
+    hist = svc._db_history(db, company)
+    assert hist.currency == "GBP"
+    assert [(r.day, round(r.close, 6), r.adj_close) for r in hist.rows] == [
+        (date(2026, 9, 30), 2.5, 2.4),
+        (date(2026, 10, 1), 2.52, None),
+        (date(2026, 10, 2), 0.0255, None),
+    ]
+
+
+def test_db_history_descarta_cierres_en_otra_moneda(db):
+    company = _company(db, "SHEL.L", currency="USD", exchange="LSE")
+    _price(db, company, date(2026, 10, 1), 30.0)  # heredada: USD de la empresa
+    _price(db, company, date(2026, 10, 2), 2500.0, quote="GBp")
+    db.flush()
+    hist = svc._db_history(db, company)
+    assert hist.currency == "GBp"
+    assert [(r.day, r.close) for r in hist.rows] == [(date(2026, 10, 2), 2500.0)]
 
 
 def _verdict(level=3, touched=3):
