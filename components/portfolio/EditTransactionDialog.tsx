@@ -89,7 +89,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
         setLoading(true);
 
         try {
-            await updateTransaction(
+            const result = await updateTransaction(
                 userId,
                 transaction._id,
                 formData.symbol,
@@ -104,6 +104,11 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     ? undefined
                     : (parseLocalizedNumber(formData.fees) ?? 0),
             );
+            // Rechazo conocido del ledger: el diálogo sigue abierto con el motivo en español.
+            if (result?.success === false) {
+                toast.error(result.error ?? 'No se pudo actualizar la transacción.');
+                return;
+            }
             setOpen(false);
             toast.success('Transacción actualizada');
             router.refresh();
