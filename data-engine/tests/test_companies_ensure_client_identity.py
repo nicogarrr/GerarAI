@@ -64,7 +64,7 @@ def test_production_ignores_client_identity_on_create(monkeypatch):
     company = _stored()
     assert company.name == TICKER
     assert company.exchange == "UNKNOWN"
-    assert company.currency == ""
+    assert company.currency == "USD"
     assert company.sector == "Unknown"
     assert company.industry == "Unknown"
     assert company.domicile_country is None
