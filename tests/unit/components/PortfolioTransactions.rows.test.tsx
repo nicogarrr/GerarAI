@@ -46,6 +46,17 @@ describe('PortfolioTransactions filas', () => {
         expect(screen.getByRole('link', { name: 'MSFT' })).toHaveAttribute('href', '/research/MSFT');
     });
 
+    it('compra a precio 0: insignia «Coste 0 (regalo / spin-off): revisar», solo en compras a 0', () => {
+        render(<PortfolioTransactions transactions={[
+            tx({ _id: 'gift', symbol: 'GIFT', price: 0, quantity: 5 }),
+            tx({ _id: 'buy', symbol: 'AAPL', price: 10 }),
+            tx({ _id: 'sell0', symbol: 'SELL0', type: 'sell', price: 0 }),
+        ]} userId="u" />);
+        const badges = screen.getAllByText('Coste 0 (regalo / spin-off): revisar');
+        expect(badges).toHaveLength(1);
+        expect(badges[0].closest('.group')!.textContent).toContain('GIFT');
+    });
+
     it('cantidad fraccionaria hasta 4 decimales', () => {
         render(<PortfolioTransactions transactions={[tx({ quantity: 0.12345678 })]} userId="u" />);
         expect(screen.getByText(/0,1235 acc/)).toBeInTheDocument();
