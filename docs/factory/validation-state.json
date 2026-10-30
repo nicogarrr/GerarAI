@@ -1,0 +1,217 @@
+{
+  "assertions": {
+    "VAL-CONTENT-001": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-002": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-003": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-004": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-005": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-006": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-007": {
+      "status": "pending"
+    },
+    "VAL-CONTENT-008": {
+      "status": "pending"
+    },
+    "VAL-COV-001": {
+      "status": "pending"
+    },
+    "VAL-COV-002": {
+      "status": "pending"
+    },
+    "VAL-COV-003": {
+      "status": "pending"
+    },
+    "VAL-COV-004": {
+      "status": "pending"
+    },
+    "VAL-COV-005": {
+      "status": "pending"
+    },
+    "VAL-COV-006": {
+      "status": "pending"
+    },
+    "VAL-CROSS-001": {
+      "status": "pending"
+    },
+    "VAL-CROSS-002": {
+      "status": "pending"
+    },
+    "VAL-CROSS-003": {
+      "status": "pending"
+    },
+    "VAL-CROSS-004": {
+      "status": "pending"
+    },
+    "VAL-CROSS-005": {
+      "status": "pending"
+    },
+    "VAL-CROSS-006": {
+      "status": "pending"
+    },
+    "VAL-CROSS-007": {
+      "status": "pending"
+    },
+    "VAL-CROSS-008": {
+      "status": "pending"
+    },
+    "VAL-DATA-001": {
+      "status": "pending"
+    },
+    "VAL-DATA-002": {
+      "status": "pending"
+    },
+    "VAL-DATA-003": {
+      "status": "pending"
+    },
+    "VAL-DATA-004": {
+      "status": "pending"
+    },
+    "VAL-DATA-005": {
+      "status": "pending"
+    },
+    "VAL-DATA-006": {
+      "status": "pending"
+    },
+    "VAL-DATA-007": {
+      "status": "pending"
+    },
+    "VAL-DATA-008": {
+      "status": "pending"
+    },
+    "VAL-DB-001": {
+      "status": "pending"
+    },
+    "VAL-DB-002": {
+      "status": "pending"
+    },
+    "VAL-DB-003": {
+      "status": "pending"
+    },
+    "VAL-DB-004": {
+      "status": "pending"
+    },
+    "VAL-DB-005": {
+      "status": "pending"
+    },
+    "VAL-DB-006": {
+      "status": "pending"
+    },
+    "VAL-DB-007": {
+      "status": "pending"
+    },
+    "VAL-DB-008": {
+      "status": "pending"
+    },
+    "VAL-DOC-001": {
+      "status": "pending"
+    },
+    "VAL-DOC-002": {
+      "status": "pending"
+    },
+    "VAL-DOC-003": {
+      "status": "pending"
+    },
+    "VAL-DOC-004": {
+      "status": "pending"
+    },
+    "VAL-DOC-005": {
+      "status": "pending"
+    },
+    "VAL-DOC-006": {
+      "status": "pending"
+    },
+    "VAL-DOC-007": {
+      "status": "pending"
+    },
+    "VAL-PERF-001": {
+      "status": "pending"
+    },
+    "VAL-PERF-002": {
+      "status": "pending"
+    },
+    "VAL-PERF-003": {
+      "status": "pending"
+    },
+    "VAL-PERF-004": {
+      "status": "pending"
+    },
+    "VAL-PERF-005": {
+      "status": "pending"
+    },
+    "VAL-PERF-006": {
+      "status": "pending"
+    },
+    "VAL-PERF-007": {
+      "status": "pending"
+    },
+    "VAL-PERF-008": {
+      "status": "pending"
+    },
+    "VAL-SEC-001": {
+      "status": "pending"
+    },
+    "VAL-SEC-002": {
+      "status": "pending"
+    },
+    "VAL-SEC-003": {
+      "status": "pending"
+    },
+    "VAL-SEC-004": {
+      "status": "pending"
+    },
+    "VAL-SEC-005": {
+      "status": "pending"
+    },
+    "VAL-SEC-006": {
+      "status": "pending"
+    },
+    "VAL-SEC-007": {
+      "status": "pending"
+    },
+    "VAL-SEC-008": {
+      "status": "pending"
+    },
+    "VAL-UX-001": {
+      "status": "pending"
+    },
+    "VAL-UX-002": {
+      "status": "pending"
+    },
+    "VAL-UX-003": {
+      "status": "pending"
+    },
+    "VAL-UX-004": {
+      "status": "pending"
+    },
+    "VAL-UX-005": {
+      "status": "pending"
+    },
+    "VAL-UX-006": {
+      "status": "pending"
+    },
+    "VAL-UX-007": {
+      "status": "pending"
+    },
+    "VAL-UX-008": {
+      "status": "pending"
+    },
+    "VAL-UX-009": {
+      "status": "pending"
+    },
+    "VAL-UX-010": {
+      "status": "pending"
+    }
+  }
+}

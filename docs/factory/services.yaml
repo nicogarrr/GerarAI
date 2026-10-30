@@ -1,0 +1,58 @@
+# GerarAI Mission Runtime Manifest
+
+commands:
+  install: npm install
+  backend_install: cd data-engine && uv sync --frozen --extra test --extra dev --no-install-project
+  typecheck: npm run typecheck
+  backend_typecheck: cd data-engine && pyright
+  lint: npm run lint
+  backend_lint: cd data-engine && ruff check .
+  test: npm run test
+  backend_test: cd data-engine && APP_ENV=test pytest -q -p no:warnings
+  e2e_test: npm run test:e2e
+  coverage: cd data-engine && APP_ENV=test pytest --cov=app --cov-report=term-missing
+  export_openapi: cd data-engine && python scripts/export_openapi.py
+  sync_requirements: cd data-engine && python scripts/sync_requirements.py --write
+
+services:
+  postgres:
+    start: docker compose up -d postgres
+    stop: docker compose stop postgres
+    healthcheck: pg_isready -h localhost -p 5432
+    port: 5432
+    depends_on: []
+
+  redis:
+    start: docker compose up -d redis
+    stop: docker compose stop redis
+    healthcheck: redis-cli -p 6379 ping
+    port: 6379
+    depends_on: []
+
+  qdrant:
+    start: docker compose up -d qdrant
+    stop: docker compose stop qdrant
+    healthcheck: curl -sf http://localhost:6333/healthz
+    port: 6333
+    depends_on: []
+
+  minio:
+    start: docker compose up -d minio
+    stop: docker compose stop minio
+    healthcheck: curl -sf http://localhost:9000/minio/health/live
+    port: 9000
+    depends_on: []
+
+  backend:
+    start: cd data-engine && PORT=8000 uvicorn app.main:app --host 0.0.0.0 --port 8000
+    stop: lsof -ti :8000 | xargs kill
+    healthcheck: curl -sf http://localhost:8000/health
+    port: 8000
+    depends_on: [postgres, redis, qdrant, minio]
+
+  frontend:
+    start: PORT=3000 npm run dev
+    stop: lsof -ti :3000 | xargs kill
+    healthcheck: curl -sf http://localhost:3000
+    port: 3000
+    depends_on: [backend]

@@ -1,0 +1,1521 @@
+{
+  "features": [
+    {
+      "id": "add-critical-indexes",
+      "description": "Add 20 critical missing indexes to optimize query performance on high-traffic tables",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "implement-fk-cascades"
+      ],
+      "expectedBehavior": [
+        "Index on portfolios(user_id, created_at DESC)",
+        "Index on transactions(portfolio_id, date DESC)",
+        "Index on holdings(portfolio_id, ticker)",
+        "Dashboard loads in <500ms with indexes",
+        "All indexes created via Alembic migration"
+      ],
+      "fulfills": [
+        "VAL-DB-002",
+        "VAL-PERF-001"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-nplus1-portfolio-dashboard",
+      "description": "Eliminate N+1 queries on portfolio dashboard by implementing eager loading with joinedload",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "add-critical-indexes"
+      ],
+      "expectedBehavior": [
+        "Dashboard loading generates ≤3 SQL queries regardless of portfolio count",
+        "SQLAlchemy query logging shows no repeated queries",
+        "Dashboard loads in <500ms for 10+ portfolios"
+      ],
+      "fulfills": [
+        "VAL-PERF-002"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-nplus1-transaction-history",
+      "description": "Eliminate N+1 queries on transaction history by implementing selectinload for related entities",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "add-critical-indexes"
+      ],
+      "expectedBehavior": [
+        "Transaction history generates ≤2 SQL queries",
+        "No repeated queries for ticker info or portfolio details",
+        "History loads in <300ms for 50+ transactions"
+      ],
+      "fulfills": [
+        "VAL-PERF-003"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-redis-caching",
+      "description": "Implement Redis caching for market data, portfolio valuations, and DCA schedules",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "fix-nplus1-portfolio-dashboard"
+      ],
+      "expectedBehavior": [
+        "Market data cached for 5 minutes with Redis",
+        "Portfolio valuations cached with dependency invalidation",
+        "Cache hit rate >70% for repeated requests",
+        "Dashboard loads from cache in <200ms"
+      ],
+      "fulfills": [
+        "VAL-PERF-004"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "optimize-cerebro-rag",
+      "description": "Optimize Cerebro RAG pipeline with batch embedding, reduced chunk overlap, and connection pooling",
+      "skillName": "ai-rag-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Embedding 10 documents completes in <30 seconds",
+        "Qdrant query returns in <500ms for context retrieval",
+        "Connection pooling eliminates repeated Qdrant connections",
+        "Batch embedding processes 5 chunks at a time"
+      ],
+      "fulfills": [
+        "VAL-PERF-005"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-pagination",
+      "description": "Add pagination to transaction history, portfolio list, and search results endpoints",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "All list endpoints accept page and page_size parameters",
+        "Responses include total count, page info, and navigation links",
+        "Default page size is 20 items",
+        "Large datasets load in <500ms per page"
+      ],
+      "fulfills": [
+        "VAL-PERF-006"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-connection-pooling",
+      "description": "Configure database connection pooling (10-20 connections) and connection lifecycle management",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "SQLAlchemy pool configured with 10 min, 20 max connections",
+        "Pool overflow handled gracefully",
+        "Connection cleanup on request completion",
+        "No connection leaks under load"
+      ],
+      "fulfills": [
+        "VAL-PERF-007"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-batch-api",
+      "description": "Add batch endpoints for bulk transaction creation and portfolio operations",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "implement-pagination"
+      ],
+      "expectedBehavior": [
+        "POST /api/transactions/batch accepts array of transactions",
+        "Batch insert uses single DB transaction",
+        "Bulk validation before commit",
+        "Batch of 50 transactions completes in <2 seconds"
+      ],
+      "fulfills": [
+        "VAL-PERF-008"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-unified-navigation",
+      "description": "Create Bloomberg-style unified navigation with persistent sidebar, breadcrumbs, and keyboard shortcuts",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Persistent sidebar navigation on all authenticated pages",
+        "Breadcrumb trail shows current location hierarchy",
+        "Keyboard shortcuts: Cmd+K for search, Cmd+P for portfolio switcher",
+        "Active page highlighted in sidebar",
+        "Mobile-responsive hamburger menu"
+      ],
+      "fulfills": [
+        "VAL-UX-001"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-responsive-design",
+      "description": "Implement fully responsive design with mobile breakpoints for all pages",
+      "skillName": "frontend-worker",
+      "preconditions": [
+        "implement-unified-navigation"
+      ],
+      "expectedBehavior": [
+        "Dashboard renders correctly on mobile (375px), tablet (768px), desktop (1440px)",
+        "Touch-friendly controls on mobile (44x44px minimum)",
+        "Horizontal scrolling eliminated",
+        "Tables become scrollable cards on mobile",
+        "All features accessible on small screens"
+      ],
+      "fulfills": [
+        "VAL-UX-002"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "improve-loading-states",
+      "description": "Add skeleton loaders, progress indicators, and optimistic UI updates throughout application",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Skeleton loaders for dashboard cards, tables, charts",
+        "Progress bars for long operations (thesis export, bulk import)",
+        "Optimistic UI for transaction creation",
+        "No blank screens during data loading",
+        "Smooth transitions between loading and content states"
+      ],
+      "fulfills": [
+        "VAL-UX-003"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "improve-error-ux",
+      "description": "Implement user-friendly error messages with actionable recovery suggestions",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Toast notifications for transient errors",
+        "Error boundaries prevent app crashes",
+        "Clear error messages in Spanish with recovery actions",
+        "Network errors show retry button",
+        "Validation errors highlight specific fields"
+      ],
+      "fulfills": [
+        "VAL-UX-004"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-dark-mode",
+      "description": "Add dark mode theme with system preference detection and manual toggle",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Dark mode toggle in user menu",
+        "Respects prefers-color-scheme media query",
+        "Theme persisted in localStorage",
+        "All components render correctly in dark mode",
+        "Smooth theme transitions"
+      ],
+      "fulfills": [
+        "VAL-UX-005"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-keyboard-shortcuts",
+      "description": "Implement comprehensive keyboard shortcuts for power users with discoverable shortcut panel",
+      "skillName": "frontend-worker",
+      "preconditions": [
+        "implement-unified-navigation"
+      ],
+      "expectedBehavior": [
+        "Cmd+K: global search",
+        "Cmd+P: portfolio switcher",
+        "Cmd+N: new transaction",
+        "?: show shortcut panel",
+        "ESC: close modals",
+        "Shortcuts work across all pages"
+      ],
+      "fulfills": [
+        "VAL-UX-006"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "improve-form-validation",
+      "description": "Add inline validation with debounced feedback and clear error messages on all forms",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Real-time validation as user types (debounced 300ms)",
+        "Field-specific error messages below inputs",
+        "Success indicators for valid fields",
+        "Submit button disabled until form valid",
+        "Focus first error field on submit failure"
+      ],
+      "fulfills": [
+        "VAL-UX-007"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-data-visualization",
+      "description": "Add professional charts for portfolio performance, allocation, and historical trends using Recharts",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Line chart for portfolio value over time",
+        "Pie chart for asset allocation",
+        "Bar chart for monthly returns",
+        "Interactive tooltips with precise values",
+        "Responsive chart sizing",
+        "Export chart as PNG option"
+      ],
+      "fulfills": [
+        "VAL-UX-008"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-search-functionality",
+      "description": "Implement global search with fuzzy matching for portfolios, tickers, and transactions",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "implement-unified-navigation"
+      ],
+      "expectedBehavior": [
+        "Cmd+K opens search modal",
+        "Fuzzy matching for ticker symbols and names",
+        "Search results categorized by type (portfolio/ticker/transaction)",
+        "Search completes in <300ms",
+        "Navigate to result with Enter key"
+      ],
+      "fulfills": [
+        "VAL-UX-009"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-bulk-operations",
+      "description": "Add bulk selection and operations UI for transaction management and portfolio operations",
+      "skillName": "frontend-worker",
+      "preconditions": [
+        "implement-batch-api"
+      ],
+      "expectedBehavior": [
+        "Checkbox column for transaction selection",
+        "Select all / deselect all controls",
+        "Bulk delete, bulk export actions",
+        "Confirmation modal for destructive bulk operations",
+        "Progress indicator for bulk operations"
+      ],
+      "fulfills": [
+        "VAL-UX-010"
+      ],
+      "milestone": "professional-ui-coherence",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "eliminate-generic-onboarding",
+      "description": "Replace generic onboarding text with specific investment context and terminology",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Onboarding screens use GerarAI-specific terminology",
+        "Examples reference EUR0 portfolios and real tickers",
+        "No generic startup/SaaS language",
+        "All text in Spanish with proper financial terminology"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-001"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "eliminate-generic-dashboard",
+      "description": "Replace placeholder dashboard text with actual portfolio metrics and insights",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Dashboard shows real portfolio data or specific empty states",
+        "Metric cards show actual calculations (total return, allocation, etc.)",
+        "No lorem ipsum or generic placeholder text",
+        "Empty states explain what data is missing and how to add it"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-002"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "eliminate-generic-errors",
+      "description": "Replace generic error messages with specific, actionable error text",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Network errors explain connectivity issue and suggest retry",
+        "Validation errors specify exact field and constraint violated",
+        "Authorization errors explain permission required",
+        "No 'Something went wrong' without specifics"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-003"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "eliminate-generic-forms",
+      "description": "Replace generic form labels and placeholders with investment-specific guidance",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Form labels use precise financial terminology",
+        "Placeholders show realistic example values (e.g., 'MSFT', '100.50 EUR')",
+        "Help text explains investment concepts",
+        "All text in Spanish"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-004"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "eliminate-generic-notifications",
+      "description": "Replace generic notification text with specific action confirmations",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Success toasts specify what was created/updated/deleted",
+        "Warning notifications explain specific risk or issue",
+        "Info notifications provide relevant context",
+        "No 'Operation successful' without details"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-005"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "improve-help-documentation",
+      "description": "Replace generic help text with specific GerarAI feature documentation",
+      "skillName": "frontend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Help tooltips explain GerarAI-specific features",
+        "In-app documentation covers EUR0 investment workflows",
+        "Examples use real GerarAI scenarios",
+        "All help text in Spanish"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-006"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "audit-all-ui-text",
+      "description": "Comprehensive audit and replacement of all remaining generic UI text",
+      "skillName": "frontend-worker",
+      "preconditions": [
+        "eliminate-generic-onboarding",
+        "eliminate-generic-dashboard",
+        "eliminate-generic-errors",
+        "eliminate-generic-forms",
+        "eliminate-generic-notifications",
+        "improve-help-documentation"
+      ],
+      "expectedBehavior": [
+        "ripgrep search for generic terms (placeholder, lorem, sample) returns zero UI matches",
+        "All user-facing text uses GerarAI domain terminology",
+        "No generic startup/SaaS language remains",
+        "Spanish language consistency across all UI text"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-007"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-content-standards",
+      "description": "Create content style guide defining GerarAI terminology, tone, and examples",
+      "skillName": "frontend-worker",
+      "preconditions": [
+        "audit-all-ui-text"
+      ],
+      "expectedBehavior": [
+        "Style guide documents approved terminology",
+        "Examples of good vs. generic content",
+        "Spanish language conventions",
+        "Accessible in CONTRIBUTING.md or docs/"
+      ],
+      "fulfills": [
+        "VAL-CONTENT-008"
+      ],
+      "milestone": "ai-slop-elimination",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "integrate-yahoo-finance",
+      "description": "Integrate Yahoo Finance as primary market data source for real-time quotes and historical data",
+      "skillName": "connector-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Real-time quotes fetched from Yahoo Finance",
+        "Historical price data for backtesting",
+        "Support for major exchanges (NYSE, NASDAQ, Euronext)",
+        "Rate limiting and error handling",
+        "Fallback to cached data on API failure"
+      ],
+      "fulfills": [
+        "VAL-DATA-001"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "integrate-alpha-vantage",
+      "description": "Integrate Alpha Vantage as secondary market data source with free tier rate limiting",
+      "skillName": "connector-worker",
+      "preconditions": [
+        "integrate-yahoo-finance"
+      ],
+      "expectedBehavior": [
+        "Alpha Vantage used as fallback data source",
+        "Free tier rate limiting (5 requests/minute)",
+        "Fundamental data retrieval",
+        "API key management via environment variables"
+      ],
+      "fulfills": [
+        "VAL-DATA-002"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "integrate-ecb-rates",
+      "description": "Integrate ECB API for EUR exchange rates and currency conversion",
+      "skillName": "connector-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Daily EUR exchange rates from ECB",
+        "Historical currency conversion support",
+        "Automatic rate updates via scheduled job",
+        "Fallback rates if ECB API unavailable"
+      ],
+      "fulfills": [
+        "VAL-DATA-003"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-data-source-health-checks",
+      "description": "Add health monitoring and alerting for all external data sources",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "integrate-yahoo-finance",
+        "integrate-alpha-vantage",
+        "integrate-ecb-rates"
+      ],
+      "expectedBehavior": [
+        "Health check endpoint reports data source status",
+        "Circuit breaker pattern for failing sources",
+        "Automatic fallback to secondary sources",
+        "Logging of data source failures"
+      ],
+      "fulfills": [
+        "VAL-DATA-004"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-thesis-pdf-export",
+      "description": "Implement PDF export for investment thesis with professional formatting",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "PDF generated with WeasyPrint or similar library",
+        "Professional layout with GerarAI branding",
+        "Includes portfolio summary, holdings, and thesis text",
+        "Download completes in <5 seconds for typical portfolio",
+        "Filename sanitization to prevent command injection"
+      ],
+      "fulfills": [
+        "VAL-DATA-005"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-transaction-import",
+      "description": "Add CSV/Excel import for bulk transaction upload with validation",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "implement-batch-api"
+      ],
+      "expectedBehavior": [
+        "Upload CSV or Excel file via UI",
+        "Column mapping for ticker, date, quantity, price",
+        "Validation before import with error report",
+        "Preview mode to review transactions before commit",
+        "Support for multiple date formats"
+      ],
+      "fulfills": [
+        "VAL-DATA-006"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-data-validation-layer",
+      "description": "Add comprehensive data validation for imported and API-sourced data",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "integrate-yahoo-finance",
+        "implement-transaction-import"
+      ],
+      "expectedBehavior": [
+        "Ticker symbol validation against known exchanges",
+        "Price sanity checks (>0, reasonable range)",
+        "Date validation (not future dates for historical data)",
+        "Quantity validation (>0 for buys)",
+        "Clear validation error messages"
+      ],
+      "fulfills": [
+        "VAL-DATA-007"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-data-provenance-tracking",
+      "description": "Add metadata tracking for data source provenance (OFICIAL/INFERIDO/SIN_DATOS)",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "integrate-yahoo-finance",
+        "integrate-alpha-vantage",
+        "integrate-ecb-rates"
+      ],
+      "expectedBehavior": [
+        "All data records tagged with source (Yahoo Finance, Alpha Vantage, ECB, Manual)",
+        "UI displays provenance badges",
+        "API responses include data source metadata",
+        "Missing data explicitly labeled as SIN_DATOS"
+      ],
+      "fulfills": [
+        "VAL-DATA-008"
+      ],
+      "milestone": "data-source-integration",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-database-monitoring",
+      "description": "Add database monitoring for slow queries, connection pool, and disk usage",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "add-connection-pooling"
+      ],
+      "expectedBehavior": [
+        "Slow query logging (>1 second)",
+        "Connection pool metrics (active, idle, max)",
+        "Disk usage monitoring",
+        "Table bloat detection",
+        "Monitoring dashboard or logs accessible"
+      ],
+      "fulfills": [
+        "VAL-DB-005"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "optimize-database-schema",
+      "description": "Review and optimize database schema for normalization and performance",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "implement-fk-cascades",
+        "add-critical-indexes"
+      ],
+      "expectedBehavior": [
+        "Schema reviewed for 3NF compliance",
+        "Denormalization applied where appropriate for performance",
+        "Column types optimized (VARCHAR sizes, numeric precision)",
+        "Audit log or history tables if needed",
+        "Schema changes documented in migration"
+      ],
+      "fulfills": [
+        "VAL-DB-006"
+      ],
+      "milestone": "performance-scalability",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-hardcoded-admin-credentials",
+      "description": "Remove hardcoded admin credentials from codebase and implement secure credential management",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "No hardcoded credentials found in codebase (ripgrep verification)",
+        "Admin credentials loaded from environment variables",
+        "Initial admin account creation via secure setup script"
+      ],
+      "fulfills": [
+        "VAL-SEC-002"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "in_progress",
+      "workerSessionIds": [
+        "7cfbfbf2-6063-43b3-9de2-88a4863a6622"
+      ],
+      "currentWorkerSessionId": "7cfbfbf2-6063-43b3-9de2-88a4863a6622",
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "fix-sql-injection-vulnerability",
+      "description": "Implement parameterized queries and input sanitization for all search endpoints to prevent SQL injection",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Portfolio search handles SQL injection payloads safely",
+        "All database queries use parameterized statements",
+        "Search returns sanitized results without DB errors"
+      ],
+      "fulfills": [
+        "VAL-SEC-003"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-csrf-protection",
+      "description": "Add CSRF token validation for all state-changing endpoints (POST, PUT, DELETE)",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "POST requests without CSRF token return 403 Forbidden",
+        "CSRF tokens generated and validated on all state-changing endpoints",
+        "Frontend includes CSRF tokens in all mutations"
+      ],
+      "fulfills": [
+        "VAL-SEC-001"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-ssrf-protection",
+      "description": "Add validation to prevent Server-Side Request Forgery on external data fetching endpoints",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Attempts to fetch internal network resources (localhost, 169.254.x.x) return 400 Bad Request",
+        "URL validation whitelist for allowed external domains",
+        "Clear error messages for blocked requests"
+      ],
+      "fulfills": [
+        "VAL-SEC-004"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-command-injection-protection",
+      "description": "Sanitize file operations to prevent command injection via filenames and paths",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Thesis export with shell metacharacters returns sanitized filename",
+        "No command execution from user-provided filenames",
+        "Filename validation and sanitization on all file operations"
+      ],
+      "fulfills": [
+        "VAL-SEC-005"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-security-headers",
+      "description": "Implement comprehensive security headers (CSP, X-Frame-Options, X-Content-Type-Options) on all routes",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "All HTML responses include CSP, X-Frame-Options, X-Content-Type-Options headers",
+        "curl -I verification shows headers on /, /dashboard, /portfolio",
+        "Security headers configured via middleware"
+      ],
+      "fulfills": [
+        "VAL-SEC-006"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-fk-cascades",
+      "description": "Add 58 missing foreign key CASCADE rules to prevent orphaned records across all entity relationships",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Deleting a portfolio cascades to holdings, transactions, and alerts",
+        "All foreign key relationships have proper CASCADE behavior",
+        "pytest test_cascade_delete_portfolio passes",
+        "No orphaned records after parent entity deletion"
+      ],
+      "fulfills": [
+        "VAL-SEC-007",
+        "VAL-DB-001"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "sanitize-error-responses",
+      "description": "Remove sensitive data from error responses (stack traces, file paths, internal details)",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "500 errors return generic message without stack traces or file paths",
+        "Development-only detailed error logging",
+        "Production error responses contain only safe, user-friendly messages"
+      ],
+      "fulfills": [
+        "VAL-SEC-008"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "improve-backend-test-coverage",
+      "description": "Increase backend test coverage to 85%+ for data-engine codebase",
+      "skillName": "testing-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "pytest coverage report shows ≥85% line coverage",
+        "All critical paths (auth, transactions, calculations) covered",
+        "Edge cases and error conditions tested",
+        "No regressions in existing tests"
+      ],
+      "fulfills": [
+        "VAL-COV-001"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "improve-frontend-test-coverage",
+      "description": "Increase frontend test coverage to 70%+ with Jest and React Testing Library",
+      "skillName": "testing-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Jest coverage report shows ≥70% line coverage",
+        "All critical user flows tested (login, add transaction, view dashboard)",
+        "Component tests for shared UI components",
+        "Integration tests for key pages"
+      ],
+      "fulfills": [
+        "VAL-COV-002"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-financial-calculation-tests",
+      "description": "Add comprehensive test suite for FIFO, DCA, tax calculation, and portfolio valuation logic",
+      "skillName": "financial-accuracy-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "FIFO algorithm tested with multiple scenarios",
+        "DCA calculation tested with various schedules",
+        "Tax calculation tested for all supported regimes",
+        "Portfolio valuation accuracy verified",
+        "Edge cases: partial sales, currency conversion, dividends"
+      ],
+      "fulfills": [
+        "VAL-COV-003"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-integration-tests",
+      "description": "Add end-to-end integration tests for critical user journeys",
+      "skillName": "testing-worker",
+      "preconditions": [
+        "improve-backend-test-coverage",
+        "improve-frontend-test-coverage"
+      ],
+      "expectedBehavior": [
+        "E2E test: user registration → portfolio creation → add transaction → view dashboard",
+        "E2E test: bulk import → validation → portfolio update",
+        "E2E test: thesis creation → PDF export",
+        "Tests run in CI with database fixtures",
+        "Tests complete in <5 minutes"
+      ],
+      "fulfills": [
+        "VAL-COV-004"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-performance-benchmarks",
+      "description": "Create performance benchmark suite for critical operations with regression detection",
+      "skillName": "testing-worker",
+      "preconditions": [
+        "add-critical-indexes",
+        "implement-redis-caching"
+      ],
+      "expectedBehavior": [
+        "Benchmark: dashboard load time <500ms",
+        "Benchmark: portfolio valuation calculation <200ms",
+        "Benchmark: 50-transaction import <2 seconds",
+        "CI fails on >20% performance regression",
+        "Benchmarks run weekly on main branch"
+      ],
+      "fulfills": [
+        "VAL-COV-005"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "add-database-migration-tests",
+      "description": "Add tests for all Alembic database migrations (upgrade and downgrade)",
+      "skillName": "testing-worker",
+      "preconditions": [
+        "implement-fk-cascades",
+        "add-critical-indexes"
+      ],
+      "expectedBehavior": [
+        "Every migration tested for upgrade path",
+        "Every migration tested for downgrade path",
+        "Data integrity verified after migration",
+        "Migration tests run in CI",
+        "No migration can break existing data"
+      ],
+      "fulfills": [
+        "VAL-COV-006"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-architecture",
+      "description": "Create comprehensive architecture documentation covering system design and data flow",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Architecture document in docs/architecture.md",
+        "Component diagram showing frontend/backend/data flow",
+        "Database schema documentation",
+        "API integration points documented",
+        "Diagrams generated with Mermaid or similar"
+      ],
+      "fulfills": [
+        "VAL-DOC-001"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-api-endpoints",
+      "description": "Generate comprehensive API documentation from OpenAPI spec with examples",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "openapi.json up-to-date with all endpoints",
+        "Generated docs include request/response examples",
+        "Authentication requirements documented",
+        "Error codes and messages documented",
+        "Docs accessible at /docs endpoint"
+      ],
+      "fulfills": [
+        "VAL-DOC-002"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-deployment-runbook",
+      "description": "Create deployment runbook with step-by-step production deployment instructions",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Runbook in docs/deployment.md",
+        "Covers docker-compose.prod.yml setup",
+        "Environment variable configuration",
+        "Database migration procedure",
+        "Rollback procedure",
+        "Health check verification steps"
+      ],
+      "fulfills": [
+        "VAL-DOC-003"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-troubleshooting",
+      "description": "Create troubleshooting guide for common issues and their resolutions",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Troubleshooting guide in docs/troubleshooting.md",
+        "Common error messages and solutions",
+        "Performance debugging steps",
+        "Database connection issues",
+        "External API failure handling",
+        "Log file locations and interpretation"
+      ],
+      "fulfills": [
+        "VAL-DOC-004"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-development-setup",
+      "description": "Improve development setup documentation with clear prerequisites and steps",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Updated README.md with clear setup steps",
+        "Prerequisites: Node.js, Python, Docker versions",
+        "First-time setup script or commands",
+        "Common development workflows",
+        "How to run tests locally",
+        "Troubleshooting common setup issues"
+      ],
+      "fulfills": [
+        "VAL-DOC-005"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-financial-logic",
+      "description": "Document all financial calculation logic (FIFO, DCA, tax) with examples",
+      "skillName": "financial-accuracy-worker",
+      "preconditions": [
+        "add-financial-calculation-tests"
+      ],
+      "expectedBehavior": [
+        "Financial logic documented in docs/financial-calculations.md",
+        "FIFO algorithm explained with examples",
+        "DCA scheduling logic documented",
+        "Tax calculation formulas",
+        "Edge case handling (partial sales, currency conversion)",
+        "References to test cases"
+      ],
+      "fulfills": [
+        "VAL-DOC-006"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "document-security-practices",
+      "description": "Document security practices and guidelines for contributors",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "fix-hardcoded-admin-credentials",
+        "implement-csrf-protection",
+        "add-security-headers"
+      ],
+      "expectedBehavior": [
+        "Security guidelines in docs/security.md",
+        "Secure credential management practices",
+        "Input validation requirements",
+        "CSRF protection implementation",
+        "Security header configuration",
+        "Vulnerability reporting process"
+      ],
+      "fulfills": [
+        "VAL-DOC-007"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "verify-database-constraints",
+      "description": "Verify all database constraints (NOT NULL, UNIQUE, CHECK) are properly enforced",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "implement-fk-cascades"
+      ],
+      "expectedBehavior": [
+        "All required fields have NOT NULL constraints",
+        "Unique constraints on email, portfolio name + user_id",
+        "CHECK constraints on positive quantities and prices",
+        "Constraint violations return clear error messages",
+        "pytest tests verify constraint enforcement"
+      ],
+      "fulfills": [
+        "VAL-DB-003"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-database-backups",
+      "description": "Implement automated daily database backups with retention policy",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "Daily automated pg_dump backups",
+        "Backup retention: 7 daily, 4 weekly, 12 monthly",
+        "Backup verification (restore test)",
+        "Backup location documented in runbook",
+        "Restore procedure tested and documented"
+      ],
+      "fulfills": [
+        "VAL-DB-004"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-transaction-isolation",
+      "description": "Verify proper transaction isolation levels and implement database transactions for multi-step operations",
+      "skillName": "backend-worker",
+      "preconditions": [],
+      "expectedBehavior": [
+        "READ COMMITTED isolation level configured",
+        "Multi-step operations wrapped in database transactions",
+        "Rollback on any step failure",
+        "No partial data commits",
+        "Concurrent transaction handling tested"
+      ],
+      "fulfills": [
+        "VAL-DB-007"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "implement-database-audit-log",
+      "description": "Add audit logging for sensitive operations (portfolio deletion, user changes)",
+      "skillName": "backend-worker",
+      "preconditions": [
+        "implement-fk-cascades"
+      ],
+      "expectedBehavior": [
+        "Audit log table with user, action, timestamp, before/after state",
+        "Logged operations: portfolio deletion, user role changes, bulk operations",
+        "Audit log retention policy",
+        "Audit log queryable via admin interface",
+        "Tamper-proof audit log (append-only)"
+      ],
+      "fulfills": [
+        "VAL-DB-008"
+      ],
+      "milestone": "security-data-integrity",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-portfolio-flow",
+      "description": "Verify complete portfolio workflow from creation through valuation and reporting",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "improve-backend-test-coverage",
+        "improve-frontend-test-coverage",
+        "add-financial-calculation-tests"
+      ],
+      "expectedBehavior": [
+        "User can create portfolio → add transactions → view dashboard",
+        "Portfolio valuation updates correctly",
+        "Historical performance calculated accurately",
+        "All UI elements render correctly",
+        "No errors in browser console or backend logs"
+      ],
+      "fulfills": [
+        "VAL-CROSS-001"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-dca-flow",
+      "description": "Verify complete DCA workflow from schedule creation through execution and reporting",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "add-financial-calculation-tests",
+        "implement-redis-caching"
+      ],
+      "expectedBehavior": [
+        "User can create DCA schedule",
+        "DCA executions logged correctly",
+        "Portfolio updated with DCA transactions",
+        "DCA performance metrics calculated",
+        "DCA schedule displayed in UI"
+      ],
+      "fulfills": [
+        "VAL-CROSS-002"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-thesis-flow",
+      "description": "Verify complete thesis workflow from creation through PDF export",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "implement-thesis-pdf-export",
+        "optimize-cerebro-rag"
+      ],
+      "expectedBehavior": [
+        "User can create investment thesis",
+        "Cerebro provides RAG-enhanced suggestions",
+        "Thesis saved to database",
+        "PDF export generates correctly",
+        "PDF includes portfolio summary and thesis content"
+      ],
+      "fulfills": [
+        "VAL-CROSS-003"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-import-flow",
+      "description": "Verify complete transaction import workflow from file upload through validation and commit",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "implement-transaction-import",
+        "implement-batch-api",
+        "implement-data-validation-layer"
+      ],
+      "expectedBehavior": [
+        "User uploads CSV/Excel file",
+        "File parsed and validated",
+        "Preview shows transactions to be imported",
+        "User confirms import",
+        "Portfolio updated with imported transactions",
+        "Validation errors displayed clearly"
+      ],
+      "fulfills": [
+        "VAL-CROSS-004"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-search-flow",
+      "description": "Verify complete search workflow from query through navigation",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "add-search-functionality",
+        "implement-pagination"
+      ],
+      "expectedBehavior": [
+        "User opens search with Cmd+K",
+        "Search returns relevant results across portfolios, tickers, transactions",
+        "User navigates to result",
+        "Correct page loads with selected item highlighted",
+        "Search performance <300ms"
+      ],
+      "fulfills": [
+        "VAL-CROSS-005"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-mobile-flow",
+      "description": "Verify complete user flows work correctly on mobile devices",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "implement-responsive-design",
+        "implement-unified-navigation"
+      ],
+      "expectedBehavior": [
+        "Mobile navigation works (hamburger menu)",
+        "Add transaction form works on mobile",
+        "Dashboard renders correctly on small screens",
+        "Charts and tables are readable on mobile",
+        "Touch interactions work correctly"
+      ],
+      "fulfills": [
+        "VAL-CROSS-006"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-error-recovery",
+      "description": "Verify error handling and recovery across all critical flows",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "improve-error-ux",
+        "sanitize-error-responses"
+      ],
+      "expectedBehavior": [
+        "Network errors show retry option",
+        "API errors display user-friendly messages",
+        "Form validation errors prevent submission",
+        "External API failures fall back to cache",
+        "User can recover from errors without data loss"
+      ],
+      "fulfills": [
+        "VAL-CROSS-007"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    },
+    {
+      "id": "end-to-end-performance-validation",
+      "description": "Verify performance targets met across all critical operations under realistic load",
+      "skillName": "integration-worker",
+      "preconditions": [
+        "add-critical-indexes",
+        "implement-redis-caching",
+        "add-connection-pooling",
+        "optimize-database-schema"
+      ],
+      "expectedBehavior": [
+        "Dashboard loads in <500ms with 10+ portfolios",
+        "Transaction history loads in <300ms",
+        "Portfolio valuation calculates in <200ms",
+        "Search completes in <300ms",
+        "All performance benchmarks pass"
+      ],
+      "fulfills": [
+        "VAL-CROSS-008"
+      ],
+      "milestone": "test-coverage-docs",
+      "status": "pending",
+      "workerSessionIds": [],
+      "currentWorkerSessionId": null,
+      "completedWorkerSessionId": null
+    }
+  ]
+}
