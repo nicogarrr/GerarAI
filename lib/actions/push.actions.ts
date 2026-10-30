@@ -10,7 +10,8 @@ export type PushEventType =
     | 'shorts_rising'
     | 'daily_digest'
     | 'dca_levels'
-    | 'macro_event';
+    | 'macro_event'
+    | 'earnings';
 
 export type PushStatus = {
     enabled: boolean;
