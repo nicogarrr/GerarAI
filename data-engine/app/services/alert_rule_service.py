@@ -368,7 +368,13 @@ class AlertRuleService:
             # 0,71 GBP son 0,70 y 0,71 GBP): mezclar peniques y libras daba
             # -99 % o +9.900 % y disparaba la alerta. Dos monedas distintas
             # no son un movimiento de precio.
-            company = db.get(Company, rule.company_id)
+            # Misma etiqueta de unidad (o ambas sin etiqueta, filas legacy): el
+            # cociente no depende de la unidad y se usa tal cual.
+            company = (
+                db.get(Company, rule.company_id)
+                if latest.quote_currency != previous.quote_currency
+                else None
+            )
             if company is not None:
                 current_listed = listing_price(
                     Decimal(current_value), quote_currency=latest.quote_currency, company=company
