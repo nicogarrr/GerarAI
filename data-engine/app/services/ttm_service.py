@@ -24,6 +24,7 @@ from app.models import Company, FinancialFact
 from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.financial_ingestion_service import SOURCE_PRIORITY
 from app.services.reviewed_eps_adjustments import NOTE, SOURCE_TYPE, is_reviewed_eps_adjustment
+from app.services.split_adjustment import fact_split_factor, split_events_by_company
 from app.services.ttm_fundamentals import (
     FLOW_METRICS,
     POINT_METRICS,
@@ -79,8 +80,28 @@ def _is_segment(fact: FinancialFact) -> bool:
     return bool(segment) and str(segment) != "consolidated"
 
 
+# Cifras por accion: un trimestre presentado antes de un split sigue en la
+# base vieja (el 10-Q siguiente no reexpresa los 3 meses previos) y sumarlo
+# con trimestres posteriores mezclaba bases (un 10:1 con 3 trimestres viejos
+# daba un BPA TTM ~7x). Regla unica fact_split_factor (consciente de `filed`).
+_SPLIT_DIVIDE = frozenset({"eps_diluted"})
+_SPLIT_MULTIPLY = frozenset({"shares_diluted"})
+
+
+def _split_adjusted(fact: FinancialFact, split_events, cutoff: date | None) -> Decimal:
+    value = Decimal(fact.value)
+    if not split_events or fact.metric not in _SPLIT_DIVIDE | _SPLIT_MULTIPLY:
+        return value
+    factor = fact_split_factor(split_events, period=fact.period, filed=fact.filed, cutoff=cutoff)
+    if factor <= 0 or factor == 1:
+        return value
+    return value / factor if fact.metric in _SPLIT_DIVIDE else value * factor
+
+
 def _best_by_period(
     facts: list[FinancialFact],
+    split_events=None,
+    cutoff: date | None = None,
 ) -> dict[str, tuple[list[PeriodValue], list[PeriodValue]]]:
     best: dict[tuple[str, str, date], tuple[tuple[float, float], FinancialFact]] = {}
     for fact in facts:
@@ -108,7 +129,7 @@ def _best_by_period(
         quarters, annuals = out.setdefault(metric, ([], []))
         row = PeriodValue(
             end=end,
-            value=Decimal(fact.value),
+            value=_split_adjusted(fact, split_events, cutoff),
             unit=fact.unit or "USD",
             reported=bool(fact.is_reported),
             fact_id=fact.id,
@@ -117,9 +138,16 @@ def _best_by_period(
     return out
 
 
-def compute_company_ttm(facts: list[FinancialFact]) -> dict[str, TtmValue]:
-    """TTM por métrica para una lista de hechos de UNA empresa."""
-    grouped = _best_by_period(facts)
+def compute_company_ttm(
+    facts: list[FinancialFact],
+    split_events=None,
+    cutoff: date | None = None,
+) -> dict[str, TtmValue]:
+    """TTM por métrica para una lista de hechos de UNA empresa.
+
+    ``split_events`` (fecha, ratio) lleva BPA y acciones a la base actual.
+    """
+    grouped = _best_by_period(facts, split_events, cutoff)
     results: dict[str, TtmValue] = {}
     for metric in FLOW_METRICS:
         quarters, annuals = grouped.get(metric, ([], []))
@@ -192,7 +220,11 @@ def build_company_ttm(db: Session, company: Company) -> dict[str, Any]:
             .options(selectinload(FinancialFact.source))
         ).all()
     )
-    results = compute_company_ttm(facts)
+    results = compute_company_ttm(
+        facts,
+        split_events_by_company(db, [company.id]).get(company.id, []),
+        date.today(),
+    )
     reviewed_ids = {f.id for f in facts if is_reviewed_eps_adjustment(f)}
     for value in results.values():
         if reviewed_ids.intersection(value.fact_ids):
