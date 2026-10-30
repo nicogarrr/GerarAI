@@ -667,16 +667,6 @@ export async function quickAddPosition(
 }
 
 // Obtener holdings con peso de portfolio
-export async function getPortfolioWithWeights(userId: string) {
-    await resolveUserId(userId);
-    const summary = await getPortfolioSummary(userId);
-
-    return summary.holdings.map(h => ({
-        ...h,
-        weight: summary.totalValue > 0 ? (h.value / summary.totalValue) * 100 : 0
-    }));
-}
-
 /**
  * Resultado de `refreshPortfolioHoldings`: lo que SE ESCRIBIÓ, no lo que se
  * pidió. Antes la acción devolvía el array de entrada con la forma del éxito
