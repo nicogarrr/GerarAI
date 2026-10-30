@@ -305,6 +305,32 @@ def primary_sources_hint(company: Company) -> str:
     )
 
 
+def _news_headline_line(news: list[NewsEvent]) -> str | None:
+    """Titulares recientes en una frase; None si no hay ninguno con texto.
+
+    Sin duplicados (mismo titular normalizado) y sin truncar: el titular va
+    entero, como mucho los dos mas recientes.
+    """
+    dated = sorted(
+        (event for event in news if event.date),
+        key=lambda event: event.date, reverse=True,
+    )
+    seen_titles: set[str] = set()
+    headlines = []
+    for event in dated or news:
+        title = " ".join((event.title or "").split())
+        key = title.lower()
+        if not title or key in seen_titles:
+            continue
+        seen_titles.add(key)
+        headlines.append(f"'{title}' ({_fmt_date_es(event.date.isoformat())})")
+        if len(headlines) == 2:
+            break
+    if not headlines:
+        return None
+    return "Últimas noticias guardadas: " + "; ".join(headlines) + "."
+
+
 def _natural_company_answer(
     *,
     company: Company,
@@ -380,25 +406,9 @@ def _natural_company_answer(
         seen_notes.add(key)
         parts.append(f"De tus notas guardadas: '{note}'.")
     if news:
-        dated = sorted(
-            (event for event in news if event.date),
-            key=lambda event: event.date, reverse=True,
-        )
-        # Sin duplicados (mismo titular normalizado) y sin truncar: el
-        # titular va entero, como mucho los dos mas recientes.
-        seen_titles: set[str] = set()
-        headlines = []
-        for event in dated or news:
-            title = " ".join((event.title or "").split())
-            key = title.lower()
-            if not title or key in seen_titles:
-                continue
-            seen_titles.add(key)
-            headlines.append(f"'{title}' ({_fmt_date_es(event.date.isoformat())})")
-            if len(headlines) == 2:
-                break
-        if headlines:
-            parts.append("Últimas noticias guardadas: " + "; ".join(headlines) + ".")
+        line = _news_headline_line(news)
+        if line is not None:
+            parts.append(line)
     if contradiction_claims:
         parts.append(
             f"Hay {len(contradiction_claims)} afirmaciones contradichas o "
@@ -499,8 +509,14 @@ def _answer_lead(
                 f"({_fmt_period_es(f.period, f.fiscal_year, f.fiscal_quarter)}, {f.source_type or 'fuente almacenada'}).")
     if re.search(r"precio|cotiza|cotizaci", text) and price_line:
         return price_line
-    if re.search(r"noticia|titular|novedad", text) and not news:
-        return f"No tengo noticias guardadas de {ticker}."
+    if re.search(r"noticia|titular|novedad", text):
+        if not news:
+            return f"No tengo noticias guardadas de {ticker}."
+        # Se contesta primero lo preguntado: la misma frase que cierra el
+        # resumen, que el llamador desduplica (lead.startswith(part)).
+        line = _news_headline_line(news)
+        if line is not None:
+            return line
     return None
 
 
@@ -560,6 +576,7 @@ _CAPABILITIES_RE = re.compile(
     r"(?:en\s+)?qu[eé]\s+(?:me\s+)?puedes\s+ayudar|"
     r"c[oó]mo\s+(?:es\s+que\s+)?(?:me\s+)?puedes\s+ayudar|"
     r"qu[eé]\s+(?:eres|es\s+esto)|qui[eé]n\s+eres|para\s+qu[eé]\s+sirves|"
+    r"qu[eé]\s+es\s+(?:gerarai|cavaai|esta\s+(?:app|aplicaci[oó]n))|"
     r"what can you do|who are you"
     r")"
     # Preguntas gemelas: "quien eres y que puedes hacer" (en cualquier orden).
@@ -813,6 +830,41 @@ class ChatService:
             if len(named.companies) == 1 and not named.ambiguous:
                 return named.companies[0]
         return next(iter(found.values())) if len(found) == 1 else None
+
+    def _history_company(
+        self, db: Session, question: str, history: list[ChatTurn] | None
+    ) -> Company | None:
+        """Empresa de la que ya se hablaba, para seguimientos sin nombre.
+
+        «cuéntame de ASTS» → «¿cuánta deuda tiene?»: sin esta mirada al hilo,
+        el seguimiento caia en la abstencion general pidiendo un ticker que el
+        usuario ya habia dado. Solo aplica cuando la pregunta actual pinta a
+        dato de empresa (pista de empresa o de metrica) y no es de cartera,
+        doctrina ni orden; se toma la mencion explicita mas reciente de un
+        turno del usuario. Si el ultimo tramo del hilo es de cartera («que
+        tengo en mi cartera»), no se arrastra la empresa anterior: «y el
+        efectivo?» pasaria a hablar de la empresa cuando se pregunta por la
+        caja.
+        """
+        text = question or ""
+        if not history:
+            return None
+        if not (_COMPANY_CUE_RE.search(text) or _question_metrics(text)):
+            return None
+        if (
+            _PORTFOLIO_SELF_RE.search(text)
+            or _ORDER_VERB_RE.search(text)
+            or _is_doctrine_question(text)
+        ):
+            return None
+        user_turns = [t.content for t in history if t.role == "user" and t.content][-4:]
+        for turn in reversed(user_turns):
+            mentioned = self._explicit_mention(db, turn)
+            if mentioned is not None:
+                return mentioned
+            if _PORTFOLIO_SELF_RE.search(turn):
+                return None
+        return None
 
     def _latest_thesis(self, db: Session, company: Company) -> ThesisVersion | None:
         return latest_thesis_version(db, company)
@@ -1111,6 +1163,7 @@ class ChatService:
         company = self._resolve_company(db, question, scope, ticker)
         if company is None and page_context is not None and (
             _PAGE_CONTENT_RE.search(question or "") or _COMPANY_CUE_RE.search(question or "")
+            or _question_metrics(question or "")
             or re.search(r"(?i)\b(?:evidencia|fuentes?|documentos?|riesgos?)\b", question or "")
         ):
             company = page_context.company
@@ -1157,6 +1210,11 @@ class ChatService:
                     llm_trace={"path": "unknown_ticker", "generated": False, "provider_calls": 0, "tickers": unknown},
                     context=context_echo,
                 )
+        # Seguimiento sin nombre («¿y su deuda?») tras hablar de una empresa:
+        # se resuelve desde el hilo. Despues del bloque de ticker desconocido
+        # para que «¿y la deuda de RKLB?» siga diciendo que RKLB no existe.
+        if company is None and not ticker:
+            company = self._history_company(db, question or "", history)
         # Pregunta sobre el contenido de la página sin empresa: el cerebro solo
         # recibe el nombre de la sección, no sus datos. Lo dice, sin inventar
         # cifras ni citar fuentes ajenas.
@@ -1230,6 +1288,24 @@ class ChatService:
             if position_answer is not None:
                 position_answer.context = context_echo
                 return position_answer
+        # «vende mis acciones de ASTS» / «compra mas ASTS»: GerarAI no opera
+        # con el broker. Antes caia en el volcado de datos de la empresa como
+        # si se hubiera preguntado por ella. Las preguntas de IRPF al vender
+        # ya salieron por _sale_tax_route / _sale_tax_answer.
+        if company is not None and _ORDER_VERB_RE.search(question or ""):
+            return ChatResponse(
+                answer=(
+                    "No ejecuto órdenes: GerarAI no compra ni vende en tu bróker. "
+                    f"Puedo enseñarte lo que tengo guardado de {company.ticker} "
+                    "(precio, cifras, tesis y noticias, con sus fuentes) o tu posición en cartera."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="order-verb-v1",
+                confidence=0.9,
+                llm_trace={"path": "order_verb", "generated": False, "provider_calls": 0},
+                context=context_echo,
+            )
         if (
             company is None
             and not ticker
@@ -1554,7 +1630,7 @@ class ChatService:
             )
             lines.append(
                 f"- {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
-                f"coste medio {_fmt_number_es(float(pos.average_cost), 2)} {_currency_display(pos.currency)}, "
+                f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
                 + value_text
             )
             sources.append(self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of)))
@@ -1565,8 +1641,9 @@ class ChatService:
             else f"valor total {_fmt_money_es(total)} {_currency_display(base)}"
             + (f" sin contar {unvalued} sin valor en {_currency_display(base)}" if unvalued else "")
         )
+        count_label = "posición abierta" if len(rows) == 1 else "posiciones abiertas"
         answer = (
-            f"Tu cartera guardada tiene {len(rows)} posiciones abiertas, {total_text}, "
+            f"Tu cartera guardada tiene {len(rows)} {count_label}, {total_text}, "
             f"con datos a {_fmt_date_es(as_of.isoformat())}:\n"
             + "\n".join(lines)
             + extra
@@ -1742,7 +1819,7 @@ class ChatService:
         rows.sort(key=keyfn, reverse=highest)
         pos, comp = rows[0]
         cur = currencies[0]
-        amount = _fmt_number_es(keyfn(rows[0]), 2)
+        amount = _fmt_money_es(keyfn(rows[0]))
         word = "más alto" if highest else "más bajo"
         weight_text = ""
         if key_name == "value":
@@ -1752,7 +1829,7 @@ class ChatService:
         answer = f"Tu posición con el {label} {word} es {comp.ticker}: {amount} {_currency_display(cur)}{weight_text}."
         if len(rows) > 1:
             nxt_pos, nxt = rows[1]
-            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {_currency_display(cur)}."
+            answer += f" Le sigue {nxt.ticker} con {_fmt_money_es(keyfn(rows[1]))} {_currency_display(cur)}."
         return ChatResponse(
             answer=answer,
             sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
@@ -2086,6 +2163,28 @@ class ChatService:
         offered: str | None = None
         if not intent:
             if not lots:
+                # Seguimiento de una respuesta de IRPF («y si vendo la
+                # mitad?»): sin la palabra impuesto pero con venta y una
+                # respuesta de IRPF reciente, es la misma pregunta sobre la
+                # misma empresa (la del hilo si la pregunta no la nombra).
+                if _SALE_VERB_RE.search(q):
+                    last_sale = next(
+                        (turn for turn in reversed(history or [])
+                         if turn.role == "assistant"
+                         and re.search(r"(?i)\birpf\b|impuestos?\b|ganancia\b", turn.content or "")),
+                        None,
+                    )
+                    if last_sale is not None:
+                        company = self._explicit_mention(db, q)
+                        if company is None:
+                            for turn in reversed(
+                                [t.content for t in (history or []) if t.role == "user" and t.content][-4:]
+                            ):
+                                company = self._explicit_mention(db, turn)
+                                if company is not None:
+                                    break
+                        if company is not None:
+                            return self._sale_tax_answer(db, company, q)
                 return None
             last = next((turn for turn in reversed(history or []) if turn.role == "assistant"), None)
             match = _NO_POSITION_TICKER_RE.search(last.content or "") if last is not None else None
