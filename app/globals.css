@@ -209,6 +209,17 @@
         }
     }
 
+    /*
+     * La app solo tiene tema oscuro, pero sin color-scheme el navegador pinta
+     * los controles nativos en claro: el icono del calendario de los
+     * <input type="date"> salia negro sobre el fondo #0a0a0b (1,06:1, WCAG
+     * 1.4.11), las flechas de los number eran una caja blanca y las barras de
+     * scroll y los desplegables nativos tambien eran claros.
+     */
+    :root {
+        color-scheme: dark;
+    }
+
     /* Las anclas no deben quedar debajo del header sticky al navegar. */
     html {
         scroll-padding-top: calc(var(--shell-top) + 1rem);
