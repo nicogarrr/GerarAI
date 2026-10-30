@@ -312,6 +312,8 @@ class PortfolioLedgerService:
         cost = Decimal("0")
         cost_base = Decimal("0")
         base_cost_complete = True
+        realized_base_complete = True
+        sold = False
         realized = Decimal("0")
         realized_base = Decimal("0")
         last_price = Decimal("0")
@@ -359,17 +361,29 @@ class PortfolioLedgerService:
                 base_currency=base_currency,
                 as_of=transaction.trade_date,
             )
-            if historical_rate is None or not base_cost_complete:
-                base_cost_complete = False
+            sold = True
+            if not base_cost_complete:
+                realized_base_complete = False
             else:
+                # El coste base de las acciones que quedan no depende del FX
+                # del dia de la venta: solo el realizado lo necesita.
                 average_cost_base = cost_base / quantity
-                proceeds_base = (
-                    transaction.price * transaction.quantity - transaction.fees
-                ) * historical_rate
-                realized_base += proceeds_base - average_cost_base * transaction.quantity
+                if historical_rate is None:
+                    realized_base_complete = False
+                else:
+                    proceeds_base = (
+                        transaction.price * transaction.quantity - transaction.fees
+                    ) * historical_rate
+                    realized_base += proceeds_base - average_cost_base * transaction.quantity
                 cost_base -= average_cost_base * transaction.quantity
             cost -= average_cost * transaction.quantity
             quantity -= transaction.quantity
+            if quantity == 0:
+                # Posicion cerrada: el siguiente lote empieza de cero. Un FX
+                # ausente en un lote ya cerrado no deja sin coste base al nuevo.
+                cost = Decimal("0")
+                cost_base = Decimal("0")
+                base_cost_complete = True
 
         position = db.scalar(select(Position).where(Position.company_id == company_id))
         held_as_of = position.as_of if position is not None else None
@@ -416,7 +430,9 @@ class PortfolioLedgerService:
             if position.market_value_base is not None and base_cost_complete
             else None
         )
-        position.realized_pnl_base = realized_base if base_cost_complete else None
+        position.realized_pnl_base = (
+            realized_base if realized_base_complete and (base_cost_complete or sold) else None
+        )
         position.fx_rate = current_rate
         position.source = "postgres_ledger"
         position.as_of = valuation_date
