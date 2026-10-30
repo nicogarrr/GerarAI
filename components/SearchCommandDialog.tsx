@@ -8,7 +8,7 @@ import { CornerDownLeft, Loader2, Terminal, TrendingUp } from "lucide-react";
 import { searchStocksWithStatus, getPopularStocks } from "@/lib/actions/finnhub.actions";
 import { loadPopularStocks } from "@/lib/popular-stocks-loader";
 import { isNextRedirectError } from "@/lib/types/errors";
-import { flattenNavItems, ROUTE_CATALOG } from "@/lib/constants";
+import { flattenNavItems, ROUTE_CATALOG, SYMBOL_VALIDATION } from "@/lib/constants";
 import { navItemMatchesSearch, navSectionMatchesSearch } from "@/lib/search/nav-search";
 import { closeSearchCommand } from "@/lib/search/search-command-store";
 import { parseTickerCommand } from "@/lib/research/ticker-commands";
@@ -54,6 +54,19 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
     // los callbacks JSX sin aserciones no nulas.
     const exactCommand = commandQuery?.exact
         ? { ticker: commandQuery.ticker, command: commandQuery.exact }
+        : null;
+
+    // Ir directo a la ficha de lo escrito si tiene forma de ticker y la
+    // búsqueda no lo devuelve tal cual (proveedor caído o sin clave, ticker
+    // poco común, mercado no cubierto). Antes «KO» sin sugerencias acababa en
+    // «Sin resultados» y no había forma de llegar a la ficha desde aquí.
+    const typedSymbol = searchTerm.trim().toUpperCase();
+    const directSymbol = !commandQuery
+        && typedSymbol.length >= SYMBOL_VALIDATION.MIN_LENGTH
+        && typedSymbol.length <= SYMBOL_VALIDATION.MAX_LENGTH
+        && SYMBOL_VALIDATION.PATTERN.test(typedSymbol)
+        && !displayStocks.some((stock) => stock.symbol.toUpperCase() === typedSymbol)
+        ? typedSymbol
         : null;
 
     // Reintento: handleSearch no puede referirse a si misma dentro de su propio
@@ -232,7 +245,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
     return (
             <CommandDialog
                 open={open}
-                commandProps={{shouldFilter:false, value:selectedValue || (exactCommand ? `cmd:${exactCommand.command.code}` : displayStocks[0] ? `stock:${displayStocks[0].symbol}` : undefined), onValueChange:setSelectedValue}}
+                commandProps={{shouldFilter:false, value:selectedValue || (exactCommand ? `cmd:${exactCommand.command.code}` : displayStocks[0] ? `stock:${displayStocks[0].symbol}` : directSymbol && !loading ? `direct:${directSymbol}` : undefined), onValueChange:setSelectedValue}}
                 onOpenChange={(nextOpen) => { if (!nextOpen) closeSearchCommand(); }}
                 onCloseAutoFocus={(event) => {
                     event.preventDefault();
@@ -282,6 +295,23 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                         </div>
                                         <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
                                     </CommandItem>
+                        </CommandGroup>
+                    ) : null}
+                    {directSymbol && !loading ? (
+                        <CommandGroup className="[&_[cmdk-group-heading]]:text-gray-400" heading="Ficha">
+                            <CommandItem
+                                value={`direct:${directSymbol}`}
+                                onSelect={() => handleSelectStock(directSymbol)}
+                                onMouseEnter={() => handlePrefetchStock(directSymbol)}
+                                className="search-item-link min-h-11 w-full text-left aria-selected:bg-teal-950/60 aria-selected:ring-1 aria-selected:ring-inset aria-selected:ring-teal-700"
+                            >
+                                <TrendingUp aria-hidden="true" className="h-4 w-4 text-teal-400" />
+                                <div className="min-w-0 flex-1">
+                                    <div className="search-item-name truncate">Abrir la ficha de «{directSymbol}»</div>
+                                    <div className="text-sm text-gray-500">Ir directo por símbolo</div>
+                                </div>
+                                <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
+                            </CommandItem>
                         </CommandGroup>
                     ) : null}
                     {loading ? (
