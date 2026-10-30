@@ -36,6 +36,21 @@ export function currencyForTicker(symbol: string): string {
   return defaultCurrencyFor(symbol) ?? NEW_TRANSACTION_CURRENCY;
 }
 
+// Subunidades de cotización (peniques, centavos, agorot): no son la divisa
+// de una operación. `GBp`/`ZAc` ya fallan la forma ISO (minúsculas).
+const QUOTE_SUBUNITS = new Set(['GBX', 'ZAC', 'ILA']);
+
+/**
+ * Divisa inicial del alta con acción ya elegida: la verificada del listado si
+ * es un código ISO de divisa; si es una subunidad (`GBp`, `GBX`) o no hay dato,
+ * la de su bolsa. Pasar `GBp` a mayúsculas daría `GBP` (libras) por accidente.
+ */
+export function presetTransactionCurrency(symbol: string, verified?: string | null): string {
+  const code = verified?.trim() ?? '';
+  if (/^[A-Z]{3}$/.test(code) && !QUOTE_SUBUNITS.has(code)) return code;
+  return currencyForTicker(symbol);
+}
+
 /** Opciones del selector: la divisa actual siempre aparece aunque no esté en la lista. */
 export function currencyOptions(current: string): string[] {
   return TRANSACTION_CURRENCIES.includes(current) ? TRANSACTION_CURRENCIES : [current, ...TRANSACTION_CURRENCIES];
