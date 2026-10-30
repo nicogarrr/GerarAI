@@ -2400,8 +2400,7 @@
           },
           "currency": {
             "default": "EUR",
-            "maxLength": 10,
-            "minLength": 3,
+            "pattern": "^[A-Za-z]{3}$",
             "title": "Currency",
             "type": "string"
           },

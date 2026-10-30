@@ -121,6 +121,9 @@ class InvestmentPlanService:
         # Normalize before BOTH persistence and retry comparison. Letting the
         # DB/driver round a float first differs at half cents across backends.
         amount = amount.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # Una divisa en minusculas es la misma divisa: se guarda normalizada
+        # para que el reintento con la misma referencia no sea un «conflicto».
+        currency = (currency or "").strip().upper()
         if amount <= 0:
             raise ValueError("El importe de la aportación debe ser positivo con precisión de céntimos.")
         plan = self.get_plan(db)

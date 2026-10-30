@@ -43,7 +43,9 @@ class PlanUpsertInput(BaseModel):
 class ContributionInput(BaseModel):
     date: date
     amount: float = Field(gt=0, le=10_000_000)
-    currency: str = Field(default="EUR", min_length=3, max_length=10)
+    # ISO 4217: «EURO» o «€» nunca tendrian tipo de cambio y dejarian el plan
+    # «incompleto» para siempre; «eur» se guarda como «EUR».
+    currency: str = Field(default="EUR", pattern=r"^[A-Za-z]{3}$")
     external_id: str | None = Field(default=None, max_length=120)
     note: str = Field(default="", max_length=500)
 
