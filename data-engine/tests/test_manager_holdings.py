@@ -483,7 +483,10 @@ def test_most_bought_counts_a_manager_once_per_cusip_even_with_two_classes(db):
                     name_of_issuer="EMISOR X",
                     title_of_class=title,
                     cusip="XXX",
-                    value_usd_thousands=Decimal("10"),
+                    # valor proporcional a las acciones: una compra real; con el
+                    # valor fijo, 1 → 5 acciones al mismo valor es la firma de
+                    # un split 5:1 y ya no cuenta como compra
+                    value_usd_thousands=Decimal("10") * Decimal(shares),
                     shares=Decimal(shares),
                     is_amendment=False,
                 )
