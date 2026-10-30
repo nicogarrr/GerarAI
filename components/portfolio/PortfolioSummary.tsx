@@ -20,6 +20,7 @@ export default function PortfolioSummary({ summary }: Props) {
   // Con caja y sin posiciones el total (la caja) sí es un dato.
   const nothingYet = isEmpty && summary.totalValue === 0 && summary.cash === 0 && summary.equityValue === 0;
   const isPositive = summary.totalGain >= 0;
+  const excluded = summary.totalsExcluded ?? 0;
   const format = (value: number) => formatMoney(value, summary.baseCurrency, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -74,6 +75,9 @@ export default function PortfolioSummary({ summary }: Props) {
         {noData ? null : (
           <p className="text-xs text-gray-500 mt-1">
             Se compara con el valor bruto de las posiciones ({format(summary.equityValue)}), no con el neto.
+            {excluded > 0
+              ? ` No incluye ${excluded === 1 ? '1 posición' : `${excluded} posiciones`} sin precio, tipo de cambio o en revisión.`
+              : null}
           </p>
         )}
       </div>

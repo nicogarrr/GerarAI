@@ -167,6 +167,19 @@ describe('getPortfolioSummary: dinero y suspensión de valoración', () => {
         expect(h.fxMissing).toBe(true);
     });
 
+    it('coste y rendimiento solo con posiciones valoradas: una sin precio no diluye el % (cuadra con /inicio)', async () => {
+        seedSummary([
+            position({ ticker: 'VALORADA', market_value_base: 1500, cost_basis_base: 1000, unrealized_pnl_base: 500 }),
+            position({ ticker: 'SINPRECIO', market_value_base: null, cost_basis_base: 1000, unrealized_pnl_base: null }),
+            position({ ticker: 'SUSPENDIDA', cost_basis_base: 700, unrealized_pnl_base: null, valuation_hold: { reason: 'split', effective_date: null, since: null } }),
+        ]);
+        const summary = await getPortfolioSummary('tenant-one');
+        expect(summary.totalCost).toBe(1000);
+        expect(summary.totalGain).toBe(500);
+        expect(summary.totalGainPercent).toBeCloseTo(50, 6);
+        expect(summary.totalsExcluded).toBe(2);
+    });
+
     it('bases nulas -> fxMissing/valueMissing; coste 0 -> gainPercent 0 (no NaN)', async () => {
         seedSummary([position({ market_value_base: null, cost_basis_base: null, unrealized_pnl_base: null })]);
         const [h] = (await getPortfolioSummary('tenant-one')).holdings;

@@ -93,6 +93,9 @@ export type PortfolioSummary = {
     totalCost: number;
     totalGain: number;
     totalGainPercent: number;
+    /** Posiciones fuera de coste/ganancia/rendimiento por no tener valor o coste en base
+     *  (sin precio, sin FX o en suspensión). Opcional: 0 si falta. */
+    totalsExcluded?: number;
     holdings: PortfolioHolding[];
     /** Valor en renta variable (suma de posiciones), sin caja. */
     equityValue: number;
@@ -312,13 +315,19 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         };
     });
     const totalValue = backendSummary.total_value;
-    const totalCost = holdings.reduce((sum, holding) => sum + holding.cost, 0);
-    const totalGain = holdings.reduce((sum, holding) => sum + holding.gain, 0);
+    // Coste y ganancia solo sobre las posiciones con valor Y coste en base conocidos:
+    // el backend ya deja fuera del valor RV las que no tienen precio, FX o están en
+    // suspensión. Sumar su coste sin su ganancia diluía el rendimiento (coste 2.000,
+    // ganancia 500 → +25 % en vez de +50 %) y descuadraba Cartera con /inicio.
+    const valued = holdings.filter((holding) => !holding.fxMissing && holding.cost > 0);
+    const totalCost = valued.reduce((sum, holding) => sum + holding.cost, 0);
+    const totalGain = valued.reduce((sum, holding) => sum + holding.gain, 0);
     return {
         totalValue,
         totalCost,
         totalGain,
         totalGainPercent: totalCost > 0 ? (totalGain / totalCost) * 100 : 0,
+        totalsExcluded: holdings.length - valued.length,
         holdings: holdings.sort((a, b) => b.value - a.value),
         equityValue: backendSummary.equity_value,
         cashAssets: backendSummary.cash_assets_base,
