@@ -13,6 +13,7 @@ import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 import { importRejection } from '@/lib/portfolio/import-rejection';
+import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
 import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -201,19 +202,25 @@ export async function addTransaction(
     if (!Number.isFinite(fees) || fees < 0) {
         throw new ValidationError('Fees cannot be negative');
     }
-    await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
-        method: 'POST',
-        body: jsonBody({
-            ticker: symbol.toUpperCase(),
-            action: type,
-            quantity,
-            price,
-            trade_date: date.toISOString().slice(0, 10),
-            notes: notes || null,
-            currency: currency.toUpperCase(),
-            fees,
-        }),
-    });
+    try {
+        await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
+            method: 'POST',
+            body: jsonBody({
+                ticker: symbol.toUpperCase(),
+                action: type,
+                quantity,
+                price,
+                trade_date: date.toISOString().slice(0, 10),
+                notes: notes || null,
+                currency: currency.toUpperCase(),
+                fees,
+            }),
+        });
+    } catch (error) {
+        const rejection = ledgerRejection(error);
+        if (rejection) return { success: false, error: rejection };
+        throw error;
+    }
     invalidatePortfolioReads(canonicalUserId);
     return { success: true };
 }
@@ -397,23 +404,29 @@ export async function updateTransaction(
     if (fees !== undefined && (!Number.isFinite(fees) || fees < 0)) {
         throw new ValidationError('Fees cannot be negative');
     }
-    await researchRequest<ResearchPortfolioTransaction>(
-        `/api/portfolio/transactions/${encodeURIComponent(transactionId)}`,
-        {
-            method: 'PUT',
-            body: jsonBody({
-                ticker: symbol.toUpperCase(),
-                action: type,
-                quantity,
-                price,
-                trade_date: date.toISOString().slice(0, 10),
-                notes: notes || null,
-                currency: currency.toUpperCase(),
-                // Omitido = el backend conserva la comisión registrada.
-                ...(fees !== undefined ? { fees } : {}),
-            }),
-        },
-    );
+    try {
+        await researchRequest<ResearchPortfolioTransaction>(
+            `/api/portfolio/transactions/${encodeURIComponent(transactionId)}`,
+            {
+                method: 'PUT',
+                body: jsonBody({
+                    ticker: symbol.toUpperCase(),
+                    action: type,
+                    quantity,
+                    price,
+                    trade_date: date.toISOString().slice(0, 10),
+                    notes: notes || null,
+                    currency: currency.toUpperCase(),
+                    // Omitido = el backend conserva la comisión registrada.
+                    ...(fees !== undefined ? { fees } : {}),
+                }),
+            },
+        );
+    } catch (error) {
+        const rejection = ledgerRejection(error);
+        if (rejection) return { success: false, error: rejection };
+        throw error;
+    }
     invalidatePortfolioReads(canonicalUserId);
     return { success: true };
 }

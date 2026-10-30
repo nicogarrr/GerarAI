@@ -85,6 +85,18 @@ describe('addTransaction / updateTransaction', () => {
         expect(researchRequest).not.toHaveBeenCalled();
     });
 
+    it('vender más de lo que tienes o mezclar divisas vuelve como resultado en español (no un error que Next oculta en prod)', async () => {
+        researchRequest.mockRejectedValueOnce(new AppError('Insufficient shares for sale', 'RESEARCH_API_ERROR', 409));
+        const sell = await addTransaction('tenant-one', 'AAPL', 'sell', 50, 100, new Date('2026-10-27T12:00:00Z'));
+        expect(sell).toEqual({ success: false, error: expect.stringMatching(/^No puedes vender más acciones de las que tienes/) });
+        researchRequest.mockRejectedValueOnce(new AppError('Position cannot mix transaction currencies', 'RESEARCH_API_ERROR', 422));
+        const edit = await updateTransaction('tenant-one', '7', 'AAPL', 'buy', 1, 100, new Date('2026-10-27T12:00:00Z'), undefined, 'EUR');
+        expect(edit).toEqual({ success: false, error: expect.stringMatching(/otra divisa/) });
+        expect(invalidate).not.toHaveBeenCalled();
+        researchRequest.mockRejectedValueOnce(new AppError('boom', 'RESEARCH_API_ERROR', 500));
+        await expect(addTransaction('tenant-one', 'AAPL', 'buy', 1, 100, new Date())).rejects.toMatchObject({ statusCode: 500 });
+    });
+
     it('escribe con ticker/divisa en mayúsculas, fecha YYYY-MM-DD e invalida las lecturas', async () => {
         researchRequest.mockResolvedValue({});
         const result = await addTransaction('tenant-one', 'aapl', 'buy', 2, 150.5, new Date('2026-10-27T15:00:00Z'), undefined, 'eur', 1.5);

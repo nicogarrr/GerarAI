@@ -98,7 +98,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol }:
     setLoading(true);
 
     try {
-      await addTransaction(
+      const result = await addTransaction(
         userId,
         formData.symbol,
         formData.type,
@@ -109,6 +109,12 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol }:
         formData.currency,
         parseLocalizedNumber(formData.fees) ?? 0,
       );
+      // Rechazo conocido del ledger (vender más de lo que tienes, divisa distinta):
+      // el formulario sigue abierto con lo escrito y el motivo en español.
+      if (result?.success === false) {
+        toast.error(result.error ?? 'No se pudo registrar la transacción.');
+        return;
+      }
       onClose();
       setFormData({
         symbol: '',

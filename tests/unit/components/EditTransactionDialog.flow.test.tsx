@@ -1,11 +1,11 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const h = vi.hoisted(() => ({ update: vi.fn(), refresh: vi.fn(), success: vi.fn(), showError: vi.fn() }));
+const h = vi.hoisted(() => ({ update: vi.fn(), refresh: vi.fn(), success: vi.fn(), error: vi.fn(), showError: vi.fn() }));
 vi.mock('@/lib/actions/portfolio.actions', () => ({ updateTransaction: h.update }));
 vi.mock('@/lib/actions/finnhub.actions', () => ({ searchStocksWithStatus: vi.fn().mockResolvedValue([]) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: h.refresh }) }));
-vi.mock('sonner', () => ({ toast: { success: h.success, error: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('@/lib/toast', () => ({ showErrorToast: h.showError }));
 import EditTransactionDialog from '@/components/portfolio/EditTransactionDialog';
 
@@ -166,5 +166,17 @@ describe('EditTransactionDialog', () => {
         fireEvent.click(d.getByRole('button', { name: 'Cancelar' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
         expect(h.update).not.toHaveBeenCalled();
+    });
+});
+
+describe('EditTransactionDialog: rechazo del ledger', () => {
+    it('vender de más: el diálogo sigue abierto con el motivo en español y no refresca', async () => {
+        h.update.mockResolvedValue({ success: false, error: 'No puedes vender más acciones de las que tienes en cartera.' });
+        const d = open({ ...base, type: 'sell' });
+        await submit(d);
+        await waitFor(() => expect(h.error).toHaveBeenCalledWith('No puedes vender más acciones de las que tienes en cartera.'));
+        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(h.success).not.toHaveBeenCalled();
+        expect(h.refresh).not.toHaveBeenCalled();
     });
 });
