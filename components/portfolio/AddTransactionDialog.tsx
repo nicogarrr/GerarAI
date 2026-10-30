@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
 import { parseLocalizedNumber, todayLocal } from '@/lib/format';
-import { currencyForTicker, currencyOptions, NEW_TRANSACTION_CURRENCY } from './transactionCurrencies';
+import { currencyForTicker, currencyOptions, NEW_TRANSACTION_CURRENCY, presetTransactionCurrency } from './transactionCurrencies';
 import { SYMBOL_VALIDATION } from '@/lib/constants';
 
 type DialogProps = {
@@ -54,9 +54,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
     symbol: presetSymbol ?? '',
     companyName: presetSymbol ? initialCompanyName ?? '' : '',
     type: 'buy' as 'buy' | 'sell',
-    currency: (presetSymbol && initialCurrency?.trim())
-      ? initialCurrency.trim().toUpperCase()
-      : presetSymbol ? currencyForTicker(presetSymbol) : NEW_TRANSACTION_CURRENCY,
+    currency: presetSymbol ? presetTransactionCurrency(presetSymbol, initialCurrency) : NEW_TRANSACTION_CURRENCY,
     quantity: '',
     price: '',
     fees: '',

@@ -93,4 +93,8 @@ describe('WatchlistBuyAction', () => {
         const dialog = await openDialog('SEK');
         expect(within(dialog).getByText('Precio (SEK)')).toBeInTheDocument();
     });
+    it('una subunidad de Londres no se convierte en libras por mayúsculas (GBp/GBX -> GBP por bolsa)', async () => {
+        const dialog = await openDialog('GBX', 'BP.L');
+        expect(within(dialog).getByText('Precio (GBP)')).toBeInTheDocument();
+    });
 });
