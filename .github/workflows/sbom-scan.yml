@@ -409,6 +409,33 @@ jobs:
           path: engine2
           if-no-files-found: ignore
 
+      - name: Digest del build de ESTA imagen
+        # needs.build.result es el resultado AGREGADO de las 4 imagenes de la
+        # matriz build: con una rota llegaba 'failure' a los 4 gates y el
+        # escaneo de una imagen sana salia rojo por "sin imagen" teniendola
+        # (medido 30-oct-2026, run 41005146082: backend-prod, backend-dev y
+        # frontend-dev rojos con imagen, SBOM e informes presentes y gate que
+        # da VERDE sobre sus informes reales). El artefacto digest-<imagen>
+        # solo existe si el paso "Registrar digest" corrio, es decir si el
+        # build de ESTA imagen termino bien: es la señal por imagen.
+        id: build_digest
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          # pattern + merge-multiple: sin artefacto el paso NO falla (avisa y
+          # sigue); el contrato del workflow prohibe continue-on-error.
+          pattern: digest-${{ matrix.name }}
+          path: digests/
+          merge-multiple: true
+
+      - name: Resultado del build de esta imagen
+        id: build_result
+        run: |
+          if [ -f "digests/${{ matrix.name }}.tsv" ]; then
+            echo "result=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "result=failure" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Crear el directorio de informes y recoger el motor 2
         id: engine2_result
         run: |
@@ -486,7 +513,7 @@ jobs:
           python data-engine/scripts/security/gate_image_scan.py \
             --image "${{ matrix.name }}" \
             --image-ref "cavaai/${{ matrix.name }}:${{ github.sha }}" \
-            --build-result "${{ needs.build.result || 'skipped' }}" \
+            --build-result "${{ steps.build_result.outputs.result }}" \
             --policy scripts/security/trivy-policy.yaml \
             --vuln-report "reports/trivy-vuln-${{ matrix.name }}.json" \
             --vuln-status "${{ steps.trivy_vuln.outcome || 'skipped' }}" \

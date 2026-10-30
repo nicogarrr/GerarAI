@@ -17,7 +17,7 @@ import { ListingStaleBanner } from '@/components/research/ListingStaleBanner';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
 import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
-import { asView, canonicalViewUrl, tabHref, tabOfView, type View } from '@/lib/research/research-views';
+import { asView, tabHref, tabOfView, type View } from '@/lib/research/research-views';
 import { FinancialTerminalSection } from '@/components/research/sections/FinancialTerminalSection';
 import { ShareCapitalSection } from '@/components/research/sections/ShareCapitalSection';
 import { DriverAssumptionsSection } from '@/components/research/sections/DriverAssumptionsSection';
@@ -822,22 +822,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     }
     redirect(`/research/${encodeURIComponent(ticker)}${search.size ? `?${search.toString()}` : ''}`);
   }
-  // URLs antiguas de módulo o de grupo histórico (?view=moat, ?view=numeros):
-  // una redirección a la URL canónica de su pestaña (una URL por contenido),
-  // conservando el resto de parámetros (?chat=, ?pagina=, controles del terminal).
-  const canonicalView = canonicalViewUrl(ticker, query.view);
-  if (canonicalView) {
-    const hashAt = canonicalView.indexOf('#');
-    const hash = hashAt >= 0 ? canonicalView.slice(hashAt) : '';
-    const withoutHash = hashAt >= 0 ? canonicalView.slice(0, hashAt) : canonicalView;
-    const [pathnamePart, viewPart] = withoutHash.split('?view=');
-    const search = new URLSearchParams();
-    if (viewPart) search.set('view', viewPart);
-    for (const [key, value] of Object.entries(query)) {
-      if (key !== 'view' && typeof value === 'string') search.set(key, value);
-    }
-    redirect(`${pathnamePart}${search.size ? `?${search.toString()}` : ''}${hash}`);
-  }
+  // Las URLs antiguas de módulo o de grupo histórico (?view=moat,
+  // ?view=thesis) las redirige el middleware con un 307 real, antes de
+  // renderizar (ver legacyResearchRedirect). Hacerlo aquí era tarde: la
+  // carcasa de loading.tsx ya iba enviada y React lo degradaba a redirección
+  // de cliente, con la ficha colgada en «Cargando…» sin JS.
   const activeView = asView(query.view);
   //
   // D2a: la ficha era una cadena de `await` secuenciales. Estas lecturas NO

@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import { MODULES, TABS, asView, canonicalViewUrl, moduleHref, subrouteRedirect, tabHref, type View } from '../lib/research/research-views.ts';
+import { MODULES, TABS, asView, canonicalViewUrl, legacyResearchRedirect, moduleHref, subrouteRedirect, tabHref, type View } from '../lib/research/research-views.ts';
 
 describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
     it('las seis pestañas abren su módulo de entrada', () => {
@@ -72,11 +72,35 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
         }
     });
 
+    it('las URLs históricas redirigen en el middleware (307 real, antes de renderizar)', () => {
+        // Un redirect() en page.tsx salta con la carcasa de loading.tsx ya
+        // enviada y React lo degrada a redirección de cliente («Switched to
+        // client rendering»: sin JS la ficha se queda en «Cargando…» para
+        // siempre; run CI 11603, e2e/research-controls-hydration.spec.ts).
+        const mw = readFileSync('middleware.ts', 'utf8');
+        assert.match(mw, /legacyResearchRedirect\(request\.nextUrl\.pathname, request\.nextUrl\.search\)/);
+        assert.match(mw, /NextResponse\.redirect\(new URL\(researchTarget, request\.url\), 307\)/);
+        const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+        assert.ok(!page.includes('canonicalViewUrl('), 'la página ya no redirige ?view=: lo hace el middleware');
+    });
+    it('legacyResearchRedirect: mapeo, conservación de parámetros y exclusiones', () => {
+        assert.equal(legacyResearchRedirect('/research/MSFT', '?view=thesis'), '/research/MSFT?view=tesis');
+        assert.equal(legacyResearchRedirect('/research/MSFT', '?view=tesis'), null);
+        assert.equal(legacyResearchRedirect('/research/MSFT', ''), null);
+        assert.equal(legacyResearchRedirect('/research/MSFT', '?view=moat&chat=abc'), '/research/MSFT?view=valoracion&chat=abc#foso');
+        assert.equal(legacyResearchRedirect('/research/MSFT', '?view=numeros'), '/research/MSFT?view=finanzas');
+        assert.equal(legacyResearchRedirect('/research/MSFT', '?view=overview'), '/research/MSFT');
+        assert.equal(legacyResearchRedirect('/research/MSFT', '?view=no-existe'), null);
+        assert.equal(legacyResearchRedirect('/research/MSFT/financial-terminal', '?metrics=revenue&years=5&foo=1'), '/research/MSFT?view=finanzas&metrics=revenue&years=5#terminal');
+        assert.equal(legacyResearchRedirect('/research/MSFT/share-capital', ''), '/research/MSFT?view=finanzas#dilucion');
+        // La tesis imprimible pública y el resto de subrutas NO se tocan.
+        assert.equal(legacyResearchRedirect('/research/MSFT/tesis', ''), null);
+        assert.equal(legacyResearchRedirect('/research/MSFT/filings', ''), null);
+        assert.equal(legacyResearchRedirect('/research', '?view=thesis'), null);
+        assert.equal(legacyResearchRedirect('/portfolio', '?view=thesis'), null);
+    });
     it('la página compone cada pestaña como secciones seguidas con título y ancla', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        // Redirect canónico antes de resolver la vista, conservando parámetros.
-        assert.match(page, /const canonicalView = canonicalViewUrl\(ticker, query\.view\);/);
-        assert.match(page, /search\.set\(key, value\)/, 'conserva ?chat=, ?pagina= y los controles del terminal');
         // Las seis pestañas con sus secciones.
         for (const anchor of ['financieros', 'terminal', 'dilucion', 'valoracion', 'modelo', 'supuestos', 'oportunidad', 'comparables', 'foso', 'cambios', 'superinversores', 'directiva', 'lecciones', 'documentos', 'fuentes', 'chat']) {
             const inline = page.includes(`id: '${anchor}'`);
