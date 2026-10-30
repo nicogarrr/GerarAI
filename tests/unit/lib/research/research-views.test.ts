@@ -134,3 +134,11 @@ describe('legacy research middleware routes', () => {
         expect(legacyResearchRedirect('/research/AAPL', '?view=thesis')).toBe('/research/AAPL?view=tesis');
     });
 });
+
+describe('legacyResearchRedirect con URL mal codificada', () => {
+  it('no lanza con un % mal formado (el middleware daría 500)', () => {
+    expect(() => legacyResearchRedirect('/research/%E0', '?view=thesis')).not.toThrow();
+    expect(legacyResearchRedirect('/research/%E0', '?view=thesis')).toBeNull();
+    expect(legacyResearchRedirect('/research/%E0/share-capital', '')).toBeNull();
+  });
+});
