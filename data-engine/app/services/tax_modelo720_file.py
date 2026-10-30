@@ -55,6 +55,9 @@ from app.services.tax_modelo720_service import Modelo720Service
 
 RECORD_LEN = 500
 CODING = "iso-8859-1"
+# Vocales acentuadas (mayúsculas, tras upper()) -> sin acento. Ñ y Ç se
+# conservan: la spec las admite.
+_SIN_ACENTOS = str.maketrans("ÁÀÂÄÃÉÈÊËÍÌÎÏÓÒÔÖÕÚÙÛÜ", "AAAAAEEEEIIIIOOOOOUUUU")
 
 
 def _text(value: str, length: int, align_right: bool = False, zero_pad: bool = False) -> str:
@@ -64,12 +67,14 @@ def _text(value: str, length: int, align_right: bool = False, zero_pad: bool = F
     (ISO-8859-1); los caracteres de control se sustituyen por espacio ANTES
     de recortar para no desplazar columnas.
     """
+    # Primero mayúsculas y vocales sin acento, DESPUÉS el filtro: antes se
+    # filtraba primero y "Muñoz Pérez José" salía "MU OZ P REZ JOS" (la ñ y
+    # las vocales acentuadas en minúscula no son ASCII imprimible).
+    clean = str(value).upper().translate(_SIN_ACENTOS)
     clean = "".join(
         ch if " " <= ch <= "~" or ch in "ÑÇ" else " "
-        for ch in str(value)
-    ).upper()
-    # Transliteración mínima de acentuadas a ASCII (spec: sin vocales acentuadas).
-    clean = clean.translate(str.maketrans("ÁÉÍÓÚÜ", "AEIOUU"))
+        for ch in clean
+    )
     clean = clean[:length]
     if align_right:
         return clean.rjust(length, "0" if zero_pad else " ")
