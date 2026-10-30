@@ -196,7 +196,7 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
                             <CompanyLogo ticker={tx.symbol} name={tx.symbol} className="size-7 shrink-0 rounded-md" />
                             <Link
                               href={`/research/${tx.symbol}`}
-                              className="font-bold text-gray-200 hover:text-teal-300 transition-colors"
+                              className="inline-flex min-h-[44px] items-center font-bold text-gray-200 hover:text-teal-300 transition-colors"
                             >
                               {tx.symbol}
                             </Link>

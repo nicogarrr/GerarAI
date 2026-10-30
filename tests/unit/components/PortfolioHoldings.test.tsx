@@ -254,3 +254,12 @@ describe('PortfolioHoldings cabecera', () => {
         expect(note.tagName).toBe('P');
     });
 });
+
+describe('PortfolioHoldings: objetivo táctil del ticker en móvil', () => {
+    it('el enlace del ticker de la tarjeta móvil mide 44 px', () => {
+        render(<PortfolioHoldings holdings={[holding()]} userId="u" />);
+        const links = screen.getAllByRole('link').filter((a) => a.getAttribute('href')?.startsWith('/research/'));
+        const mobile = links.find((a) => !a.closest('table'));
+        expect(mobile?.className).toMatch(/min-h-\[44px\]/);
+    });
+});
