@@ -1,7 +1,7 @@
 # ============================================================
 # Docker Compose - Produccion personal (Oracle Ampere Always Free)
 # ============================================================
-# Una sola VM ARM64 (2 OCPU / 12 GB RAM, Always Free sin upgrade), un solo usuario.
+# Una sola VM ARM64 (4 OCPU / 24 GB RAM, Always Free sin upgrade), un solo usuario.
 # El frontend vive en Vercel Hobby; la auth en MongoDB Atlas (M0 gratis), asi
 # que aqui NO va ni frontend ni MongoDB.
 #
