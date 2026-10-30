@@ -279,7 +279,9 @@ def market_quote(symbol: str) -> dict:
     símbolo para no golpear Yahoo en bucles (watchlist, overview).
     """
     normalized = symbol.strip().upper()
-    if not normalized:
+    # Un simbolo con caracteres de control ("%00") rompia la URL de Yahoo en
+    # httpx (InvalidURL -> 500). Nunca hay cotizacion para eso: 404.
+    if not normalized or not normalized.isprintable() or len(normalized) > 32:
         raise HTTPException(status_code=404, detail="Sin cotización disponible")
     now = time.monotonic()
     with _quote_cache_lock:
@@ -388,7 +390,7 @@ def market_candles(
     (símbolo, resolución, rango horario).
     """
     normalized = symbol.strip().upper()
-    if not normalized or to_ts <= from_ts:
+    if not normalized or not normalized.isprintable() or len(normalized) > 32 or to_ts <= from_ts:
         raise HTTPException(status_code=404, detail="Sin velas disponibles")
     interval = _YAHOO_INTERVAL_BY_RESOLUTION[resolution]
     # El rango exacto cambia en cada petición; se agrupa por hora de fin para
