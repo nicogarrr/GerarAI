@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export const metadata: Metadata = {
-  title: 'Mercado',
+  title: 'Explorar acciones',
   description:
     'Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline con Finnhub.',
 };
@@ -95,7 +95,7 @@ async function MoversVista({ vista }: { vista: Exclude<Vista, 'empresas'> }) {
     if (!moversResult.data) throw moversResult.error;
   } catch (error) {
     if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature="Mercado" retryHref={`/screener?vista=${vista}`} />;
+      return <BackendOffline feature="Explorar acciones" retryHref={`/screener?vista=${vista}`} />;
     }
     throw error;
   }
@@ -285,14 +285,14 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                   (display block + etiquetas por celda) y desde md como tabla.
                 */}
                 <table className="w-full text-sm">
-                  <caption className="sr-only">Oportunidades del screener por sector: ticker, nombre, precio, cambio de sesión, market cap y acción de seguir</caption>
+                  <caption className="sr-only">Oportunidades del screener por sector: ticker, nombre, precio, cambio de sesión, capitalización y acción de seguir</caption>
                   <thead className="hidden md:table-header-group">
                     <tr className="border-b border-gray-800 text-left text-gray-400">
                       <th className="pb-3 pr-4" scope="col">Ticker</th>
                       <th className="pb-3 pr-4" scope="col">Nombre</th>
                       <th className="pb-3 pr-4 text-right" scope="col">Precio</th>
                       <th className="pb-3 pr-4 text-right" scope="col">Cambio sesión</th>
-                      <th className="pb-3 pr-4 text-right" scope="col">Market Cap</th>
+                      <th className="pb-3 pr-4 text-right" scope="col">Capitalización</th>
                       <th className="pb-3 text-right" scope="col">Seguir</th>
                     </tr>
                   </thead>
@@ -327,7 +327,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                           </span>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
-                          <span className="text-xs text-gray-500 md:hidden">Market Cap</span>
+                          <span className="text-xs text-gray-500 md:hidden">Capitalización</span>
                           <span className="font-mono text-gray-300">
                             {r.marketCap != null && r.marketCap > 0 ? screenerMarketCap(r.marketCap) : 'N/D'}
                           </span>

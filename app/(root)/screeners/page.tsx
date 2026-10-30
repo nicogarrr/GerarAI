@@ -19,12 +19,13 @@ import {
   type ScreenResult,
 } from '@/lib/actions/research-tools.actions';
 import BackendOffline from '@/components/system/BackendOffline';
+import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import { SubmitButton } from '@/components/screeners/SubmitButton';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getErrorMessage } from '@/lib/types/errors';
 import { formatDate, formatNumber, formatPercent, NA, NO_CORRIDO } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
-import { formatScreenCriterionValue, formatScreenRank } from '@/lib/screener-results';
+import { formatScreenCriterionRight, formatScreenCriterionValue, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel } from '@/lib/screener-results';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -35,18 +36,40 @@ export const metadata: Metadata = {
     'Fórmulas seguras contra el motor de análisis, con cobertura, confianza y ranking; filtros guardados y métricas personalizadas.',
 };
 
-type PageProps = { searchParams: Promise<{ left?: string; operator?: string; right?: string; ranking?: string; direction?: string }> };
+type PageProps = { searchParams: Promise<{ left?: string; operator?: string; right?: string; ranking?: string; direction?: string; pagina?: string }> };
 const operators: ScreenCriterion['operator'][] = ['>', '>=', '<', '<=', '==', '!='];
 
-function Results({ result }: { result: ScreenResult }) {
+const RESULTS_PAGE_SIZE = 25;
+
+function Results({ result, page, pageHref }: { result: ScreenResult; page: number; pageHref: (target: number) => string }) {
   const newMatches = new Set(result.new_match_company_ids ?? []);
+  const matchedRows = result.results.filter(row => row.matched);
+  // Paginación (preferencia del usuario) en vez de una tabla sin fin: el
+  // móvil nunca ve una página de 980 px con scroll oculto.
+  const totalPages = Math.max(1, Math.ceil(matchedRows.length / RESULTS_PAGE_SIZE));
+  const currentPage = Math.min(totalPages, Math.max(1, page));
+  const pageRows = matchedRows.slice((currentPage - 1) * RESULTS_PAGE_SIZE, currentPage * RESULTS_PAGE_SIZE);
   return (
     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center"><div><h2 className="text-lg font-semibold text-gray-100">Resultados del filtro</h2><p className="text-sm text-gray-500">{formatNumber(result.match_count, { maximumFractionDigits: 0 })} {result.match_count === 1 ? 'coincidencia' : 'coincidencias'} en {formatNumber(result.company_count, { maximumFractionDigits: 0 })} {result.company_count === 1 ? 'empresa' : 'empresas'}</p></div>{result.ranking_formula ? <Badge className="md:ml-auto" variant="outline">ranking: {result.ranking_formula} · {result.ranking_direction}</Badge> : null}</div>
-      {result.metrics_without_data && result.metrics_without_data.length > 0 ? <p className="mb-3 rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">Ninguna empresa tiene dato de: {result.metrics_without_data.join(', ')}. Revisa el nombre de la métrica; el filtro no puede coincidir con ella.</p> : null}
-      <div aria-label="Resultados del filtro" className="overflow-x-auto" role="region" tabIndex={0}><table className="w-full min-w-[980px] text-left text-sm"><caption className="sr-only">Empresas que cumplen el filtro, con los criterios que cumple, ranking, cobertura de datos y confianza</caption><thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Empresa</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Coincidencia</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap text-right" scope="col">Ranking</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap text-right" scope="col">Cobertura</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap text-right" scope="col">Confianza</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Últimos datos</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Faltantes</th></tr></thead><tbody>
-        {result.results.filter(row => row.matched).map((row) => <tr className="border-b border-gray-900" key={row.company_id}><th className="py-3 text-left text-sm font-normal" scope="row"><Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>{row.ticker}</Link><div className="text-xs text-gray-500">{row.name}</div></th><td className="py-3 text-xs text-gray-300"><ul className="flex flex-col gap-1">{row.criteria.map((criterion, index) => <li className="whitespace-nowrap" key={index}><span className="font-medium text-teal-300">{criterion.left} {formatScreenCriterionValue(criterion.left_value)}</span> <span className="text-gray-500">{criterion.operator} {criterion.right}</span></li>)}</ul>{newMatches.has(row.company_id) ? <Badge className="mt-1">{t('screener.newMatch')}</Badge> : null}</td><td className="py-3 text-right text-gray-300">{formatScreenRank(row.rank_value, result.ranking_formula)}</td><td className="py-3 text-right text-gray-300">{formatPercent(row.coverage_percent, { fromRatio: false, digits: 0 })}</td><td className="py-3 text-right text-gray-300">{formatPercent(Number(row.confidence), { digits: 0 })}</td><td className="py-3 text-gray-500">{row.latest_data_at ? formatDate(row.latest_data_at) : NA}</td><td className="py-3 text-amber-300">{row.missing_fields.join(', ') || NA}</td></tr>)}
-      </tbody></table></div>
+      {result.metrics_without_data && result.metrics_without_data.length > 0 ? <p className="mb-3 rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">Ninguna empresa tiene dato de: {screenMissingFieldsLabel(result.metrics_without_data)}. Revisa el nombre de la métrica; el filtro no puede coincidir con ella.</p> : null}
+      {/*
+        Misma <table> en el DOM en todos los viewports (accesibilidad): en <md
+        cada fila es una tarjeta apilada con etiquetas por dato; desde md es
+        tabla con scroll horizontal ANUNCIADO (OverflowScrollRegion).
+      */}
+      <OverflowScrollRegion label="Resultados del filtro">
+        <table className="w-full text-left text-sm md:min-w-[980px]"><caption className="sr-only">Empresas que cumplen el filtro, con los criterios que cumple, ranking, cobertura de datos y confianza</caption><thead className="hidden text-xs uppercase text-gray-500 md:table-header-group"><tr><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Empresa</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Coincidencia</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap text-right" scope="col">Ranking</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap text-right" scope="col">Cobertura</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap text-right" scope="col">Confianza</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Últimos datos</th><th className="border-b border-gray-800 px-3 py-2 whitespace-nowrap" scope="col">Faltantes</th></tr></thead><tbody className="block space-y-3 md:table-row-group md:space-y-0">
+        {pageRows.map((row) => <tr className="block rounded-xl border border-gray-800 bg-gray-900/40 p-4 md:table-row md:rounded-none md:border-0 md:border-b md:border-gray-900 md:bg-transparent md:p-0" key={row.company_id}><th className="block py-1 text-left text-sm font-normal md:table-cell md:px-3 md:py-3" scope="row"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Empresa</span><Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/research/${row.ticker}`}>{row.ticker}</Link><div className="text-xs text-gray-500">{row.name}</div></th><td className="block py-1 text-xs text-gray-300 md:table-cell md:px-3 md:py-3"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Coincidencia</span><ul className="flex flex-col gap-1">{row.criteria.map((criterion, index) => <li key={index}><span className="font-medium text-teal-300">{screenCriterionMetricLabel(criterion.left)} {formatScreenCriterionValue(criterion.left_value)}</span> <span className="text-gray-500">{criterion.operator} {formatScreenCriterionRight(criterion.right)}</span></li>)}</ul>{newMatches.has(row.company_id) ? <Badge className="mt-1">{t('screener.newMatch')}</Badge> : null}</td><td className="block py-1 text-gray-300 md:table-cell md:px-3 md:py-3 md:text-right"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Ranking</span>{formatScreenRank(row.rank_value, result.ranking_formula)}</td><td className="block py-1 text-gray-300 md:table-cell md:px-3 md:py-3 md:text-right"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Cobertura</span>{formatPercent(row.coverage_percent, { fromRatio: false, digits: 0 })}</td><td className="block py-1 text-gray-300 md:table-cell md:px-3 md:py-3 md:text-right"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Confianza</span>{formatPercent(Number(row.confidence), { digits: 0 })}</td><td className="block py-1 text-gray-500 md:table-cell md:px-3 md:py-3"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Últimos datos</span>{row.latest_data_at ? formatDate(row.latest_data_at) : NA}</td><td className="block py-1 text-amber-300 md:table-cell md:px-3 md:py-3"><span className="mb-0.5 block text-xs uppercase text-gray-500 md:hidden">Faltantes</span>{row.missing_fields.length ? screenMissingFieldsLabel(row.missing_fields) : NA}</td></tr>)}
+      </tbody></table>
+      </OverflowScrollRegion>
+      {totalPages > 1 ? (
+        <nav aria-label="Paginación de resultados" className="mt-4 flex items-center gap-2 text-sm text-gray-400">
+          {currentPage > 1 ? <Link className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-gray-300 hover:bg-gray-800" href={pageHref(currentPage - 1)}>Anterior</Link> : null}
+          <span>Página {formatNumber(currentPage, { maximumFractionDigits: 0 })} de {formatNumber(totalPages, { maximumFractionDigits: 0 })}</span>
+          {currentPage < totalPages ? <Link className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm text-gray-300 hover:bg-gray-800" href={pageHref(currentPage + 1)}>Siguiente</Link> : null}
+        </nav>
+      ) : null}
       <p className="mt-3 text-xs text-gray-500">Solo se muestran coincidencias. {formatNumber(result.company_count - result.match_count, { maximumFractionDigits: 0 })} empresas no cumplen el filtro.</p>
     </section>
   );
@@ -54,6 +77,19 @@ function Results({ result }: { result: ScreenResult }) {
 
 export default async function ScreenersPage({ searchParams }: PageProps) {
   const query = await searchParams;
+  // Página de resultados (?pagina=N); los enlaces conservan el filtro intacto.
+  const parsedPage = Number(query.pagina);
+  const requestedPage = Number.isInteger(parsedPage) && parsedPage >= 1 ? Math.floor(parsedPage) : 1;
+  const resultsPageHref = (target: number) => {
+    const params = new URLSearchParams();
+    for (const key of ['left', 'operator', 'right', 'ranking', 'direction'] as const) {
+      const value = query[key];
+      if (value) params.set(key, value);
+    }
+    if (target > 1) params.set('pagina', String(target));
+    const qs = params.toString();
+    return qs ? `/screeners?${qs}` : '/screeners';
+  };
   const operator = operators.includes(query.operator as ScreenCriterion['operator']) ? query.operator as ScreenCriterion['operator'] : '>=';
   let workspace: Awaited<ReturnType<typeof getScreenerWorkspace>>;
   try {
@@ -109,7 +145,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
           <p className="mt-1">{screenError}</p>
         </div>
       ) : null}
-      {result ? <Results result={result} /> : null}
+      {result ? <Results page={requestedPage} pageHref={resultsPageHref} result={result} /> : null}
 
       <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2"><Filter aria-hidden="true" className="h-5 w-5 text-teal-300" /><h2 className="font-semibold text-gray-100">Ejecutar un filtro ad-hoc</h2></div>
