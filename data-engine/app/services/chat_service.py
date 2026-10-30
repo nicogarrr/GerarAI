@@ -1819,7 +1819,7 @@ class ChatService:
         rows.sort(key=keyfn, reverse=highest)
         pos, comp = rows[0]
         cur = currencies[0]
-        amount = _fmt_number_es(keyfn(rows[0]), 2)
+        amount = _fmt_money_es(keyfn(rows[0]))
         word = "más alto" if highest else "más bajo"
         weight_text = ""
         if key_name == "value":
@@ -1829,7 +1829,7 @@ class ChatService:
         answer = f"Tu posición con el {label} {word} es {comp.ticker}: {amount} {_currency_display(cur)}{weight_text}."
         if len(rows) > 1:
             nxt_pos, nxt = rows[1]
-            answer += f" Le sigue {nxt.ticker} con {_fmt_number_es(keyfn(rows[1]), 2)} {_currency_display(cur)}."
+            answer += f" Le sigue {nxt.ticker} con {_fmt_money_es(keyfn(rows[1]))} {_currency_display(cur)}."
         return ChatResponse(
             answer=answer,
             sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],

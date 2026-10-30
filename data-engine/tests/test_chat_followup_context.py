@@ -271,3 +271,32 @@ def test_empresa_sin_autor_en_la_pregunta_sigue_igual(db):
         ChatService().answer(db, "¿cuánta deuda tiene ASTS?", "portfolio", None, use_jev=False)
     )
     assert "180" in resp.answer
+
+
+def test_ranking_cartera_coste_medio_con_decimales_fijos(db):
+    a = _company(db, "AAA", "Alpha")
+    b = _company(db, "BBB", "Beta")
+    db.add(Position(tenant_id=1, company_id=a.id, quantity=Decimal("50"),
+                    average_cost=Decimal("25.10"), market_value=Decimal("600")))
+    db.add(Position(tenant_id=1, company_id=b.id, quantity=Decimal("10"),
+                    average_cost=Decimal("5"), market_value=Decimal("100")))
+    db.commit()
+    history = _history(("qué tengo en mi cartera", "Tu cartera guardada tiene 2 posiciones abiertas"))
+    resp = asyncio.run(
+        ChatService().answer(db, "¿cuál tiene el coste medio más alto?", "portfolio", None,
+                             history=history, use_jev=False)
+    )
+    assert "25,10 USD" in resp.answer
+    assert "5,00 USD" in resp.answer
+
+
+def test_dividendos_cobro_es_pregunta_de_cartera(db):
+    c = _company(db)
+    db.add(Position(tenant_id=1, company_id=c.id, quantity=Decimal("50"),
+                    average_cost=Decimal("25.10"), market_value=Decimal("600")))
+    db.commit()
+    resp = asyncio.run(
+        ChatService().answer(db, "¿cuándo cobro dividendos?", "portfolio", None, use_jev=False)
+    )
+    assert resp.prompt_version == "brain-data-v1"
+    assert "dividendos guardados de tus posiciones" in resp.answer
