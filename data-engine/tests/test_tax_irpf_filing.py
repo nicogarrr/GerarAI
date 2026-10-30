@@ -281,6 +281,53 @@ def test_double_taxation_with_manual_tme_computes_deduction():
     assert result["countries"][0]["deduction_base"] == 10.0
 
 
+def test_double_taxation_limit_is_gross_times_tme_like_hacienda():
+    # A15 (Nico 30-10-2026: «como Hacienda»). Límite (b) = TME del ahorro ×
+    # dividendo ÍNTEGRO (no neto). Valores derivados a mano:
+    #   bruto 100, retenido 15 (EE. UU., tope 15 % = 15)
+    #   TME 20 %: 100 × 0,20 = 20 → min(15, 20) = 15, manda el tope del convenio
+    #   TME 10 %: 100 × 0,10 = 10 → min(15, 10) = 10, manda bruto × TME
+    dividends = [{
+        "ticker": "MSFT", "dividends_base": 100.0, "withholding_base": 15.0,
+        "missing_fx": False, "payments": [],
+    }]
+    out = build_double_taxation(dividends, {"MSFT": "US"}, 2025, tme=Decimal("0.20"))
+    assert out["limit_basis"] == "bruto_x_tme_por_pais"
+    us = out["countries"][0]
+    assert (us["treaty_cap_base"], us["tme_limit_base"], us["deduction_base"]) == (15.0, 20.0, 15.0)
+    assert us["limit_applied"] == "tope_convenio"
+    out = build_double_taxation(dividends, {"MSFT": "US"}, 2025, tme=Decimal("0.10"))
+    us = out["countries"][0]
+    assert (us["tme_limit_base"], us["deduction_base"]) == (10.0, 10.0)
+    assert us["limit_applied"] == "bruto_x_tme"
+    # Sin TME: el límite (b) no se inventa.
+    out = build_double_taxation(dividends, {"MSFT": "US"}, 2025)
+    assert out["countries"][0]["tme_limit_base"] is None
+    assert out["countries"][0]["limit_applied"] is None
+
+
+def test_double_taxation_tme_limit_applies_per_country():
+    # Cada convenio limita la deducción a la parte del impuesto español de la
+    # renta obtenida en ESE Estado (España-EE.UU., BOE-A-1990-30940, art.
+    # 24.1.a). A mano, TME 12 %:
+    #   EE. UU.: bruto 100, retenido 15, tope 15 % = 15; 100 × 0,12 = 12 → 12
+    #   China:   bruto 100, retenido 10, tope 10 % = 10; 100 × 0,12 = 12 → 10
+    #   total 22 (agregando países saldría min(25, 24) = 24: no se agrega)
+    dividends = [
+        {"ticker": "MSFT", "dividends_base": 100.0, "withholding_base": 15.0,
+         "missing_fx": False, "payments": []},
+        {"ticker": "CHN", "dividends_base": 100.0, "withholding_base": 10.0,
+         "missing_fx": False, "payments": []},
+    ]
+    out = build_double_taxation(
+        dividends, {"MSFT": "US", "CHN": "CN"}, 2025, tme=Decimal("0.12")
+    )
+    by = {c["country"]: c for c in out["countries"]}
+    assert (by["US"]["tme_limit_base"], by["US"]["deduction_base"], by["US"]["limit_applied"]) == (12.0, 12.0, "bruto_x_tme")
+    assert (by["CN"]["tme_limit_base"], by["CN"]["deduction_base"], by["CN"]["limit_applied"]) == (12.0, 10.0, "tope_convenio")
+    assert out["total_deduction_base"] == 22.0
+
+
 def test_double_taxation_country_without_verified_treaty_is_manual_review():
     dividends = [{
         "ticker": "KRZ", "dividends_base": 100.0, "withholding_base": 25.0,

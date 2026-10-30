@@ -87,6 +87,31 @@ describe('FilingSection con datos', () => {
         expect(screen.getByText(/Falta el tipo medio efectivo/)).toBeInTheDocument();
     });
 
+    it('A15: desglose 0588 por país con el límite bruto × TME de Hacienda', () => {
+        // 100 bruto EE. UU., 15 retenido, TME 10 %: min(15, 100 × 0,10) = 10.
+        renderFiling(filing({ double_taxation: {
+            status: 'calculada_con_tme_manual', total_deduction_base: 10, spanish_withholding_base: { amount: 0 },
+            countries: [{ country: 'US', gross_base: 100, withheld_base: 15, treaty_rate: 0.15, treaty_cap_base: 15,
+                tme_limit_base: 10, limit_applied: 'bruto_x_tme', deduction_base: 10 }],
+        } }));
+        const item = screen.getByRole('list', { name: 'Deducción 0588 por país' });
+        expect(item.textContent).toMatch(/US: bruto 100,00\s€/);
+        expect(item.textContent).toMatch(/bruto × TME 10,00\s€/);
+        expect(item.textContent).toMatch(/deducción 10,00\s€ \(manda bruto × TME\)/);
+        expect(screen.getByText(/TME del ahorro aplicado al dividendo íntegro/)).toBeInTheDocument();
+    });
+
+    it('A15: sin TME el desglose no inventa el límite', () => {
+        renderFiling(filing({ double_taxation: {
+            status: 'pendiente_tme', spanish_withholding_base: { amount: 0 },
+            countries: [{ country: 'US', gross_base: 100, withheld_base: 15, treaty_rate: 0.15, treaty_cap_base: 15,
+                tme_limit_base: null, limit_applied: null, deduction_base: null }],
+        } }));
+        const item = screen.getByRole('list', { name: 'Deducción 0588 por país' });
+        expect(item.textContent).toMatch(/bruto × TME falta el TME/);
+        expect(item.textContent).toMatch(/deducción N\/D/);
+    });
+
     it('interes de margen solo aparece si es positivo y avisa de que no se resta', () => {
         const { unmount } = renderFiling(filing({ intereses: { received: { amount_base: 1 }, margin_interest_paid: { amount_base: 0 } } }));
         expect(screen.queryByText(/Intereses de margen pagados/)).not.toBeInTheDocument();

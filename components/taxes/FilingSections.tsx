@@ -102,6 +102,46 @@ function Chip({ status }: { status: string }) {
     );
 }
 
+function percent(value: unknown): string {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? `${(value * 100).toLocaleString('es-ES', { maximumFractionDigits: 2 })} %`
+        : NA;
+}
+
+/**
+ * Desglose de la casilla 0588 por país (A15, criterio de Hacienda): para
+ * cada país, el menor entre la retención con tope del convenio y el TME del
+ * ahorro aplicado al dividendo ÍNTEGRO. Sin TME no se inventa el límite.
+ */
+function DoubleTaxationByCountry({ countries }: { countries: DataRecord[] }) {
+    if (countries.length === 0) return null;
+    return (
+        <div className="mt-3 space-y-1 text-xs leading-5 text-gray-400">
+            <p>
+                Límite de la deducción (art. 80 LIRPF, como lo aplica Hacienda): por país, el menor entre la retención
+                soportada con el tope del convenio y el TME del ahorro aplicado al dividendo íntegro (bruto).
+            </p>
+            <ul aria-label="Deducción 0588 por país" className="space-y-1">
+                {countries.map((c) => {
+                    const tmeLimit = c.tme_limit_base == null
+                        ? 'falta el TME'
+                        : money(c.tme_limit_base);
+                    const applied = c.limit_applied === 'bruto_x_tme'
+                        ? ' (manda bruto × TME)'
+                        : c.limit_applied === 'tope_convenio' ? ' (manda el tope del convenio)' : '';
+                    return (
+                        <li key={String(c.country)}>
+                            {String(c.country)}: bruto {money(c.gross_base)} · retenido {money(c.withheld_base)} · tope
+                            convenio ({percent(c.treaty_rate)}) {money(c.treaty_cap_base)} · bruto × TME {tmeLimit} ·
+                            deducción {c.deduction_base == null ? NA : money(c.deduction_base)}{applied}
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+}
+
 function WarningList({ items }: { items: string[] }) {
     if (items.length === 0) return null;
     return (
@@ -236,6 +276,7 @@ export function FilingSection({ filing, year, onPreview, onReset }: {
                     />
                 )}
             </div>
+            <DoubleTaxationByCountry countries={Array.isArray(dt.countries) ? dt.countries as DataRecord[] : []} />
             {dt.partial === true && <p className="mt-2 text-xs text-amber-300">N/D en la deducción total: hay pagos que requieren revisión manual.</p>}
             {typeof filing.tme_percent_manual === 'number' && <Row label="TME manual aplicado (%)" value={String(filing.tme_percent_manual)} />}
             <TmePreviewForm key={filingSectionKey('tme-preview', year)} year={year} onPreview={onPreview} onReset={onReset} />
