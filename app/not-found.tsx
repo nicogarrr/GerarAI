@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import AuthenticatedLayout from './(root)/layout';
+import { headers } from 'next/headers';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { readSessionWhenCookies } from '@/lib/anonymous-session';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
 
 export const metadata: Metadata = { title: 'Página no encontrada' };
@@ -41,9 +43,25 @@ function NotFoundContent() {
   );
 }
 
+/**
+ * Next renderiza este 404 raíz de forma anticipada dentro de la respuesta de
+ * TODAS las páginas (es el límite notFound del layout raíz), no solo cuando la
+ * ruta no existe. Sin Cookie no hay sesión que leer: consultar Mongo aquí hacía
+ * que `/`, `/sign-in` y `/metodologia` no terminaran de enviarse hasta que la
+ * conexión a la base de datos fallaba (30 s con Mongo caído) y añadía una
+ * lectura de sesión a cada visita anónima. El bypass de e2e conserva su
+ * usuario sintético sin cookie.
+ */
+async function resolveNotFoundAuthenticated(): Promise<boolean> {
+  const browserTestBypass =
+    process.env.E2E_AUTH_BYPASS === '1' && process.env.NODE_ENV !== 'production' && process.env.APP_ENV === 'test';
+  const readUser = () => requireAuthenticatedUser().then(() => true, () => false /* Public 404 stays public. */);
+  if (browserTestBypass) return readUser();
+  return (await readSessionWhenCookies(await headers(), readUser)) ?? false;
+}
+
 export default async function NotFound() {
-  let authenticated = false;
-  try { await requireAuthenticatedUser(); authenticated = true; } catch { /* Public 404 stays public. */ }
+  const authenticated = await resolveNotFoundAuthenticated();
   if (authenticated) return <AuthenticatedLayout><NotFoundContent /></AuthenticatedLayout>;
   return <div className="min-h-dvh text-gray-300">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 px-4 py-3">
