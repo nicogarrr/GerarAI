@@ -88,7 +88,7 @@ export default async function LettersPage({ searchParams }: PageProps) {
                                 const year = titleYear(letter.title);
                                 return (
                                     <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3" key={letter.id}>
-                                        <span className="min-w-0 text-sm text-gray-200">{letter.title}</span>
+                                        <Link className="min-w-0 text-sm text-gray-200 hover:text-teal-200 hover:underline" href={`/inversores/cartas/${letter.id}`}>{letter.title}</Link>
                                         <span className="flex items-center gap-4">
                                             <Link className={LINK} href={`/inversores/cartas/${letter.id}`}>
                                                 Leer
