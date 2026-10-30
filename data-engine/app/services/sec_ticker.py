@@ -24,17 +24,37 @@ def normalize_sec_ticker(ticker: str) -> str:
     return _SEPARATORS.sub("", ticker).upper()
 
 
+class CikIndex:
+    """Indice ticker -> CIK construido UNA vez sobre ``company_tickers.json``.
+
+    Misma politica que :func:`match_cik` (exacto primero, el primero que
+    aparece gana; normalizado solo si es unico), pero cada busqueda es O(1)
+    en vez de recorrer los ~10.000 emisores.
+    """
+
+    __slots__ = ("_exact", "_normalized")
+
+    def __init__(self, entries: Iterable[tuple[str, str]]) -> None:
+        self._exact: dict[str, str] = {}
+        self._normalized: dict[str, set[str]] = {}
+        for ticker, cik in entries:
+            ticker, cik = str(ticker), str(cik)
+            self._exact.setdefault(ticker.upper(), cik)
+            self._normalized.setdefault(normalize_sec_ticker(ticker), set()).add(cik)
+
+    def lookup(self, wanted: str) -> str | None:
+        wanted_upper = wanted.strip().upper()
+        exact = self._exact.get(wanted_upper)
+        if exact is not None:
+            return exact
+        matches = self._normalized.get(normalize_sec_ticker(wanted_upper), set())
+        return next(iter(matches)) if len(matches) == 1 else None
+
+
 def match_cik(entries: Iterable[tuple[str, str]], wanted: str) -> str | None:
     """CIK para ``wanted`` dentro de pares (ticker_sec, cik), o None.
 
     Exacto primero; normalizado solo si es único. Los CIK se devuelven tal
     cual llegan (el caller decide el padding).
     """
-    pairs = [(str(ticker), str(cik)) for ticker, cik in entries]
-    wanted_upper = wanted.strip().upper()
-    for ticker, cik in pairs:
-        if ticker.upper() == wanted_upper:
-            return cik
-    wanted_norm = normalize_sec_ticker(wanted_upper)
-    matches = {cik for ticker, cik in pairs if normalize_sec_ticker(ticker) == wanted_norm}
-    return next(iter(matches)) if len(matches) == 1 else None
+    return CikIndex(entries).lookup(wanted)
