@@ -75,6 +75,8 @@ def select_candidates(db: Session, now: datetime, limit: int) -> list[str]:
         .where(NewsEvent.date >= since,
             NewsEvent.date <= _utc(now),  # nunca evidencia con fecha futura
             NewsEvent.materiality_score >= MIN_MATERIALITY,
+            # Ownership disclosure is information, never a trade proposal seed.
+            NewsEvent.event_type != "ownership_disclosure",
             *tenant_filters(db, NewsEvent))
         .group_by(Company.ticker)
         .order_by(func.max(NewsEvent.materiality_score).desc(), func.count(NewsEvent.id).desc(), Company.ticker)
