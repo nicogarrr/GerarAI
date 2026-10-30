@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useSyncExternalStore } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Download, FileText, Receipt, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -319,6 +320,13 @@ function downloadTaxSummary(holdings: DataRecord[], report: DataRecord | null, y
     URL.revokeObjectURL(url);
 }
 
+/** Ejercicio sin actividad: informe con listas vacías (no ausentes) y sin posiciones. */
+function isEmptyTaxYear(report: unknown, holdings: readonly unknown[]): boolean {
+    if (holdings.length > 0 || !report || typeof report !== 'object') return false;
+    const r = report as Record<string, unknown>;
+    return ['dividends', 'realized', 'misc'].every((key) => Array.isArray(r[key]) && (r[key] as unknown[]).length === 0);
+}
+
 export default function TaxesView({ initialHoldings, initialReport, initialThresholds720, initialFile720, initialThresholds720Unavailable, year }: TaxesViewProps) {
     const router = useRouter();
     const [regenerating, setRegenerating] = useState(false);
@@ -335,6 +343,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
     const currentHoldingPage = Math.min(holdingPage, holdingPages - 1);
     const report = reportForYear(override, initialReport, year);
     const staleNotice = staleReportNotice(report);
+    const emptyYear = isEmptyTaxYear(report, initialHoldings);
 
     const handleYearChange = (next: string) => {
         const parsed = Number.parseInt(next, 10);
@@ -410,6 +419,26 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     <Button size="sm" variant="outline" onClick={handleRegenerate} disabled={regenerating}>
                         Regenerar ahora
                     </Button>
+                </div>
+            ) : null}
+            {emptyYear ? (
+                <div
+                    role="status"
+                    data-testid="empty-tax-year"
+                    className="rounded-lg border border-gray-800 bg-surface-1 p-4 text-sm text-gray-300"
+                >
+                    <p>
+                        Aún no hay compras, ventas ni dividendos en {year}, así que el informe sale a cero.
+                        Registra tus operaciones o conecta IBKR y se calculará solo.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                        <Link href="/portfolio?anadir=1" className="inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300 hover:bg-teal-400/20">
+                            Añadir inversión
+                        </Link>
+                        <Link href="/settings" className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-gray-300 hover:bg-gray-800 hover:text-gray-100">
+                            Conectar IBKR
+                        </Link>
+                    </div>
                 </div>
             ) : null}
             <RecordDetail
