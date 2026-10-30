@@ -1145,6 +1145,14 @@ class TaxReportService:
                 }
             )
 
+        # Intereses cobrados (casilla 0027): rendimiento del capital mobiliario
+        # del ahorro. None si alguno no tiene importe en EUR.
+        interest_block = build_interest(misc_rows, fiscal_year)
+        interest_received: Decimal | None = (
+            None if interest_block["incomplete"]
+            # nosemgrep: gerarai-money-none-to-zero -- con incomplete False el importe siempre está calculado
+            else Decimal(str(interest_block["received"]["amount_base"] or 0))
+        )
         dividend_ambiguous = any(b["ambiguous_cash"] for b in dividends)
         dividend_incomplete = any(b["missing_fx"] for b in dividends) or dividend_ambiguous
         realized_incomplete = any(b["missing_fx"] for b in realized)
@@ -1197,7 +1205,9 @@ class TaxReportService:
             # patrimonial solo compensa dividendos hasta el 25 %. Antes era la
             # suma directa (1.000 de dividendos y -10.000 de pérdidas daban
             # -9.000; la base real es 750 y el resto se arrastra).
-            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable) else _money(integrate_savings_base(total_dividends, total_gain)),
+            # El saldo de RCM son dividendos MÁS intereses cobrados (art. 25.2
+            # y 46.b LIRPF), igual que en la compensación de pérdidas.
+            "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable or interest_received is None) else _money(integrate_savings_base(total_dividends + interest_received, total_gain)),
             "dividend_count": len(dividends),
             "unattributed_tickers": sorted(
                 b["ticker"] for b in dividends if b.get("unattributed")
