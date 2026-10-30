@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { getListingAnalystTargets, type ListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
 import { requestCache } from '@/lib/cache/requestCache';
 import { formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
-import { convertWithPortfolioFx, unconvertedTargetLabel, type TargetFxRate } from '@/lib/analyst-target-currency';
+import { convertWithPortfolioFx, sameTargetUnit, unconvertedTargetLabel, type TargetFxRate } from '@/lib/analyst-target-currency';
 
 /**
  * Consenso de precios objetivo de analistas para las listas (watchlist y
@@ -83,9 +83,10 @@ export default function AnalystTargetLine({
             </span>
         );
     }
-    const rowCurrency = currency ? currency.toUpperCase() : null;
-    const currencyMismatch = data.currency !== null && rowCurrency !== null && data.currency !== rowCurrency;
-    const sameCurrency = data.currency !== null && rowCurrency !== null && data.currency === rowCurrency;
+    // Se conserva «GBp» (peniques): en mayúsculas se leía como libras (×100).
+    const rowCurrency = currency ? currency.trim() || null : null;
+    const sameCurrency = data.currency !== null && rowCurrency !== null && sameTargetUnit(data.currency, rowCurrency);
+    const currencyMismatch = data.currency !== null && rowCurrency !== null && !sameCurrency;
     const converted =
         currencyMismatch && data.currency && rowCurrency
             ? convertWithPortfolioFx(data.mean, data.currency, rowCurrency, fxRates, baseCurrency)
