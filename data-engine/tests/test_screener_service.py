@@ -267,3 +267,29 @@ def test_metric_coverage_lists_only_metrics_with_data():
     assert "roic" in coverage
     assert "revenue" in coverage
     assert "wacc" not in coverage
+
+
+
+def test_fcf_per_share_cagr_ignores_quarterly_rows_like_plain_cagr():
+    """Un trimestre ingerido después del anual no es el FCF del año.
+
+    `_cagr` ya filtraba los trimestres; `_ratio_cagr` no, así que el Q3 de
+    2024 (50) sustituía al anual (200) y el CAGR salía negativo.
+    """
+    def fact(fid, metric, value, year, quarter):
+        return FinancialFact(
+            id=fid, company_id=1, metric=metric, value=Decimal(value), period=f"{quarter}{year}",
+            fiscal_year=year, fiscal_quarter=quarter, confidence=Decimal("0.9"),
+        )
+
+    # Orden de la consulta: fiscal_year DESC, id DESC (el más nuevo primero).
+    fcf = [fact(4, "free_cash_flow", "50", 2024, "Q3"), fact(3, "free_cash_flow", "200", 2024, "FY"),
+           fact(1, "free_cash_flow", "100", 2020, "FY")]
+    shares = [fact(5, "shares_diluted", "10", 2024, "FY"), fact(2, "shares_diluted", "10", 2020, "FY")]
+
+    plain = ScreenerService._cagr(fcf)
+    ratio = ScreenerService()._ratio_cagr(fcf, shares)
+
+    expected = (Decimal(2) ** (Decimal(1) / 4)) - 1  # 10 -> 20 por acción en 4 años
+    assert plain is not None and abs(plain.value - expected) < Decimal("0.000001")
+    assert ratio is not None and abs(ratio.value - expected) < Decimal("0.000001")
