@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { Label } from '@/components/ui/label';
-import { formatMoney, formatNumber } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 import { useRouter } from 'next/navigation';
 import type { Currency, OptionContract } from '@/lib/paper-trading/types';
 import { expirationState, isRealDate } from '@/lib/paper-trading/options';
-import { clientOrderIdAfter, NUM_INPUT_HINT, parseEsNumber } from './submit';
+import { clientOrderIdAfter, parseEsNumber } from './submit';
 import type { FillSubmit, SubmitFill } from './submit';
 
 type Kind = 'accion' | 'opcion';
@@ -44,6 +44,8 @@ function newClientOrderId(): string {
  * prueba de divisa): el toggle manual manda.
  */
 export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; disabled?: boolean }) {
+    const ti = useT();
+    const f = useFormat();
     const uid = useId();
     const router = useRouter();
     const clientOrderId = useRef<string>(newClientOrderId());
@@ -108,6 +110,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     // registradas con comisión se conservan; esto no es la tarifa de
     // ningún bróker ni una afirmación de que operar sea gratis.
     const parsedFee = 0;
+    const numInputHint = ti('paperTrading.numInputHint');
 
     const total = useMemo(() => {
         if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return null;
@@ -119,19 +122,19 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     }, [kind, parsedQuantity, parsedPrice]);
 
     function validate(): string | null {
-        if (!symbol.trim()) return 'Indica el símbolo.';
-        if (!name.trim()) return 'Indica el nombre (o elige la empresa en el buscador).'
-        if (!Number.isFinite(parsedQuantity)) return `La cantidad no es un número válido (${NUM_INPUT_HINT}).`;
-        if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return 'La cantidad debe ser un entero mayor que cero.';
-        if (!Number.isFinite(parsedPrice)) return `El precio no es un número válido (${NUM_INPUT_HINT}).`;
-        if (parsedPrice <= 0) return 'El precio debe ser mayor que cero.';
+        if (!symbol.trim()) return ti('paperTrading.ticket.errors.symbolRequired');
+        if (!name.trim()) return ti('paperTrading.ticket.errors.nameRequired');
+        if (!Number.isFinite(parsedQuantity)) return ti('paperTrading.ticket.errors.quantityInvalid', { hint: numInputHint });
+        if (!Number.isInteger(parsedQuantity) || parsedQuantity <= 0) return ti('paperTrading.ticket.errors.quantityInteger');
+        if (!Number.isFinite(parsedPrice)) return ti('paperTrading.ticket.errors.priceInvalid', { hint: numInputHint });
+        if (parsedPrice <= 0) return ti('paperTrading.ticket.errors.pricePositive');
         const executedAt = new Date(executedAtLocal).getTime();
-        if (!Number.isFinite(executedAt)) return 'Indica la fecha de ejecución.';
-        if (executedAt > Date.now()) return 'La fecha de ejecución no puede ser futura.';
+        if (!Number.isFinite(executedAt)) return ti('paperTrading.ticket.errors.executedRequired');
+        if (executedAt > Date.now()) return ti('paperTrading.ticket.errors.executedFuture');
         if (kind === 'opcion') {
-            if (!Number.isFinite(parsedStrike)) return `El strike no es un número válido (${NUM_INPUT_HINT}).`;
-            if (parsedStrike <= 0) return 'El strike debe ser mayor que cero.';
-            if (!EXPIRY_RE.test(expiry) || !isRealDate(expiry)) return 'Indica el vencimiento (fecha del contrato, yyyy-mm-dd real).';
+            if (!Number.isFinite(parsedStrike)) return ti('paperTrading.ticket.errors.strikeInvalid', { hint: numInputHint });
+            if (parsedStrike <= 0) return ti('paperTrading.ticket.errors.strikePositive');
+            if (!EXPIRY_RE.test(expiry) || !isRealDate(expiry)) return ti('paperTrading.ticket.errors.expiryInvalid');
             // Misma regla que el servidor (buildOptionFill): una opción no se
             // puede ejecutar después de su vencimiento (fecha civil en Nueva
             // York, la del vencimiento OCC). El día del vencimiento SÍ se
@@ -143,7 +146,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     executedAt,
                 ).status === 'vencido'
             ) {
-                return 'La fecha de ejecución es posterior al vencimiento del contrato: una opción no se puede ejecutar una vez vencida. Si registras una operación histórica, indica su fecha real de ejecución.';
+                return ti('paperTrading.ticket.errors.expiredContract');
             }
         }
         return null;
@@ -192,18 +195,18 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             });
             if (result.ok) {
                 if (result.outcome === 'filled') {
-                    setNotice('Operación registrada en la cuenta demo.');
+                    setNotice(ti('paperTrading.ticket.filled'));
                     setQuantity('');
                     setPrice('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate(
                         result.reason
-                            ? `Ya consta como rechazada con ese identificador: ${result.reason}. Corrige y reenvía: cuenta como operación nueva.`
-                            : 'Ya estaba registrada (mismo identificador de orden): no se duplicó.',
+                            ? ti('paperTrading.ticket.duplicateRejected', { reason: result.reason })
+                            : ti('paperTrading.ticket.duplicateFill'),
                     );
                 } else {
-                    setSubmitError(`Orden rechazada: ${result.reason ?? 'motivo no indicado'}.`);
+                    setSubmitError(ti('paperTrading.ticket.rejected', { reason: result.reason ?? ti('paperTrading.ticket.reasonMissing') }));
                 }
                 // Rechazo confirmado o duplicado de rechazo: id nuevo para el
                 // próximo intento; duplicado de fill: id conservado (ver helper).
@@ -218,12 +221,21 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
         }
     }
 
-    const kindLabel = kind === 'accion' ? 'acciones' : 'contratos';
-    const sideLabel = kind === 'accion' ? (side === 'buy' ? 'Compra' : 'Venta') : side === 'buy' ? 'Compra (abrir)' : 'Venta (cerrar)';
+    const kindLabel = kind === 'accion' ? ti('paperTrading.ticket.unitShares') : ti('paperTrading.ticket.unitContracts');
+    const sideLabel = kind === 'accion'
+        ? (side === 'buy' ? ti('paperTrading.ticket.buy') : ti('paperTrading.ticket.sell'))
+        : side === 'buy'
+          ? ti('paperTrading.ticket.buyOpen')
+          : ti('paperTrading.ticket.sellClose');
+    const submitSideLabel = kind === 'accion'
+        ? (side === 'buy' ? ti('paperTrading.ticket.submitSideBuy') : ti('paperTrading.ticket.submitSideSell'))
+        : side === 'buy'
+          ? ti('paperTrading.ticket.submitSideBuyOpen')
+          : ti('paperTrading.ticket.submitSideSellClose');
 
     return (
-        <form onSubmit={onSubmit} aria-label="Registrar operación simulada" className="space-y-4">
-            <div className="flex flex-wrap gap-2" role="group" aria-label="Tipo de instrumento">
+        <form onSubmit={onSubmit} aria-label={ti('paperTrading.ticket.ariaLabel')} className="space-y-4">
+            <div className="flex flex-wrap gap-2" role="group" aria-label={ti('paperTrading.ticket.kindGroup')}>
                 {(['accion', 'opcion'] as const).map((value) => (
                     <Button
                         key={value}
@@ -233,36 +245,36 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         onClick={() => setKind(value)}
                         aria-pressed={kind === value}
                     >
-                        {value === 'accion' ? 'Acción' : 'Opción (call/put)'}
+                        {value === 'accion' ? ti('paperTrading.ticket.kindStock') : ti('paperTrading.ticket.kindOption')}
                     </Button>
                 ))}
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-symbol`}>{kind === 'accion' ? 'Símbolo' : 'Subyacente'}</Label>
+                    <Label htmlFor={`${uid}-symbol`}>{kind === 'accion' ? ti('paperTrading.ticket.symbolStock') : ti('paperTrading.ticket.symbolOption')}</Label>
                     <TickerSearchInput
                         id={`${uid}-symbol`}
                         value={symbol}
                         onValueChange={onSymbolFieldChange}
                         onSelect={onSelectInstrument}
-                        placeholder={kind === 'accion' ? 'p. ej. ASTS' : 'p. ej. AAPL'}
-                        ariaLabel={kind === 'accion' ? 'Buscar acción por nombre o ticker' : 'Buscar subyacente por nombre o ticker'}
+                        placeholder={kind === 'accion' ? ti('paperTrading.ticket.symbolPhStock') : ti('paperTrading.ticket.symbolPhOption')}
+                        ariaLabel={kind === 'accion' ? ti('paperTrading.ticket.symbolAriaStock') : ti('paperTrading.ticket.symbolAriaOption')}
                         className="h-11 w-full bg-gray-800/50 uppercase placeholder:text-gray-500"
                         dropdownSide="bottom"
                         required
                     />
-                    <p className="text-xs text-gray-500">Busca por nombre o ticker y elige: se rellenan símbolo y nombre.</p>
+                    <p className="text-xs text-gray-500">{ti('paperTrading.ticket.searchHint')}</p>
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-name`}>Nombre</Label>
+                    <Label htmlFor={`${uid}-name`}>{ti('paperTrading.ticket.nameLabel')}</Label>
                     <Input
                         style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
                         id={`${uid}-name`}
                         value={name}
                         onChange={(event) => setName(event.target.value)}
-                        placeholder="Nombre de la empresa"
+                        placeholder={ti('paperTrading.ticket.namePh')}
                         autoComplete="off"
                         required
                     />
@@ -272,8 +284,8 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             {kind === 'opcion' ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <div className="space-y-1.5">
-                        <Label htmlFor={`${uid}-callput`}>Tipo</Label>
-                        <div className="flex gap-2" role="group" aria-label="Call o put">
+                        <Label htmlFor={`${uid}-callput`}>{ti('paperTrading.ticket.callPutLabel')}</Label>
+                        <div className="flex gap-2" role="group" aria-label={ti('paperTrading.ticket.callPutGroup')}>
                             {(['call', 'put'] as const).map((value) => (
                                 <Button
                                     key={value}
@@ -289,7 +301,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor={`${uid}-strike`}>Strike</Label>
+                        <Label htmlFor={`${uid}-strike`}>{ti('paperTrading.ticket.strike')}</Label>
                         <Input
                         style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
@@ -297,12 +309,12 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                             value={strike}
                             onChange={(event) => setStrike(event.target.value)}
                             inputMode="decimal"
-                            placeholder="p. ej. 200"
+                            placeholder={ti('paperTrading.ticket.strikePh')}
                             required
                         />
                     </div>
                     <div className="space-y-1.5">
-                        <Label htmlFor={`${uid}-expiry`}>Vencimiento</Label>
+                        <Label htmlFor={`${uid}-expiry`}>{ti('paperTrading.ticket.expiry')}</Label>
                         <Input
                         style={{ minHeight: 44 }}
                             className="w-full min-w-0 max-w-full px-3 text-sm placeholder:text-gray-500"
@@ -312,15 +324,15 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                             onChange={(event) => setExpiry(event.target.value)}
                             required
                         />
-                        <p className="text-xs text-gray-500">Fecha del contrato; no implica que hoy sea negociable.</p>
+                        <p className="text-xs text-gray-500">{ti('paperTrading.ticket.expiryHint')}</p>
                     </div>
                 </div>
             ) : null}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-side`}>Lado</Label>
-                    <div className="flex gap-2" role="group" aria-label="Compra o venta">
+                    <Label htmlFor={`${uid}-side`}>{ti('paperTrading.ticket.sideLabel')}</Label>
+                    <div className="flex gap-2" role="group" aria-label={ti('paperTrading.ticket.sideGroup')}>
                         {(['buy', 'sell'] as const).map((value) => (
                             <Button
                                 key={value}
@@ -330,7 +342,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                                 onClick={() => setSide(value)}
                                 aria-pressed={side === value}
                             >
-                                {value === 'buy' ? 'Compra' : 'Venta'}
+                                {value === 'buy' ? ti('paperTrading.ticket.buy') : ti('paperTrading.ticket.sell')}
                             </Button>
                         ))}
                     </div>
@@ -339,7 +351,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     {/* Label corto: «Cantidad (contratos)» envolvía a 2 líneas
                         a 390px y quedaba pegado al borde del input (QA piloto
                         21-oct-2026). La unidad va como sufijo del campo. */}
-                    <Label htmlFor={`${uid}-quantity`}>Cantidad</Label>
+                    <Label htmlFor={`${uid}-quantity`}>{ti('paperTrading.ticket.quantity')}</Label>
                     <div className="relative">
                         <Input
                         style={{ minHeight: 44 }}
@@ -349,14 +361,14 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                             value={quantity}
                             onChange={(event) => setQuantity(event.target.value)}
                             inputMode="numeric"
-                            placeholder="p. ej. 10"
+                            placeholder={ti('paperTrading.ticket.quantityPh')}
                             required
                         />
                         <span id={`${uid}-quantity-unit`} className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">{kindLabel}</span>
                     </div>
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-price`}>{kind === 'opcion' ? 'Prima por acción' : 'Precio por acción'}</Label>
+                    <Label htmlFor={`${uid}-price`}>{kind === 'opcion' ? ti('paperTrading.ticket.priceOption') : ti('paperTrading.ticket.priceStock')}</Label>
                     <Input
                         style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
@@ -364,13 +376,13 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         value={price}
                         onChange={(event) => setPrice(event.target.value)}
                         inputMode="decimal"
-                        placeholder="p. ej. 40,50"
+                        placeholder={ti('paperTrading.ticket.pricePh')}
                         required
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-currency`}>Divisa</Label>
-                    <div className="flex gap-2" role="group" aria-label="Divisa de la operación">
+                    <Label htmlFor={`${uid}-currency`}>{ti('paperTrading.ticket.currency')}</Label>
+                    <div className="flex gap-2" role="group" aria-label={ti('paperTrading.ticket.currencyGroup')}>
                         {(['EUR', 'USD'] as const).map((value) => (
                             <Button
                                 key={value}
@@ -388,7 +400,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             </div>
 
             <div className="space-y-1.5">
-                <Label htmlFor={`${uid}-executed`}>Fecha de ejecución</Label>
+                <Label htmlFor={`${uid}-executed`}>{ti('paperTrading.ticket.executed')}</Label>
                 {/* iOS Safari da al datetime-local un ancho intrínseco mayor
                     que la tarjeta y los min-w-0/max-w-full no bastan (fallo
                     real visto en iPhone 21-oct-2026): fila propia a una
@@ -408,28 +420,26 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             </div>
 
             <p className="text-xs text-gray-500">
-                Decimales con coma o punto, sin separador de miles (1234,56).
-                Registras una operación ya ejecutada con el precio que introduces tú: no es una ejecución de
-                mercado. Sin comisión en la demo (0 simulado): no reproduce la tarifa de ningún bróker.
+                {ti('paperTrading.ticket.formatHint')} {ti('paperTrading.ticket.manualNote')}
             </p>
 
             {/* Resumen claro del coste ANTES de registrar (flujo guiado tipo
                 ticket de bróker): se calcula solo con los datos introducidos,
                 sin consultar mercado. Compra = coste total; venta = neto. */}
             {total !== null ? (
-                <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-3" aria-label="Resumen de la operación antes de registrar">
-                    <p className="text-sm font-medium text-gray-200">Resumen antes de registrar</p>
+                <div className="rounded-lg border border-gray-700 bg-gray-900/50 p-3" aria-label={ti('paperTrading.ticket.summaryAria')}>
+                    <p className="text-sm font-medium text-gray-200">{ti('paperTrading.ticket.summaryTitle')}</p>
                     <p className="mt-1 text-sm text-gray-300">
-                        {sideLabel} · {formatNumber(parsedQuantity)} {kindLabel} × {formatMoney(parsedPrice, currency)}
-                        {kind === 'opcion' ? ' × 100 (multiplicador)' : ''}
-                        {parsedFee > 0 ? ` ${side === 'buy' ? '+' : '−'} ${formatMoney(parsedFee, currency)} de comisión` : ''}
+                        {sideLabel} · {f.formatNumber(parsedQuantity)} {kindLabel} × {f.formatMoney(parsedPrice, currency)}
+                        {kind === 'opcion' ? ti('paperTrading.ticket.multiplierPart') : ''}
+                        {parsedFee > 0 ? ti('paperTrading.ticket.feePart', { sign: side === 'buy' ? '+' : '−', fee: f.formatMoney(parsedFee, currency) }) : ''}
                     </p>
                     <p className="mt-1 text-base font-semibold text-gray-100">
-                        {side === 'buy' ? 'Coste total estimado: ' : 'Ingreso neto estimado: '}
-                        {formatMoney(side === 'buy' ? total + parsedFee : total - parsedFee, currency)}
+                        {side === 'buy' ? ti('paperTrading.ticket.costBuy') : ti('paperTrading.ticket.costSell')}
+                        {f.formatMoney(side === 'buy' ? total + parsedFee : total - parsedFee, currency)}
                     </p>
                     <p className="mt-1 text-xs text-gray-500">
-                        Calculado con tus datos: no es una cotización ni una ejecución de mercado.
+                        {ti('paperTrading.ticket.summaryDisclaimer')}
                     </p>
                 </div>
             ) : null}
@@ -451,7 +461,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
             ) : null}
 
             <Button type="submit" disabled={disabled || pending}>
-                {pending ? 'Registrando…' : `Registrar ${sideLabel.toLowerCase()} simulada`}
+                {pending ? ti('paperTrading.ticket.submitPending') : ti('paperTrading.ticket.submit', { side: submitSideLabel })}
             </Button>
         </form>
     );

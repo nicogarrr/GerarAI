@@ -1,0 +1,96 @@
+{
+  "meta": {
+    "title": "Portfolio exposures",
+    "description": "Weights, concentration (top 1 and top 5) and exposure by sector and position in your portfolio, with concentration alerts and their thresholds.",
+    "backendFeature": "Portfolio exposures"
+  },
+  "header": {
+    "eyebrow": "Portfolio",
+    "title": "Portfolio exposures",
+    "subtitle": "Weights, concentration (top 1 and top 5) and exposure by sector and position, with the alerts and the threshold that triggers them."
+  },
+  "methodology": {
+    "title": "Scope and limits",
+    "noRiskMeasures": "This page does not calculate volatility, drawdown or VaR: those measures live in Portfolio intelligence.",
+    "detailPre": "For per-position detail, see the portfolio. For volatility, drawdown, VaR and measured performance, ",
+    "linkIntelligence": "Portfolio intelligence",
+    "detailPost": "."
+  },
+  "thresholds": {
+    "t20": "20% threshold of portfolio value: above it, a single position concentrates the risk. A concentration rule, not a VaR or a probability of loss.",
+    "t10": "10% threshold for pre-FCF companies (not yet generating free cash flow): twice as strict as the general 20%.",
+    "t0": "The cash in this currency is negative (debit balance). Review the balances or the trades in that currency; the threshold is not falling below zero.",
+    "generic": "Alert triggered by exceeding the threshold shown next to the measured value."
+  },
+  "labels": {
+    "totalValue": "Total value",
+    "equityValue": "Equity value",
+    "cash": "Cash",
+    "top1Weight": "Largest position weight",
+    "top5Weight": "Top 5 weight",
+    "weightBasis": "Weight basis",
+    "cashAssetsBase": "Cash held",
+    "marginDebtBase": "Margin debt",
+    "sectorExposure": "Sector exposure",
+    "factorExposure": "Factor exposure",
+    "status": "Calculation data",
+    "baseCurrency": "Base currency",
+    "cashNative": "Cash in original currency",
+    "missingFx": "Missing exchange rate for",
+    "dataAsOf": "Data as of",
+    "provenance": "Source",
+    "cashAsOf": "Cash as of",
+    "fxRates": "Exchange rates used",
+    "valuationDatesDiffer": "Valuation dates",
+    "valuationHold": "Valuation on hold"
+  },
+  "status": {
+    "ok": "Complete",
+    "incompleteFx": "Incomplete: missing exchange rates",
+    "insufficientData": "Insufficient data",
+    "incompleteValuation": "Incomplete: valuation on hold"
+  },
+  "values": {
+    "yes": "Yes",
+    "no": "No",
+    "missingFxNote": "(missing exchange rates)",
+    "noBalances": "No balances",
+    "noData": "No data",
+    "weightBasisGross": "Gross position value (cash is negative)",
+    "weightBasisTotal": "Total including cash",
+    "fxScopeCash": "Cash",
+    "fxScopePositions": "Positions",
+    "fxRateLine": "{scope}: 1 {currency} = {rate} {base} ({date})",
+    "valuationDatesDiffer": "Positions and cash as of different dates: the total combines both",
+    "sourceInternal": "Internal source",
+    "sourceCava": "GerarAI database",
+    "fetchedSuffix": " · {date}"
+  },
+  "alerts": {
+    "title": "Concentration and liquidity alerts",
+    "highOne": "high alert",
+    "highMany": "high alerts",
+    "emptyOk": "No concentration or liquidity alerts in the calculated data.",
+    "emptyIncomplete": "No alerts in the available data. Incomplete coverage cannot rule out alerts in the rest of the portfolio."
+  },
+  "summary": {
+    "title": "Portfolio exposures",
+    "empty": "No risk metrics available. Check that your portfolio has positions."
+  },
+  "positions": {
+    "title": "Exposure by position",
+    "viewPortfolio": "View portfolio →",
+    "emptyPortfolio": "You have no positions yet. Record your first buy to see weights, concentration and sector exposure.",
+    "addInvestment": "Add investment",
+    "empty": "No positions with calculated exposure.",
+    "tableRegion": "Exposure by position",
+    "tableCaption": "Exposure by position: market value and weight of each holding",
+    "colTicker": "Ticker",
+    "colName": "Name",
+    "colSector": "Sector",
+    "colValue": "Value",
+    "weightGross": "Weight (gross value)",
+    "weightWithCash": "Weight (with cash)",
+    "weightUnknown": "Weight (basis unavailable)"
+  }
+}
