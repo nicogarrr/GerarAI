@@ -203,7 +203,11 @@ def test_cache_sirve_dato_y_no_guarda_un_calculo_sin_datos():
 
     assert cache.get(empty)["themes"] == []
     assert cache.get(empty)["themes"] == []
+    assert calls == ["empty"]  # dentro de FAILED_TTL_SECONDS no se relanza la descarga
+    clock["now"] = mt.FAILED_TTL_SECONDS + 1
+    assert cache.get(empty)["themes"] == []
     assert calls == ["empty", "empty"]  # Yahoo caido: no se cachea durante una hora
+    clock["now"] = 2 * mt.FAILED_TTL_SECONDS + 2
 
     def good():
         calls.append("good")
@@ -330,3 +334,36 @@ def test_la_justificacion_llega_al_constituyente():
     rows = {r["ticker"]: r for r in out["themes"][0]["constituents"]}
     assert rows["NVDA"]["reason"] == "GPU dominantes para entrenar IA"
     assert rows["AMD"]["reason"] == "CPU EPYC y GPU Instinct"
+
+
+def test_yahoo_caido_no_relanza_la_descarga_en_cada_visita_ni_encola_peticiones():
+    """Sin datos, cada visita recalculaba (hasta 40 s) y las concurrentes esperaban en fila."""
+    clock = {"now": 0.0}
+    cache = mt.ThemesCache(ttl=3600, clock=lambda: clock["now"])
+    calls = []
+    started = threading.Event()
+    release = threading.Event()
+
+    def outage():
+        calls.append(1)
+        started.set()
+        release.wait(5)
+        return {"symbols_with_data": 0, "themes": []}
+
+    results = []
+    first = threading.Thread(target=lambda: results.append(cache.get(outage)))
+    first.start()
+    assert started.wait(5)
+    others = [threading.Thread(target=lambda: results.append(cache.get(outage))) for _ in range(4)]
+    for th in others:
+        th.start()
+    release.set()
+    for th in [first, *others]:
+        th.join(5)
+    assert len(results) == 5 and all(r["themes"] == [] for r in results)
+    assert len(calls) == 1
+    assert cache.get(outage)["symbols_with_data"] == 0
+    assert len(calls) == 1
+    clock["now"] = mt.FAILED_TTL_SECONDS + 1
+    cache.get(lambda: {"symbols_with_data": 3, "themes": [1]})
+    assert cache.get(outage)["themes"] == [1]  # el dato bueno manda en cuanto vuelve Yahoo

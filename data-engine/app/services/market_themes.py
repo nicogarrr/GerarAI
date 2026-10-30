@@ -400,6 +400,7 @@ def basket_reason(basket: dict, ticker: str) -> str | None:
     cesta propia sin razones (tests)."""
     return REASONS.get(str(basket.get("id")), {}).get(ticker)
 
+
 # Cobertura minima para publicar una metrica de un tema.
 MIN_COVERAGE = 0.7
 # Un valor cuyo ultimo cierre va mas de 7 dias por detras de la sesion mas reciente
@@ -411,6 +412,10 @@ HOT_TOP_N = 3
 CACHE_TTL_SECONDS = 3600.0
 # Un resultado parcial (Yahoo limitando) se reintenta pronto en vez de durar una hora.
 PARTIAL_TTL_SECONDS = 300.0
+# Un calculo sin datos (Yahoo caido) se recuerda poco tiempo: sin esto cada visita
+# relanzaba las ~177 descargas (hasta FETCH_DEADLINE_SECONDS) y las peticiones
+# concurrentes se encolaban una tras otra en el candado de calculo.
+FAILED_TTL_SECONDS = 60.0
 FETCH_WORKERS = 6
 FETCH_DEADLINE_SECONDS = 40.0
 
@@ -640,8 +645,16 @@ class ThemesCache:
     simbolo con datos NO se guarda: Yahoo caido no puede dejar un "sin datos" durante una hora.
     """
 
-    def __init__(self, ttl: float = CACHE_TTL_SECONDS, clock: Callable[[], float] = time.monotonic) -> None:
+    def __init__(
+        self,
+        ttl: float = CACHE_TTL_SECONDS,
+        clock: Callable[[], float] = time.monotonic,
+        failed_ttl: float = FAILED_TTL_SECONDS,
+    ) -> None:
         self._ttl = ttl
+        self._failed_ttl = failed_ttl
+        self._failed: dict | None = None
+        self._failed_at = 0.0
         self._clock = clock
         self._lock = threading.Lock()
         self._compute_lock = threading.Lock()
@@ -659,16 +672,31 @@ class ThemesCache:
         if value is not None:
             self._refresh_async(compute)
             return {**value, "stale": True}
+        failed = self._recent_failure(now)
+        if failed is not None:
+            return failed
         with self._compute_lock:
             with self._lock:
                 if self._value is not None:
                     return {**self._value, "stale": False}
+            failed = self._recent_failure(self._clock())
+            if failed is not None:
+                return failed
             fresh = compute()
             self._store(fresh)
             return {**fresh, "stale": False}
 
+    def _recent_failure(self, now: float) -> dict | None:
+        with self._lock:
+            if self._failed is not None and now - self._failed_at < self._failed_ttl:
+                return {**self._failed, "stale": False}
+        return None
+
     def _store(self, fresh: dict) -> None:
         if fresh.get("symbols_with_data", 0) <= 0:
+            with self._lock:
+                self._failed = fresh
+                self._failed_at = self._clock()
             return
         with self._lock:
             self._value = fresh
