@@ -48,6 +48,7 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
 from app.services.propicks_price_service import yahoo_symbol
+from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
 
 METRIC_VERSION = "valuation-v1"
 PRICE_FRESHNESS_DAYS = 7
@@ -188,8 +189,21 @@ def _book_value_per_share(
     quote_ccy = (company.currency or "").strip()
     if not quote_ccy or eq_unit.strip() != quote_ccy:
         return None  # divisa de hechos != divisa de cotizacion: fail-closed
+    # Los hechos de un emisor extranjero vienen por accion ORDINARIA y el
+    # precio de un ADR es por ADR (N ordinarias): sin el ratio el P/B salia
+    # N veces inflado. Libros por ADR = libros por ordinaria x N; una ficha
+    # marcada ADR sin ratio valido no tiene P/B (fail-closed).
+    ratio = adr_ratio(company)
+    tagged_adr = any(
+        str(tag).strip().lower() == "adr" or str(tag).strip().lower().startswith(ADR_TAG_PREFIX)
+        for tag in (company.factor_tags or [])
+    )
+    if ratio is None and tagged_adr:
+        return None
+    bvps = equity / shares * (Decimal(str(ratio)) if ratio else Decimal(1))
     return {
-        "bvps": equity / shares,
+        "bvps": bvps,
+        "adr_ratio": ratio,
         "fiscal_year": eq_fy,
         "equity": equity,
         "shares": shares,
@@ -337,6 +351,7 @@ def compute_valuation_metrics(
                     "total_equity": str(book["equity"]),
                     "shares_diluted": str(book["shares"]),
                     "fact_unit": book["fact_unit"],
+                    "adr_ratio": book["adr_ratio"],
                     "equity_source": book["equity_source"],
                     "shares_source": book["shares_source"],
                 },

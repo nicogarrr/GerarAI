@@ -300,3 +300,28 @@ def test_fetchers_por_defecto_vetados_bajo_pytest():
         default_dividend_fetcher("AAPL")
     with pytest.raises(RuntimeError):
         default_finnhub_yield_fetcher("AAPL")
+
+
+
+def test_pb_de_un_adr_usa_libros_por_adr():
+    """BABA: 1 ADR = 8 ordinarias (tabla citada). Hechos por ordinaria.
+
+    Calculo independiente: libros/ordinaria = 1000/100 = 10; por ADR = 80;
+    ADR a 160 -> P/B = 160/80 = 2 (en main 160/10 = 16).
+    """
+    db = _db()
+    company = _seed_pb(db, ticker="BABA", price="160")
+    _run(db, [company])
+    row = _metric(db, company, METRIC_PB)
+    assert row is not None
+    assert Decimal(row.value) == Decimal("2")
+    assert row.calculation_trace["adr_ratio"] == 8
+
+
+def test_pb_adr_etiquetado_sin_ratio_no_se_escribe():
+    db = _db()
+    company = _seed_pb(db, ticker="XADR", price="160")
+    company.factor_tags = ["adr"]
+    db.flush()
+    _run(db, [company])
+    assert _metric(db, company, METRIC_PB) is None
