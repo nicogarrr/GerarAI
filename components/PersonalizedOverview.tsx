@@ -7,7 +7,7 @@ import {
     summarizeDcfProbe,
     type DcfScope,
 } from '@/lib/overview/dcf-candidates';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import { DcaLevelChip, useHoldingSignals } from '@/components/portfolio/HoldingS
 import { fairValueGapPercent } from '@/lib/portfolio/holding-signals';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
 import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
+import { getHomeOverviewBundle, type HomeOverviewBundle } from '@/lib/actions/home-bundle.actions';
 import { sectionError } from '@/lib/section-error';
 import {
     getRecentTriggeredAlerts,
@@ -307,6 +308,30 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     const retrySection = (section: SectionKey) =>
         setRetryTokens((tokens) => ({ ...tokens, [section]: tokens[section] + 1 }));
 
+    // Primera carga: las cuatro lecturas en UNA server action (Next ejecuta en
+    // serie las server actions de un cliente; eran cuatro POST encadenados).
+    // Cada sección toma su parte; los «Reintentar» usan la lectura suelta.
+    const bundleRef = useRef<{ userId: string; promise: Promise<HomeOverviewBundle> } | null>(null);
+    const firstLoad = useCallback(<K extends keyof HomeOverviewBundle>(
+        key: K,
+        fallback: HomeOverviewBundle[K]['data'],
+    ): Promise<{ data: HomeOverviewBundle[K]['data']; error: string | null }> => {
+        if (!bundleRef.current || bundleRef.current.userId !== userId) {
+            bundleRef.current = {
+                userId,
+                promise: getHomeOverviewBundle(userId, {
+                    watchlistLimit: WATCHLIST_PREVIEW_LIMIT,
+                    marketCapMoreThan: MIN_MARKET_CAP,
+                    limit: 10,
+                    candidateLimit: DCF_CANDIDATE_LIMIT,
+                }),
+            };
+        }
+        return bundleRef.current.promise
+            .then((bundle) => bundle[key])
+            .catch((error) => ({ data: fallback, error: sectionError(error) }));
+    }, [userId]);
+
     // Una sección, un disparador: cada «Reintentar» vuelve a pedir solo su
     // lectura (antes los cuatro reintentos relanzaban el loadData completo).
     useEffect(() => {
@@ -315,7 +340,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setPortfolioLoading(true);
             setPortfolioError(null);
-            const result = await settle(getPortfolioSummary(userId), null as PortfolioSummary | null);
+            const result = retryTokens.portfolio === 0
+                ? await firstLoad('portfolio', null)
+                : await settle(getPortfolioSummary(userId), null as PortfolioSummary | null);
             if (!active) return;
             setPortfolioSummary(result.data);
             setPortfolioLoading(false);
@@ -326,7 +353,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [userId, retryTokens.portfolio]);
+    }, [userId, retryTokens.portfolio, firstLoad]);
 
     useEffect(() => {
         let active = true;
@@ -334,10 +361,12 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setAlertsLoading(true);
             setAlertsError(null);
-            const result = await settle(
-                Promise.all([getUserAlerts(), getRecentTriggeredAlerts(3)]).then(([rules, triggered]) => ({ rules, triggered })),
-                { rules: [] as Alert[], triggered: [] as TriggeredAlertDelivery[] },
-            );
+            const result = retryTokens.alerts === 0
+                ? await firstLoad('alerts', { rules: [], triggered: [] })
+                : await settle(
+                    Promise.all([getUserAlerts(), getRecentTriggeredAlerts(3)]).then(([rules, triggered]) => ({ rules, triggered })),
+                    { rules: [] as Alert[], triggered: [] as TriggeredAlertDelivery[] },
+                );
             if (!active) return;
             setAlerts(result.data.rules);
             setTriggeredAlerts(result.data.triggered);
@@ -349,7 +378,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.alerts]);
+    }, [retryTokens.alerts, firstLoad]);
 
     // Solo se cotizan las primeras WATCHLIST_PREVIEW_LIMIT entradas: el resto
     // son un contador y un enlace a /watchlist, no filas anónimas.
@@ -359,13 +388,15 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setWatchlistLoading(true);
             setWatchlistError(null);
-            const result = await settle(
-                getHomeWatchlistPreview(WATCHLIST_PREVIEW_LIMIT).then((preview) => {
-                    if (preview.unavailable) throw new Error('No se pudo cargar la watchlist');
-                    return preview;
-                }),
-                { unavailable: false, total: 0, items: [] as WatchlistItem[] },
-            );
+            const result = retryTokens.watchlist === 0
+                ? await firstLoad('watchlist', { unavailable: false, total: 0, items: [] })
+                : await settle(
+                    getHomeWatchlistPreview(WATCHLIST_PREVIEW_LIMIT).then((preview) => {
+                        if (preview.unavailable) throw new Error('No se pudo cargar la watchlist');
+                        return preview;
+                    }),
+                    { unavailable: false, total: 0, items: [] as WatchlistItem[] },
+                );
             if (!active) return;
             if (result.error) {
                 setWatchlistTotal(0);
@@ -385,7 +416,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.watchlist]);
+    }, [retryTokens.watchlist, firstLoad]);
 
     useEffect(() => {
         let active = true;
@@ -393,14 +424,16 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setOpportunitiesLoading(true);
             setOpportunitiesError(null);
-            const probe = await settle(
-                getHomeOpportunities({
-                    marketCapMoreThan: MIN_MARKET_CAP,
-                    limit: 10,
-                    candidateLimit: DCF_CANDIDATE_LIMIT,
-                }),
-                [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
-            );
+            const probe = retryTokens.opportunities === 0
+                ? await firstLoad('opportunities', [])
+                : await settle(
+                    getHomeOpportunities({
+                        marketCapMoreThan: MIN_MARKET_CAP,
+                        limit: 10,
+                        candidateLimit: DCF_CANDIDATE_LIMIT,
+                    }),
+                    [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
+                );
             if (!active) return;
             if (probe.error) {
                 setOpportunities([]);
@@ -427,7 +460,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         return () => {
             active = false;
         };
-    }, [retryTokens.opportunities]);
+    }, [retryTokens.opportunities, firstLoad]);
 
     // Derivados memorizados: evita reordenar el estado en cada render
     // (.sort() mutaba el array del estado) y recalcula solo si cambian los datos.
