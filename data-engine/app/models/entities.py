@@ -92,6 +92,22 @@ class Portfolio(TenantOwnedMixin, Base, TimestampMixin):
     base_currency: Mapped[str] = mapped_column(String(10), default="EUR")
     is_default: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
+    positions: Mapped[list["Position"]] = relationship(
+        "Position", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    transactions: Mapped[list["Transaction"]] = relationship(
+        "Transaction", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    daily_snapshots: Mapped[list["PortfolioDailySnapshot"]] = relationship(
+        "PortfolioDailySnapshot", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    tax_reports: Mapped[list["TaxReport"]] = relationship(
+        "TaxReport", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+    investment_plans: Mapped[list["InvestmentPlan"]] = relationship(
+        "InvestmentPlan", back_populates="portfolio", cascade="all, delete-orphan"
+    )
+
 
 class WatchItem(TenantOwnedMixin, Base, TimestampMixin):
     """A symbol the tenant is following (research watchlist)."""
@@ -299,7 +315,7 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6), default=0)
@@ -344,6 +360,7 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     valuation_hold_since: Mapped[date | None] = mapped_column(Date, nullable=True)
 
     company: Mapped[Company] = relationship(back_populates="positions")
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="positions")
 
 
 class CashBalance(TenantOwnedMixin, Base, TimestampMixin):
@@ -368,7 +385,7 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
@@ -384,6 +401,7 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
     raw_payload: Mapped[dict] = mapped_column(JSON, default=dict)
 
     company: Mapped["Company"] = relationship("Company", foreign_keys=[company_id], overlaps="transactions")
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="transactions")
 
 
 class IbkrRawRow(TenantOwnedMixin, Base, TimestampMixin):
@@ -470,7 +488,7 @@ class PortfolioDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
     snapshot_date: Mapped[date] = mapped_column(Date, index=True)
     base_currency: Mapped[str] = mapped_column(String(10))
     positions_value_base: Mapped[Decimal] = mapped_column(Numeric(24, 6))
@@ -489,6 +507,8 @@ class PortfolioDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     source: Mapped[str] = mapped_column(String(80), default="market_refresh")
     metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
 
+    portfolio: Mapped["Portfolio"] = relationship("Portfolio", back_populates="daily_snapshots")
+
 
 class PositionDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "position_daily_snapshots"
@@ -504,7 +524,7 @@ class PositionDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     portfolio_snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("portfolio_daily_snapshots.id", ondelete="CASCADE"), index=True
     )
-    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     snapshot_date: Mapped[date] = mapped_column(Date, index=True)
     quantity: Mapped[Decimal] = mapped_column(Numeric(20, 6))
@@ -533,7 +553,7 @@ class CashDailySnapshot(TenantOwnedMixin, Base, TimestampMixin):
     portfolio_snapshot_id: Mapped[int] = mapped_column(
         ForeignKey("portfolio_daily_snapshots.id", ondelete="CASCADE"), index=True
     )
-    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id"), index=True)
+    portfolio_id: Mapped[int] = mapped_column(ForeignKey("portfolios.id", ondelete="CASCADE"), index=True)
     snapshot_date: Mapped[date] = mapped_column(Date, index=True)
     currency: Mapped[str] = mapped_column(String(10), index=True)
     balance_native: Mapped[Decimal] = mapped_column(Numeric(24, 6))
@@ -2552,7 +2572,7 @@ class TaxReport(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     fiscal_year: Mapped[int] = mapped_column(Integer, index=True)
     base_currency: Mapped[str] = mapped_column(String(10), default="EUR")
@@ -2564,13 +2584,15 @@ class TaxReport(TenantOwnedMixin, Base, TimestampMixin):
         DateTime(timezone=True), default=utcnow
     )
 
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="tax_reports")
+
 
 class InvestmentPlan(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "investment_plans"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     portfolio_id: Mapped[int | None] = mapped_column(
-        ForeignKey("portfolios.id"), nullable=True, index=True
+        ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=True, index=True
     )
     monthly_contribution: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     # Divisa de la aportacion mensual. NULL = «divisa no registrada» (planes
@@ -2583,6 +2605,8 @@ class InvestmentPlan(TenantOwnedMixin, Base, TimestampMixin):
     horizon_years: Mapped[int] = mapped_column(Integer, default=30)
     target_allocations: Mapped[list[dict]] = mapped_column(JSON, default=list)
     status: Mapped[str] = mapped_column(String(40), default="active", index=True)
+
+    portfolio: Mapped["Portfolio | None"] = relationship("Portfolio", back_populates="investment_plans")
 
 
 class PlanContribution(TenantOwnedMixin, Base, TimestampMixin):
