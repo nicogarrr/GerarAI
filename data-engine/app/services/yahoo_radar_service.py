@@ -40,6 +40,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Company
+from app.valuation.currency import normalize_currency
 
 YAHOO_SCREENER_URL = "https://query1.finance.yahoo.com/v1/finance/screener"
 YAHOO_LABEL = "Yahoo Finance (fuente no oficial)"
@@ -143,19 +144,36 @@ def parse_screener_quotes(payload: dict[str, Any]) -> list[RadarCandidate]:
         # es fraccion (0.081 = 8,1%) y "dividendYield" es porcentaje (8.1). El
         # 0 es ambiguo en Yahoo (valor real o ausencia: en HK devuelve 0 aun
         # pasando el filtro de yield), asi que 0/ausente -> N/D, nunca 0,0%.
-        yld = _raw_number(quote.get("trailingAnnualDividendYield"))
-        if yld is None or yld == 0:
-            pct = _raw_number(quote.get("dividendYield"))
-            yld = (pct / Decimal(100)) if pct is not None and pct > 0 else None
+        #
+        # Manda "dividendYield": es el campo que filtra el propio screener y
+        # sale bien en todas las divisas. "trailingAnnualDividendYield" divide
+        # el dividendo en la divisa principal entre un precio en subunidad
+        # (verificado 30-oct: TSCO.L 538 GBp, dividendo 0.148 GBP ->
+        # 0.000279 = 0,03 % en vez de 2,78 %; SHEL.L 0,04 % en vez de 2,9 %).
+        # Solo se usa como respaldo si la cotizacion NO va en subunidad.
         exchange = quote.get("fullExchangeName") or quote.get("exchange")
         currency = quote.get("currency")
+        pct = _raw_number(quote.get("dividendYield"))
+        yld = (pct / Decimal(100)) if pct is not None and pct > 0 else None
+        if yld is None and normalize_currency(str(currency or ""))[1] == 1:
+            trailing = _raw_number(quote.get("trailingAnnualDividendYield"))
+            yld = trailing if trailing is not None and trailing > 0 else None
+        # P/B: Yahoo divide el precio (divisa del listado, ya en principal)
+        # entre el valor contable en la divisa de REPORTE sin convertir
+        # (verificado 30-oct: HSBA.L 12,872 GBP / 7,554 USD = 1,70 en vez de
+        # ~2,28). Divisas distintas -> N/D (y no pasa el filtro P/B).
+        price_to_book = _first_number(quote, ("priceToBook",))
+        financial = normalize_currency(str(quote.get("financialCurrency") or ""))[0]
+        listing = normalize_currency(str(currency or ""))[0]
+        if financial and listing and financial != listing:
+            price_to_book = None
         out.append(
             RadarCandidate(
                 symbol=symbol,
                 name=quote.get("longName") or quote.get("shortName"),
                 exchange=str(exchange) if exchange else None,
                 currency=str(currency) if currency else None,
-                price_to_book=_first_number(quote, ("priceToBook",)),
+                price_to_book=price_to_book,
                 dividend_yield=yld,
                 yield_extremo_revisar=bool(yld is not None and yld > EXTREME_YIELD),
             )

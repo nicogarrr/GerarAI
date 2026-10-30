@@ -88,8 +88,9 @@ def test_saldo_cero_sin_tipo_de_cambio_con_saldo_medio_queda_sin_valorar(db):
     assert result["incomplete"] is True
 
 
-def test_saldo_cero_todo_el_trimestre_no_genera_avisos(db):
-    # Una divisa a 0 todo el 4T no es una cuenta que revisar: sin ruido.
+def test_saldo_cero_todo_el_trimestre_no_genera_avisos_de_revision(db):
+    # Una divisa a 0 todo el 4T no es una cuenta que revisar ni cambia el
+    # umbral; desde A17 sí se lista, con su motivo, en zero_balance_accounts.
     _seed_cash(db, custody={"cash:GBP": "GB"}, accounts={
         "USD": (0, 0, "0.90"),
         "GBP": (10000, 10000, "1.15"),
@@ -113,3 +114,51 @@ def test_saldo_cero_con_custodia_extranjera_sigue_sumando_saldo_medio(db):
     cuentas = result["categories"]["cuentas"]
     assert result["foreign_unverified"] == []
     assert cuentas["average_q4_total_base"] == 64913.04
+
+
+# --- A17 (Nico 30-10-2026): ninguna cuenta a 0 a 31/12 se omite en silencio ---
+
+
+def _zero(result, currency="USD"):
+    return [row for row in result["zero_balance_accounts"] if row["currency"] == currency]
+
+
+def test_a17_saldo_cero_todo_el_trimestre_se_lista_con_nombre_y_motivo(db):
+    _seed_cash(db, custody={"cash:USD": "IE", "cash:GBP": "GB"}, accounts={
+        "USD": (0, 0, "0.90"),
+        "GBP": (10000, 10000, "1.15"),
+    })
+    result = Modelo720Service().check_thresholds(db, 2025)
+    rows = _zero(result)
+    assert len(rows) == 1
+    assert rows[0]["account"] == "Cuenta en USD (cartera «Main»)"
+    assert rows[0]["snapshot_date"] == "2025-12-31"
+    assert "Saldo 0 a 31/12" in rows[0]["reason"]
+    assert "también 0" in rows[0]["reason"]
+    assert "no se incluye" in rows[0]["reason"]
+    # La libra con saldo no se lista, y el umbral no cambia (11.500 € < 50.000 €).
+    assert _zero(result, "GBP") == []
+    cuentas = result["categories"]["cuentas"]
+    assert cuentas["status"] == "por_debajo"
+    assert cuentas["total_base"] == 11500.0
+
+
+def test_a17_saldo_cero_sin_capturas_del_trimestre_se_lista(db):
+    # Solo hay captura del 31/12 (0 USD): no se puede calcular el saldo medio.
+    tenant, portfolio = _seed_cash(db, custody={"cash:USD": "IE"}, accounts={})
+    _snap(db, tenant, portfolio, YEAR_END, "USD", 0, "0.90")
+    result = Modelo720Service().check_thresholds(db, 2025)
+    rows = _zero(result)
+    assert len(rows) == 1
+    assert rows[0]["account"].startswith("Cuenta en USD")
+    assert "sin capturas suficientes" in rows[0]["reason"]
+    assert "saldo medio" in rows[0]["reason"]
+
+
+def test_a17_saldo_cero_declarada_en_espana_se_lista(db):
+    _seed_cash(db, custody={"cash:USD": "ES"}, accounts={"USD": (0, 0, "0.90")})
+    result = Modelo720Service().check_thresholds(db, 2025)
+    rows = _zero(result)
+    assert len(rows) == 1
+    assert "declarada en España" in rows[0]["reason"]
+    assert "no entra en el 720" in rows[0]["reason"]

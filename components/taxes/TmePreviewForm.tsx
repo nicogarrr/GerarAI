@@ -49,7 +49,7 @@ export default function TmePreviewForm({ year, onPreview, onReset }: {
                 }}>Quitar TME</Button>}
             </div>
             <p id="tax-tme-note" className="text-xs text-gray-500">
-                Solo para {year}. No se guarda ni sustituye tu declaración. Usa el tipo medio efectivo de la base liquidable del ahorro (cuota líquida total del ahorro entre base liquidable del ahorro, por 100, con dos decimales), no el de la base general ni el de toda la declaración. Fuente: Agencia Tributaria, Manual Renta 2025, capítulo 18, deducción por doble imposición internacional.
+                Solo para {year}. No se guarda ni sustituye tu declaración. Usa el tipo medio efectivo de la base liquidable del ahorro (como lo calcula Hacienda: cuota líquida total × cuota íntegra del ahorro ÷ cuota íntegra total, dividido entre la base liquidable del ahorro, por 100, con dos decimales; GerarAI lo aplica al dividendo íntegro de cada país), no el de la base general ni el de toda la declaración. Fuente: Agencia Tributaria, Manual Renta 2025, capítulo 18, deducción por doble imposición internacional.
             </p>
             {error && <p id="tax-tme-error" role="alert" className="text-xs text-amber-300">{error}</p>}
         </form>

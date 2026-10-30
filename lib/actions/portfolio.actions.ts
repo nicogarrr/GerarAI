@@ -76,6 +76,8 @@ export type PortfolioHolding = {
     nativeCurrency: string;
     baseCurrency: string;
     fxMissing: boolean;
+    /** A3: sin cotización real (el precio es el de la última operación): la plusvalía es desconocida. */
+    quoteMissing?: boolean;
     /** G/P y coste en divisa nativa tal como los expone la API (null si no hay dato). */
     nativeGain: number | null;
     nativeCost: number | null;
@@ -167,6 +169,8 @@ type ResearchPortfolioPosition = {
     first_buy_date: string | null;
     holding_days: number | null;
     fiscal_bucket: 'corto_plazo' | 'largo_plazo' | null;
+    // A3: el precio es el de la última operación (sin cotización real); plusvalía null.
+    quote_missing?: boolean;
 };
 
 type ResearchPortfolioSummaryResponse = {
@@ -199,10 +203,10 @@ export async function addTransaction(
 ): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
-        throw new ValidationError('Quantity must be positive and price cannot be negative');
+        throw new ValidationError('La cantidad debe ser positiva y el precio no puede ser negativo.');
     }
     if (!Number.isFinite(fees) || fees < 0) {
-        throw new ValidationError('Fees cannot be negative');
+        throw new ValidationError('Las comisiones no pueden ser negativas.');
     }
     try {
         await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
@@ -275,6 +279,27 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0, fi
 }
 
 
+/**
+ * Tipos de cambio de la cartera para páginas que no cargan la cartera entera
+ * (watchlist): misma lectura cacheada del resumen que usa Cartera, así el
+ * objetivo de analistas de un ADR se convierte igual en las dos (auditoría
+ * A9). Nunca rompe la página: sin cartera o con el motor caído devuelve una
+ * lista vacía y la línea vuelve a la etiqueta «(ADR, USD)».
+ */
+export async function getPortfolioFxContext(userId: string): Promise<{ fxRates: PortfolioFxRate[]; baseCurrency: string | null }> {
+    try {
+        const canonicalUserId = await resolveUserId(userId);
+        const summary = await cachedFetch(
+            `portfolio:${canonicalUserId}:summary`,
+            () => researchRequest<ResearchPortfolioSummaryResponse>('/api/portfolio/summary', { fast: true }),
+            15,
+        );
+        return { fxRates: summary.fx_rates ?? [], baseCurrency: summary.base_currency || null };
+    } catch {
+        return { fxRates: [], baseCurrency: null };
+    }
+}
+
 export async function getPortfolioSummary(userId: string): Promise<PortfolioSummary> {
     const canonicalUserId = await resolveUserId(userId);
     const [positions, backendSummary, quality] = await Promise.all([
@@ -313,6 +338,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             // fxMissing = no hay valor/rentabilidad base válidos. En suspensión de valoración también
             // (la UI muestra el motivo real vía valuationHold, no «conversión»).
             fxMissing: held || position.market_value_base === null || position.cost_basis_base === null,
+            quoteMissing: position.quote_missing === true,
             nativeGain: position.unrealized_pnl_native ?? null,
             nativeCost: position.cost_basis_native ?? null,
             priceEffect: position.pnl_price_effect_base ?? null,
@@ -329,7 +355,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     // el backend ya deja fuera del valor RV las que no tienen precio, FX o están en
     // suspensión (y un coste IBKR pendiente de revisión no es base fiable). Sumar su coste sin su ganancia diluía el rendimiento (coste 2.000,
     // ganancia 500 → +25 % en vez de +50 %) y descuadraba Cartera con /inicio.
-    const valued = holdings.filter((holding) => !holding.fxMissing && holding.cost > 0 && !holding.costReviewMessage);
+    const valued = holdings.filter((holding) => !holding.fxMissing && !holding.quoteMissing && holding.cost > 0 && !holding.costReviewMessage);
     const totalCost = valued.reduce((sum, holding) => sum + holding.cost, 0);
     const totalGain = valued.reduce((sum, holding) => sum + holding.gain, 0);
     return {
@@ -403,10 +429,10 @@ export async function updateTransaction(
 ): Promise<{ success: boolean; error?: string }> {
     const canonicalUserId = await resolveUserId(userId);
     if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
-        throw new ValidationError('Quantity must be positive and price cannot be negative');
+        throw new ValidationError('La cantidad debe ser positiva y el precio no puede ser negativo.');
     }
     if (fees !== undefined && (!Number.isFinite(fees) || fees < 0)) {
-        throw new ValidationError('Fees cannot be negative');
+        throw new ValidationError('Las comisiones no pueden ser negativas.');
     }
     try {
         await researchRequest<ResearchPortfolioTransaction>(
@@ -641,16 +667,6 @@ export async function quickAddPosition(
 }
 
 // Obtener holdings con peso de portfolio
-export async function getPortfolioWithWeights(userId: string) {
-    await resolveUserId(userId);
-    const summary = await getPortfolioSummary(userId);
-
-    return summary.holdings.map(h => ({
-        ...h,
-        weight: summary.totalValue > 0 ? (h.value / summary.totalValue) * 100 : 0
-    }));
-}
-
 /**
  * Resultado de `refreshPortfolioHoldings`: lo que SE ESCRIBIÓ, no lo que se
  * pidió. Antes la acción devolvía el array de entrada con la forma del éxito

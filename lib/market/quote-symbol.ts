@@ -44,7 +44,10 @@ export function quoteSymbolFor(company: ListingBasics, rawTicker: string): strin
     }
     const suffix = EXCHANGE_YAHOO_SUFFIX[exchange];
     if (suffix) {
-        return `${ticker}${suffix}`;
+        // Un ticker guardado ya con el sufijo de su plaza (ITX.MC, SAP.DE, que
+        // es como lo devuelve el buscador) es el símbolo de listado: añadir el
+        // sufijo otra vez daba ITX.MC.MC, sin cotización ni logo (404).
+        return ticker.endsWith(suffix) ? ticker : `${ticker}${suffix}`;
     }
     const usExchange =
         exchange !== '' &&

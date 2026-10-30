@@ -384,6 +384,12 @@ class ThesisEvidenceService:
                 value = _decimal(info["value"])
                 if value is None:
                     continue
+                if metric == "capital_expenditure":
+                    # PaymentsToAcquire... llega en positivo; el resto de la
+                    # app guarda el capex en negativo (salida de caja), como la
+                    # ingesta SEC completa. En positivo, FCF = OCF + capex salia
+                    # inflado en 2 x capex (TTM, modelo a largo plazo).
+                    value = -abs(value)
                 db.add(
                     FinancialFact(
                         company_id=company.id,

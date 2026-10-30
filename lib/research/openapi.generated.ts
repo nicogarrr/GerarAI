@@ -2453,6 +2453,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/knowledge/documents/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Search Documents
+         * @description Búsqueda de la Biblioteca por título, autor o ticker (sólo del tenant).
+         */
+        get: operations["search_documents_api_knowledge_documents_search_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/knowledge/documents/upload": {
         parameters: {
             query?: never;
@@ -15855,6 +15875,50 @@ export interface operations {
     documents_page_api_knowledge_documents_page_get: {
         parameters: {
             query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_documents_api_knowledge_documents_search_get: {
+        parameters: {
+            query?: {
+                q?: string;
                 limit?: number;
                 offset?: number;
             };

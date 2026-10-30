@@ -161,6 +161,46 @@ describe('EarningsDayStrip', () => {
         expect(screen.getAllByText('Sin eventos')).toHaveLength(5);
         expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/calendar/resultados');
     });
+    it('cada tarjeta enlaza a su día en /calendar/resultados para ver todas las empresas', async () => {
+        getFollowedEarnings.mockResolvedValue({
+            followed_count: 3,
+            days: [{ date: plus(2), events: [ev({ ticker: 'A' }), ev({ ticker: 'B' }), ev({ ticker: 'C' })] }],
+        });
+        render(await EarningsDayStrip());
+        const card = screen.getByRole('link', { name: /3 eventos$/ });
+        expect(card).toHaveAttribute('href', `/calendar/resultados#d-${plus(2)}`);
+        // El ancla existe en la página de resultados: <h2 id={`d-${day.date}`}>.
+        // Días sin eventos conservan el enlace (sin ancla destino, no pasa nada).
+        expect(screen.getAllByRole('link', { name: /Sin eventos$/ })[0]).toHaveAttribute('href', expect.stringMatching(/^\/calendar\/resultados#d-\d{4}-\d{2}-\d{2}$/));
+    });
+    it('el «+N» es visible de verdad y los logos no se encogen cuando sobran eventos', async () => {
+        getFollowedEarnings.mockResolvedValue({
+            followed_count: 3,
+            days: [{ date: today, events: [ev({ ticker: 'A' }), ev({ ticker: 'B' }), ev({ ticker: 'C' })] }],
+        });
+        render(await EarningsDayStrip());
+        // 3 eventos: 2 logos a tamaño completo (size-9) y «+1» con jerarquía
+        // (text-sm semibold, no el gris tenue de antes que pasaba desapercibido).
+        const more = screen.getByText('+1');
+        expect(more.className).toMatch(/\btext-sm\b/);
+        expect(more.className).toMatch(/\bfont-semibold\b/);
+        const logos = screen.getAllByTestId('logo');
+        expect(logos).toHaveLength(2);
+    });
+    it('la tira ancla el scroll a tarjetas enteras (sin descansos a media tarjeta)', async () => {
+        // Captura de prod 30-oct-2026 (390 px): la primera tarjeta aparecía
+        // cortada por el borde izquierdo cuando la tira quedaba a medio
+        // desplazar. snap-mandatory + scroll-pl-4 fuerzan el reposo sobre una
+        // tarjeta entera, respetando el sangrado px-4 del borde.
+        getFollowedEarnings.mockResolvedValue({ followed_count: 1, days: [{ date: today, events: [ev()] }] });
+        render(await EarningsDayStrip());
+        const card = screen.getAllByRole('link', { name: /^Resultados del/ })[0];
+        const scroller = card.parentElement as HTMLElement;
+        expect(scroller.className).toMatch(/\bsnap-x\b/);
+        expect(scroller.className).toMatch(/\bsnap-mandatory\b/);
+        expect(scroller.className).toMatch(/\bscroll-pl-4\b/);
+        expect(card.className).toMatch(/\bsnap-start\b/);
+    });
     it('la tira horizontal contiene sus etiquetas sr-only (sin desborde de la página en móvil)', async () => {
         // Suite E2E de flujos (28-oct-2026), /inicio a 375 px: las etiquetas
         // sr-only (position:absolute) de las tarjetas no tenían un ancestro

@@ -21,7 +21,15 @@ const TONE_CLASSES: Record<StatTone, string> = {
 
 const VALUE_SIZE_CLASSES: Record<StatSize, string> = {
   md: 'text-2xl font-semibold',
-  sm: 'text-lg font-semibold',
+  // En móvil las rejillas `sm` van a 2 columnas (~125 px útiles por tarjeta):
+  // a text-lg una cifra como «100.000,00 €» no cabía y `break-words` la partía
+  // dejando el «€» solo en otra línea. text-base hasta `sm:` + padding p-3.
+  sm: 'text-base font-semibold sm:text-lg',
+}
+
+const PADDING_CLASSES: Record<StatSize, string> = {
+  md: 'p-4',
+  sm: 'p-3 sm:p-4',
 }
 
 export interface StatProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -48,7 +56,8 @@ function Stat({ label, value, tone = 'default', size = 'md', hint, className, ..
   return (
     <div
       className={cn(
-        'min-w-0 rounded-xl border border-gray-700/50 bg-surface-1 p-4',
+        'min-w-0 rounded-xl border border-gray-700/50 bg-surface-1',
+        PADDING_CLASSES[size],
         className
       )}
       {...props}
@@ -56,7 +65,7 @@ function Stat({ label, value, tone = 'default', size = 'md', hint, className, ..
       <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
         {label}
       </div>
-      <div className={cn('mt-2 break-words', VALUE_SIZE_CLASSES[size], TONE_CLASSES[tone])}>
+      <div className={cn('mt-2 break-words tabular-nums', VALUE_SIZE_CLASSES[size], TONE_CLASSES[tone])}>
         {value}
       </div>
       {hint ? <div className="mt-1 text-xs text-gray-500">{hint}</div> : null}

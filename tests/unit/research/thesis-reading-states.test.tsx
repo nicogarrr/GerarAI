@@ -123,4 +123,18 @@ describe('vista de lectura de la tesis: documento', () => {
         expect(screen.getByText('Margen de seguridad')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/api/thesis/AAPL/pdf');
     });
+
+    it('A10: una tesis antigua solo con markdown muestra sus catalizadores y riesgos en la lectura', async () => {
+        const old = {
+            ...thesis, narrative_sections: [], catalysts: [], invalidation_criteria: [],
+            thesis_markdown: '# ACME\n\n## Catalizadores\n\n- Investor day en enero\n\n## Riesgos\n\nLa deuda vence en 2027.\n',
+        };
+        vi.mocked(getResearchThesisWorkspace).mockResolvedValue({ thesis: old } as never);
+        vi.mocked(researchRequest).mockResolvedValue([old]);
+        render(await page());
+        expect(screen.getAllByRole('heading', { name: 'Catalizadores' }).length).toBeGreaterThan(0);
+        expect(screen.getByText('Investor day en enero')).toBeInTheDocument();
+        expect(screen.getAllByRole('heading', { name: 'Riesgos' }).length).toBeGreaterThan(0);
+        expect(screen.getByText('La deuda vence en 2027.')).toBeInTheDocument();
+    });
 });

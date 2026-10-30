@@ -9,6 +9,7 @@ import { researchErrorDetail } from '@/lib/research/error-detail';
 import { AppError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
+import { spanishBackendMessage } from '@/lib/research/backend-error-es';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -450,7 +451,7 @@ export async function ingestLettersCorpusNow(): Promise<CorpusIngestResult> {
     return { success: true };
   } catch (error) {
     console.error('ingestLettersCorpusNow error:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'No se pudo encolar la descarga.' };
+    return { success: false, message: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo encolar la descarga.' };
   }
 }
 
@@ -505,7 +506,7 @@ export async function deleteKnowledgeDocument(documentId: number): Promise<Delet
     return { success: true };
   } catch (error) {
     console.error('deleteKnowledgeDocument error:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'No se pudo eliminar el documento.' };
+    return { success: false, message: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo eliminar el documento.' };
   }
 }
 
@@ -517,7 +518,7 @@ export async function deleteKnowledgeCollection(collectionId: number): Promise<D
     return { success: true };
   } catch (error) {
     console.error('deleteKnowledgeCollection error:', error);
-    return { success: false, message: error instanceof Error ? error.message : 'No se pudo eliminar la colección.' };
+    return { success: false, message: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo eliminar la colección.' };
   }
 }
 
@@ -853,7 +854,7 @@ export async function reconcileManagementCredibility(ticker: string) {
 }
 
 export async function updateManagementExplanation(ticker: string, promiseId: number, formData: FormData) {
-  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${promiseId}/explanation`, {
+  await requestJson(`/api/companies/${encodeURIComponent(ticker.toUpperCase())}/management-credibility/promises/${assertPositiveInt(promiseId, 'promiseId')}/explanation`, {
     method: 'PUT',
     body: JSON.stringify({ explanation: required(formData, 'explanation', 'Explanation') }),
   });

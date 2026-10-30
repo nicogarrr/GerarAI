@@ -70,13 +70,25 @@ money = st.floats(min_value=0.01, max_value=1e9)  # choose() redondea a 4 decima
 
 @given(
     st.one_of(st.none(), st.builds(Candidate, value=money, as_of=st.one_of(st.none(), st.dates()), thesis_version=st.integers(1, 9))),
-    st.one_of(st.none(), st.builds(Candidate, value=money, as_of=st.none(), publishable=st.booleans())),
+    st.one_of(st.none(), st.builds(Candidate, value=money, as_of=st.one_of(st.none(), st.dates()), publishable=st.booleans())),
 )
 def test_choose_never_invents_a_value(thesis, engine):
-    reading = choose(thesis, engine, today=date(2026, 10, 27))
+    today = date(2026, 10, 27)
+    reading = choose(thesis, engine, today=today)
+    fresh_orientative = (
+        engine is not None
+        and not engine.publishable
+        and engine.as_of is not None
+        and (today - engine.as_of).days <= 180
+    )
     if thesis is None and engine is None:
         assert reading["value"] is None and reading["publishable"] is False
-    else:
+    elif thesis is not None or (engine is not None and engine.publishable) or fresh_orientative:
         assert reading["value"] is not None and reading["value"] > 0
+    else:
+        # Unico caso sin cifra habiendo motor: borrador orientativo caducado o
+        # sin fecha (caduca como una tesis; nunca se sirve un numero viejo).
+        assert reading["value"] is None and reading["publishable"] is False
+        assert reading["reason"]
     if reading["source"] == "motor_orientativo":
         assert reading["publishable"] is False

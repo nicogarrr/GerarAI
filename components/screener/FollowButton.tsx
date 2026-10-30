@@ -31,7 +31,7 @@ export default function FollowButton({
   isFollowed?: boolean;
   /** El servidor no pudo leer la watchlist: no se sabe si se sigue. Botón deshabilitado, no un "Seguir" que podría ser falso. */
   stateUnknown?: boolean;
-  /** Solo icono por debajo de sm (cabecera de la ficha); desde sm vuelve el texto. El nombre accesible es siempre el texto completo. */
+  /** Etiqueta corta por debajo de sm (cabecera de la ficha); desde sm, el texto completo. El nombre accesible sale del texto visible de cada breakpoint (sin aria-label: WCAG 2.5.3, label-content-name-mismatch). */
   compact?: boolean;
 }) {
   const [followed, setFollowed] = useState(isFollowed);
@@ -83,7 +83,6 @@ export default function FollowButton({
       title={stateUnknown ? 'No se pudo comprobar tu watchlist. Recarga la página.' : undefined}
       aria-busy={busy}
       aria-pressed={followed}
-      aria-label={compact ? (stateUnknown ? 'Seguir (no disponible)' : followed ? 'Dejar de seguir' : 'Seguir') : undefined}
       className={compact ? 'h-11 gap-1.5 px-3 text-gray-300 hover:text-teal-300 sm:h-7 sm:w-auto sm:gap-1 sm:px-2 sm:text-xs' : 'min-h-[44px] px-3 py-2 text-sm text-gray-300 hover:text-teal-300 sm:h-7 sm:min-h-0 sm:px-2 sm:text-xs'}
     >
       {busy ? (
@@ -98,6 +97,10 @@ export default function FollowButton({
         if (!compact) return text;
         // En móvil una ✓ sola no dice que el estado es «siguiendo» ni que el
         // toque lo quita (informe UX 29-oct, punto 12): etiqueta corta visible.
+        // Sin aria-label: con «Siguiendo» visible y nombre «Dejar de seguir»
+        // axe-core lo marca label-content-name-mismatch (serio) a 375 px; el
+        // nombre accesible es el texto visible de cada breakpoint y el estado
+        // lo da aria-pressed.
         const short = busy ? 'Guardando…' : stateUnknown ? 'No disponible' : followed ? 'Siguiendo' : 'Seguir';
         return <><span className="sm:hidden">{short}</span><span className="hidden sm:inline">{text}</span></>;
       })()}

@@ -576,3 +576,31 @@ def test_tenant_directions_ignore_legacy_override_and_saved_policy_wins(db):
     fetcher.set("UBER", series(70.0))  # saved up threshold 4X: no alert
     assert _run(db, fetcher)["alerted"] == []
     assert db.scalar(select(DcaAlertOverride).where(DcaAlertOverride.symbol == "UBER")).min_level == 0
+
+
+def test_market_prices_fallback_keeps_the_declared_unit_not_company_currency(db):
+    """Cierres de respaldo en peniques: la etiqueta es la unidad de las filas.
+
+    Antes el estado se etiquetaba con company.currency (GBP) y un cierre de
+    70 peniques se mostraba como «70,00 GBP» (x100) en UI y correo.
+    """
+    from app.models.entities import MarketPrice
+
+    company = _company(db, "CGEO.L", currency="GBP", exchange="LSE", name="Georgia Capital")
+    for row in series(70.0):
+        db.add(
+            MarketPrice(
+                company_id=company.id,
+                date=row.day,
+                close=Decimal(str(row.close)),
+                source="seed",
+                quote_currency="GBp",
+            )
+        )
+    db.commit()
+    _watch(db, "CGEO.L")
+    _run(db, FakeFetcher())  # Yahoo falla: solo respaldo
+    state = _state(db, "CGEO.L")
+    assert state.data_source == "market_prices"
+    assert state.currency == "GBp"
+    assert float(state.close) == 70.0

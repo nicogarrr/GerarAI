@@ -111,3 +111,45 @@ def test_rebuild_position_uses_last_transaction_date_by_default(db):
 
     assert position is not None
     assert position.as_of == date(2026, 1, 10)
+
+
+def _rates(service, monkeypatch, table):
+    """EUR por USD por fecha; una fecha ausente = sin tipo de cambio ese dia."""
+    monkeypatch.setattr(
+        service.fx, "rate",
+        lambda db, *, quote_currency, base_currency, as_of: (
+            Decimal("1") if quote_currency == base_currency else table.get(as_of)
+        ),
+    )
+
+
+def test_sell_without_fx_keeps_the_remaining_cost_base(db, monkeypatch):
+    service = PortfolioLedgerService()
+    d1, d2 = date(2026, 1, 10), date(2026, 2, 10)
+    _rates(service, monkeypatch, {d1: Decimal("0.9")})
+    _buy(service, db, currency="USD", trade_date=d1)          # 10 @ 100 USD -> 900 EUR
+    _buy(service, db, currency="USD", action="sell", quantity=Decimal("4"),
+         price=Decimal("120"), trade_date=d2)                 # sin FX ese dia
+    position = service.rebuild_position(db, service.ensure_company(db, "AAPL").id)
+    assert position.quantity == Decimal("6")
+    # Coste base de las 6 restantes: 900 * 6/10 = 540 EUR, sin depender del FX de la venta.
+    assert position.cost_basis_base == Decimal("540")
+    assert position.realized_pnl_base is None                 # este si necesita el FX
+
+
+def test_missing_fx_in_a_closed_lot_does_not_blank_the_new_lot(db, monkeypatch):
+    service = PortfolioLedgerService()
+    d1, d2, d3 = date(2025, 1, 10), date(2025, 2, 10), date(2026, 1, 10)
+    _rates(service, monkeypatch, {d3: Decimal("0.9")})
+    _buy(service, db, currency="USD", trade_date=d1)
+    _buy(service, db, currency="USD", action="sell", quantity=Decimal("10"),
+         price=Decimal("110"), trade_date=d2)
+    _buy(service, db, currency="USD", quantity=Decimal("5"), price=Decimal("200"),
+         trade_date=d3)                                       # nuevo lote con FX
+    position = service.rebuild_position(db, service.ensure_company(db, "AAPL").id)
+    assert position.average_cost == Decimal("200")
+    assert position.cost_basis_base == Decimal("900")         # 5 * 200 * 0.9
+    assert position.market_value_base == Decimal("900")
+    assert position.unrealized_pnl_base == Decimal("0")
+    assert position.realized_pnl == Decimal("100")            # nativo: (110-100)*10
+    assert position.realized_pnl_base is None                 # lote cerrado sin FX

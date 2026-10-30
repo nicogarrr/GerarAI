@@ -372,6 +372,16 @@ def _with_retry_hint(request: LLMRequest) -> LLMRequest:
     return replace(request, messages=messages)
 
 
+async def _evict(provider: Any, response: Any) -> None:
+    """Una salida rechazada no se queda en la cache de respuestas."""
+    evict = getattr(provider, "evict_cached", None)
+    if callable(evict) and getattr(response, "cache_key", None):
+        try:
+            await evict(response)
+        except Exception:  # noqa: BLE001 - la cache nunca rompe la llamada
+            logger.debug("llm_output_guard: no se pudo retirar la entrada de cache", exc_info=True)
+
+
 async def complete_guarded(
     provider: Any,
     request: LLMRequest,
@@ -398,6 +408,7 @@ async def complete_guarded(
     if not reasons:
         return GuardedResponse(first)
     _count(source, "triggered")
+    await _evict(provider, first)
     for reason in reasons:
         _count(source, f"reason.{reason}")
     logger.warning("llm_output_guard[%s]: salida rechazada (%s), reintento unico", source, ",".join(reasons))
@@ -422,6 +433,7 @@ async def complete_guarded(
         _count(source, "recovered")
         return GuardedResponse(second, discarded=[first], retried=True, calls=2)
     _count(source, "rejected")
+    await _evict(provider, second)
     logger.warning(
         "llm_output_guard[%s]: reintento tambien rechazado (%s), degradando", source, ",".join(retry_reasons)
     )

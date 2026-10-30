@@ -20,6 +20,7 @@ from app.services.esef_fact_quarantine import fact_quarantine_reason
 from app.services.price_units import close_in_company_currency
 from app.services.split_adjustment import (
     fact_split_factor,
+    split_after_price,
     split_events_by_company,
 )
 from app.valuation.engines.base import ADR_TAG_PREFIX, adr_ratio
@@ -197,6 +198,14 @@ def load_screener_ratios(
             price_provenance["adr_ratio"] = ratio
             price_provenance["basis"] = "ordinary_share (adr_close / adr_ratio)"
         provenance = {"price": price_provenance, "facts": {}}
+        # Cierre guardado anterior a un split ya efectivo: base desconocida
+        # (vieja o ya ajustada por el proveedor), PER y P/B N/D como la
+        # valoracion (#3227). El precio en vivo es de hoy: no aplica.
+        price_basis_unknown = not use_live and split_after_price(
+            splits_by_company.get(company.id, []), price.date, today
+        )
+        if price_basis_unknown:
+            price_provenance["basis"] = "unknown_after_split"
 
         def pair(left: str, right: str):
             for year in years:
@@ -206,7 +215,7 @@ def load_screener_ratios(
                     return a, b
             return None
 
-        for year in years:
+        for year in [] if price_basis_unknown else years:
             eps = facts_for_company.get((year, "eps_diluted"))
             if eps and eps.value and eps.value > 0 and _unit_currency(eps.unit) == currency:
                 # El precio es de HOY: si hubo split tras el cierre del
@@ -230,7 +239,7 @@ def load_screener_ratios(
                     )
                 provenance["facts"]["pe"] = pe_prov
                 break
-        equity_shares = pair("total_equity", "shares_diluted")
+        equity_shares = None if price_basis_unknown else pair("total_equity", "shares_diluted")
         if equity_shares:
             equity, shares = equity_shares
             if equity.value > 0 and _unit_currency(equity.unit) == currency and (shares.unit or "").lower() == "shares":

@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entities import Base, Company, FXRate, Portfolio, Transaction
 from app.services.connectors.ecb_history import backfill_ecb_rates, parse_ecb_csv
+from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.tax_report_service import TaxReportService
 
 CSV = (
@@ -87,9 +88,10 @@ def test_backfill_guarda_eur_por_unidad_y_subunidades(db):
         FXRate.quote_currency == "USD", FXRate.rate_date == date(2025, 12, 29)))
     assert usd is not None and usd.source == "ECB"
     assert usd.rate == pytest.approx(Decimal("0.849906510"), abs=Decimal("1e-9"))
-    gbx = db.scalar(select(FXRate).where(FXRate.quote_currency == "GBX"))
+    gbx = PortfolioFXService().rate(
+        db, quote_currency="GBX", base_currency="EUR", as_of=date(2025, 12, 29))
     assert gbx is not None
-    assert gbx.rate * 250 == pytest.approx(Decimal("2.8650"), abs=Decimal("0.0001"))
+    assert gbx * 250 == pytest.approx(Decimal("2.8650"), abs=Decimal("0.0001"))
 
 
 def test_informe_usa_el_tipo_bce_descargado(db):
@@ -121,3 +123,35 @@ def test_tipo_de_mas_de_7_dias_no_se_usa(db):
     by_date = {p["date"]: p["amount_base"] for p in payments}
     assert by_date["2025-01-06"] == 96.0
     assert by_date["2025-03-01"] is None
+
+
+def test_cartera_solo_en_peniques_tiene_tipo_tras_la_descarga(db):
+    """Solo hay operaciones en GBp (peniques), ninguna en GBP.
+
+    A mano: GBP 29/12/2025 = 0,8726 por EUR → 1 GBP = 1/0,8726 EUR =
+    1,1460005 EUR; 1 GBp = 0,011460005 EUR; dividendo de 250 GBp → 2,86 €
+    (2,8650 redondeado a céntimos: 2,86 o 2,87 según la regla del informe).
+    Antes la descarga guardaba una fila «GBX» que ningún lector consulta y
+    el tipo de GBp seguía sin existir: el dividendo salía «sin tipo».
+    """
+    company = _company(db)
+
+    async def fake_fetch(codes, start, end):
+        assert codes == ["GBP"]
+        return CSV
+
+    asyncio.run(backfill_ecb_rates(
+        db, currencies={"GBp"}, start=date(2025, 12, 29), end=date(2025, 12, 30),
+        fetcher=fake_fetch,
+    ))
+    rate = PortfolioFXService().rate(
+        db, quote_currency="GBp", base_currency="EUR", as_of=date(2025, 12, 29))
+    assert rate is not None
+    assert rate * 250 == pytest.approx(Decimal("2.8650"), abs=Decimal("0.0001"))
+    gbp = PortfolioFXService().rate(
+        db, quote_currency="GBP", base_currency="EUR", as_of=date(2025, 12, 29))
+    assert gbp == pytest.approx(Decimal("1.1460005"), abs=Decimal("0.000001"))
+    _dividend(db, company, date(2025, 12, 29), 250, currency="GBp")
+    bucket = TaxReportService().compute_report(db, 2025)["dividends"][0]
+    assert not bucket.get("missing_fx")
+    assert bucket["dividends_base"] == pytest.approx(2.87, abs=0.011)

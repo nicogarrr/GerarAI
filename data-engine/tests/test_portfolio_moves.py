@@ -134,3 +134,28 @@ def test_split_does_not_become_false_price_move(db):
     assert item["adjusted_close"] == "110.000000"
     assert item["previous_adjusted_close"] == "100.000000"
     assert "close" not in item and "previous_close" not in item
+
+
+def test_missing_session_is_not_presented_as_the_day_move(db):
+    # Falta el martes 22-sep: lunes 10 -> miercoles 11 (+10 % en dos sesiones)
+    # no es la variacion del miercoles.
+    tenant = Tenant(external_id="tenant-gap", name="Gap", metadata_={}, status="active")
+    db.add(tenant)
+    db.flush()
+    company = Company(ticker="GAP", name="Gap", exchange="NASDAQ", currency="USD",
+                      company_type="holding", valuation_model="unassigned")
+    db.add(company)
+    db.flush()
+    portfolio = Portfolio(tenant_id=tenant.id, name="A")
+    db.add(portfolio)
+    db.flush()
+    db.add(Position(tenant_id=tenant.id, portfolio_id=portfolio.id, company_id=company.id,
+                    quantity=Decimal("1"), average_cost=Decimal("10")))
+    db.add_all((MarketPrice(company_id=company.id, date=date(2026, 9, 21), close=Decimal("10"), adj_close=Decimal("10"), source="yfinance"),
+                MarketPrice(company_id=company.id, date=date(2026, 9, 23), close=Decimal("11"), adj_close=Decimal("11"), source="yfinance")))
+    db.commit()
+    db.info["tenant_id"] = tenant.id
+    item = build_digest(db, date(2026, 9, 23), datetime(2026, 9, 24, tzinfo=UTC)).items[0]
+    assert item["status"] == "hueco de sesión"
+    assert "price_change_pct" not in item
+    assert item["missing_sessions"] == ["2026-09-22"]

@@ -284,15 +284,17 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           </div>
         </section>
       ) : null}
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+      {/* Tres cifras en una fila también en móvil: apiladas ocupaban ~300 px y
+          empujaban el buscador y la lista fuera de la primera pantalla. */}
+      <section aria-label="Resumen de la biblioteca" className="grid grid-cols-3 gap-2 sm:gap-4">
         {[
           ['Colecciones', collections.length],
           ['Documentos', library.documentTotal],
           ['Pendientes de aprobación', library.proposedTotal],
         ].map(([label, value]) => (
-          <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={label}>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
-            <div className="mt-2 text-2xl font-semibold text-gray-100">{formatNumber(Number(value), { maximumFractionDigits: 0 })}</div>
+          <div className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-4" key={label}>
+            <div className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">{label}</div>
+            <div className="mt-1 text-xl font-semibold tabular-nums text-gray-100 sm:mt-2 sm:text-2xl">{formatNumber(Number(value), { maximumFractionDigits: 0 })}</div>
           </div>
         ))}
       </section>

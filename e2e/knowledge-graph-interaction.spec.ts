@@ -1,9 +1,10 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { APIRequestContext, Locator, Page } from "@playwright/test";
+import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
 
 const runUiE2E = process.env.E2E_UI_RUN === "1";
-const uiBackendURL = process.env.E2E_UI_BACKEND_URL ?? "http://127.0.0.1:8100";
+const uiBackendURL = E2E_UI_BACKEND_URL;
 const authSecret =
   process.env.RESEARCH_AUTH_SECRET ?? "cavaai-e2e-research-secret-at-least-32-characters";
 // El navegador entra con el bypass E2E como `e2e-browser-user` y la UI firma con

@@ -249,3 +249,71 @@ def test_sotp_same_period_segments_still_value():
     result = _sotp_result({})
     assert result["status"] == "ok"
     assert "consistent_segment_periods" not in result["missing_inputs"]
+
+
+def _seed_sotp(db, ticker, units):
+    existing = db.scalar(select(Company).where(Company.ticker == ticker))
+    if existing:
+        db.execute(delete(FinancialFact).where(FinancialFact.company_id == existing.id))
+        db.delete(existing)
+        db.commit()
+    company = Company(
+        ticker=ticker, name="SOTP currency test", exchange="TEST", currency="USD",
+        sector="Industrials", industry="Conglomerate", company_type="multi_segment",
+        valuation_model="sotp", special_sources=[], special_risks=[], factor_tags=["sotp"],
+    )
+    db.add(company)
+    db.flush()
+    facts = {
+        "shares_diluted": (100, "shares"),
+        "net_debt": (250, units["net_debt"]),
+        "holding_company_discount": (0.12, "decimal"),
+        "segment_services_operating_metric": (80, units["services"]),
+        "segment_services_valuation_multiple": (12, "decimal"),
+        "segment_assets_operating_metric": (500, units["assets"]),
+        "segment_assets_valuation_multiple": (1.1, "decimal"),
+    }
+    for metric, (value, unit) in facts.items():
+        db.add(FinancialFact(
+            company_id=company.id, metric=metric, value=Decimal(str(value)), unit=unit,
+            period="FY2025", fiscal_year=2025, fiscal_quarter="FY",
+            source_type="sotp_engine_test", confidence=Decimal("0.91"),
+        ))
+    db.commit()
+    return company
+
+
+def test_sotp_blocks_segments_and_net_debt_in_different_currencies():
+    """Un segmento en EUR sumado a otro en USD menos deuda en USD no es un NAV.
+
+    Antes: (80x12 USD + 500x1,1 EUR - 250 USD) / 100 = 12,60 "USD" por accion,
+    11,09 tras el 12 % de descuento, con margen de seguridad publicado.
+    Ahora: N/D con ``single_reporting_currency`` en lo que falta.
+    """
+    init_db()
+    db = SessionLocal()
+    ids = []
+    try:
+        mixed = _seed_sotp(db, "SOTPFX", {"net_debt": "USD", "services": "USD", "assets": "EUR"})
+        ids.append(mixed.id)
+        result = ValuationService().value_company(db, mixed)
+        assert result["status"] != "ok"
+        assert result.get("expected_value") is None
+        assert "single_reporting_currency" in result["missing_inputs"]
+
+        same = _seed_sotp(db, "SOTPUS", {"net_debt": "USD", "services": "USD", "assets": "USD"})
+        ids.append(same.id)
+        ok = ValuationService().value_company(db, same)
+        assert ok["status"] == "ok"
+        # (960 + 550 - 250) / 100 = 12,60 NAV; x (1 - 0,12) = 11,088 base.
+        rows = ok["trace"]["sensitivity"]["rows"] if "sensitivity" in ok["trace"] else None
+        assert "single_reporting_currency" not in (ok.get("missing_inputs") or [])
+        if rows:
+            base = next(r for r in rows if r["scenario"] == "base_discount")
+            assert abs(base["nav_per_share"] - 12.60) < 1e-9
+    finally:
+        for cid in ids:
+            db.execute(delete(FinancialFact).where(FinancialFact.company_id == cid))
+            db.execute(delete(Company).where(Company.id == cid))
+        db.commit()
+        db.close()

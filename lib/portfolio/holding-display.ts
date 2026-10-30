@@ -6,12 +6,13 @@ export type HoldingDisplayInput = {
     value: number;
     valueMissing: boolean;
     fxMissing: boolean;
+    quoteMissing?: boolean;
 };
 
 export type HoldingDisplayMode = 'gain' | 'value' | 'na';
 
 export function holdingDisplayMode(h: HoldingDisplayInput): HoldingDisplayMode {
-    if (h.cost > 0 && !h.fxMissing) return 'gain';
+    if (h.cost > 0 && !h.fxMissing && !h.quoteMissing) return 'gain';
     if (!h.valueMissing && h.value > 0) return 'value';
     return 'na';
 }

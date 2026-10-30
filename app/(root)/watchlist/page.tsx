@@ -20,6 +20,7 @@ import DcaLevelBadge from '@/components/watchlist/DcaLevelBadge';
 import { sortWatchlistRows } from '@/lib/watchlist/sort-rows';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
+import { getPortfolioFxContext } from '@/lib/actions/portfolio.actions';
 import type { DcaSignalItem } from '@/lib/dca/types';
 import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
@@ -84,7 +85,9 @@ export default async function WatchlistPage({
     // userId para el alta de «Registrar compra» (misma sesión cacheada por
     // petición que usan las acciones de esta página).
     const { id: userId } = await requireAuthenticatedUser();
-    const [{ items: watchlistItems, unavailable }, query] = await Promise.all([getWatchlistState(), searchParams]);
+    // A9: tipos de la cartera para convertir el objetivo de analistas de un ADR
+    // (USD) a la divisa de la fila, como ya hace Cartera.
+    const [{ items: watchlistItems, unavailable }, query, { fxRates, baseCurrency }] = await Promise.all([getWatchlistState(), searchParams, getPortfolioFxContext(userId)]);
     const requestedPage = /^\d+$/.test(query.page ?? '') ? Number(query.page) : 1;
     const totalPages = Math.max(1, Math.ceil(watchlistItems.length / PAGE_SIZE));
     const page = Math.min(totalPages, Math.max(1, Number.isSafeInteger(requestedPage) ? requestedPage : 1));
@@ -503,7 +506,7 @@ export default async function WatchlistPage({
                                     </div>
                                     <div className="min-w-0">
                                         <dt className="text-[11px] text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente: Yahoo Finance (no oficial).">Obj. analistas</dt>
-                                        <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} /></dd>
+                                        <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} /></dd>
                                     </div>
                                 </dl>
                                 <div className="mt-2 flex items-center gap-2">
@@ -629,7 +632,7 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right text-sm">
-                                            <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} />
+                                            <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} />
                                         </TableCell>
                                         <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
                                             {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
