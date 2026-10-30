@@ -186,6 +186,32 @@ def test_backtest_endpoint_any_ticker_plain_vs_levels(client):
     assert client.get("/api/watchlist/dca-signals/DCABT/backtest", params={"start": "2026-13"}).status_code == 422
 
 
+def test_backtest_uses_new_york_today_at_month_end(client, monkeypatch):
+    """01:30 UTC del 1 de noviembre = 31 de octubre en NY: octubre sigue en curso."""
+    from datetime import UTC, date, datetime
+
+    from app.api.routes import watchlist as route
+    from app.services import dca_backtest
+
+    class _Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 1, 1, 30, tzinfo=UTC)
+
+    seen: dict = {}
+    real = dca_backtest.backtest_dca
+
+    def spy(*args, **kwargs):
+        seen["today"] = kwargs.get("today")
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(route, "datetime", _Clock)
+    monkeypatch.setattr(dca_backtest, "backtest_dca", spy)
+    response = client.get("/api/watchlist/dca-signals/DCABT/backtest")
+    assert response.status_code == 200, response.text
+    assert seen["today"] == date(2026, 10, 31)
+
+
 def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
     """Prueba real en vivo (realqa-15): con DCA_EVALUATION_ENABLED=false en el
     servidor el job diario sale «disabled» cada noche, ningun ticker tiene
