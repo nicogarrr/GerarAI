@@ -12,12 +12,34 @@ from tests import test_thesis_auto_ingest as base
 
 
 @pytest.fixture(autouse=True)
-def _cleanup_asts_evidence():
-    yield
-    base._clean_asts_evidence()
+def _private_database(tmp_path, monkeypatch):
+    """BD SQLite propia para este test (antes compartía la BD de la sesión y
+    fallaba de forma intermitente según lo que otros tests dejaban de ASTS:
+    tesis previas, supuestos, splits...). SessionLocal se re-enlaza en sitio
+    (configure) porque muchos módulos lo importan por nombre."""
+    from sqlalchemy import create_engine
+
+    from app.core import database
+
+    private = create_engine(
+        f"sqlite:///{(tmp_path / 'positive_cash.db').as_posix()}",
+        connect_args={"check_same_thread": False},
+    )
+    previous_bind = database.SessionLocal.kw.get("bind")
+    monkeypatch.setattr(database, "engine", private)
+    database.SessionLocal.configure(bind=private)
+    try:
+        yield
+    finally:
+        database.SessionLocal.configure(bind=previous_bind)
+        private.dispose()
 
 
 def test_positive_ocf_keeps_partial_indicative_range(monkeypatch):
+    from app.core import database
+
+    with database.SessionLocal() as probe:
+        assert "positive_cash.db" in str(probe.get_bind().url)
     init_db()
     seed()
     base._clean_asts_evidence()
