@@ -9,7 +9,7 @@ import { ScreenBreadcrumbName } from '@/components/screeners/ScreenBreadcrumbNam
 import { getScreenerWorkspace, runSavedScreen } from '@/lib/actions/research-tools.actions';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
-import { formatScreenCriterionRight, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel } from '@/lib/screener-results';
+import { formatScreenCriterionRight, formatScreenRank, screenCriterionMetricLabel, screenMissingDataEntry, screenMissingFieldsLabel } from '@/lib/screener-results';
 
 // Sin metadata propia la pestaña heredaba el título genérico de la app y
 // todos los filtros guardados se llamaban igual (WCAG 2.4.2).
@@ -73,7 +73,7 @@ export default async function SavedScreenResultsPage({ params }: { params: Promi
       {result.match_count === 0 && result.company_count > 0 && topMissing.length > 0 ? (
         <p className="rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">
           Sin coincidencias por falta de dato, no por incumplimiento:{' '}
-          {topMissing.map(([field, count]) => `${field} (sin dato en ${formatNumber(count, { maximumFractionDigits: 0 })} de ${formatNumber(result.company_count, { maximumFractionDigits: 0 })} empresas)`).join(', ')}.
+          {topMissing.map(([field, count]) => screenMissingDataEntry(field, count, result.company_count)).join(', ')}.
           El filtro no inventa el dato que falta.
         </p>
       ) : null}
