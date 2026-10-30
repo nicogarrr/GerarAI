@@ -32,7 +32,7 @@ class CachedMarketDataService:
         price = db.scalar(
             select(MarketPrice)
             .where(MarketPrice.company_id == company_id)
-            .order_by(MarketPrice.as_of.desc())
+            .order_by(MarketPrice.date.desc())
             .limit(1)
         )
         if price is None:
@@ -40,9 +40,9 @@ class CachedMarketDataService:
         
         return {
             "company_id": price.company_id,
-            "price": float(price.price),
-            "as_of": price.as_of.isoformat(),
-            "currency": price.currency,
+            "price": float(price.close),
+            "as_of": price.date.isoformat(),
+            "currency": price.quote_currency or "USD",
             "source": price.source,
         }
     
@@ -58,7 +58,7 @@ class CachedMarketDataService:
         subq = (
             select(
                 MarketPrice.company_id,
-                func.max(MarketPrice.as_of).label("max_as_of")
+                func.max(MarketPrice.date).label("max_date")
             )
             .where(MarketPrice.company_id.in_(company_ids))
             .group_by(MarketPrice.company_id)
@@ -70,7 +70,7 @@ class CachedMarketDataService:
             .join(
                 subq,
                 (MarketPrice.company_id == subq.c.company_id)
-                & (MarketPrice.as_of == subq.c.max_as_of)
+                & (MarketPrice.date == subq.c.max_date)
             )
         ).all()
         
@@ -78,9 +78,9 @@ class CachedMarketDataService:
         for price in prices:
             result[price.company_id] = {
                 "company_id": price.company_id,
-                "price": float(price.price),
-                "as_of": price.as_of.isoformat(),
-                "currency": price.currency,
+                "price": float(price.close),
+                "as_of": price.date.isoformat(),
+                "currency": price.quote_currency or "USD",
                 "source": price.source,
             }
         
@@ -89,7 +89,7 @@ class CachedMarketDataService:
     @cached(prefix=f"{MARKET_DATA_PREFIX}:quote", ttl=MARKET_DATA_TTL, category="market_data")
     def get_quote(self, db: Session, symbol: str) -> dict[str, Any] | None:
         """Obtiene quote de un simbolo con cache."""
-        company = db.scalar(select(Company).where(Company.symbol == symbol))
+        company = db.scalar(select(Company).where(Company.ticker == symbol))
         if company is None:
             return None
         
@@ -117,16 +117,16 @@ class CachedMarketDataService:
             select(MarketPrice)
             .where(
                 MarketPrice.company_id == company_id,
-                MarketPrice.as_of >= cutoff
+                MarketPrice.date >= cutoff
             )
-            .order_by(MarketPrice.as_of.desc())
+            .order_by(MarketPrice.date.desc())
         ).all()
         
         return [
             {
-                "as_of": price.as_of.isoformat(),
-                "price": float(price.price),
-                "currency": price.currency,
+                "as_of": price.date.isoformat(),
+                "price": float(price.close),
+                "currency": price.quote_currency or "USD",
                 "source": price.source,
             }
             for price in prices

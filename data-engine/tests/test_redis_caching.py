@@ -11,6 +11,7 @@ Verifies:
 
 from __future__ import annotations
 
+import fnmatch
 from datetime import date, timedelta
 from decimal import Decimal
 from unittest.mock import patch
@@ -19,15 +20,58 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.core import cache as cache_module
 from app.core.cache import (
     get_cache_stats,
     invalidate_market_data_cache,
     reset_cache_stats,
 )
-from app.models import Base, Company, DcaSignalState, MarketPrice, Portfolio, Position
+from app.core.database import Base
+from app.models import Company, DcaSignalState, MarketPrice, Portfolio, Position
 from app.services.cached_dca_schedule import CachedDcaScheduleService
 from app.services.cached_market_data import CachedMarketDataService
 from app.services.cached_portfolio_valuation import CachedPortfolioValuationService
+
+
+class FakeRedisCache:
+    """In-memory Redis implementation for unit testing."""
+
+    def __init__(self):
+        self.store: dict[str, str] = {}
+
+    def ping(self) -> bool:
+        return True
+
+    def get(self, key: str) -> str | None:
+        return self.store.get(key)
+
+    def setex(self, key: str, ttl: int, value: str) -> bool:
+        self.store[key] = value
+        return True
+
+    def scan(self, cursor: int = 0, match: str | None = None, count: int = 100):
+        pattern = match or "*"
+        matched = [k for k in self.store if fnmatch.fnmatch(k, pattern)]
+        return 0, matched
+
+    def delete(self, *keys: str) -> int:
+        deleted = 0
+        for k in keys:
+            if k in self.store:
+                del self.store[k]
+                deleted += 1
+        return deleted
+
+
+@pytest.fixture(autouse=True)
+def mock_redis_cache():
+    """Autouse fixture providing in-memory Redis client."""
+    fake = FakeRedisCache()
+    cache_module._redis_state["client"] = fake
+    cache_module._redis_state["down_until"] = 0.0
+    yield fake
+    cache_module._redis_state["client"] = None
+    cache_module._redis_state["down_until"] = 0.0
 
 
 @pytest.fixture
@@ -47,10 +91,12 @@ def db_session():
 def sample_company(db_session: Session) -> Company:
     """Create a sample company."""
     company = Company(
-        symbol="AAPL",
+        ticker="AAPL",
         name="Apple Inc.",
         exchange="NASDAQ",
         currency="USD",
+        company_type="operating",
+        valuation_model="dcf",
     )
     db_session.add(company)
     db_session.commit()
@@ -66,9 +112,9 @@ def sample_prices(db_session: Session, sample_company: Company) -> list[MarketPr
     for i in range(30):
         price = MarketPrice(
             company_id=sample_company.id,
-            price=Decimal(f"{150 + i * 0.5}"),
-            as_of=base_date + timedelta(days=i),
-            currency="USD",
+            date=base_date + timedelta(days=i),
+            close=Decimal(f"{150 + i * 0.5}"),
+            quote_currency="USD",
             source="test",
         )
         prices.append(price)
@@ -82,7 +128,9 @@ def sample_prices(db_session: Session, sample_company: Company) -> list[MarketPr
 def sample_portfolio(db_session: Session) -> Portfolio:
     """Create a sample portfolio."""
     portfolio = Portfolio(
+        name="Main",
         base_currency="USD",
+        is_default=True,
         tenant_id=1,
     )
     db_session.add(portfolio)
@@ -100,6 +148,7 @@ def sample_position(db_session: Session, sample_portfolio: Portfolio, sample_com
         market_price=Decimal("150.00"),
         currency="USD",
         as_of=date.today(),
+        tenant_id=1,
     )
     db_session.add(position)
     db_session.commit()
@@ -278,12 +327,16 @@ class TestCachedDcaSchedule:
         
         # Create a DCA signal
         signal = DcaSignalState(
-            symbol=sample_company.symbol,
-            current_level=2,
-            verdict_month=date.today().replace(day=1),
-            current_price=Decimal("150.00"),
-            level_price=Decimal("145.00"),
             tenant_id=1,
+            symbol=sample_company.ticker,
+            level=2,
+            status="active",
+            period=date.today().strftime("%Y-%m"),
+            signal_date=date.today(),
+            close=Decimal("150.00"),
+            level_prices={"2": "145.00"},
+            params_version="v1",
+            data_source="test",
         )
         db_session.add(signal)
         db_session.commit()
@@ -293,7 +346,7 @@ class TestCachedDcaSchedule:
         # First call: cache miss
         result1 = service.get_dca_signals(db_session)
         assert len(result1) == 1
-        assert result1[0]["symbol"] == sample_company.symbol
+        assert result1[0]["symbol"] == sample_company.ticker
         
         # Second call: cache hit
         result2 = service.get_dca_signals(db_session)

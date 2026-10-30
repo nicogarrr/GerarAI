@@ -19,7 +19,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar, cast
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +161,7 @@ def invalidate_portfolio_cache(tenant_id: int | None = None, db=None) -> None:
     try:
         if tenant_id is not None:
             # Invalidar solo este tenant
-            pattern = f"{PORTFOLIO_VALUATION_PREFIX}:tenant:{tenant_id}:*"
+            pattern = f"{PORTFOLIO_VALUATION_PREFIX}*:tenant:{tenant_id}:*"
         else:
             # Invalidar todo
             pattern = f"{PORTFOLIO_VALUATION_PREFIX}:*"
@@ -215,7 +215,7 @@ def invalidate_dca_cache(tenant_id: int | None = None, db=None) -> None:
     
     try:
         if tenant_id is not None:
-            pattern = f"{DCA_SCHEDULE_PREFIX}:tenant:{tenant_id}:*"
+            pattern = f"{DCA_SCHEDULE_PREFIX}*:tenant:{tenant_id}:*"
         else:
             pattern = f"{DCA_SCHEDULE_PREFIX}:*"
         
@@ -264,8 +264,22 @@ def cached(
                 except Exception:
                     pass
             
+            # Filtrar self y Session para una clave determinista entre requests
+            clean_args = []
+            for i, arg in enumerate(args):
+                if i == 0 and hasattr(arg, func.__name__):
+                    continue
+                if hasattr(arg, "info") and (hasattr(arg, "execute") or hasattr(arg, "scalars")):
+                    continue
+                clean_args.append(arg)
+
+            clean_kwargs = {
+                k: v for k, v in kwargs.items()
+                if k not in ("db", "session") and not (hasattr(v, "info") and hasattr(v, "scalars"))
+            }
+
             # Generar clave de cache
-            cache_key = _make_cache_key(prefix, tenant_id, *args, **kwargs)
+            cache_key = _make_cache_key(prefix, tenant_id, *clean_args, **clean_kwargs)
             
             # Intentar leer de cache
             client = _redis_client()
@@ -275,8 +289,10 @@ def cached(
                     if cached_value is not None:
                         _record_hit(category)
                         result = json.loads(cached_value)
+                        if isinstance(result, dict) and result and all(isinstance(k, str) and k.isdigit() for k in result):
+                            result = {int(k): v for k, v in result.items()}
                         logger.debug(f"Cache hit: {cache_key}")
-                        return result
+                        return cast(T, result)
                 except Exception as exc:
                     logger.debug(f"Cache read failed for {cache_key}: {exc}")
                     _redis_down()

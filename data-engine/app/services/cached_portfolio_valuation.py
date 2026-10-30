@@ -28,9 +28,11 @@ logger = logging.getLogger(__name__)
 
 def _extract_tenant_from_db(args, kwargs) -> int | None:
     """Extrae tenant_id del primer argumento (Session db)."""
-    if args and hasattr(args[1], 'info'):  # args[0] es self, args[1] es db
-        return tenant_cache_scope.get()
-    return None
+    if len(args) >= 2 and hasattr(args[1], 'info'):  # args[0] es self, args[1] es db
+        tenant_id = args[1].info.get("tenant_id")
+        if tenant_id is not None:
+            return tenant_id
+    return tenant_cache_scope.get()
 
 
 class CachedPortfolioValuationService:
@@ -69,7 +71,7 @@ class CachedPortfolioValuationService:
             
             positions_data.append({
                 "company_id": position.company_id,
-                "symbol": position.company.symbol if position.company else None,
+                "symbol": position.company.ticker if position.company else None,
                 "quantity": float(position.quantity),
                 "market_price": float(position.market_price),
                 "currency": position.currency,

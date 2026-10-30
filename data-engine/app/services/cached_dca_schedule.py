@@ -45,19 +45,27 @@ class CachedDcaScheduleService:
         states = list(
             db.scalars(
                 select(DcaSignalState)
-                .where(*tenant_filters(DcaSignalState))
+                .where(*tenant_filters(db, DcaSignalState))
                 .order_by(DcaSignalState.symbol)
             ).all()
         )
         
         result = []
         for state in states:
+            level_price = None
+            if state.level_prices and isinstance(state.level_prices, dict):
+                val = state.level_prices.get(str(state.level))
+                if val is not None:
+                    try:
+                        level_price = float(val)
+                    except (ValueError, TypeError):
+                        pass
             result.append({
                 "symbol": state.symbol,
-                "current_level": state.current_level,
-                "verdict_month": state.verdict_month.isoformat() if state.verdict_month else None,
-                "current_price": float(state.current_price) if state.current_price else None,
-                "level_price": float(state.level_price) if state.level_price else None,
+                "current_level": state.level,
+                "verdict_month": state.period,
+                "current_price": float(state.close) if state.close is not None else None,
+                "level_price": level_price,
                 "updated_at": state.updated_at.isoformat() if state.updated_at else None,
             })
         
@@ -75,21 +83,29 @@ class CachedDcaScheduleService:
             select(DcaSignalState)
             .where(
                 DcaSignalState.symbol == symbol,
-                *tenant_filters(DcaSignalState)
+                *tenant_filters(db, DcaSignalState)
             )
         )
         
         if state is None:
             return None
         
+        level_price = None
+        if state.level_prices and isinstance(state.level_prices, dict):
+            val = state.level_prices.get(str(state.level))
+            if val is not None:
+                try:
+                    level_price = float(val)
+                except (ValueError, TypeError):
+                    pass
         return {
             "symbol": state.symbol,
-            "current_level": state.current_level,
-            "verdict_month": state.verdict_month.isoformat() if state.verdict_month else None,
-            "current_price": float(state.current_price) if state.current_price else None,
-            "level_price": float(state.level_price) if state.level_price else None,
+            "current_level": state.level,
+            "verdict_month": state.period,
+            "current_price": float(state.close) if state.close is not None else None,
+            "level_price": level_price,
             "updated_at": state.updated_at.isoformat() if state.updated_at else None,
-            "metadata": state.metadata_ if hasattr(state, "metadata_") else {},
+            "metadata": state.metrics if hasattr(state, "metrics") and state.metrics else {},
         }
     
     @cached(
@@ -104,7 +120,7 @@ class CachedDcaScheduleService:
         watch_items = list(
             db.scalars(
                 select(WatchItem)
-                .where(*tenant_filters(WatchItem))
+                .where(*tenant_filters(db, WatchItem))
             ).all()
         )
         
@@ -119,20 +135,28 @@ class CachedDcaScheduleService:
                 select(DcaSignalState)
                 .where(
                     DcaSignalState.symbol.in_(symbols),
-                    *tenant_filters(DcaSignalState)
+                    *tenant_filters(db, DcaSignalState)
                 )
-                .order_by(DcaSignalState.current_level.desc())
+                .order_by(DcaSignalState.level.desc())
             ).all()
         )
         
         result = []
         for state in states:
+            level_price = None
+            if state.level_prices and isinstance(state.level_prices, dict):
+                val = state.level_prices.get(str(state.level))
+                if val is not None:
+                    try:
+                        level_price = float(val)
+                    except (ValueError, TypeError):
+                        pass
             result.append({
                 "symbol": state.symbol,
-                "current_level": state.current_level,
-                "verdict_month": state.verdict_month.isoformat() if state.verdict_month else None,
-                "current_price": float(state.current_price) if state.current_price else None,
-                "level_price": float(state.level_price) if state.level_price else None,
+                "current_level": state.level,
+                "verdict_month": state.period,
+                "current_price": float(state.close) if state.close is not None else None,
+                "level_price": level_price,
             })
         
         return result
@@ -158,7 +182,7 @@ class CachedDcaScheduleService:
             ).all()
         )
         
-        symbols = [p.company.symbol for p in positions if p.company and p.company.symbol]
+        symbols = [p.company.ticker for p in positions if p.company and p.company.ticker]
         
         if not symbols:
             return []
@@ -169,19 +193,27 @@ class CachedDcaScheduleService:
                 select(DcaSignalState)
                 .where(
                     DcaSignalState.symbol.in_(symbols),
-                    *tenant_filters(DcaSignalState)
+                    *tenant_filters(db, DcaSignalState)
                 )
-                .order_by(DcaSignalState.current_level.desc())
+                .order_by(DcaSignalState.level.desc())
             ).all()
         )
         
         result = []
         for state in states:
+            level_price = None
+            if state.level_prices and isinstance(state.level_prices, dict):
+                val = state.level_prices.get(str(state.level))
+                if val is not None:
+                    try:
+                        level_price = float(val)
+                    except (ValueError, TypeError):
+                        pass
             result.append({
                 "symbol": state.symbol,
-                "current_level": state.current_level,
-                "current_price": float(state.current_price) if state.current_price else None,
-                "level_price": float(state.level_price) if state.level_price else None,
+                "current_level": state.level,
+                "current_price": float(state.close) if state.close is not None else None,
+                "level_price": level_price,
             })
         
         return result
