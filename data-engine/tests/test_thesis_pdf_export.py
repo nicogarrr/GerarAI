@@ -211,3 +211,220 @@ def test_get_portfolio_pdf_endpoint(env):
     # Cartera inexistente -> 404
     res404 = client.get("/api/portfolio/999999/pdf")
     assert res404.status_code == 404
+
+
+def _page_text(pdf_bytes: bytes) -> tuple[str, str]:
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    page1 = reader.pages[0].extract_text()
+    page2 = reader.pages[1].extract_text() if len(reader.pages) > 1 else ""
+    return page1, page2
+
+
+def test_portfolio_pdf_no_invented_rating_strategy_or_provenance(env):
+    """Veracidad: el informe de cartera no inventa calificación, estado, estrategia ni procedencia oficial."""
+    client, _, port_id = env
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, page2 = _page_text(res.content)
+
+    # Sin insignia inventada de COMPRA ni estado PUBLISHED
+    assert "COMPRA" not in page1
+    assert "PUBLISHED" not in page1
+    # Procedencia honesta: datos de la cartera, nunca "OFICIAL"
+    assert "DATOS DE LA CARTERA REGISTRADA" in page1
+    assert "Procedencia: OFICIAL" not in page1
+    # Nada de estrategia inventada
+    full = page1 + page2
+    assert "alta calidad" not in full
+    assert "márgenes de seguridad" not in full
+    # Composición calculada con la posición real
+    assert "SAN.MC" in full
+
+
+def test_portfolio_pdf_cost_fallback_is_labelled(env):
+    """Sin cotización, el valor se marca como coste de adquisición; nunca como precio de mercado."""
+    client, factory, port_id = env
+    from app.models.entities import Company as C, Position as P
+
+    from app.models.entities import Portfolio as Pf
+    with factory() as s:
+        portfolio = s.query(Pf).filter(Pf.id == port_id).first()
+        s.add(C(ticker="XYZ.MC", name="Sin Cotizar SA", exchange="BME", currency="EUR", sector="S", industry="I", company_type="operating", valuation_model="dcf"))
+        s.commit()
+        company2 = s.query(C).filter(C.ticker == "XYZ.MC").first()
+        s.add(P(
+            tenant_id=portfolio.tenant_id,
+            portfolio_id=port_id,
+            company_id=company2.id,
+            quantity=10.0,
+            average_cost=50.0,
+            market_price=0,
+            currency="EUR",
+        ))
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, page2 = _page_text(res.content)
+    full = page1 + page2
+    assert "coste de adquisición" in full
+    assert "*" in page1
+
+
+def test_thesis_pdf_provenance_and_citations_honest(env):
+    """Sin evidencias registradas la procedencia lo dice; nunca se afirma OFICIAL."""
+    client, _, _ = env
+    res = client.get("/api/thesis/SAN.MC/pdf")
+    assert res.status_code == 200
+    page1, page2 = _page_text(res.content)
+    assert "Procedencia: OFICIAL" not in page1
+    assert "SIN FUENTES REGISTRADAS" in page1
+
+
+def test_thesis_pdf_single_section_not_duplicated():
+    """Una sola sección aparece en página 1 y no se repite en página 2."""
+    data = ThesisPdfData(
+        ticker="IBE.MC",
+        company_name="Iberdrola S.A.",
+        version=1,
+        rating="hold",
+        status="published",
+        generated_on="2026-10-30",
+        executive_summary="Resumen.",
+        sections=[PdfSection(title="1. Única Sección", body="Contenido.")],
+    )
+    page1, page2 = _page_text(build_thesis_pdf(data))
+    assert "1. Única Sección" in page1
+    assert "1. Única Sección" not in page2
+
+
+def test_thesis_pdf_citations_use_real_source_urls(env):
+    """Las citas llevan la URL de la evidencia cuando existe, no un id interno."""
+    from app.models.entities import Claim, ClaimEvidence, FundamentalModelVersion as FMV, ThesisVersion as TV
+
+    client, factory, _ = env
+    with factory() as s:
+        thesis = s.query(TV).filter(TV.version == 1).first()
+        # Modelo publicable: la puerta de publicación deja pasar la tesis
+        s.add(FMV(
+            tenant_id=thesis.tenant_id,
+            company_id=thesis.company_id,
+            version=1,
+            engine_version="t",
+            algorithm_version="t",
+            framework_key="dcf",
+            horizon_years=5,
+            status="final",
+            publishable=True,
+            input_fingerprint="fp1",
+            forecast_fingerprint="fp2",
+            market_snapshot_fingerprint="fp3",
+            valuation_snapshot_fingerprint="fp4",
+            scenario_probabilities={},
+        ))
+        s.commit()
+        claim = Claim(
+            tenant_id=thesis.tenant_id,
+            company_id=thesis.company_id,
+            thesis_version_id=thesis.id,
+            statement="El beneficio neto 2025 fue 12.574 M€",
+            claim_type="fact",
+        )
+        s.add(claim)
+        s.flush()
+        s.add(ClaimEvidence(
+            tenant_id=thesis.tenant_id,
+            claim_id=claim.id,
+            source_url="https://www.cnmv.es/doc/santander-iis-2025.pdf",
+            evidence_type="supports",
+            summary="Cifra del informe anual",
+            source_tier="primary",
+        ))
+        s.commit()
+
+    res = client.get("/api/thesis/SAN.MC/pdf")
+    assert res.status_code == 200
+    page1, page2 = _page_text(res.content)
+    full = page1 + page2
+    assert "https://www.cnmv.es/doc/santander-iis-2025.pdf" in full
+    assert "FUENTES OFICIALES" in page1
+
+
+def test_portfolio_pdf_usd_positions_not_labelled_eur(env):
+    """Posiciones en USD sin valor base: el total se etiqueta USD, nunca EUR."""
+    client, factory, port_id = env
+    from app.models.entities import Company as C, Portfolio as Pf, Position as P
+
+    with factory() as s:
+        portfolio = s.query(Pf).filter(Pf.id == port_id).first()
+        # La posición SAN.MC del fixture tiene currency USD por defecto y sin market_value_base
+        s.query(P).filter(P.portfolio_id == port_id).delete()
+        s.add(C(ticker="ASTS", name="AST SpaceMobile", exchange="NASDAQ", currency="USD", sector="T", industry="I", company_type="operating", valuation_model="dcf"))
+        s.commit()
+        asts = s.query(C).filter(C.ticker == "ASTS").first()
+        s.add(P(tenant_id=portfolio.tenant_id, portfolio_id=port_id, company_id=asts.id,
+                quantity=100.0, average_cost=30.0, market_price=30.0, currency="USD"))
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, _ = _page_text(res.content)
+    assert "3.000,00 USD" in page1 or "3,000.00 USD" in page1
+    assert "EUR" not in page1.split("Composición")[0].replace("ASTS", "")
+
+
+def test_portfolio_pdf_mixed_currencies_no_fake_weights(env):
+    """Divisas mezcladas sin valor base: pesos n/d y sin ranking de 'mayores posiciones'."""
+    client, factory, port_id = env
+    from app.models.entities import Company as C, Portfolio as Pf, Position as P
+
+    with factory() as s:
+        portfolio = s.query(Pf).filter(Pf.id == port_id).first()
+        s.add(C(ticker="IBE.MC", name="Iberdrola", exchange="BME", currency="EUR", sector="U", industry="I", company_type="operating", valuation_model="dcf"))
+        s.commit()
+        ibe = s.query(C).filter(C.ticker == "IBE.MC").first()
+        # SAN.MC del fixture está en USD; añadimos IBE.MC en EUR
+        s.add(P(tenant_id=portfolio.tenant_id, portfolio_id=port_id, company_id=ibe.id,
+                quantity=200.0, average_cost=11.5, market_price=11.5, currency="EUR"))
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, page2 = _page_text(res.content)
+    full = page1 + page2
+    assert "n/d" in page1
+    assert "Pesos no calculables" in full
+    assert "Mayores posiciones por peso estimado" not in full
+
+
+def test_pdf_canvas_has_fixed_unit_limits():
+    """Regresión del layout: sin límites 0-1 fijos, matplotlib autoescala con los
+    artistas y la cabecera oscura cubría media página mientras el título se
+    solapaba con la tabla y el resumen salía del área visible."""
+    import matplotlib.pyplot as plt
+
+    from app.services.thesis_pdf_service import _new_page
+
+    fig, ax = _new_page()
+    try:
+        assert ax.get_xlim() == (0.0, 1.0)
+        assert ax.get_ylim() == (0.0, 1.0)
+    finally:
+        plt.close(fig)
+
+
+def test_portfolio_pdf_texto_dentro_del_area_visible(env):
+    """Todo el texto debe caer dentro del área visible de la página (regresión:
+    con el autoescalado de ejes, resumen y secciones quedaban fuera y el título
+    se solapaba con la tabla)."""
+    client, _, port_id = env
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    reader = PdfReader(io.BytesIO(res.content))
+    for page in reader.pages:
+        height = float(page.mediabox.height)
+        ys: list[float] = []
+        page.extract_text(visitor_text=lambda t, cm, tm, fd, fs: ys.append(tm[5] + cm[5]) if t.strip() else None)
+        assert ys, "la página no tiene texto"
+        assert min(ys) >= -1.0, f"texto por debajo del área visible (y={min(ys):.1f})"
+        assert max(ys) <= height + 1.0, f"texto por encima del área visible (y={max(ys):.1f} > {height:.1f})"

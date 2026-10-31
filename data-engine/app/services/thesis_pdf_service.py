@@ -44,6 +44,9 @@ class HoldingItem:
     price: float
     value: float
     weight: str
+    currency: str = ""
+    price_is_cost: bool = False
+    value_currency: str = ""
 
 
 @dataclass
@@ -54,10 +57,12 @@ class ThesisPdfData:
     company_name: str = ""
     portfolio_name: str = ""
     version: int = 1
-    rating: str = "watch"
+    # rating=None -> sin insignia (los informes de cartera no tienen calificación)
+    rating: str | None = None
     status: str = "draft"
     generated_on: str = ""
     executive_summary: str = ""
+    provenance: str = ""
     sections: list[PdfSection] = field(default_factory=list)
     holdings: list[HoldingItem] = field(default_factory=list)
     citations: list[str] = field(default_factory=list)
@@ -72,6 +77,21 @@ def sanitize_pdf_filename(raw_name: str, fallback: str = "gerarai-tesis") -> str
     return clean[:64] or fallback
 
 
+def _new_page() -> tuple[plt.Figure, plt.Axes]:
+    """Página A4 con lienzo fijo 0-1.
+
+    Sin límites explícitos, matplotlib autoescala los ejes con los artistas
+    (rectángulo de cabecera, líneas separadoras): la cabecera acababa ocupando
+    media página y los textos por debajo del separador salían del área visible.
+    """
+    fig = plt.figure(figsize=(8.27, 11.69), dpi=100)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_axis_off()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    return fig, ax
+
+
 def build_thesis_pdf(data: ThesisPdfData) -> bytes:
     """Construye un documento PDF vectorial de alta calidad con branding GerarAI."""
     buf = io.BytesIO()
@@ -79,9 +99,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
     # Formato A4 estándar
     with PdfPages(buf) as pdf:
         # Página 1: Portada, Resumen Ejecutivo y Cartera/Activos
-        fig1 = plt.figure(figsize=(8.27, 11.69), dpi=100)
-        ax1 = fig1.add_axes([0, 0, 1, 1])
-        ax1.set_axis_off()
+        fig1, ax1 = _new_page()
 
         # Cabecera superior con branding oscuro
         header_rect = plt.Rectangle((0, 0.88), 1, 0.12, facecolor="#0f172a", edgecolor="none")
@@ -111,24 +129,32 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
 
         ax1.text(0.06, 0.83, main_title, fontsize=17, weight="bold", color="#0f172a", va="center")
 
-        # Insignia de Calificación
-        rating_map = {
-            "buy": ("#16a34a", "COMPRA"),
-            "strong_buy": ("#15803d", "COMPRA FUERTE"),
-            "hold": ("#d97706", "MANTENER"),
-            "watch": ("#2563eb", "SEGUIMIENTO"),
-            "sell": ("#dc2626", "VENTA"),
-            "insufficient_data": ("#64748b", "DATOS INSUFICIENTES"),
-        }
-        badge_bg, badge_lbl = rating_map.get(data.rating.lower(), ("#475569", data.rating.upper()))
-        badge_rect = plt.Rectangle((0.06, 0.77), 0.22, 0.035, facecolor=badge_bg, edgecolor="none")
-        ax1.add_patch(badge_rect)
-        ax1.text(0.17, 0.787, badge_lbl, fontsize=9.5, weight="bold", color="white", ha="center", va="center")
-
+        # Insignia de Calificación (solo si la tesis tiene rating; un informe
+        # de cartera nunca inventa una calificación)
+        meta_parts = [f"Versión v{data.version}"]
+        if data.status:
+            meta_parts.append(f"Estado: {data.status.upper()}")
+        if data.provenance:
+            meta_parts.append(f"Procedencia: {data.provenance}")
+        meta_x = 0.06
+        if data.rating:
+            rating_map = {
+                "buy": ("#16a34a", "COMPRA"),
+                "strong_buy": ("#15803d", "COMPRA FUERTE"),
+                "hold": ("#d97706", "MANTENER"),
+                "watch": ("#2563eb", "SEGUIMIENTO"),
+                "sell": ("#dc2626", "VENTA"),
+                "insufficient_data": ("#64748b", "DATOS INSUFICIENTES"),
+            }
+            badge_bg, badge_lbl = rating_map.get(data.rating.lower(), ("#475569", data.rating.upper()))
+            badge_rect = plt.Rectangle((0.06, 0.77), 0.22, 0.035, facecolor=badge_bg, edgecolor="none")
+            ax1.add_patch(badge_rect)
+            ax1.text(0.17, 0.787, badge_lbl, fontsize=9.5, weight="bold", color="white", ha="center", va="center")
+            meta_x = 0.31
         ax1.text(
-            0.31,
+            meta_x,
             0.787,
-            f"Versión v{data.version} · Estado: {data.status.upper()} · Procedencia: OFICIAL",
+            " · ".join(meta_parts),
             fontsize=9,
             color="#64748b",
             va="center",
@@ -148,13 +174,17 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
         if data.holdings:
             ax1.text(0.06, current_y, "Composición de la Cartera", fontsize=13, weight="bold", color="#1e293b", va="top")
             current_y -= 0.03
-            table_data = [["Activo", "Títulos", "Precio (€)", "Valor (€)", "Peso"]]
+            table_data = [["Activo", "Títulos", "Precio", "Valor", "Peso"]]
             for h in data.holdings[:6]:
-                table_data.append([h.ticker, f"{h.shares:,.2f}", f"{h.price:,.2f}", f"{h.value:,.2f}", h.weight])
+                price_lbl = f"{h.price:,.2f} {h.currency}".strip()
+                if h.price_is_cost:
+                    price_lbl += " *"
+                value_lbl = f"{h.value:,.2f} {h.value_currency}".strip()
+                table_data.append([h.ticker, f"{h.shares:,.2f}", price_lbl, value_lbl, h.weight])
 
             tbl = ax1.table(
                 cellText=table_data,
-                colWidths=[0.18, 0.18, 0.18, 0.20, 0.14],
+                colWidths=[0.16, 0.16, 0.22, 0.24, 0.10],
                 loc="center",
                 bbox=[0.06, current_y - 0.18, 0.88, 0.18],
             )
@@ -168,7 +198,17 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
                 else:
                     cell.set_facecolor("#ffffff" if r % 2 == 1 else "#f8fafc")
                     cell.set_text_props(color="#334155")
-            current_y -= 0.22
+            current_y -= 0.20
+            if any(h.price_is_cost for h in data.holdings[:6]):
+                ax1.text(
+                    0.06,
+                    current_y,
+                    "* Valorado al coste de adquisición por falta de cotización disponible.",
+                    fontsize=7.5,
+                    color="#64748b",
+                    va="top",
+                )
+            current_y -= 0.02
 
         # Primera sección si hay espacio
         if data.sections:
@@ -186,9 +226,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
         plt.close(fig1)
 
         # Página 2: Análisis Detallado, Riesgos y Evidencias
-        fig2 = plt.figure(figsize=(8.27, 11.69), dpi=100)
-        ax2 = fig2.add_axes([0, 0, 1, 1])
-        ax2.set_axis_off()
+        fig2, ax2 = _new_page()
 
         # Mini cabecera
         ax2.plot([0.06, 0.94], [0.94, 0.94], color="#0f172a", lw=2)
@@ -196,9 +234,8 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
         ax2.text(0.94, 0.96, f"v{data.version}", fontsize=9, color="#64748b", ha="right")
 
         y2 = 0.90
-        # Secciones siguientes
-        sections_to_show = data.sections[1:] if len(data.sections) > 1 else data.sections
-        for sec in sections_to_show[:3]:
+        # Secciones siguientes (la primera ya está en la página 1)
+        for sec in data.sections[1:4]:
             ax2.text(0.06, y2, sec.title, fontsize=12, weight="bold", color="#1e293b", va="top")
             y2 -= 0.025
             wrapped = textwrap.fill(sec.body, width=88)
@@ -258,15 +295,36 @@ def export_thesis_pdf_for_ticker(db: Session, ticker: str) -> tuple[bytes, str]:
     ).all()
 
     claims = db.scalars(
-        select(Claim).where(Claim.thesis_version_id == thesis.id)
+        select(Claim)
+        .options(selectinload(Claim.evidence))
+        .where(Claim.thesis_version_id == thesis.id)
     ).all()
 
     reason = thesis_withheld_reason(db, thesis)
     pdf_sections = [] if reason else [PdfSection(title=s.title, body=s.body or "") for s in sections]
-    citations = []
+    citations: list[str] = []
+    tiers: set[str] = set()
+    has_evidence = False
     if not reason:
         for c in claims:
-            citations.append(f"{c.statement} [claim:{c.id}]")
+            evidences = list(c.evidence or [])
+            if evidences:
+                has_evidence = True
+                tiers.update((e.source_tier or "unknown") for e in evidences)
+                first_with_url = next((e for e in evidences if e.source_url), None)
+                if first_with_url is not None:
+                    citations.append(f"{c.statement} — fuente: {first_with_url.source_url}")
+                else:
+                    citations.append(f"{c.statement} — fuente registrada sin enlace")
+            else:
+                citations.append(f"{c.statement} — sin fuente registrada")
+
+    if not claims or not has_evidence:
+        provenance = "SIN FUENTES REGISTRADAS"
+    elif tiers <= {"primary", "tier_primary", "official", "regulatory"}:
+        provenance = "FUENTES OFICIALES"
+    else:
+        provenance = "MIXTA (oficiales y secundarias)"
 
     data = ThesisPdfData(
         ticker=company.ticker,
@@ -276,6 +334,7 @@ def export_thesis_pdf_for_ticker(db: Session, ticker: str) -> tuple[bytes, str]:
         status=thesis.status or "draft",
         generated_on=thesis.updated_at.date().isoformat() if thesis.updated_at else "",
         executive_summary=archived_thesis_notice(thesis, reason) if reason else thesis.executive_summary or "",
+        provenance=provenance,
         sections=pdf_sections,
         citations=citations,
     )
@@ -299,14 +358,27 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
         ).all()
     )
 
+    base_ccy = (portfolio.base_currency or "EUR").upper()
     holdings: list[HoldingItem] = []
-    total_val = sum(float(p.quantity or 0) * float(p.average_cost or p.market_price or 0) for p in positions)
-
+    rows: list[tuple] = []
     for p in positions:
         qty = float(p.quantity or 0)
-        px = float(p.average_cost or p.market_price or 0)
-        val = qty * px
-        weight = f"{(val / total_val * 100):.1f}%" if total_val > 0 else "0.0%"
+        market_px = float(p.market_price or 0)
+        cost_px = float(p.average_cost or 0)
+        price_is_cost = not market_px and bool(cost_px)
+        px = market_px if market_px else cost_px
+        native_ccy = (p.currency or "").upper()
+        # Valor en divisa base si el libro lo tiene; si no, valor nativo estimado.
+        base_val = float(p.market_value_base) if p.market_value_base is not None else None
+        val = base_val if base_val is not None else qty * px
+        rows.append((p, qty, px, price_is_cost, native_ccy, val, base_val is not None))
+
+    # Pesos solo comparables cuando todas las valoraciones comparten divisa.
+    all_base = bool(rows) and all(r[6] for r in rows)
+    same_ccy = len({(base_ccy if r[6] else r[4]) for r in rows}) <= 1
+    total_val = sum(r[5] for r in rows) if (all_base or same_ccy) else 0.0
+    for p, qty, px, price_is_cost, native_ccy, val, is_base in rows:
+        weight = f"{(val / total_val * 100):.1f}%" if total_val > 0 else "n/d"
         ticker_name = p.company.ticker if p.company else f"ACT-{p.company_id}"
         holdings.append(
             HoldingItem(
@@ -315,26 +387,64 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
                 price=px,
                 value=val,
                 weight=weight,
+                currency=native_ccy,
+                price_is_cost=price_is_cost,
+                value_currency=base_ccy if is_base else native_ccy,
             )
         )
+
+    cost_rows = sum(1 for r in rows if r[3])
+    composition_body = ""
+    if rows:
+        if total_val > 0:
+            top = sorted(rows, key=lambda r: r[5], reverse=True)[:3]
+            lines = []
+            for p, _qty, _px, _pc, _ccy, val, _ib in top:
+                share = f"{(val / total_val * 100):.1f}%"
+                name = p.company.ticker if p.company else f"ACT-{p.company_id}"
+                lines.append(f"{name}: {share}")
+            composition_body = "Mayores posiciones por peso estimado: " + ", ".join(lines) + "."
+        else:
+            # Divisas mezcladas sin valor consolidado: no se ordenan por peso.
+            names = [p.company.ticker if p.company else f"ACT-{p.company_id}" for p, *_r in rows]
+            composition_body = (
+                "Posiciones: " + ", ".join(names) + ". "
+                "Pesos no calculables: hay posiciones en divisas distintas sin valor consolidado en divisa base."
+            )
+
+    limitations: list[str] = []
+    if cost_rows:
+        limitations.append(f"{cost_rows} posición(es) valorada(s) al coste de adquisición por falta de cotización")
+    ccys = sorted({r[4] for r in rows if r[4]})
+    if len(ccys) > 1:
+        limitations.append("posiciones en varias divisas (" + ", ".join(ccys) + ")")
+    if rows and not all_base:
+        limitations.append("sin valor de mercado consolidado en divisa base para alguna posición")
+    limitations_body = (
+        "Limitaciones de este informe: " + "; ".join(limitations) + "."
+        if limitations
+        else "Todas las posiciones tienen valor de mercado consolidado en divisa base."
+    )
+    # Divisa del total: la común a todas las valoraciones (base si hay valor
+    # consolidado; la nativa compartida si no), nunca la base por defecto.
+    total_ccy = base_ccy if all_base else (ccys[0] if len(ccys) == 1 else "")
+    summary = f"Informe consolidado de la cartera {portfolio.name}. Consta de {len(positions)} posiciones activas"
+    if total_val > 0 and total_ccy:
+        summary += f" con un valor total estimado de {total_val:,.2f} {total_ccy}"
+    summary += "."
 
     data = ThesisPdfData(
         portfolio_name=portfolio.name,
         version=1,
-        rating="buy",
-        status="published",
+        rating=None,
+        status="",
         generated_on=portfolio.created_at.date().isoformat() if portfolio.created_at else "",
-        executive_summary=f"Informe consolidado de la cartera {portfolio.name}. Consta de {len(positions)} posiciones activas con un valor contable total estimado de {total_val:,.2f} €.",
+        executive_summary=summary,
+        provenance="DATOS DE LA CARTERA REGISTRADA",
         holdings=holdings,
         sections=[
-            PdfSection(
-                title="1. Estrategia y Asignación de Capital",
-                body="La cartera está orientada a la generación de valor a largo plazo mediante empresas de alta calidad, ventajas competitivas sostenibles y balances saneados.",
-            ),
-            PdfSection(
-                title="2. Control de Riesgos",
-                body="Se monitorizan límites de concentración por posición y sector con rebalanceos periódicos basados en márgenes de seguridad y catalizadores operativos.",
-            ),
+            PdfSection(title="1. Composición", body=composition_body or "Cartera sin posiciones registradas."),
+            PdfSection(title="2. Datos y limitaciones", body=limitations_body),
         ],
     )
 
