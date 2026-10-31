@@ -4,6 +4,7 @@ import { isQuoteLandingEvent } from '@/lib/news-landing';
 import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { revalidatePath } from 'next/cache';
+import type { ImpliedSensitivity, ImpliedValueSplit } from '@/lib/research/implied-growth';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
 import { sourcesPageInfo } from '@/lib/research/sources-inventory';
 import { researchRequest } from '@/lib/research/client';
@@ -585,7 +586,7 @@ export type ResearchLongTermModel = {
   current_snapshot: { period: string | null; fiscal_year: number | null; metrics: Record<string, { value: number | null; source_fact_ids: number[]; status: string }> };
   assumptions: Record<string, { value: number | null; unit: string; source_type: string; basis: string; source_fact_ids: number[]; fuentes?: Array<{ fact_id: number; titulo: string | null; url: string | null; fecha: string | null }>; confidence: number }>;
   scenarios: Record<string, ResearchLongTermScenario>;
-  reverse_dcf: { status: string; required_revenue_growth?: number; base_revenue_growth?: number; fcf_margin?: number | null; growth_gap_vs_base?: number; market_price?: number | null; missing_inputs?: string[] };
+  reverse_dcf: { status: string; required_revenue_growth?: number; implied_perpetual_growth?: number | null; wacc?: number | null; value_split?: ImpliedValueSplit | null; sensitivity?: ImpliedSensitivity | null; base_revenue_growth?: number; fcf_margin?: number | null; growth_gap_vs_base?: number; market_price?: number | null; missing_inputs?: string[] };
   market_opportunity: {
     status: string;
     mode: string;

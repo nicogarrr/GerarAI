@@ -1,3 +1,4 @@
+import { impliedGrowthView } from '@/lib/research/implied-growth';
 import Link from 'next/link';
 import { modelConditionState } from '@/lib/research/coverage-state';
 import { formatCompact, formatMarketDate, formatNumber, formatPercent, NA } from '@/lib/format';
@@ -292,6 +293,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
             <p className="mt-2 text-xs leading-5 text-gray-500">
               El reverse DCF parte del precio de mercado y calcula qué crecimiento está descontando ya.
             </p>
+            <ImpliedGrowthDetail reverse={model.reverse_dcf} />
           </div>
         </div>
       </div>
@@ -562,4 +564,45 @@ function isAutoLinked(metadata: Record<string, unknown> | undefined): boolean {
 
 function isSuggested(metadata: Record<string, unknown> | undefined): boolean {
   return (metadata?.auto_link as { status?: unknown } | undefined)?.status === 'suggested';
+}
+
+function ImpliedGrowthDetail({ reverse }: { reverse: Parameters<typeof impliedGrowthView>[0] }) {
+  const view = impliedGrowthView(reverse);
+  if (!view.perpetual && !view.split.length && !view.grid) return null;
+  return (
+    <div className="mt-3 space-y-3 border-t border-gray-800 pt-3" data-testid="implied-growth">
+      <div className="text-xs font-semibold uppercase text-gray-500">Crecimiento implícito</div>
+      {view.perpetual ? <p className="text-gray-300">A este precio, el mercado descuenta un crecimiento perpetuo del flujo de caja de {view.perpetual} (WACC − FCF / valor empresa).</p> : null}
+      {view.split.length ? (
+        <div>
+          <p className="text-xs text-gray-500">De dónde sale el valor que pagas hoy</p>
+          <ul className="mt-1 space-y-1">
+            {view.split.map((part) => (
+              <li key={part.label} className="flex items-center gap-2 text-xs">
+                <span className="w-32 shrink-0 text-gray-400">{part.label}</span>
+                <span className="h-2 flex-1 rounded bg-gray-800"><span className="block h-2 rounded bg-teal-400/60" style={{ width: `${part.width}%` }} /></span>
+                <span className="w-10 text-right tabular-nums text-gray-200">{part.share}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {view.grid ? (
+        <div className="overflow-x-auto">
+          <p className="text-xs text-gray-500">Crecimiento exigido si cambian el WACC o el margen</p>
+          <table className="mt-1 w-full text-xs tabular-nums">
+            <thead><tr><th className="text-left font-normal text-gray-500" scope="col"><span className="sr-only">WACC</span></th>{view.grid.columns.map((column) => <th key={column} scope="col" className="px-1 text-right font-normal text-gray-500">{column}</th>)}</tr></thead>
+            <tbody>
+              {view.grid.rows.map((row) => (
+                <tr key={row.label}>
+                  <th scope="row" className="text-left font-normal text-gray-400">{row.label}</th>
+                  {row.cells.map((cell, index) => <td key={index} className={`px-1 text-right ${cell.base ? 'font-semibold text-teal-300' : 'text-gray-300'}`}>{cell.text}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
 }
