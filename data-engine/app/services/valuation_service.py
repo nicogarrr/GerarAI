@@ -333,6 +333,8 @@ def _relative_multiples_cross_check(
     *,
     resolved_engine: str,
     to_listing: float | None,
+    price_currency: str,
+    reporting_currency: str | None,
 ) -> dict | None:
     """Contraste aditivo por multiplos de comparables junto al DCF estandar.
 
@@ -365,12 +367,21 @@ def _relative_multiples_cross_check(
         )
         return None
 
+    # Una sola conversion: el motor relativo publica por accion ordinaria en
+    # la divisa de las cuentas; aqui se escala UNA vez a la divisa del
+    # listado (misma tasa que la valoracion principal, nunca dos veces).
     scale = to_listing if to_listing is not None else 1.0
 
     def _scaled(key: str) -> float | None:
         value = relative.get(key)
         return value * scale if isinstance(value, (int, float)) else None
 
+    listed = relative.get("listed_share_values")
+    listed_scaled = (
+        {key: value * scale for key, value in listed.items() if isinstance(value, (int, float))}
+        if isinstance(listed, dict)
+        else None
+    )
     trace = relative.get("trace") or {}
     rel = relative.get("relative") or {}
     cross = {
@@ -384,6 +395,15 @@ def _relative_multiples_cross_check(
         "margin_of_safety": relative.get("margin_of_safety"),
         "peer_set_size": rel.get("peer_set_size"),
         "peer_median": rel.get("peer_median"),
+        # Moneda y base de cada cifra: los valores bear/base/bull/expected
+        # van por accion ordinaria en la divisa del listado (tras UN unico
+        # reescalado); listed_share_values van por ADR/unidad listada.
+        "value_currency": price_currency,
+        "engine_value_currency": reporting_currency,
+        "scale_factor_to_listing": scale,
+        "value_per_share_basis": relative.get("value_per_share_basis"),
+        "adr_ratio": relative.get("adr_ratio"),
+        "listed_share_values": listed_scaled,
         "publication_blockers": relative.get("publication_blockers") or [],
         "missing_inputs": relative.get("missing_inputs") or [],
         # Fuente y fecha por cifra: mismos ids/periodos de hechos SEC que
@@ -483,6 +503,8 @@ class ValuationService:
                 context,
                 resolved_engine=resolve_engine_key(company),
                 to_listing=to_listing if currency_gate["status"] != "blocked" else None,
+                price_currency=price_currency,
+                reporting_currency=currency_gate.get("reporting_currency"),
             )
             if cross is not None:
                 result.setdefault("cross_checks", {})["relative_multiples"] = cross
