@@ -295,9 +295,7 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
             bound = sig.bind_partial(*args, **kwargs)
             values = bound.arguments
             parts = tuple(str(values.get(part)) for part in key_parts)
-            window = int(
-                window_seconds(**values) if callable(window_seconds) else window_seconds
-            )
+            window = int(window_seconds(**values) if callable(window_seconds) else window_seconds)
             key = "coalesce:" + ":".join((job, *parts))
             token = uuid.uuid4().hex
             try:
@@ -342,9 +340,7 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
             # Exito: el claim queda como marca fresca con su TTL original
             # (anclado al INICIO) - extenderlo aqui descuadraria la cadencia.
             # Fallo: liberar para que el reintento o el siguiente tick corran.
-            if client is not None and not (
-                isinstance(result, dict) and result.get("status") == "ok"
-            ):
+            if client is not None and not (isinstance(result, dict) and result.get("status") == "ok"):
                 _release()
             return result
 
@@ -564,10 +560,12 @@ def _price_tracked_companies(db):
     alert_company_ids = [
         row[0]
         for row in db.execute(
-            select(AlertRule.company_id).where(
+            select(AlertRule.company_id)
+            .where(
                 AlertRule.active.is_(True),
                 *tenant_filters(db, AlertRule),
-            ).distinct()
+            )
+            .distinct()
         ).all()
     ]
     missing = [company_id for company_id in alert_company_ids if company_id not in tracked]
@@ -589,18 +587,14 @@ def _tracked_companies(db):
     from app.models import Company, Position, WatchItem
 
     tickers: set[str] = set()
-    for (symbol,) in db.execute(
-        select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))
-    ).all():
+    for (symbol,) in db.execute(select(WatchItem.symbol).where(*tenant_filters(db, WatchItem))).all():
         if symbol:
             tickers.add(str(symbol).upper())
             tickers.add(str(symbol).upper().split(".")[0])
     company_ids = [
         row[0]
         for row in db.execute(
-            select(Position.company_id)
-            .where(*tenant_filters(db, Position))
-            .distinct()
+            select(Position.company_id).where(*tenant_filters(db, Position)).distinct()
         ).all()
         if row[0] is not None
     ]
@@ -697,9 +691,7 @@ return 0
 """
 
 
-def release_job_lease(
-    job_name: str, token: str, *, redis_url: str | None = None
-) -> None:
+def release_job_lease(job_name: str, token: str, *, redis_url: str | None = None) -> None:
     """Libera el lease solo si sigue siendo nuestro (best-effort).
 
     Redis: compare-and-del atomico via Lua (sin ventana GET/DEL). Fallback
@@ -786,7 +778,8 @@ def enqueue_document_kpis(db, document) -> dict[str, Any]:
     db.commit()
     try:
         message = extract_document_kpis.send(
-            document.id, tenant_id=int(db.info["tenant_id"]),
+            document.id,
+            tenant_id=int(db.info["tenant_id"]),
             user_id=str(db.info["user_id"]),
         )
     except QueueCapacityError:
@@ -830,9 +823,7 @@ def backfill_document_kpis() -> dict[str, Any]:
         db = _session(tenant_id, user_id)
         try:
             now = int(time.time())
-            attempts_expr = cast(
-                Document.metadata_[(KPI_DEFERRED_KEY, "attempts")].as_string(), Integer
-            )
+            attempts_expr = cast(Document.metadata_[(KPI_DEFERRED_KEY, "attempts")].as_string(), Integer)
             queued_raw = Document.metadata_[(KPI_DEFERRED_KEY, "queued_at")]
             queued_expr = cast(queued_raw.as_string(), Integer)
             # Regla anti-duplicado definitiva (auditor, bounce 3): un doc YA
@@ -894,16 +885,19 @@ def backfill_document_kpis() -> dict[str, Any]:
                 # como nunca enviado con el attempts ya consumido.
                 db.commit()
                 try:
-                    extract_document_kpis.send(
-                        document.id, tenant_id=tenant_id, user_id=user_id
-                    )
+                    extract_document_kpis.send(document.id, tenant_id=tenant_id, user_id=user_id)
                 except QueueCapacityError:
                     deferred["attempts"] = attempts
                     deferred.pop("queued_at", None)
                     document.metadata_ = {**meta, KPI_DEFERRED_KEY: deferred}
                     db.commit()
-                    return {"actor": "backfill_document_kpis", "status": "ok",
-                            "queued": queued, "exhausted": exhausted, "capacity": capacity}
+                    return {
+                        "actor": "backfill_document_kpis",
+                        "status": "ok",
+                        "queued": queued,
+                        "exhausted": exhausted,
+                        "capacity": capacity,
+                    }
                 except Exception:  # noqa: BLE001 - un send roto no frena el lote
                     # Resultado INCIERTO (auditor, bounce 5): un error de red
                     # o timeout no prueba que el mensaje no entrase en Redis
@@ -969,9 +963,7 @@ def recompute_fundamental_metrics(
             statement = statement.where(Company.ticker == ticker.upper())
         if start_from:
             statement = statement.where(Company.ticker > start_from.upper())
-        companies = list(
-            db.scalars(statement.order_by(Company.ticker).limit(limit)).all()
-        )
+        companies = list(db.scalars(statement.order_by(Company.ticker).limit(limit)).all())
         service = MetricCalculationService()
         processed = 0
         status_counts: dict[str, int] = {}
@@ -1010,9 +1002,7 @@ def recompute_fundamental_metrics(
             # ultimo ticker visto. Sin coalesce a proposito: cada chunk es
             # trabajo distinto y no debe suprimir al siguiente.
             next_cursor = companies[-1].ticker
-            recompute_fundamental_metrics.send(
-                tenant_id, user_id, start_from=next_cursor, limit=limit
-            )
+            recompute_fundamental_metrics.send(tenant_id, user_id, start_from=next_cursor, limit=limit)
         return {
             "status": _batch_status(processed, errors),
             "actor": actor_name,
@@ -1130,8 +1120,7 @@ def refresh_asts_catalog() -> dict[str, Any]:
     # This avoids a second worker racing between the timestamp read and the
     # outbound HTTP request. The 2h TTL is a fallback; the durable timestamp
     # remains authoritative across restarts and failed network attempts.
-    lease = acquire_job_lease("celestrak_ast_2h", ttl_seconds=7200,
-                              redis_url=_lease_redis_url())
+    lease = acquire_job_lease("celestrak_ast_2h", ttl_seconds=7200, redis_url=_lease_redis_url())
     if lease is None:
         return {"actor": "refresh_asts_catalog", "status": "skipped", "reason": "celestrak_2h_minimum"}
     fetched_at = datetime.now(UTC)
@@ -1147,8 +1136,7 @@ def refresh_asts_catalog() -> dict[str, Any]:
             finally:
                 db.close()
         if recent and fetched_at - max(recent) < MIN_FETCH_INTERVAL:
-            return {"actor": "refresh_asts_catalog", "status": "skipped",
-                    "reason": "celestrak_2h_minimum"}
+            return {"actor": "refresh_asts_catalog", "status": "skipped", "reason": "celestrak_2h_minimum"}
         # All context writes must succeed before the first network call.
         for tenant_id, user_id in contexts:
             db = _session(tenant_id, user_id)
@@ -1177,8 +1165,12 @@ def refresh_asts_catalog() -> dict[str, Any]:
     except Exception as exc:
         supgp_error = type(exc).__name__
     if catalog is None and supgp is None:
-        return {"actor": "refresh_asts_catalog", "status": "error",
-                "gp_error": gp_error, "supgp_error": supgp_error}
+        return {
+            "actor": "refresh_asts_catalog",
+            "status": "error",
+            "gp_error": gp_error,
+            "supgp_error": supgp_error,
+        }
     errors = []
     for tenant_id, user_id in contexts:
         db = _session(tenant_id, user_id)
@@ -1189,10 +1181,16 @@ def refresh_asts_catalog() -> dict[str, Any]:
             errors.append({"tenant_id": tenant_id, "type": type(exc).__name__})
         finally:
             db.close()
-    return {"actor": "refresh_asts_catalog", "status": "partial" if errors or gp_error or supgp_error else "ok",
-            "gp_error": gp_error, "count": len(catalog) if catalog is not None else 0,
-            "supgp_count": len(supgp) if supgp is not None else 0,
-            "supgp_error": supgp_error, "tenant_count": len(contexts), "errors": errors}
+    return {
+        "actor": "refresh_asts_catalog",
+        "status": "partial" if errors or gp_error or supgp_error else "ok",
+        "gp_error": gp_error,
+        "count": len(catalog) if catalog is not None else 0,
+        "supgp_count": len(supgp) if supgp is not None else 0,
+        "supgp_error": supgp_error,
+        "tenant_count": len(contexts),
+        "errors": errors,
+    }
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000)
@@ -1279,6 +1277,7 @@ def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = Non
         # Derive contexts from current stored evidence, not a possibly empty
         # signal table waiting for the hourly reconciliation.
         from app.services.bottleneck_service import refresh_signals
+
         refresh_signals(db)
         db.commit()
         outcome = _run(discover(db, deadline=deadline))
@@ -1335,10 +1334,15 @@ def sync_ibkr_flex() -> dict[str, Any]:
 
         from app.core.database import SessionLocal
         from app.models import IBKRConnection
+
         with SessionLocal() as admin:
-            migrated = admin.scalar(select(IBKRConnection.id).where(
-                IBKRConnection.tenant_id == tenant_id,
-            ).execution_options(include_all_tenants=True))
+            migrated = admin.scalar(
+                select(IBKRConnection.id)
+                .where(
+                    IBKRConnection.tenant_id == tenant_id,
+                )
+                .execution_options(include_all_tenants=True)
+            )
         if migrated is not None:
             return {"actor": "sync_ibkr_flex", "status": "skipped", "reason": "tenant_connector"}
     account_id = (get_settings().ibkr_flex_account_id or "").strip()
@@ -1401,10 +1405,10 @@ def refresh_market_pipeline(
     if scope not in ("tracked", "universe"):
         raise ValueError(f"scope de refresh_market_pipeline desconocido: {scope!r}")
     db = _session(tenant_id, user_id)
-        # La sesion se abre ANTES de tomar el lease: _session() lanza
-        # ValueError si el tenant no esta activo, y esa excepcion entre la
-        # toma del lease y el try se escapaba sin pasar por el finally que
-        # lo libera, dejando el lease retenido hasta su TTL.
+    # La sesion se abre ANTES de tomar el lease: _session() lanza
+    # ValueError si el tenant no esta activo, y esa excepcion entre la
+    # toma del lease y el try se escapaba sin pasar por el finally que
+    # lo libera, dejando el lease retenido hasta su TTL.
     try:
         lease = acquire_job_lease(
             f"refresh_market_pipeline:{tenant_id}",
@@ -1436,9 +1440,7 @@ def refresh_market_pipeline(
         _rollback(db)
         return _handle_actor_error("refresh_market_pipeline", exc, tenant_id=tenant_id)
     finally:
-        release_job_lease(
-            f"refresh_market_pipeline:{tenant_id}", lease, redis_url=_lease_redis_url()
-        )
+        release_job_lease(f"refresh_market_pipeline:{tenant_id}", lease, redis_url=_lease_redis_url())
         db.close()
 
 
@@ -1461,13 +1463,22 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
             _rollback(db)
             logger.exception("refresh_portfolio_moves: fallo emitiendo el resumen diario")
             # Digest construido pero aviso no emitido: parcial, nunca verde falso.
-            return {"actor": "refresh_portfolio_moves", "status": "partial",
-                    "digest_id": digest.id, "coverage": digest.coverage,
-                    "digest_alert": "error", "alert_error": str(exc)[:200]}
-        return {"actor": "refresh_portfolio_moves", "status": "ok", "digest_id": digest.id,
+            return {
+                "actor": "refresh_portfolio_moves",
+                "status": "partial",
+                "digest_id": digest.id,
                 "coverage": digest.coverage,
-                "digest_alert": "emitted" if emitted is not None else "already_emitted",
-                "digest_alert_id": emitted.id if emitted is not None else None}
+                "digest_alert": "error",
+                "alert_error": str(exc)[:200],
+            }
+        return {
+            "actor": "refresh_portfolio_moves",
+            "status": "ok",
+            "digest_id": digest.id,
+            "coverage": digest.coverage,
+            "digest_alert": "emitted" if emitted is not None else "already_emitted",
+            "digest_alert_id": emitted.id if emitted is not None else None,
+        }
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_portfolio_moves", exc, tenant_id=tenant_id)
@@ -1504,6 +1515,8 @@ def backfill_finnhub_profiles(
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
+
+
 @dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
 def backfill_sec_fundamentals(
     tenant_id: int | None = None,
@@ -1554,19 +1567,20 @@ def seed_company_fundamentals(
         ticker = (ticker or "").strip().upper()
         company = db.scalar(_select(Company).where(Company.ticker == ticker))
         if company is None and "." in ticker:
-            company = db.scalar(
-                _select(Company).where(Company.ticker == ticker.split(".")[0])
-            )
+            company = db.scalar(_select(Company).where(Company.ticker == ticker.split(".")[0]))
         if company is None:
-            return {"actor": "seed_company_fundamentals", "status": "sin_company",
-                    "ticker": ticker}
+            return {"actor": "seed_company_fundamentals", "status": "sin_company", "ticker": ticker}
         try:
             result = _seed(db, company)
         except Exception as exc:
             _rollback(db)
             logger.exception("seed fundamentals failed for %s", ticker)
-            return {"actor": "seed_company_fundamentals", "status": "error",
-                    "ticker": ticker, "detail": str(exc)[:200]}
+            return {
+                "actor": "seed_company_fundamentals",
+                "status": "error",
+                "ticker": ticker,
+                "detail": str(exc)[:200],
+            }
         return {"actor": "seed_company_fundamentals", **result}
     finally:
         db.close()
@@ -1608,22 +1622,16 @@ def ingest_class_shares_outstanding(
                 results[ticker] = "no_cik"
                 continue
             try:
-                outcome = backfill_class_shares_outstanding(
-                    db, company, cik=company.cik)
+                outcome = backfill_class_shares_outstanding(db, company, cik=company.cik)
                 db.commit()
-                results[ticker] = (
-                    "ok" if outcome.written
-                    else f"skipped:{outcome.skipped_reason}"
-                )
+                results[ticker] = "ok" if outcome.written else f"skipped:{outcome.skipped_reason}"
             except Exception:
                 _rollback(db)
                 logger.exception("class shares ECSO failed for %s", ticker)
                 results[ticker] = "error"
-        return {"actor": "ingest_class_shares_outstanding",
-                "status": "ok", "results": results}
+        return {"actor": "ingest_class_shares_outstanding", "status": "ok", "results": results}
     finally:
         db.close()
-
 
 
 @dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
@@ -1654,8 +1662,11 @@ def refresh_esef_fundamentals(
         if phase == "build":
             base = get_settings().esef_snapshot_dir
             if not base:
-                return {"actor": "refresh_esef_fundamentals", "status": "skipped",
-                        "reason": "esef_snapshot_dir_not_configured"}
+                return {
+                    "actor": "refresh_esef_fundamentals",
+                    "status": "skipped",
+                    "reason": "esef_snapshot_dir_not_configured",
+                }
             import sys
             from datetime import date as _date
             from pathlib import Path as _Path
@@ -1671,12 +1682,15 @@ def refresh_esef_fundamentals(
             manifest = run_from_any_context(
                 # ES + NL en un unico manifest (ASML reviewed; cada pais
                 # resuelve contra su tabla: CNMV / AFM-ESEF).
-                build_esef(_Path(base), ["ES", "NL"], _date.today().isoformat(), EsefClient(),
-                           package_fetcher=fetch_esef_package)
+                build_esef(
+                    _Path(base),
+                    ["ES", "NL"],
+                    _date.today().isoformat(),
+                    EsefClient(),
+                    package_fetcher=fetch_esef_package,
+                )
             )
-            refresh_esef_fundamentals.send(
-                tenant_id, user_id, phase="ingest", cursor=0
-            )
+            refresh_esef_fundamentals.send(tenant_id, user_id, phase="ingest", cursor=0)
             return {
                 "actor": "refresh_esef_fundamentals",
                 "status": "ok",
@@ -1691,7 +1705,7 @@ def refresh_esef_fundamentals(
         )
 
         tickers = reviewed_tickers()
-        chunk = tickers[cursor:cursor + ESEF_REINGEST_CHUNK]
+        chunk = tickers[cursor : cursor + ESEF_REINGEST_CHUNK]
         service = FinancialIngestionService()
         results: dict[str, str] = {}
         for ticker in chunk:
@@ -1706,15 +1720,9 @@ def refresh_esef_fundamentals(
             except Exception as exc:  # snapshot ausente o hechos no importables
                 _rollback(db)
                 results[ticker] = f"error:{type(exc).__name__}"
-        next_cursor = (
-            cursor + ESEF_REINGEST_CHUNK
-            if cursor + ESEF_REINGEST_CHUNK < len(tickers)
-            else None
-        )
+        next_cursor = cursor + ESEF_REINGEST_CHUNK if cursor + ESEF_REINGEST_CHUNK < len(tickers) else None
         if next_cursor is not None:
-            refresh_esef_fundamentals.send(
-                tenant_id, user_id, phase="ingest", cursor=next_cursor
-            )
+            refresh_esef_fundamentals.send(tenant_id, user_id, phase="ingest", cursor=next_cursor)
         return {
             "actor": "refresh_esef_fundamentals",
             "status": "ok",
@@ -1749,15 +1757,13 @@ def split_sync_tickers(
 
     if scope == "tracked":
         company_ids = list(
-            db.scalars(
-                _select(Position.company_id)
-                .where(*tenant_filters(db, Position))
-                .distinct()
-            ).all()
+            db.scalars(_select(Position.company_id).where(*tenant_filters(db, Position)).distinct()).all()
         )
-        tickers = set(
-            db.scalars(_select(Company.ticker).where(Company.id.in_(company_ids))).all()
-        ) if company_ids else set()
+        tickers = (
+            set(db.scalars(_select(Company.ticker).where(Company.id.in_(company_ids))).all())
+            if company_ids
+            else set()
+        )
         tickers |= {
             str(sym).upper()
             for sym in db.scalars(
@@ -1766,7 +1772,7 @@ def split_sync_tickers(
         }
         return sorted(tickers), None
     tickers = list(db.scalars(_select(Company.ticker).order_by(Company.id)).all())
-    chunk_tickers = tickers[cursor:cursor + chunk]
+    chunk_tickers = tickers[cursor : cursor + chunk]
     next_cursor = cursor + chunk if cursor + chunk < len(tickers) else None
     return chunk_tickers, next_cursor
 
@@ -1792,14 +1798,9 @@ def ingest_corporate_splits(
     try:
         tickers, next_cursor = split_sync_tickers(db, scope, cursor, chunk=SPLIT_SYNC_UNIVERSE_CHUNK)
         service = SplitIngestionService()
-        results = [
-            run_from_any_context(service.sync_company(db, ticker=ticker))
-            for ticker in tickers
-        ]
+        results = [run_from_any_context(service.sync_company(db, ticker=ticker)) for ticker in tickers]
         if next_cursor is not None:
-            ingest_corporate_splits.send(
-                tenant_id, user_id, scope=scope, cursor=next_cursor
-            )
+            ingest_corporate_splits.send(tenant_id, user_id, scope=scope, cursor=next_cursor)
         return {
             "actor": "ingest_corporate_splits",
             "status": "ok",
@@ -1829,9 +1830,13 @@ def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None =
     db = _session(tenant_id, user_id)
     try:
         result = run_from_any_context(DividendIngestionService().sync_portfolio(db))
-        return {"actor": "sync_portfolio_dividends", "status": "ok",
-                "companies": result["companies"], "synced": result["synced"],
-                "unavailable": result["unavailable"]}
+        return {
+            "actor": "sync_portfolio_dividends",
+            "status": "ok",
+            "companies": result["companies"],
+            "synced": result["synced"],
+            "unavailable": result["unavailable"],
+        }
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("sync_portfolio_dividends", exc, tenant_id=tenant_id)
@@ -1860,10 +1865,10 @@ def refresh_portfolio_prices_intraday(
     )
 
     db = _session(tenant_id, user_id)
-        # La sesion se abre ANTES de tomar el lease: _session() lanza
-        # ValueError si el tenant no esta activo, y esa excepcion entre la
-        # toma del lease y el try se escapaba sin pasar por el finally que
-        # lo libera, dejando el lease retenido hasta su TTL.
+    # La sesion se abre ANTES de tomar el lease: _session() lanza
+    # ValueError si el tenant no esta activo, y esa excepcion entre la
+    # toma del lease y el try se escapaba sin pasar por el finally que
+    # lo libera, dejando el lease retenido hasta su TTL.
     try:
         lease = acquire_job_lease(
             f"refresh_portfolio_prices_intraday:{tenant_id}",
@@ -1896,11 +1901,7 @@ def refresh_portfolio_prices_intraday(
             .scalar_subquery()
         )
         companies = list(
-            db.scalars(
-                _select(Company)
-                .where(Company.id.in_(company_ids))
-                .order_by(Company.ticker)
-            ).all()
+            db.scalars(_select(Company).where(Company.id.in_(company_ids)).order_by(Company.ticker)).all()
         )
         if not companies:
             return {
@@ -1909,16 +1910,12 @@ def refresh_portfolio_prices_intraday(
                 "reason": "no_positions",
             }
         result = _run(
-            MarketRefreshService(price_provider=YahooIntradayPriceProvider()).refresh(
-                db, companies=companies
-            )
+            MarketRefreshService(price_provider=YahooIntradayPriceProvider()).refresh(db, companies=companies)
         )
         return {"actor": "refresh_portfolio_prices_intraday", **result}
     except Exception as exc:
         _rollback(db)
-        return _handle_actor_error(
-            "refresh_portfolio_prices_intraday", exc, tenant_id=tenant_id
-        )
+        return _handle_actor_error("refresh_portfolio_prices_intraday", exc, tenant_id=tenant_id)
     finally:
         release_job_lease(
             f"refresh_portfolio_prices_intraday:{tenant_id}",
@@ -1937,10 +1934,10 @@ def refresh_propicks_prices(
     from app.services.propicks_price_service import refresh_propicks_prices as _refresh
 
     db = _session(tenant_id, user_id)
-        # La sesion se abre ANTES de tomar el lease: _session() lanza
-        # ValueError si el tenant no esta activo, y esa excepcion entre la
-        # toma del lease y el try se escapaba sin pasar por el finally que
-        # lo libera, dejando el lease retenido hasta su TTL.
+    # La sesion se abre ANTES de tomar el lease: _session() lanza
+    # ValueError si el tenant no esta activo, y esa excepcion entre la
+    # toma del lease y el try se escapaba sin pasar por el finally que
+    # lo libera, dejando el lease retenido hasta su TTL.
     try:
         lease = acquire_job_lease(
             f"refresh_propicks_prices:{tenant_id}",
@@ -1966,9 +1963,7 @@ def refresh_propicks_prices(
         _rollback(db)
         return _handle_actor_error("refresh_propicks_prices", exc, tenant_id=tenant_id)
     finally:
-        release_job_lease(
-            f"refresh_propicks_prices:{tenant_id}", lease, redis_url=_lease_redis_url()
-        )
+        release_job_lease(f"refresh_propicks_prices:{tenant_id}", lease, redis_url=_lease_redis_url())
         db.close()
 
 
@@ -2055,9 +2050,7 @@ def refresh_valuation_metrics(
         _rollback(db)
         return _handle_actor_error("refresh_valuation_metrics", exc, tenant_id=tenant_id)
     finally:
-        release_job_lease(
-            f"refresh_valuation_metrics:{tenant_id}", lease, redis_url=_lease_redis_url()
-        )
+        release_job_lease(f"refresh_valuation_metrics:{tenant_id}", lease, redis_url=_lease_redis_url())
         db.close()
 
 
@@ -2146,11 +2139,11 @@ def _official_close_session_key() -> str:
     from datetime import UTC, datetime
 
     from app.services.market_close_sync import last_completed_us_session
+
     return last_completed_us_session(datetime.now(UTC)).isoformat()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
-                queue_name="official-closes")
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000, queue_name="official-closes")
 def sync_official_closes(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2197,21 +2190,35 @@ def sync_official_closes(
                 started = str(now_seconds)
             remaining = max(0, 6 * 3600 - (now_seconds - int(started)))
             if remaining:
-                return {"status": "skipped", "reason": "session_attempt_cooldown",
-                        "attempts": tried, "target_date": session_key,
-                        "retry_after_seconds": remaining}
+                return {
+                    "status": "skipped",
+                    "reason": "session_attempt_cooldown",
+                    "attempts": tried,
+                    "target_date": session_key,
+                    "retry_after_seconds": remaining,
+                }
             tried = 0
         client.set(attempts, str(tried + 1), ex=7 * 86400)
         if tried + 1 >= 3:
             client.set(cooldown_key, str(now_seconds), ex=7 * 86400)
         db = _session(tenant_id, user_id)
         result = _sync(db)
-        logger.info("official_closes_result session=%s status=%s target_covered=%s "
-                    "with_symbol=%s target_coverage=%s failed_chunks=%s target_missing=%s",
-                    session_key, result.get("status"), result.get("target_covered"),
-                    result.get("with_symbol"), result.get("target_coverage"),
-                    result.get("failed_chunks"), result.get("target_missing"))
-        if result.get("status") == "ok" and result.get("target_coverage", 0) >= MIN_TARGET_COVERAGE and result.get("target_date") == session_key:
+        logger.info(
+            "official_closes_result session=%s status=%s target_covered=%s "
+            "with_symbol=%s target_coverage=%s failed_chunks=%s target_missing=%s",
+            session_key,
+            result.get("status"),
+            result.get("target_covered"),
+            result.get("with_symbol"),
+            result.get("target_coverage"),
+            result.get("failed_chunks"),
+            result.get("target_missing"),
+        )
+        if (
+            result.get("status") == "ok"
+            and result.get("target_coverage", 0) >= MIN_TARGET_COVERAGE
+            and result.get("target_date") == session_key
+        ):
             client.set(done, "1", ex=7 * 86400)
         return {"actor": "sync_official_closes", **result}
     except Exception:
@@ -2262,6 +2269,7 @@ def evaluate_dca_signals(
     try:
         summary = evaluate_watchlist(db)
         from app.services.plan_proactivity import review_savings_plan
+
         summary["savings_plan_review"] = review_savings_plan(db)
         db.commit()
         dca_run_log.finish_run(db, run, summary=summary)
@@ -2271,9 +2279,7 @@ def evaluate_dca_signals(
         dca_run_log.finish_run(db, run, error=f"{type(exc).__name__}: {exc}")
         return _handle_actor_error("evaluate_dca_signals", exc, tenant_id=tenant_id)
     finally:
-        release_job_lease(
-            f"evaluate_dca_signals:{tenant_id}", lease, redis_url=_lease_redis_url()
-        )
+        release_job_lease(f"evaluate_dca_signals:{tenant_id}", lease, redis_url=_lease_redis_url())
         db.close()
 
 
@@ -2322,9 +2328,7 @@ def backfill_company_price_history(
         }
     except Exception as exc:
         _rollback(db)
-        return _handle_actor_error(
-            "backfill_company_price_history", exc, company_id=company_id
-        )
+        return _handle_actor_error("backfill_company_price_history", exc, company_id=company_id)
     finally:
         db.close()
 
@@ -2419,7 +2423,9 @@ def refresh_sec_filings(
         finally:
             db.close()
     except Exception as exc:
-        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id, ticker=ticker, limit=limit)
+        return _handle_actor_error(
+            actor_name, exc, tenant_id=tenant_id, user_id=user_id, ticker=ticker, limit=limit
+        )
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
@@ -2443,9 +2449,7 @@ def refresh_ir_pages(
                 if not company.ir_url:
                     continue
                 try:
-                    result = _run(
-                        service.poll_ir(company.ir_url, ticker=company.ticker)
-                    )
+                    result = _run(service.poll_ir(company.ir_url, ticker=company.ticker))
                     if result.errors:
                         errors.extend(
                             {"ticker": company.ticker, "source": "ir", "message": error}
@@ -2507,6 +2511,7 @@ def refresh_ir_pages(
 # Al agotarse, los feeds restantes quedan diferidos al siguiente tick y el
 # resultado lo declara ("partial" + time_budget_exceeded), nada se silencia.
 _RSS_TIME_BUDGET_SECONDS = 480.0
+
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
 @_coalesce_on_success("refresh_rss_feeds", 12 * 60, ("tenant_id", "feed_url", "ticker"))
@@ -2598,9 +2603,7 @@ def refresh_rss_feeds(
                     break
                 state = state_by_url.get(feed.url)
                 if state is None:
-                    state = ConnectorState(
-                        tenant_id=tenant_id, connector="rss", feed_url=feed.url
-                    )
+                    state = ConnectorState(tenant_id=tenant_id, connector="rss", feed_url=feed.url)
                     db.add(state)
                     state_by_url[feed.url] = state
                 state.last_started_at = datetime.now(UTC)
@@ -2608,13 +2611,10 @@ def refresh_rss_feeds(
                 # siguiente no vuelve a empezar por este feed.
                 db.commit()
                 try:
-                    result = _run(
-                        service.poll_rss(feed.url, ticker=feed.ticker, source_label=feed.label)
-                    )
+                    result = _run(service.poll_rss(feed.url, ticker=feed.ticker, source_label=feed.label))
                     if result.errors:
                         errors.extend(
-                            {"url": feed.url, "source": "rss", "message": error}
-                            for error in result.errors
+                            {"url": feed.url, "source": "rss", "message": error} for error in result.errors
                         )
                     ingestion = service.ingest_news_result(
                         db,
@@ -2629,8 +2629,7 @@ def refresh_rss_feeds(
                         # titular de carril que nombra una empresa NO la
                         # enlaza (test: BEA con «Apple» queda company_id NULL).
                         detect_company=(
-                            feed.lane is None
-                            or feed.lane in lane_feeds_company_detection_allowed
+                            feed.lane is None or feed.lane in lane_feeds_company_detection_allowed
                         ),
                     )
                     if result.status != "error":
@@ -2676,8 +2675,9 @@ def refresh_rss_feeds(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
-def analyze_tracked_news_alert(alert_id: int, *, tenant_id: int | None = None,
-                               user_id: str | None = None) -> dict[str, Any]:
+def analyze_tracked_news_alert(
+    alert_id: int, *, tenant_id: int | None = None, user_id: str | None = None
+) -> dict[str, Any]:
     """Idempotent attributed-headline baseline, never a verified claim."""
     from app.services.alert_analysis_service import analyze_alert
 
@@ -2711,7 +2711,8 @@ def dispatch_tracked_news_alerts(tenant_id: int | None = None, user_id: str | No
     try:
         lease = acquire_job_lease(
             f"dispatch_tracked_news_alerts:{tenant_id}",
-            ttl_seconds=900, redis_url=_lease_redis_url(),
+            ttl_seconds=900,
+            redis_url=_lease_redis_url(),
         )
     except Exception:
         db.close()
@@ -2729,10 +2730,16 @@ def dispatch_tracked_news_alerts(tenant_id: int | None = None, user_id: str | No
         from app.models import AlertAnalysis
         from app.services.alert_analysis_service import VERSION
 
-        pending = db.scalars(select(AlertAnalysis).where(
-            AlertAnalysis.tenant_id == tenant_id, AlertAnalysis.version == VERSION,
-            AlertAnalysis.status == "pending",
-        ).order_by(AlertAnalysis.id).limit(20)).all()
+        pending = db.scalars(
+            select(AlertAnalysis)
+            .where(
+                AlertAnalysis.tenant_id == tenant_id,
+                AlertAnalysis.version == VERSION,
+                AlertAnalysis.status == "pending",
+            )
+            .order_by(AlertAnalysis.id)
+            .limit(20)
+        ).all()
         enqueued = 0
         deduped = 0
         for row in pending:
@@ -2758,7 +2765,9 @@ def dispatch_tracked_news_alerts(tenant_id: int | None = None, user_id: str | No
         return _handle_actor_error("dispatch_tracked_news_alerts", exc, tenant_id=tenant_id)
     finally:
         release_job_lease(
-            f"dispatch_tracked_news_alerts:{tenant_id}", lease, redis_url=_lease_redis_url(),
+            f"dispatch_tracked_news_alerts:{tenant_id}",
+            lease,
+            redis_url=_lease_redis_url(),
         )
         db.close()
 
@@ -2812,9 +2821,7 @@ def refresh_news(
                 ingest_in_chunks,
             )
 
-            companies = sorted(
-                companies, key=lambda c: (c.ticker.upper() not in PRIORITY_TICKERS, c.ticker)
-            )
+            companies = sorted(companies, key=lambda c: (c.ticker.upper() not in PRIORITY_TICKERS, c.ticker))
             # Cierra la transaccion de lectura de _session/_companies ANTES del
             # bucle de red (GDELT tarda segundos por empresa): la lista ya esta
             # materializada y expire_on_commit=False mantiene los atributos.
@@ -2840,9 +2847,7 @@ def refresh_news(
                             for error in result.errors
                         )
                     ingested += ingest_in_chunks(
-                        lambda part, _c=company: service.ingest_news_result(
-                            db, part, ticker=_c.ticker
-                        ),
+                        lambda part, _c=company: service.ingest_news_result(db, part, ticker=_c.ticker),
                         result,
                         deadline,
                     )
@@ -2976,7 +2981,9 @@ def refresh_ticker_news(
                 on_error=lambda: _rollback(db),
             )
             processed, ingested, errors = (
-                outcome["processed"], outcome["ingested"], outcome["errors"],
+                outcome["processed"],
+                outcome["ingested"],
+                outcome["errors"],
             )
             return {
                 "status": finalize_status(_batch_status(processed, errors), deadline.truncated),
@@ -3008,7 +3015,8 @@ def reconcile_alert_analyses(tenant_id: int | None = None, user_id: str | None =
     try:
         lease = acquire_job_lease(
             f"reconcile_alert_analyses:{tenant_id}",
-            ttl_seconds=900, redis_url=_lease_redis_url(),
+            ttl_seconds=900,
+            redis_url=_lease_redis_url(),
         )
     except Exception:
         db.close()
@@ -3024,7 +3032,9 @@ def reconcile_alert_analyses(tenant_id: int | None = None, user_id: str | None =
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
     finally:
         release_job_lease(
-            f"reconcile_alert_analyses:{tenant_id}", lease, redis_url=_lease_redis_url(),
+            f"reconcile_alert_analyses:{tenant_id}",
+            lease,
+            redis_url=_lease_redis_url(),
         )
         db.close()
 
@@ -3071,9 +3081,7 @@ def _gdelt_macro_cache_get(client, theme: str):
                 url=item.get("url"),
                 summary=item.get("summary", ""),
                 published_at=(
-                    datetime.fromisoformat(item["published_at"])
-                    if item.get("published_at")
-                    else None
+                    datetime.fromisoformat(item["published_at"]) if item.get("published_at") else None
                 ),
                 ticker=item.get("ticker"),
                 item_type=item.get("item_type", "news"),
@@ -3105,8 +3113,7 @@ def _gdelt_macro_cache_set(client, theme: str, result) -> None:
             "errors": list(result.errors),
             "metadata": dict(result.metadata or {}),
             "items": [
-                {**item.as_dict(), "headline_from_source": item.headline_from_source}
-                for item in result.items
+                {**item.as_dict(), "headline_from_source": item.headline_from_source} for item in result.items
             ],
         }
         # redis-py depreco setex (DeprecationWarning desde 2.6.12): set con ex=ttl
@@ -3142,7 +3149,8 @@ def refresh_macro_news(
         try:
             lease = acquire_job_lease(
                 f"refresh_macro_news:{tenant_id}",
-                ttl_seconds=1800, redis_url=_lease_redis_url(),
+                ttl_seconds=1800,
+                redis_url=_lease_redis_url(),
             )
         except Exception:
             db.close()
@@ -3163,9 +3171,7 @@ def refresh_macro_news(
                 result = _gdelt_macro_cache_get(cache_client, theme)
                 if result is None:
                     try:
-                        result = _run(
-                            service.poll_gdelt(query, ticker=None, max_records=max_records)
-                        )
+                        result = _run(service.poll_gdelt(query, ticker=None, max_records=max_records))
                     except Exception as exc:
                         _rollback(db)
                         from app.services.connectors.gdelt import GdeltRateLimited
@@ -3203,8 +3209,7 @@ def refresh_macro_news(
                         # todos los tenants.
                         consecutive_failures += 1
                         errors.extend(
-                            {"theme": theme, "source": "gdelt", "message": error}
-                            for error in result.errors
+                            {"theme": theme, "source": "gdelt", "message": error} for error in result.errors
                         )
                         if consecutive_failures >= _GDELT_MACRO_CIRCUIT_THRESHOLD:
                             errors.append(
@@ -3225,8 +3230,7 @@ def refresh_macro_news(
                     _gdelt_macro_cache_set(cache_client, theme, result)
                 if result.errors:
                     errors.extend(
-                        {"theme": theme, "source": "gdelt", "message": error}
-                        for error in result.errors
+                        {"theme": theme, "source": "gdelt", "message": error} for error in result.errors
                     )
                 ingestion = service.ingest_news_result(
                     db,
@@ -3248,7 +3252,9 @@ def refresh_macro_news(
             }
         finally:
             release_job_lease(
-                f"refresh_macro_news:{tenant_id}", lease, redis_url=_lease_redis_url(),
+                f"refresh_macro_news:{tenant_id}",
+                lease,
+                redis_url=_lease_redis_url(),
             )
             db.close()
     except dramatiq.Retry:
@@ -3272,11 +3278,7 @@ def process_document(
     try:
         from app.services.feed_ingestion_service import FeedIngestionService
 
-        published = (
-            datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-            if published_at
-            else None
-        )
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00")) if published_at else None
         db = _session(tenant_id, user_id)
         try:
             result = _run(
@@ -3327,11 +3329,7 @@ def process_document_structured(
         from app.services.docling_pipeline import docling_heavy_context
         from app.services.feed_ingestion_service import FeedIngestionService
 
-        published = (
-            datetime.fromisoformat(published_at.replace("Z", "+00:00"))
-            if published_at
-            else None
-        )
+        published = datetime.fromisoformat(published_at.replace("Z", "+00:00")) if published_at else None
         db = _session(tenant_id, user_id)
         try:
             with docling_heavy_context():
@@ -3375,9 +3373,7 @@ def consolidate_memory(
         try:
             items = list(
                 db.scalars(
-                    select(MemoryItem)
-                    .where(MemoryItem.status == "active")
-                    .order_by(MemoryItem.id)
+                    select(MemoryItem).where(MemoryItem.status == "active").order_by(MemoryItem.id)
                 ).all()
             )
             canonical: dict[tuple, Any] = {}
@@ -3428,30 +3424,17 @@ def scan_contradictions(
         db = _session(tenant_id, user_id)
         try:
             evidence = list(
-                db.scalars(
-                    select(ClaimEvidence).where(
-                        ClaimEvidence.evidence_type == "contradicts"
-                    )
-                ).all()
+                db.scalars(select(ClaimEvidence).where(ClaimEvidence.evidence_type == "contradicts")).all()
             )
             claim_ids = {item.claim_id for item in evidence}
-            claims = (
-                list(db.scalars(select(Claim).where(Claim.id.in_(claim_ids))).all())
-                if claim_ids
-                else []
-            )
+            claims = list(db.scalars(select(Claim).where(Claim.id.in_(claim_ids))).all()) if claim_ids else []
             existing_changes = list(
                 db.scalars(
-                    select(ThesisChange).where(
-                        ThesisChange.change_type
-                        == claim_change_type("contradicted")
-                    )
+                    select(ThesisChange).where(ThesisChange.change_type == claim_change_type("contradicted"))
                 ).all()
             )
             already_flagged = {
-                claim_id
-                for change in existing_changes
-                for claim_id in (change.affected_claim_ids or [])
+                claim_id for change in existing_changes for claim_id in (change.affected_claim_ids or [])
             }
             created = 0
             for claim in claims:
@@ -3504,9 +3487,7 @@ def review_theses(
         db = _session(tenant_id, user_id)
         try:
             pending = list(
-                db.scalars(
-                    select(ThesisChange).where(ThesisChange.requires_review.is_(True))
-                ).all()
+                db.scalars(select(ThesisChange).where(ThesisChange.requires_review.is_(True))).all()
             )
             company_ids = {change.company_id for change in pending if change.company_id}
             statement = select(Company)
@@ -3540,9 +3521,7 @@ def review_theses(
                         if change_created_at and change_created_at.tzinfo is None:
                             change_created_at = change_created_at.replace(tzinfo=UTC)
                         thesis_is_newer = bool(
-                            thesis_created_at
-                            and change_created_at
-                            and thesis_created_at >= change_created_at
+                            thesis_created_at and change_created_at and thesis_created_at >= change_created_at
                         )
                         if change.from_version_id != thesis.id and thesis_is_newer:
                             change.to_version_id = thesis.id
@@ -3631,9 +3610,7 @@ def run_daily_research() -> dict[str, Any]:
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
-@_coalesce_on_success(
-    "scan_insider_watchlist", 12 * 60, ("tenant_id", "lookback", "max_new_fetches")
-)
+@_coalesce_on_success("scan_insider_watchlist", 12 * 60, ("tenant_id", "lookback", "max_new_fetches"))
 def scan_insider_watchlist(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -3676,9 +3653,7 @@ def scan_insider_watchlist(
                 backfill=True,
             )
         finally:
-            release_job_lease(
-                f"scan_insider_watchlist:{tenant_id}", lease, redis_url=_lease_redis_url()
-            )
+            release_job_lease(f"scan_insider_watchlist:{tenant_id}", lease, redis_url=_lease_redis_url())
             db.close()
         return {
             "status": stats["status"],
@@ -3736,9 +3711,7 @@ def scan_schedule13dg_watchlist(
                 max_new_fetches=max_new_fetches,
             )
         finally:
-            release_job_lease(
-                f"scan_schedule13dg_watchlist:{tenant_id}", lease, redis_url=_lease_redis_url()
-            )
+            release_job_lease(f"scan_schedule13dg_watchlist:{tenant_id}", lease, redis_url=_lease_redis_url())
             db.close()
         return {
             "status": stats["status"],
@@ -3782,9 +3755,7 @@ def sync_investor_holdings(
         try:
             result = run_sync(db)
         finally:
-            release_job_lease(
-                f"sync_investor_holdings:{tenant_id}", lease, redis_url=_lease_redis_url()
-            )
+            release_job_lease(f"sync_investor_holdings:{tenant_id}", lease, redis_url=_lease_redis_url())
             db.close()
         return {"actor": actor_name, **result}
     except Exception as exc:
@@ -3823,9 +3794,7 @@ def ingest_letters_corpus(
         try:
             result = ingest_free_corpus(db)
         finally:
-            release_job_lease(
-                f"ingest_letters_corpus:{tenant_id}", lease, redis_url=_lease_redis_url()
-            )
+            release_job_lease(f"ingest_letters_corpus:{tenant_id}", lease, redis_url=_lease_redis_url())
             db.close()
         return {"actor": actor_name, **result}
     except Exception as exc:
@@ -3867,9 +3836,7 @@ def dispatch_insider_alerts(
         try:
             stats = insider_alerts.evaluate(db, tenant_id=tenant_id)
         finally:
-            release_job_lease(
-                f"dispatch_insider_alerts:{tenant_id}", lease, redis_url=_lease_redis_url()
-            )
+            release_job_lease(f"dispatch_insider_alerts:{tenant_id}", lease, redis_url=_lease_redis_url())
             db.close()
         return {
             "status": stats["status"],
@@ -3905,15 +3872,22 @@ def dispatch_earnings_reminders(
 
         db = _session(tenant_id, user_id)
         lease = acquire_job_lease(
-            f"{actor_name}:{tenant_id}", ttl_seconds=300, redis_url=_lease_redis_url(),
+            f"{actor_name}:{tenant_id}",
+            ttl_seconds=300,
+            redis_url=_lease_redis_url(),
         )
         if lease is None:
             return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
         stats = emit_earnings_reminders(db)
         pending = dispatch_pending(db)
-        return {"status": "ok", "actor": actor_name,
-                "created": stats["created"], "existing": stats["existing"],
-                "redispatched": pending["redispatched"], "errors": pending["errors"][:20]}
+        return {
+            "status": "ok",
+            "actor": actor_name,
+            "created": stats["created"],
+            "existing": stats["existing"],
+            "redispatched": pending["redispatched"],
+            "errors": pending["errors"][:20],
+        }
     except Exception as exc:
         if db is not None:
             _rollback(db)
@@ -3947,20 +3921,29 @@ def dispatch_macro_reminders(
 
         db = _session(tenant_id, user_id)
         lease = acquire_job_lease(
-            f"dispatch_macro_reminders:{tenant_id}", ttl_seconds=300, redis_url=_lease_redis_url(),
+            f"dispatch_macro_reminders:{tenant_id}",
+            ttl_seconds=300,
+            redis_url=_lease_redis_url(),
         )
         if lease is None:
             return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
         today = datetime.now(UTC).date()
-        calendar = _run(macro_calendar_service.get_macro_events(today - timedelta(days=1),
-                                                               today + timedelta(days=3)))
+        calendar = _run(
+            macro_calendar_service.get_macro_events(today - timedelta(days=1), today + timedelta(days=3))
+        )
         if calendar["status"] == "unavailable":
             return {"status": "skipped", "actor": actor_name, "reason": "source_unavailable"}
         stats = emit_macro_reminders(db, calendar["events"])
         pending = dispatch_pending(db)
-        return {"status": "ok", "actor": actor_name, "calendar_status": calendar["status"],
-                "created": stats["created"], "existing": stats["existing"],
-                "redispatched": pending["redispatched"], "errors": pending["errors"][:20]}
+        return {
+            "status": "ok",
+            "actor": actor_name,
+            "calendar_status": calendar["status"],
+            "created": stats["created"],
+            "existing": stats["existing"],
+            "redispatched": pending["redispatched"],
+            "errors": pending["errors"][:20],
+        }
     except Exception as exc:
         if db is not None:
             _rollback(db)
@@ -4004,9 +3987,7 @@ def reconcile_alert_deliveries(
         from app.services.outbound_alerts import dispatch_pending
 
         pending = dispatch_pending(db)
-        stats = NotificationService().reconcile_stale_deliveries(
-            db, tenant_id=tenant_id
-        )
+        stats = NotificationService().reconcile_stale_deliveries(db, tenant_id=tenant_id)
         for key in ("candidates", "redispatched"):
             stats[key] += pending[key]
         stats["errors"].extend(pending["errors"])
@@ -4112,7 +4093,8 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
     db = _session(tenant_id, user_id)
     try:
         tickers = [
-            t for (t,) in db.execute(
+            t
+            for (t,) in db.execute(
                 select(_PT.ticker).where(_PT.status.in_(("pending", "open"))).distinct()
             ).all()
         ]
@@ -4122,8 +4104,13 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
             db.commit()  # sesion libre antes de la red
             result = run_from_any_context(service.sync_company(db, ticker=ticker))
             (synced if result.get("status") == "ok" else unavailable).append(ticker)
-        return {"actor": "sync_paper_dividends", "status": "ok",
-                "tickers": len(tickers), "synced": synced, "unavailable": unavailable}
+        return {
+            "actor": "sync_paper_dividends",
+            "status": "ok",
+            "tickers": len(tickers),
+            "synced": synced,
+            "unavailable": unavailable,
+        }
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("sync_paper_dividends", exc, tenant_id=tenant_id)
@@ -4144,13 +4131,23 @@ def sync_tenant_ibkr_connections() -> dict[str, Any]:
     from app.models import IBKRConnection
 
     with SessionLocal() as admin:
-        ids = set(admin.scalars(select(IBKRConnection.tenant_id).where(
-            IBKRConnection.enabled.is_(True),
-        ).execution_options(include_all_tenants=True)).all())
+        ids = set(
+            admin.scalars(
+                select(IBKRConnection.tenant_id)
+                .where(
+                    IBKRConnection.enabled.is_(True),
+                )
+                .execution_options(include_all_tenants=True)
+            ).all()
+        )
     scheduled = 0
     for tenant_id, user_id in tenant_contexts():
         if tenant_id in ids:
-            actor = sync_one_tenant_ibkr_dedicated if get_settings().ibkr_dedicated_sync_enabled else sync_one_tenant_ibkr
+            actor = (
+                sync_one_tenant_ibkr_dedicated
+                if get_settings().ibkr_dedicated_sync_enabled
+                else sync_one_tenant_ibkr
+            )
             actor.send(tenant_id, user_id)
             scheduled += 1
     return {"scheduled": scheduled}
@@ -4172,7 +4169,10 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
                     return ibkr.import_report(db, xml, account_id, revision, receipt_id=receipt_id)
                 except Exception:
                     ibkr.record_failure(db, revision=revision, receipt_id=receipt_id)
-                    return {"status": "error", "message": "IBKR no disponible; se conservan los datos anteriores."}
+                    return {
+                        "status": "error",
+                        "message": "IBKR no disponible; se conservan los datos anteriores.",
+                    }
         except ibkr.SyncBusy:
             return {"status": "busy", "message": "Ya hay una sincronización IBKR en curso."}
 
@@ -4181,6 +4181,7 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
 def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -> dict:
     """Execute an accepted, bounded manual batch outside the HTTP request."""
     from app.services.dca_manual_job import run_manual_job
+
     db = _session(tenant_id, user_id)
     try:
         return run_manual_job(db, run_id, token)
@@ -4198,3 +4199,43 @@ def sync_tenant_ibkr_connections_dedicated() -> dict[str, Any]:
 def sync_one_tenant_ibkr_dedicated(tenant_id: int, user_id: str) -> dict[str, Any]:
     """Same revision/date validation, separate bounded read-only consumer."""
     return sync_one_tenant_ibkr.fn(tenant_id, user_id)
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
+def dispatch_source_health_watchdog(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Alerta in-app al operador cuando una fuente de datos pasa a degradada/caída.
+
+    Lee el circuit breaker de fuentes del PROCESO del worker (el registry es
+    por proceso: ve las transiciones registradas por actores de este worker) y
+    persiste una ResearchAlert in-app por fuente, estado y día. Coste 0.
+    """
+    actor_name = "dispatch_source_health_watchdog"
+    db = None
+    lease = None
+    try:
+        from app.services.source_health_watchdog import emit_source_health_alerts
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(
+            f"dispatch_source_health_watchdog:{tenant_id}",
+            ttl_seconds=120,
+            redis_url=_lease_redis_url(),
+        )
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        stats = emit_source_health_alerts(db)
+        return {"status": "ok", "actor": actor_name, **stats}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(
+                f"dispatch_source_health_watchdog:{tenant_id}", lease, redis_url=_lease_redis_url()
+            )
+        if db is not None:
+            db.close()
