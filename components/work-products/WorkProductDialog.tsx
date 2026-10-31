@@ -76,7 +76,7 @@ export default function WorkProductDialog() {
     };
 
     return (
-        <DialogContent className="border-gray-700 bg-gray-800">
+        <DialogContent className="border-gray-700 bg-gray-800 max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle className="text-gray-100">Generar entregable</DialogTitle>
                 <DialogDescription className="text-gray-400">

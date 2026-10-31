@@ -149,7 +149,7 @@ export default function AddTransactionDialog({ userId, onClose, initialSymbol, i
   };
 
   return (
-      <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+      <DialogContent className="bg-gray-900 border-gray-700 max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-gray-100">{ti('portfolio.addTransaction.title')}</DialogTitle>
           <DialogDescription className="text-gray-400">

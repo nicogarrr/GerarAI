@@ -115,7 +115,7 @@ export default function PlanContributionDialog({
                     {t('plan.contribution.trigger')}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-md">
+            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-md max-h-[90dvh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{t('plan.contribution.title')}</DialogTitle>
                     <DialogDescription className="text-gray-400">

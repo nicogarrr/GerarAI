@@ -195,7 +195,7 @@ export default function PlanSetupDialog({
                     {triggerText}
                 </Button>
             </DialogTrigger>
-            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-xl">
+            <DialogContent className="border-gray-700 bg-gray-900 text-gray-100 sm:max-w-xl max-h-[90dvh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{t('plan.setup.title')}</DialogTitle>
                     <DialogDescription className="text-gray-400">
