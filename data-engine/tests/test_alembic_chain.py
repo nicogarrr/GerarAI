@@ -257,7 +257,6 @@ def test_salto_huerfano_se_detecta(tmp_path):
 def test_web_push_0101_round_trip_on_ci_postgres():
     """Real Postgres round trip in an isolated schema; CI migration job runs this file."""
     import importlib.util
-    import os
     import uuid
 
     import pytest
@@ -334,11 +333,11 @@ def _deriva_actual(url: str) -> list[str]:
     import uuid
 
     import sqlalchemy as sa
-    from alembic import command
     from alembic.autogenerate import compare_metadata
     from alembic.config import Config
     from alembic.migration import MigrationContext
 
+    from alembic import command
     from app.core.config import get_settings
     from app.core.database import Base
 

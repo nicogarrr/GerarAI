@@ -2062,6 +2062,12 @@ class FundamentalValuationSnapshot(TenantOwnedMixin, Base, TimestampMixin):
             "market_snapshot_fingerprint",
             name="uq_fundamental_valuation_market_snapshot",
         ),
+        # MEDIDO: el nombre autogenerado (ix_<tabla>_<columna>, 65 chars) supera
+        # el limite de identificadores de PostgreSQL (63); nombre explicito.
+        Index(
+            "ix_fundamental_valuation_snapshots_valuation_fp",
+            "valuation_snapshot_fingerprint",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -2071,7 +2077,7 @@ class FundamentalValuationSnapshot(TenantOwnedMixin, Base, TimestampMixin):
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     current_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
     market_snapshot_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
-    valuation_snapshot_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    valuation_snapshot_fingerprint: Mapped[str] = mapped_column(String(64))
     snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
