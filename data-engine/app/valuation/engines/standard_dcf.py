@@ -79,7 +79,7 @@ def _scenario_nd_note(name: str, raw_value: float | None, scenario_margin: float
 
 
 def _normalized_fcf_margin(
-    context: "ValuationContext", snapshot
+    context: ValuationContext, snapshot
 ) -> tuple[float | None, dict | None]:
     """Margen FCF del DCF como mediana de los ultimos 3 ejercicios fiscales.
 

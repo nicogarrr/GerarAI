@@ -151,7 +151,7 @@ def test_data_sources_health_endpoint(client):
 
 def test_health_reports_unknown_until_first_real_check():
     """Veracidad: una fuente nunca sondeada no se reporta 'healthy' ni con fecha de chequeo inventada."""
-    from app.services.data_source_health import DataSourceHealthRegistry, DataSourceStatus
+    from app.services.data_source_health import DataSourceHealthRegistry
 
     DataSourceHealthRegistry._instance = None
     registry = DataSourceHealthRegistry()

@@ -19,9 +19,9 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Sequence
-from decimal import ROUND_HALF_UP, Decimal
 from dataclasses import asdict, dataclass, field
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 
 # Codigos de nivel. Compra: 1..4 (multiplo de la aportacion base). Recorte: -1/-2.
 LEVEL_STRONG_TRIM = -2
