@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -146,9 +146,29 @@ def list_discoveries(
     # tx_date es texto; se interpreta con el mismo parser que las alertas insider.
     insider_cutoff = datetime.now(UTC).date() - timedelta(days=90)
     insider_tickers: set[str] = set()
+    # Prefiltro SQL SUPERSET (el DISTINCT leia la tabla entera; 372 ms
+    # medidos en el barrido 2026-10-31). El parseo exacto sigue en Python:
+    # - ISO ("YYYY-MM-DD", con o sin ceros): una fecha parseada >= cutoff
+    #   SIEMPRE ordena lexicamente >= cutoff ISO acolchado (demostrado por
+    #   componentes: el primer componente mayor empieza por digito > '0').
+    # - US ("MM/DD/YYYY"): no ordena contra ISO; se acota por su año
+    #   (ultimos 4 caracteres >= año del cutoff), exacto para años de 4 cifras.
+    # Basura ("fecha rara") puede pasar el prefiltro: el parser la descarta.
+    tx = InsiderTransaction
     for ticker, tx_date in db.execute(
-        select(InsiderTransaction.issuer_ticker, InsiderTransaction.tx_date)
-        .where(InsiderTransaction.tenant_id == tenant, InsiderTransaction.issuer_ticker.is_not(None))
+        select(tx.issuer_ticker, tx.tx_date)
+        .where(
+            tx.tenant_id == tenant,
+            tx.issuer_ticker.is_not(None),
+            or_(
+                tx.tx_date >= insider_cutoff.isoformat(),
+                and_(
+                    tx.tx_date.like("%/%"),
+                    func.substr(tx.tx_date, func.length(tx.tx_date) - 3, 4)
+                    >= str(insider_cutoff.year),
+                ),
+            ),
+        )
         .distinct()
     ):
         parsed = _parse_insider_date(tx_date)

@@ -535,3 +535,77 @@ def test_discoveries_flag_recent_insider_activity(db):
     assert items["BHP"]["recent_insider_activity"] is False   # 2020: fuera de ventana
     assert items["XOM"]["recent_insider_activity"] is False   # fecha ilegible
     assert items["FDX"]["recent_insider_activity"] is False   # sin datos
+
+
+def test_discoveries_flag_recent_insider_activity_formato_us(db):
+    """El parser acepta MM/DD/YYYY: el prefiltro SQL no puede quedarse las
+    fechas US recientes fuera (se acotan por año, no por orden lexico)."""
+    from datetime import date as dt_date
+    from datetime import timedelta as dt_td
+
+    from app.models import BottleneckDiscovery, InsiderFiling, InsiderTransaction
+
+    db.add(InsiderFiling(accession_number="0001", form="4", issuer_cik="1",
+                         issuer_ticker="NVDA", parser_version="v1"))
+    db.flush()
+    filing_id = db.scalar(select(InsiderFiling.id))
+    today = datetime.now(UTC).date()
+    reciente_us = (today - dt_td(days=30)).strftime("%m/%d/%Y")
+    db.add_all([
+        InsiderTransaction(fingerprint="fp1", filing_id=filing_id, accession_number="0001",
+                           form="4", issuer_ticker="NVDA", tx_date=reciente_us),
+        InsiderTransaction(fingerprint="fp2", filing_id=filing_id, accession_number="0001",
+                           form="4", issuer_ticker="BHP", tx_date="01/15/2020"),
+    ])
+    db.add_all([
+        BottleneckDiscovery(theme="Semiconductores", ticker="NVDA", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=2),
+        BottleneckDiscovery(theme="Minerales", ticker="BHP", reasoning="h",
+                            evidence_ids=[], model="m", day=dt_date(2026, 10, 9),
+                            created_at=datetime(2026, 10, 9, tzinfo=UTC), n_sources=0),
+    ])
+    db.commit()
+    app = FastAPI()
+    app.include_router(router, prefix="/api/bottlenecks")
+    app.dependency_overrides[get_db] = lambda: db
+    with TestClient(app) as client:
+        items = {i["ticker"]: i for i in client.get("/api/bottlenecks/discoveries").json()["items"]}
+    assert items["NVDA"]["recent_insider_activity"] is True   # MM/DD/YYYY reciente
+    assert items["BHP"]["recent_insider_activity"] is False   # MM/DD/YYYY vieja
+
+
+def test_discoveries_insider_prefiltro_sql(db):
+    """Perf: el DISTINCT de insider_transactions leia la tabla ENTERA sin cota
+    de fecha (372 ms medidos en el barrido 2026-10-31). Debe llevar prefiltro
+    por tx_date (superset; el parseo exacto sigue en Python)."""
+    from sqlalchemy import event
+
+    from app.models import InsiderFiling, InsiderTransaction
+
+    db.add(InsiderFiling(accession_number="0001", form="4", issuer_cik="1",
+                         issuer_ticker="NVDA", parser_version="v1"))
+    db.flush()
+    filing_id = db.scalar(select(InsiderFiling.id))
+    today = datetime.now(UTC).date()
+    db.add(InsiderTransaction(fingerprint="fp1", filing_id=filing_id, accession_number="0001",
+                              form="4", issuer_ticker="NVDA", tx_date=str(today)))
+    db.commit()
+    engine = db.get_bind()
+    statements: list[str] = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        if "insider_transactions" in statement and "DISTINCT" in statement.upper():
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    app = FastAPI()
+    app.include_router(router, prefix="/api/bottlenecks")
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        with TestClient(app) as client:
+            assert client.get("/api/bottlenecks/discoveries").status_code == 200
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+    assert statements, "consulta DISTINCT de insider no encontrada"
+    assert "tx_date >=" in statements[0], "sin prefiltro SQL por tx_date"
