@@ -28,7 +28,9 @@ void test('fuente sin fecha: fallback declarado, no silencioso', () => {
   const news = source('data-engine/app/services/news_service.py');
   assert.ok(news.includes('ingested_at_fallback'), 'metadata declara el fallback');
   const page = (source('app/(root)/research/news/page.tsx') + source('components/research/NewsEventsFlow.tsx'));
-  assert.ok(page.includes('la fuente no da fecha'), 'la UI etiqueta el fallback');
+  assert.ok(page.includes("t('research.flow.dateIngested')"), 'la UI etiqueta el fallback');
+  const flowEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).flow;
+  assert.equal(flowEs.dateIngested, 'fecha de ingesta · la fuente no da fecha');
 });
 
 void test('la UI no pinta el razonamiento interno de scoring', () => {
