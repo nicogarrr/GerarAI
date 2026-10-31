@@ -1644,3 +1644,37 @@ class PortfolioTransactionPageOut(BaseModel):
 
     items: list[PortfolioTransactionOut]
     total: int
+
+
+# --- GET /api/portfolio/data-quality ----------------------------------------
+# Forma medida contra portfolio_quality (servicio real): la rama sin cartera
+# OMITE cost_review_positions y cost_unverified_positions; el resto de
+# claves se emite siempre. La ruta usa response_model_exclude_unset=True
+# para conservar esa omision.
+
+
+class PortfolioTwrChainOut(BaseModel):
+    status: Literal["no_snapshots", "broken", "linked"]
+    unlinked_snapshots: int
+    first_unlinked_date: str | None
+
+
+class PortfolioDataQualityOut(BaseModel):
+    status: Literal["ok", "incomplete", "no_portfolio"]
+    positions: int
+    missing_cost_positions: int
+    # Solo presentes con cartera (la rama no_portfolio las omite).
+    cost_review_positions: int | None = None
+    cost_unverified_positions: int | None = None
+    position_dates: list[str]
+    cash_dates: list[str]
+    cash_native: dict[str, float]
+    position_sources: list[str]
+    cash_sources: list[str]
+    snapshots: int
+    complete_snapshots: int
+    return_observations: int
+    latest_snapshot_date: str | None
+    latest_pricing_coverage: float | None
+    twr_chain: PortfolioTwrChainOut
+    reasons: list[str]

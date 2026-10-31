@@ -10580,6 +10580,147 @@
         "title": "PortfolioCoverageOut",
         "type": "object"
       },
+      "PortfolioDataQualityOut": {
+        "properties": {
+          "cash_dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cash Dates",
+            "type": "array"
+          },
+          "cash_native": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Cash Native",
+            "type": "object"
+          },
+          "cash_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cash Sources",
+            "type": "array"
+          },
+          "complete_snapshots": {
+            "title": "Complete Snapshots",
+            "type": "integer"
+          },
+          "cost_review_positions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Review Positions"
+          },
+          "cost_unverified_positions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Unverified Positions"
+          },
+          "latest_pricing_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Pricing Coverage"
+          },
+          "latest_snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Snapshot Date"
+          },
+          "missing_cost_positions": {
+            "title": "Missing Cost Positions",
+            "type": "integer"
+          },
+          "position_dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Position Dates",
+            "type": "array"
+          },
+          "position_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Position Sources",
+            "type": "array"
+          },
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "return_observations": {
+            "title": "Return Observations",
+            "type": "integer"
+          },
+          "snapshots": {
+            "title": "Snapshots",
+            "type": "integer"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "incomplete",
+              "no_portfolio"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "twr_chain": {
+            "$ref": "#/components/schemas/PortfolioTwrChainOut"
+          }
+        },
+        "required": [
+          "status",
+          "positions",
+          "missing_cost_positions",
+          "position_dates",
+          "cash_dates",
+          "cash_native",
+          "position_sources",
+          "cash_sources",
+          "snapshots",
+          "complete_snapshots",
+          "return_observations",
+          "latest_snapshot_date",
+          "latest_pricing_coverage",
+          "twr_chain",
+          "reasons"
+        ],
+        "title": "PortfolioDataQualityOut",
+        "type": "object"
+      },
       "PortfolioDrawdownPointOut": {
         "properties": {
           "date": {
@@ -12263,6 +12404,41 @@
           "total"
         ],
         "title": "PortfolioTransactionPageOut",
+        "type": "object"
+      },
+      "PortfolioTwrChainOut": {
+        "properties": {
+          "first_unlinked_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Unlinked Date"
+          },
+          "status": {
+            "enum": [
+              "no_snapshots",
+              "broken",
+              "linked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unlinked_snapshots": {
+            "title": "Unlinked Snapshots",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "unlinked_snapshots",
+          "first_unlinked_date"
+        ],
+        "title": "PortfolioTwrChainOut",
         "type": "object"
       },
       "PortfolioTwrPeriodOut": {
@@ -56647,9 +56823,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Data Quality Api Portfolio Data Quality Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioDataQualityOut"
                 }
               }
             },
