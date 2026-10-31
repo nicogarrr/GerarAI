@@ -10817,6 +10817,11 @@ export interface components {
             }[];
             performance: components["schemas"]["PortfolioPerformanceOut"];
             risk: components["schemas"]["PortfolioRiskOut"];
+            /**
+             * Xray
+             * @default []
+             */
+            xray: components["schemas"]["PortfolioXrayRuleOut"][];
         };
         /** PortfolioLedgerContributionOut */
         PortfolioLedgerContributionOut: {
@@ -11439,6 +11444,19 @@ export interface components {
             reason: string;
             /** Ticker */
             ticker: string;
+        };
+        /** PortfolioXrayRuleOut */
+        PortfolioXrayRuleOut: {
+            /** Id */
+            id: string;
+            /** Status */
+            status: string;
+            /** Subject */
+            subject?: string | null;
+            /** Threshold */
+            threshold: number;
+            /** Value */
+            value?: number | null;
         };
         /** PositionValuationHoldOut */
         PositionValuationHoldOut: {

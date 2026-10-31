@@ -1387,6 +1387,14 @@ class PortfolioRiskOut(BaseModel):
     correlation_min_observations: int
 
 
+class PortfolioXrayRuleOut(BaseModel):
+    id: str
+    status: str
+    subject: str | None = None
+    value: float | None = None
+    threshold: float
+
+
 class PortfolioConcentrationOut(BaseModel):
     top_1: float
     top_5: float
@@ -1486,6 +1494,7 @@ class PortfolioIntelligenceOut(BaseModel):
     risk: PortfolioRiskOut
     concentration: PortfolioConcentrationOut
     exposures: PortfolioExposuresOut
+    xray: list[PortfolioXrayRuleOut] = []
     attribution: PortfolioAttributionOut
     ledger_contribution: PortfolioLedgerContributionOut
     benchmark: PortfolioBenchmarkOut

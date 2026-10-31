@@ -13,6 +13,7 @@ import { getPortfolioIntelligence, type PortfolioIntelligence } from '@/lib/acti
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
 import type { Formatters } from '@/lib/format';
 
 
@@ -37,6 +38,21 @@ const ATTRIBUTION_ND_LABEL_KEYS = {
   sizing: 'portfolio.intelligence.attrNd_sizing',
 } as const;
 const ATTRIBUTION_ND_KEYS = Object.keys(ATTRIBUTION_ND_LABEL_KEYS) as Array<keyof typeof ATTRIBUTION_ND_LABEL_KEYS>;
+
+// Portfolio X-ray rules (idea from Ghostfolio's X-ray report). Literal keys so the i18n
+// checker sees every text; an unknown rule or status falls back to «sin datos».
+const XRAY_LABEL_KEYS: Record<string, { aviso: TranslationKey; ok: TranslationKey }> = {
+  posicion_unica: { aviso: 'portfolio.intelligence.xrayPosicionUnicaAviso', ok: 'portfolio.intelligence.xrayPosicionUnicaOk' },
+  divisa_unica: { aviso: 'portfolio.intelligence.xrayDivisaUnicaAviso', ok: 'portfolio.intelligence.xrayDivisaUnicaOk' },
+  sector_unico: { aviso: 'portfolio.intelligence.xraySectorUnicoAviso', ok: 'portfolio.intelligence.xraySectorUnicoOk' },
+  pais_unico: { aviso: 'portfolio.intelligence.xrayPaisUnicoAviso', ok: 'portfolio.intelligence.xrayPaisUnicoOk' },
+};
+
+function xrayLabelKey(id: string, status: string): TranslationKey {
+  const keys = XRAY_LABEL_KEYS[id];
+  if (!keys || (status !== 'aviso' && status !== 'ok')) return 'portfolio.intelligence.xraySinDatos';
+  return keys[status];
+}
 
 type LedgerReason = keyof typeof LEDGER_LABEL_KEYS;
 type AttributionNdReason = keyof typeof ATTRIBUTION_ND_LABEL_KEYS;
@@ -127,6 +143,25 @@ export default async function PortfolioIntelligencePage({ searchParams }: { sear
         <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('portfolio.intelligence.top5')}</span><span className="text-gray-200">{pct(data.concentration.top_5)}</span></div>
         <div className="flex justify-between gap-3"><span className="text-gray-400">{ti('portfolio.intelligence.herfindahl')}</span><span className="text-gray-200">{f.formatNumber(data.concentration.herfindahl, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</span></div>
       </div>
+      {data.xray && data.xray.length > 0 ? (
+        <div className="mt-4 border-t border-gray-800 pt-3 text-sm">
+          <p className="mb-2 text-gray-300">{ti('portfolio.intelligence.xrayTitle')}</p>
+          <ul className="space-y-1">
+            {data.xray.map((rule) => (
+              <li className={rule.status === 'aviso' ? 'flex items-start gap-2 text-amber-300' : 'flex items-start gap-2 text-gray-400'} key={rule.id}>
+                {rule.status === 'aviso' ? <AlertTriangle aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" /> : null}
+                <span>
+                  {ti(xrayLabelKey(rule.id, rule.status), {
+                    subject: rule.subject ?? 'N/D',
+                    value: rule.value == null ? 'N/D' : pct(rule.value),
+                    threshold: pct(rule.threshold),
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <p className="mt-4 border-t border-gray-800 pt-3 text-gray-500">{data.coverage.positions === 0 ? ti('portfolio.intelligence.coverageNone') : ti('portfolio.intelligence.coverageLine', { withHistory: data.coverage.positions_with_price_history, positions: data.coverage.positions, fullHorizon: data.coverage.positions_with_full_horizon, positions2: data.coverage.positions, years: data.horizon_years, percent: f.formatPercent(data.coverage.price_history_window_percent, { fromRatio: false, digits: 0 }) })}</p>
     </Panel>
     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5"><div className="flex flex-col gap-2 md:flex-row md:items-center"><h2 className="font-semibold text-gray-100">{ti('portfolio.intelligence.benchmarkTitle', { symbol: data.benchmark.symbol })}</h2>{data.benchmark.status !== 'calculated' ? <Badge className="md:ml-auto" variant="outline">{data.benchmark.status === 'missing_benchmark' ? ti('portfolio.intelligence.benchmarkMissing') : ti('portfolio.intelligence.benchmarkOverlap', { n: data.benchmark.observations })}</Badge> : null}</div>{data.benchmark.status === 'calculated' ? <section className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[[ti('portfolio.intelligence.benchmarkPortfolioAnnualized'), pct(data.benchmark.portfolio_annualized)], [ti('portfolio.intelligence.benchmarkSymbolAnnualized', { symbol: data.benchmark.symbol }), pct(data.benchmark.benchmark_annualized)], [ti('portfolio.intelligence.benchmarkAlpha'), pct(data.benchmark.alpha_annualized)], [ti('portfolio.intelligence.benchmarkTrackingError'), pct(data.benchmark.tracking_error)], [ti('portfolio.intelligence.benchmarkInformationRatio'), ratio(data.benchmark.information_ratio)], [ti('portfolio.intelligence.benchmarkObservations'), String(data.benchmark.observations)]].map(([label, value]) => <div className="rounded-xl border border-gray-800 bg-gray-900/40 p-4" key={label}><div className="text-xs font-semibold uppercase text-gray-500">{label}</div><div className="mt-2 text-xl font-semibold text-gray-100">{value}</div></div>)}</section> : <p className="mt-3 text-sm text-gray-400">{ti('portfolio.intelligence.benchmarkRequirement')}</p>}</section>
