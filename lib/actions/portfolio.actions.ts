@@ -14,7 +14,7 @@ import { AppError, AuthorizationError, ValidationError } from '@/lib/types/error
 import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
-import { importRejection } from '@/lib/portfolio/import-rejection';
+import { importRejection, type ImportRejection } from '@/lib/portfolio/import-rejection';
 import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
 import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
@@ -831,11 +831,11 @@ export async function importIBKRXml(userId: string, xml: string): Promise<IBKRIm
 /**
  * Importa un CSV de actividad de IBKR (symbol, quantity, price, date + action/fees/currency opcionales).
  */
-export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRImportResult> {
+export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRCsvImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRCsvImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/csv', {
+        result = await researchRequest<IBKRCsvImportResult>('/api/portfolio/import/ibkr/csv', {
             method: 'POST',
             body: jsonBody({ csv }),
         });
@@ -850,6 +850,10 @@ export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRIm
 
 // Tipos generados desde el OpenAPI del backend (response_model en la ruta);
 // regenerar con `npx openapi-typescript data-engine/openapi.json`.
+// El CSV de IBKR tiene su propio contrato en el backend (no devuelve
+// positions_imported ni portfolio_snapshot_id: esos son del Flex XML).
+export type IBKRCsvImportResult = components['schemas']['PortfolioIbkrCsvImportOut'];
+
 export type PortfolioTearsheetMetrics = components['schemas']['TearsheetMetricsOut'];
 
 export type PortfolioTearsheet = components['schemas']['PortfolioTearsheetOut'];
