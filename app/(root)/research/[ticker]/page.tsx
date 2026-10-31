@@ -1266,6 +1266,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildThesisContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const data = await viewData('thesis');
     return (
       <div className="min-w-0 max-w-full space-y-6 [overflow-wrap:anywhere]">
@@ -1277,9 +1278,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             latestStatus={data.thesis?.status ?? null}
             latestVersion={data.thesis?.version ?? null}
             riskNotes={[
-              ...(snapshot?.model_summary && !snapshot.model_summary.publishable ? ['La valoración es parcial o está bloqueada: no es un valor justo final.'] : []),
-              ...((data.thesis?.missing_inputs?.length ?? 0) > 0 ? [`Faltan ${data.thesis?.missing_inputs?.length} inputs del modelo (ver «Datos pendientes»).`] : []),
-              ...(typeof data.thesis?.red_team_score === 'number' && data.thesis.red_team_score < 40 ? [`El red team puntúa ${data.thesis.red_team_score}/100.`] : []),
+              ...(snapshot?.model_summary && !snapshot.model_summary.publishable ? [t('research.fichaRiskPartialValuation')] : []),
+              ...((data.thesis?.missing_inputs?.length ?? 0) > 0 ? [t('research.fichaRiskMissingInputs', { count: data.thesis?.missing_inputs?.length ?? 0 })] : []),
+              ...(typeof data.thesis?.red_team_score === 'number' && data.thesis.red_team_score < 40 ? [t('research.fichaRiskRedTeam', { score: data.thesis.red_team_score })] : []),
             ]}
             olderPublishedVersion={
               data.historyDetail.history
@@ -1293,12 +1294,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             latestDraftVersion={data.historyDetail.history.filter((entry) => entry.status !== 'published').map((entry) => entry.version).reduce((a, b) => Math.max(a, b), 0) || null}
             ticker={ticker}
           />
-          <Badge variant="outline">{data.history.length} versiones</Badge>
-          <Badge variant="outline">{data.claims.length} afirmaciones</Badge>
+          <Badge variant="outline">{t('research.fichaVersionsCount', { count: data.history.length })}</Badge>
+          <Badge variant="outline">{t('research.fichaClaimsCount', { count: data.claims.length })}</Badge>
         </div>
-        <Panel title="Historial de versiones y aprobaciones" collapsible="mobile">
+        <Panel title={t('research.fichaVersionHistory')} collapsible="mobile">
           {data.historyDetail.history.length === 0 ? (
-            <EmptyState title="Aún no hay historial de versiones." />
+            <EmptyState title={t('research.fichaNoVersionHistory')} />
           ) : (
             <PagedList
               className="space-y-3"
@@ -1311,7 +1312,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="outline">v{entry.version}</Badge>
                         {group.length > 1 ? (
-                          <Badge variant="outline">{group.length} versiones seguidas con el mismo resumen (v{entry.version}–v{group[group.length - 1].version})</Badge>
+                          <Badge variant="outline">{t('research.fichaSameSummaryVersions', { count: group.length, from: entry.version, to: group[group.length - 1].version })}</Badge>
                         ) : null}
                         {versionHistoryBadges(entry, label).map((badge) => (
                           <Badge
@@ -1333,22 +1334,22 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       {entry.diff ? (
                         <p className="mt-2 text-sm leading-6 text-gray-400">{entry.diff.change_summary}</p>
                       ) : (
-                        <p className="mt-2 text-xs text-gray-500">Primera versión registrada o sin diff persistido.</p>
+                        <p className="mt-2 text-xs text-gray-500">{t('research.fichaFirstVersionNoDiff')}</p>
                       )}
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                        <span>red-team {entry.red_team_score}/100</span>
-                        <span>confianza datos {entry.data_confidence_score}/100</span>
+                        <span>{t('research.fichaRedTeamScore', { score: entry.red_team_score })}</span>
+                        <span>{t('research.fichaDataConfidence', { score: entry.data_confidence_score })}</span>
                       </div>
                     </div>
                   ),
                 };
               })}
-              label="Historial de versiones y aprobaciones"
+              label={t('research.fichaVersionHistory')}
               pageSize={10}
             />
           )}
           <p className="mt-3 text-xs text-gray-500">
-            El historial muestra estado, fecha y resumen del cambio tal como están persistidos; el sistema no registra quién aprobó cada versión.
+            {t('research.fichaHistoryFootnote')}
           </p>
         </Panel>
         <ThesisAudioPlayer
@@ -1356,7 +1357,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           version={data.historyDetail.history.filter((entry) => entry.status === 'published').reduce<number | null>((a, entry) => (a === null ? entry.version : Math.max(a, entry.version)), null)}
         />
         <div id="tesis-actual" style={{ scrollMarginTop: '5rem' }}>
-        <Panel title="Tesis actual">
+        <Panel title={t('research.fichaCurrentThesis')}>
           {data.thesis ? (
             <ThesisMemo
               thesis={data.thesis}
@@ -1370,38 +1371,38 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             />
           ) : (
             <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=fuentes`}>Importa fuentes antes de generar</EmptyLink>}
-              title="Aún no existe ninguna tesis."
+              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=fuentes`}>{t('research.fichaImportSourcesFirst')}</EmptyLink>}
+              title={t('research.fichaNoThesis')}
             />
           )}
         </Panel>
         </div>
         <ThesisScenariosPanel adrRatio={data.thesis?.valuation_basis?.adr_ratio} currency={company.currency} data={data.scenarios} />
-        <Panel title="Afirmaciones y evidencia">
+        <Panel title={t('research.fichaClaimsEvidence')}>
           <ResearchClaimForm action={createResearchClaim.bind(null, ticker)} />
           <div className="space-y-3">
             {data.claims.length ? groupClaimsByVersion(data.claims, data.history).map((group) => (
               <details key={group.key} open={group.claims.some((claim) => claim.thesis_version_id === data.thesis?.id)} className="rounded-lg border border-gray-800 p-3">
-                <summary className="cursor-pointer text-sm font-semibold text-gray-300">{group.label} · {group.claims.length} afirmaciones</summary>
+                <summary className="cursor-pointer text-sm font-semibold text-gray-300">{t('research.fichaGroupClaims', { label: group.label, count: group.claims.length })}</summary>
                 <PagedList
                   className="mt-3"
                   items={group.claims.map((claim) => ({
                     key: `claim-${claim.id}`,
                     node: (
                       <div className="rounded-lg border border-gray-800 p-4">
-                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">materialidad {claim.materiality_score}</Badge><Badge variant="outline">{claim.evidence.length} pruebas</Badge></div>
+                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">{t('research.fichaMaterialityLower', { score: claim.materiality_score })}</Badge><Badge variant="outline">{t('research.fichaEvidenceCount', { count: claim.evidence.length })}</Badge></div>
                         <p className="mt-3 text-sm text-gray-300">{claim.statement}</p>
                       </div>
                     ),
                   }))}
-                  label={`Afirmaciones de ${group.label}`}
+                  label={t('research.fichaClaimsOf', { label: group.label })}
                   pageSize={10}
                 />
               </details>
             )) : (
               <EmptyState
-                action={<EmptyLink href="#statement">Escribe la primera afirmación</EmptyLink>}
-                title="Sin afirmaciones registradas."
+                action={<EmptyLink href="#statement">{t('research.fichaWriteFirstClaim')}</EmptyLink>}
+                title={t('research.fichaNoClaims')}
               />
             )}
           </div>
