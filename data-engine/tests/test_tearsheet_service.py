@@ -112,6 +112,43 @@ def test_exposure_from_snapshot_recomputes_weights():
     assert exposure["top_5_weight"] == pytest.approx(0.8)
 
 
+def test_exposure_n_positions_counts_held_rows_even_underwater():
+    """Cartera bajo agua (margen > valor): las posiciones siguen existiendo.
+
+    total_value_base negativo apagaba los pesos (correcto: sin NAV positivo
+    no hay peso honesto) pero tambien dejaba n_positions en 0 como si no
+    hubiera posiciones. El recuento no depende del NAV.
+    """
+    snapshot = PortfolioDailySnapshot(
+        portfolio_id=1,
+        snapshot_date=date(2026, 9, 18),
+        base_currency="EUR",
+        positions_value_base=Decimal("8000"),
+        cash_value_base=Decimal("-12000"),
+        total_value_base=Decimal("-4000"),
+    )
+    rows = [
+        PositionDailySnapshot(
+            portfolio_snapshot_id=1,
+            portfolio_id=1,
+            company_id=i,
+            snapshot_date=date(2026, 9, 18),
+            quantity=Decimal("1"),
+            market_price_native=Decimal("100"),
+            currency="EUR",
+            market_value_native=Decimal("100"),
+            market_value_base=Decimal(value),
+            weight=None,
+        )
+        for i, value in enumerate(["5000", "3000"], start=1)
+    ]
+    exposure = exposure_from_snapshot(snapshot, rows)
+    assert exposure["n_positions"] == 2
+    # Sin NAV positivo, los pesos sobre NAV se quedan en None (no se fabrican).
+    assert exposure["top_1_weight"] is None
+    assert exposure["equity_weight"] is None
+
+
 def _seed_portfolio_with_snapshots(db: Session) -> None:
     tenant = Tenant(external_id="tearsheet-test", name="Tearsheet test")
     db.add(tenant)
