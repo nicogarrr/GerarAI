@@ -147,3 +147,54 @@ def test_few_sessions_fail_liquidity(db):
     db.commit()
     verdict = quality_for_companies(db, [8], as_of=AS_OF)[8]
     assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_mixed_quarters_not_paired_as_fiscal_years(db):
+    """Un Q3 con fiscal_year relleno NO es un FY: sin filtro, el par
+    'dos ultimos FY' podia ser Q3-2026 + FY-2025 y pasar por comparable."""
+    _company(db, 9)
+    _seed_clear_inputs(db, 9)
+    # Deja un solo FY y anade un Q3 del ano siguiente con FCF mayor.
+    fact = db.query(FinancialFact).filter_by(company_id=9, fiscal_year=2024).one()
+    fact.fiscal_year = 2026
+    fact.fiscal_quarter = "Q3"
+    fact.period = "2026-Q3"
+    fact.value = 500  # "creceria" si se emparejara con FY2025
+    db.commit()
+    verdict = quality_for_companies(db, [9], as_of=AS_OF)[9]
+    assert "fcf_not_positive_and_growing" in verdict["reasons"]
+
+
+def test_liquidity_dedupes_same_session_rows():
+    """Dos filas de la MISMA sesion cuentan UNA. La restriccion
+    UNIQUE(company_id, date) de market_prices (0001) ya impide duplicados
+    en BD hoy; el dedupe es defensa explicita: si una fuente futura o un
+    esquema distinto trajera 2 filas por fecha, el contador no se infla."""
+    from app.services.propicks_radar_quality import _liquidity
+
+    class _Result:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def all(self):
+            return self._rows
+
+    class _Db:
+        def __init__(self, rows):
+            self._rows = rows
+
+        def execute(self, _stmt):
+            return _Result(self._rows)
+
+    day = date(2026, 10, 30)
+    # 10 fechas x 2 proveedores = 20 filas -> 10 sesiones.
+    rows = [(1, day - timedelta(days=i), 100, 200_000)
+            for i in range(10) for _ in range(2)]
+    median_dollars, sessions = _liquidity(_Db(rows), [1])[1]
+    assert sessions == 10
+    assert median_dollars == 100 * 200_000
+    # 20 fechas distintas x 2 proveedores -> 20 sesiones (suficiente).
+    rows20 = [(1, day - timedelta(days=i), 100, 200_000)
+              for i in range(20) for _ in range(2)]
+    _, sessions20 = _liquidity(_Db(rows20), [1])[1]
+    assert sessions20 == 20

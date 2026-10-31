@@ -19,6 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
+from app.valuation.financial_snapshot import _period_type
 from app.models import (
     CalculatedMetric,
     Company,
@@ -95,6 +96,11 @@ def _fcf_pairs(db: Session, company_ids: list[int]) -> dict[int, tuple[float, fl
     ).all()
     by_company: dict[int, list[FinancialFact]] = {}
     for fact in rows:
+        # Solo ejercicios fiscales completos: un Q3 con fiscal_year relleno
+        # NO es comparable con un FY (misma clasificacion que el snapshot:
+        # acepta FY/ANNUAL y filas legadas sin trimestre con periodo anual).
+        if _period_type(fact.period, fact.fiscal_quarter) != "FY":
+            continue
         facts = by_company.setdefault(fact.company_id, [])
         if not any(f.fiscal_year == fact.fiscal_year for f in facts):
             facts.append(fact)
@@ -125,7 +131,7 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
     if not company_ids:
         return {}
     rows = db.execute(
-        select(MarketPrice.company_id, MarketPrice.close, MarketPrice.volume)
+        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.close, MarketPrice.volume)
         .where(
             MarketPrice.company_id.in_(company_ids),
             MarketPrice.close.is_not(None),
@@ -133,11 +139,18 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
             MarketPrice.volume.is_not(None),
             MarketPrice.volume > 0,
         )
-        .order_by(MarketPrice.company_id, MarketPrice.date.desc())
+        # id desc: desempate determinista; con 2 proveedores en la misma
+        # sesion se cuenta UNA (la de mayor id), no dos sesiones.
+        .order_by(MarketPrice.company_id, MarketPrice.date.desc(), MarketPrice.id.desc())
     ).all()
     by_company: dict[int, list[float]] = {}
-    for cid, close, volume in rows:
-        dollars = by_company.setdefault(int(cid), [])
+    seen_dates: dict[int, set] = {}
+    for cid, day, close, volume in rows:
+        cid = int(cid)
+        if day in seen_dates.setdefault(cid, set()):
+            continue
+        seen_dates[cid].add(day)
+        dollars = by_company.setdefault(cid, [])
         if len(dollars) < LIQUIDITY_SESSIONS:
             dollars.append(float(close) * float(volume))
     return {cid: (median(dollars), len(dollars)) for cid, dollars in by_company.items()}
