@@ -40,6 +40,7 @@ from app.schemas.api import (
     PortfolioDividendProjectionOut,
     PortfolioDividendYieldsOut,
     PortfolioForecastOut,
+    PortfolioImportCommitOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
     PortfolioPriceUpdateOut,
@@ -1531,7 +1532,7 @@ def preview_transaction_import(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/commit")
+@router.post("/import/commit", response_model=PortfolioImportCommitOut)
 def commit_transaction_import(
     payload: TransactionImportCommitRequest,
     db: Session = Depends(get_db),

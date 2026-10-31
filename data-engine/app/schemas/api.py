@@ -1748,6 +1748,19 @@ class FXRateOut(BaseModel):
     source: str
 
 
+# --- POST /api/portfolio/import/commit ---------------------------------------
+# Forma medida contra TransactionImportService.commit_import: exito -> las 5
+# claves siempre; los errores salen como 400 (ValueError), no como wire.
+
+
+class PortfolioImportCommitOut(BaseModel):
+    success: bool
+    message: str
+    imported_count: int
+    duplicates_skipped: int
+    import_batch: str
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto
