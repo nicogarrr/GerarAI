@@ -57,7 +57,13 @@ function TabsContent({
   return (
     <TabsPrimitive.Content
       data-slot="tabs-content"
-      className={cn("flex-1 outline-none", className)}
+      className={cn(
+            // Sin la utilidad que anula el outline: tapaba el anillo global
+            // :focus-visible y el panel (Radix le da tabIndex=0) quedaba
+            // enfocado sin indicador visible (WCAG 2.2 SC 2.4.7).
+            "flex-1",
+            className
+        )}
       {...props}
     />
   )
