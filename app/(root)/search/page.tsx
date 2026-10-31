@@ -11,15 +11,18 @@ import { searchResearchLibrary } from '@/lib/actions/research-tools.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent } from '@/lib/format';
 import { entityTypeDisplay, evidenceStatusDisplay, sourceDisplay, sourceTierDisplay } from '@/lib/research/source-display';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-  title: t('search.title'),
-  description: t('search.metadataDescription'),
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return {
+    title: t('search.title'),
+    description: t('search.metadataDescription'),
+  };
+}
 
 type PageProps = {
   searchParams: Promise<{
@@ -36,6 +39,7 @@ type PageProps = {
 };
 
 export default async function UniversalSearchPage({ searchParams }: PageProps) {
+  const t = await getT();
   const query = await searchParams;
   const searched = Boolean(query.q?.trim());
   // El botón «Reintentar» de BackendOffline vuelve a la MISMA consulta: sin
