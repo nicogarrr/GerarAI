@@ -54,7 +54,7 @@ test('F321: la ficha usa metricLabel en hechos y metricas calculadas', () => {
     // Los hechos (tarjeta movil y tabla) viven en FactsPanels.
     assert.match(panels, /\{metricLabel\(fact\.metric\)\}<\/span>/);
     assert.match(panels, /scope="row">\{metricLabel\(fact\.metric\)\}<\/th>/);
-    assert.match(page, /\{metricLabel\(metric\.metric\)\}<\/span>/);
+    assert.match(page, /\{metricLabel\(metric\.metric, locale\)\}<\/span>/);
 });
 
 test('F321: los estados ok/unavailable del backend tienen etiqueta en espanol', () => {

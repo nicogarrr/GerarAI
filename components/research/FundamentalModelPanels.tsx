@@ -120,8 +120,8 @@ export function ownerEarningsFormulaLabel(formula: string): string {
 }
 
 /** Driver, KPI, entrada o restricción del modelo en español (marco por tipo de empresa primero, luego métricas). */
-export function termLabel(raw: string): string {
-  return frameworkTerm(raw) ?? metricLabel(raw);
+export function termLabel(raw: string, locale: 'es' | 'en' = 'es'): string {
+  return frameworkTerm(raw, locale) ?? metricLabel(raw, locale);
 }
 
 function ModelStat({ label, value, positive = false, hint }: { label: string; value: string; positive?: boolean; hint?: string }) {
@@ -189,14 +189,14 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
 
       {model.missing_inputs.length ? (
         <div className="mb-4 rounded-md border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-          Modelo no publicable: faltan {model.missing_inputs.map(termLabel).join(', ')}.
+          Modelo no publicable: faltan {model.missing_inputs.map((item) => termLabel(item)).join(', ')}.
         </div>
       ) : null}
 
       <div className="mb-4 rounded-md border border-gray-800 bg-black/10 p-3 text-xs leading-5 text-gray-400">
-        <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map(termLabel).join(' · ')}
+        <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map((item) => termLabel(item)).join(' · ')}
         <span aria-hidden="true" className="mx-2 text-gray-700">|</span>
-        <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map(termLabel).join(' · ')}
+        <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map((item) => termLabel(item)).join(' · ')}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -287,7 +287,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
             <p className="mt-2 text-gray-300">
               {model.reverse_dcf.status === 'ok'
                 ? `El precio actual exige ${percentage(model.reverse_dcf.required_revenue_growth)} de crecimiento; la base asume ${percentage(model.reverse_dcf.base_revenue_growth)}${model.reverse_dcf.fcf_margin != null ? `, con margen FCF normalizado ${percentage(model.reverse_dcf.fcf_margin)}` : ''}.`
-                : `No disponible: ${(model.reverse_dcf.missing_inputs ?? []).map(termLabel).join(', ') || 'faltan inputs de mercado o financieros'}.`}
+                : `No disponible: ${(model.reverse_dcf.missing_inputs ?? []).map((item) => termLabel(item)).join(', ') || 'faltan inputs de mercado o financieros'}.`}
             </p>
             <p className="mt-2 text-xs leading-5 text-gray-500">
               El reverse DCF parte del precio de mercado y calcula qué crecimiento está descontando ya.
@@ -306,7 +306,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
         <div className="rounded-md border border-gray-800 p-3 text-sm">
           <div className="text-xs font-semibold uppercase text-gray-500">Beneficio del propietario</div>
           <div className="mt-2 text-xl font-semibold text-gray-200">{compactNumber(model.owner_earnings.value)}</div>
-          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map(termLabel).join(', ')}.`}</p>
+          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map((item) => termLabel(item)).join(', ')}.`}</p>
         </div>
         <div className="rounded-md border border-gray-800 p-3 text-sm">
           <div className="text-xs font-semibold uppercase text-gray-500">Motor de oportunidad de mercado</div>

@@ -16,7 +16,7 @@ export default function BlockedValuation({ valuation, ticker }: { valuation: Res
             <h2 className="font-semibold">Valoración bloqueada: {termLabel(valuation.model_type)}</h2>
             <p>{negativeFcf
                 ? 'El margen de flujo de caja libre registrado es negativo. Este modelo DCF no puede valorarlo sin falsear el consumo de caja. Revisa un modelo de financiación y dilución; no fuerces un margen positivo.'
-                : `Este modelo no puede publicar una valoración con las entradas disponibles: ${missing.map(termLabel).join(', ') || 'el motor no especifica las entradas que faltan'}.`}</p>
+                : `Este modelo no puede publicar una valoración con las entradas disponibles: ${missing.map((item) => termLabel(item)).join(', ') || 'el motor no especifica las entradas que faltan'}.`}</p>
             <p className="text-xs text-gray-300">Fuente de las entradas: {source && source !== 'insufficient_data' ? sourceDisplay(source) : 'no especificada en esta valoración'}.
                 {' '}Periodos: {periods.length ? periods.map(([metric, period]) => `${termLabel(metric)}: ${period}`).join(' · ') : 'no registrados'}.
                 {factIds.length ? ` Hechos registrados: ${factIds.map(([metric, id]) => `${termLabel(metric)} #${id}`).join(' · ')}.` : null}

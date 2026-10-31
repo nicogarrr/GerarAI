@@ -361,12 +361,12 @@ async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] })
               (net_debt_to_ebitda): sin min-w-0/break-all empujaba el badge
               fuera de la tarjeta a 768px. */}
           <div className="flex items-center justify-between gap-3">
-            <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric)}</span>
+            <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric, locale)}</span>
             <Badge className="shrink-0" variant="outline">{label(metric.status, locale)}</Badge>
           </div>
           <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit, t)}</div>
-          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersionLabel(metric.definition_version)}</div>
-          <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula)}</div>
+          <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period, locale)} · {financialVersionLabel(metric.definition_version, locale)}</div>
+          <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula, locale)}</div>
         </div>
       ))}
     </div>
@@ -391,7 +391,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
   const method = typeof valuation.trace?.method === 'string' ? valuation.trace.method : null;
   const periods = Object.entries(valuation.trace?.periods ?? {})
     .filter(([, value]) => value)
-    .map(([metric, period]) => `${termLabel(metric)}: ${period}`)
+    .map(([metric, period]) => `${termLabel(metric, locale)}: ${period}`)
     .join(' · ');
   // Una valoración no publicable (estado distinto de ok, p.ej. partial por
   // entradas sin trazabilidad fechada como traceable_wacc) no puede
@@ -435,7 +435,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
             {t('research.ficha.notPublishable', { status: label(valuation.status ?? 'unknown', locale) })}
           </p>
           {blockers.length ? <p className="mt-2 text-xs">{t('research.ficha.blockers', { list: blockers.map((id) => blockerLabel(id, locale)).join('; ') })}</p> : null}
-          {missingInputs.length ? <p className="mt-2 text-xs">{t('research.ficha.missingInputs', { list: missingInputs.map(termLabel).join(', ') })}</p> : null}
+          {missingInputs.length ? <p className="mt-2 text-xs">{t('research.ficha.missingInputs', { list: missingInputs.map((item) => termLabel(item, locale)).join(', ') })}</p> : null}
           {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNotice })}</p> : null}
         </div>
         <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-3">
@@ -451,7 +451,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
-          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
+          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
           {t('research.ficha.persistedNoteGuidance')}{' '}
           {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
         </p>
@@ -474,7 +474,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
-        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
+        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type, locale), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
         {t('research.ficha.persistedNote')}{' '}
         {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
       </p>
@@ -505,7 +505,7 @@ async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTer
         <div className="flex flex-wrap gap-2">
           <Badge>{label(opportunity.verdict.label, locale)}</Badge>
           <Badge variant="outline">{t('research.ficha.confidence', { value: label(opportunity.verdict.confidence, locale) })}</Badge>
-          <Badge variant="outline">{t('research.ficha.bindingConstraint', { value: opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint) : t('research.ficha.unknownFem') })}</Badge>
+          <Badge variant="outline">{t('research.ficha.bindingConstraint', { value: opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint, locale) : t('research.ficha.unknownFem') })}</Badge>
         </div>
         <p className="mt-3 text-sm text-gray-300">{opportunity.verdict.conclusion}</p>
       </Panel>
@@ -517,7 +517,7 @@ async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTer
                 <span className="text-gray-200">{formula.label}</span>
                 <span className="text-teal-300">{formula.value === null ? label(formula.status, locale) : metricValue(formula.value, formula.unit ?? '', t)}</span>
               </div>
-              {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">{t('research.ficha.missingInputsShort', { list: formula.missing_inputs.map(termLabel).join(', ') })}</p> : null}
+              {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">{t('research.ficha.missingInputsShort', { list: formula.missing_inputs.map((item) => termLabel(item, locale)).join(', ') })}</p> : null}
             </div>
           ))}
         </div>

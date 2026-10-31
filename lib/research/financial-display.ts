@@ -2,7 +2,13 @@
 import { METRIC_LABELS } from './metric-labels.ts';
 
 /** Conserva la fecha de cierre: no convierte un ejercicio irregular en año natural. */
-export function financialPeriod(value: string): string {
+export function financialPeriod(value: string, locale: 'es' | 'en' = 'es'): string {
+  if (locale === 'en') {
+    if (value === 'unknown') return 'Period not reported';
+    const datedEn = /^(\d{4})-(\d{2})-(\d{2}):(FY|Q[1-4])$/.exec(value);
+    if (datedEn) return `${datedEn[4] === 'FY' ? 'Fiscal year' : datedEn[4]} ended ${datedEn[1]}-${datedEn[2]}-${datedEn[3]}`;
+    return value.replace(/\bFY(?=\d)/g, 'FY ');
+  }
   if (value === 'unknown') return 'Periodo no informado por la fuente';
   const dated = /^(\d{4})-(\d{2})-(\d{2}):(FY|Q[1-4])$/.exec(value);
   if (dated) return `${dated[4] === 'FY' ? 'Ejercicio' : `T${dated[4][1]}`} al ${dated[3]}/${dated[2]}/${dated[1]}`;
@@ -44,7 +50,9 @@ const PHRASES: [string, string][] = [
 ];
 
 /** Traduce términos, no altera operaciones, umbrales ni versiones de cálculo. */
-export function financialFormula(value: string): string {
+export function financialFormula(value: string, locale: 'es' | 'en' = 'es'): string {
+  // El backend entrega la fórmula en inglés: en EN se muestra tal cual.
+  if (locale === 'en') return value;
   let text = value;
   for (const [from, to] of PHRASES) text = text.replaceAll(from, to);
   return text.replace(/\b[A-Za-z][A-Za-z0-9_]*\b/g, (word) => WORDS[word] ?? word);
@@ -102,7 +110,13 @@ export function loadedFinancialRange(metrics: Array<{ series: Array<{ period: st
 }
 
 /** Como financialVersion, pero sin mostrar claves internas: una versión no catalogada se muestra como "cálculo vN". */
-export function financialVersionLabel(value: string): string {
+export function financialVersionLabel(value: string, locale: 'es' | 'en' = 'es'): string {
+  if (locale === 'en') {
+    const knownEn = ({ MARCO_V1: 'Quality framework · version 1', MARCO_V2: 'Quality framework · version 2' } as Record<string, string>)[value];
+    if (knownEn) return knownEn;
+    const matchEn = /_V(\d+)$/i.exec(value);
+    return matchEn ? `calculation v${matchEn[1]}` : 'unversioned calculation';
+  }
   const known = financialVersion(value);
   if (known !== value) return known;
   const match = /_V(\d+)$/i.exec(value);
