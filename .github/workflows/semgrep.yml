@@ -60,6 +60,18 @@ jobs:
           --config p/python --config p/fastapi --config p/typescript
           --config p/react --config p/secrets --config p/owasp-top-ten
           --sarif --output semgrep-registry.sarif .
+      # GitHub code scanning NO honora la propiedad SARIF `suppressions`
+      # (github/codeql-action#1230, confirmado por GitHub: se ignora): cada
+      # hallazgo suprimido con nosemgrep reapareceria como alerta NUEVA a cada
+      # analisis (así reabrieron las 218-225 tras suprimir las 208-213). El
+      # nosemgrep motivado queda en el codigo (y el texto del CLI lo muestra),
+      # pero el SARIF subido solo lleva hallazgos activos; los suprimidos
+      # desaparecen del upload y code scanning los cierra como fixed.
+      - name: Quitar del SARIF los hallazgos suprimidos con nosemgrep
+        run: >-
+          jq 'del(.runs[].results[] | select(.suppressions))'
+          semgrep-registry.sarif > semgrep-registry.filtered.sarif
+          && mv semgrep-registry.filtered.sarif semgrep-registry.sarif
       - name: Bandit (severidad media o mayor)
         run: bandit -r data-engine/app -ll -f sarif -o bandit.sarif || true
       - name: Upload Semgrep SARIF

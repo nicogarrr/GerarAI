@@ -18,8 +18,6 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, aliased
 
-from app.core.errors import redact_secrets
-
 _METRIC_COVERAGE_CACHE: dict[int, tuple[float, list[str]]] = {}
 _METRIC_COVERAGE_LOCK = threading.Lock()
 _METRIC_COVERAGE_TTL_SECONDS = 600.0
@@ -55,6 +53,9 @@ class MissingVariables(ValueError):
     def __init__(self, names: set[str]) -> None:
         self.names = names
         super().__init__(f"Missing variables: {', '.join(sorted(names))}")
+
+
+CRITERION_UNEVALUABLE_REASON = "No se puede evaluar la fórmula con estos valores"
 
 
 class SafeFormula:
@@ -504,12 +505,21 @@ class ScreenerService:
                     # POST /api/portfolio/refresh-market after prices, FX,
                     # revaluation and the snapshot had already been committed).
                     unevaluable_criteria.add(criterion["left"])
+                    # py/stack-trace-exposure (alerta 216): la razon publica es
+                    # constante y el detalle de la excepcion va al log del
+                    # servidor, nunca a la respuesta.
+                    logger.warning(
+                        "screener criterion %s unevaluable for company_id=%s: %s",
+                        criterion["left"],
+                        company.id,
+                        exc,
+                    )
                     criterion_results.append(
                         {
                             **criterion,
                             "passed": False,
                             "status": "unevaluable",
-                            "error": redact_secrets(str(exc)),
+                            "error": CRITERION_UNEVALUABLE_REASON,
                         }
                     )
             rank_value = None
