@@ -696,7 +696,10 @@ EXTERNA_QUEUE_NAME = "externa"
 # hilos solo solapan latencia, nunca suben la tasa): Finnhub ~60/min
 # compartido, Yahoo/Google noticias 1 req/1,5 s. GDELT ya tenia carril.
 FINNHUB_QUEUE_NAME = "finnhub"
-YAHOO_NEWS_QUEUE_NAME = "yahoo-news"
+# Toda la ingesta ligada a Yahoo/yfinance (noticias, insiders CA, splits,
+# dividendos, calendario de resultados) comparte carril: el freno/pacer de
+# Yahoo es global en Redis, y una racha de 429 no debe atascar default.
+YAHOO_QUEUE_NAME = "yahoo"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -1488,7 +1491,7 @@ def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = N
 
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000,
-              queue_name=YAHOO_NEWS_QUEUE_NAME)
+              queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success("ingest_ca_insider_yahoo", 330 * 60, ("tenant_id",))
 def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Insiders de Canada via Yahoo quoteSummary (FUENTE NO OFICIAL; SEDI es la verdad)."""
@@ -2034,7 +2037,7 @@ def split_sync_tickers(
     return chunk_tickers, next_cursor
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success("ingest_corporate_splits", 6 * 86400, ("tenant_id", "scope", "cursor"))
 def ingest_corporate_splits(
     tenant_id: int | None = None,
@@ -2079,7 +2082,7 @@ def ingest_corporate_splits(
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success("sync_portfolio_dividends", 20 * 3600, ("tenant_id",))
 def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingesta diaria de dividendos declarados de las posiciones abiertas (Yahoo, FMP de respaldo)."""
@@ -2602,7 +2605,7 @@ def evaluate_dca_signals(
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000, queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success("refresh_earnings_calendar", 11 * 3600, ("tenant_id",))
 def refresh_earnings_calendar(
     tenant_id: int | None = None,
@@ -3233,7 +3236,7 @@ def refresh_news(
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000,
-              queue_name=YAHOO_NEWS_QUEUE_NAME)
+              queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success(
     "refresh_ticker_news",
     lambda scope="tracked", **_: 20 * 60 if scope == "tracked" else 5 * 3600,
@@ -4474,7 +4477,7 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success("sync_paper_dividends", 20 * 3600, ("tenant_id",))
 def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingesta diaria de dividendos declarados de los tickers con paper trades vivos.
