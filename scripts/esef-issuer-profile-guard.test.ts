@@ -21,7 +21,7 @@ test('los mercados ESEF se reconocen por nombre (Finnhub incluido)', () => {
 test('los tres puntos de la vista financiera usan el perfil', () => {
     assert.match(page, /\{fmpCovers\(ticker, company\.exchange\) \? \(/);
     assert.match(page, /\{isEsefIssuerProfile\(ticker, company\.exchange\) \? \(/);
-    assert.match(page, /fmpCovers\(ticker, company\.exchange\)\s*\n\s*\? 'Refrescar financieros \(FMP\)'/);
+    assert.match(page, /fmpCovers\(ticker, company\.exchange\)\s*\n\s*\? t\('research\.fichaRefreshFinancialsFmp'\)/);
 });
 
 test('un emisor español sin sufijo ya no ve FMP ni SEC', () => {

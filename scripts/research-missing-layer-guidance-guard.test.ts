@@ -63,7 +63,7 @@ test('F309: los estados vacíos de la vista financieros ya no mandan a importar 
 
 test('F309: FactTable recibe el nombre exacto del botón de refresh según el mercado', () => {
     assert.match(page, /refreshLabel=\{/);
-    assert.match(page, /'Refrescar financieros \(FMP\)'/);
-    assert.match(page, /'Refrescar ESEF'/);
-    assert.match(page, /'Refrescar SEC'/);
+    assert.match(page, /t\('research\.fichaRefreshFinancialsFmp'\)/);
+    assert.match(page, /t\('research\.fichaRefreshEsef'\)/);
+    assert.match(page, /t\('research\.fichaRefreshSec'\)/);
 });
