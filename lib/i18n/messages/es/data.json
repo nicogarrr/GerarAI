@@ -1,1 +1,8 @@
-{}
+{
+  "refresh": "Refrescar",
+  "emptyDefault": "No hay datos disponibles todavía",
+  "records": "registros",
+  "actions": "Acciones",
+  "yes": "Sí",
+  "no": "No"
+}

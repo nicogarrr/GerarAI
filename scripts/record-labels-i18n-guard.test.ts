@@ -150,7 +150,7 @@ void test('los valores anidados no se serializan como JSON crudo en la celda', (
   // `JSON.stringify` dentro de un line-clamp escondía el dato detrás de un
   // bloque de código truncado con las claves internas en crudo.
   assert.ok(!recordViews.includes('JSON.stringify(value)'));
-  assert.match(recordViews, /function describeValue\(value: unknown, depth: number\): string \{/);
+  assert.match(recordViews, /function describeValue\(value: unknown, depth: number(, t\?: TranslateFn)?\): string \{/);
   // Y lo que no cabe se cuenta, no desaparece sin aviso.
   assert.match(recordViews, /\+\$\{rest\} más/);
 });
