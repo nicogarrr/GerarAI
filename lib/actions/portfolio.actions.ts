@@ -792,11 +792,11 @@ export type IBKRImportResult = {
  * Dispara la descarga del Flex statement de IBKR (via IBKR_FLEX_TOKEN /
  * IBKR_FLEX_QUERY_ID) y la importación en el research backend.
  */
-export async function importFromIBKR(userId: string): Promise<IBKRImportResult> {
+export async function importFromIBKR(userId: string): Promise<IBKRDownloadImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRDownloadImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr', {
+        result = await researchRequest<IBKRDownloadImportResult>('/api/portfolio/import/ibkr', {
             method: 'POST',
         });
     } catch (error) {
@@ -853,6 +853,10 @@ export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRCs
 // El CSV de IBKR tiene su propio contrato en el backend (no devuelve
 // positions_imported ni portfolio_snapshot_id: esos son del Flex XML).
 export type IBKRCsvImportResult = components['schemas']['PortfolioIbkrCsvImportOut'];
+// /import/ibkr devuelve el importado Flex o la variante not_configured
+// (discriminado por status; response_model + exclude_unset en la ruta).
+export type IBKRDownloadImportResult = components['schemas']['PortfolioIbkrImportOut'];
+
 export type IBKRXmlImportResult = components['schemas']['PortfolioIbkrXmlImportOut'];
 
 export type PortfolioTearsheetMetrics = components['schemas']['TearsheetMetricsOut'];

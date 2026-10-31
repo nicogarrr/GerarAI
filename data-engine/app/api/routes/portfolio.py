@@ -42,6 +42,7 @@ from app.schemas.api import (
     PortfolioDividendYieldsOut,
     PortfolioForecastOut,
     PortfolioIbkrCsvImportOut,
+    PortfolioIbkrImportOut,
     PortfolioIbkrXmlImportOut,
     PortfolioImportCommitOut,
     PortfolioIntelligenceOut,
@@ -1469,7 +1470,7 @@ def _require_ibkr_owner(db: Session):
     return settings
 
 
-@router.post("/import/ibkr")
+@router.post("/import/ibkr", response_model=PortfolioIbkrImportOut, response_model_exclude_unset=True)
 async def import_ibkr(db: Session = Depends(get_db)) -> dict:
     # _require_ibkr_owner y la importacion del XML son sqlalchemy/parseo
     # sincronos: hilo del pool. fetch_latest_xml es red async y se queda.
