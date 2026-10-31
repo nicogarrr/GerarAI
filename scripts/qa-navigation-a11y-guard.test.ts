@@ -10,7 +10,10 @@ test('search restores focus via dialog close-autofocus to connected opener',()=>
  assert.match(read('components/ui/command.tsx'),/onCloseAutoFocus=\{onCloseAutoFocus\}/);
 });
 test('page titles and 404 navigation are explicit and human readable',()=>{
- for(const [page,title] of [['discover','Descubrir'],['security','Seguridad'],['research/sources','Fuentes'],['research/news','Noticias']]) assert.ok(read(`app/(root)/${page}/page.tsx`).includes(`title: '${title}'`));
+ for(const [page,title] of [['discover','Descubrir'],['security','Seguridad'],['research/sources','Fuentes']]) assert.ok(read(`app/(root)/${page}/page.tsx`).includes(`title: '${title}'`));
+ // research/news migro a generateMetadata + t(): clave en la pagina y ES del dict == literal historico.
+ assert.ok(read('app/(root)/research/news/page.tsx').includes("title: t('research.newsMetaTitle')"));
+ assert.equal(JSON.parse(read('lib/i18n/messages/es/research.json')).newsMetaTitle, 'Noticias');
  assert.match(read('app/(root)/inversores/[slug]/page.tsx'),/investor.name/);
  const missing=read('app/not-found.tsx');
  assert.match(missing,/<header/);assert.match(missing,/aria-label=\{t\('errors\.notFound\.navAria'\)\}/);

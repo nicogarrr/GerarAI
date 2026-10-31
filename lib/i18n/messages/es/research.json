@@ -65,5 +65,24 @@
     "viewOriginal": "Ver original",
     "translating": "Traduciendo…",
     "translate": "Traducir"
-  }
+  },
+  "newsMetaTitle": "Noticias",
+  "newsFeature": "La sección de noticias",
+  "newsKicker": "Inteligencia de mercado",
+  "newsTitle": "Eventos de noticias",
+  "newsAdd": "Añadir noticias",
+  "analyzeTitle": "Analizar un artículo",
+  "analyzeSuccess": "Noticia analizada",
+  "analyzeTextLabel": "Texto de la noticia",
+  "analyzeTextPlaceholder": "Pega aquí el artículo, la nota de prensa o la nota de relaciones con inversores...",
+  "sourceLabel": "Fuente",
+  "sourcePlaceholder": "Bloomberg, FT, RI...",
+  "sourceUrlLabel": "URL de la fuente",
+  "analyzeSubmit": "Analizar noticia",
+  "ingestTitle": "Importar noticias en lote",
+  "ingestSuccess": "Noticias importadas",
+  "ingestItemsLabel": "Noticias del lote (JSON)",
+  "ingestItemsPlaceholder": "[{\"ticker\":\"MSFT\",\"title\":\"MSFT recorta guía\",\"text\":\"resultado por debajo y recorte de guía\",\"url\":\"https://...\"}]",
+  "ingestSubmit": "Importar lote",
+  "backToTicker": "Volver a {ticker}"
 }
