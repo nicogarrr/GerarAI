@@ -480,12 +480,15 @@ def get_signals_for_ticker(
                     if persisted_filing_date:
                         persisted_dates.append(persisted_filing_date)
                     continue
-                # El tipo solo («ValueError») no diagnostica nada: el detalle
-                # redactado permite distinguir parseo de red sin filtrar datos.
-                errors.append(
-                    f"{filing.get('accession_number')}: "
-                    f"{type(exc).__name__}: {redact_secrets(str(exc))[:200]}"
+                # Detalle completo (tipo + texto redactado) al log del backend;
+                # la respuesta solo lleva codigos estables (public_reason):
+                # texto de excepcion al cliente = py/stack-trace-exposure (F30).
+                logger.warning(
+                    "insider filing %s: %s: %s",
+                    filing.get("accession_number"), type(exc).__name__,
+                    redact_secrets(str(exc))[:200],
                 )
+                errors.append(f"{filing.get('accession_number')}: {public_reason(exc)}")
                 failure_reasons.append(public_reason(exc))
         signals = detect_signals(transactions)
         parse_error_count = len(errors)
@@ -684,4 +687,8 @@ def maybe_notify_insider_buy(
             return dict(notifier(payload))
         return {"status": "skipped", "reason": "Usa el outbox con suscripción y chat verificado"}
     except Exception as exc:  # noqa: BLE001 — notificar jamas rompe el flujo
-        return {"status": "skipped", "reason": redact_secrets(f"{type(exc).__name__}: {exc}")}
+        logger.warning(
+            "insider notify %s fallo: %s: %s",
+            ticker, type(exc).__name__, redact_secrets(str(exc))[:200],
+        )
+        return {"status": "skipped", "reason": public_reason(exc)}
