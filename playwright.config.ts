@@ -69,6 +69,9 @@ export default defineConfig({
           // El bypass E2E exige APP_ENV=test de forma estricta (ver require-user.ts).
           APP_ENV: "test",
           E2E_AUTH_BYPASS: "1",
+          // Alta abierta con aprobación: en E2E las cuentas nuevas nacen
+          // aprobadas (ver lib/auth/account-approval.ts).
+          SIGNUP_AUTO_APPROVE: "1",
           FMP_BACKEND_URL: uiBackendURL,
           RESEARCH_AUTH_SECRET: e2eResearchSecret,
           NEXT_DIST_DIR: ".next-e2e",
