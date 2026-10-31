@@ -1,4 +1,5 @@
 import { getLocale, getT } from '@/lib/i18n/server';
+import { RATING_LABELS_EN, STATUS_LABELS_EN } from '@/lib/research/status-labels-en';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { getParticipationFilings } from '@/lib/actions/research.actions';
@@ -299,8 +300,9 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
   };
 }
 
-function label(value: string | null | undefined): string {
+function label(value: string | null | undefined, locale: Locale = 'es'): string {
   if (value === null || value === undefined || value === '') return NA;
+  if (locale === 'en') return STATUS_LABELS_EN[value] ?? RATING_LABELS_EN[value] ?? etiquetaValor(value);
   return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? etiquetaValor(value);
 }
 
@@ -342,6 +344,7 @@ function thesisIsPublic(status: string | null | undefined): boolean {
 
 async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
   const t = await getT();
+  const locale = await getLocale();
   if (!metrics.length) {
     return (
       <EmptyState
@@ -359,7 +362,7 @@ async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] })
               fuera de la tarjeta a 768px. */}
           <div className="flex items-center justify-between gap-3">
             <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric)}</span>
-            <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
+            <Badge className="shrink-0" variant="outline">{label(metric.status, locale)}</Badge>
           </div>
           <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit, t)}</div>
           <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersionLabel(metric.definition_version)}</div>
@@ -429,9 +432,9 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
           <p className="font-semibold">{t('research.ficha.engineGuidanceTitle')}</p>
           <p className="mt-1">
-            {t('research.ficha.notPublishable', { status: label(valuation.status ?? 'unknown') })}
+            {t('research.ficha.notPublishable', { status: label(valuation.status ?? 'unknown', locale) })}
           </p>
-          {blockers.length ? <p className="mt-2 text-xs">{t('research.ficha.blockers', { list: blockers.map(blockerLabel).join('; ') })}</p> : null}
+          {blockers.length ? <p className="mt-2 text-xs">{t('research.ficha.blockers', { list: blockers.map((id) => blockerLabel(id, locale)).join('; ') })}</p> : null}
           {missingInputs.length ? <p className="mt-2 text-xs">{t('research.ficha.missingInputs', { list: missingInputs.map(termLabel).join(', ') })}</p> : null}
           {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNotice })}</p> : null}
         </div>
@@ -448,7 +451,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
-          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown') })}{' '}
+          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
           {t('research.ficha.persistedNoteGuidance')}{' '}
           {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
         </p>
@@ -471,7 +474,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
-        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown') })}{' '}
+        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown', locale) })}{' '}
         {t('research.ficha.persistedNote')}{' '}
         {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
       </p>
@@ -481,6 +484,7 @@ async function ValuationView({ valuation, currency, ticker }: { valuation: Resea
 
 async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel | null; ticker: string }) {
   const t = await getT();
+  const locale = await getLocale();
   if (!model || model.status === 'not_generated') {
     return (
       <EmptyState
@@ -499,8 +503,8 @@ async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTer
       </div>
       <Panel title={t('research.ficha.verdictTitle')}>
         <div className="flex flex-wrap gap-2">
-          <Badge>{label(opportunity.verdict.label)}</Badge>
-          <Badge variant="outline">{t('research.ficha.confidence', { value: label(opportunity.verdict.confidence) })}</Badge>
+          <Badge>{label(opportunity.verdict.label, locale)}</Badge>
+          <Badge variant="outline">{t('research.ficha.confidence', { value: label(opportunity.verdict.confidence, locale) })}</Badge>
           <Badge variant="outline">{t('research.ficha.bindingConstraint', { value: opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint) : t('research.ficha.unknownFem') })}</Badge>
         </div>
         <p className="mt-3 text-sm text-gray-300">{opportunity.verdict.conclusion}</p>
@@ -511,7 +515,7 @@ async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTer
             <div className="rounded-lg border border-gray-800 p-3" key={formula.label}>
               <div className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-200">{formula.label}</span>
-                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, formula.unit ?? '', t)}</span>
+                <span className="text-teal-300">{formula.value === null ? label(formula.status, locale) : metricValue(formula.value, formula.unit ?? '', t)}</span>
               </div>
               {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">{t('research.ficha.missingInputsShort', { list: formula.missing_inputs.map(termLabel).join(', ') })}</p> : null}
             </div>
