@@ -29,6 +29,7 @@ from app.models import (
 )
 from app.services.propicks_dca_radar import quality_checks
 from app.services.propicks_funnel_service import LEVERAGE_METRIC
+from app.valuation.currency import listing_currency
 from app.valuation.financial_snapshot import _period_type
 
 FCF_METRIC = "free_cash_flow"
@@ -130,8 +131,12 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
     """Mediana de close*volume y nº de sesiones, sobre las últimas 20 con datos."""
     if not company_ids:
         return {}
+    companies = {
+        c.id: c for c in db.scalars(select(Company).where(Company.id.in_(company_ids)))
+    }
     rows = db.execute(
-        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.close, MarketPrice.volume)
+        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.close, MarketPrice.volume,
+               MarketPrice.quote_currency)
         .where(
             MarketPrice.company_id.in_(company_ids),
             MarketPrice.close.is_not(None),
@@ -145,8 +150,22 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
     ).all()
     by_company: dict[int, list[float]] = {}
     seen_dates: dict[int, set] = {}
-    for cid, day, close, volume in rows:
+    for cid, day, close, volume, quote_currency in rows:
         cid = int(cid)
+        # El umbral de quality-v1 esta en USD: solo cuentan sesiones con
+        # unidad USD verificable. Un close en peniques o yenes multiplicado
+        # por el volumen se leia como dolares y coronaba como liquida una
+        # accion con una fraccion del umbral real. Filas legacy (NULL) solo
+        # son compatibles si el listado es USD (contrato de price_units);
+        # cualquier otra divisa se declara AUSENTE, como el market_cap,
+        # antes que convertir con un tipo de cambio no verificado.
+        unit = (quote_currency or "").strip().upper() or None
+        if unit is None:
+            company = companies.get(cid)
+            if company is None or listing_currency(company.ticker, company.currency) != "USD":
+                continue
+        elif unit != "USD":
+            continue
         if day in seen_dates.setdefault(cid, set()):
             continue
         seen_dates[cid].add(day)
