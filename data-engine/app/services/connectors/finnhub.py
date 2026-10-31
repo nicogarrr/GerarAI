@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 from typing import Any
 
 import httpx
@@ -42,7 +41,6 @@ class FinnhubClient:
         query = {**params, "token": self.settings.finnhub_api_key}
         retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
         registry = get_data_source_registry()
-        started = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await get_with_retry(lambda: client.get(url, params=query), **retry_kwargs)
@@ -62,13 +60,16 @@ class FinnhubClient:
         except ValueError:
             registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
             raise
-        registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+        # Sin éxito aquí: _get es genérico y un 200 no basta. Cada endpoint
+        # valida su forma (objeto/lista) y registra el éxito tras validar.
         return payload
 
     async def quote(self, ticker: str, *, max_retries: int | None = None) -> dict[str, Any]:
         payload = await self._get("/quote", {"symbol": ticker.upper()}, max_retries=max_retries)
         if not isinstance(payload, dict):
+            get_data_source_registry().record_failure(REGISTRY_KEY, "quote no objeto (parse failed)")
             raise RuntimeError("Finnhub returned an invalid quote")
+        get_data_source_registry().record_success(REGISTRY_KEY)
         return payload
 
     async def profile(self, ticker: str) -> dict[str, Any]:
@@ -79,7 +80,9 @@ class FinnhubClient:
         """
         payload = await self._get("/stock/profile2", {"symbol": ticker.upper()})
         if not isinstance(payload, dict):
+            get_data_source_registry().record_failure(REGISTRY_KEY, "profile no objeto (parse failed)")
             raise RuntimeError("Finnhub returned an invalid profile")
+        get_data_source_registry().record_success(REGISTRY_KEY)
         return payload
 
     async def us_symbols(self) -> list[dict[str, Any]]:
@@ -90,7 +93,11 @@ class FinnhubClient:
         """
         payload = await self._get("/stock/symbol", {"exchange": "US"})
         if not isinstance(payload, list):
+            get_data_source_registry().record_failure(
+                REGISTRY_KEY, "universo de símbolos no lista (parse failed)"
+            )
             raise RuntimeError("Finnhub returned an invalid symbol universe")
+        get_data_source_registry().record_success(REGISTRY_KEY)
         return [row for row in payload if isinstance(row, dict)]
 
     async def metric(self, ticker: str) -> dict[str, Any]:
@@ -100,5 +107,9 @@ class FinnhubClient:
         """
         payload = await self._get("/stock/metric", {"symbol": ticker.upper(), "metric": "all"})
         if not isinstance(payload, dict) or not isinstance(payload.get("metric"), dict):
+            get_data_source_registry().record_failure(
+                REGISTRY_KEY, "metrics sin objeto 'metric' (parse failed)"
+            )
             raise RuntimeError("Finnhub returned invalid metrics")
+        get_data_source_registry().record_success(REGISTRY_KEY)
         return payload["metric"]
