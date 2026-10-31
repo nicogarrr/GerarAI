@@ -172,6 +172,12 @@ def test_single_ticker_computes_engine_live_only_when_thesis_is_not_enough(db, m
                          expected_value=200, thesis_markdown="t", executive_summary="s"))
     db.commit()
     calls.clear()
+    # La lectura live se cachea 15 min en Redis (d1f2578): sin borrar la entrada,
+    # la segunda llamada serviria el motor cacheado y no veria la tesis nueva.
+    # Es el mismo borde que el fixture autouse hace entre tests; sin Redis, no-op.
+    from tests.conftest import reset_shared_redis_dedup_state
+
+    reset_shared_redis_dedup_state()
     out = valuation_routes.fair_value("LIVE", db=db)
     assert (out["value"], out["source"]) == (200.0, "tesis")
     assert calls == []  # tesis vigente: el motor no se paga
