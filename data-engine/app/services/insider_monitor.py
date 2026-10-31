@@ -156,12 +156,12 @@ def scan(
 
         # Filtro por el tenant EXPLICITO del argumento, no por
         # db.info["tenant_id"]: en workers la sesion nace sin scope (None -> el
-        # set salia vacio y se reprocesaban filings ya persistidos) o arrastra
-        # el tenant de una corrida anterior (-> se saltaban los de ESTE
-        # tenant). Un select() de una sola columna tampoco dispara el
-        # with_loader_criteria de database.py (los loader criteria aplican a
-        # la carga de entidades, no a tuplas de columnas), asi que el filtro
-        # tiene que estar aqui y tiene que ser el argumento.
+        # criteria no se activa, el set salia vacio y se reprocesaban filings
+        # ya persistidos) o arrastra el tenant de una corrida anterior (-> se
+        # saltaban los de ESTE tenant). Medido en SQLAlchemy 2.1.6: un select()
+        # de una sola columna SI dispara el with_loader_criteria de
+        # database.py; el filtro tiene que estar aqui y tiene que ser el
+        # argumento porque la sesion de worker no garantiza el contexto.
         known_accessions = {
             row[0]
             for row in db.execute(
