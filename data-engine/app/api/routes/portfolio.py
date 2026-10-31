@@ -31,7 +31,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
-from app.schemas.api import PortfolioIntelligenceOut
+from app.schemas.api import PortfolioIntelligenceOut, PortfolioSummaryOut
 from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.audit_service import record_audit_event
@@ -381,7 +381,7 @@ def portfolio_pdf_export(portfolio_id: int, db: Session = Depends(get_db)) -> Re
     )
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=PortfolioSummaryOut)
 def portfolio_summary(db: Session = Depends(get_db)) -> dict:
     # Cache Redis de 10 min por tenant (categoria portfolio_valuation): se
     # invalida por eventos ORM al escribir posiciones/transacciones/caja/FX y

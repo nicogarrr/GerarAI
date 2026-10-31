@@ -9931,6 +9931,20 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** PortfolioFxRateOut */
+        PortfolioFxRateOut: {
+            /** As Of */
+            as_of: string;
+            /** Currency */
+            currency: string;
+            /** Rate */
+            rate: number;
+            /**
+             * Scope
+             * @enum {string}
+             */
+            scope: "cash" | "positions";
+        };
         /** PortfolioIntelligenceOut */
         PortfolioIntelligenceOut: {
             /**
@@ -10176,6 +10190,69 @@ export interface components {
             /** Volatility */
             volatility: number | null;
         };
+        /** PortfolioSummaryAlertOut */
+        PortfolioSummaryAlertOut: {
+            /** Message */
+            message: string;
+            /** Metric Value */
+            metric_value: number;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "high" | "medium";
+            /** Threshold */
+            threshold: number;
+            /** Ticker */
+            ticker: string | null;
+        };
+        /** PortfolioSummaryOut */
+        PortfolioSummaryOut: {
+            /** Alerts */
+            alerts: components["schemas"]["PortfolioSummaryAlertOut"][];
+            /** Base Currency */
+            base_currency: string;
+            /** Cash */
+            cash: {
+                [key: string]: number;
+            };
+            /** Cash As Of */
+            cash_as_of: string | null;
+            /** Cash Assets Base */
+            cash_assets_base: number;
+            /** Cash Native */
+            cash_native: {
+                [key: string]: number;
+            };
+            /** Data As Of */
+            data_as_of: string | null;
+            /** Equity Value */
+            equity_value: number;
+            /** Fx Rates */
+            fx_rates: components["schemas"]["PortfolioFxRateOut"][];
+            /** Margin Debt Base */
+            margin_debt_base: number;
+            /** Missing Fx */
+            missing_fx: {
+                [key: string]: unknown;
+            }[];
+            provenance: components["schemas"]["ProvenanceOut"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "incomplete_fx" | "incomplete_valuation";
+            /** Top 1 Weight */
+            top_1_weight: number;
+            /** Top 5 Weight */
+            top_5_weight: number;
+            /** Total Value */
+            total_value: number;
+            /** Valuation Dates Differ */
+            valuation_dates_differ: boolean;
+            /** Valuation Hold */
+            valuation_hold: components["schemas"]["PortfolioValuationHoldOut"][];
+        };
         /** PortfolioTransactionBatchInput */
         PortfolioTransactionBatchInput: {
             /** Transactions */
@@ -10226,6 +10303,15 @@ export interface components {
              * Format: date
              */
             start: string;
+        };
+        /** PortfolioValuationHoldOut */
+        PortfolioValuationHoldOut: {
+            /** Effective Date */
+            effective_date: string | null;
+            /** Reason */
+            reason: string;
+            /** Ticker */
+            ticker: string;
         };
         /** PrincipleAction */
         PrincipleAction: {
@@ -22339,9 +22425,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioSummaryOut"];
                 };
             };
             /** @description Validation Error */

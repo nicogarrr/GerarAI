@@ -230,7 +230,7 @@ describe('PortfolioTransactions: la divisa la manda el ledger y el importe se de
         // /api/portfolio/transactions no expone total: el único número
         // derivable es cantidad x precio, que NO descuenta comisiones.
         const route = readFileSync(join(root, 'data-engine/app/api/routes/portfolio.py'), 'utf8');
-        const payload = route.slice(route.indexOf('def _transaction_payload'), route.indexOf('@router.get("/summary")'));
+        const payload = route.slice(route.indexOf('def _transaction_payload'), route.indexOf('@router.get("/summary"'));
         assert.ok(!/"(total|amount|notional)"/.test(payload), 'el backend sigue sin mandar importe por movimiento');
         assert.ok(/fees/.test(payload), 'las comisiones sí están en el ledger: por eso el importe va como «bruto»');
         assert.match(src, /const gross = tx\.quantity \* tx\.price;/, 'el nocional se deriva en un punto con nombre');
