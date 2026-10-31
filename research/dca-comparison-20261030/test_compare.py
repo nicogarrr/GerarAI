@@ -37,8 +37,16 @@ def test_constant_prices_no_market_dd_and_costs_reduce_value():
 def test_insufficient_window_is_not_fabricated():
  assert m.simulate(toy(),{'2020-12':1},'2021-01','2021-12','plain') is None
 
+RESULTS_JSON=Path(__file__).with_name('results.json')
+
+# Artefacto inmutable de la corrida 2026-10-30 (datos reales): NO esta en el
+# repo (audit.json guarda los hashes; una descarga nueva trae ajustes
+# revisados y no reproduce los mismos bytes — medido 2026-10-31). Sin el
+# artefacto este test se salta de forma explicita: bateria declarada
+# «4 pass, 1 skip», sin inventar datos.
+@pytest.mark.skipif(not RESULTS_JSON.exists(),reason='artefacto results.json ausente (ver README): 4 pass, 1 skip declarado')
 def test_actual_results_equal_budget_same_dates_and_no_insolvency():
- rows=json.load(open(Path(__file__).with_name('results.json')))
+ rows=json.load(open(RESULTS_JSON))
  grouped={}
  for r in rows:
   key=(r['symbol'],r['period'],r['cost_bps']);grouped.setdefault(key,[]).append(r)
