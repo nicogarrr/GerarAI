@@ -28,12 +28,15 @@ Las peticiones internas entre Next.js y FastAPI incorporan las siguientes cabece
 |---|---|---|
 | `200 OK` | Petición procesada con éxito | Formato JSON específico del endpoint |
 | `201 Created` | Recurso creado exitosamente | Entidad recién creada con su identificador |
-| `400 Bad Request` | Parámetros inválidos o formato no admitido | `{"detail": "Mensaje descriptivo en español"}` |
-| `401 Unauthorized` | Firma HMAC inválida o expirada | `{"detail": "Firma criptográfica inválida"}` |
-| `404 Not Found` | Recurso no encontrado o no perteneciente al tenant | `{"detail": "Cartera no encontrada"}` |
-| `409 Conflict` | Conflicto contable (ej. venta en descubierto) | `{"detail": "Venta sin acciones suficientes disponibles"}` |
+| `400 Bad Request` | Parámetros inválidos o formato no admitido | `{"detail": "Mensaje descriptivo del rechazo"}` |
+| `401 Unauthorized` | Firma HMAC inválida o expirada | `{"detail": "La firma de tu sesión no es válida. Vuelve a iniciar sesión."}` |
+| `404 Not Found` | Recurso no encontrado o no perteneciente al tenant | `{"detail": "Holding not found"}` |
+| `409 Conflict` | Conflicto contable (ej. venta en descubierto) | `{"detail": "Insufficient shares for sale"}` |
 | `422 Unprocessable` | Validación de esquema Pydantic fallida | `{"detail": [{"loc": [...], "msg": "...", "type": "..."}]}` |
-| `500 Server Error` | Error no controlado (fail-open activado) | `{"detail": "Error interno del servidor"}` |
+| `500 Server Error` | Error no controlado: detalle genérico con id de correlación; el texto de la excepción solo queda en el log del servidor | `{"detail": "Internal server error (ref: 1a2b3c4d5e6f)"}` |
+
+> [!NOTE]
+> Los rechazos de negocio del motor viajan muchas veces en inglés (404/409 de la tabla). El frontend los traduce en la frontera de la UI (`spanishBackendMessage`), así que el usuario los ve en español aunque el contrato del API sea el texto original.
 
 ---
 
@@ -77,7 +80,7 @@ Estado, latencia y circuit breakers de las fuentes de datos externas (FMP, Alpha
       "name": "Alpha Vantage",
       "is_primary": false,
       "status": "healthy",
-      "circuit_state": "CLOSED",
+      "circuit_state": "closed",
       "consecutive_failures": 0,
       "last_checked_at": "2026-10-31T00:24:41+00:00",
       "fallback_source": null,
