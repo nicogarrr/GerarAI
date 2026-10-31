@@ -57,9 +57,15 @@ class ECBClient:
                 currency = element.attrib.get("currency")
                 rate = element.attrib.get("rate")
                 if currency and rate:
-                    per_eur[currency.upper()] = Decimal(rate)
+                    value = Decimal(rate)
+                    # Decimal("NaN") y Decimal("Infinity") PARSEAN sin error:
+                    # sin esta comprobacion colarian al registry como salud y
+                    # una tasa cero romperia la division de abajo.
+                    if not value.is_finite() or value <= 0:
+                        raise ValueError(f"tasa no finita o no positiva para {currency}: {rate}")
+                    per_eur[currency.upper()] = value
         except (ValueError, InvalidOperation) as exc:
-            registry.record_failure(REGISTRY_KEY, "XML con fecha o tasa inválida (parse failed)")
+            registry.record_failure(REGISTRY_KEY, "XML con fecha o tasa inválida o no positiva (parse failed)")
             raise RuntimeError("ECB devolvió una fecha o tasa inválida (posible cambio de formato)") from exc
         base = base_currency.upper()
         if rate_date is None or base not in per_eur:

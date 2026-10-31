@@ -160,3 +160,42 @@ def test_ecb_xml_valido_cierra(monkeypatch):
     rates = asyncio.run(ecb.ECBClient().conversion_rates(base_currency="EUR", quote_currencies={"USD"}))
     assert rates.rate_date == date(2026, 10, 30)
     assert _failures("ecb") == 0
+
+
+# ---------- Finnhub: 200 {"error": ...} ----------
+
+
+def test_finnhub_quote_200_con_error_no_es_exito(monkeypatch):
+    client = _finnhub_client(monkeypatch, {"error": "Invalid API key"})
+    before = _failures("finnhub")
+    with pytest.raises(RuntimeError, match="Invalid API key"):
+        asyncio.run(client.quote("AAPL", max_retries=0))
+    assert _failures("finnhub") == before + 1
+
+
+def test_finnhub_metric_200_con_error_no_es_exito(monkeypatch):
+    client = _finnhub_client(monkeypatch, {"error": "API limit reached"})
+    before = _failures("finnhub")
+    with pytest.raises(RuntimeError, match="API limit reached"):
+        asyncio.run(client.metric("AAPL"))
+    assert _failures("finnhub") == before + 1
+
+
+# ---------- ECB: tasas no finitas o no positivas ----------
+
+
+def _xml_con_tasa(tasa: str) -> bytes:
+    return f"""<?xml version="1.0"?>
+<gesmes:Envelope xmlns:gesmes="http://www.gesmes.org/xml/2002-05-01" xmlns="http://www.ecb.int/vocabulary/2002-08-01/eurofxref">
+  <Cube><Cube time="2026-10-30"><Cube currency="USD" rate="{tasa}"/></Cube></Cube>
+</gesmes:Envelope>""".encode()
+
+
+@pytest.mark.parametrize("tasa", ["NaN", "Infinity", "-Infinity", "0", "-1.05"])
+def test_ecb_tasa_no_finita_o_no_positiva_no_es_exito(monkeypatch, tasa):
+    # Decimal() parsea NaN/Infinity sin error: sin la comprobacion colarian.
+    _patch_ecb(monkeypatch, _xml_con_tasa(tasa))
+    before = _failures("ecb")
+    with pytest.raises(RuntimeError):
+        asyncio.run(ecb.ECBClient().conversion_rates(base_currency="EUR", quote_currencies={"USD"}))
+    assert _failures("ecb") == before + 1

@@ -60,6 +60,11 @@ class FinnhubClient:
         except ValueError:
             registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
             raise
+        # Finnhub responde a clave inválida o símbolo con error como un 200
+        # {"error": "..."}: es un dict y colaría como payload válido.
+        if isinstance(payload, dict) and payload.get("error"):
+            registry.record_failure(REGISTRY_KEY, f"payload con error: {payload['error']}")
+            raise RuntimeError(f"Finnhub devolvió un error: {payload['error']}")
         # Sin éxito aquí: _get es genérico y un 200 no basta. Cada endpoint
         # valida su forma (objeto/lista) y registra el éxito tras validar.
         return payload
