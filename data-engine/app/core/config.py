@@ -371,7 +371,7 @@ class Settings(BaseSettings):
     # Apagada por defecto: via nueva con dependencia de bus-factor 1 y el
     # enchufado al scheduler/Dramatiq es un follow-up cuando BUG-1 cierre.
     # Env: EDGARTOOLS_ENABLED.
-    edgartools_enabled: bool = False
+    edgartools_enabled: bool = True  # via cableada como fallback de lectura 13F; EDGARTOOLS_ENABLED=false = kill switch
     # Snapshot edgartools (manifest.json con synced_at + companyfacts/ +
     # submissions/ + filings/): mismo patron que sec_snapshot_dir. En
     # produccion (OCI, IP baneada por la SEC con 403 permanente) es la UNICA
