@@ -324,3 +324,28 @@ def test_digest_duplicate_empty_copy_does_not_hide_available_text(db) -> None:
     assert result["items"][0]["status"] == "ready"
     assert result["items"][0]["items"][0]["excerpts"]
     assert result["items"][0]["document_id"] == first.id
+
+
+def test_fuentes_se_consultan_en_paralelo(monkeypatch) -> None:
+    """Perf: 479 ms medidos en el barrido 2026-10-31 (cache fria por worker).
+    Las dos fuentes se pedian EN SERIE; en paralelo el total es el maximo
+    de ambas, no la suma."""
+    import time
+
+    async def slow_fomc(agent, client):
+        await asyncio.sleep(0.2)
+        return connector.parse_fomc_html(FOMC_HTML)
+
+    async def slow_bls(agent, client):
+        await asyncio.sleep(0.2)
+        return connector.parse_bls_ics(BLS_ICS)
+
+    monkeypatch.setattr(connector, "fetch_fomc", slow_fomc)
+    monkeypatch.setattr(connector, "fetch_bls", slow_bls)
+    service.clear_cache()
+    start = time.monotonic()
+    result = run(service.get_macro_events(date(2026, 1, 1), date(2026, 10, 31)))
+    elapsed = time.monotonic() - start
+    assert result["status"] == "ready"
+    # En serie: >= 0.40 s. En paralelo: ~0.20 s + epsilon.
+    assert elapsed < 0.34, f"fuentes en serie: {elapsed:.2f}s para 2 x 0.20s"
