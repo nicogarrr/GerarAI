@@ -348,3 +348,50 @@ def test_thesis_pdf_citations_use_real_source_urls(env):
     full = page1 + page2
     assert "https://www.cnmv.es/doc/santander-iis-2025.pdf" in full
     assert "FUENTES OFICIALES" in page1
+
+
+def test_portfolio_pdf_usd_positions_not_labelled_eur(env):
+    """Posiciones en USD sin valor base: el total se etiqueta USD, nunca EUR."""
+    client, factory, port_id = env
+    from app.models.entities import Company as C, Portfolio as Pf, Position as P
+
+    with factory() as s:
+        portfolio = s.query(Pf).filter(Pf.id == port_id).first()
+        # La posición SAN.MC del fixture tiene currency USD por defecto y sin market_value_base
+        s.query(P).filter(P.portfolio_id == port_id).delete()
+        s.add(C(ticker="ASTS", name="AST SpaceMobile", exchange="NASDAQ", currency="USD", sector="T", industry="I", company_type="operating", valuation_model="dcf"))
+        s.commit()
+        asts = s.query(C).filter(C.ticker == "ASTS").first()
+        s.add(P(tenant_id=portfolio.tenant_id, portfolio_id=port_id, company_id=asts.id,
+                quantity=100.0, average_cost=30.0, market_price=30.0, currency="USD"))
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, _ = _page_text(res.content)
+    assert "3.000,00 USD" in page1 or "3,000.00 USD" in page1
+    assert "EUR" not in page1.split("Composición")[0].replace("ASTS", "")
+
+
+def test_portfolio_pdf_mixed_currencies_no_fake_weights(env):
+    """Divisas mezcladas sin valor base: pesos n/d y sin ranking de 'mayores posiciones'."""
+    client, factory, port_id = env
+    from app.models.entities import Company as C, Portfolio as Pf, Position as P
+
+    with factory() as s:
+        portfolio = s.query(Pf).filter(Pf.id == port_id).first()
+        s.add(C(ticker="IBE.MC", name="Iberdrola", exchange="BME", currency="EUR", sector="U", industry="I", company_type="operating", valuation_model="dcf"))
+        s.commit()
+        ibe = s.query(C).filter(C.ticker == "IBE.MC").first()
+        # SAN.MC del fixture está en USD; añadimos IBE.MC en EUR
+        s.add(P(tenant_id=portfolio.tenant_id, portfolio_id=port_id, company_id=ibe.id,
+                quantity=200.0, average_cost=11.5, market_price=11.5, currency="EUR"))
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    page1, page2 = _page_text(res.content)
+    full = page1 + page2
+    assert "n/d" in page1
+    assert "Pesos no calculables" in full
+    assert "Mayores posiciones por peso estimado" not in full

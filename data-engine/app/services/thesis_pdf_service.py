@@ -385,13 +385,21 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
     cost_rows = sum(1 for r in rows if r[3])
     composition_body = ""
     if rows:
-        top = sorted(rows, key=lambda r: r[5], reverse=True)[:3]
-        lines = []
-        for p, _qty, _px, _pc, _ccy, val, _ib in top:
-            share = f"{(val / total_val * 100):.1f}%" if total_val > 0 else "peso n/d"
-            name = p.company.ticker if p.company else f"ACT-{p.company_id}"
-            lines.append(f"{name}: {share}")
-        composition_body = "Mayores posiciones por peso estimado: " + ", ".join(lines) + "."
+        if total_val > 0:
+            top = sorted(rows, key=lambda r: r[5], reverse=True)[:3]
+            lines = []
+            for p, _qty, _px, _pc, _ccy, val, _ib in top:
+                share = f"{(val / total_val * 100):.1f}%"
+                name = p.company.ticker if p.company else f"ACT-{p.company_id}"
+                lines.append(f"{name}: {share}")
+            composition_body = "Mayores posiciones por peso estimado: " + ", ".join(lines) + "."
+        else:
+            # Divisas mezcladas sin valor consolidado: no se ordenan por peso.
+            names = [p.company.ticker if p.company else f"ACT-{p.company_id}" for p, *_r in rows]
+            composition_body = (
+                "Posiciones: " + ", ".join(names) + ". "
+                "Pesos no calculables: hay posiciones en divisas distintas sin valor consolidado en divisa base."
+            )
 
     limitations: list[str] = []
     if cost_rows:
@@ -406,9 +414,12 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
         if limitations
         else "Todas las posiciones tienen valor de mercado consolidado en divisa base."
     )
+    # Divisa del total: la común a todas las valoraciones (base si hay valor
+    # consolidado; la nativa compartida si no), nunca la base por defecto.
+    total_ccy = base_ccy if all_base else (ccys[0] if len(ccys) == 1 else "")
     summary = f"Informe consolidado de la cartera {portfolio.name}. Consta de {len(positions)} posiciones activas"
-    if total_val > 0:
-        summary += f" con un valor total estimado de {total_val:,.2f} {base_ccy}"
+    if total_val > 0 and total_ccy:
+        summary += f" con un valor total estimado de {total_val:,.2f} {total_ccy}"
     summary += "."
 
     data = ThesisPdfData(
