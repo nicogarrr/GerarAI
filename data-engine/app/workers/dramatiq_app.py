@@ -683,6 +683,13 @@ GDELT_QUEUE_NAME = "gdelt"
 # worker default: queue_name solo enruta mensajes NUEVOS, el actor se
 # resuelve por nombre al consumir.
 COMPUTED_QUEUE_NAME = "computed"
+# Carril de APIs externas (yfinance/Finnhub/SEC/proveedores de precios): los
+# trabajos que queman cuota HTTP fuera no comparten la cola default con el
+# resto (31-oct: 2 refresh_valuation_metrics ocupando los 2 hilos de default,
+# 7.617 pendientes; 1.077 HTTP 429 en 10 min). La consume worker-externa
+# (1 proceso, EXTERNA_THREADS=2 por defecto). queue_name solo enruta mensajes
+# NUEVOS: los ya encolados en default los drena el worker default.
+EXTERNA_QUEUE_NAME = "externa"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -1722,7 +1729,8 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000,
+              queue_name=EXTERNA_QUEUE_NAME)
 @_coalesce_on_success("backfill_finnhub_profiles", 20 * 3600, ("tenant_id",))
 def backfill_finnhub_profiles(
     tenant_id: int | None = None,
@@ -1754,7 +1762,8 @@ def backfill_finnhub_profiles(
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
 
 
-@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000,
+              queue_name=EXTERNA_QUEUE_NAME)
 @_coalesce_on_success("backfill_sec_fundamentals", 20 * 3600, ("tenant_id",))
 def backfill_sec_fundamentals(
     tenant_id: int | None = None,
@@ -2254,7 +2263,7 @@ def propicks_radar_scan(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=EXTERNA_QUEUE_NAME)
 @_coalesce_on_success("refresh_valuation_metrics", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def refresh_valuation_metrics(
     tenant_id: int | None = None,
@@ -2596,7 +2605,8 @@ def refresh_earnings_calendar(
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000,
+              queue_name=EXTERNA_QUEUE_NAME)
 def backfill_company_price_history(
     company_id: int,
     tenant_id: int | None = None,
