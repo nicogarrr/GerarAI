@@ -588,6 +588,14 @@ class InsiderFiling(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "accession_number", name="uq_insider_filings_tenant_accession"),
         Index("ix_insider_filings_issuer", "issuer_cik"),
+        # /api/insider/filings lista y cuenta por issuer_ticker ordenando por
+        # filing_date DESC; sin este indice era Seq Scan por peticion.
+        Index(
+            "ix_insider_filings_tenant_ticker_date",
+            "tenant_id",
+            "issuer_ticker",
+            "filing_date",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
