@@ -46,28 +46,22 @@ def _news_events_by_change(db: Session, change_ids: list[int]) -> dict[int, News
     identidad atribuida, nunca similitud."""
     if not change_ids:
         return {}
+    # Puente y evento en UNA pasada: antes eran dos consultas secuenciales
+    # (review -> event_ids -> events), dos round-trips por request.
     review_rows = db.execute(
-        select(ResearchReview.thesis_change_id, ResearchReview.news_event_id).where(
+        select(ResearchReview.thesis_change_id, NewsEvent)
+        .join(NewsEvent, NewsEvent.id == ResearchReview.news_event_id)
+        .where(
             ResearchReview.thesis_change_id.in_(change_ids),
             ResearchReview.news_event_id.is_not(None),
             *tenant_filters(db, ResearchReview),
+            *tenant_filters(db, NewsEvent),
         )
     ).all()
-    event_id_by_change: dict[int, int] = {}
-    for change_id, event_id in review_rows:
-        event_id_by_change.setdefault(change_id, event_id)
-    if not event_id_by_change:
-        return {}
-    events = {
-        event.id: event
-        for event in db.scalars(
-            select(NewsEvent).where(
-                NewsEvent.id.in_(set(event_id_by_change.values())),
-                *tenant_filters(db, NewsEvent),
-            )
-        ).all()
-    }
-    return {cid: events[eid] for cid, eid in event_id_by_change.items() if eid in events}
+    events: dict[int, NewsEvent] = {}
+    for change_id, event in review_rows:
+        events.setdefault(change_id, event)
+    return events
 
 
 def _summary_en_castellano(change: ThesisChange, event: NewsEvent | None) -> str:
