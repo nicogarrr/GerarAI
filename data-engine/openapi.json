@@ -9682,6 +9682,69 @@
         "title": "OwnershipManagersOut",
         "type": "object"
       },
+      "PageInfo": {
+        "description": "Pagination metadata.",
+        "properties": {
+          "has_next": {
+            "title": "Has Next",
+            "type": "boolean"
+          },
+          "has_prev": {
+            "title": "Has Prev",
+            "type": "boolean"
+          },
+          "page": {
+            "minimum": 1.0,
+            "title": "Page",
+            "type": "integer"
+          },
+          "page_size": {
+            "minimum": 1.0,
+            "title": "Page Size",
+            "type": "integer"
+          },
+          "total_items": {
+            "minimum": 0.0,
+            "title": "Total Items",
+            "type": "integer"
+          },
+          "total_pages": {
+            "minimum": 0.0,
+            "title": "Total Pages",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page",
+          "page_size",
+          "total_items",
+          "total_pages",
+          "has_next",
+          "has_prev"
+        ],
+        "title": "PageInfo",
+        "type": "object"
+      },
+      "PaginatedResponse_PortfolioPositionItemOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPositionItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "PaginatedResponse[PortfolioPositionItemOut]",
+        "type": "object"
+      },
       "PaperProposal": {
         "additionalProperties": false,
         "properties": {
@@ -9956,6 +10019,50 @@
           "start_date"
         ],
         "title": "PlanUpsertInput",
+        "type": "object"
+      },
+      "PortfolioAnalysisStateOut": {
+        "description": "Estado de analisis tracked (tracked_statuses): clave por ticker.",
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "missing_inputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Inputs"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "thesis_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Status"
+          }
+        },
+        "required": [
+          "status",
+          "as_of"
+        ],
+        "title": "PortfolioAnalysisStateOut",
         "type": "object"
       },
       "PortfolioAttributionOut": {
@@ -10275,6 +10382,113 @@
           "base_currency"
         ],
         "title": "PortfolioConfigurationInput",
+        "type": "object"
+      },
+      "PortfolioCostReconciliationOut": {
+        "description": "Resultado de reconcile_ibkr_costs para una posicion IBKR.",
+        "properties": {
+          "cost_unit_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Unit Verified"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "difference_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Native"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "snapshot_cost_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Cost Native"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "review_required",
+              "not_comparable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tolerance_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tolerance Native"
+          },
+          "trade_cost_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Cost Native"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioCostReconciliationOut",
         "type": "object"
       },
       "PortfolioCoverageOut": {
@@ -10953,6 +11167,322 @@
           "valuation_history"
         ],
         "title": "PortfolioPerformanceOut",
+        "type": "object"
+      },
+      "PortfolioPositionItemOut": {
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioAnalysisStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "average_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Cost"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "cost_basis": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis"
+          },
+          "cost_basis_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Base"
+          },
+          "cost_basis_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis Native"
+          },
+          "cost_reconciliation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioCostReconciliationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "first_buy_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Buy Date"
+          },
+          "fiscal_bucket": {
+            "anyOf": [
+              {
+                "enum": [
+                  "corto_plazo",
+                  "largo_plazo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fiscal Bucket"
+          },
+          "fx_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Rate"
+          },
+          "holding_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holding Days"
+          },
+          "market_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Price"
+          },
+          "market_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Value"
+          },
+          "market_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Value Base"
+          },
+          "market_value_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Value Native"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "native_currency": {
+            "title": "Native Currency",
+            "type": "string"
+          },
+          "pnl_fx_effect_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl Fx Effect Base"
+          },
+          "pnl_price_effect_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl Price Effect Base"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "quote_missing": {
+            "title": "Quote Missing",
+            "type": "boolean"
+          },
+          "realized_pnl": {
+            "title": "Realized Pnl",
+            "type": "number"
+          },
+          "realized_pnl_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Pnl Base"
+          },
+          "sector": {
+            "title": "Sector",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "unrealized_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl"
+          },
+          "unrealized_pnl_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Base"
+          },
+          "unrealized_pnl_native": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unrealized Pnl Native"
+          },
+          "valuation_hold": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PositionValuationHoldOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ticker",
+          "name",
+          "sector",
+          "analysis",
+          "quantity",
+          "average_cost",
+          "market_price",
+          "market_value",
+          "valuation_hold",
+          "unrealized_pnl",
+          "realized_pnl",
+          "cost_basis",
+          "as_of",
+          "currency",
+          "native_currency",
+          "base_currency",
+          "market_value_native",
+          "market_value_base",
+          "cost_basis_native",
+          "cost_basis_base",
+          "unrealized_pnl_native",
+          "unrealized_pnl_base",
+          "realized_pnl_base",
+          "fx_rate",
+          "pnl_price_effect_base",
+          "pnl_fx_effect_base",
+          "source",
+          "first_buy_date",
+          "holding_days",
+          "fiscal_bucket",
+          "quote_missing",
+          "cost_reconciliation"
+        ],
+        "title": "PortfolioPositionItemOut",
         "type": "object"
       },
       "PortfolioPositionOut": {
@@ -11660,6 +12190,43 @@
           "effective_date"
         ],
         "title": "PortfolioValuationHoldOut",
+        "type": "object"
+      },
+      "PositionValuationHoldOut": {
+        "properties": {
+          "effective_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          }
+        },
+        "required": [
+          "reason",
+          "effective_date",
+          "since"
+        ],
+        "title": "PositionValuationHoldOut",
         "type": "object"
       },
       "PrincipleAction": {
@@ -59455,9 +60022,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Positions Api Portfolio Positions Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PaginatedResponse_PortfolioPositionItemOut_"
                 }
               }
             },

@@ -141,39 +141,7 @@ type ResearchPortfolioTransaction = {
     updated_at: string;
 };
 
-type ResearchPortfolioPosition = {
-    analysis?: TrackedAnalysisStatus | null;
-    ticker: string;
-    quantity: number;
-    average_cost: number | null;
-    cost_reconciliation?: { status: string; message?: string | null } | null;
-    // null = valoración en suspenso (p. ej. split sin precio post-split verificado).
-    market_price: number | null;
-    market_value: number | null;
-    unrealized_pnl: number | null;
-    valuation_hold?: { reason: string; effective_date: string | null; since: string | null } | null;
-    currency: string;
-    native_currency: string;
-    base_currency: string;
-    realized_pnl: number;
-    cost_basis: number | null;
-    as_of: string;
-    market_value_native: number;
-    market_value_base: number | null;
-    cost_basis_native: number | null;
-    unrealized_pnl_native?: number | null;
-    cost_basis_base: number | null;
-    unrealized_pnl_base: number | null;
-    realized_pnl_base: number | null;
-    fx_rate: number | null;
-    pnl_price_effect_base?: number | null;
-    pnl_fx_effect_base?: number | null;
-    first_buy_date: string | null;
-    holding_days: number | null;
-    fiscal_bucket: 'corto_plazo' | 'largo_plazo' | null;
-    // A3: el precio es el de la última operación (sin cotización real); plusvalía null.
-    quote_missing?: boolean;
-};
+type ResearchPortfolioPosition = components['schemas']['PortfolioPositionItemOut'];
 
 type ResearchPortfolioSummaryResponse = components['schemas']['PortfolioSummaryOut'];
 
