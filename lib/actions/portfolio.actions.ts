@@ -127,19 +127,7 @@ export type PortfolioSummary = {
 
 export type PortfolioFxRate = components['schemas']['PortfolioFxRateOut'];
 
-type ResearchPortfolioTransaction = {
-    id: number;
-    ticker: string;
-    action: 'buy' | 'sell';
-    quantity: number;
-    price: number;
-    fees: number;
-    currency: string;
-    trade_date: string;
-    notes?: string | null;
-    created_at: string;
-    updated_at: string;
-};
+type ResearchPortfolioTransaction = components['schemas']['PortfolioTransactionOut'];
 
 type ResearchPortfolioPosition = components['schemas']['PortfolioPositionItemOut'];
 
@@ -218,7 +206,7 @@ export async function getPortfolioTransactionPage(userId: string, offset = 0, fi
     // backend con la sesión.
     await resolveUserId(userId);
     const safeOffset = Number.isSafeInteger(offset) && offset >= 0 ? offset : 0;
-    const page = await researchRequest<{ items: ResearchPortfolioTransaction[]; total: number }>(
+    const page = await researchRequest<components['schemas']['PortfolioTransactionPageOut']>(
         `/api/portfolio/transactions/page?limit=50&offset=${safeOffset}${transactionFiltersQuery(filters)}`, { fast: true },
     );
     const items = page.items.map((transaction) => ({

@@ -1615,3 +1615,32 @@ class PortfolioPositionItemOut(BaseModel):
     fiscal_bucket: Literal["corto_plazo", "largo_plazo"] | None
     quote_missing: bool
     cost_reconciliation: PortfolioCostReconciliationOut | None
+
+
+# --- GET /api/portfolio/transactions (+ /page) ------------------------------
+# Forma medida contra _transaction_payload (servicio real): emite siempre
+# todas las claves (notes/review_flag llegan como null). El listado se
+# limita a buy/sell via _trade_filters.
+
+
+class PortfolioTransactionOut(BaseModel):
+    id: int
+    ticker: str
+    action: Literal["buy", "sell"]
+    quantity: float
+    price: float
+    fees: float
+    currency: str
+    trade_date: str
+    notes: str | None
+    # Compra a precio 0 aceptada pero marcada para revision (regalo/spin-off).
+    review_flag: str | None
+    created_at: str
+    updated_at: str
+
+
+class PortfolioTransactionPageOut(BaseModel):
+    """Respuesta de GET /api/portfolio/transactions/page (limit/offset)."""
+
+    items: list[PortfolioTransactionOut]
+    total: int
