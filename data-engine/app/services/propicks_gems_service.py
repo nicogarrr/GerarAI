@@ -234,11 +234,15 @@ def find_gems(
         if (c.currency or "").upper() == "USD"  # facts and prices share currency
     }
     base = _latest_fcf_and_shares(db, today.year - 2)
+    # Ventana de 7 dias en SQL (anti lectura historica): un precio mas viejo
+    # se descarta siempre abajo, asi que traerlo era coste puro (miles de
+    # barras por empresa para quedarse con la ultima).
     prices: dict[int, MarketPrice] = {}
     for p in db.scalars(
         select(MarketPrice)
         .where(MarketPrice.company_id.in_(list(companies)))
         .where(MarketPrice.close.isnot(None))
+        .where(MarketPrice.date >= today - timedelta(days=7))
         .order_by(MarketPrice.date.desc())
     ).all():
         prices.setdefault(p.company_id, p)
