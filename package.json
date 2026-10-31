@@ -88,7 +88,8 @@
         "next": {
             "postcss": "8.5.26"
         },
-        "postcss": "8.5.26"
+        "postcss": "8.5.26",
+        "minimatch": "11.0.1"
     },
     "description": "GerarAI — Research OS de inversión personal (Next.js + FastAPI)"
 }
