@@ -3,10 +3,10 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/actions/analyst-targets.actions', () => ({
-    getListingAnalystTargets: vi.fn(),
+    getListingAnalystTargetsBatch: vi.fn(),
 }));
 
-import { getListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { getListingAnalystTargetsBatch } from '@/lib/actions/analyst-targets.actions';
 import { requestCache } from '@/lib/cache/requestCache';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { convertWithPortfolioFx } from '@/lib/analyst-target-currency';
@@ -15,7 +15,7 @@ import { convertWithPortfolioFx } from '@/lib/analyst-target-currency';
 // La watchlist pinta el precio en libras (GBP) y Cartera en peniques (GBp).
 // Valores derivados a mano: objetivo 300 p = 3,00 £; precio 2,50 £ = 250 p;
 // recorrido (3,00 / 2,50 − 1) × 100 = +20,0 %.
-const mocked = vi.mocked(getListingAnalystTargets);
+const mocked = vi.mocked(getListingAnalystTargetsBatch);
 const target = (mean: number, currency: string) =>
     ({ status: 'available', mean, currency, firms: 12, fetchedAt: null, source: 'Yahoo Finance', note: null }) as never;
 
@@ -25,7 +25,9 @@ beforeEach(() => {
 
 describe('objetivo de analistas en peniques', () => {
     it('watchlist (fila en GBP): objetivo en GBX convertido exacto a libras, con recorrido', async () => {
-        mocked.mockResolvedValue(target(300, 'GBX'));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, target(300, 'GBX')])),
+        );
         render(<AnalystTargetLine symbol="CGEO.L" currency="GBP" referencePrice={2.5} />);
         expect(await screen.findByText(/\+20,0/)).toBeInTheDocument();
         expect(screen.getByText(/3,00/)).toBeInTheDocument();
@@ -33,13 +35,17 @@ describe('objetivo de analistas en peniques', () => {
     });
 
     it('cartera (fila en GBp): objetivo en GBX es la misma unidad', async () => {
-        mocked.mockResolvedValue(target(300, 'GBX'));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, target(300, 'GBX')])),
+        );
         render(<AnalystTargetLine symbol="CGEO.L" currency="GBp" referencePrice={250} />);
         expect(await screen.findByText(/\+20,0/)).toBeInTheDocument();
     });
 
     it('cartera (fila en GBp): un objetivo en libras no se lee como peniques (×100)', async () => {
-        mocked.mockResolvedValue(target(3, 'GBP'));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, target(3, 'GBP')])),
+        );
         render(<AnalystTargetLine symbol="CGEO.L" currency="GBp" referencePrice={250} />);
         expect(await screen.findByText(/\+20,0/)).toBeInTheDocument();
         expect(screen.queryByText(/98,8/)).toBeNull();

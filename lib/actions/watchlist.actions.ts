@@ -342,3 +342,21 @@ export async function getExtendedQuote(symbol: string): Promise<ExtendedQuote | 
         return null;
     }
 }
+
+/** Límite defensivo del batch de cotizaciones extendidas (una página entera cabe de sobras). */
+const EXTENDED_QUOTES_BATCH_MAX = 100;
+
+/**
+ * Versión batch de getExtendedQuote: UNA invocación serverless por página en
+ * vez de una por fila (medido en prod: 12 POSTs de acción por carga de
+ * /watchlist solo para cotizaciones extendidas). Las peticiones al backend
+ * salen en paralelo dentro de la misma invocación.
+ */
+export async function getExtendedQuotes(symbols: string[]): Promise<Record<string, ExtendedQuote | null>> {
+    await requireAuthenticatedUser();
+    const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))].slice(0, EXTENDED_QUOTES_BATCH_MAX);
+    const entries = await Promise.all(
+        unique.map(async (symbol) => [symbol, await getExtendedQuote(symbol)] as const),
+    );
+    return Object.fromEntries(entries);
+}

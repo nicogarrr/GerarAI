@@ -3,14 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/actions/analyst-targets.actions', () => ({
-    getListingAnalystTargets: vi.fn(),
+    getListingAnalystTargetsBatch: vi.fn(),
 }));
 
-import { getListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { getListingAnalystTargetsBatch } from '@/lib/actions/analyst-targets.actions';
 import { requestCache } from '@/lib/cache/requestCache';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 
-const mocked = vi.mocked(getListingAnalystTargets);
+const mocked = vi.mocked(getListingAnalystTargetsBatch);
 
 const TARGETS = {
     status: 'available', mean: 120, currency: 'USD', count: 12, high: 150, low: 90,
@@ -23,7 +23,9 @@ beforeEach(() => {
 
 describe('AnalystTargetLine: deduplicación de lecturas por símbolo', () => {
     it('dos instancias montadas a la vez (tarjetas + tabla) hacen UNA sola lectura', async () => {
-        mocked.mockResolvedValue(TARGETS);
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         render(
             <>
                 <AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />
@@ -34,7 +36,9 @@ describe('AnalystTargetLine: deduplicación de lecturas por símbolo', () => {
     });
 
     it('un remontaje dentro del TTL no repite la lectura', async () => {
-        mocked.mockResolvedValue(TARGETS);
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         const first = render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
         first.unmount();
@@ -48,7 +52,9 @@ describe('AnalystTargetLine: deduplicación de lecturas por símbolo', () => {
         const first = render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
         first.unmount();
-        mocked.mockResolvedValue(TARGETS);
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
     });
