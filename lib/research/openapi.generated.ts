@@ -3137,6 +3137,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market/quotes/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Market Quotes Batch
+         * @description Cotizaciones por lote (shape Finnhub via Yahoo), cache Redis 60s.
+         *
+         *     Respuesta por simbolo: payload o null (sin dato NUNCA es error global).
+         */
+        post: operations["market_quotes_batch_api_market_quotes_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market/regime": {
         parameters: {
             query?: never;
@@ -6082,6 +6104,10 @@ export interface paths {
         /**
          * Fair Value
          * @description Valor justo único de un ticker; recalcula el motor si la tesis no basta.
+         *
+         *     El recalculo pasa por cache Redis (FAIR_VALUE_LIVE_CACHE_TTL_SECONDS):
+         *     el sondeo de oportunidades de Inicio y la ficha piden el mismo ticker
+         *     muchas veces al dia y el motor no cambia hasta la proxima ingesta.
          */
         get: operations["fair_value_api_valuation__ticker__fair_value_get"];
         put?: never;
@@ -9903,6 +9929,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** MarketQuotesBatchIn */
+        MarketQuotesBatchIn: {
+            /** Symbols */
+            symbols: string[];
+        };
         /** MemoryItemCreate */
         MemoryItemCreate: {
             /** Company Id */
@@ -13188,6 +13219,17 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** WatchlistAnalysisStateOut */
+        WatchlistAnalysisStateOut: {
+            /** As Of */
+            as_of: string;
+            /** Missing Inputs */
+            missing_inputs?: string[] | null;
+            /** Status */
+            status: string;
+            /** Thesis Status */
+            thesis_status: string | null;
+        };
         /** WatchlistAttentionThesisItemOut */
         WatchlistAttentionThesisItemOut: {
             /** Createdat */
@@ -13207,6 +13249,20 @@ export interface components {
             items: components["schemas"]["WatchlistAttentionThesisItemOut"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /** WatchlistItemOut */
+        WatchlistItemOut: {
+            analysis: components["schemas"]["WatchlistAnalysisStateOut"] | null;
+            /** Company */
+            company: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Updated At */
+            updated_at: string | null;
         };
         /** WorkProductRequest */
         WorkProductRequest: {
@@ -20458,6 +20514,50 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    market_quotes_batch_api_market_quotes_batch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarketQuotesBatchIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -27947,9 +28047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["WatchlistItemOut"][];
                 };
             };
             /** @description Validation Error */

@@ -25,7 +25,7 @@ from app.models import (
     MarketPrice,
     WatchItem,
 )
-from app.schemas.api import WatchlistAttentionThesisOut
+from app.schemas.api import WatchlistAttentionThesisOut, WatchlistItemOut
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
@@ -56,7 +56,8 @@ def _find_watch_item(db: Session, symbol: str) -> WatchItem | None:
     return db.scalar(select(WatchItem).where(WatchItem.symbol == symbol))
 
 
-@router.get("")
+@router.get("", response_model=list[WatchlistItemOut],
+            response_model_exclude_unset=True)
 def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     """Watch items of the active tenant, most recently added first.
 
