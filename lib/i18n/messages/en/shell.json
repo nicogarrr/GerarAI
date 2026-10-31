@@ -46,5 +46,11 @@
     "devDetails": "Technical details (development only)",
     "retry": "Try again",
     "reload": "Reload page"
+  },
+  "meta": {
+    "title": "GerarAI - Research OS for fundamental investing",
+    "description": "GerarAI turns evidence, company-specific models and historical memory into traceable fundamental theses.",
+    "shareDescription": "Evidence, models and historical memory turned into traceable fundamental theses.",
+    "keywordFundamental": "fundamental analysis"
   }
 }

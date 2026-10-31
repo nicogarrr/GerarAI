@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { useLocale, useT } from '@/lib/i18n/client';
 import { Loader2, Play, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -65,6 +66,8 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
     const [baseError, setBaseError] = useState<string | null>(null);
     const [rangeError, setRangeError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    const hitT = useT();
+    const hitLocale = useLocale();
 
     const run = (event: React.FormEvent) => {
         event.preventDefault();
@@ -222,7 +225,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                             ))}
                         </div>
                     )}
-                    <DcaHitRatesCard data={result.hit_rates} scope="range" />
+                    <DcaHitRatesCard data={result.hit_rates} scope="range" ti={hitT} locale={hitLocale} />
                     <p className="text-[11px] text-gray-500">{result.disclaimer}</p>
                 </div>
             )}

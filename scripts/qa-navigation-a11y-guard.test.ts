@@ -23,7 +23,8 @@ test('page titles and 404 navigation are explicit and human readable',()=>{
  assert.ok(missing.includes("t('errors.notFound.metaTitle')"));
 });
 test('ticker targets and removal names are usable without icons',()=>{
- assert.match(read('components/watchlist/WatchlistRemoveButton.tsx'),/aria-label=\{`Quitar \$\{symbol\} de la watchlist`\}/);
+ assert.match(read('components/watchlist/WatchlistRemoveButton.tsx'),/aria-label=\{t\('watchlist\.remove\.label', \{ symbol \}\)\}/);
+ assert.equal(JSON.parse(read('lib/i18n/messages/es/watchlist.json')).remove.label,'Quitar {symbol} de la watchlist');
  assert.match(read('app/(root)/watchlist/page.tsx'),/min-h-11 items-center truncate text-base/);
  const news=read('components/research/NewsEventsFlow.tsx');
  assert.ok((news.match(/inline-flex min-h-11[^"]*items-center[^"]*text-teal-300/g)??[]).length>=2);

@@ -28,7 +28,8 @@ test('desktop portfolio and watchlist keep destructive action within symbol menu
   assert.equal(portfolioEs.holdings.options, 'Opciones');
   assert.match(portfolio, /setConfirmSymbol\(holding\.symbol\)/, 'la acción destructiva abre la confirmación');
   assert.match(portfolio, /onConfirm=\{\(\) => \{ if \(confirmSymbol\) handleDelete\(confirmSymbol\); \}\}/, 'la mutación solo corre al confirmar');
-  assert.match(watchlist, /<summary[^>]*Opciones/);
+  assert.match(watchlist, /<summary[^>]*>\{t\('watchlist\.page\.options'\)\}<\/summary>/);
+  assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/watchlist.json', 'utf8')).page.options, 'Opciones');
   assert.match(watchlist, /<WatchlistRemoveButton symbol=\{stock.symbol\}/);
 });
 

@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { DcaSignalItem } from '@/lib/dca/types';
+import { useT } from '@/lib/i18n/client';
 import { DCA_STATUS_LABEL, dcaDataAge, dcaMissingBadge, dcaPrice, dcaRsi, dcaSignalMetric } from '@/lib/dca/format';
 
 interface DcaLevelBadgeProps {
@@ -18,6 +19,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     // zona ni los cierres que activarían 2X-4X. El toque lo abre y lo cierra.
     const [open, setOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
+    const t = useT();
     const state = item?.state ?? null;
     if (!state) {
         if (compact) return null;
@@ -59,7 +61,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}${staleText ? `, ${staleText}` : ''}`}
                 >
                     {state.label}
-                    {forming ? <span className="font-normal opacity-80">(provisional)</span> : null}
+                    {forming ? <span className="font-normal opacity-80">{t('watchlist.dca.badge.provisional')}</span> : null}
                 </button>
             </TooltipTrigger>
             <TooltipContent
@@ -68,20 +70,20 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                 onPointerDownOutside={(event) => { if (triggerRef.current?.contains(event.target as Node)) event.preventDefault(); }}
             >
                 <p className="font-semibold">{state.zone}</p>
-                <p>Estado: mes {DCA_STATUS_LABEL[state.status] ?? state.status} ({state.period})</p>
-                {close ? <p>Cierre asentado: {close} · {state.signal_date}</p> : null}
+                <p>{t('watchlist.dca.badge.status', { status: DCA_STATUS_LABEL[state.status] ?? state.status, period: state.period })}</p>
+                {close ? <p>{t('watchlist.dca.badge.settledClose', { close, date: state.signal_date })}</p> : null}
                 {metric ? <p>{metric.label}: {metric.value}</p> : null}
-                {rsi ? <p>RSI mensual: {rsi}</p> : null}
+                {rsi ? <p>{t('watchlist.dca.badge.monthlyRsi', { rsi })}</p> : null}
                 {prices.length > 0 ? (
-                    <p>Cierre que activaría: {prices.map((entry) => `${entry.key.toUpperCase()} ${entry.value}`).join(' · ')}</p>
+                    <p>{t('watchlist.dca.badge.triggerClose', { prices: prices.map((entry) => `${entry.key.toUpperCase()} ${entry.value}`).join(' · ') })}</p>
                 ) : null}
-                {forming ? <p className="text-gray-400">El mes no ha cerrado: el veredicto puede cambiar.</p> : null}
+                {forming ? <p className="text-gray-400">{t('watchlist.dca.badge.forming')}</p> : null}
                 {stale ? (
                     <p className="text-amber-300">
-                        Datos desactualizados{age ? ` (último cierre ${age})` : ''}: el nivel puede no ser el actual.
+                        {age ? t('watchlist.dca.badge.staleAge', { age }) : t('watchlist.dca.badge.stale')}
                     </p>
                 ) : null}
-                <p className="text-gray-500">Apoyo a la decisión, no asesoramiento financiero.</p>
+                <p className="text-gray-500">{t('watchlist.dca.badge.disclaimer')}</p>
             </TooltipContent>
         </Tooltip>
     );

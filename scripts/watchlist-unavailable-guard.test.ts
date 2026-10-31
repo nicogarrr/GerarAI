@@ -20,7 +20,10 @@ describe('watchlist: fallo del backend vs lista vacía', () => {
     it('la página muestra un estado no disponible antes del vacío', () => {
         const page = source('app/(root)/watchlist/page.tsx');
         assert.match(page, /getWatchlistState\(\)/);
-        assert.ok(page.indexOf('watchlist-unavailable') < page.indexOf('Tu watchlist está vacía'));
-        assert.match(page, /No se pudo cargar tu watchlist/);
+        assert.ok(page.indexOf('watchlist-unavailable') < page.indexOf("t('watchlist.page.empty.title')"));
+        assert.ok(page.includes("t('watchlist.page.unavailable')"));
+        const es = JSON.parse(source('lib/i18n/messages/es/watchlist.json')).page;
+        assert.equal(es.empty.title, 'Tu watchlist está vacía');
+        assert.match(es.unavailable, /^No se pudo cargar tu watchlist/);
     });
 });

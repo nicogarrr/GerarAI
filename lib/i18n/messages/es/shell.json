@@ -46,5 +46,11 @@
     "devDetails": "Detalles técnicos (solo en desarrollo)",
     "retry": "Intentar de nuevo",
     "reload": "Recargar página"
+  },
+  "meta": {
+    "title": "GerarAI - Research OS de inversión fundamental",
+    "description": "GerarAI convierte evidencia, modelos específicos de cada empresa y memoria histórica en tesis fundamentales trazables.",
+    "shareDescription": "Evidencia, modelos y memoria histórica convertidos en tesis fundamentales trazables.",
+    "keywordFundamental": "análisis fundamental"
   }
 }

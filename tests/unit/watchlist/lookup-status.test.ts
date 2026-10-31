@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { isTickerNotFound, NOT_FOUND_LABEL } from '@/lib/watchlist/lookup-status';
+import { isTickerNotFound } from '@/lib/watchlist/lookup-status';
+import esWatchlist from '@/lib/i18n/messages/es/watchlist.json';
+import enWatchlist from '@/lib/i18n/messages/en/watchlist.json';
 
 describe('isTickerNotFound (watchlist «No encontrado»)', () => {
     it('fuera del master y el proveedor no conoce el símbolo → no encontrado', () => {
@@ -16,7 +18,8 @@ describe('isTickerNotFound (watchlist «No encontrado»)', () => {
     it('el proveedor conoce el símbolo → no es «no encontrado»', () => {
         expect(isTickerNotFound(null, { name: 'Almonty Industries' }, 'ALM')).toBe(false);
     });
-    it('rótulo en español', () => {
-        expect(NOT_FOUND_LABEL).toBe('No encontrado');
+    it('rótulo en español e inglés (diccionario)', () => {
+        expect(esWatchlist.page.notFound.label).toBe('No encontrado');
+        expect(enWatchlist.page.notFound.label).toBe('Not found');
     });
 });

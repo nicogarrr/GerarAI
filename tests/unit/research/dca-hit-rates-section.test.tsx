@@ -4,6 +4,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 const getState = vi.fn();
 vi.mock('@/lib/actions/dca-signals.actions', () => ({ getDcaHitRatesState: (s: string) => getState(s) }));
+// Server component traducido con getT(): sin cookie el locale es «es».
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/components/watchlist/DcaHitRatesCard', () => ({ default: () => <div data-testid="card" /> }));
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
 
