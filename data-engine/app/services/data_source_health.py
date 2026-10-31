@@ -183,6 +183,11 @@ class DataSourceHealthRegistry:
                 is_primary=True,
                 fallback_source="in_memory_lru",
             ),
+            "tracefour": DataSourceStatus(
+                name="Tracefour (PDMR UK)",
+                is_primary=False,
+                fallback_source=None,
+            ),
         }
 
     def get_status(self, source_key: str) -> DataSourceStatus:
