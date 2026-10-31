@@ -31,9 +31,13 @@ VERSION = "source-health-v1"
 ALERT_TYPE = "source_health"
 ALERT_STATES = {"degraded", "failing"}
 
-# Último estado visto por fuente EN ESTE PROCESO: el diff de transiciones vive
-# aquí; la dedup durable la garantiza el fingerprint único en research_alerts.
-_last_states: dict[str, str] = {}
+# Último estado visto por (tenant, fuente) EN ESTE PROCESO. La dedup durable la
+# garantiza el fingerprint único en research_alerts: el dict en memoria solo
+# evita realertar dentro del mismo día. Se clavea por tenant para que el primer
+# tenant sondeado no se "coma" la transición de los demás, y solo se actualiza
+# DESPUÉS de un commit exitoso: un rollback no consume la transición y el
+# siguiente ciclo reintenta (la dedup por fingerprint evita duplicados).
+_last_states: dict[tuple[Any, str], str] = {}
 _last_states_lock = threading.Lock()
 
 
@@ -44,29 +48,43 @@ def _collect_sources(registry: Any) -> list[dict[str, Any]]:
 
 def detect_transitions(
     sources: list[dict[str, Any]],
+    *,
+    tenant_id: Any = None,
     last_states: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Diff puro: fuentes que ACABAN de entrar en degraded/failing.
 
-    Actualiza ``last_states`` (o el estado del módulo). Una fuente que sigue
-    degradada no realerta; si se recupera y vuelve a caer otro día, la dedup
-    por fingerprint (fuente, estado, día) permite la nueva alerta.
+    NO muta estado: ``record_states`` lo graba tras el commit. Una fuente que
+    sigue degradada no realerta; si se recupera y vuelve a caer otro día, la
+    dedup por fingerprint (fuente, estado, día) permite la nueva alerta.
     """
     transitions: list[dict[str, Any]] = []
     for source in sources:
         key = source["key"]
         status = source["status"]
-        previous = last_states.get(key) if last_states is not None else _last_states.get(key)
+        if last_states is not None:
+            previous = last_states.get(key)
+        else:
+            previous = _last_states.get((tenant_id, key))
         if status in ALERT_STATES and previous != status:
             transitions.append({**source, "previous_status": previous})
+    return transitions
+
+
+def record_states(
+    sources: list[dict[str, Any]],
+    *,
+    tenant_id: Any = None,
+    last_states: dict[str, str] | None = None,
+) -> None:
+    """Graba el estado observado; llamar solo tras un commit exitoso."""
     if last_states is not None:
         for source in sources:
             last_states[source["key"]] = source["status"]
-    else:
-        with _last_states_lock:
-            for source in sources:
-                _last_states[source["key"]] = source["status"]
-    return transitions
+        return
+    with _last_states_lock:
+        for source in sources:
+            _last_states[(tenant_id, source["key"])] = source["status"]
 
 
 def _message(source: dict[str, Any]) -> tuple[str, str, str]:
@@ -108,7 +126,8 @@ def emit_source_health_alerts(
         raise ValueError("Tenant context required")
     now = (now or datetime.now(UTC)).astimezone(UTC)
 
-    transitions = detect_transitions(_collect_sources(registry), last_states)
+    sources = _collect_sources(registry)
+    transitions = detect_transitions(sources, tenant_id=tenant_id, last_states=last_states)
     created: list[int] = []
     existing = 0
     for source in transitions:
@@ -155,6 +174,9 @@ def emit_source_health_alerts(
             continue
         created.append(alert.id)
     db.commit()
+    # Solo tras el commit: un rollback no consume las transiciones y el
+    # siguiente ciclo las reintenta (el fingerprint las deduplica).
+    record_states(sources, tenant_id=tenant_id, last_states=last_states)
     return {
         "created": len(created),
         "existing": existing,

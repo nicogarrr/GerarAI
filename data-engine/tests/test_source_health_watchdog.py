@@ -143,3 +143,71 @@ def test_degraded_es_severity_media(db):
     alert = db.scalar(select(ResearchAlert))
     assert alert.severity == "medium"
     assert "degradada" in alert.title
+
+
+def _registry_failing_yahoo():
+    class _Status:
+        def as_dict(self):
+            return _fuente("failing")
+
+    class _Registry:
+        sources = {"yahoo_finance": _Status()}
+
+    return _Registry()
+
+
+@pytest.fixture(autouse=True)
+def _limpiar_estado_global():
+    wd._last_states.clear()
+    yield
+    wd._last_states.clear()
+
+
+def test_dos_tenants_reciben_cada_uno_su_alerta(db):
+    """El estado global es por tenant: el primero no consume la transición del segundo."""
+    db.add(Tenant(id=2, external_id="other"))
+    db.commit()
+    db2 = Session(db.bind)
+    db2.info.update(tenant_id=2, user_id="other")
+    try:
+        first = wd.emit_source_health_alerts(db, registry=_registry_failing_yahoo(), now=NOW)
+        second = wd.emit_source_health_alerts(db2, registry=_registry_failing_yahoo(), now=NOW)
+        # Cada sesión ve su propia alerta (SQLite+StaticPool comparte la conexión
+        # y el driver compromete el savepoint al hacer RELEASE: la visibilidad
+        # entre sesiones no es fiable en este stack; en Postgres sí).
+        alert1 = db.scalar(select(ResearchAlert))
+        alert2 = db2.scalar(select(ResearchAlert))
+    finally:
+        db2.close()
+    assert first["created"] == 1
+    assert second["created"] == 1  # con el estado global antiguo era 0
+    assert alert1 is not None and alert1.tenant_id == 1
+    assert alert2 is not None and alert2.tenant_id == 2
+    assert alert1.fingerprint != alert2.fingerprint
+
+
+def test_rollback_no_consume_la_transicion(db, monkeypatch):
+    """Si el commit falla, el siguiente ciclo reintenta y crea la alerta."""
+    from sqlalchemy.exc import SQLAlchemyError
+
+    calls = {"n": 0}
+    real_commit = Session.commit
+
+    def flaky_commit(self):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise SQLAlchemyError("base de datos caída")
+        return real_commit(self)
+
+    monkeypatch.setattr(Session, "commit", flaky_commit)
+    with pytest.raises(SQLAlchemyError):
+        wd.emit_source_health_alerts(db, registry=_registry_failing_yahoo(), now=NOW)
+    db.rollback()
+    retry = wd.emit_source_health_alerts(db, registry=_registry_failing_yahoo(), now=NOW)
+    # El fallo de commit NO consumió la transición: el reintento la redetecta.
+    # (Con el código anterior, _last_states ya decía "failing" y transitions
+    # era 0: la alerta se perdía para siempre.)
+    assert retry["transitions"] == 1
+    assert retry["created"] + retry["existing"] == 1
+    alert = db.scalar(select(ResearchAlert))
+    assert alert is not None and alert.metadata_["source_key"] == "yahoo_finance"
