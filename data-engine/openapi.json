@@ -13874,6 +13874,36 @@
         "title": "PortfolioTransactionBatchInput",
         "type": "object"
       },
+      "PortfolioTransactionBatchOut": {
+        "description": "Respuesta de POST /api/portfolio/transactions/batch (201, atomico).",
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "integer"
+          },
+          "transaction_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Transaction Ids",
+            "type": "array"
+          },
+          "transactions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioTransactionCreateOut"
+            },
+            "title": "Transactions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "created",
+          "transaction_ids",
+          "transactions"
+        ],
+        "title": "PortfolioTransactionBatchOut",
+        "type": "object"
+      },
       "PortfolioTransactionCreateOut": {
         "description": "Respuesta de POST /api/portfolio/transactions (201).\n\nIgual que PortfolioTransactionOut pero el POST acepta acciones de caja\n(dividend/interest/fee/cash_misc), no solo buy/sell.",
         "properties": {
@@ -64113,9 +64143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Transaction Batch Api Portfolio Transactions Batch Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTransactionBatchOut"
                 }
               }
             },

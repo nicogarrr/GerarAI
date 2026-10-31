@@ -10941,6 +10941,18 @@ export interface components {
             transactions: components["schemas"]["PortfolioTransactionInput"][];
         };
         /**
+         * PortfolioTransactionBatchOut
+         * @description Respuesta de POST /api/portfolio/transactions/batch (201, atomico).
+         */
+        PortfolioTransactionBatchOut: {
+            /** Created */
+            created: number;
+            /** Transaction Ids */
+            transaction_ids: number[];
+            /** Transactions */
+            transactions: components["schemas"]["PortfolioTransactionCreateOut"][];
+        };
+        /**
          * PortfolioTransactionCreateOut
          * @description Respuesta de POST /api/portfolio/transactions (201).
          *
@@ -23435,9 +23447,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTransactionBatchOut"];
                 };
             };
             /** @description Validation Error */
