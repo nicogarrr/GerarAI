@@ -41,6 +41,17 @@ describe('guard móvil: inputs sin zoom automático de iOS (text-base en móvil)
         for (const root of ['app', 'components']) {
             for (const file of walk(root)) {
                 const src = readFileSync(file, 'utf8');
+                // className={ident}: resolver la constante local (const ident = '...')
+                // o el control queda fuera del escaneo (falso negativo:
+                // ThesisHumanInputForm tenía 6 controles así).
+                const localConsts = new Map([...src.matchAll(/const (\w+) = '([^']+)'/g)].map((m) => [m[1], m[2]]));
+                const identRe = /<(?:input|textarea|select)(?:(?:[^>{]|\{(?:[^{}]|\{[^{}]*\})*\}){0,600}?)className=\{(\w+)\}/g;
+                for (const m of src.matchAll(identRe)) {
+                    const resolved = localConsts.get(m[1]);
+                    if (resolved && /\btext-(sm|xs)\b/.test(resolved) && !resolved.includes('text-base') && !resolved.includes('sr-only')) {
+                        offenders.push(`${file}: className={${m[1]}} → ${resolved.slice(0, 80)}`);
+                    }
+                }
                 for (const m of src.matchAll(re)) {
                     const c = m[1];
                     if (/\btext-(sm|xs)\b/.test(c) && !c.includes('text-base') && !c.includes('sr-only')) {

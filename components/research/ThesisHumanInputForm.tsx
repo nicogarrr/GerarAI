@@ -39,7 +39,7 @@ export default function ThesisHumanInputForm({ ticker }: { ticker: string }) {
     }
   };
 
-  const inputClass = 'mt-1 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100';
+  const inputClass = 'mt-1 min-h-[44px] w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-base text-gray-100 sm:min-h-0 sm:text-sm';
 
   return (
     <details className="rounded-lg border border-gray-800 p-4">
