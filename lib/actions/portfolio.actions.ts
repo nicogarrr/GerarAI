@@ -1080,22 +1080,7 @@ export async function getPortfolioDividendProjection(): Promise<PortfolioDividen
   return researchRequest<PortfolioDividendProjection>('/api/portfolio/dividends/projection', { fast: true });
 }
 
-export type PortfolioDataQuality = {
-    status: string;
-    positions: number;
-    missing_cost_positions: number;
-    position_dates: string[];
-    cash_dates: string[];
-    position_sources: string[];
-    cash_sources: string[];
-    cash_native: Record<string, number>;
-    snapshots: number;
-    complete_snapshots: number;
-    return_observations: number;
-    latest_snapshot_date: string | null;
-    latest_pricing_coverage: number | null;
-    reasons: string[];
-};
+export type PortfolioDataQuality = components['schemas']['PortfolioDataQualityOut'];
 
 export async function getPortfolioDataQuality(userId: string): Promise<PortfolioDataQuality | null> {
     const canonicalUserId = await resolveUserId(userId);

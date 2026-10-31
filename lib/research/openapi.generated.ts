@@ -9973,6 +9973,47 @@ export interface components {
             /** Spot Tail Positions */
             spot_tail_positions: string[];
         };
+        /** PortfolioDataQualityOut */
+        PortfolioDataQualityOut: {
+            /** Cash Dates */
+            cash_dates: string[];
+            /** Cash Native */
+            cash_native: {
+                [key: string]: number;
+            };
+            /** Cash Sources */
+            cash_sources: string[];
+            /** Complete Snapshots */
+            complete_snapshots: number;
+            /** Cost Review Positions */
+            cost_review_positions?: number | null;
+            /** Cost Unverified Positions */
+            cost_unverified_positions?: number | null;
+            /** Latest Pricing Coverage */
+            latest_pricing_coverage: number | null;
+            /** Latest Snapshot Date */
+            latest_snapshot_date: string | null;
+            /** Missing Cost Positions */
+            missing_cost_positions: number;
+            /** Position Dates */
+            position_dates: string[];
+            /** Position Sources */
+            position_sources: string[];
+            /** Positions */
+            positions: number;
+            /** Reasons */
+            reasons: string[];
+            /** Return Observations */
+            return_observations: number;
+            /** Snapshots */
+            snapshots: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "incomplete" | "no_portfolio";
+            twr_chain: components["schemas"]["PortfolioTwrChainOut"];
+        };
         /** PortfolioDrawdownPointOut */
         PortfolioDrawdownPointOut: {
             /**
@@ -10463,6 +10504,18 @@ export interface components {
             items: components["schemas"]["PortfolioTransactionOut"][];
             /** Total */
             total: number;
+        };
+        /** PortfolioTwrChainOut */
+        PortfolioTwrChainOut: {
+            /** First Unlinked Date */
+            first_unlinked_date: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "no_snapshots" | "broken" | "linked";
+            /** Unlinked Snapshots */
+            unlinked_snapshots: number;
         };
         /** PortfolioTwrPeriodOut */
         PortfolioTwrPeriodOut: {
@@ -21551,9 +21604,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDataQualityOut"];
                 };
             };
             /** @description Validation Error */
