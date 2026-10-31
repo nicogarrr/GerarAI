@@ -704,7 +704,7 @@ def list_fx_rates(
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.post("/fx-rates", status_code=201)
+@router.post("/fx-rates", status_code=201, response_model=FXRateOut)
 def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
     service = PortfolioFXService()
     ledger = PortfolioLedgerService()

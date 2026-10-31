@@ -60047,9 +60047,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upsert Fx Rate Api Portfolio Fx Rates Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/FXRateOut"
                 }
               }
             },
