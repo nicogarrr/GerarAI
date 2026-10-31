@@ -70,9 +70,9 @@ git pull --ff-only origin main
 ### Paso 2: Crear Copia de Seguridad Preventiva (Snapshot)
 Antes de aplicar cualquier cambio o migración, ejecutar:
 ```bash
-bash scripts/backup_db.sh
+./scripts/backup.sh
 ```
-El backup se almacenará en `storage/backups/pg_dump_$(date +%Y%m%d_%H%M%S).sql.gz`.
+El backup se guarda en `backups/<AAAAMMDD-HHMMSS>/` (PostgreSQL con `pg_dump -Fc`, snapshots de Qdrant, MinIO, DuckDB y un `manifest.txt`). Opciones, retención y restauración: [BACKUP_RESTORE.md](BACKUP_RESTORE.md).
 
 ### Paso 3: Aplicar Migraciones de Base de Datos (Alembic)
 Las migraciones se ejecutan mediante un contenedor temporal antes de reiniciar los servicios:

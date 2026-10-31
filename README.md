@@ -234,10 +234,11 @@ cp docker.env.example .env
 docker compose up -d mongodb postgres redis qdrant minio
 ```
 
-Backend. It reads `.env` from its working directory, so create `data-engine/.env` with the backend variables:
+Backend. It reads `.env` from its working directory, so it needs its own copy in `data-engine/` (keep `RESEARCH_AUTH_SECRET` identical in both files):
 
 ```bash
 cd data-engine
+cp ../docker.env.example .env
 uv sync --frozen --extra test --extra dev --no-install-project
 source .venv/bin/activate
 python -m alembic upgrade head
