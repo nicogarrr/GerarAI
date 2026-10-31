@@ -157,6 +157,7 @@
     "k8Note": "At most the 300 most recent 8-Ks of your companies are reviewed.",
     "k8EmptyDefault": "No relevant 8-Ks.",
     "dateUnavailable": "Date not available",
+    "docAria": "Open the event's official document (external link)",
     "secDocument": "Document on SEC",
     "excerptsAll": "Literal excerpts from the 8-K, in English. No recalculated figures.",
     "excerptsSome": "Literal excerpts from the 8-K when the full text is available, in English. No recalculated figures.",
