@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Pre-push rapido (articulo de Owen/Boardy: pillar los fallos antes de CI).
+# Solo ficheros CAMBIADOS respecto al remoto: eslint (ts/tsx) y ruff (py de
+# data-engine), mas tsc --noEmit si hay cambios ts/tsx (salta con SKIP_TSC=1).
+# Saltar todo: git push --no-verify. Sin dependencias nuevas.
+set -u
+zero=0000000000000000000000000000000000000000
+base=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue
+  if [ "$remote_sha" = "$zero" ]; then
+    mb=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
+    range="${mb:-$zero}..$local_sha"
+  else
+    range="$remote_sha..$local_sha"
+  fi
+  base="$base $(git diff --name-only "$range" 2>/dev/null)"
+done
+files=$(echo "$base" | tr ' ' '\n' | grep -v '^$' | sort -u || true)
+[ -z "$files" ] && exit 0
+ts=$(echo "$files" | grep -E '\.(ts|tsx|mts)$' || true)
+py=$(echo "$files" | grep -E '^data-engine/.*\.py$' || true)
+rc=0
+if [ -n "$ts" ]; then
+  echo "pre-push: eslint ($(echo "$ts" | wc -l) ficheros)"
+  echo "$ts" | xargs npx eslint || rc=1
+  if [ "${SKIP_TSC:-0}" != "1" ]; then
+    echo "pre-push: tsc --noEmit (proyecto completo; SKIP_TSC=1 lo salta)"
+    npx tsc --noEmit || rc=1
+  fi
+fi
+if [ -n "$py" ]; then
+  echo "pre-push: ruff ($(echo "$py" | wc -l) ficheros)"
+  (cd data-engine && echo "$py" | sed 's|^data-engine/||' | xargs uv run --frozen --extra dev ruff check) || rc=1
+fi
+exit $rc
