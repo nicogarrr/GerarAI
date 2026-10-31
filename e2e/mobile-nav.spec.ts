@@ -41,6 +41,22 @@ const NAV_ROUTES: { path: string; heading?: string }[] = [
   { path: "/alerts", heading: "Alertas" },
   { path: "/security", heading: "Seguridad" },
   { path: "/research/MSFT", heading: "MSFT" },
+  // Resto de secciones del producto sin cobertura de overflow a 390px
+  // (31-oct-2026). Sin heading: basta carga limpia + sin overflow; los
+  // encabezados exactos ya los cubren los specs de cada dominio.
+  // /calendar no va: redirige a /alerts (ya cubierta).
+  { path: "/mercados" },
+  { path: "/insider" },
+  { path: "/plan" },
+  { path: "/risk" },
+  { path: "/temas" },
+  { path: "/cuellos" },
+  { path: "/settings" },
+  { path: "/paper-trading" },
+  { path: "/macro-calendar" },
+  { path: "/inversores" },
+  { path: "/knowledge-graph" },
+  { path: "/export" },
 ];
 
 // Ancho de tablet portrait (768x1024 -> viewport 700px): cae entre `sm` (640)
