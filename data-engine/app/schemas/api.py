@@ -2137,6 +2137,53 @@ class ThesisHistoryOut(BaseModel):
     data_as_of: str | None
     provenance: ProvenanceOut
 
+# --- GET /api/thesis/{ticker}/audio/status --------------------------------------
+# Forma medida contra la ruta y thesis_audio_service.status_info: state y key
+# siempre; generated_at SOLO cuando el mp3 esta listo (status_info lo OMITE
+# en cualquier otro estado): exclude_unset + test de ausencia. state sale del
+# servicio TTS externo (passthrough salvo prefijo error): no cerrado, str.
+
+
+class ThesisAudioStatusOut(BaseModel):
+    state: str
+    key: str | None
+    generated_at: str | None = None
+
+
+# --- GET /api/thesis/jobs y /jobs/{run_id} ---------------------------------------
+# Forma medida contra thesis_job_service.job_payload: 13 claves siempre; los
+# huecos (timestamps, errores, result) van a null. result es el result_payload
+# libre del workflow: free-form declarado. fase: 4 claves siempre.
+
+
+class ThesisJobPhaseOut(BaseModel):
+    name: str
+    status: str
+    started_at: str | None
+    finished_at: str | None
+
+
+class ThesisJobStatusOut(BaseModel):
+    id: int
+    workflow_name: str
+    status: str
+    ticker: str | None
+    force: bool | None
+    phases: list[ThesisJobPhaseOut]
+    current_phase: str | None
+    total_phases: int
+    result: dict[str, Any] | None
+    error_class: str | None
+    error_message: str | None
+    attempt: int
+    created_at: str | None
+    started_at: str | None
+    finished_at: str | None
+
+
+class ThesisLatestJobOut(BaseModel):
+    job: ThesisJobStatusOut | None
+
 
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas

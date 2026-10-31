@@ -5,28 +5,16 @@ import { researchRequest } from '@/lib/research/client';
 import { sanitizeDebate, type SanitizedDebate } from '@/lib/research/debate-sanitize';
 import { debateErrorMessage } from '@/lib/research/debate-error';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
+import type { components } from '@/lib/research/openapi.generated';
 
-export interface ThesisJobPhase {
-    name: string;
-    status: string;
-    started_at?: string | null;
-    finished_at?: string | null;
-}
+export type ThesisJobPhase = components['schemas']['ThesisJobPhaseOut'];
 
-export interface ThesisJobStatus {
-    id: number;
-    status: 'queued' | 'running' | 'succeeded' | 'failed' | string;
-    ticker: string;
-    phases: ThesisJobPhase[];
-    current_phase?: string | null;
-    /** Fases reales previstas (7, u 8 con refresco SEC). Ausente en backends antiguos. */
-    total_phases?: number | null;
+/** Alias del contrato generado; `result` conserva la vista estrecha medida del
+ *  front (el worker escribe thesis_version_id/version/status) porque el payload
+ *  completo es libre en el backend. */
+export type ThesisJobStatus = Omit<components['schemas']['ThesisJobStatusOut'], 'result'> & {
     result?: { thesis_version_id?: number; version?: number; status?: string } | null;
-    error_class?: string | null;
-    error_message?: string | null;
-    started_at?: string | null;
-    finished_at?: string | null;
-}
+};
 
 /** POST /api/thesis/generate-async — encola generación en segundo plano (202).
  *  `requestId` identifica el click del usuario: sin él el backend replaya el

@@ -12743,6 +12743,15 @@ export interface components {
              */
             decision: "approved" | "rejected";
         };
+        /** ThesisAudioStatusOut */
+        ThesisAudioStatusOut: {
+            /** Generated At */
+            generated_at?: string | null;
+            /** Key */
+            key: string | null;
+            /** State */
+            state: string;
+        };
         /** ThesisChangeCreate */
         ThesisChangeCreate: {
             /** Affected Claim Ids */
@@ -12927,6 +12936,56 @@ export interface components {
         ThesisInputsRequest: {
             /** Inputs */
             inputs: components["schemas"]["ThesisHumanInput"][];
+        };
+        /** ThesisJobPhaseOut */
+        ThesisJobPhaseOut: {
+            /** Finished At */
+            finished_at: string | null;
+            /** Name */
+            name: string;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+        };
+        /** ThesisJobStatusOut */
+        ThesisJobStatusOut: {
+            /** Attempt */
+            attempt: number;
+            /** Created At */
+            created_at: string | null;
+            /** Current Phase */
+            current_phase: string | null;
+            /** Error Class */
+            error_class: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Force */
+            force: boolean | null;
+            /** Id */
+            id: number;
+            /** Phases */
+            phases: components["schemas"]["ThesisJobPhaseOut"][];
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            } | null;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Ticker */
+            ticker: string | null;
+            /** Total Phases */
+            total_phases: number;
+            /** Workflow Name */
+            workflow_name: string;
+        };
+        /** ThesisLatestJobOut */
+        ThesisLatestJobOut: {
+            job: components["schemas"]["ThesisJobStatusOut"] | null;
         };
         /** ThesisNodeOut */
         ThesisNodeOut: {
@@ -27244,9 +27303,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisLatestJobOut"];
                 };
             };
             /** @description Validation Error */
@@ -27286,9 +27343,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisJobStatusOut"];
                 };
             };
             /** @description Validation Error */
@@ -27462,9 +27517,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisAudioStatusOut"];
                 };
             };
             /** @description Validation Error */
