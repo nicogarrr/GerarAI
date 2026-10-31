@@ -19,4 +19,11 @@ describe('analyst pagination by firm',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Anterior'}));
   expect(screen.getAllByText('Firm 1')).toHaveLength(2);
  });
+ it('sin etiqueta de fuente en el pie; se conserva la fecha y el aviso de no verificado',()=>{
+  render(<AnalystTargetsView data={data}/>);
+  expect(screen.queryByText(/Fuente:/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/ver en Yahoo Finance/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Obtenido el/)).toBeInTheDocument();
+  expect(screen.getByText(/no verificado por GerarAI/)).toBeInTheDocument();
+ });
 });

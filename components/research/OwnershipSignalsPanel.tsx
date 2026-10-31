@@ -70,7 +70,7 @@ export function OwnershipSignalsPanel({ ticker, signals }: { ticker: string; sig
           ) : null}
         </section>
       </div>
-      <p className="mt-3 text-xs text-gray-500">Fuente: SEC EDGAR (Form 4 y 13F), solo lo ya sincronizado. El 13F es trimestral, con hasta 45 días de retraso y solo posiciones largas. Este resumen entra en la tesis.</p>
+      <p className="mt-3 text-xs text-gray-500">Form 4 y 13F ya sincronizados. El 13F es trimestral, con hasta 45 días de retraso y solo posiciones largas. Este resumen entra en la tesis.</p>
     </Panel>
   );
 }

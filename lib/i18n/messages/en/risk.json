@@ -38,7 +38,6 @@
     "cashNative": "Cash in original currency",
     "missingFx": "Missing exchange rate for",
     "dataAsOf": "Data as of",
-    "provenance": "Source",
     "cashAsOf": "Cash as of",
     "fxRates": "Exchange rates used",
     "valuationDatesDiffer": "Valuation dates",
@@ -61,10 +60,7 @@
     "fxScopeCash": "Cash",
     "fxScopePositions": "Positions",
     "fxRateLine": "{scope}: 1 {currency} = {rate} {base} ({date})",
-    "valuationDatesDiffer": "Positions and cash as of different dates: the total combines both",
-    "sourceInternal": "Internal source",
-    "sourceCava": "GerarAI database",
-    "fetchedSuffix": " · {date}"
+    "valuationDatesDiffer": "Positions and cash as of different dates: the total combines both"
   },
   "alerts": {
     "title": "Concentration and liquidity alerts",

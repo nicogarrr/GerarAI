@@ -38,7 +38,6 @@
     "addWatchlist": "Añadir a la watchlist",
     "addInvestment": "Añadir inversión",
     "emptyRange": "Sin eventos en este rango. Los resultados y ex-dividendos en vivo solo cubren EE. UU. (USD); las fechas de pago y los ex-dividendos de otros mercados salen de tu historial de dividendos importado, que solo muestra lo que su fuente ha declarado.",
-    "sourcePre": "Fuente: {source}",
     "typeEarnings": "Resultados",
     "typeDividendEx": "Ex-dividendo",
     "typeDividendPayment": "Pago de dividendo",
@@ -75,11 +74,8 @@
     "assetWebcast": "Webcast",
     "assetGrabacion": "Grabación",
     "assetTranscripcion": "Transcripción",
-    "sourceAria": "Fuente de la fecha de {ticker}: {source}",
-    "sourceTitle": "Fuente: {source}",
-    "openAria": "Abrir {name}",
-    "sourcesPre": "Fuente: ",
-    "sourcesPrePlural": "Fuentes: "
+    "docAria": "Abrir el documento de la fecha de {ticker} (enlace externo)",
+    "openAria": "Abrir {name}"
   },
   "strip": {
     "ariaLabel": "Calendario de resultados",

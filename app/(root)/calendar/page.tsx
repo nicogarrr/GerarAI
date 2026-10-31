@@ -142,7 +142,6 @@ export default async function CalendarPage({
                                         {event.origin === 'watchlist' ? (
                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">Watchlist</Badge>
                                         ) : null}
-                                        <span className="ml-auto text-xs text-gray-500">{ti('calendar.catalysts.sourcePre', { source: event.source })}</span>
                                         </div>
                                     </li>
                                 ))}

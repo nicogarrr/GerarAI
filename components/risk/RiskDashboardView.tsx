@@ -11,7 +11,6 @@ import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels'
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
-import { sourceDisplay } from '@/lib/research/source-display';
 import { getRiskDashboard } from '@/lib/actions/risk.actions';
 
 interface RiskDashboardViewProps {
@@ -82,7 +81,6 @@ const RISK_LABEL_KEYS: Record<string, string> = {
     cash_native: 'risk.labels.cashNative',
     missing_fx: 'risk.labels.missingFx',
     data_as_of: 'risk.labels.dataAsOf',
-    provenance: 'risk.labels.provenance',
     cash_as_of: 'risk.labels.cashAsOf',
     fx_rates: 'risk.labels.fxRates',
     valuation_dates_differ: 'risk.labels.valuationDatesDiffer',
@@ -141,6 +139,9 @@ function humanizeRiskDashboard(t: TFunction, f: Formatters, dashboard: DataRecor
         : 'EUR';
     const display: DataRecord = {};
     for (const [key, value] of Object.entries(dashboard)) {
+        // La procedencia sigue en la API; no se pinta como etiqueta de
+        // fuente (decisión de producto 2026-10-31: sin etiquetas de fuente).
+        if (key === 'provenance') continue;
         const label = humanizeRiskKey(t, key);
         if (key === 'total_value' || key === 'equity_value') {
             display[label] = value === null || value === undefined
@@ -204,17 +205,6 @@ function humanizeRiskDashboard(t: TFunction, f: Formatters, dashboard: DataRecor
             display[label] = t('risk.values.valuationDatesDiffer');
         } else if (key === 'data_as_of') {
             display[label] = typeof value === 'string' && value ? f.formatUserDateTime(value) : t('common.na');
-        } else if (key === 'provenance') {
-            if (isRecord(value)) {
-                const rawSource = typeof value.source === 'string' ? value.source : null;
-                const source = rawSource === null ? t('risk.values.sourceInternal') : rawSource === 'CavaAI Postgres' ? t('risk.values.sourceCava') : sourceDisplay(rawSource);
-                const fetched = typeof value.fetched_at === 'string' && value.fetched_at
-                    ? t('risk.values.fetchedSuffix', { date: f.formatUserDateTime(value.fetched_at) })
-                    : '';
-                display[label] = `${source}${fetched}`;
-            } else {
-                display[label] = t('common.na');
-            }
         } else if (typeof value === 'boolean') {
             display[label] = value ? t('risk.values.yes') : t('risk.values.no');
         } else {

@@ -36,7 +36,6 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const visible = useMemo(() => needsRemote ? remotePrices.bars : rangeBars(bars, range as '1M' | '6M' | 'YTD' | '1A'), [bars, range, needsRemote, remotePrices]);
     const visibleCurrency = needsRemote ? remotePrices.currency : daily.currency;
     const hourly = range === '1D' || range === '5D';
-    const historySource = needsRemote ? remote?.range === range ? remote.data.source : null : snapshot.historySource;
 
     const levels = useMemo(() => dailyPivots(bars), [bars]);
     const fib = useMemo(() => fibonacci(visible), [visible]);
@@ -54,7 +53,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                 <div className="min-w-0 p-3 sm:p-5">
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <h2 className="text-sm font-semibold text-gray-200">Precio</h2>
-                        <span className="text-xs text-gray-500">{hourly ? 'Horario (UTC)' : 'Diario'} · {historySource || 'Fuente no disponible'}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
+                        <span className="text-xs text-gray-500">{hourly ? 'Horario (UTC)' : 'Diario'}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
                     </div>
                     {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">Cargando rango {range}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">No se pudo cargar este rango</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} />}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

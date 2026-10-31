@@ -782,10 +782,6 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                                     {t('knowledgeGraph.detail.confidence')}
                                                     {row.confidence === null ? t('knowledgeGraph.detail.absent') : ` ${Math.round(row.confidence * 100)}%`}
                                                 </span>
-                                                <span>
-                                                    {t('knowledgeGraph.detail.provenance')}
-                                                    {row.provenance ? ` ${row.provenance}` : ` ${t('knowledgeGraph.detail.absent')}`}
-                                                </span>
                                             </div>
                                         </li>
                                     ))}

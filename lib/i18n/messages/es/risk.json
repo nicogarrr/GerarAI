@@ -38,7 +38,6 @@
     "cashNative": "Caja en divisa original",
     "missingFx": "Sin tipo de cambio para",
     "dataAsOf": "Datos a fecha de",
-    "provenance": "Fuente",
     "cashAsOf": "Caja a fecha de",
     "fxRates": "Tipos de cambio usados",
     "valuationDatesDiffer": "Fechas de valoración",
@@ -61,10 +60,7 @@
     "fxScopeCash": "Caja",
     "fxScopePositions": "Posiciones",
     "fxRateLine": "{scope}: 1 {currency} = {rate} {base} ({date})",
-    "valuationDatesDiffer": "Posiciones y caja a fechas distintas: el total combina ambas",
-    "sourceInternal": "Fuente interna",
-    "sourceCava": "Base de datos de GerarAI",
-    "fetchedSuffix": " · {date}"
+    "valuationDatesDiffer": "Posiciones y caja a fechas distintas: el total combina ambas"
   },
   "alerts": {
     "title": "Alertas de concentración y liquidez",

@@ -66,26 +66,6 @@ export function ChangesSinceVisit({ ticker }: { ticker: string }) {
                     <li key={`${change.fecha}-${index}`}>
                         Tesis: {changeHeadlineCopy(change.resumen).text}{change.requiere_revision ? ' (requiere revisión)' : ''}
                         {changeHeadlineCopy(change.resumen).note ? <p className="mt-1 text-xs text-amber-300">{changeHeadlineCopy(change.resumen).note}</p> : null}
-                        {/* Procedencia: la fuente del evento y las URLs absorbidas al
-                            agrupar la misma noticia en dos idiomas quedan revisables. */}
-                        {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
-                            <>
-                                {' · '}
-                                <a href={change.fuente_url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-                                    {change.fuente_nombre || 'Fuente'}
-                                </a>
-                            </>
-                        ) : null}
-                        {change.tambien_en?.map((entry, entryIndex) => (
-                            entry.url && /^https:\/\//.test(entry.url) ? (
-                                <span key={`${entry.url}-${entryIndex}`}>
-                                    {' · también en '}
-                                    <a href={entry.url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-                                        {entry.fuente || 'otra fuente'}
-                                    </a>
-                                </span>
-                            ) : null
-                        ))}
                     </li>
                 ))}
             </ul>

@@ -53,7 +53,6 @@
     "directionOut": "sale",
     "directionIn": "entra",
     "confidence": "Confianza",
-    "provenance": "Procedencia",
     "scopeLink": "Abrir el entorno completo de este nodo en el servidor",
     "unknownNode": "El nodo #{id} no está en el subgrafo que se ha cargado.",
     "shareLink": "Enlace compartible a este nodo",

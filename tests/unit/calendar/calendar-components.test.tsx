@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let pathname = '/calendar';
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
+// EarningsDayStrip es un server component traducido con getT(): lib/i18n/server
+// lee la cookie de locale vía next/headers; sin cookie el locale es «es».
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 const getFollowedEarnings = vi.fn();
 vi.mock('@/lib/actions/catalysts.actions', () => ({ getFollowedEarnings: (...a: unknown[]) => getFollowedEarnings(...a) }));
@@ -20,7 +23,6 @@ import { CalendarTabs } from '@/components/calendar/CalendarTabs';
 import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
 import SubscriptionManager, { SubscribeButtons } from '@/components/calendar/SubscriptionManager';
 import {
-    FollowedDaySources,
     FollowedEarningsRow,
     EventMaterialsLine,
     IrLine,
@@ -286,20 +288,20 @@ describe('IrLine', () => {
     });
 });
 
-describe('FollowedEarningsRow / FollowedDaySources', () => {
+describe('FollowedEarningsRow', () => {
     it('muestra sesión, cierre, fuente y enlace a la ficha con el ticker codificado', () => {
         render(<ul><FollowedEarningsRow event={ev({ ticker: 'BRK.B' })} /></ul>);
         expect(screen.getByText('Antes de apertura')).toBeInTheDocument();
         expect(screen.getByText('Cierre Sep 2026')).toBeInTheDocument();
         expect(screen.queryByText('Estimada')).not.toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'Fuente de la fecha de BRK.B: Nasdaq' })).toHaveAttribute('href', 'https://example.com/ko');
+        expect(screen.getByRole('link', { name: 'Abrir el documento de la fecha de BRK.B (enlace externo)' })).toHaveAttribute('href', 'https://example.com/ko');
         expect(screen.getByRole('link', { name: 'Abrir Coca-Cola' })).toHaveAttribute('href', '/research/BRK.B');
     });
     it('sin sesión: hora por confirmar; estimada marcada; sin fuente no hay enlace de fuente; sin empresa usa el ticker', () => {
         render(<ul><FollowedEarningsRow event={ev({ session: null, confirmed: false, source_url: null, fiscal_label: null, company: '' })} materialsSlot={<span>slot</span>} /></ul>);
         expect(screen.getByText('Hora por confirmar')).toBeInTheDocument();
         expect(screen.getByText('Estimada')).toBeInTheDocument();
-        expect(screen.queryByRole('link', { name: /Fuente de la fecha/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /documento de la fecha/ })).not.toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Abrir KO' })).toBeInTheDocument();
         expect(screen.getByText('slot')).toBeInTheDocument();
     });
@@ -308,15 +310,10 @@ describe('FollowedEarningsRow / FollowedDaySources', () => {
         expect(screen.getByText('Tras el cierre')).toBeInTheDocument();
         expect(screen.queryByText('Estimada')).not.toBeInTheDocument();
     });
-    it('FollowedDaySources: sin eventos nada; deduplica fuentes y pluraliza', () => {
-        expect(render(<FollowedDaySources events={[]} />).container).toBeEmptyDOMElement();
-        const { container } = render(<FollowedDaySources events={[ev(), ev({ ticker: 'X' }), ev({ source: 'Zacks', source_url: null })]} />);
-        expect(container.textContent).toBe('Fuentes: Nasdaq · Zacks');
-        expect(screen.getAllByRole('link')).toHaveLength(1);
-    });
-    it('FollowedDaySources: una sola fuente va en singular', () => {
-        const { container } = render(<FollowedDaySources events={[ev()]} />);
-        expect(container.textContent).toBe('Fuente: Nasdaq');
+    it('sin etiquetas de fuente visibles (decisión de producto 2026-10-31)', () => {
+        const { container } = render(<ul><FollowedEarningsRow event={ev()} /></ul>);
+        expect(container.textContent).not.toMatch(/Fuente/);
+        expect(container.querySelector('[title*="Fuente"]')).toBeNull();
     });
 });
 

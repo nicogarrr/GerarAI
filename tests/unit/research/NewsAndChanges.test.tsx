@@ -51,7 +51,7 @@ describe('ChangesSinceVisit', () => {
         render(<ChangesSinceVisit ticker="AAPL" />);
         await screen.findByText(/Desde tu última visita/);
         const hrefs = screen.getAllByRole('link').map((a) => a.getAttribute('href'));
-        expect(hrefs).toEqual(['https://sec.gov/a', 'https://news.com/x', 'https://b.com/x']);
+        expect(hrefs).toEqual(['https://sec.gov/a']);
         expect(screen.getByText(/Doc http/)).toBeInTheDocument();
         expect(screen.getByText(/Doc js/)).toBeInTheDocument();
         for (const a of screen.getAllByRole('link')) expect(a).toHaveAttribute('rel', 'noopener noreferrer');

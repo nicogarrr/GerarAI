@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import BackendOffline from '@/components/system/BackendOffline';
-import { EventMaterialsLine, FollowedDaySources, FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
+import { EventMaterialsLine, FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
 import { getFollowedEarnings, type FollowedEarningsCalendar } from '@/lib/actions/catalysts.actions';
 import { getEarningsMaterials } from '@/lib/actions/earnings-materials.actions';
 import { HISTORY_DAYS, type EventMaterials } from '@/lib/earnings-materials';
@@ -69,7 +69,6 @@ export default async function FollowedEarningsPage() {
                     />
                 ))}
             </ul>
-            <FollowedDaySources events={day.events} ti={ti} />
         </section>
     );
 
