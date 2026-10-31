@@ -75,9 +75,11 @@ def test_list_alerts_loads_relations_in_bounded_queries():
         rows = list_alerts(ticker=None, status=None, include_snoozed=False, limit=100, db=db)
         assert len(rows) == 2
         assert rows[0].ticker in {"AAPL", None}
-        # alerts+company (join) + news events + deliveries = 3; la carga de
-        # compañías como consulta aparte (4) es la regresión que se fija.
-        assert counter.count == 3
+        # alerts + companies (IN aparte) + news events + deliveries = 4:
+        # forma medida mas rapida en el A/B del piloto (31-oct, restore PG):
+        # el join de company en el listado dio p50 25,4 -> 27,9/26,3 ms
+        # (~4-10 % peor). Si vuelve el join (3), el test falla.
+        assert counter.count == 4
     engine.dispose()
 
 
