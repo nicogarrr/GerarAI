@@ -106,7 +106,14 @@ def client(monkeypatch):
         return FetchedHistory(rows=rows, currency="USD")
 
     monkeypatch.setattr(dca_signal_service, "fetch_yahoo_history", fake_fetch)
-    yield TestClient(main.app)
+    client = TestClient(main.app)
+    # El middleware CSRF exige token en todo metodo mutante. Sin el, estos
+    # tests solo pasaban tapados por el orden de la suite completa y fallaban
+    # al ejecutar este archivo aislado.
+    csrf = client.get("/api/csrf-token")
+    assert csrf.status_code == 200, csrf.text
+    client.headers["X-CSRF-Token"] = csrf.json()["csrf_token"]
+    yield client
     _cleanup()
 
 
