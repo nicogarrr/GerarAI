@@ -918,3 +918,96 @@ class ValuationResponse(BaseModel):
     sensitivity: dict = {}
     moat: dict = {}
     trace: dict = {}
+
+
+# --- Ownership (SEC 13F, gestores revisados) ---------------------------------
+# Modelan EXACTAMENTE lo que devuelven las ramas de ManagerHoldingIngestionService
+# (persistida, snapshot edgartools y unavailable); un Literal de mas romperia la
+# respuesta con un 500 de validacion y uno de menos esconderia el caso real.
+
+
+class ProvenanceOut(BaseModel):
+    """Bloque de proveniencia estandar (app/services/provenance.py)."""
+
+    source: str
+    source_kind: str
+    source_url: str | None = None
+    fetched_at: str
+    coverage: str
+    note: str | None = None
+
+
+class OwnershipManagerOut(BaseModel):
+    cik: str
+    name: str
+
+
+class OwnershipManagersOut(BaseModel):
+    managers: list[OwnershipManagerOut]
+    limitations: list[str]
+
+
+class ManagerHoldingRowOut(BaseModel):
+    """Una posicion 13F tal como se sirvio. La via snapshot (sin sync en vivo)
+    deja en None lo que el snapshot no tiene (accession, filing_url, ...)."""
+
+    accession_number: str | None = None
+    is_amendment: bool = False
+    name_of_issuer: str | None = None
+    name_of_issuer_filed: str | None = None
+    title_of_class: str | None = None
+    cusip: str | None = None
+    value_usd_thousands: float | None = None
+    shares: float | None = None
+    share_type: str | None = None
+    put_call: str | None = None
+    investment_discretion: str | None = None
+    filing_url: str | None = None
+
+
+class ManagerHoldingsOut(BaseModel):
+    # "ok" solo con totales contrastados contra el propio 13F; "snapshot" =
+    # servido del snapshot edgartools sin contrastar (nunca es "ok").
+    status: Literal["ok", "mismatch", "unverified", "partial", "unavailable", "snapshot"]
+    cik: str
+    manager: str | None = None
+    verification: str | None = None
+    report_date: str | None = None
+    coverage: str | None = None
+    holdings: list[ManagerHoldingRowOut]
+    errors: list | None = None
+    limitations: list[str] | None = None
+    transport: str | None = None
+    snapshot_synced_at: str | None = None
+    provenance: ProvenanceOut | None = None
+
+
+class ManagerChangeRowOut(BaseModel):
+    change: Literal["new", "closed", "increased", "decreased", "unchanged"]
+    name_of_issuer: str
+    title_of_class: str
+    cusip: str
+    put_call: str | None = None
+    shares_latest: float | None = None
+    shares_previous: float | None = None
+    value_usd_thousands_latest: float | None = None
+    value_usd_thousands_previous: float | None = None
+
+
+class ComparedAccessionsOut(BaseModel):
+    latest: str
+    previous: str
+    rule: str
+
+
+class ManagerChangesOut(BaseModel):
+    status: Literal["ok", "insufficient_history", "unavailable"]
+    cik: str
+    manager: str | None = None
+    detail: str | None = None
+    latest_report: str | None = None
+    previous_report: str | None = None
+    compared_accessions: ComparedAccessionsOut | None = None
+    changes: list[ManagerChangeRowOut]
+    limitations: list[str] | None = None
+    provenance: ProvenanceOut | None = None

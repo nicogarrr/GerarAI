@@ -21,22 +21,26 @@ export type OwnershipProvenance = {
   coverage: string;
 };
 
+// La via snapshot (sin sync en vivo) deja en null lo que el snapshot no tiene:
+// accession, filing_url y los campos que el filing no parseo. Nunca asumir string.
 export type ManagerHoldingRow = {
-  accession_number: string;
+  accession_number: string | null;
   is_amendment: boolean;
-  name_of_issuer: string;
-  title_of_class: string;
-  cusip: string;
+  name_of_issuer: string | null;
+  name_of_issuer_filed?: string | null;
+  title_of_class: string | null;
+  cusip: string | null;
   value_usd_thousands: number | null;
   shares: number | null;
-  share_type: string;
+  share_type: string | null;
   put_call: string | null;
-  investment_discretion: string;
-  filing_url: string;
+  investment_discretion: string | null;
+  filing_url: string | null;
 };
 
 /** «ok» solo si los totales cuadran con el resumen del propio 13F (Auditoría A). */
-export type ManagerHoldingsStatus = 'ok' | 'mismatch' | 'unverified' | 'partial' | 'unavailable';
+// «snapshot»: servido del snapshot edgartools sin contrastar totales (nunca es «ok»).
+export type ManagerHoldingsStatus = 'ok' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | 'snapshot';
 
 export type ManagerHoldings = {
   cik: string;
@@ -81,11 +85,11 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getOwnershipManagers(): Promise<{ managers: OwnershipManager[]; limitations: string[] }> {
-  return requestJson('/api/ownership/managers');
+  return requestJson<{ managers: OwnershipManager[]; limitations: string[] }>('/api/ownership/managers');
 }
 
 export async function getManagerHoldings(cik: string): Promise<ManagerHoldings> {
-  return requestJson(`/api/ownership/managers/${encodeURIComponent(cik)}/holdings`);
+  return requestJson<ManagerHoldings>(`/api/ownership/managers/${encodeURIComponent(cik)}/holdings`);
 }
 
 export type ManagerChangeRow = {
@@ -114,7 +118,7 @@ export type ManagerChanges = {
 };
 
 export async function getManagerChanges(cik: string): Promise<ManagerChanges> {
-  return requestJson(`/api/ownership/managers/${encodeURIComponent(cik)}/changes`);
+  return requestJson<ManagerChanges>(`/api/ownership/managers/${encodeURIComponent(cik)}/changes`);
 }
 
 export interface OwnershipSyncResult {

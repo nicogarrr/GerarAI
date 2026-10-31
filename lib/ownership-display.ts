@@ -45,5 +45,8 @@ export function holdingsVerificationNote(status: string): string | null {
   if (status === 'partial') {
     return 'Datos parciales: parte del informe no se pudo descargar o verificar.';
   }
+  if (status === 'snapshot') {
+    return 'Cifras servidas desde una copia local (snapshot) sin contrastar contra el 13F: sin verificar.';
+  }
   return null;
 }
