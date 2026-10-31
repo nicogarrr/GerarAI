@@ -132,6 +132,8 @@
     "currencyMissing": "Currency not reported",
     "pdmrSource": "Source: tracefour (CC BY 4.0) · original document in FCA NSM",
     "canadaSourcePre": "Unofficial source; the official record is ",
-    "canadaSourcePost": " (manual check)"
+    "canadaSourcePost": " (manual check)",
+    "sideBuyLabel": "Buy",
+    "sideSellLabel": "Sell"
   }
 }
