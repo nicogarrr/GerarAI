@@ -24,7 +24,7 @@ export async function getTickerContext(): Promise<TickerContext> {
         cachedFetch(
             `portfolio:${userId}:positions`,
             // Lectura completa: paginado page/page_size hasta agotar (fetchAllBackendPages lanza si no avanza).
-            () => fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number | null }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true })),
+            () => fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number | null }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }), (position) => position.ticker),
             15,
         ).catch(() => [] as Array<{ ticker: string; quantity: number | null }>),
         getWatchlist().catch(() => [] as Array<{ symbol: string }>),

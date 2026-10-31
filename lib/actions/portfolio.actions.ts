@@ -238,6 +238,7 @@ export async function getPortfolioTransactions(userId: string) {
         `portfolio:${canonicalUserId}:transactions`,
         () => fetchAllBackendPages(
             (page) => researchRequest<PaginatedBackendResponse<ResearchPortfolioTransaction>>(`/api/portfolio/transactions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+            (transaction) => String(transaction.id),
         ),
         15,
     );
@@ -311,6 +312,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
             `portfolio:${canonicalUserId}:positions`,
             () => fetchAllBackendPages(
                 (page) => researchRequest<PaginatedBackendResponse<ResearchPortfolioPosition>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+                (position) => position.ticker,
             ),
             15,
         ),
@@ -581,6 +583,7 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
             `portfolio:${canonicalUserId}:snapshots`,
             () => fetchAllBackendPages(
                 (page) => researchRequest<PaginatedBackendResponse<PortfolioSnapshotPoint>>(`/api/portfolio/snapshots?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+                (snapshot) => snapshot.snapshot_date,
             ),
             15,
         ).catch(() => [] as PortfolioSnapshotPoint[]);

@@ -1444,6 +1444,7 @@ export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: s
     researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number }>>(
       `/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true },
     ),
+    (position) => position.ticker,
   );
 }
 

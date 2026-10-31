@@ -46,7 +46,7 @@ export async function getFlowHoldings(): Promise<{
   try {
     const [rawPositions, rawWatchlist] = await Promise.all([
       // Lectura completa: paginado page/page_size hasta agotar (fetchAllBackendPages lanza si no avanza).
-      fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true })),
+      fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }), (position) => position.ticker),
       researchRequest<Array<{ symbol: string }> | { items: Array<{ symbol: string }> }>('/api/watchlist', { fast: true }),
     ]);
     const positions = rawPositions;
