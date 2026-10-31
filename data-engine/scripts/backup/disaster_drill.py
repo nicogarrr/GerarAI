@@ -89,10 +89,19 @@ class DrillEnvironment:
     """Contenedores, puertos y volumenes PROPIOS del drill."""
 
     def __init__(
-        self, *, workdir: Path, keep: bool = False, minio_image: str | None = None
+        self,
+        *,
+        workdir: Path,
+        keep: bool = False,
+        minio_image: str | None = None,
+        pg_memory: str | None = None,
     ) -> None:
         self.workdir = workdir
         self.keep = keep
+        # Tope de memoria del contenedor Postgres (formato docker: 896m, 4g...).
+        # Lo usa el A/B de carga (pg_load_ab); el drill normal lo deja en None
+        # para no cambiar el comportamiento del canario de backup/restore.
+        self.pg_memory = pg_memory
         self.drill_id = f"drill{os.getpid()}{uuid.uuid4().hex[:4]}"
         self.containers: dict[str, str] = {}
         self.volumes: dict[str, str] = {}
@@ -143,28 +152,35 @@ class DrillEnvironment:
         self.volumes[service] = name
         return name
 
+    def _pg_options(self, pg_volume: str) -> list[str]:
+        """Opciones del contenedor Postgres; con `pg_memory`, tope duro.
+
+        --memory-swap igual que --memory: sin swap, el tope es de verdad; si el
+        motor pide mas, el kernel lo mata (OOM) en vez de degradar en silencio,
+        y el A/B registra ese resultado en vez de medir una maquina swapping.
+        """
+        options = [
+            "-e",
+            f"POSTGRES_USER={PG_USER}",
+            "-e",
+            f"POSTGRES_PASSWORD={PG_PASSWORD}",
+            "-e",
+            "POSTGRES_DB=cavaai_drill",
+            "-v",
+            f"{pg_volume}:/var/lib/postgresql/data",
+            "-p",
+            f"127.0.0.1:{self.pg_port}:5432",
+        ]
+        if self.pg_memory:
+            options += ["--memory", self.pg_memory, "--memory-swap", self.pg_memory]
+        return options
+
     def up(self) -> None:
         require_tool_docker()
         pg_volume = self._volume("postgres")
         minio_volume = self._volume("minio")
         qdrant_volume = self._volume("qdrant")
-        self._run_container(
-            "postgres",
-            POSTGRES_IMAGE,
-            [
-                "-e",
-                f"POSTGRES_USER={PG_USER}",
-                "-e",
-                f"POSTGRES_PASSWORD={PG_PASSWORD}",
-                "-e",
-                "POSTGRES_DB=cavaai_drill",
-                "-v",
-                f"{pg_volume}:/var/lib/postgresql/data",
-                "-p",
-                f"127.0.0.1:{self.pg_port}:5432",
-            ],
-            [],
-        )
+        self._run_container("postgres", POSTGRES_IMAGE, self._pg_options(pg_volume), [])
         self._run_container(
             "minio",
             self.minio_image,

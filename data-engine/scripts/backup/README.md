@@ -175,3 +175,20 @@ el manifiesto y sus campos obligatorios, el fail-closed de cada comprobacion, el
 orden del runbook, que el runbook menciona cada paso, que el workflow declara
 los tres pilares y que las herramientas estan fijadas por version y coinciden con
 los pins de los compose.
+
+## A/B de carga Postgres con topes de memoria (`pg_load_ab.py`)
+
+Apoyo al A/B de Postgres del piloto: misma carga determinista contra la copia
+restaurada con cada tope (896m, 4g, 6g, 8g), con verificacion de restore tras
+cada cambio y sin backup concurrente. Un tope que rompe el restore o mata
+Postgres por OOM queda registrado en el informe (es el dato buscado), no
+tumba el instrumento.
+
+    python -m scripts.backup.pg_load_ab --caps 896m,4g,6g,8g --out load_ab.json
+
+Modo externo (copia restaurada de la VM, tope aplicado por el piloto):
+
+    python -m scripts.backup.pg_load_ab --external --database-url postgresql://... \
+        --cap-label 4g [--backup-dir DIR --minio-endpoint ... --qdrant-url ...]
+
+No cambies `--seed` entre topes: romperia la comparabilidad.
