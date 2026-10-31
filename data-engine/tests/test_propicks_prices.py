@@ -357,7 +357,8 @@ def test_upsert_pg_on_conflict_coalesces_volume():
         def execute(self, stmt):
             _Db.executed = stmt
 
-    from app.services.propicks_price_service import PriceBar as _PB, upsert_prices as _up
+    from app.services.propicks_price_service import PriceBar as _PB
+    from app.services.propicks_price_service import upsert_prices as _up
 
     company = _company("VOL4")
     bar = _PB(day=date(2026, 10, 28), close=Decimal("101"),
