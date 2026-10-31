@@ -283,6 +283,8 @@ def test_default_fx_backfill_commits_only_its_own_session(tmp_path, monkeypatch)
     Es la garantia estructural: aunque una descarga ocurra con el savepoint
     de una fila abierto, el commit es de otra sesion y la transaccion del
     importador sigue viva (InvalidRequestError imposible desde esta via).
+    La fila queda con el tenant DEL LLAMANTE (heredado de ``db.info``): sin
+    esa herencia quedaria con tenant NULL, invisible para el propio llamante.
     """
     engine = create_engine(f"sqlite:///{tmp_path}/fx.db")
     Base.metadata.create_all(engine)
@@ -292,6 +294,7 @@ def test_default_fx_backfill_commits_only_its_own_session(tmp_path, monkeypatch)
 
     def fake_sync(session, *, currencies, start, end):
         captured["session"] = session
+        captured["tenant_id"] = session.info.get("tenant_id")
         session.add(
             FXRate(
                 base_currency="EUR",
@@ -308,17 +311,135 @@ def test_default_fx_backfill_commits_only_its_own_session(tmp_path, monkeypatch)
         "app.services.connectors.ecb_history.backfill_ecb_rates_sync", fake_sync
     )
     caller = factory()
+    owner = Tenant(external_id="own-session", name="own session")
+    caller.add(owner)
+    caller.commit()
+    caller.info["tenant_id"] = owner.id
     with caller.begin_nested():
         _default_fx_backfill(caller, {"USD"}, date(2025, 1, 1), date(2025, 1, 10))
         # Si el commit hubiera sido de ``caller``, el savepoint estaria muerto.
         assert caller.in_nested_transaction()
-        caller.add(Tenant(external_id="own-session", name="own session"))
+        caller.add(Tenant(external_id="own-session-2", name="own session 2"))
         caller.flush()
     caller.commit()
     assert captured["session"] is not caller
+    assert captured["tenant_id"] == owner.id  # contexto heredado, no anonimo
     assert not captured["session"].in_transaction()  # commit hecho y sesion cerrada
     with Session(engine) as check:
+        check.info["tenant_id"] = owner.id
         # El tipo del backfill y el trabajo del llamante: ambos confirmados,
-        # cada uno por su camino.
-        assert check.scalar(select(FXRate.quote_currency)) == "USD"
-        assert check.scalar(select(Tenant.external_id)) == "own-session"
+        # cada uno por su camino, y la fila con el tenant del llamante.
+        row = check.query(FXRate).one()
+        assert (row.quote_currency, row.tenant_id) == ("USD", owner.id)
+        assert check.scalar(
+            select(Tenant.external_id).where(Tenant.external_id == "own-session-2")
+        ) == "own-session-2"
+
+
+ECB_CSV_USD = (
+    "KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE,OBS_STATUS\n"
+    "EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2025-01-06,1.0500,A\n"
+)
+
+
+def test_default_backfill_real_connector_writes_for_caller_tenant(tmp_path, monkeypatch):
+    """Conector real con fetcher stub, auth estricta y dos tenants.
+
+    La fila la escribe la sesion propia con el contexto heredado del
+    llamante: el tenant A la ve, el tenant B no. Sin esa herencia,
+    ``before_flush`` rechazaria la escritura (auth estricta) y, sin auth, la
+    fila quedaria con tenant NULL e invisible para todos.
+    """
+    import app.core.database as database_module
+    from app.services.connectors import ecb_history
+
+    engine = create_engine(f"sqlite:///{tmp_path}/fx.db")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    monkeypatch.setattr(database_module, "SessionLocal", factory)
+    monkeypatch.setattr(
+        database_module,
+        "settings",
+        database_module.settings.model_copy(update={"research_auth_required": True}),
+    )
+    real_sync = ecb_history.backfill_ecb_rates_sync
+
+    def with_stub_fetcher(session, *, currencies, start, end):
+        return real_sync(
+            session,
+            currencies=currencies,
+            start=start,
+            end=end,
+            fetcher=lambda codes, s, e: ECB_CSV_USD,
+        )
+
+    monkeypatch.setattr(ecb_history, "backfill_ecb_rates_sync", with_stub_fetcher)
+
+    with factory() as session:
+        session.add_all(
+            [Tenant(external_id="fx-a", name="A"), Tenant(external_id="fx-b", name="B")]
+        )
+        session.commit()
+        id_a = session.scalar(select(Tenant.id).where(Tenant.external_id == "fx-a"))
+        id_b = session.scalar(select(Tenant.id).where(Tenant.external_id == "fx-b"))
+
+    caller = factory()
+    caller.info["tenant_id"] = id_a
+    caller.info["user_id"] = "user-a"
+    summary = _default_fx_backfill(caller, {"USD"}, date(2025, 1, 6), date(2025, 1, 10))
+    assert summary["written"].get("USD") == 1
+    row = caller.query(FXRate).one()  # criteria de tenant ya activo en caller
+    assert (row.tenant_id, row.quote_currency, row.rate_date) == (
+        id_a,
+        "USD",
+        date(2025, 1, 6),
+    )
+    other = factory()
+    other.info["tenant_id"] = id_b
+    assert other.query(FXRate).count() == 0
+
+
+def test_default_backfill_failure_rolls_back_own_session(tmp_path, monkeypatch):
+    """Fallo a mitad de escritura: la sesion propia se cierra y revierte.
+
+    La escritura parcial (ya flusheada) no sobrevive al fallo y la
+    transaccion del llamante queda intacta y operativa.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path}/fx.db")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine)
+    monkeypatch.setattr("app.core.database.SessionLocal", factory)
+
+    def broken_sync(session, *, currencies, start, end):
+        session.add(
+            FXRate(
+                base_currency="EUR",
+                quote_currency="USD",
+                rate=Decimal("0.92"),
+                rate_date=start,
+                source="ecb",
+            )
+        )
+        session.flush()  # la escritura llega a la BD dentro de SU transaccion
+        raise ConnectionError("BCE caido a mitad de escritura")
+
+    monkeypatch.setattr(
+        "app.services.connectors.ecb_history.backfill_ecb_rates_sync", broken_sync
+    )
+    caller = factory()
+    owner = Tenant(external_id="fx-fail", name="fail")
+    caller.add(owner)
+    caller.commit()
+    caller.info["tenant_id"] = owner.id
+    with pytest.raises(ConnectionError, match="BCE caido"):
+        _default_fx_backfill(caller, {"USD"}, date(2025, 1, 1), date(2025, 1, 10))
+    # La escritura parcial de la sesion propia NO sobrevive al fallo.
+    with Session(engine) as check:
+        check.info["tenant_id"] = owner.id
+        assert check.query(FXRate).count() == 0
+    # El llamante sigue operativo: su transaccion no fue tocada.
+    caller.add(Tenant(external_id="fx-fail-2", name="fail 2"))
+    caller.commit()
+    assert caller.scalar(
+        select(Tenant.external_id).where(Tenant.external_id == "fx-fail-2")
+    ) == "fx-fail-2"

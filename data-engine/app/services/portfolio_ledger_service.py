@@ -33,14 +33,31 @@ def _default_fx_backfill(db: Session, currencies: set[str], start: date, end: da
     el de cada fila del importador CSV: InvalidRequestError a mitad de
     fichero) y confirma trabajo ajeno a medias. Con una sesion independiente
     el commit es suyo, y la transaccion del llamante (Postgres, READ
-    COMMITTED) ve los tipos nuevos en su siguiente SELECT. ``db`` queda solo
-    para la firma del seam inyectable (los tests reciben su sesion).
+    COMMITTED) ve los tipos nuevos en su siguiente SELECT.
+
+    La sesion nueva hereda SOLO el contexto de autoridad del llamante
+    (``tenant_id``/``user_id`` de ``db.info``, puestos por ``get_db`` tras
+    autenticar al principal): sin tenant, ``before_flush`` rechaza la
+    escritura de ``FXRate`` (TenantOwnedMixin) con auth obligatoria y, sin
+    ella, la fila quedaria con tenant NULL, invisible para el propio
+    llamante. El contexto sale EXCLUSIVAMENTE de la sesion que ya tiene la
+    autoridad (nunca de parametros) y nunca se eleva el ambito: nada de
+    ``include_all_tenants``. Si el llamante no tiene tenant (sesion de
+    mantenimiento), la nueva tampoco: mismo fail-closed que tendria el
+    llamante escribiendo el mismo modelo.
+
+    ``db`` sigue siendo el origen del contexto; el seam inyectable de los
+    tests recibe la sesion de test como antes.
     """
     from app.core.database import SessionLocal
     from app.services.connectors.ecb_history import backfill_ecb_rates_sync
 
     session = SessionLocal()
     try:
+        for key in ("tenant_id", "user_id"):
+            value = db.info.get(key)
+            if value is not None:
+                session.info[key] = value
         return backfill_ecb_rates_sync(session, currencies=currencies, start=start, end=end)
     finally:
         session.close()
