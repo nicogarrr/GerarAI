@@ -158,6 +158,7 @@ class PortfolioLedgerService:
         fees: Decimal = Decimal("0"),
         currency: str = "USD",
         notes: str | None = None,
+        external_id: str | None = None,
     ) -> Transaction:
         normalized_action = (action or "").lower()
         if normalized_action not in LEDGER_ACTIONS:
@@ -213,7 +214,7 @@ class PortfolioLedgerService:
             price=price,
             fees=fees,
             currency=canonical_currency_code(currency),
-            external_id=f"manual-{uuid4().hex}",
+            external_id=external_id or f"manual-{uuid4().hex}",
             raw_payload={"notes": notes} if notes else {},
         )
         db.add(row)

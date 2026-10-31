@@ -1429,7 +1429,7 @@ def commit_transaction_import(
     """Inserta atómicamente el lote de transacciones validadas en la cartera."""
     try:
         service = TransactionImportService()
-        return service.commit_import(db, payload.transactions)
+        return service.commit_import(db, payload.transactions, source_filename=payload.source_filename)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
