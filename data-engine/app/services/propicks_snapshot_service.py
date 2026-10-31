@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -31,14 +31,30 @@ def freeze_monthly_snapshot(db: Session, *, now: datetime | None = None) -> Prop
         return None
     ids = [r.company_id for r in passed]
     companies = {c.id: c for c in db.scalars(select(Company).where(Company.id.in_(ids))).all()}
-    prices: dict[int, MarketPrice] = {}
-    for p in db.scalars(
-        select(MarketPrice)
-        .where(MarketPrice.company_id.in_(ids))
-        .where(MarketPrice.close.isnot(None))
-        .order_by(MarketPrice.date.desc())
-    ).all():
-        prices.setdefault(p.company_id, p)
+    # Solo el ultimo cierre con dato por empresa: recorrer toda la historia
+    # (~100 empresas x todos sus cierres) para descartar todo menos uno por
+    # empresa es un orden de magnitud mas filas de las necesarias.
+    latest = (
+        select(
+            MarketPrice.company_id.label("company_id"),
+            MarketPrice.close.label("close"),
+            MarketPrice.date.label("date"),
+            func.row_number()
+            .over(
+                partition_by=MarketPrice.company_id,
+                order_by=(MarketPrice.date.desc(), MarketPrice.id.desc()),
+            )
+            .label("rn"),
+        )
+        .where(MarketPrice.company_id.in_(ids), MarketPrice.close.isnot(None))
+        .subquery()
+    )
+    prices = {
+        row.company_id: row
+        for row in db.execute(
+            select(latest.c.company_id, latest.c.close, latest.c.date).where(latest.c.rn == 1)
+        )
+    }
     picks = []
     for r in sorted(passed, key=lambda x: (-(x.score or 0.0), x.company_id)):
         c = companies.get(r.company_id)
