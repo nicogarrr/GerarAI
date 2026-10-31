@@ -58,6 +58,19 @@ jobs:
             python data-engine/scripts/sync_requirements.py --check
           fi
 
+  dead-code:
+    name: Dead code (alcanzabilidad, baseline E6)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      # Sin cache ni install: el escaner es estatico puro (git ls-files +
+      # parsing), solo necesita el arbol y node, que la imagen ya trae.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+      - name: Alcanzabilidad contra baseline de inertes conocidos
+        run: node scripts/find-dead-code.mjs --fail --baseline scripts/baselines/dead-code.txt
+
   frontend:
     name: Frontend quality
     runs-on: ubuntu-24.04
