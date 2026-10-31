@@ -8,7 +8,26 @@ from urllib.parse import urldefrag, urljoin, urlparse
 import httpx
 
 from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.data_source_health import get_data_source_registry
 from app.services.public_fetch import fetch_public_url_async
+
+_REGISTRY_KEY = "ir"
+_HTML_SHAPE_RE = re.compile(r"<(?:!doctype|html|head|body|a|div|table)\b", re.IGNORECASE)
+
+
+def _record_health_failure(exc: Exception) -> None:
+    """5xx/401/403/429/red degradan; 400/404/410 (página IR retirada) neutros."""
+    registry = get_data_source_registry()
+    if isinstance(exc, httpx.HTTPStatusError):
+        if exc.response.status_code in (400, 404, 410):
+            return
+        registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        return
+    if isinstance(exc, httpx.TransportError):
+        registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        return
+    registry.record_failure(_REGISTRY_KEY, f"documento inválido: {type(exc).__name__}")
+
 
 PRESS_PAGE_RE = re.compile(
     r"(?:news(?:room|-and-events|-events)?|press(?:-releases)?|media|releases)",
@@ -80,14 +99,16 @@ def discover_press_release_links(html_text: str, base_url: str) -> list[tuple[st
     seen: set[str] = set()
     for url, text in _links(html_text, base_url):
         label = f"{text} {url}"
-        is_release = RELEASE_LINK_RE.search(url) is not None or re.search(
-            r"\bpress release\s*[:\-\u2014]\s*\w",
-            text,
-            re.IGNORECASE,
-        ) is not None
-        is_pdf_release = urlparse(url).path.lower().endswith(".pdf") and PRESS_PAGE_RE.search(
-            label
+        is_release = (
+            RELEASE_LINK_RE.search(url) is not None
+            or re.search(
+                r"\bpress release\s*[:\-\u2014]\s*\w",
+                text,
+                re.IGNORECASE,
+            )
+            is not None
         )
+        is_pdf_release = urlparse(url).path.lower().endswith(".pdf") and PRESS_PAGE_RE.search(label)
         if not (is_release or is_pdf_release) or url in seen:
             continue
         seen.add(url)
@@ -148,8 +169,14 @@ class IRConnector:
         errors: list[str] = []
         try:
             root_html = await self._fetch(ir_url)
+            if not _HTML_SHAPE_RE.search(root_html[:2000]):
+                # 200 sin estructura HTML (JSON de error, texto plano): la
+                # página IR no es tal; la salud la decide solo la página raíz.
+                raise ValueError("la página IR raíz no tiene estructura HTML")
         except Exception as exc:
+            _record_health_failure(exc)
             return ConnectorResult.failed("ir", exc, metadata=metadata)
+        get_data_source_registry().record_success(_REGISTRY_KEY)
 
         release_links = discover_press_release_links(root_html, ir_url)
         pages = discover_press_release_pages(root_html, ir_url)
