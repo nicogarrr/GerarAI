@@ -559,29 +559,36 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                             href={`/research/${h.symbol}`}
                                             className="flex min-h-[44px] flex-wrap items-center justify-between gap-3 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
                                         >
-                                            <span className="flex flex-1 flex-col gap-1">
-                                                <span className="text-white font-semibold">{h.symbol}</span>
+                                            <span className="flex min-w-0 flex-1 flex-col gap-1">
+                                                {/* Simbolo y valor en la MISMA fila que envuelve: antes el
+                                                    valor era hermano de una columna flex-1 cuyo minimo lo
+                                                    fijaba el chip DCA (~150px); con valores largos la
+                                                    columna se encogia y el chip tapaba el importe
+                                                    (medido en prod a 390px: ASTS/BN/RKLB). */}
+                                                <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                                                    <span className="text-white font-semibold">{h.symbol}</span>
+                                                    {holdingDisplayMode(h) === 'gain' ? (
+                                                        <span className={`font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
+                                                            {formatPercent(h.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
+                                                        </span>
+                                                    ) : holdingDisplayMode(h) === 'value' && isValidCurrencyCode(h.baseCurrency) ? (
+                                                        // Sin base de coste no hay rentabilidad (N/D), pero el valor y el peso
+                                                        // salen de la cotización y se muestran con su divisa.
+                                                        <span className="text-right font-mono text-gray-300">
+                                                            {formatMoney(h.value, h.baseCurrency)}
+                                                            {portfolioSummary && portfolioSummary.equityValue > 0
+                                                                ? `\u00a0\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
+                                                                : ''}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="font-mono text-gray-500">{NA}</span>
+                                                    )}
+                                                </span>
                                                 <span className="flex flex-wrap items-center gap-1">
                                                     <DcaLevelChip symbol={h.symbol} signals={holdingSignals} />
                                                     <HomeFairValueHint holding={h} signals={holdingSignals} />
                                                 </span>
                                             </span>
-                                            {holdingDisplayMode(h) === 'gain' ? (
-                                                <span className={`ml-auto font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
-                                                    {formatPercent(h.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
-                                                </span>
-                                            ) : holdingDisplayMode(h) === 'value' && isValidCurrencyCode(h.baseCurrency) ? (
-                                                // Sin base de coste no hay rentabilidad (N/D), pero el valor y el peso
-                                                // salen de la cotización y se muestran con su divisa.
-                                                <span className="ml-auto text-right font-mono text-gray-300">
-                                                    {formatMoney(h.value, h.baseCurrency)}
-                                                    {portfolioSummary && portfolioSummary.equityValue > 0
-                                                        ? `\u00a0\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
-                                                        : ''}
-                                                </span>
-                                            ) : (
-                                                <span className="ml-auto font-mono text-gray-500">{NA}</span>
-                                            )}
                                         </Link>
                                     ))}
                             </div>

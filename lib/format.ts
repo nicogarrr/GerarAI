@@ -352,6 +352,11 @@ export function formatCompact(
   // «compact»): 999.999.999 redondea a 1.000 M y debe salir «1 mil M».
   const digits = Math.min(Math.max(Math.trunc(maximumFractionDigits), 0), 20);
   const roundsTo = (scaled: number) => Number(scaled.toFixed(digits));
+  // Billones (10^12): «3.414 mil M» se leía como tres mil cuatrocientos
+  // (visto en prod, capitalización de GOOGL). A partir de 1e12, «3,41 B».
+  if (abs >= 1e12 || roundsTo(abs / 1e9) >= 1000) {
+    return `${formatNumber(parsed / 1e12, { maximumFractionDigits, ...rest }, fallback, locale)} B`;
+  }
   if (abs >= 1e9 || roundsTo(abs / 1e6) >= 1000) {
     return `${formatNumber(parsed / 1e9, { maximumFractionDigits, ...rest }, fallback, locale)} mil M`;
   }
