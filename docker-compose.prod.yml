@@ -421,18 +421,18 @@ services:
   # refresh_bottlenecks cargaba todos los chunks del tenant en memoria
   # (stored_evidence), y la concurrencia/redelivery de esos jobs sumaba memoria.
   # Bajar hilos mitiga, no corrige la carga; el fix esta en bottleneck_service.
+  # Hilos por env (WORKER_THREADS, defecto 2) para subir de forma gradual SIN
+  # redeploy de codigo: el worker es I/O-bound (CPU 0,17% medido con 8.709
+  # pendientes, 31-oct piloto) y el pool de BD es por proceso (10+10), asi
+  # que mas hilos no abren conexiones nuevas ni mas rate de proveedores (el
+  # pacing 1,5 s es por peticion y el ritmo de encolado no cambia).
+  # Escalado: 2 -> medir RSS -> 4. El historial OOM venia de N
+  # refresh_bottlenecks concurrentes en memoria; ya hay streaming (yield_per),
+  # pero se mide RSS antes de cada subida.
   worker:
     image: cavaai-backend:prod
     container_name: cavaai-worker
     restart: unless-stopped
-    # Hilos por env para subir de forma gradual SIN nuevo despliegue de codigo:
-    # el worker es I/O-bound (CPU 0,17% medido con 8.709 pendientes, 31-oct
-    # piloto) y el pool de BD es por proceso (10+10), asi que mas hilos no
-    # abren conexiones nuevas ni mas rate de proveedores (el pacing 1,5 s es
-    # por peticion y el ritmo de encolado no cambia). Escalado: 2 -> medir ->
-    # 4 (WORKER_THREADS en .env). El historial de OOM venia de N
-    # refresh_bottlenecks concurrentes cargando chunks en memoria; el servicio
-    # ya hace streaming (yield_per), pero se mide RSS antes de cada subida.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${WORKER_THREADS:-2}", "-Q", "default", "prices"]
     environment:
       <<: [*app-env, *worker-db-env, *llm-env]
