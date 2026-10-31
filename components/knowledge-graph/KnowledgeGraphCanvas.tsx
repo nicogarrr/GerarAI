@@ -215,7 +215,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
     const suggestions = useMemo(() => searchNodes(scene, query, MAX_SUGGESTIONS), [scene, query]);
     const hoveredNode: SceneNode | null = hoveredId === null ? null : (nodeById.get(hoveredId) ?? null);
     const selectedNode = selectedId === null ? null : (nodeById.get(selectedId) ?? null);
-    const detailFields = selectedId === null ? [] : describeDetail(scene, selectedId);
+    const detailFields = selectedId === null ? [] : describeDetail(scene, selectedId, t);
     const neighbors = selectedId === null ? [] : neighborRows(scene, selectedId);
 
     /* -------------------------------------------------------------- *

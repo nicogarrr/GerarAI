@@ -47,7 +47,6 @@
   "detail": {
     "title": "Detalle del nodo",
     "empty": "Selecciona un nodo del grafo para ver lo que el backend sabe de él.",
-    "absent": "N/D",
     "neighborsTitle": "Vecinos ({count})",
     "noNeighbors": "Este nodo no tiene relaciones en el subgrafo visible.",
     "directionOut": "sale",
@@ -69,6 +68,18 @@
       "degree": "Grado",
       "description": "Descripción",
       "attributes": "Atributos"
+    },
+    "absent": "N/D",
+    "absentReason": {
+      "id": "El backend no devolvio identificador para este nodo.",
+      "label": "El backend no devolvio etiqueta para este nodo.",
+      "type": "El backend no devolvio tipo para este nodo.",
+      "key": "El grafo no guarda clave propia para este tipo de nodo.",
+      "entity": "Este nodo no esta enlazado con una entidad de otra tabla.",
+      "confidence": "El grafo no guarda confianza para este nodo.",
+      "degree": "Sin aristas incidentes: el grafo no relaciona este nodo con ninguno.",
+      "description": "El grafo no guarda descripción para este tipo de nodo.",
+      "attributes": "El backend no devolvio atributos para este nodo."
     }
   },
   "listing": {
