@@ -14,7 +14,7 @@ const panels = readFileSync('components/research/FundamentalModelPanels.tsx', 'u
 
 describe('cortes de lista declarados', () => {
     it('operaciones insider de un Form 4: 6 de N declarado', () => {
-        assert.match(tickerPage, /Se muestran 6 de \{formatNumber\(filing\.transactions\.length/);
+        assert.match(tickerPage, /research\.fichaTxShown', \{ total: formatNumber\(filing\.transactions\.length/);
     });
     it('auditorías por empresa: última visible, historial plegado y 100 de N declarado', () => {
         assert.match(tickerPage, /Se muestran 100 de \{formatNumber\(audits\.length/);

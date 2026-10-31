@@ -8,7 +8,8 @@ const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
 test('holders view incluye panel insiders Form 4 via endpoint persistido', () => {
     assert.match(page, /getInsiderFilings\(ticker/);
-    assert.match(page, /Insiders \(Form 4 · SEC EDGAR\)/);
+    assert.match(page, /research\.fichaInsidersPanel/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).fichaInsidersPanel, 'Insiders (Form 4 · SEC EDGAR)');
     assert.match(page, /\/api\/insider\/filings|insider\.actions/);
 });
 
@@ -18,5 +19,6 @@ test('enlaces insider solo con URL SEC verificada (safeHttpUrl)', () => {
 });
 
 test('sin operaciones persistidas -> EmptyState honesto, nunca lista vacia inventada', () => {
-    assert.match(page, /Sin operaciones insider persistidas para este ticker\./);
+    assert.match(page, /research\.fichaNoInsiderTrades/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).fichaNoInsiderTrades, 'Sin operaciones insider persistidas para este ticker.');
 });

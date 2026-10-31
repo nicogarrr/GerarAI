@@ -1412,6 +1412,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildChangesContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const data = await viewData('changes');
     // Contexto de guía (revisiones anclables + noticias atribuidas): opcional,
     // su fallo no puede romper la pestaña Seguir.
@@ -1425,10 +1426,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         {data.changes.length || data.reviews.length || data.alerts.length ? (
           <ChangesFeed alerts={data.alerts} changes={data.changes} reviews={data.reviews} ticker={ticker} />
         ) : (
-          <Panel title="Qué ha cambiado">
+          <Panel title={t('research.fichaWhatChanged')}>
             <EmptyState
-              action={<EmptyLink href="/research/news">Analiza la última noticia</EmptyLink>}
-              title="Sin cambios materiales registrados."
+              action={<EmptyLink href="/research/news">{t('research.fichaAnalyzeLatestNews')}</EmptyLink>}
+              title={t('research.fichaNoMaterialChanges')}
             />
           </Panel>
         )}
@@ -1440,6 +1441,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildHoldersSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const holders = await viewData('holders');
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
@@ -1452,13 +1454,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <div className="space-y-6">
         <ParticipationFilingsPanel data={participation} />
         {holders === null ? (
-          <EmptyState title="No se pudieron cargar los superinversores de esta empresa." />
+          <EmptyState title={t('research.fichaHoldersLoadError')} />
         ) : holders.status === 'sin_identificador' ? (
-          <EmptyState title={holders.identity_source ?? 'Sin identidad CUSIP verificada para cruzar los 13F.'} />
+          <EmptyState title={holders.identity_source ?? t('research.fichaNoCusipIdentity')} />
         ) : holders.status === 'sin_datos' ? (
-          <EmptyState title="Sin informes 13F sincronizados." />
+          <EmptyState title={t('research.fichaNo13fSynced')} />
         ) : (
-          <Panel title="Superinversores que la declaran">
+          <Panel title={t('research.fichaHoldersPanel')}>
             {holders.holders.length ? (
               <ul className="space-y-3">
                 {holders.holders.map((holder) => (
@@ -1468,12 +1470,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       <span className="text-gray-200">{holder.value_usd !== null ? formatMarketCapUsd(holder.value_usd) : NA}</span>
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      Cartera a {holder.report_date ? formatDate(holder.report_date) : 'fecha desconocida'}
-                      {holder.coverage === 'partial' ? ' · Datos parciales' : ''}
+                      {t('research.fichaPortfolioAt', { date: holder.report_date ? formatDate(holder.report_date) : t('research.fichaUnknownDate') })}
+                      {holder.coverage === 'partial' ? ` · ${t('research.fichaPartialData')}` : ''}
                       {holder.filing_url ? (
                         <>
                           {' · '}
-                          <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={holder.filing_url} rel="noopener noreferrer" target="_blank">13F original</a>
+                          <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={holder.filing_url} rel="noopener noreferrer" target="_blank">{t('research.fichaOriginal13f')}</a>
                         </>
                       ) : null}
                     </p>
@@ -1481,23 +1483,23 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 ))}
               </ul>
             ) : (
-              <EmptyState title="Ningún gestor revisado la declara en su último 13F." />
+              <EmptyState title={t('research.fichaNoManagerDeclares')} />
             )}
             <p className="mt-4 text-xs text-gray-500">
-              {holders.managers_with_data} gestores con datos · {holders.managers_without_data} sin datos
-              {holders.managers_partial ? ` · ${holders.managers_partial} parciales` : ''} · {ownershipLimitations(holders.limitations)}
+              {t('research.fichaManagersSummary', { withData: holders.managers_with_data, withoutData: holders.managers_without_data })}
+              {holders.managers_partial ? t('research.fichaManagersPartialSuffix', { count: holders.managers_partial }) : ''} · {ownershipLimitations(holders.limitations)}
             </p>
           </Panel>
         )}
-        <Panel title="Insiders (Form 4 · SEC EDGAR)">
+        <Panel title={t('research.fichaInsidersPanel')}>
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
             insiderFilings?.foreign_issuer ? (
               <EmptyState
-                description="Los emisores privados extranjeros están exentos de la Sección 16 de la SEC: no presentan Form 4. Sus insiders declaran en el registro de su país (p. ej. SEDI en Canadá, NSM/FCA en Reino Unido), no en EDGAR."
-                title="Sin Form 4: emisor extranjero"
+                description={t('research.fichaForeignIssuerDesc')}
+                title={t('research.fichaForeignIssuerTitle')}
               />
             ) : (
-              <EmptyState title="Sin operaciones insider persistidas para este ticker." />
+              <EmptyState title={t('research.fichaNoInsiderTrades')} />
             )
           ) : (
             <ul className="space-y-3">
@@ -1505,25 +1507,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 <li className="rounded-lg border border-gray-800 p-3 text-sm" key={filing.accession_number}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="text-gray-300">
-                      {filing.form}{filing.is_amendment ? ' (enmienda)' : ''} · {filing.filing_date ? formatDate(filing.filing_date) : 'fecha desconocida'}
+                      {filing.form}{filing.is_amendment ? t('research.fichaAmendmentSuffix') : ''} · {filing.filing_date ? formatDate(filing.filing_date) : t('research.fichaUnknownDate')}
                     </span>
                     {safeHttpUrl(filing.source_url) ? (
-                      <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(filing.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">Form 4 original</a>
+                      <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeHttpUrl(filing.source_url) ?? undefined} rel="noopener noreferrer" target="_blank">{t('research.fichaOriginalForm4')}</a>
                     ) : null}
                   </div>
                   <ul className="mt-2 space-y-1 text-xs text-gray-400">
                     {filing.transactions.slice(0, 6).map((tx, index) => (
                       <li key={`${filing.accession_number}-${index}`}>
-                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? 'Compra' : tx.code === 'S' ? 'Venta' : tx.code ?? '—'}
-                        {typeof tx.shares === 'number' ? ` · ${formatNumber(tx.shares)} acciones` : ''}
+                        {insiderName(tx.insider)} · {insiderRole(tx.role, tx.officer_title)} · {tx.code === 'P' ? t('research.fichaTxBuy') : tx.code === 'S' ? t('research.fichaTxSell') : tx.code ?? '—'}
+                        {typeof tx.shares === 'number' ? t('research.fichaTxSharesSuffix', { count: formatNumber(tx.shares) }) : ''}
                         {typeof tx.value === 'number' && Number.isFinite(tx.value) ? ` · ${tx.currency && isValidCurrencyCode(tx.currency) ? formatPrice(tx.value, tx.currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : formatNumber(tx.value, { maximumFractionDigits: 0 })}` : ''}
-                        {tx.currency == null && typeof tx.value === 'number' ? ' · divisa no informada' : ''}
+                        {tx.currency == null && typeof tx.value === 'number' ? t('research.fichaTxNoCurrencySuffix') : ''}
                         {tx.tx_date ? ` · ${formatDate(tx.tx_date)}` : ''}
                       </li>
                     ))}
                   </ul>
                   {filing.transactions.length > 6 ? (
-                    <p className="mt-1 text-xs text-gray-500">Se muestran 6 de {formatNumber(filing.transactions.length, { maximumFractionDigits: 0 })} operaciones de este formulario.</p>
+                    <p className="mt-1 text-xs text-gray-500">{t('research.fichaTxShown', { total: formatNumber(filing.transactions.length, { maximumFractionDigits: 0 }) })}</p>
                   ) : null}
                 </li>
               ))}
