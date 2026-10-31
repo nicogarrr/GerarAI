@@ -205,19 +205,70 @@ def context_observations(
     return result
 
 
+def _any_real_thesis(db: Session) -> bool:
+    """Existe alguna tesis con datos (cualquier estado salvo insufficient/rejected)."""
+    return (
+        db.scalar(
+            select(ThesisVersion.id)
+            .where(*tenant_filters(db, ThesisVersion), ThesisVersion.status.not_in(_NOT_A_THESIS))
+            .limit(1)
+        )
+        is not None
+    )
+
+
+def _any_margin_of_safety(db: Session) -> bool:
+    """Alguna empresa tiene margen conocido en su ultima valoracion.
+
+    Misma semantica que _margin_of_safety, pero de existencia: en vez de una
+    consulta de outputs POR empresa (N+1; en frio era la mayor parte de los
+    15-18 s de metric-coverage medidos en prod), trae los modelos (1 query,
+    como antes) y los outputs de los candidatos en consultas IN acotadas, y
+    evalua la misma logica de payload en Python. Sale en la primera empresa
+    con margen: el caso comun cuesta dos consultas.
+    """
+    latest: dict[int, ValuationModel] = {}
+    for model in db.scalars(
+        select(ValuationModel).order_by(ValuationModel.company_id, desc(ValuationModel.version))
+    ).all():
+        latest.setdefault(model.company_id, model)
+    candidates = [m for m in latest.values() if m.status != "insufficient_data"]
+    if not candidates:
+        return False
+    outputs_by_model: dict[int, list[ValuationOutput]] = {}
+    ids = [m.id for m in candidates]
+    for start in range(0, len(ids), 5000):
+        chunk = ids[start : start + 5000]
+        for out in db.scalars(
+            select(ValuationOutput).where(ValuationOutput.valuation_model_id.in_(chunk))
+        ).all():
+            outputs_by_model.setdefault(out.valuation_model_id, []).append(out)
+    for model in candidates:
+        outputs = outputs_by_model.get(model.id, [])
+        outputs.sort(key=lambda row: row.scenario != "base")
+        for output in outputs:
+            payload = output.output_payload or {}
+            if not margin_convention_known(payload.get("trace")):
+                continue
+            if _decimal(payload.get("margin_of_safety")) is not None:
+                return True
+    return False
+
+
 def context_metrics_with_data(db: Session) -> list[str]:
     """Nombres de contexto que al menos una empresa tiene (para las sugerencias de la UI)."""
     companies = list(db.scalars(select(Company)).all())
     if not companies:
         return []
-    observed = context_observations(db, CONTEXT_METRICS, companies)
     names: set[str] = set()
-    for per_company in observed.values():
-        names.update(per_company)
-    # tiene_tesis/tesis_publicada siempre tienen valor (0 o 1); solo se ofrecen
-    # si alguna empresa tiene tesis, para no sugerir un filtro que no filtra.
-    if not any(
-        obs.get(HAS_THESIS) is not None and obs[HAS_THESIS].value == 1 for obs in observed.values()
-    ):
-        names -= {HAS_THESIS, PUBLISHED_THESIS}
+    # tiene_tesis/tesis_publicada solo se ofrecen si alguna empresa tiene
+    # tesis real, para no sugerir un filtro que no filtra (misma regla que
+    # antes: publicada se mantiene aunque nadie la tenga publicada).
+    if _any_real_thesis(db):
+        names |= {HAS_THESIS, PUBLISHED_THESIS}
+    if _any_margin_of_safety(db):
+        names.add(MARGIN_OF_SAFETY)
+    # Nivel DCA: {} si la tabla no existe o nadie tiene nivel (degrada limpio).
+    if _dca_levels(db, companies):
+        names.add(DCA_LEVEL)
     return sorted(names)
