@@ -74,7 +74,7 @@ export function SubscribeButtons({ origin, token }: { origin: string; token: str
                     readOnly
                     value={urls.https}
                     aria-label={ti('calendar.subscription.linkAria')}
-                    className="min-w-0 flex-1 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 font-mono text-xs text-gray-400"
+                    className="min-w-0 flex-1 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 font-mono text-base text-gray-400 sm:text-xs"
                     onFocus={(event) => event.target.select()}
                 />
                 <Button

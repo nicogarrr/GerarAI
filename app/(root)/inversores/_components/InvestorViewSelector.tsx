@@ -9,7 +9,7 @@ export function InvestorViewSelector({ slug, view }: { slug: string; view: strin
     return (
         <select
             aria-label="Contenido del inversor"
-            className="min-h-11 w-full rounded-lg border border-gray-800 bg-surface-1 px-3 text-sm text-gray-100"
+            className="min-h-11 w-full rounded-lg border border-gray-800 bg-surface-1 px-3 text-base text-gray-100 sm:text-sm"
             value={view}
             onChange={(event) => {
                 const next = event.target.value;
