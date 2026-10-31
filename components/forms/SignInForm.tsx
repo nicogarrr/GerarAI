@@ -11,6 +11,8 @@ import {useRouter} from "next/navigation";
 import Link from "next/link";
 import React, {useState} from "react";
 import {useT} from "@/lib/i18n/client";
+import AccountStatusNotice from "@/components/auth/AccountStatusNotice";
+import {pendingStateFromSignInCode, type PendingAccountState} from "@/lib/auth/pending-account";
 
 type Props = {
     /** Solo se muestra el enlace de recuperación si el despliegue puede enviar correo. */
@@ -24,6 +26,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
     const t = useT();
     const router = useRouter()
     const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+    const [accountNotice, setAccountNotice] = useState<PendingAccountState | null>(null);
     const [pendingCredentials, setPendingCredentials] = useState<{ email: string; password: string } | null>(null);
     const [isVerifying, setIsVerifying] = useState(false);
     const {
@@ -50,6 +53,14 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
             if (result.twoFactorRequired) {
                 setPendingCredentials({ email: data.email, password: data.password });
                 setTwoFactorRequired(true);
+                return;
+            }
+            // Cuenta pendiente o rechazada: pantalla de estado, no el toast
+            // generico (un "credenciales no validas" aqui confunde y filtra el
+            // estado de la solicitud).
+            const noticeState = pendingStateFromSignInCode(result.code);
+            if (noticeState) {
+                setAccountNotice(noticeState);
                 return;
             }
             toast.error(t('auth.signIn.failedTitle'), {
@@ -86,6 +97,15 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
         } finally {
             setIsVerifying(false);
         }
+    }
+
+    if (accountNotice) {
+        return (
+            <AccountStatusNotice
+                state={accountNotice}
+                onBack={() => setAccountNotice(null)}
+            />
+        );
     }
 
     if (twoFactorRequired) {

@@ -11,6 +11,8 @@ import FooterLink from "@/components/forms/FooterLink";
 import {signUpWithEmail} from "@/lib/actions/auth.actions";
 import {emailFieldValidation} from "@/lib/validation/email";
 import AccessRequestForm from "@/components/forms/AccessRequestForm";
+import AccountStatusNotice from "@/components/auth/AccountStatusNotice";
+import {afterSignUpRoute, type PendingAccountState} from "@/lib/auth/pending-account";
 import {useRouter} from "next/navigation";
 import {toast} from "sonner";
 import React from "react";
@@ -27,6 +29,7 @@ type SignUpFormProps = { signUpOpen: boolean; inviteOnly?: boolean; invitationsE
 const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false }: SignUpFormProps) => {
     const t = useT();
     const router = useRouter()
+    const [registeredState, setRegisteredState] = React.useState<PendingAccountState | null>(null);
     const {
         register,
         handleSubmit,
@@ -50,7 +53,16 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
         try {
             const result = await signUpWithEmail(data);
             if (result.success) {
-                router.push('/inicio');
+                // Registro abierto con aprobacion: toda cuenta nueva nace
+                // pendiente y sin sesion (autoSignIn=false), asi que /inicio
+                // rebotaria a /sign-in. Solo un 'approved' explicito entra
+                // directo; el resto ve la pantalla de cuenta pendiente.
+                const route = afterSignUpRoute(result.accountStatus);
+                if (route === '/inicio') {
+                    router.push('/inicio');
+                    return;
+                }
+                setRegisteredState(route);
                 return;
             }
             toast.error(t('auth.signUp.failedTitle'), {
@@ -61,6 +73,13 @@ const SignUpForm = ({ signUpOpen, inviteOnly = false, invitationsEnabled = false
                 description: e instanceof Error ? e.message : t('auth.signUp.unexpectedError')
             })
         }
+    }
+
+    // Alta completada: la pantalla de cuenta pendiente sustituye al
+    // formulario (sin navegar: el layout de (auth) redirigiria a /inicio si
+    // el despliegue aun crea sesion en el alta).
+    if (registeredState) {
+        return <AccountStatusNotice state={registeredState} />;
     }
 
     return (

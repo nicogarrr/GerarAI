@@ -280,6 +280,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/security/TwoFactorSettings.tsx': 'useState, browser:navigator, jsx-onSubmit, jsx-onClick, libreria cliente: sonner, libreria cliente: react-hook-form, dynamic (QR qrcode.react diferido: solo se usa al activar 2FA)',
   'components/security/PrivacySettings.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/security/ChangePassword.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
+  'components/auth/AccountStatusNotice.tsx': 'useT lee locale para el aviso de cuenta pendiente/rechazada y jsx-onClick para volver al formulario',
   'components/auth/ForgotPasswordForm.tsx': 'useState, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/auth/ResetPasswordForm.tsx': 'useState, useRouter, jsx-onSubmit, jsx-onClick, libreria cliente: sonner',
   'components/settings/TaxDeclarantForm.tsx': 'useState, jsx-onSubmit, jsx-onChange, libreria cliente: sonner',
