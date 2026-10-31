@@ -5631,6 +5631,44 @@
         "title": "FXRateInput",
         "type": "object"
       },
+      "FXRateOut": {
+        "properties": {
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "quote_currency": {
+            "title": "Quote Currency",
+            "type": "string"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "number"
+          },
+          "rate_date": {
+            "title": "Rate Date",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "base_currency",
+          "quote_currency",
+          "rate",
+          "rate_date",
+          "source"
+        ],
+        "title": "FXRateOut",
+        "type": "object"
+      },
       "FeedCreate": {
         "properties": {
           "scope": {
@@ -9723,6 +9761,26 @@
           "has_prev"
         ],
         "title": "PageInfo",
+        "type": "object"
+      },
+      "PaginatedResponse_FXRateOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FXRateOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "PaginatedResponse[FXRateOut]",
         "type": "object"
       },
       "PaginatedResponse_PortfolioPositionItemOut_": {
@@ -57815,9 +57873,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Fx Rates Api Portfolio Fx Rates Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PaginatedResponse_FXRateOut_"
                 }
               }
             },

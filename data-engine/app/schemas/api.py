@@ -1705,3 +1705,15 @@ class PortfolioConfigurationUpdateOut(BaseModel):
     name: str
     base_currency: str
     is_default: bool
+# --- GET /api/portfolio/fx-rates ---------------------------------------------
+# Forma medida contra la ruta (servicio real): emite siempre todas las
+# claves. Paginado con PaginatedResponse como /positions.
+
+
+class FXRateOut(BaseModel):
+    id: int
+    base_currency: str
+    quote_currency: str
+    rate: float
+    rate_date: str
+    source: str

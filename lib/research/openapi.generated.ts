@@ -8407,6 +8407,21 @@ export interface components {
              */
             source: string;
         };
+        /** FXRateOut */
+        FXRateOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Id */
+            id: number;
+            /** Quote Currency */
+            quote_currency: string;
+            /** Rate */
+            rate: number;
+            /** Rate Date */
+            rate_date: string;
+            /** Source */
+            source: string;
+        };
         /** FeedCreate */
         FeedCreate: {
             /**
@@ -9715,6 +9730,12 @@ export interface components {
             total_items: number;
             /** Total Pages */
             total_pages: number;
+        };
+        /** PaginatedResponse[FXRateOut] */
+        PaginatedResponse_FXRateOut_: {
+            /** Items */
+            items: components["schemas"]["FXRateOut"][];
+            page_info: components["schemas"]["PageInfo"];
         };
         /** PaginatedResponse[PortfolioPositionItemOut] */
         PaginatedResponse_PortfolioPositionItemOut_: {
@@ -21839,9 +21860,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PaginatedResponse_FXRateOut_"];
                 };
             };
             /** @description Validation Error */
