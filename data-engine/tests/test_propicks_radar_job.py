@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.database import Base
 from app.models import Company, MarketPrice, ProPicksRadarSnapshot
 from app.services.propicks_radar_job import run_radar_scan, universe_company_ids
+from app.services.propicks_radar_store import FORMULA_VERSION
 
 AS_OF = date(2026, 10, 30)
 NOW = datetime(2026, 10, 30, 22, 0, tzinfo=UTC)
@@ -62,7 +63,7 @@ def test_scan_persists_snapshots_and_resumes_without_duplicates(db):
     assert len(rows) == 2
     by_company = {r.company_id: r for r in rows}
     assert by_company[1].status == "ok"
-    assert by_company[1].payload["formula_version"] == "nico-v1"
+    assert by_company[1].payload["formula_version"] == FORMULA_VERSION
     assert by_company[1].payload["current"]["status"] == "forming"
     assert by_company[1].payload["confirmed"] is not None
 

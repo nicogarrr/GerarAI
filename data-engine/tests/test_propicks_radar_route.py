@@ -23,7 +23,7 @@ from app.models import (
     Tenant,
     WatchItem,
 )
-from app.services.propicks_radar_store import save_snapshot
+from app.services.propicks_radar_store import FORMULA_VERSION, save_snapshot
 
 NOW = datetime(2026, 10, 30, 22, 0, tzinfo=UTC)
 
@@ -33,7 +33,7 @@ def _payload(level: int, *, status: str = "ok") -> dict:
         return {"status": status, "reason": "stale"}
     current = {"level": level, "status": "forming", "signal_date": "2026-10-29",
                "close": 91.5, "zone": {"label": f"{level}X DCA"}}
-    return {"status": "ok", "formula_version": "nico-v1", "price_verified": True,
+    return {"status": "ok", "formula_version": FORMULA_VERSION, "price_verified": True,
             "price_date": "2026-10-29", "source": "yfinance",
             "current": current, "confirmed": {"level": 1, "period": "2026-09"},
             "clear_price_signal": level == 4}
@@ -104,7 +104,7 @@ def test_pagination_20_per_page_and_counts(client):
     assert page1["coverage"] == {"universe": 27, "evaluated": 26, "ok": 25, "invalid": 1,
                                         "stale": 0}
     row = page1["items"][0]
-    assert row["formula_version"] == "nico-v1"
+    assert row["formula_version"] == FORMULA_VERSION
     assert row["status"] == "forming"
     assert row["confirmed_level"] == 1
     assert row["signal_date"] == "2026-10-29"
