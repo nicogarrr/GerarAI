@@ -423,13 +423,14 @@ def test_migration_0118_has_upgrade_and_downgrade() -> None:
         Path(__file__).resolve().parents[1]
         / "alembic"
         / "versions"
-        / "0118_thesis_changes_attention_thesis.py"
+        / "0118_thesis_attention_idx.py"
     )
     assert path.exists(), "falta la migración 0118"
     spec = importlib.util.spec_from_file_location("m0118", path)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    assert module.revision == "0118_thesis_changes_attention_thesis"
+    assert module.revision == "0118_thesis_attention_idx"
+    assert len(module.revision) <= 32
     assert module.down_revision == "0117_fk_child_indexes"
     assert callable(module.upgrade) and callable(module.downgrade)
