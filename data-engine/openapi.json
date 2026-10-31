@@ -13251,6 +13251,14 @@
           },
           "risk": {
             "$ref": "#/components/schemas/PortfolioRiskOut"
+          },
+          "xray": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PortfolioXrayRuleOut"
+            },
+            "title": "Xray",
+            "type": "array"
           }
         },
         "required": [
@@ -15304,6 +15312,51 @@
           "effective_date"
         ],
         "title": "PortfolioValuationHoldOut",
+        "type": "object"
+      },
+      "PortfolioXrayRuleOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "threshold"
+        ],
+        "title": "PortfolioXrayRuleOut",
         "type": "object"
       },
       "PositionValuationHoldOut": {
