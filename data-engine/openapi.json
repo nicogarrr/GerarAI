@@ -10404,6 +10404,78 @@
         "title": "PortfolioConfigurationInput",
         "type": "object"
       },
+      "PortfolioConfigurationOut": {
+        "properties": {
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "fx_source": {
+            "$ref": "#/components/schemas/PortfolioFxSourceOut"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "tax_currency": {
+            "title": "Tax Currency",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "base_currency",
+          "is_default",
+          "tax_currency",
+          "fx_source"
+        ],
+        "title": "PortfolioConfigurationOut",
+        "type": "object"
+      },
+      "PortfolioConfigurationUpdateOut": {
+        "properties": {
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_default": {
+            "title": "Is Default",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "base_currency",
+          "is_default"
+        ],
+        "title": "PortfolioConfigurationUpdateOut",
+        "type": "object"
+      },
       "PortfolioCostReconciliationOut": {
         "description": "Resultado de reconcile_ibkr_costs para una posicion IBKR.",
         "properties": {
@@ -10810,6 +10882,43 @@
           "as_of"
         ],
         "title": "PortfolioFxRateOut",
+        "type": "object"
+      },
+      "PortfolioFxSourceOut": {
+        "properties": {
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "latest_rate_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Rate Date"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "required": [
+          "source",
+          "latest_rate_date",
+          "base_currency"
+        ],
+        "title": "PortfolioFxSourceOut",
         "type": "object"
       },
       "PortfolioIntelligenceOut": {
@@ -56489,9 +56598,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Configuration Api Portfolio Configuration Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioConfigurationOut"
                 }
               }
             },
@@ -56660,9 +56767,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Portfolio Configuration Api Portfolio Configuration Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioConfigurationUpdateOut"
                 }
               }
             },

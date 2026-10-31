@@ -1678,3 +1678,30 @@ class PortfolioDataQualityOut(BaseModel):
     latest_pricing_coverage: float | None
     twr_chain: PortfolioTwrChainOut
     reasons: list[str]
+# --- GET/PUT /api/portfolio/configuration ------------------------------------
+# Formas medidas contra las rutas (servicio real): GET emite siempre todas
+# las claves (id/source/latest_rate_date llegan como null); PUT devuelve un
+# payload distinto y mas corto (sin tax_currency ni fx_source).
+
+
+class PortfolioFxSourceOut(BaseModel):
+    source: str | None
+    latest_rate_date: str | None
+    base_currency: str
+
+
+class PortfolioConfigurationOut(BaseModel):
+    id: int | None
+    name: str
+    base_currency: str
+    is_default: bool
+    # IRPF y Modelo 720 se declaran en euros al tipo BCE.
+    tax_currency: str
+    fx_source: PortfolioFxSourceOut
+
+
+class PortfolioConfigurationUpdateOut(BaseModel):
+    id: int
+    name: str
+    base_currency: str
+    is_default: bool
