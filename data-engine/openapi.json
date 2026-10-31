@@ -11713,6 +11713,491 @@
         "title": "RowValidationError",
         "type": "object"
       },
+      "SavingsProjectionOut": {
+        "description": "Contrato de savings_contract: dict literal, todas las claves siempre presentes.",
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "basis": {
+            "title": "Basis",
+            "type": "string"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "horizon_years": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Horizon Years"
+          },
+          "initial_capital": {
+            "title": "Initial Capital",
+            "type": "integer"
+          },
+          "monthly_contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Monthly Contribution"
+          },
+          "plan_exists": {
+            "title": "Plan Exists",
+            "type": "boolean"
+          },
+          "plan_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Id"
+          },
+          "portfolio_included": {
+            "title": "Portfolio Included",
+            "type": "boolean"
+          },
+          "preview": {
+            "title": "Preview",
+            "type": "boolean"
+          },
+          "projection_url": {
+            "title": "Projection Url",
+            "type": "string"
+          },
+          "scenarios": {
+            "items": {
+              "$ref": "#/components/schemas/SavingsScenarioOut"
+            },
+            "title": "Scenarios",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "no_plan",
+              "currency_missing"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_exists",
+          "preview",
+          "initial_capital",
+          "portfolio_included",
+          "basis",
+          "assumptions",
+          "scenarios",
+          "status",
+          "source",
+          "projection_url"
+        ],
+        "title": "SavingsProjectionOut",
+        "type": "object"
+      },
+      "SavingsScenarioOut": {
+        "description": "Escenario de project_savings: cifras ilustrativas, net_dividend siempre null.",
+        "properties": {
+          "annual_inflation": {
+            "title": "Annual Inflation",
+            "type": "number"
+          },
+          "annual_total_return": {
+            "title": "Annual Total Return",
+            "type": "number"
+          },
+          "contributed": {
+            "title": "Contributed",
+            "type": "number"
+          },
+          "net_dividend": {
+            "title": "Net Dividend",
+            "type": "null"
+          },
+          "simulated_return": {
+            "title": "Simulated Return",
+            "type": "number"
+          },
+          "terminal_annual_gross_dividend": {
+            "title": "Terminal Annual Gross Dividend",
+            "type": "number"
+          },
+          "terminal_dividend_yield": {
+            "title": "Terminal Dividend Yield",
+            "type": "number"
+          },
+          "terminal_monthly_gross_dividend_equivalent": {
+            "title": "Terminal Monthly Gross Dividend Equivalent",
+            "type": "number"
+          },
+          "terminal_value": {
+            "title": "Terminal Value",
+            "type": "number"
+          },
+          "terminal_value_today_money": {
+            "title": "Terminal Value Today Money",
+            "type": "number"
+          },
+          "years": {
+            "title": "Years",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "years",
+          "annual_total_return",
+          "contributed",
+          "terminal_value",
+          "simulated_return",
+          "terminal_value_today_money",
+          "annual_inflation",
+          "terminal_dividend_yield",
+          "terminal_annual_gross_dividend",
+          "terminal_monthly_gross_dividend_equivalent"
+        ],
+        "title": "SavingsScenarioOut",
+        "type": "object"
+      },
+      "Schedule13DGDisplayOut": {
+        "properties": {
+          "aggregate_shares": {
+            "title": "Aggregate Shares",
+            "type": "string"
+          },
+          "holder": {
+            "title": "Holder",
+            "type": "string"
+          },
+          "percent_of_class": {
+            "title": "Percent Of Class",
+            "type": "string"
+          },
+          "snapshot_date": {
+            "title": "Snapshot Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "holder",
+          "aggregate_shares",
+          "percent_of_class",
+          "snapshot_date"
+        ],
+        "title": "Schedule13DGDisplayOut",
+        "type": "object"
+      },
+      "Schedule13DGFilingOut": {
+        "description": "Fila persistida de SC 13D/13G: lo no parseado queda null (N/D en display).",
+        "properties": {
+          "accession_number": {
+            "title": "Accession Number",
+            "type": "string"
+          },
+          "aggregate_shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aggregate Shares"
+          },
+          "display": {
+            "$ref": "#/components/schemas/Schedule13DGDisplayOut"
+          },
+          "filer_cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filer Cik"
+          },
+          "filing_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Date"
+          },
+          "form": {
+            "title": "Form",
+            "type": "string"
+          },
+          "holder_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holder Name"
+          },
+          "index_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Url"
+          },
+          "is_amendment": {
+            "title": "Is Amendment",
+            "type": "boolean"
+          },
+          "issuer_cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Cik"
+          },
+          "issuer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Name"
+          },
+          "issuer_ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer Ticker"
+          },
+          "parser_version": {
+            "title": "Parser Version",
+            "type": "string"
+          },
+          "percent_of_class": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Percent Of Class"
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date"
+          },
+          "securities_class_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Securities Class Title"
+          },
+          "shared_dispositive_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Dispositive Power"
+          },
+          "shared_voting_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shared Voting Power"
+          },
+          "signature_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signature Date"
+          },
+          "snapshot_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Date"
+          },
+          "sole_dispositive_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sole Dispositive Power"
+          },
+          "sole_voting_power": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sole Voting Power"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "accession_number",
+          "form",
+          "is_amendment",
+          "status",
+          "source",
+          "parser_version",
+          "display"
+        ],
+        "title": "Schedule13DGFilingOut",
+        "type": "object"
+      },
+      "Schedule13DGResponseOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "filings": {
+            "items": {
+              "$ref": "#/components/schemas/Schedule13DGFilingOut"
+            },
+            "title": "Filings",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "source",
+          "count",
+          "filings",
+          "limitations"
+        ],
+        "title": "Schedule13DGResponseOut",
+        "type": "object"
+      },
       "ScreenCreate": {
         "properties": {
           "alerts_enabled": {
@@ -49395,9 +49880,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Schedule 13Dg Api Ownership Schedule 13Dg Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Schedule13DGResponseOut"
                 }
               }
             },
@@ -52207,9 +52690,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Savings Projection Api Plan Savings Projection Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavingsProjectionOut"
                 }
               }
             },

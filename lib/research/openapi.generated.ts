@@ -10338,6 +10338,150 @@ export interface components {
             /** Row Number */
             row_number: number;
         };
+        /**
+         * SavingsProjectionOut
+         * @description Contrato de savings_contract: dict literal, todas las claves siempre presentes.
+         */
+        SavingsProjectionOut: {
+            /** Assumptions */
+            assumptions: string[];
+            /** Basis */
+            basis: string;
+            /** Currency */
+            currency?: string | null;
+            /** Horizon Years */
+            horizon_years?: number | null;
+            /** Initial Capital */
+            initial_capital: number;
+            /** Monthly Contribution */
+            monthly_contribution?: number | null;
+            /** Plan Exists */
+            plan_exists: boolean;
+            /** Plan Id */
+            plan_id?: number | null;
+            /** Portfolio Included */
+            portfolio_included: boolean;
+            /** Preview */
+            preview: boolean;
+            /** Projection Url */
+            projection_url: string;
+            /** Scenarios */
+            scenarios: components["schemas"]["SavingsScenarioOut"][];
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "no_plan" | "currency_missing";
+        };
+        /**
+         * SavingsScenarioOut
+         * @description Escenario de project_savings: cifras ilustrativas, net_dividend siempre null.
+         */
+        SavingsScenarioOut: {
+            /** Annual Inflation */
+            annual_inflation: number;
+            /** Annual Total Return */
+            annual_total_return: number;
+            /** Contributed */
+            contributed: number;
+            /** Net Dividend */
+            net_dividend?: null;
+            /** Simulated Return */
+            simulated_return: number;
+            /** Terminal Annual Gross Dividend */
+            terminal_annual_gross_dividend: number;
+            /** Terminal Dividend Yield */
+            terminal_dividend_yield: number;
+            /** Terminal Monthly Gross Dividend Equivalent */
+            terminal_monthly_gross_dividend_equivalent: number;
+            /** Terminal Value */
+            terminal_value: number;
+            /** Terminal Value Today Money */
+            terminal_value_today_money: number;
+            /** Years */
+            years: number;
+        };
+        /** Schedule13DGDisplayOut */
+        Schedule13DGDisplayOut: {
+            /** Aggregate Shares */
+            aggregate_shares: string;
+            /** Holder */
+            holder: string;
+            /** Percent Of Class */
+            percent_of_class: string;
+            /** Snapshot Date */
+            snapshot_date: string;
+        };
+        /**
+         * Schedule13DGFilingOut
+         * @description Fila persistida de SC 13D/13G: lo no parseado queda null (N/D en display).
+         */
+        Schedule13DGFilingOut: {
+            /** Accession Number */
+            accession_number: string;
+            /** Aggregate Shares */
+            aggregate_shares?: number | null;
+            display: components["schemas"]["Schedule13DGDisplayOut"];
+            /** Filer Cik */
+            filer_cik?: string | null;
+            /** Filing Date */
+            filing_date?: string | null;
+            /** Form */
+            form: string;
+            /** Holder Name */
+            holder_name?: string | null;
+            /** Index Url */
+            index_url?: string | null;
+            /** Is Amendment */
+            is_amendment: boolean;
+            /** Issuer Cik */
+            issuer_cik?: string | null;
+            /** Issuer Name */
+            issuer_name?: string | null;
+            /** Issuer Ticker */
+            issuer_ticker?: string | null;
+            /** Parser Version */
+            parser_version: string;
+            /** Percent Of Class */
+            percent_of_class?: number | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Securities Class Title */
+            securities_class_title?: string | null;
+            /** Shared Dispositive Power */
+            shared_dispositive_power?: number | null;
+            /** Shared Voting Power */
+            shared_voting_power?: number | null;
+            /** Signature Date */
+            signature_date?: string | null;
+            /** Snapshot Date */
+            snapshot_date?: string | null;
+            /** Sole Dispositive Power */
+            sole_dispositive_power?: number | null;
+            /** Sole Voting Power */
+            sole_voting_power?: number | null;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Status */
+            status: string;
+        };
+        /** Schedule13DGResponseOut */
+        Schedule13DGResponseOut: {
+            /** Count */
+            count: number;
+            /** Filings */
+            filings: components["schemas"]["Schedule13DGFilingOut"][];
+            /** Limitations */
+            limitations: string[];
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+        };
         /** ScreenCreate */
         ScreenCreate: {
             /**
@@ -19623,9 +19767,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["Schedule13DGResponseOut"];
                 };
             };
             /** @description Validation Error */
@@ -20294,9 +20436,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["SavingsProjectionOut"];
                 };
             };
             /** @description Validation Error */

@@ -238,3 +238,82 @@ def test_changes_ok_rows_wire_shape(monkeypatch) -> None:
     assert row["change"] == "increased"
     assert row["put_call"] is None
     assert body["compared_accessions"]["latest"] == "0001067983-26-000002"
+
+
+def test_schedule_13dg_real_service_persisted_row_with_nulls(monkeypatch) -> None:
+    """Fila real persistida con campos no parseados en null: el wire los conserva
+    (N/D vive en display) y la respuesta sigue el contrato."""
+    from app.models.entities import Schedule13DGFiling
+
+    monkeypatch.setattr(
+        auth_module,
+        "get_settings",
+        lambda: auth_settings(strict=True, secret=SECRET),
+    )
+    init_db()
+    tenant_ext = f"sched13dg-{uuid4().hex[:8]}"
+    db = SessionLocal()
+    tenant = Tenant(external_id=tenant_ext, name="Schedule 13DG test")
+    db.add(tenant)
+    db.commit()
+    db.add(
+        Schedule13DGFiling(
+            tenant_id=tenant.id,
+            accession_number="0002012383-26-000099",
+            form="SC 13G",
+            is_amendment=False,
+            issuer_ticker="ZZT",
+            issuer_name=None,  # no parseado -> null, N/D en display
+            issuer_cik="1780312",
+            filer_cik=None,
+            holder_name=None,
+            aggregate_shares=None,
+            percent_of_class=None,
+            snapshot_date=None,
+            filing_date="2026-02-14",
+            source_url=None,
+            index_url=None,
+            holders=[],
+            parser_version="1.0",
+            status="parsed",
+        )
+    )
+    db.commit()
+    db.close()
+
+    client = TestClient(main.app)
+    res = signed_request(
+        client, SECRET, tenant_ext, "sched13dg-user", "GET",
+        "/api/ownership/schedule-13dg", params={"ticker": "ZZT"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ticker"] == "ZZT"
+    assert body["count"] == 1
+    filing = body["filings"][0]
+    assert filing["issuer_name"] is None
+    assert filing["holder_name"] is None
+    assert filing["aggregate_shares"] is None
+    assert filing["snapshot_date"] is None
+    assert filing["source_url"] is None
+    assert filing["display"]["holder"] == "N/D"
+    assert filing["display"]["aggregate_shares"] == "N/D"
+    assert filing["parser_version"] == "1.0"
+    assert body["limitations"]
+
+
+def test_schedule_13dg_empty_ticker_real_service(monkeypatch) -> None:
+    client, tenant, user = _client(monkeypatch)
+    res = signed_request(
+        client, SECRET, tenant, user, "GET",
+        "/api/ownership/schedule-13dg", params={"ticker": "NOPE"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body == {
+        "ticker": "NOPE",
+        "source": body["source"],
+        "count": 0,
+        "filings": [],
+        "limitations": body["limitations"],
+    }
