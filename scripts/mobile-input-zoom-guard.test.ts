@@ -16,15 +16,6 @@ const FIXED = [
     ['components/screeners/FilterFields.tsx', 'px-3 text-base text-gray-200 sm:text-sm', 1],
 ] as const;
 
-// Selects de research/sections ya corregidos en la rama del PR #3514; al
-// mergearse, quitar de esta lista y el escaneo los cubrirá también.
-const PENDING_3514 = new Set([
-    'components/research/sections/DecisionLessonsSection.tsx',
-    'components/research/sections/DriverAssumptionsSection.tsx',
-    'components/research/sections/FinancialTerminalSection.tsx',
-    'components/research/sections/ManagementCredibilitySection.tsx',
-]);
-
 function* walk(dir: string): Generator<string> {
     for (const entry of readdirSync(dir)) {
         const full = join(dir, entry);
@@ -46,7 +37,6 @@ describe('guard móvil: inputs sin zoom automático de iOS (text-base en móvil)
         const offenders: string[] = [];
         for (const root of ['app', 'components']) {
             for (const file of walk(root)) {
-                if (PENDING_3514.has(file)) continue;
                 const src = readFileSync(file, 'utf8');
                 for (const m of src.matchAll(re)) {
                     const c = m[1];
