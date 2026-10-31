@@ -1,12 +1,13 @@
 """Tests for the IBKR Flex import pipeline (IBKRImportService)."""
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
 from app.models import CashBalance, Company, Position, Tenant, Transaction
-from app.services.ibkr_import_service import IBKRImportService
+from app.services.ibkr_import_service import IBKRImportError, IBKRImportService, validate_flex_xml
 
 SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <FlexQueryResponse queryName="test">
@@ -182,3 +183,34 @@ def test_flex_decimal_dot_is_always_the_decimal_separator():
     assert _decimal("1,234.56") == Decimal("1234.56")
     assert _decimal("1.234,56") == Decimal("1234.56")
     assert _decimal("1.234.567") == Decimal("1234567")
+
+
+BOMB_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE lolz [
+ <!ENTITY lol "lollollollollollollollollollol">
+ <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+ <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+]>
+<FlexQueryResponse queryName="bomb">
+  <FlexStatements>
+    <FlexStatement accountId="&lol3;">
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>"""
+
+
+def test_validate_flex_xml_rejects_entities():
+    """Un XML con DOCTYPE/entidades (billion laughs) se rechaza sin expandir."""
+    errors = validate_flex_xml(BOMB_XML)
+    assert errors
+    assert "entidades" in errors[0]
+
+
+def test_import_flex_xml_rejects_entities():
+    """El import tambien rechaza entidades con error controlado (no 500, no expansion)."""
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    with _tenant_session(engine) as db:
+        with pytest.raises(IBKRImportError, match="entidades"):
+            IBKRImportService().import_flex_xml(db, BOMB_XML)

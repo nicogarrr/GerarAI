@@ -9,7 +9,16 @@ from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from xml.etree import ElementTree
+
+from defusedxml import ElementTree
+from defusedxml.common import EntitiesForbidden
+
+# XML externo (Flex Query subido por el usuario o servicio web de IBKR):
+# defusedxml rechaza entidades/DTDs (billion laughs) antes de expandirlas.
+_XML_ENTITIES_MSG = (
+    "El XML declara entidades (DOCTYPE): no es un Flex Query exportado por IBKR. "
+    "Descarga el fichero de nuevo desde IBKR sin editarlo."
+)
 
 from sqlalchemy import select, union_all
 from sqlalchemy.exc import IntegrityError
@@ -103,6 +112,8 @@ def validate_flex_xml(xml_text: str) -> list[str]:
     """Valida un Flex Query XML de IBKR (fechas con barra: orden por fichero)."""
     try:
         root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+    except EntitiesForbidden:
+        return [_XML_ENTITIES_MSG]
     except ElementTree.ParseError:
         root = None
     day_first = _flex_slash_day_first(root) if root is not None else False
@@ -127,6 +138,8 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
         return ["El fichero está vacío: descarga de nuevo el Flex Query XML desde IBKR (Informes > Flex Queries)."]
     try:
         root = ElementTree.fromstring(xml_text)
+    except EntitiesForbidden:
+        return [_XML_ENTITIES_MSG]
     except ElementTree.ParseError as exc:
         return [
             f"El XML no se puede leer ({exc}): el fichero está incompleto o no es XML. "
@@ -1137,6 +1150,8 @@ class IBKRImportService:
         """
         try:
             root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        except EntitiesForbidden as exc:
+            raise IBKRImportError(_XML_ENTITIES_MSG) from exc
         except ElementTree.ParseError:
             root = None
         day_first = _flex_slash_day_first(root) if root is not None else False
