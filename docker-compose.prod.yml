@@ -651,11 +651,14 @@ services:
           cpus: "0.50"
           memory: 384M
 
+  # Consume tambien la cola efimera "yahoo-news" del primer despliegue de
+  # #3763: drena lo que quedara encolado antes del renombre; quitarla en una
+  # limpieza posterior cuando este vacia (HLEN 0 en prod).
   worker-yahoo:
     image: cavaai-backend:prod
     container_name: cavaai-worker-yahoo
     restart: unless-stopped
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_THREADS:-2}", "-Q", "yahoo"]
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_THREADS:-2}", "-Q", "yahoo", "-Q", "yahoo-news"]
     environment:
       <<: [*app-env, *worker-db-env]
     logging: *default-logging

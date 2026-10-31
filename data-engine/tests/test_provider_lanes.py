@@ -114,6 +114,8 @@ def test_workers_de_proveedor_en_compose():
     assert fin["environment"]["dramatiq_queue_prefetch"] == "1"
     yahoo = compose["services"]["worker-yahoo"]
     assert yahoo["command"][yahoo["command"].index("-Q") + 1] == "yahoo"
+    # Transicion: drena la cola efimera del primer despliegue de #3763.
+    assert "yahoo-news" in yahoo["command"]
     # Nadie mas consume los carriles nuevos: el aislamiento es real.
     for nombre in ("worker", "worker-externa", "worker-gdelt"):
         comando = compose["services"][nombre]["command"]
