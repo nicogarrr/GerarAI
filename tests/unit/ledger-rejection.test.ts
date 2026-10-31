@@ -10,10 +10,13 @@ describe('ledgerRejection', () => {
         expect(ledgerRejection(api('Position cannot mix transaction currencies', 422))).toMatch(/otra divisa/);
         expect(ledgerRejection(api('Transaction not found', 404))).toMatch(/ya no existe/);
         expect(ledgerRejection(api('Insufficient shares for sale', 409), 'delete')).toMatch(/^No se puede borrar: una venta posterior/);
+        expect(ledgerRejection(api('Datos no válidos en: trade_date. Revisa esos campos y vuelve a intentarlo.', 422))).toMatch(/^La fecha de la operación no puede ser futura/);
     });
     it('lo demás no es un rechazo conocido (se relanza)', () => {
         expect(ledgerRejection(api('boom', 500))).toBeNull();
         expect(ledgerRejection(api('Insufficient shares for sale', 500))).toBeNull();
+        expect(ledgerRejection(api('Datos no válidos en: trade_date. Revisa esos campos y vuelve a intentarlo.', 500))).toBeNull();
+        expect(ledgerRejection(api('Datos no válidos en: quantity. Revisa esos campos y vuelve a intentarlo.', 422))).toBeNull();
         expect(ledgerRejection(new Error('Insufficient shares for sale'))).toBeNull();
         expect(ledgerRejection(null)).toBeNull();
     });

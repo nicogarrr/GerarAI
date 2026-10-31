@@ -24,5 +24,11 @@ export function ledgerRejection(error: unknown, operation: 'save' | 'delete' = '
     if (error.statusCode === 404 && /transaction not found/i.test(message)) {
         return 'Ese movimiento ya no existe (quizá se borró en otra pestaña). Recarga la página.';
     }
+    // La fecha futura la rechaza el validador del input (422 con lista
+    // pydantic): researchErrorDetail conserva el nombre del campo, no el
+    // motivo. Hoy la unica validacion de trade_date es la fecha futura.
+    if (error.statusCode === 422 && /\btrade_date\b/.test(message)) {
+        return 'La fecha de la operación no puede ser futura. Corrige la fecha y vuelve a intentarlo.';
+    }
     return null;
 }
