@@ -1,4 +1,5 @@
 from app.schemas.api import (
+    AlertAnalysisReadOut,
     AlertRuleOut,
     AlertsTelegramStatusOut,
     CalculatedMetricOut,
@@ -95,6 +96,7 @@ __all__ = [
     "ResearchSessionCreate",
     "ResearchSessionOut",
     "ResearchAlertAction",
+    "AlertAnalysisReadOut",
     "AlertRuleOut",
     "AlertsTelegramStatusOut",
     "ResearchAlertChannels",

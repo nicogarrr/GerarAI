@@ -14,6 +14,7 @@ from app.core.ui_errors import ui_error
 from app.models import AlertDelivery, AlertRule, Company, NewsEvent, ResearchAlert
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.schemas import (
+    AlertAnalysisReadOut,
     AlertRuleOut,
     AlertsTelegramStatusOut,
     ResearchAlertAction,
@@ -353,7 +354,8 @@ def list_alerts(
     return result
 
 
-@router.get("/{alert_id}/analysis")
+@router.get("/{alert_id}/analysis", response_model=AlertAnalysisReadOut,
+                    response_model_exclude_unset=True)
 def get_alert_analysis(alert_id: int, db: Session = Depends(get_db)) -> dict:
     from app.services.alert_analysis_service import read_analysis
 
