@@ -31,6 +31,13 @@ describe('DCA historical evidence display',()=>{
   render(<DcaHitRatesCard data={data({zone_visits})}/>);
   expect(screen.getByTestId('dca-zone-visits')).toHaveTextContent('Tiempo medio en 2X-4X: 2,5 meses · 2 visitas completadas · en curso 1 m (no cuenta)');
  });
+ it('declara las visitas excluidas por huecos con su n, sin contarlas en la media',()=>{
+  const zone_visits={available:true,reason:null,levels:[2,3,4],months_completed:130,first_period:'2015-01',last_period:'2026-09',completed_visits:2,excluded_gap_visits:1,avg_months:2.5,max_months:3,visits:[{start:'2018-06',end:'2018-08',months:3},{start:'2019-01',end:'2019-02',months:2}],open_visit_months:null,params_version:'v1'};
+  const view=render(<DcaHitRatesCard data={data({zone_visits})}/>);
+  expect(screen.getByTestId('dca-zone-visits')).toHaveTextContent('2 visitas completadas · 1 excluida por huecos en el histórico');
+  view.rerender(<DcaHitRatesCard data={data({zone_visits:{...zone_visits,excluded_gap_visits:3}})}/>);
+  expect(screen.getByTestId('dca-zone-visits')).toHaveTextContent('3 excluidas por huecos');
+ });
  it('no inventa el tiempo medio: sin dato o sin visitas completadas se dice y no se muestra cifra',()=>{
   const view=render(<DcaHitRatesCard data={data()}/>);
   expect(view.container.querySelector('[data-testid="dca-zone-visits"]')).toBeNull();

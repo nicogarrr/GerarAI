@@ -124,6 +124,8 @@ export interface DcaZoneVisits {
     first_period: string | null;
     last_period: string | null;
     completed_visits: number;
+    /** Visitas excluidas por huecos en el historico (meses sin dato dentro o junto a la racha). */
+    excluded_gap_visits?: number;
     avg_months: number | null;
     max_months: number | null;
     visits: DcaZoneVisit[];

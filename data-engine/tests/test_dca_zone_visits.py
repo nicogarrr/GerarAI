@@ -73,3 +73,36 @@ def test_zone_visits_unavailable_without_confirmed_months() -> None:
     assert out["available"] is False
     assert out["completed_visits"] == 0
     assert out["avg_months"] is None
+
+
+def test_zone_visits_gap_inside_run_is_excluded_not_joined() -> None:
+    # jun 2X, jul AUSENTE, ago 2X, sep/oct 1X: el hueco es desconocido; la
+    # visita no demuestra 2 meses y se excluye (n visible), no se une.
+    closes = [100.0] * 5 + [80.0] + [80.0] + [100.0, 100.0]
+    bars = [
+        b for i, b in enumerate(_month_end_bars(closes)) if i != 6  # sin julio
+    ]
+    out = zone_visits(bars, params=PARAMS, today=bars[-1].day)
+    assert out["completed_visits"] == 0
+    assert out["visits"] == []
+    assert out["excluded_gap_visits"] == 1
+    assert out["avg_months"] is None
+
+
+def test_zone_visits_gap_at_closing_edge_is_excluded() -> None:
+    # jun 2X, jul AUSENTE, ago 1X: la visita duro 1 o 2 meses (indeterminado).
+    closes = [100.0] * 5 + [80.0] + [100.0, 100.0, 100.0]
+    bars = [b for i, b in enumerate(_month_end_bars(closes)) if i != 6]
+    out = zone_visits(bars, params=PARAMS, today=bars[-1].day)
+    assert out["completed_visits"] == 0
+    assert out["excluded_gap_visits"] == 1
+
+
+def test_zone_visits_open_run_with_gap_declares_no_length() -> None:
+    # Racha abierta con hueco dentro: no se declara largo y cuenta como excluida.
+    closes = [100.0] * 5 + [80.0, 80.0, 80.0]
+    bars = [b for i, b in enumerate(_month_end_bars(closes)) if i != 6]
+    out = zone_visits(bars, params=PARAMS, today=bars[-1].day)
+    assert out["completed_visits"] == 0
+    assert out["open_visit_months"] is None
+    assert out["excluded_gap_visits"] == 1

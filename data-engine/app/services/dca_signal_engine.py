@@ -415,7 +415,11 @@ def zone_visits(
     formación no entra (misma disciplina sin look-ahead que ``hit_rates``).
     Histórico e hipotético; no predice resultados.
     """
-    series = [v for v in evaluate_series(bars, params=params, today=today) if v.status == "confirmed"]
+    verdicts = evaluate_series(bars, params=params, today=today)
+    series = [v for v in verdicts if v.status == "confirmed"]
+    forming_period = (
+        verdicts[-1].period if verdicts and verdicts[-1].status == "forming" else None
+    )
     wanted = {int(level) for level in levels}
     empty = {
         "available": False,
@@ -425,6 +429,7 @@ def zone_visits(
         "first_period": None,
         "last_period": None,
         "completed_visits": 0,
+        "excluded_gap_visits": 0,
         "avg_months": None,
         "max_months": None,
         "visits": [],
@@ -433,20 +438,51 @@ def zone_visits(
     }
     if not series:
         return empty
+    def _next(period: str) -> str:
+        y, m = int(period[:4]), int(period[5:7])
+        return f"{y + (m == 12):04d}-{m % 12 + 1:02d}"
+
+    # Una racha solo demuestra meses OBSERVADOS consecutivos: si entre dos
+    # meses de la visita falta un mes del historico (jun 2X, ago 2X), el hueco
+    # es desconocido y la duracion no es comparable: la visita se EXCLUYE de
+    # la media y se cuenta en ``excluded_gap_visits``; nunca se une a traves
+    # del hueco. Igual para la visita abierta: con hueco no se declara largo.
+    def _has_gap(start_i: int, end_i: int) -> bool:
+        return any(
+            _next(series[j].period) != series[j + 1].period
+            for j in range(start_i, end_i)
+        )
+
     visits: list[dict] = []
+    excluded_gap = 0
     run_start: int | None = None
     for i, verdict in enumerate(series):
         if verdict.level in wanted:
             if run_start is None:
                 run_start = i
         elif run_start is not None:
-            visits.append({
-                "start": series[run_start].period,
-                "end": series[i - 1].period,
-                "months": i - run_start,
-            })
+            if _has_gap(run_start, i):  # incluye la adyacencia con el mes que cierra
+                excluded_gap += 1
+            else:
+                visits.append({
+                    "start": series[run_start].period,
+                    "end": series[i - 1].period,
+                    "months": i - run_start,
+                })
             run_start = None
-    open_months = (len(series) - run_start) if run_start is not None else None
+    if run_start is None:
+        open_months = None
+    else:
+        # La racha abierta solo declara largo si llega CONTIGUA al mes en
+        # formacion: con un mes ausente en medio (jun 2X, jul sin dato, ago
+        # 2X en formacion) no se sabe si la visita sigue viva o se cerro en
+        # el hueco, asi que se excluye igual que las completadas con gap.
+        reaches_present = forming_period is None or _next(series[-1].period) == forming_period
+        if _has_gap(run_start, len(series) - 1) or not reaches_present:
+            open_months = None
+            excluded_gap += 1
+        else:
+            open_months = len(series) - run_start
     lengths = [visit["months"] for visit in visits]
     avg = None
     if lengths:
@@ -463,6 +499,7 @@ def zone_visits(
         "first_period": series[0].period,
         "last_period": series[-1].period,
         "completed_visits": len(visits),
+        "excluded_gap_visits": excluded_gap,
         "avg_months": avg,
         "max_months": max(lengths) if lengths else None,
         "visits": visits,

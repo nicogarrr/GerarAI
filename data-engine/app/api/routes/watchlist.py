@@ -466,6 +466,7 @@ class DcaZoneVisitsOut(BaseModel):
     first_period: str | None = None
     last_period: str | None = None
     completed_visits: int = 0
+    excluded_gap_visits: int = 0
     avg_months: float | None = None
     max_months: int | None = None
     visits: list[DcaZoneVisitOut] = Field(default_factory=list)

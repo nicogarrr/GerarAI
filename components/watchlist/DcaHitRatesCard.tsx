@@ -23,11 +23,13 @@ function zoneVisitsLine(data: DcaHitRates): string | null {
     const zv = data.zone_visits;
     if (!zv || !zv.available) return null;
     const open = zv.open_visit_months ? ` · en curso ${MONTHS.format(zv.open_visit_months)} m (no cuenta)` : '';
+    const ex = zv.excluded_gap_visits ?? 0;
+    const excluded = ex > 0 ? ` · ${ex} ${ex === 1 ? 'excluida' : 'excluidas'} por huecos en el histórico` : '';
     if (!zv.completed_visits || zv.avg_months === null) {
-        return `Sin visitas completadas a 2X-4X en el histórico${open}`;
+        return `Sin visitas completadas a 2X-4X en el histórico${open}${excluded}`;
     }
     const n = zv.completed_visits;
-    return `Tiempo medio en 2X-4X: ${MONTHS.format(zv.avg_months)} meses · ${n} ${n === 1 ? 'visita completada' : 'visitas completadas'}${open}`;
+    return `Tiempo medio en 2X-4X: ${MONTHS.format(zv.avg_months)} meses · ${n} ${n === 1 ? 'visita completada' : 'visitas completadas'}${open}${excluded}`;
 }
 
 export default function DcaHitRatesCard({ data, compact = false, scope = 'full' }: {
