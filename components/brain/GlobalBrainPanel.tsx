@@ -150,7 +150,11 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
 
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                // Con movimiento reducido el salto es instantaneo (WCAG 2.3.3).
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+            });
         }
     }, [messages, isMaximized]);
 

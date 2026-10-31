@@ -532,4 +532,17 @@
     .brain-breathe {
         animation: none;
     }
+
+    /*
+     * Las utilidades de animacion de Tailwind (animate-pulse en esqueletos de
+     * carga, animate-spin en spinners, bounce/ping) se repiten en bucle sin
+     * control del usuario: con movimiento reducido se detienen. WCAG 2.2
+     * SC 2.2.2 (contenido en movimiento automatico) y SC 2.3.3.
+     */
+    .animate-pulse,
+    .animate-spin,
+    .animate-bounce,
+    .animate-ping {
+        animation: none;
+    }
 }
