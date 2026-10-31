@@ -26,9 +26,24 @@ _ECB_BACKFILL_TRIED: set[tuple[str, date]] = set()
 
 
 def _default_fx_backfill(db: Session, currencies: set[str], start: date, end: date) -> dict:
+    """Descarga BCE con SESION PROPIA: jamas confirma la sesion del llamante.
+
+    :func:`backfill_ecb_rates` cierra su escritura con ``db.commit()``; sobre
+    la sesion del llamante ese commit mata cualquier savepoint abierto (p. ej.
+    el de cada fila del importador CSV: InvalidRequestError a mitad de
+    fichero) y confirma trabajo ajeno a medias. Con una sesion independiente
+    el commit es suyo, y la transaccion del llamante (Postgres, READ
+    COMMITTED) ve los tipos nuevos en su siguiente SELECT. ``db`` queda solo
+    para la firma del seam inyectable (los tests reciben su sesion).
+    """
+    from app.core.database import SessionLocal
     from app.services.connectors.ecb_history import backfill_ecb_rates_sync
 
-    return backfill_ecb_rates_sync(db, currencies=currencies, start=start, end=end)
+    session = SessionLocal()
+    try:
+        return backfill_ecb_rates_sync(session, currencies=currencies, start=start, end=end)
+    finally:
+        session.close()
 
 #: Acciones válidas del ledger (enum cerrado: buy/sell mueven posición,
 #: el resto son movimientos de caja/ajuste que no tocan cantidad).
