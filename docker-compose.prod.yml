@@ -6,7 +6,8 @@
 # que aqui NO va ni frontend ni MongoDB.
 #
 # Presupuesto de memoria: la suma de `memory` de TODOS los servicios es
-# 12.032 MiB (11,75 GiB); worker default con 3 GiB tras OOM medido. El resto de la VM queda para el kernel, page cache y una swap de
+# 13.568 MiB (13,25 GiB); worker default con 4 GiB tras OOM medido (3 GiB con
+# 1 hilo + margen por concurrencia). El resto de la VM queda para el kernel, page cache y una swap de
 # 2-4 GB (ver docs/oracle-setup.md). Los `cpus` son techos por servicio, no
 # reservas: la VM tiene 4 OCPU y varios servicios pueden turnarse. No se
 # supera este techo: el carril "computed" lo consume el worker-alerts (jobs
@@ -58,9 +59,10 @@ x-app-env: &app-env
   FINANCIAL_DOCUMENT_RETENTION_DAYS: ${FINANCIAL_DOCUMENT_RETENTION_DAYS:-2555}
   CHAT_TELEMETRY_RETENTION_DAYS: ${CHAT_TELEMETRY_RETENTION_DAYS:-90}
 
-# Pool de BD de los workers: 4 conexiones + 2 de overflow por proceso. Con 8
-# workers + scheduler son ~54 conexiones, mas las 30 del backend (20+10): muy
-# por debajo de max_connections=200 de Postgres.
+# Pool de BD de los workers: 4 conexiones + 2 de overflow por proceso (el
+# carril default sube a 8+2 por sus 4 hilos). Con 9 workers + scheduler son
+# ~64 conexiones, mas las 30 del backend (20+10): muy por debajo de
+# max_connections=200 de Postgres.
 x-worker-db-env: &worker-db-env
   DB_POOL_SIZE: ${WORKER_DB_POOL_SIZE:-4}
   DB_MAX_OVERFLOW: ${WORKER_DB_MAX_OVERFLOW:-2}
@@ -143,9 +145,9 @@ services:
     image: postgres:17
     container_name: cavaai-postgres
     restart: unless-stopped
-    # 200 conexiones: 30 del backend (20+10) + ~54 de los workers (4+2 cada
-    # uno) + salud/diagnostico. Sin subirlo, el pool por defecto (100) dejaba
-    # a los workers esperando conexiones bajo fan-out.
+    # 200 conexiones: 30 del backend (20+10) + ~64 de los workers (el default
+    # usa 8+2; el resto 4+2) + salud/diagnostico. Sin subirlo, el pool por
+    # defecto (100) dejaba a los workers esperando conexiones bajo fan-out.
     command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=256MB"]
     # Sin puerto publico: solo red interna de compose.
     volumes:
@@ -421,21 +423,31 @@ services:
   # refresh_bottlenecks cargaba todos los chunks del tenant en memoria
   # (stored_evidence), y la concurrencia/redelivery de esos jobs sumaba memoria.
   # Bajar hilos mitiga, no corrige la carga; el fix esta en bottleneck_service.
-  # Hilos por env (WORKER_THREADS, defecto 2) para subir de forma gradual SIN
-  # redeploy de codigo: el worker es I/O-bound (CPU 0,17% medido con 8.709
-  # pendientes, 31-oct piloto) y el pool de BD es por proceso (10+10), asi
-  # que mas hilos no abren conexiones nuevas ni mas rate de proveedores (el
-  # pacing 1,5 s es por peticion y el ritmo de encolado no cambia).
-  # Escalado: 2 -> medir RSS -> 4. El historial OOM venia de N
-  # refresh_bottlenecks concurrentes en memoria; ya hay streaming (yield_per),
-  # pero se mide RSS antes de cada subida.
+  # Hilos por env para subir de forma gradual SIN nuevo despliegue de codigo:
+  # el worker es I/O-bound (CPU 0,17% medido con 8.709 pendientes, 31-oct
+  # piloto) y el pool de BD es por proceso (8+2, ver DB_POOL_SIZE abajo).
+  # Un solo knob para hilos: WORKER_THREADS (defecto 4 aqui, 2 en
+  # worker-prices). Escalado: 2 -> medir -> 4 -> 8 (WORKER_THREADS en .env).
+  # El historial de OOM venia de N refresh_bottlenecks concurrentes cargando
+  # chunks en memoria; el servicio ya hace streaming (yield_per), pero se
+  # mide RSS antes de cada subida.
+  # prices sale a worker-prices (carril dedicado, mismo patron que
+  # official-closes/dca-manual/thesis): su frescura intradia (15 min)
+  # esperaba detras del backlog de default (8.709 pendientes, edad p50 39 h).
+  # El comentario va ANTES del servicio (no entre worker: y command:) porque
+  # los guards de carriles localizan el command en una ventana de 200 chars.
   worker:
     image: cavaai-backend:prod
     container_name: cavaai-worker
     restart: unless-stopped
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${WORKER_THREADS:-2}", "-Q", "default", "prices"]
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${WORKER_THREADS:-4}", "-Q", "default"]
     environment:
       <<: [*app-env, *worker-db-env, *llm-env]
+      # 4 hilos por proceso: con el pool por defecto (4+2) los hilos se
+      # serializaban esperando conexion. Mismo knob WORKER_DB_POOL_SIZE con
+      # defecto 8 solo en este servicio: 8+2 = 10 conexiones; el presupuesto
+      # global sigue muy por debajo de max_connections=200.
+      DB_POOL_SIZE: ${WORKER_DB_POOL_SIZE:-8}
       EIA_API_KEY: ${EIA_API_KEY:-}
       IBKR_FLEX_TOKEN: ${IBKR_FLEX_TOKEN:-}
       IBKR_FLEX_QUERY_ID: ${IBKR_FLEX_QUERY_ID:-}
@@ -499,11 +511,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # Memoria: 3 GiB eran el suelo medido con 1 hilo (OOM previo); con 4
+    # hilos concurrentes se deja 1 GiB de margen. Medir RSS antes de subir a 8.
+    # (El comentario fuera de limits: los guards matchean cpus+memory juntas.)
     deploy:
       resources:
         limits:
           cpus: "1.00"
-          memory: 3G
+          memory: 4G
 
   # Dedicated lane: closes must not wait behind RSS/default backpressure.
   worker-official-closes:
@@ -530,6 +545,33 @@ services:
         limits:
           cpus: "0.50"
           memory: 384M
+
+  # Dedicated lane: intraday price freshness (15 min) must not wait behind
+  # the default backlog (8.709 pending, p50 age 39 h medido 2026-10-31).
+  worker-prices:
+    image: cavaai-backend:prod
+    container_name: cavaai-worker-prices
+    restart: unless-stopped
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${WORKER_THREADS:-2}", "-Q", "prices"]
+    environment:
+      <<: [*app-env, *worker-db-env]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
 
   # Interactive manual DCA never waits behind RSS/default or price ingestion.
   worker-dca-manual:
