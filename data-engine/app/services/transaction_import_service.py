@@ -234,17 +234,19 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
             for r in sheet.iter_rows(values_only=True):
                 if any(v is not None for v in r):
                     rows.append([str(v) if v is not None else "" for v in r])
-            if not rows:
-                raise ValueError("El archivo Excel no contiene filas con datos")
-            headers = rows[0]
-            data_rows = rows[1:]
-            if len(data_rows) > MAX_IMPORT_ROWS:
-                raise ValueError(
-                    f"El archivo supera el máximo de {MAX_IMPORT_ROWS} filas; divídelo en varios lotes"
-                )
-            return headers, data_rows
         except Exception as exc:
             raise ValueError(f"Error al leer el archivo Excel: {exc}") from exc
+        # Fuera del try: el límite de filas y el archivo vacío llegan con su
+        # propio mensaje, no envueltos en «Error al leer el archivo Excel».
+        if not rows:
+            raise ValueError("El archivo Excel no contiene filas con datos")
+        headers = rows[0]
+        data_rows = rows[1:]
+        if len(data_rows) > MAX_IMPORT_ROWS:
+            raise ValueError(
+                f"El archivo supera el máximo de {MAX_IMPORT_ROWS} filas; divídelo en varios lotes"
+            )
+        return headers, data_rows
 
     try:
         text = file_bytes.decode("utf-8-sig")
