@@ -704,9 +704,22 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
 def positions(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
-    offset = (page - 1) * page_size
+    # Contrato dual (aditivo): page/page_size es el estilo documentado y
+    # limit/offset el que usa el indice de /research via paginateAll
+    # (?limit=2000&offset=N). Antes solo existian page/page_size y FastAPI
+    # descartaba limit/offset en silencio: cualquier tenant con mas de 20
+    # posiciones recibia solo la primera pagina rotulada como completa.
+    # limit/offset tiene precedencia cuando se pasa `limit`.
+    if limit is not None:
+        page_size = limit
+        offset_val = offset or 0
+        page = offset_val // limit + 1
+    else:
+        offset_val = (page - 1) * page_size
     total = db.scalar(
         select(func.count())
         .select_from(Position)
@@ -718,7 +731,7 @@ def positions(
         .join(Company, Position.company_id == Company.id)
         .order_by(Company.ticker)
         .limit(page_size)
-        .offset(offset)
+        .offset(offset_val)
     ).all()
     fiscal = _fiscal_info_batch(db, _holding_as_of(db, rows))
     analysis_states = tracked_statuses(db, [company.ticker for _, company in rows])
