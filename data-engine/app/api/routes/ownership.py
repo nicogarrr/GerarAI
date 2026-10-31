@@ -6,7 +6,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.ui_errors import ui_error
-from app.schemas.api import ManagerChangesOut, ManagerHoldingsOut, OwnershipManagersOut
+from app.schemas.api import (
+    ManagerChangesOut,
+    ManagerHoldingsOut,
+    OwnershipManagersOut,
+    Schedule13DGResponseOut,
+)
 from app.services import schedule13dg_monitor, schedule13dg_service
 from app.services.manager_holding_ingestion_service import (
     LIMITATIONS,
@@ -68,7 +73,7 @@ def manager_holdings(cik: str, db: Session = Depends(get_db)) -> dict:
     return ManagerHoldingIngestionService().latest_holdings(db, cik=cik)
 
 
-@router.get("/schedule-13dg")
+@router.get("/schedule-13dg", response_model=Schedule13DGResponseOut)
 def schedule_13dg(
     ticker: str = Query(min_length=1, max_length=20),
     db: Session = Depends(get_db),

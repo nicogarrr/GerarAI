@@ -1159,3 +1159,83 @@ class InvestorPortfolioOut(BaseModel):
     total_value_usd: InvestorDatumOut
     coverage: str | None = None
     note: str | None = None
+
+
+class SavingsScenarioOut(BaseModel):
+    """Escenario de project_savings: cifras ilustrativas, net_dividend siempre null."""
+
+    years: int
+    annual_total_return: float
+    contributed: float
+    terminal_value: float
+    simulated_return: float
+    terminal_value_today_money: float
+    annual_inflation: float
+    terminal_dividend_yield: float
+    terminal_annual_gross_dividend: float
+    terminal_monthly_gross_dividend_equivalent: float
+    net_dividend: None = None
+
+
+class SavingsProjectionOut(BaseModel):
+    """Contrato de savings_contract: dict literal, todas las claves siempre presentes."""
+
+    plan_exists: bool
+    plan_id: int | None = None
+    preview: bool
+    monthly_contribution: float | None = None
+    currency: str | None = None
+    horizon_years: int | None = None
+    initial_capital: int
+    portfolio_included: bool
+    basis: str
+    assumptions: list[str]
+    scenarios: list[SavingsScenarioOut]
+    status: Literal["ok", "no_plan", "currency_missing"]
+    source: str
+    projection_url: str
+
+
+class Schedule13DGDisplayOut(BaseModel):
+    holder: str
+    aggregate_shares: str
+    percent_of_class: str
+    snapshot_date: str
+
+
+class Schedule13DGFilingOut(BaseModel):
+    """Fila persistida de SC 13D/13G: lo no parseado queda null (N/D en display)."""
+
+    accession_number: str
+    form: str
+    is_amendment: bool
+    issuer_ticker: str | None = None
+    issuer_name: str | None = None
+    issuer_cik: str | None = None
+    filer_cik: str | None = None
+    holder_name: str | None = None
+    aggregate_shares: float | None = None
+    percent_of_class: float | None = None
+    sole_voting_power: float | None = None
+    shared_voting_power: float | None = None
+    sole_dispositive_power: float | None = None
+    shared_dispositive_power: float | None = None
+    securities_class_title: str | None = None
+    snapshot_date: str | None = None
+    filing_date: str | None = None
+    report_date: str | None = None
+    signature_date: str | None = None
+    status: str
+    source: str
+    source_url: str | None = None
+    index_url: str | None = None
+    parser_version: str
+    display: Schedule13DGDisplayOut
+
+
+class Schedule13DGResponseOut(BaseModel):
+    ticker: str
+    source: str
+    count: int
+    filings: list[Schedule13DGFilingOut]
+    limitations: list[str]
