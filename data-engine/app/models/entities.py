@@ -1255,7 +1255,9 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
         ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    title: Mapped[str] = mapped_column(String(400))
+    # VARCHAR(500): prod guarda titulos de hasta 467 caracteres (MEDIDO
+    # 2026-10-31); la reduccion a 400 de 0105 se retiro para no perderlos.
+    title: Mapped[str] = mapped_column(String(500))
     source: Mapped[str] = mapped_column(String(120), default="manual")
     url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     summary: Mapped[str] = mapped_column(Text, default="")

@@ -7,12 +7,17 @@ Create Date: 2026-10-30T19:05:21.808Z
 Conservative VARCHAR size reductions for performance optimization:
 - companies.name: 255 → 200
 - documents.title: 500 → 400
-- news_events.title: 500 → 400
+- news_events.title: SIN CAMBIO (se mantiene VARCHAR(500))
 - insider_filings.issuer_name: 300 → 250
 - knowledge_documents.title: 500 → 400
 
 All changes are backward compatible (smaller values fit in existing columns).
 No data truncation expected - sizes remain generous for typical content.
+
+EXCEPCION medida en prod (2026-10-31, sin mutar prod): news_events.title tiene
+7 filas por encima de 400 caracteres, maximo 467. Reducir a VARCHAR(400)
+abortaria el upgrade 0103 -> head con StringDataRightTruncation y truncar es
+perder historico, asi que esta columna conserva su capacidad VARCHAR(500).
 
 SQLite: Uses batch_alter_table for compatibility.
 PostgreSQL: Direct ALTER COLUMN TYPE (instant when new size >= all values).
@@ -49,12 +54,9 @@ def upgrade() -> None:
                               type_=sa.String(length=400),
                               existing_nullable=False)
     
-    # 3. news_events.title: 500 → 400
-    with op.batch_alter_table('news_events', schema=None) as batch_op:
-        batch_op.alter_column('title',
-                              existing_type=sa.String(length=500),
-                              type_=sa.String(length=400),
-                              existing_nullable=False)
+    # 3. news_events.title: NO se reduce. MEDIDO en prod (2026-10-31): hay
+    # titulos de hasta 467 caracteres; VARCHAR(400) haria fallar el ALTER y
+    # truncar destruiria historico. La columna se queda en VARCHAR(500).
     
     # 4. insider_filings.issuer_name: 300 → 250
     with op.batch_alter_table('insider_filings', schema=None) as batch_op:
@@ -88,11 +90,7 @@ def downgrade() -> None:
                               type_=sa.String(length=300),
                               existing_nullable=True)
     
-    with op.batch_alter_table('news_events', schema=None) as batch_op:
-        batch_op.alter_column('title',
-                              existing_type=sa.String(length=400),
-                              type_=sa.String(length=500),
-                              existing_nullable=False)
+    # news_events.title nunca se redujo en upgrade: nada que restaurar.
     
     with op.batch_alter_table('documents', schema=None) as batch_op:
         batch_op.alter_column('title',
