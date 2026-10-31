@@ -49,8 +49,13 @@ def _pendientes(conn, tabla: str | None) -> list[tuple[str, str]]:
     return [(r[0], r[1]) for r in rows if tabla is None or r[1] == tabla]
 
 
-def _muestra_infractores(conn, conname: str, tabla: str) -> list[str]:
-    """Hasta 5 filas que violan la FK (columnas locales -> referenciadas)."""
+def _muestra_infractores(conn, conname: str, tabla: str, quote) -> list[str]:
+    """Hasta 5 filas que violan la FK (columnas locales -> referenciadas).
+
+    Un unico NOT EXISTS con TODAS las igualdades: en una FK compuesta el
+    hijo (A1,B2) es huerfano aunque existan los padres (A1,B1) y (A2,B2);
+    comparar columna a columna no lo detectaria.
+    """
     meta = conn.execute(
         sa.text(
             "select conkey, confkey, confrelid::regclass::text "
@@ -64,12 +69,16 @@ def _muestra_infractores(conn, conname: str, tabla: str) -> list[str]:
     )
     locales = [conn.execute(att, {"t": tabla, "a": int(a)}).scalar_one() for a in conkey]
     remotas = [conn.execute(att, {"t": ref, "a": int(a)}).scalar_one() for a in confkey]
-    cond = " and ".join(
-        f"t.{l} is not null and not exists (select 1 from {ref} r where r.{m} = t.{l})"
-        for l, m in zip(locales, remotas, strict=True)
+    igualdades = " and ".join(
+        f"r.{quote(m)} = t.{quote(l)}" for l, m in zip(locales, remotas, strict=True)
     )
-    cols = ", ".join(locales)
-    return [str(tuple(r)) for r in conn.execute(sa.text(_MUESTRA_INFRACTORAS.format(cols=cols, tabla=tabla, cond=cond))).all()]
+    cond = " and ".join(
+        [*(f"t.{quote(l)} is not null" for l in locales),
+         f"not exists (select 1 from {quote(ref)} r where {igualdades})"]
+    )
+    cols = ", ".join(quote(l) for l in locales)
+    sql = _MUESTRA_INFRACTORAS.format(cols=cols, tabla=quote(tabla), cond=cond)
+    return [str(tuple(r)) for r in conn.execute(sa.text(sql)).all()]
 
 
 def main() -> int:
@@ -81,6 +90,7 @@ def main() -> int:
     from app.core.config import get_settings
 
     engine = sa.create_engine(get_settings().database_url)
+    quote = engine.dialect.identifier_preparer.quote
     with engine.connect() as conn:
         pendientes = _pendientes(conn, args.tabla)
     if not pendientes:
@@ -98,12 +108,14 @@ def main() -> int:
         try:
             with engine.begin() as conn:
                 conn.execute(
-                    sa.text(f'ALTER TABLE "{tabla}" VALIDATE CONSTRAINT "{nombre}"')
+                    sa.text(
+                        f"ALTER TABLE {quote(tabla)} VALIDATE CONSTRAINT {quote(nombre)}"
+                    )
                 )
             print(f"OK   {tabla}: {nombre}")
         except sa.exc.SQLAlchemyError as exc:
             with engine.connect() as conn:
-                muestra = _muestra_infractores(conn, nombre, tabla)
+                muestra = _muestra_infractores(conn, nombre, tabla, quote)
             fallidas.append((tabla, nombre, muestra))
             print(f"FALLO {tabla}: {nombre} ({exc.__class__.__name__})")
     if fallidas:
@@ -115,7 +127,7 @@ def main() -> int:
         print("Corrige los datos y relanza el script (idempotente).")
         return 1
     with engine.connect() as conn:
-        restantes = _pendientes(conn, None)
+        restantes = _pendientes(conn, args.tabla)
     assert not restantes, restantes
     print("\nTodas las FKs pendientes quedaron validadas.")
     return 0

@@ -112,3 +112,60 @@ def test_runner_reporta_huerfanos_y_sigue_con_el_resto_en_ci_postgres():
         engine.dispose()
     finally:
         _drop(admin, scratch)
+
+
+def test_fk_compuesta_huerfano_detectado_y_tabla_filtra_el_resultado_en_ci_postgres():
+    """FK compuesta: hijo (A1,B2) con padres (A1,B1),(A2,B2) ES huerfano y la
+    muestra debe detectarlo (un unico NOT EXISTS con todas las igualdades).
+    Ademas, con --tabla el exito/fracaso se juzga solo en esa tabla aunque el
+    resto de la BD siga con NOT VALID pendientes."""
+    url = _url_postgres_ci()
+    if not url:
+        pytest.skip("solo en el job Postgres con CAVAAI_ORIGINAL_DATABASE_URL")
+    scratch, scratch_url, admin = _scratch(url)
+    try:
+        engine = sa.create_engine(scratch_url)
+        with engine.begin() as conn:
+            conn.execute(sa.text(
+                "create table padre_comp (a int not null, b int not null,"
+                " constraint uq_padre_comp unique (a, b))"
+            ))
+            conn.execute(sa.text(
+                "create table hijo_comp (id int primary key, a int, b int)"
+            ))
+            conn.execute(sa.text(
+                "alter table hijo_comp add constraint fk_hijo_comp_padre"
+                " foreign key (a, b) references padre_comp (a, b) not valid"
+            ))
+            conn.execute(sa.text("insert into padre_comp (a, b) values (1, 1), (2, 2)"))
+            conn.execute(sa.text("set session_replication_role = replica"))
+            conn.execute(sa.text("insert into hijo_comp (id, a, b) values (1, 1, 2)"))
+            conn.execute(sa.text("reset session_replication_role"))
+
+        res = _run(scratch_url, "--apply", "--tabla", "hijo_comp")
+        assert res.returncode == 1
+        assert "fk_hijo_comp_padre" in res.stdout
+        assert "(1, 2)" in res.stdout  # la combinacion huerfana, no columnas sueltas
+        with engine.connect() as conn:
+            restantes = {
+                r[0]
+                for r in conn.execute(sa.text(
+                    "select conname from pg_constraint where contype='f'"
+                    " and not convalidated and connamespace='public'::regnamespace"
+                )).all()
+            }
+        assert "fk_hijo_comp_padre" in restantes
+        assert len(restantes) == 60  # las 59 de la cadena + la compuesta
+
+        # una tabla limpia valida aunque queden NOT VALID en otras: sale 0
+        res_ok = _run(scratch_url, "--apply", "--tabla", "documents")
+        assert res_ok.returncode == 0, res_ok.stdout
+        with engine.connect() as conn:
+            docs_pendientes = conn.execute(sa.text(
+                "select count(*) from pg_constraint where contype='f' and not convalidated"
+                " and conrelid = 'documents'::regclass"
+            )).scalar_one()
+        assert docs_pendientes == 0
+        engine.dispose()
+    finally:
+        _drop(admin, scratch)
