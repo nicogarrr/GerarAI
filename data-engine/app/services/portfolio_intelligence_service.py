@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
 from app.services.async_bridge import run_from_any_context
 from app.services.portfolio_fx_service import PortfolioFXService, currency_key
@@ -171,7 +172,8 @@ MIN_ANNUALIZATION_SESSIONS = 60
 class PortfolioIntelligenceService:
     def build(self, db: Session, *, years: int = 5) -> dict[str, Any]:
         years = max(1, min(years, 20))
-        cutoff = date.today() - timedelta(days=365 * years)
+        # «Hoy» del usuario (Europe/Madrid), no el día UTC del servidor.
+        cutoff = local_today() - timedelta(days=365 * years)
         fx = PortfolioFXService()
         base_currency = fx.base_currency(db)
         rows = list(
@@ -309,7 +311,7 @@ class PortfolioIntelligenceService:
         attribution = self._attribution(db, rows, weights, price_series, cutoff)
         ledger_contribution = self._ledger_contribution(db, rows, cutoff)
         complete_price_series = sum(len(series) >= 2 for series in price_series.values())
-        today_ = date.today()
+        today_ = local_today()
         horizon_coverages = {
             company.id: self._horizon_coverage(price_series.get(company.id, []), cutoff, today_)
             for _, company in rows
@@ -319,7 +321,7 @@ class PortfolioIntelligenceService:
             round(100 * fmean(share for share, _ in horizon_coverages.values()), 1) if rows else 100.0
         )
         return {
-            "as_of": date.today(),
+            "as_of": today_,
             "base_currency": base_currency,
             "missing_fx": missing_fx,
             "horizon_years": years,
@@ -771,7 +773,7 @@ class PortfolioIntelligenceService:
             db,
             quote_currencies={cash.currency for cash in cash_rows},
             base_currency=base,
-            as_of=date.today(),
+            as_of=local_today(),
         )
         if perspective == "account" and not cash_rows:
             # Con depositos registrados el valor final DEBE incluir la caja. Sin
@@ -800,7 +802,9 @@ class PortfolioIntelligenceService:
                 "external_flows": len(external),
             }
         if ending_value:
-            cashflows.append((date.today(), ending_value))
+            # El valor final va fechado hoy en Madrid: una compra de hoy (fecha
+            # de Madrid) no puede quedar después del final del XIRR.
+            cashflows.append((local_today(), ending_value))
         if len(cashflows) < 2 or not any(value < 0 for _, value in cashflows):
             return None, {
                 "status": "insufficient_cashflows",

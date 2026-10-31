@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import select
 
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
@@ -42,7 +42,7 @@ def review_portfolio_data(db) -> dict:
     """
     emitted = 0
     for cash in db.scalars(select(CashBalance).where(*tenant_filters(db, CashBalance))):
-        if cash.balance is None or cash.balance >= 0 or cash.as_of > date.today():
+        if cash.balance is None or cash.balance >= 0 or cash.as_of > local_today():  # día de Madrid
             continue
         currency = (cash.currency or '').upper()
         if not currency:
@@ -63,7 +63,7 @@ def review_portfolio_data(db) -> dict:
         return {'new_in_app_alerts': emitted, 'concentration_status': 'no_plan'}
     snapshot = db.scalar(select(PortfolioDailySnapshot).where(
         PortfolioDailySnapshot.portfolio_id == plan.portfolio_id,
-        PortfolioDailySnapshot.snapshot_date <= date.today(),
+        PortfolioDailySnapshot.snapshot_date <= local_today(),
         *tenant_filters(db, PortfolioDailySnapshot))
         .order_by(PortfolioDailySnapshot.snapshot_date.desc(), PortfolioDailySnapshot.id.desc()).limit(1))
     if snapshot is None or snapshot.pricing_coverage != Decimal('1') or snapshot.total_value_base <= 0:
