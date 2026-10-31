@@ -12,6 +12,21 @@ export const metadata: Metadata = {
     template: "%s | GerarAI"
   },
   description: "GerarAI convierte evidencia, modelos específicos de cada empresa y memoria histórica en tesis fundamentales trazables.",
+  metadataBase: new URL('https://gerarai.vercel.app'),
+  openGraph: {
+    siteName: 'GerarAI',
+    title: 'GerarAI - Research OS de inversión fundamental',
+    description: 'Evidencia, modelos y memoria histórica convertidos en tesis fundamentales trazables.',
+    locale: 'es_ES',
+    type: 'website',
+    images: [{ url: '/assets/og/cover.png', width: 1200, height: 630, alt: 'GerarAI' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'GerarAI - Research OS de inversión fundamental',
+    description: 'Evidencia, modelos y memoria histórica convertidos en tesis fundamentales trazables.',
+    images: ['/assets/og/cover.png'],
+  },
   keywords: ["fundamental analysis", "investment thesis", "financial modeling", "research OS", "análisis fundamental"],
   authors: [{ name: "GerarAI Team" }],
   creator: "GerarAI",
