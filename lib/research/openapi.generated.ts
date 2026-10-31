@@ -6514,6 +6514,58 @@ export interface components {
             /** Ranking Formula */
             ranking_formula?: string | null;
         };
+        /** AlertAnalysisCitationOut */
+        AlertAnalysisCitationOut: {
+            /** As Of */
+            as_of: string;
+            /** Excerpt */
+            excerpt: string;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Source */
+            source: string;
+            /** Url */
+            url: string;
+        };
+        /** AlertAnalysisReadOut */
+        AlertAnalysisReadOut: {
+            /** Alert Id */
+            alert_id: number;
+            /** Versions */
+            versions: components["schemas"]["AlertAnalysisVersionOut"][];
+        };
+        /** AlertAnalysisSectionOut */
+        AlertAnalysisSectionOut: {
+            /** Body */
+            body: string;
+            /** Citation Ids */
+            citation_ids: string[];
+            /** Key */
+            key: string;
+        };
+        /** AlertAnalysisVersionOut */
+        AlertAnalysisVersionOut: {
+            /** Citations */
+            citations: components["schemas"]["AlertAnalysisCitationOut"][];
+            /** Id */
+            id: number;
+            /** Missing Data */
+            missing_data: string[];
+            /** Second Order */
+            second_order?: {
+                [key: string]: unknown;
+            } | null;
+            /** Sections */
+            sections: components["schemas"]["AlertAnalysisSectionOut"][];
+            /** Status */
+            status: string;
+            /** Version */
+            version: string;
+            /** Writeback */
+            writeback: boolean;
+        };
         /** AlertRuleOut */
         AlertRuleOut: {
             /** Active */
@@ -13765,9 +13817,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AlertAnalysisReadOut"];
                 };
             };
             /** @description Validation Error */

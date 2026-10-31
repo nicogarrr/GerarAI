@@ -40,6 +40,155 @@
         "title": "AdHocScreen",
         "type": "object"
       },
+      "AlertAnalysisCitationOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "source",
+          "url",
+          "as_of",
+          "excerpt"
+        ],
+        "title": "AlertAnalysisCitationOut",
+        "type": "object"
+      },
+      "AlertAnalysisReadOut": {
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/AlertAnalysisVersionOut"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "alert_id",
+          "versions"
+        ],
+        "title": "AlertAnalysisReadOut",
+        "type": "object"
+      },
+      "AlertAnalysisSectionOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "citation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Ids",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "body",
+          "citation_ids"
+        ],
+        "title": "AlertAnalysisSectionOut",
+        "type": "object"
+      },
+      "AlertAnalysisVersionOut": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/AlertAnalysisCitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Data",
+            "type": "array"
+          },
+          "second_order": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Order"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/AlertAnalysisSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "writeback": {
+            "title": "Writeback",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status",
+          "sections",
+          "citations",
+          "missing_data",
+          "writeback"
+        ],
+        "title": "AlertAnalysisVersionOut",
+        "type": "object"
+      },
       "AlertRuleOut": {
         "properties": {
           "active": {
@@ -23293,9 +23442,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Alert Analysis Api Alerts  Alert Id  Analysis Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AlertAnalysisReadOut"
                 }
               }
             },

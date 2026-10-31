@@ -1794,6 +1794,46 @@ class PortfolioDividendSyncOut(BaseModel):
     provenance: ProvenanceOut
 
 
+# --- GET /api/alerts/{alert_id}/analysis --------------------------------------
+# Forma medida contra alert_analysis_service.read_analysis: envelope fijo
+# {alert_id, versions}. Cada version tiene 7 claves siempre; la rama valida
+# (cita verificada) anade second_order (null si no se ejecuto el paso LLM) y
+# la rama invalida lo OMITE: response_model_exclude_unset + test de ausencia.
+# second_order es un bloque de hipotesis (temas/candidatos LLM) sin contrato
+# cerrado: se declara free-form dict, nunca se inventa su interior.
+
+
+class AlertAnalysisSectionOut(BaseModel):
+    key: str
+    body: str
+    citation_ids: list[str]
+
+
+class AlertAnalysisCitationOut(BaseModel):
+    id: str
+    kind: str
+    source: str
+    url: str
+    as_of: str
+    excerpt: str
+
+
+class AlertAnalysisVersionOut(BaseModel):
+    id: int
+    version: str
+    status: str
+    sections: list[AlertAnalysisSectionOut]
+    citations: list[AlertAnalysisCitationOut]
+    second_order: dict[str, Any] | None = None
+    missing_data: list[str]
+    writeback: bool
+
+
+class AlertAnalysisReadOut(BaseModel):
+    alert_id: int
+    versions: list[AlertAnalysisVersionOut]
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto
