@@ -20,7 +20,9 @@ const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 describe('portfolio holding badge guard (F143)', () => {
   it('el badge usa la tenencia viva del snapshot', () => {
     assert.match(page, /snapshot\.in_portfolio/, 'el badge debe derivarse de snapshot.in_portfolio');
-    assert.match(page, /'en cartera'/, 'la tenencia viva se etiqueta "en cartera"');
+    assert.ok(page.includes("t('research.fichaInPortfolio')"), 'la tenencia viva se etiqueta via i18n');
+    const esResearch = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+    assert.equal(esResearch['fichaInPortfolio'], 'en cartera', 'el literal ES visible no cambia');
   });
 
   it('company_type ya no se pinta directamente como badge', () => {
