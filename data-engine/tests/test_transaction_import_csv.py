@@ -262,3 +262,172 @@ def test_api_import_commit_endpoint(env):
         # Verificar que la posición se actualizó
         positions = s.scalars(select(Position)).all()
         assert len(positions) >= 2
+
+
+def _csv_bytes(*rows: str) -> bytes:
+    header = "ticker;date;action;quantity;price;fees;currency"
+    return ("\n".join([header, *rows])).encode("utf-8")
+
+
+def test_preview_flags_duplicate_rows_as_warning():
+    """Veracidad: filas idénticas dentro del archivo se avisan (no se cuelan dos veces en silencio)."""
+    service = TransactionImportService()
+    content = _csv_bytes(
+        "SAN.MC;2024-01-15;compra;100;3.50;1.00;EUR",
+        "SAN.MC;2024-01-15;compra;100;3.50;1.00;EUR",
+        "IBE.MC;2024-01-16;compra;50;10.00;0;EUR",
+    )
+    result = service.preview_import(content, "dupes.csv")
+    assert result.success is True
+    assert result.valid_rows_count == 3
+    assert len(result.warnings) == 1
+    assert result.warnings[0].row_number == 3
+    assert "duplicada" in result.warnings[0].message
+
+
+def test_preview_empty_action_cell_is_error_not_silent_buy():
+    """Una celda de acción vacía en columna mapeada es error: nunca se asume compra."""
+    service = TransactionImportService()
+    content = _csv_bytes("SAN.MC;2024-01-15;;100;3.50;1.00;EUR")
+    result = service.preview_import(content, "venta.csv")
+    assert result.success is False
+    assert any(e.field == "action" for e in result.errors)
+    assert result.valid_rows_count == 0
+
+
+def test_commit_skips_exact_duplicates_and_records_provenance(env):
+    """Reimportar el mismo lote no duplica la cartera; cada pata lleva lote y fichero."""
+    _, factory, _, _ = env
+    service = TransactionImportService()
+    txs = [
+        ParsedTransaction(row_number=2, ticker="SAN.MC", date="2024-01-15", action="buy", quantity=100, price=3.5, fees=1.0, currency="EUR"),
+    ]
+    with factory() as s:
+        s.info["tenant_id"] = "tenant-csv-test"
+        first = service.commit_import(s, txs, source_filename="broker-enero.csv")
+        assert first["imported_count"] == 1
+        assert first["duplicates_skipped"] == 0
+        assert first["import_batch"].startswith("csv-")
+        from app.models.entities import Transaction
+        row = s.query(Transaction).filter(Transaction.action == "buy").first()
+        assert row.raw_payload["notes"] is not None
+        assert "broker-enero.csv" in row.raw_payload["notes"]
+        assert first["import_batch"] in row.raw_payload["notes"]
+
+        # Segunda importación del mismo fichero: se omite, no duplica
+        second = service.commit_import(s, txs, source_filename="broker-enero.csv")
+        assert second["imported_count"] == 0
+        assert second["duplicates_skipped"] == 1
+        count = s.query(Transaction).filter(Transaction.action == "buy").count()
+        assert count == 1
+
+
+def test_preview_isin_column_warns_and_validates():
+    """Una columna ISIN se valida como ISIN y se avisa de la resolución; no pasa como ticker."""
+    service = TransactionImportService()
+    content = ("isin;date;action;quantity;price\n"
+               "ES0113900J37;2024-01-15;compra;100;3.50\n")
+    result = service.preview_import(content.encode(), "isin.csv")
+    assert result.success is True
+    assert any("ISIN" in w.message for w in result.warnings)
+
+    bad = service.preview_import(("isin;date;action;quantity;price\n"
+                                  "NOTANISIN;2024-01-15;compra;100;3.50\n").encode(), "isin.csv")
+    assert bad.success is False
+    assert any("ISIN" in e.message for e in bad.errors)
+
+
+def test_preview_ambiguous_date_warns():
+    """01/02/2024 es ambiguo (1 feb vs 2 ene): se interpreta DD/MM y se avisa."""
+    service = TransactionImportService()
+    content = ("ticker;date;action;quantity;price\n"
+               "SAN.MC;01/02/2024;compra;100;3.50\n")
+    result = service.preview_import(content.encode(), "fechas.csv")
+    assert result.success is True
+    assert any("ambigua" in w.message for w in result.warnings)
+    assert result.preview_items[0].date == "2024-02-01"
+
+
+def test_commit_resolves_isin_to_registered_ticker(env):
+    """Un ISIN registrado importa sobre el ticker de la empresa; uno desconocido falla."""
+    _, factory, _, _ = env
+    from app.models.entities import Company
+
+    with factory() as s:
+        company = s.query(Company).filter(Company.ticker == "SAN.MC").first()
+        company.isin = "ES0113900J37"
+        s.commit()
+        s.info["tenant_id"] = "tenant-csv-test"
+
+        service = TransactionImportService()
+        ok = service.commit_import(s, [ParsedTransaction(
+            row_number=2, ticker="ES0113900J37", date="2024-01-15",
+            action="buy", quantity=10, price=3.5, fees=0.0, currency="EUR",
+        )], source_filename="isin.csv")
+        assert ok["imported_count"] == 1
+        from app.models.entities import Transaction
+        row = s.query(Transaction).filter(Transaction.action == "buy").first()
+        assert row.company.ticker == "SAN.MC"
+
+        with pytest.raises(ValueError, match="sin empresa registrada"):
+            service.commit_import(s, [ParsedTransaction(
+                row_number=3, ticker="US0000000000", date="2024-01-15",
+                action="buy", quantity=1, price=1.0, fees=0.0, currency="USD",
+            )], source_filename="isin.csv")
+
+
+
+def test_commit_inserts_in_chronological_order(env):
+    """Una venta anterior a una compra listada después no debe fallar por sobreventa."""
+    _, factory, _, _ = env
+    service = TransactionImportService()
+    with factory() as s:
+        s.info["tenant_id"] = "tenant-csv-test"
+        # El archivo lista la venta del día 10 antes que la compra del día 5
+        txs = [
+            ParsedTransaction(row_number=2, ticker="IBE.MC", date="2024-01-10", action="sell", quantity=5, price=11.0, fees=0.0, currency="EUR"),
+            ParsedTransaction(row_number=3, ticker="IBE.MC", date="2024-01-05", action="buy", quantity=10, price=10.0, fees=0.0, currency="EUR"),
+        ]
+        result = service.commit_import(s, txs, source_filename="desordenado.csv")
+        assert result["imported_count"] == 2
+        assert result["duplicates_skipped"] == 0
+
+
+def test_dedupe_is_per_portfolio_not_tenant_wide(env):
+    """Una compra idéntica en OTRA cartera del mismo tenant es legítima: no se omite."""
+    _, factory, _, _ = env
+    from app.models.entities import Company, Portfolio, Transaction
+    from datetime import UTC, datetime
+
+    service = TransactionImportService()
+    with factory() as s:
+        s.info["tenant_id"] = "tenant-csv-test"
+        s.add(Portfolio(tenant_id="tenant-csv-test", name="Cartera B", base_currency="EUR", is_default=False, created_at=datetime.now(UTC)))
+        s.commit()
+
+        # Importar en la cartera por defecto (la crea ensure_portfolio)
+        first = service.commit_import(s, [ParsedTransaction(
+            row_number=2, ticker="SAN.MC", date="2024-03-01", action="buy",
+            quantity=10, price=3.5, fees=0.0, currency="EUR",
+        )], source_filename="a.csv")
+        assert first["imported_count"] == 1
+
+        # Misma pata dirigida a la otra cartera (mismo tenant): debe importarse
+        other = s.query(Portfolio).filter(Portfolio.name == "Cartera B").first()
+        s.query(Transaction).filter(Transaction.action == "buy").first().portfolio_id = other.id
+        s.commit()
+
+        second = service.commit_import(s, [ParsedTransaction(
+            row_number=2, ticker="SAN.MC", date="2024-03-01", action="buy",
+            quantity=10, price=3.5, fees=0.0, currency="EUR",
+        )], source_filename="a.csv")
+        assert second["imported_count"] == 1
+        assert second["duplicates_skipped"] == 0
+
+        # Y reimportar en la MISMA cartera sí se omite
+        third = service.commit_import(s, [ParsedTransaction(
+            row_number=2, ticker="SAN.MC", date="2024-03-01", action="buy",
+            quantity=10, price=3.5, fees=0.0, currency="EUR",
+        )], source_filename="a.csv")
+        assert third["imported_count"] == 0
+        assert third["duplicates_skipped"] == 1

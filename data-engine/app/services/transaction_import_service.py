@@ -19,11 +19,15 @@ import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
+from app.core.tenancy import tenant_filters
+from app.models.entities import Company, Transaction
 from app.services.audit_service import record_audit_event
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_ledger_service import PortfolioLedgerService, PortfolioOversellError
@@ -56,10 +60,12 @@ class TransactionImportPreviewResponse(BaseModel):
     detected_columns: dict[str, str]
     preview_items: list[ParsedTransaction]
     errors: list[RowValidationError]
+    warnings: list[RowValidationError] = []
 
 
 class TransactionImportCommitRequest(BaseModel):
     transactions: list[ParsedTransaction] = Field(min_length=1, max_length=2000)
+    source_filename: str | None = None
 
 
 def _normalize_header(header: str) -> str:
@@ -266,7 +272,16 @@ class TransactionImportService:
         col_indices = {k: header_indices.get(v, -1) for k, v in detected_mapping.items()}
 
         preview_items: list[ParsedTransaction] = []
-        action_default = "buy"
+        warnings: list[RowValidationError] = []
+        # Si el archivo tiene columna de acción, una celda vacía no puede
+        # asumirse "compra" (una venta importada como compra corrompe la cartera).
+        # Sin columna de acción en absoluto sí se asume compra (fichero simple de compras).
+        action_column_mapped = "action" in detected_mapping
+        # Columna ISIN explícita: el ISIN no es un ticker; hay que resolverlo a
+        # la empresa registrada o rechazar la fila (nunca crear un ticker falso).
+        ticker_header = detected_mapping.get("ticker", "")
+        ticker_is_isin = _normalize_header(ticker_header) == "isin"
+        seen_row_keys: dict[tuple, int] = {}
 
         for row_idx, row in enumerate(data_rows, start=2):
             row_has_error = False
@@ -282,6 +297,19 @@ class TransactionImportService:
             if not ticker_raw:
                 errors.append(RowValidationError(row_number=row_idx, field="ticker", message="El ticker es obligatorio"))
                 row_has_error = True
+            elif ticker_is_isin:
+                if not re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", ticker_raw):
+                    errors.append(RowValidationError(row_number=row_idx, field="ticker", message="Formato de ISIN no válido", raw_value=ticker_raw))
+                    row_has_error = True
+                else:
+                    warnings.append(
+                        RowValidationError(
+                            row_number=row_idx,
+                            field="ticker",
+                            message="La columna es ISIN: se resolverá al ticker registrado al importar (si no existe, la fila fallará)",
+                            raw_value=ticker_raw,
+                        )
+                    )
             elif not re.match(r"^[A-Z0-9_\.-]{1,20}$", ticker_raw):
                 errors.append(RowValidationError(row_number=row_idx, field="ticker", message="Formato de ticker no válido", raw_value=ticker_raw))
                 row_has_error = True
@@ -292,19 +320,32 @@ class TransactionImportService:
             try:
                 dt = parse_flexible_date(date_raw)
                 parsed_date_str = dt.isoformat()
+                # Día <= 12 con formato DD/MM: ambiguo con MM/DD americano; se avisa.
+                if dt.day <= 12 and re.match(r"^\d{1,2}[/\-]\d{1,2}[/\-]\d{4}$", date_raw.strip()):
+                    warnings.append(
+                        RowValidationError(
+                            row_number=row_idx,
+                            field="date",
+                            message=f"Fecha ambigua '{date_raw.strip()}': se interpreta como día/mes/año ({dt.isoformat()})",
+                            raw_value=date_raw,
+                        )
+                    )
             except ValueError as exc:
                 errors.append(RowValidationError(row_number=row_idx, field="date", message=str(exc), raw_value=date_raw))
                 row_has_error = True
 
             # Acción
             action_raw = get_val("action")
-            parsed_action = action_default
+            parsed_action = "buy"
             if action_raw:
                 try:
                     parsed_action = normalize_action(action_raw)
                 except ValueError as exc:
                     errors.append(RowValidationError(row_number=row_idx, field="action", message=str(exc), raw_value=action_raw))
                     row_has_error = True
+            elif action_column_mapped:
+                errors.append(RowValidationError(row_number=row_idx, field="action", message="La acción está vacía (se esperaba compra, venta o dividendo)"))
+                row_has_error = True
 
             # Cantidad
             qty_raw = get_val("quantity")
@@ -344,6 +385,18 @@ class TransactionImportService:
             currency_raw = get_val("currency").upper() or "EUR"
 
             if not row_has_error:
+                row_key = (ticker_raw, parsed_date_str, parsed_action, qty_num, price_num, fees_num, currency_raw)
+                if row_key in seen_row_keys:
+                    warnings.append(
+                        RowValidationError(
+                            row_number=row_idx,
+                            field="row",
+                            message=f"Fila duplicada: idéntica a la fila {seen_row_keys[row_key]} del propio archivo",
+                            raw_value=ticker_raw,
+                        )
+                    )
+                else:
+                    seen_row_keys[row_key] = row_idx
                 preview_items.append(
                     ParsedTransaction(
                         row_number=row_idx,
@@ -366,32 +419,84 @@ class TransactionImportService:
             detected_columns=detected_mapping,
             preview_items=preview_items,
             errors=errors,
+            warnings=warnings,
         )
 
     def commit_import(
         self,
         db: Session,
         transactions: list[ParsedTransaction],
+        source_filename: str | None = None,
     ) -> dict[str, Any]:
-        """Inserta atómicamente todas las transacciones validadas en la cartera."""
+        """Inserta atómicamente las transacciones validadas, omitiendo duplicados exactos.
+
+        Duplicados: una pata idéntica ya registrada (misma empresa, fecha, acción,
+        cantidad, precio, comisión y divisa) se omite y se cuenta en
+        ``duplicates_skipped``: reimportar el mismo fichero nunca duplica la cartera.
+        Procedencia: cada pata lleva lote de importación, nombre de fichero y fila.
+        """
         if not transactions:
             raise ValueError("No hay transacciones para importar")
 
         service = PortfolioLedgerService()
         inserted_count = 0
+        duplicates_skipped = 0
+        import_batch = f"csv-{uuid4().hex[:12]}"
+
+        def _already_imported(company_id: int | None, portfolio_id: int | None, tx: ParsedTransaction) -> bool:
+            if company_id is None:
+                return False
+            existing = db.scalar(
+                select(Transaction.id).where(
+                    Transaction.company_id == company_id,
+                    Transaction.portfolio_id == portfolio_id,
+                    Transaction.trade_date == date.fromisoformat(tx.date),
+                    Transaction.action == tx.action.lower(),
+                    Transaction.quantity == Decimal(str(tx.quantity)),
+                    Transaction.price == Decimal(str(tx.price)),
+                    Transaction.fees == Decimal(str(tx.fees)),
+                    Transaction.currency == tx.currency.upper(),
+                    *tenant_filters(db, Transaction),
+                ).limit(1)
+            )
+            return existing is not None
+
+        def _resolve_company(ticker_or_isin: str) -> Company | None:
+            raw = ticker_or_isin.upper()
+            if re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", raw):
+                # Un ISIN no es un ticker: se resuelve a la empresa registrada por ISIN.
+                return db.scalar(select(Company).where(Company.isin == raw).limit(1))
+            return db.scalar(select(Company).where(Company.ticker == raw).limit(1))
+
+        # Orden cronológico: una venta anterior a una compra listada después no
+        # debe fallar por sobreventa. Mismo día: compras antes que ventas.
+        def _chronological(tx: ParsedTransaction) -> tuple:
+            action_rank = 0 if tx.action.lower() in ("buy", "deposit") else 1 if tx.action.lower() in ("sell", "withdrawal") else 2
+            return (date.fromisoformat(tx.date), action_rank, tx.row_number)
 
         try:
-            for tx in transactions:
+            target_portfolio = service.fx.ensure_portfolio(db)
+            for tx in sorted(transactions, key=_chronological):
+                company = _resolve_company(tx.ticker)
+                if company is None and re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", tx.ticker.upper()):
+                    raise ValueError(
+                        f"ISIN {tx.ticker} sin empresa registrada (fila {tx.row_number}): "
+                        "importa primero por ticker o registra la empresa con su ISIN"
+                    )
+                if _already_imported(company.id if company else None, target_portfolio.id, tx):
+                    duplicates_skipped += 1
+                    continue
+                origin = f"Importación masiva ({source_filename}, fila {tx.row_number})" if source_filename else f"Importación masiva (fila {tx.row_number})"
                 service.create_transaction(
                     db,
-                    ticker=tx.ticker,
+                    ticker=company.ticker if company else tx.ticker,
                     action=tx.action,
                     quantity=Decimal(str(tx.quantity)),
                     price=Decimal(str(tx.price)),
                     trade_date=date.fromisoformat(tx.date),
                     fees=Decimal(str(tx.fees)),
                     currency=tx.currency,
-                    notes=tx.notes or f"Importación masiva (fila {tx.row_number})",
+                    notes=tx.notes or f"{origin} · lote {import_batch}",
                 )
                 inserted_count += 1
 
@@ -399,13 +504,24 @@ class TransactionImportService:
                 db=db,
                 action="IMPORT_BATCH",
                 resource_type="transactions",
-                after_state={"count": inserted_count, "tickers": list({t.ticker for t in transactions})},
+                after_state={
+                    "count": inserted_count,
+                    "duplicates_skipped": duplicates_skipped,
+                    "import_batch": import_batch,
+                    "source_filename": source_filename,
+                    "tickers": list({t.ticker for t in transactions}),
+                },
             )
             db.commit()
+            message = f"Se han importado exitosamente {inserted_count} transacciones"
+            if duplicates_skipped:
+                message += f" ({duplicates_skipped} duplicada(s) omitida(s))"
             return {
                 "success": True,
-                "message": f"Se han importado exitosamente {inserted_count} transacciones",
+                "message": message,
                 "imported_count": inserted_count,
+                "duplicates_skipped": duplicates_skipped,
+                "import_batch": import_batch,
             }
         except PortfolioOversellError as exc:
             db.rollback()
