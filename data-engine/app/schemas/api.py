@@ -1958,3 +1958,92 @@ class CashBalanceOut(BaseModel):
     settled_cash: float
     interest_rate: float
     source: str
+
+
+# --- GET /api/portfolio/forecast ---------------------------------------------
+# Formas medidas contra la ruta (agregacion inline, servicio real): todas las
+# ramas (vacia, monedas mezcladas, sin valor base) emiten las mismas seis
+# claves de nivel superior; los huecos llegan como null, nunca omitidos.
+# El tipo manuscrito del front no contemplaba reason_code "valuation_hold".
+
+
+class ForecastScenarioOut(BaseModel):
+    contribution_cagr: float
+    contribution_total_return: float
+    coverage: float
+    horizon_scope: Literal["uniform", "mixed"]
+
+
+class ForecastCoveredScenarioOut(BaseModel):
+    cagr: float
+    total_return: float
+    coverage: float
+    horizon_scope: Literal["uniform", "mixed"]
+
+
+class ForecastCoveredOnlyOut(BaseModel):
+    scenarios: dict[str, ForecastCoveredScenarioOut]
+    expected_cagr: float | None
+
+
+class ForecastPortfolioOut(BaseModel):
+    total_value_base: float
+    position_count: int
+    covered_count: int
+    excluded_count: int
+    covered_weight: float | None
+    scenarios: dict[str, ForecastScenarioOut] | None
+    expected_cagr: float | None
+    expected_coverage: float | None
+    covered_only: ForecastCoveredOnlyOut
+
+
+class ForecastPositionOut(BaseModel):
+    ticker: str
+    name: str
+    weight: float
+    currency: str
+    weight_scope: Literal["total_portfolio", "valued_subset"]
+    price: float
+    price_as_of: str
+    price_source: str
+    price_veracity: Literal["OFICIAL", "MANUAL/NO OFICIAL", "NO VERIFICADA"]
+    # El dict trae las tres claves de escenario y un valor None cuando ese
+    # escenario no es computable (tesis sin bear/base/bull value).
+    intrinsic: dict[str, float | None]
+    comparison_basis: str
+    probabilities: dict[str, float] | None
+    probability_mass: float | None
+    horizon_years: int
+    thesis_version: int
+    thesis_status: str
+    model_version: int | None
+    cagr: dict[str, float]
+    total_return: dict[str, float]
+    expected_cagr: float | None
+    partial_expected_cagr: float | None
+    contribution_expected: float | None
+
+
+class ForecastExcludedOut(BaseModel):
+    ticker: str
+    name: str
+    weight: float | None
+    currency: str
+    reason_code: Literal[
+        "valuation_hold",
+        "no_base_value",
+        "no_published_thesis",
+        "valuation_basis_unverified",
+        "no_computable_intrinsic",
+    ]
+    reason: str
+
+
+class PortfolioForecastOut(BaseModel):
+    as_of: str | None
+    base_currency: str | None
+    portfolio: ForecastPortfolioOut | None
+    positions: list[ForecastPositionOut]
+    excluded: list[ForecastExcludedOut]
+    assumptions: list[str]

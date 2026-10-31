@@ -8852,6 +8852,144 @@ export interface components {
              */
             unit: string;
         };
+        /** ForecastCoveredOnlyOut */
+        ForecastCoveredOnlyOut: {
+            /** Expected Cagr */
+            expected_cagr: number | null;
+            /** Scenarios */
+            scenarios: {
+                [key: string]: components["schemas"]["ForecastCoveredScenarioOut"];
+            };
+        };
+        /** ForecastCoveredScenarioOut */
+        ForecastCoveredScenarioOut: {
+            /** Cagr */
+            cagr: number;
+            /** Coverage */
+            coverage: number;
+            /**
+             * Horizon Scope
+             * @enum {string}
+             */
+            horizon_scope: "uniform" | "mixed";
+            /** Total Return */
+            total_return: number;
+        };
+        /** ForecastExcludedOut */
+        ForecastExcludedOut: {
+            /** Currency */
+            currency: string;
+            /** Name */
+            name: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Reason Code
+             * @enum {string}
+             */
+            reason_code: "valuation_hold" | "no_base_value" | "no_published_thesis" | "valuation_basis_unverified" | "no_computable_intrinsic";
+            /** Ticker */
+            ticker: string;
+            /** Weight */
+            weight: number | null;
+        };
+        /** ForecastPortfolioOut */
+        ForecastPortfolioOut: {
+            /** Covered Count */
+            covered_count: number;
+            covered_only: components["schemas"]["ForecastCoveredOnlyOut"];
+            /** Covered Weight */
+            covered_weight: number | null;
+            /** Excluded Count */
+            excluded_count: number;
+            /** Expected Cagr */
+            expected_cagr: number | null;
+            /** Expected Coverage */
+            expected_coverage: number | null;
+            /** Position Count */
+            position_count: number;
+            /** Scenarios */
+            scenarios: {
+                [key: string]: components["schemas"]["ForecastScenarioOut"];
+            } | null;
+            /** Total Value Base */
+            total_value_base: number;
+        };
+        /** ForecastPositionOut */
+        ForecastPositionOut: {
+            /** Cagr */
+            cagr: {
+                [key: string]: number;
+            };
+            /** Comparison Basis */
+            comparison_basis: string;
+            /** Contribution Expected */
+            contribution_expected: number | null;
+            /** Currency */
+            currency: string;
+            /** Expected Cagr */
+            expected_cagr: number | null;
+            /** Horizon Years */
+            horizon_years: number;
+            /** Intrinsic */
+            intrinsic: {
+                [key: string]: number | null;
+            };
+            /** Model Version */
+            model_version: number | null;
+            /** Name */
+            name: string;
+            /** Partial Expected Cagr */
+            partial_expected_cagr: number | null;
+            /** Price */
+            price: number;
+            /** Price As Of */
+            price_as_of: string;
+            /** Price Source */
+            price_source: string;
+            /**
+             * Price Veracity
+             * @enum {string}
+             */
+            price_veracity: "OFICIAL" | "MANUAL/NO OFICIAL" | "NO VERIFICADA";
+            /** Probabilities */
+            probabilities: {
+                [key: string]: number;
+            } | null;
+            /** Probability Mass */
+            probability_mass: number | null;
+            /** Thesis Status */
+            thesis_status: string;
+            /** Thesis Version */
+            thesis_version: number;
+            /** Ticker */
+            ticker: string;
+            /** Total Return */
+            total_return: {
+                [key: string]: number;
+            };
+            /** Weight */
+            weight: number;
+            /**
+             * Weight Scope
+             * @enum {string}
+             */
+            weight_scope: "total_portfolio" | "valued_subset";
+        };
+        /** ForecastScenarioOut */
+        ForecastScenarioOut: {
+            /** Contribution Cagr */
+            contribution_cagr: number;
+            /** Contribution Total Return */
+            contribution_total_return: number;
+            /** Coverage */
+            coverage: number;
+            /**
+             * Horizon Scope
+             * @enum {string}
+             */
+            horizon_scope: "uniform" | "mixed";
+        };
         /** GemOut */
         GemOut: {
             /** Market Cap */
@@ -10341,6 +10479,20 @@ export interface components {
             sectors: {
                 [key: string]: number;
             };
+        };
+        /** PortfolioForecastOut */
+        PortfolioForecastOut: {
+            /** As Of */
+            as_of: string | null;
+            /** Assumptions */
+            assumptions: string[];
+            /** Base Currency */
+            base_currency: string | null;
+            /** Excluded */
+            excluded: components["schemas"]["ForecastExcludedOut"][];
+            portfolio: components["schemas"]["ForecastPortfolioOut"] | null;
+            /** Positions */
+            positions: components["schemas"]["ForecastPositionOut"][];
         };
         /** PortfolioFxRateOut */
         PortfolioFxRateOut: {
@@ -22193,9 +22345,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioForecastOut"];
                 };
             };
             /** @description Validation Error */

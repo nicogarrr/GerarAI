@@ -21,6 +21,8 @@ void test('sin moneda base no se inventa símbolo: NA honesto', () => {
   assert.ok(!page.includes('Contexto de cartera'), 'contexto retirado del índice');
   // El resumen de cartera del índice llega via getPortfolioSummary
   // (portfolio.actions): el dashboard ya no duplica /api/portfolio/summary.
-  const type = source('lib/actions/portfolio.actions.ts');
-  assert.ok(type.includes('base_currency: string'), 'el tipo declara base_currency');
+  // Los tipos del front son alias del OpenAPI generado (response_model en el
+  // backend): la declaracion vive en openapi.generated.ts.
+  const generated = source('lib/research/openapi.generated.ts');
+  assert.ok(/PortfolioForecastOut: \{[\s\S]*?base_currency: string \| null;/.test(generated), 'el tipo generado declara base_currency');
 });
