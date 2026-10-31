@@ -169,3 +169,54 @@ def test_fk_compuesta_huerfano_detectado_y_tabla_filtra_el_resultado_en_ci_postg
         engine.dispose()
     finally:
         _drop(admin, scratch)
+
+
+def test_nombres_mixedcase_se_citan_una_sola_vez_en_ci_postgres():
+    """Identificadores MixedCase ("HijoMix", "ColA"): se leen crudos de
+    pg_class/pg_attribute y se citan UNA sola vez; regclass::text los devuelve
+    ya citados y una segunda cita romperia el SQL."""
+    url = _url_postgres_ci()
+    if not url:
+        pytest.skip("solo en el job Postgres con CAVAAI_ORIGINAL_DATABASE_URL")
+    scratch, scratch_url, admin = _scratch(url)
+    try:
+        engine = sa.create_engine(scratch_url)
+        with engine.begin() as conn:
+            conn.execute(sa.text(
+                'create table "PadreMix" ("ColA" int not null, "ColB" int not null,'
+                ' constraint "UqPadreMix" unique ("ColA", "ColB"))'
+            ))
+            conn.execute(sa.text(
+                'create table "HijoMix" ("IdMix" int primary key, "ColA" int, "ColB" int)'
+            ))
+            conn.execute(sa.text(
+                'alter table "HijoMix" add constraint "FkHijoMixPadre"'
+                ' foreign key ("ColA", "ColB") references "PadreMix" ("ColA", "ColB") not valid'
+            ))
+            conn.execute(sa.text('insert into "PadreMix" ("ColA", "ColB") values (1, 1), (2, 2)'))
+            conn.execute(sa.text("set session_replication_role = replica"))
+            conn.execute(sa.text('insert into "HijoMix" ("IdMix", "ColA", "ColB") values (1, 1, 2)'))
+            conn.execute(sa.text("reset session_replication_role"))
+
+        res = _run(scratch_url, "--apply", "--tabla", "HijoMix")
+        assert res.returncode == 1, res.stderr
+        assert "FkHijoMixPadre" in res.stdout
+        assert "(1, 2)" in res.stdout
+        with engine.connect() as conn:
+            sigue = conn.execute(sa.text(
+                "select convalidated from pg_constraint where conname = 'FkHijoMixPadre'"
+            )).scalar_one()
+        assert sigue is False
+        # limpiar y revalidar: el VALIDATE tambien cita bien los MixedCase
+        with engine.begin() as conn:
+            conn.execute(sa.text('delete from "HijoMix"'))
+        ok = _run(scratch_url, "--apply", "--tabla", "HijoMix")
+        assert ok.returncode == 0, ok.stderr + ok.stdout
+        with engine.connect() as conn:
+            ya = conn.execute(sa.text(
+                "select convalidated from pg_constraint where conname = 'FkHijoMixPadre'"
+            )).scalar_one()
+        assert ya is True
+        engine.dispose()
+    finally:
+        _drop(admin, scratch)

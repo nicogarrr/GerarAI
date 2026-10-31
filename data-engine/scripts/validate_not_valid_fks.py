@@ -30,10 +30,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import sqlalchemy as sa
 
 _FKS_PENDIENTES = """
-select conname, conrelid::regclass::text as tabla
-from pg_constraint
-where contype = 'f' and not convalidated and connamespace = 'public'::regnamespace
-order by conrelid::regclass::text, conname
+select c.conname, cl.relname as tabla
+from pg_constraint c
+join pg_class cl on cl.oid = c.conrelid
+where c.contype = 'f' and not c.convalidated and c.connamespace = 'public'::regnamespace
+order by cl.relname, c.conname
 """
 
 _MUESTRA_INFRACTORAS = """
@@ -58,14 +59,20 @@ def _muestra_infractores(conn, conname: str, tabla: str, quote) -> list[str]:
     """
     meta = conn.execute(
         sa.text(
-            "select conkey, confkey, confrelid::regclass::text "
-            "from pg_constraint where conname = :n and conrelid = cast(:t as regclass)"
+            "select c.conkey, c.confkey, refcl.relname "
+            "from pg_constraint c "
+            "join pg_class cl on cl.oid = c.conrelid "
+            "join pg_class refcl on refcl.oid = c.confrelid "
+            "where c.conname = :n and cl.relname = :t "
+            "and cl.relnamespace = 'public'::regnamespace"
         ),
         {"n": conname, "t": tabla},
     ).one()
     conkey, confkey, ref = meta[0], meta[1], meta[2]
     att = sa.text(
-        "select attname from pg_attribute where attrelid = cast(:t as regclass) and attnum = :a"
+        "select attname from pg_attribute "
+        "where attrelid = (select oid from pg_class where relname = :t "
+        "and relnamespace = 'public'::regnamespace) and attnum = :a"
     )
     locales = [conn.execute(att, {"t": tabla, "a": int(a)}).scalar_one() for a in conkey]
     remotas = [conn.execute(att, {"t": ref, "a": int(a)}).scalar_one() for a in confkey]
