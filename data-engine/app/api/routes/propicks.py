@@ -198,7 +198,7 @@ def freeze_snapshot(db: Session = Depends(get_db)) -> dict:
 
     row = freeze_monthly_snapshot(db)
     if row is None:
-        raise HTTPException(status_code=409, detail="ninguna empresa pasa el embudo: no se congela un mes vacio")
+        raise HTTPException(status_code=409, detail="ninguna empresa pasa el embudo: no se congela un mes vacío")
     return {"month": row.month, "as_of": row.as_of, "passed_count": row.passed_count}
 
 

@@ -171,7 +171,7 @@ def test_c_rango_invalido_falla_en_conector():
     with pytest.raises(ValueError, match="posterior"):
         run(calendar_connector.fetch_earnings_range(date(2024, 2, 1), date(2024, 1, 1)))
     too_long = calendar_connector.MAX_DAYS_PER_REQUEST + 1
-    with pytest.raises(ValueError, match="rango maximo"):
+    with pytest.raises(ValueError, match="rango máximo"):
         run(
             calendar_connector.fetch_earnings_range(
                 date(2024, 1, 1),

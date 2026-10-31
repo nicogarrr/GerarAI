@@ -194,7 +194,7 @@ def _check_range(desde: date, hasta: date) -> None:
     if desde > hasta:
         raise ValueError("desde no puede ser posterior a hasta")
     if (hasta - desde).days + 1 > MAX_DAYS_PER_REQUEST:
-        raise ValueError(f"rango maximo: {MAX_DAYS_PER_REQUEST} dias")
+        raise ValueError(f"rango máximo: {MAX_DAYS_PER_REQUEST} días")
 
 
 # Marca interna para "el rango agoto su deadline": NO es un fallo del
