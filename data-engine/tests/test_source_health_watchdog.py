@@ -211,3 +211,23 @@ def test_rollback_no_consume_la_transicion(db, monkeypatch):
     assert retry["created"] + retry["existing"] == 1
     alert = db.scalar(select(ResearchAlert))
     assert alert is not None and alert.metadata_["source_key"] == "yahoo_finance"
+
+
+def test_mensaje_no_afirma_respaldo_configurado_sin_cablear(db):
+    """Veracidad: fallback_source es una DECLARACIÓN del registry; ningún
+    código ejecuta el respaldo (medido: AV sin consumidores fuera de /health,
+    "cached_fx" inexistente). El mensaje no puede decir "configurada"."""
+    last: dict[str, str] = {"yahoo_finance": "healthy"}
+
+    class _Status:
+        def as_dict(self):
+            return _fuente("failing", fallback="alpha_vantage")
+
+    class _Registry:
+        sources = {"yahoo_finance": _Status()}
+
+    wd.emit_source_health_alerts(db, registry=_Registry(), now=NOW, last_states=last)
+    alert = db.scalar(select(ResearchAlert))
+    assert "configurada" not in alert.message
+    assert "prevista" in alert.message
+    assert "sin degradación automática" in alert.message
