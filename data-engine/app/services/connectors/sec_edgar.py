@@ -24,6 +24,12 @@ from typing import Any
 import httpx
 
 from app.core.config import get_settings
+from app.services.data_source_health import get_data_source_registry
+
+# Clave compartida con connectors/sec.py: mismo proveedor, mismo circuito.
+# 400/404 son dato por documento/CIK y NO degradan; 401/403 van al mirror HF
+# (fallback declarado): si el mirror sirve cuenta como exito, si falla, fallo.
+_REGISTRY_KEY = "sec_edgar"
 
 TICKER_MAP_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
@@ -32,9 +38,7 @@ ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
 
 DEFAULT_CONTACT = "contact@example.com"
 # Cabecera tipo navegador + contacto: la SEC bloquea User-Agents sin contacto.
-BROWSER_USER_AGENT = (
-    "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
-)
+BROWSER_USER_AGENT = "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
 
 ANNUAL_FORMS = {"10-K", "20-F"}
 QUARTERLY_FORMS = {"10-Q"}
@@ -95,9 +99,7 @@ def _snapshot_path_for(url: str) -> Path | None:
     root = Path(base)
     if url == TICKER_MAP_URL:
         return root / "company_tickers.json"
-    match = re.search(
-        r"(?:companyfacts|submissions)/(CIK\d{10}(?:-submissions-\d+)?)\.json$", url
-    )
+    match = re.search(r"(?:companyfacts|submissions)/(CIK\d{10}(?:-submissions-\d+)?)\.json$", url)
     if match:
         kind = "companyfacts" if "companyfacts" in url else "submissions"
         return root / kind / f"{match.group(1)}.json"
@@ -109,9 +111,7 @@ def _mirror_path_for(url: str) -> str | None:
     SEC no tiene equivalente en el mirror."""
     if url == TICKER_MAP_URL:
         return "company_tickers.json"
-    match = re.search(
-        r"(?:companyfacts|submissions)/(CIK\d{10}(?:-submissions-\d+)?)\.json$", url
-    )
+    match = re.search(r"(?:companyfacts|submissions)/(CIK\d{10}(?:-submissions-\d+)?)\.json$", url)
     if not match:
         return None
     kind = "companyfacts" if "companyfacts" in url else "submissions"
@@ -163,14 +163,18 @@ async def _get_json(
     direct_error: Exception | None = None
     delay = base_delay
     last_error: Exception | None = None
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     for attempt in range(max_retries + 1):
-        if client is not None:
-            response = await client.get(url, headers=headers)
-        else:
-            async with httpx.AsyncClient(
-                timeout=30, headers=headers, follow_redirects=True
-            ) as owned:
-                response = await owned.get(url)
+        try:
+            if client is not None:
+                response = await client.get(url, headers=headers)
+            else:
+                async with httpx.AsyncClient(timeout=30, headers=headers, follow_redirects=True) as owned:
+                    response = await owned.get(url)
+        except httpx.TransportError as exc:
+            registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+            raise
         if response.status_code == 429 and attempt < max_retries:
             retry_after = response.headers.get("retry-after")
             try:
@@ -190,27 +194,37 @@ async def _get_json(
             if response.status_code in {401, 403} and mirror_url is not None:
                 direct_error = exc
                 break
-            raise RuntimeError(
-                f"SEC EDGAR request failed ({response.status_code} {url})"
-            ) from exc
+            if response.status_code not in (400, 404):
+                # 400/404: documento inexistente, dato por emisor (neutral).
+                registry.record_failure(_REGISTRY_KEY, f"HTTP {response.status_code}")
+            raise RuntimeError(f"SEC EDGAR request failed ({response.status_code} {url})") from exc
         last_error = None
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError:
+            registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
+            raise
         if not isinstance(data, dict):
+            registry.record_failure(_REGISTRY_KEY, "JSON no objeto")
             raise RuntimeError(f"SEC EDGAR returned non-object JSON ({url})")
+        registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return data
     if direct_error is None:
-        raise RuntimeError(
-            f"SEC EDGAR rate-limited (429 {url}) after {max_retries} retries"
-        ) from last_error
-    return await mirror_get_json(url, direct_error=direct_error)
+        registry.record_failure(_REGISTRY_KEY, "HTTP 429: rate limit agotado")
+        raise RuntimeError(f"SEC EDGAR rate-limited (429 {url}) after {max_retries} retries") from last_error
+    try:
+        mirrored = await mirror_get_json(url, direct_error=direct_error)
+    except Exception as exc:
+        registry.record_failure(_REGISTRY_KEY, f"HTTP 401/403 (IP) y mirror fallo: {type(exc).__name__}")
+        raise
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    return mirrored
 
 
 MIRROR_MAX_AGE = timedelta(hours=48)
 _MANIFEST_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 _MANIFEST_TTL_SECONDS = 300.0
-_MIRROR_SERVES: ContextVar[list[dict[str, Any]] | None] = ContextVar(
-    "cavaai_mirror_serves", default=None
-)
+_MIRROR_SERVES: ContextVar[list[dict[str, Any]] | None] = ContextVar("cavaai_mirror_serves", default=None)
 
 
 def drain_mirror_serves() -> list[dict[str, Any]]:
@@ -251,9 +265,7 @@ async def _mirror_manifest(dataset: str) -> dict[str, Any]:
     try:
         synced_at = datetime.fromisoformat(str(synced_raw).replace("Z", "+00:00"))
     except ValueError as exc:
-        raise RuntimeError(
-            f"Mirror HF sin synced_at valido ({synced_raw!r}): fail closed"
-        ) from exc
+        raise RuntimeError(f"Mirror HF sin synced_at valido ({synced_raw!r}): fail closed") from exc
     age = datetime.now(UTC) - synced_at
     if age > MIRROR_MAX_AGE:
         raise RuntimeError(
@@ -271,9 +283,7 @@ async def mirror_get_json(url: str, *, direct_error: Exception | None = None) ->
     fallo de dato como de transporte."""
     mirror_url = _mirror_url_for(url)
     if mirror_url is None:
-        raise RuntimeError(
-            f"SEC bloqueada y sin mirror HF configurado ({url})"
-        ) from direct_error
+        raise RuntimeError(f"SEC bloqueada y sin mirror HF configurado ({url})") from direct_error
     from app.core.config import get_settings
 
     manifest = await _mirror_manifest(get_settings().sec_hf_mirror_dataset or "")
@@ -333,9 +343,7 @@ def _manifest_cik(ticker: str) -> str | None:
     return _pad_cik(cik) if cik else None
 
 
-async def cik_for_ticker(
-    ticker: str, client: httpx.AsyncClient | None = None
-) -> str | None:
+async def cik_for_ticker(ticker: str, client: httpx.AsyncClient | None = None) -> str | None:
     """CIK a 10 digitos para un ticker US, o None si no es filer EDGAR."""
     from_manifest = _manifest_cik(ticker)
     if from_manifest is not None:
@@ -355,9 +363,7 @@ async def cik_for_ticker(
     )
 
 
-async def company_facts(
-    cik: str | int, client: httpx.AsyncClient | None = None
-) -> dict[str, Any]:
+async def company_facts(cik: str | int, client: httpx.AsyncClient | None = None) -> dict[str, Any]:
     """Hechos XBRL (companyfacts) tal como fueron fileados, sin normalizar."""
     return await _get_json(COMPANYFACTS_URL.format(cik=_pad_cik(cik)), client)
 
@@ -429,9 +435,7 @@ def extract_metric_values(
         )
     if not candidates:
         return None
-    candidates.sort(
-        key=lambda te: (str(te[1].get("filed", "")), str(te[1].get("end", "")))
-    )
+    candidates.sort(key=lambda te: (str(te[1].get("filed", "")), str(te[1].get("end", ""))))
     tag, latest = candidates[-1]
     return {
         "concept": tag,
@@ -472,6 +476,7 @@ async def get_fundamentals(
         "metrics": metrics,
         "recent_filings": await recent_filings(resolved_cik, client=client),
     }
+
 
 # Alias publicos para el cliente async (connectors/sec.py).
 manifest_cik = _manifest_cik
