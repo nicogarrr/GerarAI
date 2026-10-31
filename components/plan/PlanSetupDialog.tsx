@@ -250,7 +250,7 @@ export default function PlanSetupDialog({
                                 value={currency}
                                 onChange={(e) => setCurrency(e.target.value)}
                                 aria-invalid={error === currencyRequiredError}
-                                className="h-9 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
+                                className="h-11 w-full rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:h-9 sm:text-sm"
                             >
                                 <option value="" disabled>{t('plan.setup.currencyPlaceholder')}</option>
                                 {/* Una divisa registrada fuera de la lista se conserva como opción: nunca se muestra otra. */}
@@ -273,7 +273,7 @@ export default function PlanSetupDialog({
                                     aria-label={t('plan.setup.categoryAria', { n: index + 1 })}
                                     value={row.kind}
                                     onChange={(e) => updateRow(index, { kind: e.target.value as AllocationRow['kind'] })}
-                                    className="h-9 min-w-0 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100"
+                                    className="h-11 min-w-0 rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:h-9 sm:text-sm"
                                 >
                                     <option value="ticker">{t('plan.setup.kindTicker')}</option>
                                     <option value="sector">{t('plan.setup.kindSector')}</option>

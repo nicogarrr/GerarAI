@@ -33,7 +33,10 @@ describe('guard móvil: inputs sin zoom automático de iOS (text-base en móvil)
         }
     });
     it('ningún control de app/ o components/ queda con text-sm/xs sin text-base', () => {
-        const re = /<(?:input|textarea|select)[^>]{0,400}?className="([^"]*)"/g;
+        // El salto hasta className atraviesa handlers inline (`onChange={(e) => ...}`):
+        // `[^>]` moría en el `>` del arrow y esos controles quedaban fuera del
+        // escaneo (falso negativo: 9 controles con text-sm en main).
+        const re = /<(?:input|textarea|select)(?:(?:[^>{]|\{(?:[^{}]|\{[^{}]*\})*\}){0,600}?)className="([^"]*)"/g;
         const offenders: string[] = [];
         for (const root of ['app', 'components']) {
             for (const file of walk(root)) {
