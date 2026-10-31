@@ -37,6 +37,7 @@ from app.services.brain_service import (
 )
 from app.services.chat_synthesis_service import ChatSynthesisService
 from app.services.claim_scope import latest_thesis_version, live_claims
+from app.services.company_catalog import all_companies
 from app.services.company_resolver import resolve_company
 from app.services.library_context import company_library_context, retrieve_library_context
 from app.services.memory_service import MemoryService, remember_note
@@ -787,7 +788,7 @@ class ChatService:
         - Con varias empresas distintas nombradas no se elige ninguna: la
           ambiguedad se deja al flujo general en vez de adivinar.
         """
-        companies = list(db.scalars(select(Company)).all())
+        companies = list(all_companies(db))
         by_ticker = {company.ticker.upper(): company for company in companies}
         found: dict[str, Company] = {}
         has_cue = bool(_COMPANY_CUE_RE.search(question))
@@ -961,21 +962,33 @@ class ChatService:
             tenant_id = db.info.get("tenant_id")
             if type(tenant_id) is not int or tenant_id <= 0:
                 return []
+            # Hidratacion en lote (anti N+1): una consulta para todos los
+            # candidatos con los mismos filtros (tenant, empresa); el orden y
+            # el cap se siguen decidiendo al recorrer los hits.
+            candidate_ids = [
+                hit["entity_id"]
+                for hit in hits
+                if hit.get("entity_type") == "document_chunk" and type(hit.get("entity_id")) is int
+            ]
+            hydrated: dict[int, tuple[DocumentChunk, Document]] = {}
+            if candidate_ids:
+                statement = (
+                    select(DocumentChunk, Document)
+                    .join(Document, Document.id == DocumentChunk.document_id)
+                    .where(DocumentChunk.id.in_(candidate_ids), DocumentChunk.tenant_id == tenant_id,
+                           Document.tenant_id == tenant_id)
+                )
+                if company:
+                    statement = statement.where(Document.company_id == company.id)
+                for row in db.execute(statement).all():
+                    hydrated[row[0].id] = (row[0], row[1])
             rows = []
             seen = set()
             for hit in hits:
                 chunk_id = hit.get("entity_id")
                 if hit.get("entity_type") != "document_chunk" or type(chunk_id) is not int or chunk_id in seen:
                     continue
-                statement = (
-                    select(DocumentChunk, Document)
-                    .join(Document, Document.id == DocumentChunk.document_id)
-                    .where(DocumentChunk.id == chunk_id, DocumentChunk.tenant_id == tenant_id,
-                           Document.tenant_id == tenant_id)
-                )
-                if company:
-                    statement = statement.where(Document.company_id == company.id)
-                row = db.execute(statement).first()
+                row = hydrated.get(chunk_id)
                 if not row:
                     continue
                 chunk, document = row
@@ -1188,7 +1201,7 @@ class ChatService:
             )
             from app.services.company_names import ambiguous_name_answer, companies_named_in
 
-            named = companies_named_in(question, db.scalars(select(Company)).all())
+            named = companies_named_in(question, all_companies(db))
             if named.ambiguous and not named.companies and not doctrine_question:
                 word, candidates = named.ambiguous[0]
                 return ChatResponse(
@@ -2136,7 +2149,7 @@ class ChatService:
         """Empresa nombrada por su nombre («mis acciones de Apple»), solo si es única."""
         words = {w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ]{4,}", question or "")}
         found: dict[int, Company] = {}
-        for company in db.scalars(select(Company)).all():
+        for company in all_companies(db):
             first = re.findall(r"[A-Za-zÀ-ÿ]{4,}", company.name or "")
             if first and first[0].lower() in words and first[0].lower() not in _GENERIC_NAME_WORDS:
                 found[company.id] = company

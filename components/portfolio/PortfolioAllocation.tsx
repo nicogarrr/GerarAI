@@ -5,19 +5,21 @@ import Link from 'next/link';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { PieChart as PieChartIcon } from 'lucide-react';
-import { formatMoney, formatPercent } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 // Datos y colores desde módulos ligeros: importar valores de
 // './PortfolioAllocationChart' metía recharts en la carga inicial de /portfolio.
 import { COLORS } from './allocation-colors';
 import { buildAllocationSlices, CASH_SLICE_SYMBOL, type AllocationSliceData as AllocationSlice } from '@/lib/portfolio-allocation';
 
+const AllocationChartLoading = () => {
+    const ti = useT();
+    // h-full/w-full: el placeholder hereda el tamaño del wrapper
+    // (200px bajo sm, 250px desde sm); fijo a 250 desbordaba a 360px.
+    return <div className="h-full w-full animate-pulse rounded-full border border-gray-800 bg-gray-900/40" aria-label={ti('portfolio.allocation.loadingChart')} role="status" />;
+};
 const PortfolioAllocationChart = dynamic(() => import('./PortfolioAllocationChart'), {
     ssr: false,
-    loading: () => (
-        // h-full/w-full: el placeholder hereda el tamaño del wrapper
-        // (200px bajo sm, 250px desde sm); fijo a 250 desbordaba a 360px.
-        <div className="h-full w-full animate-pulse rounded-full border border-gray-800 bg-gray-900/40" aria-label="Cargando distribución" role="status" />
-    ),
+    loading: AllocationChartLoading,
 });
 
 type Props = {
@@ -30,6 +32,8 @@ type Props = {
 };
 
 export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Props) {
+    const ti = useT();
+    const f = useFormat();
     const hasCash = typeof cash === 'number' && cash !== 0;
     if (holdings.length === 0 && !hasCash) {
         return (
@@ -37,12 +41,12 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                 <CardHeader className="pb-2">
                     <CardTitle className="text-gray-100 flex items-center gap-2">
                         <PieChartIcon className="h-5 w-5 text-teal-400" />
-                        Distribución de la cartera
+                        {ti('portfolio.allocation.emptyTitle')}
                     </CardTitle>
                 </CardHeader>
                 <CardContent>
                     <div className="text-center py-8">
-                        <p className="text-gray-400">Añade posiciones para ver la distribución</p>
+                        <p className="text-gray-400">{ti('portfolio.allocation.emptyHint')}</p>
                     </div>
                 </CardContent>
             </Card>
@@ -67,8 +71,8 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
         <div className="bg-[#111111] border border-gray-800 rounded-2xl p-6 h-full flex flex-col">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
-                <span className="text-gray-400 text-sm font-medium">Distribución</span>
-                <span className="text-xs text-gray-500">Pesos sobre el valor bruto de las posiciones</span>
+                <span className="text-gray-400 text-sm font-medium">{ti('portfolio.allocation.title')}</span>
+                <span className="text-xs text-gray-500">{ti('portfolio.allocation.weightsNote')}</span>
             </div>
 
             {/* Contenido: Pie Chart + Leyenda */}
@@ -80,7 +84,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                     ) : (
                         <div className="flex h-full w-full items-center justify-center rounded-full border border-gray-800">
                             <span className="px-6 text-center text-sm text-gray-500">
-                                Distribución N/D: ninguna posición tiene valor disponible
+                                {ti('portfolio.allocation.noValues')}
                             </span>
                         </div>
                     )}
@@ -91,7 +95,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="text-center">
                                 <span className="text-4xl font-bold text-white block">{knownHoldings.length}</span>
-                                <span className="text-xs text-gray-500">Posiciones</span>
+                                <span className="text-xs text-gray-500">{ti('portfolio.allocation.positionsCount')}</span>
                             </div>
                         </div>
                     )}
@@ -107,7 +111,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                                     style={{ backgroundColor: COLORS[index % COLORS.length] }}
                                 />
                                 {item.symbol === CASH_SLICE_SYMBOL ? (
-                                    <span className="text-sm text-gray-300">Caja</span>
+                                    <span className="text-sm text-gray-300">{ti('portfolio.allocation.cash')}</span>
                                 ) : (
                                     <Link
                                         href={`/research/${item.symbol}`}
@@ -118,7 +122,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                                 )}
                             </div>
                             <span className="flex-shrink-0 whitespace-nowrap text-sm text-gray-400 tabular-nums">
-                                {formatPercent(item.percentage, { fromRatio: false, digits: 1 })}
+                                {f.formatPercent(item.percentage, { fromRatio: false, digits: 1 })}
                             </span>
                         </div>
                     ))}
@@ -127,7 +131,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
 
             {missingCount > 0 && (
                 <p className="mt-3 text-xs text-amber-400">
-                    Distribución incompleta: {missingCount} {missingCount === 1 ? 'posición' : 'posiciones'} sin valor (fuera del donut)
+                    {ti('portfolio.allocation.incomplete', { count: `${missingCount} ${missingCount === 1 ? ti('portfolio.allocation.positionOne') : ti('portfolio.allocation.positionMany')}` })}
                 </p>
             )}
 
@@ -135,9 +139,9 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                 Nunca entra en el donut (margen negativo daría pesos >100%). */}
             {typeof cash === 'number' && cash !== 0 && (
                 <div className="mt-4 flex items-center justify-between border-t border-gray-800 pt-3 text-sm">
-                    <span className="text-gray-400">{cash < 0 ? 'Caja (margen)' : 'Caja'}</span>
+                    <span className="text-gray-400">{cash < 0 ? ti('portfolio.allocation.cashMargin') : ti('portfolio.allocation.cash')}</span>
                     <span className={`tabular-nums ${cash < 0 ? 'text-red-400' : 'text-gray-300'}`}>
-                        {formatMoney(cash, baseCurrency ?? 'EUR')}
+                        {f.formatMoney(cash, baseCurrency ?? 'EUR')}
                     </span>
                 </div>
             )}

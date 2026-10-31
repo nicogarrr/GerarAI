@@ -9,6 +9,7 @@ from app.core.tenancy import tenant_filters
 from app.models import Company, ExternalClaim, NewsEvent, ThesisChange, ThesisVersion
 from app.schemas import ManualNewsResponse, NewsFeedItem, NewsIngestResponse
 from app.services.claim_intelligence_service import ClaimIntelligenceService
+from app.services.company_catalog import all_companies
 from app.services.company_resolver import resolve_company
 from app.services.materiality_service import MaterialityService, apply_recency_policy
 from app.services.review_alert_service import ReviewAlertService
@@ -204,7 +205,7 @@ class NewsService:
         """
         best_level = 0
         best: list[Company] = []
-        for company in db.scalars(select(Company)).all():
+        for company in all_companies(db):
             level = _ticker_evidence_level(company.ticker, company.name, text)
             if level > best_level:
                 best_level, best = level, [company]

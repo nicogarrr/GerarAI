@@ -15,7 +15,7 @@ const view = readFileSync('components/risk/RiskDashboardView.tsx', 'utf8');
 
 describe('risk position exposure guard (F43)', () => {
   it('el valor de mercado se formatea como dinero con la divisa base', () => {
-    assert.match(view, /formatMoney\(numeric, baseCurrency\)/, 'formatMoney con baseCurrency');
+    assert.match(view, /f\.formatMoney\(numeric, baseCurrency\)/, 'formatMoney con baseCurrency (locale activo)');
     assert.equal(view.includes('formatRecordValue(position.market_value)'), false, 'sin numero crudo');
   });
 
@@ -30,7 +30,7 @@ describe('risk position exposure guard (F43)', () => {
   });
 
   it('los nulos siguen siendo NA honesto (nunca «NaN €»)', () => {
-    assert.match(view, /if \(!Number\.isFinite\(numeric\)\) return NA;/, 'guardia de no numérico');
-    assert.match(view, /if \(value === null \|\| value === undefined \|\| value === ''\) return NA;/, 'guardia de ausente');
+    assert.match(view, /if \(!Number\.isFinite\(numeric\)\) return t\('common\.na'\);/, 'guardia de no numérico');
+    assert.match(view, /if \(value === null \|\| value === undefined \|\| value === ''\) return t\('common\.na'\);/, 'guardia de ausente');
   });
 });

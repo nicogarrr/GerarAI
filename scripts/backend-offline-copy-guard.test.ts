@@ -37,12 +37,15 @@ void test('el copy de backend caído es cierto tanto en fallo de red como en 5xx
         for (const claim of UNVERIFIABLE) {
             assert.ok(!src.includes(claim), `${path}: afirmación no comprobable «${claim}»`);
         }
+        const dict = JSON.parse(readFileSync(join(here, '..', 'lib/i18n/messages/es/ui.json'), 'utf8'));
+        assert.ok(dict.system.failedDetail.includes('no ha podido completar la consulta'), 'diccionario: consulta no completada');
+        assert.ok(dict.system.failedDetail.includes('Reintenta en unos segundos'), 'diccionario: reintento');
         assert.ok(
-            src.includes('no ha podido completar la consulta'),
+            src.includes('no ha podido completar la consulta') || src.includes("ui.system.failedDetail"),
             `${path}: el copy describe lo comprobado (consulta no completada)`,
         );
         assert.ok(
-            src.includes('Reintenta en unos segundos'),
+            src.includes('Reintenta en unos segundos') || src.includes("ui.system.failedDetail"),
             `${path}: acción honesta (reintento, sin prometer resultado)`,
         );
     }

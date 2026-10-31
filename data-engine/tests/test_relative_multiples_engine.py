@@ -792,3 +792,24 @@ def test_relative_engine_adjusts_a_peer_split_after_its_fiscal_year(db):
     # EV/ventas: 25 x 400 acciones post-split + 200 deuda - 50 caja = 10.150 / 1.000.
     ev_sales = {peer["ticker"]: peer["value"] for peer in blocks["ev_to_sales"]["peers"]}
     assert ev_sales["RELPSPLIT"] == pytest.approx(10.15)
+
+
+def test_divergence_below_text_points_in_the_direction_of_the_gap():
+    """Relativa POR DEBAJO del DCF: las lecturas posibles son «peers baratos»
+    o «prevision del DCF alta». Decir «peers mas caros» contradice la brecha
+    medida (peers caros empujarian la relativa POR ENCIMA)."""
+    report = divergence_report(intrinsic_value=30.0, relative_value=10.0, current_price=20.0)
+    assert report["warning"] is True
+    assert report["gap_pct"] == pytest.approx(-2 / 3)
+    assert "BELOW" in report["text"]
+    assert "cheaper" in report["text"]
+    assert "more expensive" not in report["text"]
+    assert "too high" in report["text"]
+
+
+def test_divergence_above_text_points_in_the_direction_of_the_gap():
+    """Relativa POR ENCIMA del DCF: «peers caros» o «prevision baja»."""
+    report = divergence_report(intrinsic_value=10.0, relative_value=30.0, current_price=20.0)
+    assert "ABOVE" in report["text"]
+    assert "more expensive" in report["text"]
+    assert "too low" in report["text"]

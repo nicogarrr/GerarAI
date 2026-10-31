@@ -3,9 +3,8 @@
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, TrendingUp, CircleDollarSign, Coins, Percent } from 'lucide-react';
-import { formatNumber, formatPercent } from '@/lib/format';
 import { portfolioScoreDisplay } from '@/lib/portfolio-score-display';
-import { t } from '@/lib/i18n/t';
+import { useT, useFormat } from '@/lib/i18n/client';
 
 interface PortfolioScoresProps {
     scores: {
@@ -18,21 +17,23 @@ interface PortfolioScoresProps {
 }
 
 export default function PortfolioScores({ scores }: PortfolioScoresProps) {
+    const ti = useT();
+    const f = useFormat();
     const scoreItems = [
-        { label: t('portfolio.scores.quality'), value: scores.quality, icon: Shield, color: 'text-purple-400' },
-        { label: t('portfolio.scores.growth'), value: scores.growth, icon: TrendingUp, color: 'text-blue-400' },
-        { label: t('portfolio.scores.value'), value: scores.value, icon: CircleDollarSign, color: 'text-green-400' },
-        { label: t('portfolio.scores.dividend'), value: scores.dividend, icon: Coins, color: 'text-yellow-400' },
-        { label: 'Retorno acumulado', value: scores.cagr3y, icon: Percent, color: 'text-teal-400', isPercent: true },
+        { label: ti('portfolio.scores.quality'), value: scores.quality, icon: Shield, color: 'text-purple-400' },
+        { label: ti('portfolio.scores.growth'), value: scores.growth, icon: TrendingUp, color: 'text-blue-400' },
+        { label: ti('portfolio.scores.value'), value: scores.value, icon: CircleDollarSign, color: 'text-green-400' },
+        { label: ti('portfolio.scores.dividend'), value: scores.dividend, icon: Coins, color: 'text-yellow-400' },
+        { label: ti('portfolio.scoresExtra.cumulativeReturn'), value: scores.cagr3y, icon: Percent, color: 'text-teal-400', isPercent: true },
     ];
     const missing = scoreItems.filter((item) => item.value == null).map((item) => item.label);
 
     return (
         <Card className="bg-gray-800/50 border-gray-700">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-lg text-gray-100">Indicadores históricos</CardTitle>
+                <CardTitle className="text-lg text-gray-100">{ti('portfolio.scoresExtra.title')}</CardTitle>
                 <Link href="/metodologia" className="inline-flex min-h-[44px] items-center text-sm text-purple-300 underline-offset-2 hover:text-purple-200 hover:underline">
-                    Metodología
+                    {ti('portfolio.scoresExtra.methodologyLink')}
                 </Link>
             </CardHeader>
             <CardContent>
@@ -48,21 +49,21 @@ export default function PortfolioScores({ scores }: PortfolioScoresProps) {
                                     <>
                                         <div
                                             className="text-2xl font-bold text-gray-500"
-                                            title="No hay datos suficientes para calcular esta puntuación"
+                                            title={ti('portfolio.scoresExtra.noDataTitle')}
                                         >
                                             &mdash;
                                         </div>
                                         <div className="text-xs text-gray-400">{item.label}</div>
                                         <div className="text-[10px] uppercase tracking-wide text-gray-500">
-                                            sin datos
+                                            {ti('portfolio.scoresExtra.noData')}
                                         </div>
                                     </>
                                 ) : (
                                     <>
                                         <div className="text-2xl font-bold text-gray-100">
                                             {display.isPercent
-                                                ? formatPercent(display.value, { fromRatio: false, digits: 2 })
-                                                : formatNumber(display.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                ? f.formatPercent(display.value, { fromRatio: false, digits: 2 })
+                                                : f.formatNumber(display.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </div>
                                         <div className="text-xs text-gray-400">{item.label}</div>
                                     </>
@@ -72,14 +73,11 @@ export default function PortfolioScores({ scores }: PortfolioScoresProps) {
                     })}
                 </div>
                 <p className="mt-3 text-xs text-gray-400">
-                    Bandas de 0 a 100, no factores fundamentales: consistencia combina Sharpe y días positivos;
-                    retorno usa la rentabilidad acumulada; resiliencia usa la caída máxima.
-                    Dividendos usa la rentabilidad declarada de los últimos 12 meses (6% equivale a 100).
-                    El retorno acumulado es del historial disponible, no un CAGR ni una previsión a tres años.
+                    {ti('portfolio.scoresExtra.explanation')}
                 </p>
                 {missing.length > 0 && (
                     <p className="mt-3 text-xs text-gray-500">
-                        Sin datos para: {missing.join(', ')}. Una puntuación sin datos no es un 0.
+                        {ti('portfolio.scoresExtra.missingFor', { labels: missing.join(', ') })}
                     </p>
                 )}
             </CardContent>

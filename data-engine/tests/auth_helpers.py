@@ -119,3 +119,23 @@ def signed_request(
     if params:
         kwargs["params"] = params
     return client.request(method.upper(), path, **kwargs)
+
+
+def csrf_client(app=None, **kwargs):
+    """TestClient con un token CSRF válido por defecto, como el frontend.
+
+    El middleware CSRF (VAL-SEC-001) corre antes del routing y responde 403 a
+    todo mutante sin token. Los tests que miden auth o comportamiento de ruta
+    (no el middleware) lo usan para que la petición llegue a la capa que
+    quieren medir. Quien mide el middleware (test_csrf_protection) o las
+    rutas públicas sigue creando su TestClient a pelo: este helper es una
+    función opt-in, no un fixture autouse.
+    """
+    from fastapi.testclient import TestClient
+
+    import main as _main
+    from app.core.csrf import generate_csrf_token
+
+    client = TestClient(app if app is not None else _main.app, **kwargs)
+    client.headers.update({"X-CSRF-Token": generate_csrf_token()})
+    return client

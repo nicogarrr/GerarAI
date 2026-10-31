@@ -1,7 +1,9 @@
 'use client';
 
-import { formatDate, formatUserDateTime, formatNumber, formatPrice, formatCountEs } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
+import { useT, useFormat } from '@/lib/i18n/client';
+import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
+import type { Formatters } from '@/lib/format';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -33,36 +35,36 @@ function signalTone(signal: unknown): 'default' | 'outline' {
         : 'outline';
 }
 
-function moneyText(value: unknown): string {
+function moneyText(f: Formatters, value: unknown): string {
     if (typeof value !== 'number' || !Number.isFinite(value)) return formatRecordValue(value);
-    return formatPrice(value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    return f.formatPrice(value, 'USD', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
-function formBadge(form: unknown): { label: string; amended: boolean } | null {
+function formBadge(ti: TFunction, form: unknown): { label: string; amended: boolean } | null {
     if (typeof form !== 'string' || !form) return null;
-    if (form.endsWith('/A')) return { label: 'Enmienda ' + form, amended: true };
-    return { label: 'Form ' + form, amended: false };
+    if (form.endsWith('/A')) return { label: ti('insider.formBadge.amended', { form }), amended: true };
+    return { label: ti('insider.formBadge.form', { form }), amended: false };
 }
 
 function secLink(sourceUrl: unknown): string | null {
     return typeof sourceUrl === 'string' && sourceUrl.startsWith('https://') ? sourceUrl : null;
 }
 
-function formatFetchedAt(value: unknown): string {
+function formatFetchedAt(f: Formatters, value: unknown): string {
     if (typeof value !== 'string' || !value) return t('signals.noDate');
-    return formatUserDateTime(value);
+    return f.formatUserDateTime(value);
 }
 
 /** Fechas de Form 4: son días del calendario EDGAR (US), no instantes. Se
  *  formatean sin timeZone para que el día salga siempre igual (parseo local +
  *  formato local es invariante de zona). */
-function filingDateText(value: unknown): string {
-    return typeof value === 'string' && value ? formatDate(value) : formatRecordValue(value);
+function filingDateText(f: Formatters, value: unknown): string {
+    return typeof value === 'string' && value ? f.formatDate(value) : formatRecordValue(value);
 }
 
 /** Contadores del backend: enteros con separadores es-ES. */
-function countText(value: unknown): string {
-    return typeof value === 'number' ? formatNumber(value, { maximumFractionDigits: 0 }) : formatRecordValue(value);
+function countText(f: Formatters, value: unknown): string {
+    return typeof value === 'number' ? f.formatNumber(value, { maximumFractionDigits: 0 }) : formatRecordValue(value);
 }
 
 /** Identidad de la señal: el backend no manda id, así que se compone con los
@@ -95,6 +97,8 @@ function signalKey(signal: DataRecord): string {
 const FILINGS_PAGE_SIZE = 20;
 
 export default function InsiderSignalsView({ initialTicker, initialResult, initialFilings }: InsiderSignalsViewProps) {
+    const ti = useT();
+    const f = useFormat();
     const router = useRouter();
     const [ticker, setTicker] = useState(initialTicker);
 
@@ -172,13 +176,13 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     value={ticker}
                     onValueChange={setTicker}
                     onSelect={(stock) => router.push(`/insider?ticker=${encodeURIComponent(stock.symbol.toUpperCase())}`)}
-                    placeholder="Buscar por ticker o empresa"
+                    placeholder={ti('insider.search.placeholder')}
                     ariaLabel={t('insider.searchPlaceholder')}
                     className="h-11 w-full bg-gray-900"
                 />
                 <Button type="submit" className="h-11 shrink-0 gap-2">
                     <Search aria-hidden="true" className="h-4 w-4" />
-                    Buscar
+                    {ti('insider.search.submit')}
                 </Button>
             </form>
 
@@ -186,16 +190,14 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
             {initialTicker ? (
                 <div className="flex flex-wrap items-center gap-2">
                     {(!initialResult || !initialFilings) ? (
-                        <span className="text-xs text-amber-300">
-                            Lectura parcial: una de las fuentes no respondió. Reintenta la búsqueda.
-                        </span>
+                        <span className="text-xs text-amber-300">{ti('insider.partialRead')}</span>
                     ) : null}
                     {durable ? (
                         <span className="max-w-xl text-xs leading-5 text-amber-300">
                             {durable.header}
                             {durable.detail ? (
                                 <span className="block text-amber-300/80">
-                                    Detalle técnico: {durable.detail}
+                                    {ti('insider.technicalDetail', { detail: durable.detail })}
                                 </span>
                             ) : null}
                         </span>
@@ -205,22 +207,19 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
 
             {!initialTicker ? null : !initialResult ? (
                 <p className="rounded-lg border border-red-900/50 bg-red-950/20 p-6 text-sm text-red-200">
-                    No se pudieron cargar las señales de {initialTicker}. Reintenta más tarde.
+                    {ti('insider.loadError', { ticker: initialTicker })}
                 </p>
             ) : initialResult.status === 'unavailable' ? (
                 <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
                     {/* unavailable solo se devuelve cuando el ticker no resuelve CIK en EDGAR:
                         eso prueba «no es emisor SEC US», nada mas. La reason estable
                         («not a US SEC filer») ya la dice la cabecera; otra reason seria detalle. */}
-                    <p>
-                        {initialTicker}: no es un emisor SEC estadounidense (sin CIK en EDGAR), así
-                        que no tiene señales insider Form 4.
-                    </p>
+                    <p>{ti('insider.notSecFiler', { ticker: initialTicker })}</p>
                     {typeof initialResult.reason === 'string' &&
                     initialResult.reason &&
                     initialResult.reason !== 'not a US SEC filer' ? (
                         <p className="mt-2 text-xs text-amber-300/80">
-                            Detalle técnico: {formatRecordValue(initialResult.reason)}
+                            {ti('insider.technicalDetail', { detail: formatRecordValue(initialResult.reason) })}
                         </p>
                     ) : null}
                 </div>
@@ -231,18 +230,18 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 // palabra cruda. Y se deja claro que no es un «sin actividad».
                 <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
                     <p>
-                        {degradedCopy(initialTicker, initialResult, countText).header} Es un fallo
-                        de lectura, no una ausencia de actividad insider.
+                        {degradedCopy(initialTicker, initialResult, (v) => countText(f, v)).header}{' '}
+                        {ti('insider.degraded.readFailureNote')}{' '}
                         {initialFilings && initialFilings.status === 'ok' && initialFilings.filings.length > 0
                             /* Con filings guardados debajo, «reintenta más tarde» a pelo
                                contradecía la lista visible: el aviso declara que la lectura
                                en vivo falló y que debajo está la copia guardada. */
-                            ? ` Debajo se muestran los ${countText(initialFilings.total ?? initialFilings.filings.length)} filings guardados; la actualización en vivo desde EDGAR se reintentará en el próximo ciclo del monitor.`
-                            : ' Reintenta más tarde.'}
+                            ? ti('insider.degraded.savedBelow', { count: countText(f, initialFilings.total ?? initialFilings.filings.length) })
+                            : ti('insider.degraded.retryLater')}
                     </p>
-                    {degradedCopy(initialTicker, initialResult, countText).detail ? (
+                    {degradedCopy(initialTicker, initialResult, (v) => countText(f, v)).detail ? (
                         <p className="mt-2 text-xs text-amber-300/80">
-                            Detalle técnico: {degradedCopy(initialTicker, initialResult, countText).detail}
+                            {ti('insider.technicalDetail', { detail: degradedCopy(initialTicker, initialResult, (v) => countText(f, v)).detail! })}
                         </p>
                     ) : null}
                 </div>
@@ -254,10 +253,12 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                         <p className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
                             {(initialResult.filings_failed ?? 0) > 0 ? (
                                 <>
-                                    {initialTicker}: lectura incompleta — {countText(initialResult.filings_parsed)} de{' '}
-                                    {countText(initialResult.filings_scanned)} Form 4 leídos (
-                                    {countText(initialResult.filings_failed)} con error). Las señales de abajo
-                                    cubren solo los filings legibles.{' '}
+                                    {ti('insider.partialReadIncomplete', {
+                                        ticker: initialTicker,
+                                        parsed: countText(f, initialResult.filings_parsed),
+                                        scanned: countText(f, initialResult.filings_scanned),
+                                        failed: countText(f, initialResult.filings_failed),
+                                    })}{' '}
                                 </>
                             ) : null}
                             {Array.isArray(initialResult.warnings) && initialResult.warnings.length
@@ -265,15 +266,15 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                 : null}
                         </p>
                     ) : null}
-                    {persistedSourceCopy(initialTicker, initialResult, countText) ? (
+                    {persistedSourceCopy(initialTicker, initialResult, (v) => countText(f, v)) ? (
                         <p className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
-                            {persistedSourceCopy(initialTicker, initialResult, countText)}
+                            {persistedSourceCopy(initialTicker, initialResult, (v) => countText(f, v))}
                         </p>
                     ) : null}
                     {signals.length === 0 ? (
                         <p className="rounded-lg border border-dashed border-gray-800 p-6 text-sm text-gray-500">
                             {initialTicker}: {t('insider.noSignals')} (
-                            {analyzedCountCopy(initialResult.status, initialResult, countText)}).
+                            {analyzedCountCopy(initialResult.status, initialResult, (v) => countText(f, v))}).
                         </p>
                     ) : (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
@@ -282,7 +283,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             <Users aria-hidden="true" className="h-5 w-5 text-teal-400" />
                             <div>
                                 <CardTitle className="text-lg font-semibold text-gray-100">
-                                    Señales ·{' '}
+                                    {ti('insider.signals.title')} ·{' '}
                                     <Link
                                         href={`/research/${encodeURIComponent(initialTicker)}`}
                                         className="font-mono text-teal-300 hover:text-teal-200 hover:underline"
@@ -291,10 +292,12 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                     </Link>
                                 </CardTitle>
                                 <CardDescription className="mt-0.5 text-sm text-gray-500">
-                                    {formatCountEs(signals.length, 'señal', 'señales')} ·{' '}
-                                    {countText(initialResult.buy_count)} compras ·{' '}
-                                    {countText(initialResult.filings_scanned)} filings · datos al{' '}
-                                    {t('signals.asOf', { date: formatFetchedAt((initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at) })}
+                                    {ti('insider.signals.description', {
+                                        signals: f.formatCount(signals.length, ti('insider.signals.unit'), ti('insider.signals.unitPlural')),
+                                        buys: countText(f, initialResult.buy_count),
+                                        scanned: countText(f, initialResult.filings_scanned),
+                                        date: t('signals.asOf', { date: formatFetchedAt(f, (initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at) }),
+                                    })}
                                 </CardDescription>
                             </div>
                         </div>
@@ -305,8 +308,8 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     </CardHeader>
                     <CardContent className="min-w-0 pt-4">
                         <div className="hidden md:block">
-                        <Table regionLabel="Señales insider del ticker">
-                            <TableCaption className="sr-only">Compras insider registradas: tipo de señal, persona, fecha, importe y detalle con enlace al filing de la SEC.</TableCaption>
+                        <Table regionLabel={ti('insider.signals.tableRegion')}>
+                            <TableCaption className="sr-only">{ti('insider.signals.tableCaption')}</TableCaption>
                             <TableHeader>
                                 <TableRow className="border-gray-700 hover:bg-transparent">
                                     <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.signal')}</TableHead>
@@ -340,19 +343,19 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                             ) : null}
                                         </TableCell>
                                         <TableCell className="text-sm text-gray-300">
-                                            {filingDateText(signal.date ?? signal.window_start)}
+                                            {filingDateText(f, signal.date ?? signal.window_start)}
                                         </TableCell>
                                         <TableCell className="text-right text-sm font-semibold text-gray-100">
-                                            {moneyText(signal.value ?? signal.total_value)}
+                                            {moneyText(f, signal.value ?? signal.total_value)}
                                         </TableCell>
                                         <TableCell className="max-w-md text-sm text-gray-400">
                                             <span className="line-clamp-3">{formatRecordValue(signal.detail)}</span>
                                             <span className="mt-1 flex flex-wrap items-center gap-2">
-                                                {formBadge(signal.form) ? (
-                                                    <Badge variant="outline">{formBadge(signal.form)!.label}</Badge>
+                                                {formBadge(ti, signal.form) ? (
+                                                    <Badge variant="outline">{formBadge(ti, signal.form)!.label}</Badge>
                                                 ) : null}
                                                 {signal.multi_reporter === true ? (
-                                                    <span className="text-xs text-gray-500">filing conjunto</span>
+                                                    <span className="text-xs text-gray-500">{ti('insider.multiReporter')}</span>
                                                 ) : null}
                                                 {secLink(signal.source_url) ? (
                                                     <a
@@ -361,7 +364,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                         rel="noopener noreferrer"
                                                         className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
                                                     >
-                                                        Ver filing SEC <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                                        {ti('insider.viewSecFiling')} <ExternalLink aria-hidden="true" className="h-3 w-3" />
                                                     </a>
                                                 ) : null}
                                             </span>
@@ -376,7 +379,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                 <article className="min-w-0 rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 break-words" key={signalKey(signal)}>
                                     <div className="flex flex-wrap items-center gap-2">
                                         <Badge variant={signalTone(signal.signal)} title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null)}>{signalLabel(typeof signal.signal === 'string' ? signal.signal : null)}</Badge>
-                                        <span className="ml-auto text-sm font-semibold text-gray-100">{moneyText(signal.value ?? signal.total_value)}</span>
+                                        <span className="ml-auto text-sm font-semibold text-gray-100">{moneyText(f, signal.value ?? signal.total_value)}</span>
                                     </div>
                                     <div className="mt-3 text-sm font-medium text-gray-200">{formatRecordValue(signal.insider)}</div>
                                     {signal.officer_title ?? signal.role ? (
@@ -387,11 +390,11 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                             )}
                                         </div>
                                     ) : null}
-                                    <div className="mt-1 text-xs text-gray-500">{filingDateText(signal.date ?? signal.window_start)}</div>
+                                    <div className="mt-1 text-xs text-gray-500">{filingDateText(f, signal.date ?? signal.window_start)}</div>
                                     <div className="mt-2 text-sm leading-6 text-gray-400"><span className="line-clamp-3">{formatRecordValue(signal.detail)}</span></div>
                                     <div className="mt-2 flex flex-wrap items-center gap-2">
-                                        {formBadge(signal.form) ? <Badge variant="outline">{formBadge(signal.form)!.label}</Badge> : null}
-                                        {signal.multi_reporter === true ? <span className="text-xs text-gray-500">filing conjunto</span> : null}
+                                        {formBadge(ti, signal.form) ? <Badge variant="outline">{formBadge(ti, signal.form)!.label}</Badge> : null}
+                                        {signal.multi_reporter === true ? <span className="text-xs text-gray-500">{ti('insider.multiReporter')}</span> : null}
                                         {secLink(signal.source_url) ? (
                                             <a
                                                 href={secLink(signal.source_url)!}
@@ -399,7 +402,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
                                             >
-                                                Ver filing SEC <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                                {ti('insider.viewSecFiling')} <ExternalLink aria-hidden="true" className="h-3 w-3" />
                                             </a>
                                         ) : null}
                                     </div>
@@ -415,7 +418,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
                     <CardHeader className="border-b border-gray-700/50 pb-4">
                         <CardTitle className="text-lg font-semibold text-gray-100">
-                            Filings persistidos · {initialFilings.total ?? initialFilings.count}
+                            {ti('insider.filings.title', { count: String(initialFilings.total ?? initialFilings.count) })}
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4">
@@ -424,9 +427,9 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                 <li key={filing.accession_number} className="rounded-lg border border-gray-800 p-3 text-sm">
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                         <Badge variant="outline">{filing.form}</Badge>
-                                        {filing.is_amendment ? <Badge>Enmienda</Badge> : null}
+                                        {filing.is_amendment ? <Badge>{ti('insider.filings.amendment')}</Badge> : null}
                                         <span className="font-mono text-gray-300">
-                                            {filingDateText(filing.filing_date)}
+                                            {filingDateText(f, filing.filing_date)}
                                         </span>
                                         {secLink(filing.source_url) ? (
                                             <a
@@ -435,7 +438,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 rel="noopener noreferrer"
                                                 className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
                                             >
-                                                Ver filing SEC <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                                {ti('insider.viewSecFiling')} <ExternalLink aria-hidden="true" className="h-3 w-3" />
                                             </a>
                                         ) : null}
                                     </div>
@@ -447,38 +450,42 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                     <span className="text-gray-400">{insiderRole(tx.role, tx.officer_title)}</span>
                                                     <span className={tx.code === 'P' ? 'text-teal-300' : tx.code === 'S' ? 'text-red-400' : 'text-gray-400'}>
                                                         {insiderCodeLabel(tx.code)}
-                                                        {tx.is_derivative ? ' · derivado' : ''}
+                                                        {tx.is_derivative ? ` · ${ti('insider.derivative')}` : ''}
                                                         {tx.security_title ? ` · ${tx.security_title}` : ''}
-                                                        {tx.rule_10b5_1 ? ' · plan 10b5-1' : ''}
+                                                        {tx.rule_10b5_1 ? ` · ${ti('insider.plan10b51')}` : ''}
                                                     </span>
-                                                    <span className="tabular-nums text-gray-300">{formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })} acc.</span>
+                                                    <span className="tabular-nums text-gray-300">{ti('insider.shares', { n: f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 }) })}</span>
                                                     {tx.price !== null && tx.price !== undefined ? (
-                                                        <span className="tabular-nums text-gray-300">{moneyText(tx.price)}</span>
+                                                        <span className="tabular-nums text-gray-300">{moneyText(f, tx.price)}</span>
                                                     ) : null}
                                                     {tx.value !== null && tx.value !== undefined && !(tx.value === 0 && tx.code !== 'P' && tx.code !== 'S') ? (
-                                                        <span className="tabular-nums text-gray-100">{moneyText(tx.value)}</span>
+                                                        <span className="tabular-nums text-gray-100">{moneyText(f, tx.value)}</span>
                                                     ) : null}
                                                 </li>
                                             ))}
                                         </ul>
                                     ) : (
-                                        <p className="mt-2 text-xs text-gray-500">Sin operaciones extraídas.</p>
+                                        <p className="mt-2 text-xs text-gray-500">{ti('insider.filings.noTransactions')}</p>
                                     )}
                                 </li>
                             ))}
                         </ul>
                         <div className="mt-4 flex flex-col gap-2 text-xs text-gray-500">
                             <span className="text-center">
-                                Mostrando {(filingsPageNow - 1) * FILINGS_PAGE_SIZE + 1}-{(filingsPageNow - 1) * FILINGS_PAGE_SIZE + visibleFilings.length} de {filingsTotal}
+                                {ti('insider.filings.showing', {
+                                    from: (filingsPageNow - 1) * FILINGS_PAGE_SIZE + 1,
+                                    to: (filingsPageNow - 1) * FILINGS_PAGE_SIZE + visibleFilings.length,
+                                    total: filingsTotal,
+                                })}
                             </span>
                             {filingsError ? (
                                 <span className="text-center text-red-400" role="alert">
-                                    No se pudieron cargar más filings.
+                                    {ti('insider.filings.loadMoreError')}
                                 </span>
                             ) : null}
                             <Pagination
                                 busy={filingsLoading}
-                                label="Filings persistidos"
+                                label={ti('insider.filings.paginationLabel')}
                                 onPageChange={(target) => void goToFilingsPage(target)}
                                 page={filingsPageNow}
                                 pages={filingsPages}

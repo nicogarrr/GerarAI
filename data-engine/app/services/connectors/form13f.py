@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree as ET
@@ -24,6 +25,7 @@ import httpx
 # throttle, el de connectors/base.py.
 from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
 from app.services.connectors.form4 import SUBMISSIONS_URL, default_headers, filing_index_url
+from app.services.data_source_health import get_data_source_registry
 
 MIN_INTERVAL_SECONDS = SEC_MIN_INTERVAL_SECONDS
 FORMS = {"13F-HR", "13F-HR/A"}
@@ -32,17 +34,47 @@ FORMS = {"13F-HR", "13F-HR/A"}
 _throttle = sec_throttle
 
 
+# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
+# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
+# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
+_REGISTRY_KEY = "sec_edgar"
+
+
+def _record_sec_outcome(registry, started: float) -> None:
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+
+
+def _record_sec_http_failure(registry, exc) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+
+
+def _record_sec_transport_failure(registry, exc: Exception) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+
+
 def _get(url: str, client: httpx.Client | None) -> httpx.Response:
     # Cabeceras antes del throttle (ver form4.recent_form4_filings): el sello
     # del intervalo debe fijarse lo mas pegado posible a la salida a la red.
     headers = default_headers()
+    registry = get_data_source_registry()
     _throttle()
-    if client is not None:
-        response = client.get(url, headers=headers)
-    else:
-        with httpx.Client(timeout=30, headers=headers) as owned:
-            response = owned.get(url)
-    response.raise_for_status()
+    try:
+        if client is not None:
+            response = client.get(url, headers=headers)
+        else:
+            with httpx.Client(timeout=30, headers=headers) as owned:
+                response = owned.get(url)
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (400, 404):
+            raise  # CIK/documento inexistente: dato por emisor
+        _record_sec_http_failure(registry, exc)
+        raise
+    except httpx.TransportError as exc:
+        _record_sec_transport_failure(registry, exc)
+        raise
+    # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El éxito
+    # lo registra el consumidor tras validar el formato (JSON o XML).
     return response
 
 
@@ -54,7 +86,18 @@ def recent_13f_filings(
 ) -> list[dict]:
     """13F-HR y 13F-HR/A recientes del manager, mas reciente primero."""
     url = SUBMISSIONS_URL.format(cik=str(cik).strip().zfill(10))
-    payload = _get(url, client).json()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        payload = _get(url, client).json()
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
+        raise
+    if not isinstance(payload, dict) or "filings" not in payload:
+        # Un 200 con JSON lista o {} no es el submissions de la SEC.
+        registry.record_failure(_REGISTRY_KEY, "200 con JSON sin la clave 'filings' (parse failed)")
+        raise ValueError("13F submissions payload is not the SEC submissions object")
+    _record_sec_outcome(registry, started)
     recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
     items: list[dict] = []
@@ -91,7 +134,17 @@ def information_table_url(
 ) -> str | None:
     """URL del information table XML dentro del filing; None si no se localiza."""
     base = filing_index_url(cik, accession_number)
-    payload = _get(f"{base}index.json", client).json()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        payload = _get(f"{base}index.json", client).json()
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
+        raise
+    if not isinstance(payload, dict) or "directory" not in payload:
+        registry.record_failure(_REGISTRY_KEY, "200 con JSON sin la clave 'directory' (parse failed)")
+        raise ValueError("13F index payload is not the SEC directory object")
+    _record_sec_outcome(registry, started)
     items = (payload.get("directory") or {}).get("item") or []
     candidates: list[str] = []
     for item in items:
@@ -101,11 +154,16 @@ def information_table_url(
         # primaryDocument puede venir con carpeta de estilo ("xslForm13F_X02/primary_doc.xml"):
         # se compara el nombre base, y primary_doc.xml nunca es el information table.
         primary_base = (primary_document or "").rsplit("/", 1)[-1]
-        if name == primary_document or (primary_base and name == primary_base) or name.lower() == "primary_doc.xml":
+        if (
+            name == primary_document
+            or (primary_base and name == primary_base)
+            or name.lower() == "primary_doc.xml"
+        ):
             continue
         candidates.append(name)
     if not candidates:
         return None
+
     def _is_info_table(n: str) -> bool:
         flat = n.lower().replace("-", "").replace("_", "")
         return "infotable" in flat or "13f" in flat
@@ -115,7 +173,16 @@ def information_table_url(
 
 
 def fetch_information_table(url: str, *, client: httpx.Client | None = None) -> list[dict]:
-    return parse_information_table(_get(url, client).text)
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    text = _get(url, client).text
+    try:
+        rows = parse_information_table(text)
+    except (ET.ParseError, ValueError):
+        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
+        raise
+    _record_sec_outcome(registry, started)
+    return rows
 
 
 def parse_information_table(xml_text: str) -> list[dict]:
@@ -131,6 +198,10 @@ def parse_information_table(xml_text: str) -> list[dict]:
         return None
 
     root = ET.fromstring(xml_text)
+    if local(root.tag) != "informationTable":
+        # Un 200 con HTML bien formado (challenge de WAF) parsea como XML;
+        # la raíz oficial del esquema 13F es informationTable.
+        raise ValueError("el documento no es un information table 13F")
     rows: list[dict] = []
     for info in root.iter():
         if local(info.tag) != "infoTable":
@@ -227,21 +298,31 @@ def infer_value_scale(rows: list[dict], report_date: str | date | None) -> dict:
         return {"scale": None, "median_implied_price": None, "priced_rows": 0, "reason": "legacy_period"}
     prices: list[Decimal] = []
     for row in rows:
-        if (row.get("ssh_prnamt_type") or "SH").strip().upper() != "SH" or (row.get("put_call") or "").strip():
+        if (row.get("ssh_prnamt_type") or "SH").strip().upper() != "SH" or (
+            row.get("put_call") or ""
+        ).strip():
             continue
         value, shares = _dec(row.get("value_usd_thousands")), _dec(row.get("ssh_prnamt"))
         if value is None or shares is None or value <= 0 or shares <= 0:
             continue
         prices.append(value / shares)
     if len(prices) < MIN_PRICED_ROWS:
-        return {"scale": SCALE_DOLLARS, "median_implied_price": None, "priced_rows": len(prices),
-                "reason": "insufficient_rows"}
+        return {
+            "scale": SCALE_DOLLARS,
+            "median_implied_price": None,
+            "priced_rows": len(prices),
+            "reason": "insufficient_rows",
+        }
     prices.sort()
     mid = len(prices) // 2
     median = prices[mid] if len(prices) % 2 else (prices[mid - 1] + prices[mid]) / 2
     scale = SCALE_THOUSANDS if median < THOUSANDS_MEDIAN_PRICE_CEILING else SCALE_DOLLARS
-    return {"scale": scale, "median_implied_price": str(round(median, 4)), "priced_rows": len(prices),
-            "reason": "median_implied_price"}
+    return {
+        "scale": scale,
+        "median_implied_price": str(round(median, 4)),
+        "priced_rows": len(prices),
+        "reason": "median_implied_price",
+    }
 
 
 def apply_value_scale(rows: list[dict], scale: str | None) -> list[dict]:
@@ -262,7 +343,11 @@ def parse_primary_summary(xml_text: str) -> dict:
         return tag.rsplit("}", 1)[-1]
 
     found: dict[str, str] = {}
-    for elem in ET.fromstring(xml_text).iter():
+    root = ET.fromstring(xml_text)
+    # Raíz oficial del esquema thirteenffiler (ns sec.gov/edgar/thirteenffiler).
+    if local(root.tag) != "edgarSubmission":
+        raise ValueError("el documento no es un primary_doc 13F")
+    for elem in root.iter():
         name = local(elem.tag)
         if name in {"tableEntryTotal", "tableValueTotal", "amendmentType"} and (elem.text or "").strip():
             found.setdefault(name, (elem.text or "").strip())
@@ -280,7 +365,19 @@ def fetch_primary_summary(
 ) -> dict | None:
     """Resumen declarado por el propio filing; None si no se puede leer."""
     url = filing_index_url(cik, accession_number) + "primary_doc.xml"
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     try:
-        return parse_primary_summary(_get(url, client).text)
-    except Exception:  # noqa: BLE001 - sin resumen => "no verificado", nunca invent
+        text = _get(url, client).text
+    except Exception:  # noqa: BLE001 - sin resumen => "no verificado", nunca inventado
+        # Los fallos HTTP/red ya quedaron registrados dentro de _get.
         return None
+    try:
+        summary = parse_primary_summary(text)
+    except (ET.ParseError, ValueError):
+        # Formato drift (p.ej. challenge HTML): fuente degradada, pero el
+        # contrato "None = no verificado" se mantiene para el llamador.
+        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
+        return None
+    _record_sec_outcome(registry, started)
+    return summary

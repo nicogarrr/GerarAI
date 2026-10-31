@@ -13,6 +13,9 @@ import { readFileSync } from 'node:fs';
 
 const dialog = readFileSync('components/plan/PlanSetupDialog.tsx', 'utf8');
 const view = readFileSync('components/plan/PlanView.tsx', 'utf8');
+// Las cadenas visibles viven en el diccionario i18n (carril C); los
+// componentes las referencian por clave. El guard verifica ambos extremos.
+const esPlan = JSON.parse(readFileSync('lib/i18n/messages/es/plan.json', 'utf8'));
 const actions = readFileSync('lib/actions/plan.actions.ts', 'utf8');
 
 describe('selector de divisa del plan', () => {
@@ -36,9 +39,10 @@ describe('selector de divisa del plan', () => {
 
 describe('visualizacion del importe', () => {
     it('plan legacy con contrato activo: importe crudo y «divisa no registrada»', () => {
-        const f = view.match(/const planMonthly[\s\S]*?\n};/);
+        const f = view.match(/const planMonthly[\s\S]*?\n    \};/);
         assert.ok(f);
-        assert.match(f[0], /divisa no registrada/);
+        assert.match(f[0], /plan\.values\.currencyNotRegistered/);
+        assert.match(esPlan.values.currencyNotRegistered, /divisa no registrada/);
         assert.match(f[0], /currency_contract_enabled === true/);
     });
     it('la proxima aportacion usa su propia divisa, nunca la base', () => {
@@ -49,28 +53,32 @@ describe('visualizacion del importe', () => {
         assert.match(view, /next_contribution: planNext/);
     });
     it('cuotas pendientes de vencimiento se informan, no se tratan como error', () => {
-        const f = view.match(/const planExpectedPeriods[\s\S]*?\n};/);
+        const f = view.match(/const planExpectedPeriods[\s\S]*?\n    \};/);
         assert.ok(f);
-        assert.match(f[0], /pendientes de vencimiento/);
+        assert.match(f[0], /plan\.values\.periodsPending/);
+        assert.match(esPlan.values.periodsPending, /pendientes de vencimiento/);
         assert.match(view, /expected_periods: planExpectedPeriods/);
     });
     it('divisa sin registrar con contrato activo: cuotas no calculables, no ceros', () => {
-        const f = view.match(/const planExpectedPeriods[\s\S]*?\n};/);
+        const f = view.match(/const planExpectedPeriods[\s\S]*?\n    \};/);
         assert.ok(f);
-        assert.match(f[0], /No calculables: divisa no registrada/);
+        assert.match(f[0], /plan\.values\.periodsNotCalculable/);
+        assert.equal(esPlan.values.periodsNotCalculable, 'No calculables: divisa no registrada');
         assert.match(f[0], /monthly_currency_recorded !== true/);
     });
     it('las cuotas sin tipo de cambio se resumen en espanol, no como claves crudas', () => {
-        const f = view.match(/const planExpectedMissingFx[\s\S]*?\n};/);
+        const f = view.match(/const planExpectedMissingFx[\s\S]*?\n    \};/);
         assert.ok(f);
-        assert.match(f[0], /sin tipo de cambio/);
+        assert.match(f[0], /plan\.values\.expectedMissingFx\b/);
+        assert.match(esPlan.values.expectedMissingFx, /sin tipo de cambio/);
         assert.match(view, /expected_missing_fx: planExpectedMissingFx/);
     });
     it('el 409 del contrato se devuelve como resultado y se muestra inline, sin guardar', () => {
         assert.match(actions, /plan_currency_required_for_amount_change/);
         assert.match(actions, /if \(code\) return \{ ok: false, code \}/);
         assert.match(dialog, /if \(!result\.ok\)/);
-        assert.match(dialog, /no se ha guardado nada/);
+        assert.match(dialog, /plan\.setup\.errorCurrencyUnavailable/);
+        assert.match(esPlan.setup.errorCurrencyUnavailable, /no se ha guardado nada/);
     });
     it('una divisa registrada fuera de la lista se muestra y se conserva (no se enmascara con otra)', () => {
         assert.match(dialog, /currency && !CURRENCY_OPTIONS\.includes\(currency\) \? \[currency, \.\.\.CURRENCY_OPTIONS\]/);

@@ -40,7 +40,7 @@ void test('la tarjeta estira exactamente un enlace y protege el secundario', () 
     assert.match(block, /destination \? 'relative border-gray-700\/50 bg-gray-900\/50 transition-colors hover:border-teal-700\/60 hover:bg-gray-900'/);
 
     // El enlace de investigación (siempre interno) va estirado.
-    const researchLink = block.slice(block.indexOf('Revisar tesis de') - 400, block.indexOf('Revisar tesis de'));
+    const researchLink = block.slice(block.indexOf('home.alerts.reviewThesis') - 400, block.indexOf('home.alerts.reviewThesis'));
     assert.match(researchLink, /after:absolute after:inset-0/);
 
     // El documento fuente va estirado SOLO cuando no hay ticker (es entonces

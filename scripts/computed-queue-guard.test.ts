@@ -13,12 +13,18 @@ const compose = readFileSync('docker-compose.prod.yml', 'utf8');
 // ya esta en su techo de 10 GiB (test_memory_limits_fit_the_12gb_vm), asi que
 // la consume el worker-alerts (jobs cortos y diarios; el otro hilo sigue
 // libre para alertas) con CPU compartida baja (hay un spotdl en el host).
-test('el carril computed (4 actores) va en cola dedicada consumida por el worker-alerts', () => {
+test('el carril computed (5 actores) va en cola dedicada consumida por el worker-alerts', () => {
     for (const actor of [
         'run_propicks_funnel',
         'freeze_propicks_snapshot',
         'ingest_spy_daily',
         'refresh_propicks_prices',
+        // Admitido (a9f2faa6f): barrido ACOTADO y resumible por cursor diario,
+        // sin red ni LLM, con lease global. Va en computed a proposito para NO
+        // compartir cola con evaluate_dca_signals (default, tambien 30 min de
+        // time_limit): dos barredores largos juntos se hambrearian. Ocupa como
+        // mucho 1 de los 2 hilos del worker-alerts y el otro sigue libre.
+        'propicks_radar_scan',
     ]) {
         assert.match(
             workers,
@@ -28,7 +34,9 @@ test('el carril computed (4 actores) va en cola dedicada consumida por el worker
     }
     assert.match(workers, /COMPUTED_QUEUE_NAME = "computed"/);
     const declaraciones = workers.match(/queue_name=COMPUTED_QUEUE_NAME/g) ?? [];
-    assert.equal(declaraciones.length, 4, 'solo los 4 actores del carril declaran la cola computed');
+    assert.equal(declaraciones.length, 5, 'solo los 5 actores del carril declaran la cola computed');
+    // El radar se mantiene ACOTADO: sin time_limit acotado saldria de la cola.
+    assert.match(workers, /time_limit=1_800_000,\s*queue_name=COMPUTED_QUEUE_NAME\)\ndef propicks_radar_scan/);
     // Trabajos largos o de ingesta NO entran: recrearian el starvation dentro.
     assert.doesNotMatch(workers, /queue_name=COMPUTED_QUEUE_NAME\)\ndef refresh_valuation_metrics/);
     assert.doesNotMatch(workers, /queue_name=COMPUTED_QUEUE_NAME\)\ndef propose_paper_trades/);

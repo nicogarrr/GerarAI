@@ -14,6 +14,9 @@ import test from 'node:test';
 import { analyzedCountCopy, degradedCopy, durableReadCopy, persistedSourceCopy } from '../lib/insider-status-copy.ts';
 
 const view = readFileSync('components/insider/InsiderSignalsView.tsx', 'utf8');
+// Las cadenas visibles de la vista viven en el diccionario i18n (carril C);
+// el componente las referencia por clave. El guard verifica ambos extremos.
+const esInsider = JSON.parse(readFileSync('lib/i18n/messages/es/insider.json', 'utf8'));
 const count = (v: unknown) => String(v);
 
 test('degraded con contadores: cabecera con N de M y sin reason', () => {
@@ -42,10 +45,13 @@ test('F30: una excepción cruda nunca llega al usuario', () => {
 });
 
 test('la reason nunca sustituye a la cabecera en el componente', () => {
-    assert.match(view, /degradedCopy\(initialTicker, initialResult, countText\)\.header/);
-    assert.match(view, /Es un fallo\s+de lectura, no una ausencia de actividad insider\./);
-    assert.match(view, /Reintenta más tarde\./);
-    assert.match(view, /Detalle técnico:/);
+    assert.match(view, /degradedCopy\(initialTicker, initialResult, \(v\) => countText\(f, v\)\)\.header/);
+    assert.match(view, /insider\.degraded\.readFailureNote/);
+    assert.equal(esInsider.degraded.readFailureNote, 'Es un fallo de lectura, no una ausencia de actividad insider.');
+    assert.match(view, /insider\.degraded\.retryLater/);
+    assert.equal(esInsider.degraded.retryLater, 'Reintenta más tarde.');
+    assert.match(view, /insider\.technicalDetail/);
+    assert.equal(esInsider.technicalDetail, 'Detalle técnico: {detail}');
     assert.ok(
         !/\{initialTicker\}: \{formatRecordValue\(initialResult\.reason \?\? initialResult\.status\)\}/.test(view),
         'la salida cruda reason ?? status queda vetada',
@@ -68,18 +74,20 @@ test('partial sin señales: legibles de escaneados, nunca «analizados» inflado
 
 test('partial muestra las señales con aviso de cobertura incompleta', () => {
     assert.match(view, /initialResult\.status === 'partial' \?/);
-    assert.match(view, /lectura incompleta/);
-    assert.match(view, /cubren solo los filings legibles/);
+    assert.match(view, /insider\.partialReadIncomplete/);
+    assert.match(esInsider.partialReadIncomplete, /lectura incompleta/);
+    assert.match(esInsider.partialReadIncomplete, /cubren solo los filings legibles/);
 });
 
 test('el vacío usa analyzedCountCopy (consciente del estado)', () => {
-    assert.match(view, /analyzedCountCopy\(initialResult\.status, initialResult, countText\)/);
+    assert.match(view, /analyzedCountCopy\(initialResult\.status, initialResult, \(v\) => countText\(f, v\)\)/);
 });
 
 test('unavailable afirma solo lo probado: sin CIK en EDGAR (backend: insider_service devuelve unavailable solo sin CIK)', () => {
-    assert.match(view, /no es un emisor SEC\s+estadounidense \(sin CIK en EDGAR\), así\s+que no tiene señales insider Form 4/);
+    assert.match(view, /insider\.notSecFiler/);
+    assert.match(esInsider.notSecFiler, /no es un emisor SEC estadounidense \(sin CIK en EDGAR\), así que no tiene señales insider Form 4/);
     assert.ok(
-        !/no constan Form 4 registrados/.test(view),
+        !/no constan Form 4 registrados/.test(view) && !/no constan Form 4 registrados/.test(JSON.stringify(esInsider)),
         '«no constan Form 4 registrados» no queda probado por unavailable',
     );
     // La reason estable del backend («not a US SEC filer») ya la dice la
@@ -114,7 +122,7 @@ test('el panel usa durableReadCopy y no muestra el count si el status no es ok',
         !/countText\(initialFilings\?\.count \?\? 0\)/.test(view),
         'el count de una lectura fallida no puede salir como número',
     );
-    assert.match(view, /Detalle técnico: \{durable\.detail\}/);
+    assert.match(view, /ti\('insider\.technicalDetail', \{ detail: durable\.detail \}\)/);
 });
 
 test('filings persistidos: la lectura live fallida se declara con fecha del ultimo filing', () => {
@@ -132,5 +140,5 @@ test('filings persistidos: la lectura live fallida se declara con fecha del ulti
 test('filings persistidos: sin copia persistida no hay etiqueta, y la vista la renderiza', () => {
     assert.equal(persistedSourceCopy('ASTS', { filings_scanned: 20 }, count), null);
     assert.equal(persistedSourceCopy('ASTS', { filings_from_persisted: 0 }, count), null);
-    assert.match(view, /persistedSourceCopy\(initialTicker, initialResult, countText\)/);
+    assert.match(view, /persistedSourceCopy\(initialTicker, initialResult, \(v\) => countText\(f, v\)\)/);
 });

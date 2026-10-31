@@ -7,12 +7,12 @@ que encolan con Dramatiq) devolvía 500 «Internal server error»: el
 
 import pytest
 import redis.exceptions
-from fastapi.testclient import TestClient
 
 from app.core.auth import ResearchPrincipal, get_research_principal
 from app.core.database import init_db
 from app.workers import dramatiq_app
 from main import app
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def client():
         user_id="u-queue", tenant_external_id="t-queue"
     )
     try:
-        yield TestClient(app, raise_server_exceptions=False)
+        yield csrf_client(app, raise_server_exceptions=False)
     finally:
         app.dependency_overrides.pop(get_research_principal, None)
 

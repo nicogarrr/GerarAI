@@ -15,6 +15,7 @@ export async function resolve(specifier, context, nextResolve) {
     ['@/lib/brain/history', new URL('../lib/brain/history.ts', import.meta.url).href],
     ['@/lib/chat/citations', new URL('../lib/chat/citations.ts', import.meta.url).href],
     ['@/lib/paginate-all', new URL('../lib/paginate-all.ts', import.meta.url).href],
+    ['@/lib/paginated-backend', new URL('../lib/paginated-backend.ts', import.meta.url).href],
     ['@/lib/research/sources-inventory', new URL('../lib/research/sources-inventory.ts', import.meta.url).href],
     ['@/lib/news-landing', new URL('../lib/news-landing.ts', import.meta.url).href],
     ['next/cache', 'guard-stub:next-cache'],

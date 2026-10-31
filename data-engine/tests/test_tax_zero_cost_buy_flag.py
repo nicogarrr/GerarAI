@@ -8,8 +8,6 @@ from datetime import date
 from decimal import Decimal as D
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
-
 from app.core.database import init_db
 from app.services.tax_report_service import (
     ZERO_COST_REVIEW_LABEL,
@@ -17,6 +15,7 @@ from app.services.tax_report_service import (
     zero_cost_buys_for_review,
 )
 from main import app
+from tests.auth_helpers import csrf_client
 
 START, END = date(2025, 1, 1), date(2025, 12, 31)
 
@@ -45,7 +44,7 @@ def test_zero_cost_buys_listed_for_review_without_changing_fifo():
 
 def test_transaction_list_flags_zero_price_buy():
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     for ticker, price in (("ZEROGIFT", "0"), ("PAIDBUY", "10")):
         response = client.post(
             "/api/portfolio/transactions",

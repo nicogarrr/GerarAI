@@ -1,1 +1,32 @@
-{}
+{
+  "meta": {
+    "title": "Export",
+    "description": "Download your decision journal in CSV or JSON, or your theses for Obsidian (.zip)."
+  },
+  "header": {
+    "eyebrow": "Journal",
+    "title": "Export"
+  },
+  "journal": {
+    "title": "Decision journal",
+    "description": "One year of decisions in CSV or JSON.",
+    "yearLabel": "Year",
+    "formatLabel": "Format",
+    "formatCsv": "CSV (spreadsheet)",
+    "formatJson": "JSON (raw data)",
+    "exporting": "Exporting...",
+    "exportCta": "Export journal",
+    "preview": "Preview",
+    "success": "Export complete: {filename}"
+  },
+  "obsidian": {
+    "title": "Theses for Obsidian",
+    "description": "Download your portfolio and watchlist theses in linked Markdown (.zip) for Obsidian.",
+    "downloading": "Downloading…",
+    "cta": "Download for Obsidian (.zip)",
+    "error": "The vault could not be downloaded. Try again in a few seconds.",
+    "confirmTitle": "Download for Obsidian",
+    "confirmDescription": "Download your theses and portfolio data as a ZIP file to this device?",
+    "confirmLabel": "Download"
+  }
+}

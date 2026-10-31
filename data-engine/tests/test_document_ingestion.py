@@ -8,6 +8,7 @@ from pypdf import PdfWriter
 from sqlalchemy import delete, select
 
 import main
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Document, DocumentChunk
 from app.seed import seed
@@ -50,6 +51,7 @@ def test_file_ingestion_creates_traceable_chunks_and_dedupes():
     cleanup_test_uploads()
     seed()
     client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
     unique = uuid4().hex
     text = (
         f"Azure AI demand and operating margin discipline are key thesis evidence {unique}. "
@@ -118,6 +120,7 @@ def test_xlsx_ingestion_preserves_sheet_lineage():
     cleanup_test_uploads()
     seed()
     client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
     unique = uuid4().hex
 
     workbook = Workbook()

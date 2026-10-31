@@ -57,7 +57,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
-from app.valuation.fact_reference import split_scaled_value
+from app.valuation.fact_reference import split_scaled_value, usable_fact
 from app.valuation.moat_framework import empty_moat_framework
 
 # Nombre de la regla de coherencia temporal, para que el trace diga qué se
@@ -184,8 +184,9 @@ def _resolve_inputs(
     periodo y su periodo se expone en el trace en vez de anclarlas al balance.
     """
     aliases = {alias for group in inputs.values() for alias in group} | set(anchor_metrics)
-    rows = list(
-        context.db.scalars(
+    rows = [
+        row
+        for row in context.db.scalars(
             select(FinancialFact)
             .where(
                 FinancialFact.company_id == context.company.id,
@@ -196,7 +197,11 @@ def _resolve_inputs(
                 desc(FinancialFact.created_at),
             )
         ).all()
-    )
+        # Misma frontera que el snapshot: un hecho en cuarentena (p. ej.
+        # acciones derivadas de un BPA ESEF en conflicto de escala) no es un
+        # input del ejercicio; es ausente y el motor cae en insufficient.
+        if usable_fact(row)
+    ]
     anchor_row = next((row for row in rows if row.metric in anchor_metrics), None)
     anchor = (
         PeriodAnchor(

@@ -33,11 +33,11 @@ describe('exportación fiscal completa', () => {
     });
     it('serializa con un serializer completo sin topes de entradas ni caracteres', () => {
         assert.match(view, /function csvFullValue/);
-        assert.match(exportBlock[0], /csvExportCell\(value\)/);
-        assert.match(exportBlock[0], /csvExportCell\(holding\[header\]\)/);
+        assert.match(exportBlock[0], /csvExportCell\(value, tFn\)/);
+        assert.match(exportBlock[0], /csvExportCell\(holding\[header\], tFn\)/);
         const cell = view.match(/function csvExportCell[\s\S]*?\n}/);
         assert.ok(cell, 'csvExportCell no encontrado');
-        assert.match(cell[0], /csvFullValue\(value\)/);
+        assert.match(cell[0], /csvFullValue\(value, tFn\)/);
         const serializer = view.match(/function csvFullValue[\s\S]*?\n}/);
         assert.ok(serializer, 'csvFullValue no encontrado');
         assert.doesNotMatch(serializer[0], /más|MAX_VALUE|slice\(0, MAX/);
@@ -56,6 +56,10 @@ describe('exportación fiscal completa', () => {
         assert.match(view, /value\.replaceAll\('"', '""'\)/);
         const serializer = view.match(/function csvFullValue[\s\S]*?\n}/);
         assert.match(serializer![0], /return '—'/);
-        assert.match(serializer![0], /value \? 'Sí' : 'No'/);
+        assert.match(serializer![0], /value \? tFn\('taxes\.values\.yes'\) : tFn\('taxes\.values\.no'\)/);
+        // Los sentinelas visibles viven en el diccionario i18n (carril C).
+        const esTaxes = JSON.parse(readFileSync('lib/i18n/messages/es/taxes.json', 'utf8'));
+        assert.equal(esTaxes.values.yes, 'Sí');
+        assert.equal(esTaxes.values.no, 'No');
     });
 });

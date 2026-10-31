@@ -560,7 +560,7 @@ def divergence_report(
     else:
         text = (
             f"{relative_label} is {abs(gap_pct):.0%} BELOW {intrinsic_label}. Either the "
-            "peers are more expensive than the cash flows justify, or the "
+            "peers are cheaper than the cash flows justify, or the "
             f"{intrinsic_label} forecast is too high. The two cannot both be right."
         )
     return {

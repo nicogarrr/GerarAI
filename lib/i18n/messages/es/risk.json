@@ -1,1 +1,96 @@
-{}
+{
+  "meta": {
+    "title": "Exposiciones de cartera",
+    "description": "Pesos, concentración (top 1 y top 5) y exposición por sector y posición de tu cartera, con las alertas de concentración y sus umbrales.",
+    "backendFeature": "Exposiciones de cartera"
+  },
+  "header": {
+    "eyebrow": "Cartera",
+    "title": "Exposiciones de cartera",
+    "subtitle": "Pesos, concentración (top 1 y top 5) y exposición por sector y posición, con las alertas y el umbral que las dispara."
+  },
+  "methodology": {
+    "title": "Alcance y límites",
+    "noRiskMeasures": "Esta página no calcula volatilidad, drawdown ni VaR: esas medidas están en Inteligencia de cartera.",
+    "detailPre": "Para el detalle por posición, ver la cartera. Para volatilidad, drawdown, VaR y rendimiento medidos, ",
+    "linkIntelligence": "Inteligencia de cartera",
+    "detailPost": "."
+  },
+  "thresholds": {
+    "t20": "Umbral 20% del valor de la cartera: por encima, una sola posición concentra el riesgo. Regla de concentración, no un VaR ni una probabilidad de pérdida.",
+    "t10": "Umbral 10% para empresas pre-FCF (todavía no generan caja libre): el doble de estricto que el 20% general.",
+    "t0": "La caja de esta divisa está en negativo (saldo deudor). Revisa los saldos o las operaciones en esa divisa; el umbral es no bajar de cero.",
+    "generic": "Alerta disparada al superar el umbral indicado junto al valor medido."
+  },
+  "labels": {
+    "totalValue": "Valor total",
+    "equityValue": "Valor en renta variable",
+    "cash": "Caja",
+    "top1Weight": "Peso de la mayor posición",
+    "top5Weight": "Peso de las 5 mayores",
+    "weightBasis": "Base de los pesos",
+    "cashAssetsBase": "Caja a favor",
+    "marginDebtBase": "Deuda de margen",
+    "sectorExposure": "Exposición por sector",
+    "factorExposure": "Exposición por factor",
+    "status": "Datos del cálculo",
+    "baseCurrency": "Divisa base",
+    "cashNative": "Caja en divisa original",
+    "missingFx": "Sin tipo de cambio para",
+    "dataAsOf": "Datos a fecha de",
+    "provenance": "Fuente",
+    "cashAsOf": "Caja a fecha de",
+    "fxRates": "Tipos de cambio usados",
+    "valuationDatesDiffer": "Fechas de valoración",
+    "valuationHold": "Valoración en suspenso"
+  },
+  "status": {
+    "ok": "Completos",
+    "incompleteFx": "Incompleto: faltan tipos de cambio",
+    "insufficientData": "Datos insuficientes",
+    "incompleteValuation": "Incompleto: valoración en suspenso"
+  },
+  "values": {
+    "yes": "Sí",
+    "no": "No",
+    "missingFxNote": "(faltan tipos de cambio)",
+    "noBalances": "Sin saldos",
+    "noData": "Sin datos",
+    "weightBasisGross": "Valor bruto de las posiciones (la caja es negativa)",
+    "weightBasisTotal": "Total con caja",
+    "fxScopeCash": "Caja",
+    "fxScopePositions": "Posiciones",
+    "fxRateLine": "{scope}: 1 {currency} = {rate} {base} ({date})",
+    "valuationDatesDiffer": "Posiciones y caja a fechas distintas: el total combina ambas",
+    "sourceInternal": "Fuente interna",
+    "sourceCava": "Base de datos de GerarAI",
+    "fetchedSuffix": " · {date}"
+  },
+  "alerts": {
+    "title": "Alertas de concentración y liquidez",
+    "highOne": "alerta alta",
+    "highMany": "alertas altas",
+    "emptyOk": "Sin alertas de concentración o liquidez en los datos calculados.",
+    "emptyIncomplete": "No hay alertas en los datos disponibles. La cobertura incompleta no permite descartar alertas en el resto de la cartera."
+  },
+  "summary": {
+    "title": "Exposiciones de cartera",
+    "empty": "No hay métricas de riesgo disponibles. Comprueba que tu cartera tiene posiciones."
+  },
+  "positions": {
+    "title": "Exposición por posición",
+    "viewPortfolio": "Ver cartera →",
+    "emptyPortfolio": "Aún no tienes posiciones. Registra tu primera compra para ver pesos, concentración y exposición por sector.",
+    "addInvestment": "Añadir inversión",
+    "empty": "Sin posiciones con exposición calculada.",
+    "tableRegion": "Exposición por posición",
+    "tableCaption": "Exposición por posición: valor de mercado y peso de cada holding",
+    "colTicker": "Ticker",
+    "colName": "Nombre",
+    "colSector": "Sector",
+    "colValue": "Valor",
+    "weightGross": "Peso (valor bruto)",
+    "weightWithCash": "Peso (con caja)",
+    "weightUnknown": "Peso (base no disponible)"
+  }
+}

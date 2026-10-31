@@ -25,5 +25,7 @@ test('inicio watchlist etiqueta los cierres con su fecha, como /watchlist', () =
     assert.match(source, /priceAsOf: dated \? dated\.date : data\.priceAsOf/);
     assert.match(source, /stock\.priceKind === 'close'/);
     assert.match(source, /formatMarketDate\(stock\.priceAsOf\)/);
-    assert.match(source, /'Cierre sin fecha de la fuente'/);
+    assert.match(source, /home\.watchlist\.closeNoDate/);
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.equal(dict.watchlist.closeNoDate, 'Cierre sin fecha de la fuente');
 });

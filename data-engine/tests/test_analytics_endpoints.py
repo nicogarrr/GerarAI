@@ -9,14 +9,14 @@ Run from data-engine/:
 """
 
 import pytest
-from fastapi.testclient import TestClient
 
 import main
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture
 def client():
-    return TestClient(main.app)
+    return csrf_client(main.app)
 
 
 def test_legacy_analytics_endpoints_are_retired(client):

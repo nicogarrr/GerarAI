@@ -12,17 +12,20 @@ import {
 } from '@/lib/actions/manual-demo.actions';
 import { getManualDemoHistory } from '@/lib/actions/manual-demo-history.actions';
 import type { RefreshResult } from '@/components/paper-trading/ManualDemoPanel';
+import { getT } from '@/lib/i18n/server';
 import type { DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, FillSubmit, FxSubmit, HistoryPageResult, HistoryRow, SubmitResult } from '@/components/paper-trading/submit';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Mi cuenta demo',
-    description:
-        'Cuenta de práctica con saldo ficticio y operaciones manuales: registras compras y ventas con el precio que introduces tú.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const ti = await getT();
+    return {
+        title: ti('paperTrading.meta.title'),
+        description: ti('paperTrading.meta.description'),
+    };
+}
 
 type DemoData = {
     account: DemoStateView | null;
@@ -179,6 +182,7 @@ async function loadDemoData(): Promise<DemoData> {
 }
 
 export default async function PaperTradingPage() {
+    const ti = await getT();
     const { account, ledger, historyHasMore, historyNextBefore, loadError, valuation, valuationAsOf } = await loadDemoData();
     // Misma condicion que loadDemoData: fixtures dev sin Mongo. El comentario
     // de DEV_DATA prometia etiqueta en pantalla y no existia; sin ella la QA
@@ -232,18 +236,18 @@ export default async function PaperTradingPage() {
     return (
         <main id="content" tabIndex={-1} className="mx-auto w-full max-w-3xl px-4 py-6">
             <PageHeader
-                title="Mi cuenta demo"
-                description="Práctica con dinero ficticio: 100.000 € iniciales, operaciones manuales y contabilidad FIFO."
+                title={ti('paperTrading.page.title')}
+                description={ti('paperTrading.page.description')}
             />
-            <p className="mt-3 text-sm text-gray-400">Esta es tu cuenta de práctica manual, separada de las propuestas de la IA. <Link href="/propicks?tab=paper" className="text-teal-300 hover:underline">Ver resultados simulados de la IA</Link>.</p>
+            <p className="mt-3 text-sm text-gray-400">{ti('paperTrading.page.aiLinkPre')}<Link href="/propicks?tab=paper" className="text-teal-300 hover:underline">{ti('paperTrading.page.aiLink')}</Link>.</p>
             {loadError ? (
                 <p role="alert" className="mt-4 rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
-                    No se pudo cargar la cuenta demo: {loadError}
+                    {ti('paperTrading.page.loadError', { error: loadError })}
                 </p>
             ) : null}
             {usingFixtures ? (
                 <p role="note" className="mt-4 rounded-lg border border-sky-900/60 bg-sky-950/40 px-3 py-2 text-xs text-sky-200">
-                    Datos de ejemplo para QA visual: sin MONGODB_URI la cuenta no está conectada y registrar operaciones fallará.
+                    {ti('paperTrading.page.fixtureNotice')}
                 </p>
             ) : null}
             <ManualDemoPanel

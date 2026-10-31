@@ -38,6 +38,9 @@ _TEST_DB_PATH = Path(
     os.environ.get("CAVAAI_TEST_DB")
     or f"cavaai_test_{os.getpid()}_{uuid4().hex[:8]}.db"
 )
+# Los tests gated a CI Postgres (round-trips reales de Alembic) necesitan la
+# URL original del job; sin esta copia la pierden al forzar el sqlite hermetico.
+os.environ.setdefault("CAVAAI_ORIGINAL_DATABASE_URL", os.environ.get("DATABASE_URL", ""))
 os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DB_PATH.as_posix()}"
 
 

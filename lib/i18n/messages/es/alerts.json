@@ -7,5 +7,131 @@
     "priceChange": "Cambio de precio %",
     "news": "Nueva noticia",
     "earnings": "Informe de ganancias"
+  },
+  "meta": {
+    "title": "Alertas",
+    "description": "Alertas por precio, cambio, noticias y resultados de tus acciones, con el estado del motor de evaluación y el envío por Telegram."
+  },
+  "header": {
+    "title": "Alertas",
+    "resultsLink": "Resultados"
+  },
+  "manager": {
+    "title": "Mis alertas"
+  },
+  "dialog": {
+    "description": "Configura alertas para recibir notificaciones en tiempo real sobre cambios en tus acciones."
+  },
+  "form": {
+    "symbol": "Símbolo",
+    "type": "Tipo de alerta",
+    "operator": "Operador",
+    "operatorGt": "Mayor que (>)",
+    "operatorLt": "Menor que (<)",
+    "valuePercent": "Porcentaje (%)",
+    "valuePrice": "Precio (divisa de la cotización)",
+    "pricePlaceholder": "100,00",
+    "percentPlaceholder": "5",
+    "thresholdNote": "La alerta guarda el umbral sin divisa: el motor lo compara con el último cierre del valor en la divisa de su bolsa."
+  },
+  "errors": {
+    "invalidSymbol": "Introduce un símbolo válido (letras, números, punto o guion; máximo 20)",
+    "ambiguousNumber": "Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).",
+    "invalidNumber": "Introduce un valor numérico válido",
+    "pricePositive": "El precio debe ser mayor que 0",
+    "duplicate": "Ya tienes esta alerta configurada."
+  },
+  "toast": {
+    "created": "Alerta creada",
+    "deleted": "Alerta eliminada",
+    "reviewLaunched": "Revisión de expectativas lanzada para {symbol}"
+  },
+  "telegram": {
+    "configured": "Canal Telegram configurado en el servidor",
+    "notConfigured": "Telegram sin configurar: las alertas solo llegan en la app"
+  },
+  "session": {
+    "signIn": "Iniciar sesión"
+  },
+  "empty": {
+    "createFirst": "Crear la primera alerta"
+  },
+  "list": {
+    "createdAt": "Creada: {date}",
+    "lastTriggered": "Disparada por última vez: {date}",
+    "channelsTitle": "Canales: {channels} · disparos: {count}",
+    "motorEvaluated": "Motor: evaluada {date} · {count} disparos · {channels}",
+    "motorPending": "Motor: pendiente de primera evaluación (cada 5 min)",
+    "viewResearch": "Ver research →",
+    "review": "Ejecutar revisión",
+    "reviewAria": "Ejecutar revisión de expectativas de {symbol}",
+    "deleteAria": "Eliminar alerta: {label}",
+    "thresholdNote": "Cada umbral de precio se compara con el último cierre guardado del valor, sin convertir divisas; la regla no guarda la divisa, por eso se muestra sin símbolo."
+  },
+  "labels": {
+    "fallback": "Alerta",
+    "price": "{symbol}: {type} {threshold}",
+    "priceChange": "{symbol}: {type} {direction} a {threshold}%",
+    "simple": "{symbol}: {type}",
+    "changeUp": "mayor",
+    "changeDown": "menor"
+  },
+  "triggered": {
+    "title": "Últimos disparos y entregas",
+    "lastShot": "Último disparo {date}",
+    "created": "Creada {date}",
+    "viewOriginal": "Ver aviso original",
+    "reviewThesis": "Revisar tesis de {ticker}",
+    "openDocument": "Abrir documento",
+    "noChannels": "sin canales",
+    "noDeliveryRecord": "sin registro",
+    "channelTitle": "canal {channel}: {status}"
+  },
+  "confirm": {
+    "title": "Eliminar alerta",
+    "description": "¿Eliminar {label}? Esta acción no se puede deshacer."
+  },
+  "push": {
+    "title": "Avisos en este dispositivo",
+    "iosPre": "En iPhone o iPad los avisos solo funcionan con la app instalada (iOS 16.4 o posterior): en Safari toca ",
+    "iosShare": "Compartir",
+    "iosMid": " y ",
+    "iosAdd": "Añadir a pantalla de inicio",
+    "iosPost": ", y vuelve a abrir esta página desde el icono.",
+    "unsupported": "Este navegador no admite avisos push. Los avisos por Telegram y por correo siguen funcionando.",
+    "serverOff": "Los avisos push aún no están activados en el servidor.",
+    "denied": "Bloqueaste las notificaciones de GerarAI. Para activarlas, permítelas en los ajustes del navegador o del sistema.",
+    "intro": "Recibe avisos aunque no tengas la app abierta. Tú eliges qué tipos; el aviso trae la fuente y la hora.",
+    "enable": "Activar avisos en este dispositivo",
+    "disable": "Desactivar en este dispositivo",
+    "legend": "Tipos de aviso push",
+    "errorEnable": "No se pudo activar en este dispositivo. Inténtalo de nuevo.",
+    "errorDisable": "No se pudo desactivar. Inténtalo de nuevo.",
+    "errorSave": "No se pudo guardar el cambio. Inténtalo de nuevo.",
+    "types": {
+      "macroEvent": "Eventos macro (IPC, empleo, FOMC): 24 h y 1 h antes",
+      "earnings": "Próximos resultados de cartera y watchlist: 7 días, 1 día y el mismo día",
+      "dcaLevels": "Niveles DCA de tu watchlist",
+      "newFiling": "Nuevos documentos de la SEC",
+      "thesisBroken": "Tesis en riesgo",
+      "insiders": "Movimientos de directivos",
+      "shortsRising": "Posiciones cortas al alza",
+      "dailyDigest": "Resumen diario de tu cartera"
+    }
+  },
+  "card": {
+    "kindNews": "Noticia",
+    "kindMaterialNews": "Noticia material",
+    "kindAlert": "Alerta",
+    "dateDetected": "detectada {date}",
+    "summaryDailyDigest": "Resumen diario de tu cartera; abre el detalle para ver la cobertura de datos.",
+    "summaryMacroEvent": "Recordatorio del calendario macro oficial; el detalle indica la fuente y la hora.",
+    "summaryUnlinked": "Alerta sin empresa asociada.",
+    "formSummary": "Documento {form} asociado a {company}.",
+    "trackedNewsFallback": "Noticia sobre {company}.",
+    "newsNoHeadline": "Noticia sobre {company}; el aviso no trae titular verificable.",
+    "ruleMatched": "Se cumplió la regla «{title}» para {company}.",
+    "fallback": "Alerta de {company}: {title}.",
+    "fallbackNoDetail": "sin detalle disponible"
   }
 }

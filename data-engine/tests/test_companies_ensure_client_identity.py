@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 import main
 from app.api.routes import companies as companies_routes
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Company
 from app.services.company_enrichment_service import CompanyEnrichmentService
@@ -59,7 +60,7 @@ POISON = {
 def test_production_ignores_client_identity_on_create(monkeypatch):
     monkeypatch.setattr(companies_routes, "_trust_client_identity", lambda: False)
     monkeypatch.setattr(CompanyEnrichmentService, "_finnhub_profile", lambda self, ticker: None)
-    response = TestClient(main.app).post("/api/companies/ensure", json=POISON)
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json=POISON)
     assert response.status_code in (200, 201)
     company = _stored()
     assert company.name == TICKER
@@ -78,7 +79,7 @@ def test_production_provider_identity_wins_over_client(monkeypatch, currency):
         "_finnhub_profile",
         lambda self, ticker: {"name": "QA Real Corp", "exchange": "NASDAQ NMS - GLOBAL MARKET", "finnhubIndustry": "Technology", "currency": currency},
     )
-    response = TestClient(main.app).post("/api/companies/ensure", json=POISON)
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json=POISON)
     assert response.status_code in (200, 201)
     company = _stored()
     assert company.name == "QA Real Corp"
@@ -89,6 +90,7 @@ def test_production_provider_identity_wins_over_client(monkeypatch, currency):
 def test_production_ignores_client_identity_on_existing_stub(monkeypatch):
     monkeypatch.setattr(CompanyEnrichmentService, "_finnhub_profile", lambda self, ticker: None)
     client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
     assert client.post("/api/companies/ensure", json={"ticker": TICKER}).status_code in (200, 201)
     monkeypatch.setattr(companies_routes, "_trust_client_identity", lambda: False)
     assert client.post("/api/companies/ensure", json=POISON).status_code in (200, 201)
@@ -111,6 +113,6 @@ def test_trust_follows_production_flag(monkeypatch):
 
 def test_local_seeding_still_accepts_identity(monkeypatch):
     monkeypatch.setattr(CompanyEnrichmentService, "_finnhub_profile", lambda self, ticker: None)
-    response = TestClient(main.app).post("/api/companies/ensure", json=POISON)
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json=POISON)
     assert response.status_code in (200, 201)
     assert _stored().currency == "GBX"

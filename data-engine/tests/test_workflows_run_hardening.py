@@ -12,15 +12,15 @@
 import inspect
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
 from app.api.routes import workflows as workflows_route
 from app.core.database import SessionLocal, init_db
 from app.models import Company, WorkflowRun
+from tests.auth_helpers import csrf_client
 
-client = TestClient(main.app)
+client = csrf_client(main.app)
 
 
 def _seed_company(ticker: str) -> None:
