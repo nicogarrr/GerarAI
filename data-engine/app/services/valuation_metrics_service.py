@@ -38,11 +38,11 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable, Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -575,6 +575,35 @@ def refresh_valuation_metrics(
         # no repite el universo ya hecho (cada repetida quema cuota Finnhub).
         statement = statement.where(Company.ticker > start_after_ticker)
     companies = list(db.scalars(statement).all())
+    # Cache de 24h: una empresa con el CONJUNTO COMPLETO de metricas del
+    # periodo calculadas hace menos de 24h se salta entera (0 llamadas a
+    # yfinance/Finnhub). Las reanudaciones tras 429 y los disparos duplicados
+    # del scheduler dejan de recomputar el universo: solo trabajan lo obsoleto
+    # o nuevo. Una empresa parcial (P/B fresco pero yield ausente: fuente de
+    # dividendos fallo, split sin ajustar, unidad desconocida...) NO es
+    # fresca: se recomputa para completar el conjunto. Las sin metrica
+    # computable no dejan fila y se reintentan como hasta ahora.
+    tenant_id = db.info.get("tenant_id")
+    skipped_fresh = 0
+    if tenant_id is not None:
+        fresh_cutoff = datetime.now(UTC) - timedelta(hours=24)
+        fresh_ids = set(
+            db.scalars(
+                select(CalculatedMetric.company_id)
+                .where(
+                    CalculatedMetric.tenant_id == tenant_id,
+                    CalculatedMetric.period == as_of.isoformat(),
+                    CalculatedMetric.definition_version == METRIC_VERSION,
+                    CalculatedMetric.metric.in_([METRIC_PB, METRIC_YIELD]),
+                    CalculatedMetric.updated_at >= fresh_cutoff,
+                )
+                .group_by(CalculatedMetric.company_id)
+                .having(func.count(func.distinct(CalculatedMetric.metric)) == 2)
+            ).all()
+        )
+        if fresh_ids:
+            skipped_fresh = sum(1 for c in companies if c.id in fresh_ids)
+            companies = [c for c in companies if c.id not in fresh_ids]
     stats = compute_valuation_metrics(
         db,
         companies,
@@ -584,4 +613,9 @@ def refresh_valuation_metrics(
         finnhub_yield_fetcher=finnhub_yield_fetcher,
     )
     db.commit()
-    return {"as_of": as_of.isoformat(), "companies": len(companies), **stats}
+    return {
+        "as_of": as_of.isoformat(),
+        "companies": len(companies) + skipped_fresh,
+        "companies_skipped_fresh_24h": skipped_fresh,
+        **stats,
+    }
