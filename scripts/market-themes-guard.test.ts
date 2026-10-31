@@ -91,13 +91,16 @@ describe('página /temas', () => {
     assert.equal((page.match(/<footer/g) ?? []).length, 1);
   });
 
-  it('declara fuente, cierre/intradía y método en el pie', () => {
-    assert.ok(page.includes('data.source') && page.includes('data.method'));
-    assert.ok(page.includes("data.intraday ? 'intradía' : 'cierre'"));
+  it('declara cierre/intradía y método en el pie, sin etiqueta de fuente', () => {
+    // El proveedor es una etiqueta de fuente: fuera de la UI (la fuente
+    // sigue viajando en la API). Frescura y método se conservan.
+    assert.ok(!page.includes('data.source'));
+    assert.ok(page.includes('data.method'));
+    assert.ok(page.includes("data.intraday ? 'Intradía' : 'Cierre'"));
   });
 
   it('QA 19: sin as_of el pie lo declara, no pinta «del —»', () => {
-    assert.ok(page.includes('sin fecha de datos disponible'));
+    assert.ok(page.includes('Sin fecha de datos disponible'));
     assert.ok(page.includes('data.as_of'));
     assert.ok(!page.includes('del {formatMarketDate(data.as_of)}'));
   });
