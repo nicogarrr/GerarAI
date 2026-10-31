@@ -690,6 +690,13 @@ COMPUTED_QUEUE_NAME = "computed"
 # (1 proceso, EXTERNA_THREADS=2 por defecto). queue_name solo enruta mensajes
 # NUEVOS: los ya encolados en default los drena el worker default.
 EXTERNA_QUEUE_NAME = "externa"
+# Carriles por proveedor (31-oct): cada proveedor externo ingiere en su cola,
+# asi una racha de 429 o una corrida larga de UNO no frena a los demas. El
+# ritmo real lo siguen poniendo los pacers/frenos globales en Redis (los
+# hilos solo solapan latencia, nunca suben la tasa): Finnhub ~60/min
+# compartido, Yahoo/Google noticias 1 req/1,5 s. GDELT ya tenia carril.
+FINNHUB_QUEUE_NAME = "finnhub"
+YAHOO_NEWS_QUEUE_NAME = "yahoo-news"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -1480,7 +1487,8 @@ def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = N
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000,
+              queue_name=YAHOO_NEWS_QUEUE_NAME)
 @_coalesce_on_success("ingest_ca_insider_yahoo", 330 * 60, ("tenant_id",))
 def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Insiders de Canada via Yahoo quoteSummary (FUENTE NO OFICIAL; SEDI es la verdad)."""
@@ -1730,7 +1738,7 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
 
 
 @dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000,
-              queue_name=EXTERNA_QUEUE_NAME)
+              queue_name=FINNHUB_QUEUE_NAME)
 @_coalesce_on_success("backfill_finnhub_profiles", 20 * 3600, ("tenant_id",))
 def backfill_finnhub_profiles(
     tenant_id: int | None = None,
@@ -3224,7 +3232,8 @@ def refresh_news(
         )
 
 
-@dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000,
+              queue_name=YAHOO_NEWS_QUEUE_NAME)
 @_coalesce_on_success(
     "refresh_ticker_news",
     lambda scope="tracked", **_: 20 * 60 if scope == "tracked" else 5 * 3600,

@@ -15,9 +15,9 @@ import yaml
 COMPOSE_PATH = Path(__file__).resolve().parents[2] / "docker-compose.prod.yml"
 WORKERS_PATH = Path(__file__).resolve().parents[1] / "app" / "workers" / "dramatiq_app.py"
 
+# 31-oct: backfill_finnhub_profiles salio al carril "finnhub" (test_provider_lanes.py).
 ACTORES_EXTERNOS = [
     "refresh_valuation_metrics",      # yfinance + Finnhub (las 1.077)
-    "backfill_finnhub_profiles",      # Finnhub
     "backfill_sec_fundamentals",      # SEC EDGAR
     "backfill_company_price_history",  # proveedor de precios
 ]

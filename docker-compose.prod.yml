@@ -613,6 +613,66 @@ services:
           cpus: "0.75"
           memory: 1G
 
+  # Carriles de ingesta por proveedor (31-oct): una racha de 429 o una
+  # corrida larga de UN proveedor ya no frena a los demas. Los hilos solo
+  # solapan latencia: la tasa la fijan los pacers/frenos en Redis (Finnhub
+  # ~60/min compartido; Yahoo/Google noticias 1 req/1,5 s), asi que 2 hilos
+  # por carril bastan y NO se suben a ciegas. GDELT ya tenia worker propio.
+  # Comentarios ANTES del servicio: los guards localizan command en 200 chars.
+  worker-finnhub:
+    image: cavaai-backend:prod
+    container_name: cavaai-worker-finnhub
+    restart: unless-stopped
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${FINNHUB_THREADS:-2}", "-Q", "finnhub"]
+    environment:
+      <<: [*app-env, *worker-db-env]
+      FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      # Backfills largos: sin prefetch extra (mismo patron que externa/knowledge).
+      dramatiq_queue_prefetch: "1"
+      dramatiq_delay_queue_prefetch: "1"
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+
+  worker-yahoo-news:
+    image: cavaai-backend:prod
+    container_name: cavaai-worker-yahoo-news
+    restart: unless-stopped
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_NEWS_THREADS:-2}", "-Q", "yahoo-news"]
+    environment:
+      <<: [*app-env, *worker-db-env]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)\""]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 384M
+
   # Interactive manual DCA never waits behind RSS/default or price ingestion.
   worker-dca-manual:
     image: cavaai-backend:prod
