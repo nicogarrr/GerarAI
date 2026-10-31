@@ -151,3 +151,52 @@ def test_tracefour_feed_valido_cierra():
     out = asyncio.run(uk_pdmr_tracefour.fetch_pdmr_feed(_async(handler)))
     assert out == []
     assert get_data_source_registry().get_status("tracefour").consecutive_failures == 0
+
+
+def test_ca_yahoo_200_error_interno_unauthorized_degrada():
+    """{quoteSummary:{result:null,error:{code:'Unauthorized'}}} NO es healthy."""
+
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "quoteSummary": {
+                    "result": None,
+                    "error": {"code": "Unauthorized", "description": "Invalid crumb"},
+                }
+            },
+        )
+
+    before = get_data_source_registry().get_status("yahoo_finance").consecutive_failures
+    with pytest.raises(ValueError):
+        ca_insider_yahoo.fetch_insider_transactions("BN", _sync(handler), "crumb-caducado")
+    assert get_data_source_registry().get_status("yahoo_finance").consecutive_failures == before + 1
+
+
+def test_ca_yahoo_200_result_null_sin_error_no_es_exito():
+    def handler(request):
+        return httpx.Response(200, json={"quoteSummary": {"result": None, "error": None}})
+
+    before = get_data_source_registry().get_status("yahoo_finance").consecutive_failures
+    with pytest.raises(ValueError):
+        ca_insider_yahoo.fetch_insider_transactions("BN", _sync(handler), "crumb123")
+    assert get_data_source_registry().get_status("yahoo_finance").consecutive_failures == before + 1
+
+
+def test_ca_yahoo_lista_interna_valida_cierra():
+    def handler(request):
+        return httpx.Response(
+            200,
+            json={
+                "quoteSummary": {
+                    "result": [{"insiderTransactions": {"transactions": [{"filerName": "X"}]}}],
+                    "error": None,
+                }
+            },
+        )
+
+    registry = get_data_source_registry()
+    registry.record_failure("yahoo_finance", "fallo previo")
+    out = ca_insider_yahoo.fetch_insider_transactions("BN", _sync(handler), "crumb123")
+    assert out == [{"filerName": "X"}]
+    assert get_data_source_registry().get_status("yahoo_finance").consecutive_failures == 0

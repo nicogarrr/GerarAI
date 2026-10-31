@@ -123,8 +123,27 @@ def fetch_insider_transactions(symbol: str, client: httpx.Client, crumb: str) ->
             _REGISTRY_KEY, "200 con JSON sin 'quoteSummary' (parse failed)"
         )
         raise ValueError("yahoo quoteSummary payload is not the expected object")
-    result = (payload.get("quoteSummary") or {}).get("result") or []
-    # Éxito tras validar la envoltura; un símbolo sin módulo es [] válido.
+    summary = payload["quoteSummary"]
+    if not isinstance(summary, dict):
+        get_data_source_registry().record_failure(
+            _REGISTRY_KEY, "200 con 'quoteSummary' no objeto (parse failed)"
+        )
+        raise ValueError("yahoo quoteSummary payload is not the expected object")
+    error = summary.get("error")
+    if error is not None:
+        # Yahoo responde 200 con error interno (p.ej. {"code": "Unauthorized"}
+        # cuando el crumb caduca): es un fallo de auth/formato, NO salud.
+        code = error.get("code") if isinstance(error, dict) else None
+        get_data_source_registry().record_failure(_REGISTRY_KEY, f"200 con error interno de Yahoo ({code})")
+        raise ValueError(f"yahoo quoteSummary returned an error: {code}")
+    result = summary.get("result")
+    if not isinstance(result, list):
+        # result=null con error=null no es una forma documentada de Yahoo:
+        # ausencia ambigua -> fallo de formato, nunca "sin actividad".
+        get_data_source_registry().record_failure(_REGISTRY_KEY, "200 con 'result' no lista (parse failed)")
+        raise ValueError("yahoo quoteSummary result is not a list")
+    # Éxito tras validar envoltura, error nulo y result lista (vacía = símbolo
+    # sin módulo, dato ausente legítimo; no vacía = hay movimientos).
     get_data_source_registry().record_success(_REGISTRY_KEY)
     if not result:
         return []
