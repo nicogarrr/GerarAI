@@ -1,5 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// QuickGlancePanel es un server component asincrono (getT lee la cookie de locale).
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 
 import { QuickGlancePanel } from '@/components/research/QuickGlancePanel';
 import type { ManagementCredibility } from '@/components/research/sections/ManagementCredibilitySection';
@@ -62,9 +65,12 @@ const base = {
     moatScore: moat(72),
 };
 
+type Props = Parameters<typeof QuickGlancePanel>[0];
+const view = (over: Partial<Props> = {}) => QuickGlancePanel({ ...base, ...over } as Props);
+
 describe('QuickGlancePanel', () => {
-    it('pinta cada fila con dato real enlazada a su sección', () => {
-        render(<QuickGlancePanel {...base} />);
+    it('pinta cada fila con dato real enlazada a su sección', async () => {
+        render(await view());
         expect(screen.getByRole('heading', { name: 'Vistazo rápido' })).toBeVisible();
         expect(screen.getByRole('link', { name: /Valor del modelo \(datos a FY2025\)/ }))
             .toHaveAttribute('href', '/research/TEST?view=valoracion#modelo');
@@ -80,8 +86,8 @@ describe('QuickGlancePanel', () => {
         expect(screen.getByText('72/100')).toBeVisible();
     });
 
-    it('etiqueta el consenso como agregado Yahoo no oficial con su recorrido', () => {
-        render(<QuickGlancePanel {...base} />);
+    it('etiqueta el consenso como agregado Yahoo no oficial con su recorrido', async () => {
+        render(await view());
         expect(screen.getByRole('link', { name: /Analistas \(agregado Yahoo, no oficial\)/ }))
             .toHaveAttribute('href', '#analistas');
         expect(screen.getByText('Mediana 150,00 US$')).toBeVisible();
@@ -89,54 +95,45 @@ describe('QuickGlancePanel', () => {
         expect(screen.getByText(/Recorrido a la mediana: \+50,0 %/)).toBeVisible();
     });
 
-    it('sin recorrido cuando falta el precio en vivo (nada inventado)', () => {
-        render(<QuickGlancePanel {...base} livePrice={null} />);
+    it('sin recorrido cuando falta el precio en vivo (nada inventado)', async () => {
+        render(await view({ livePrice: null }));
         expect(screen.getByText('Mediana 150,00 US$')).toBeVisible();
         expect(screen.queryByText(/Recorrido a la mediana/)).toBeNull();
     });
 
-    it('no pinta filas sin dato real', () => {
+    it('no pinta filas sin dato real', async () => {
         const { rerender } = render(
-            <QuickGlancePanel {...base} model={model({ publishable: false })} />,
+            await view({ model: model({ publishable: false }) }),
         );
         expect(screen.queryByText(/Valor del modelo/)).toBeNull();
 
-        rerender(<QuickGlancePanel {...base} model={model({ status: 'not_generated' })} />);
+        rerender(await view({ model: model({ status: 'not_generated' }) }));
         expect(screen.queryByText(/Valor del modelo/)).toBeNull();
 
-        rerender(<QuickGlancePanel {...base} analysts={analysts({ status: 'unavailable' })} />);
+        rerender(await view({ analysts: analysts({ status: 'unavailable' }) }));
         expect(screen.queryByText(/Analistas/)).toBeNull();
 
-        rerender(<QuickGlancePanel {...base} analysts={analysts({ consensus: { median: null } })} />);
+        rerender(await view({ analysts: analysts({ consensus: { median: null } }) }));
         expect(screen.queryByText(/Analistas/)).toBeNull();
 
-        rerender(<QuickGlancePanel {...base} shareCapital={shareCapital({ status: 'SIN_DATOS' })} />);
+        rerender(await view({ shareCapital: shareCapital({ status: 'SIN_DATOS' }) }));
         expect(screen.queryByText(/Recompras/)).toBeNull();
 
-        rerender(<QuickGlancePanel {...base} credibility={null} />);
+        rerender(await view({ credibility: null }));
         expect(screen.queryByText(/Compromisos de la directiva/)).toBeNull();
 
-        rerender(<QuickGlancePanel {...base} moatScore={moat(null)} />);
+        rerender(await view({ moatScore: moat(null) }));
         expect(screen.queryByText(/Calidad financiera/)).toBeNull();
     });
 
-    it('declara sin recompras cuando el registro SEC oficial no recoge ninguna', () => {
-        render(<QuickGlancePanel {...base} shareCapital={shareCapital({ annual_flows: [] })} />);
+    it('declara sin recompras cuando el registro SEC oficial no recoge ninguna', async () => {
+        render(await view({ shareCapital: shareCapital({ annual_flows: [] }) }));
         expect(screen.getByText('Sin recompras declaradas')).toBeVisible();
     });
 
-    it('devuelve null cuando ninguna fila tiene dato', () => {
+    it('devuelve null cuando ninguna fila tiene dato', async () => {
         const { container } = render(
-            <QuickGlancePanel
-                ticker="TEST"
-                currency="USD"
-                model={null}
-                analysts={null}
-                livePrice={null}
-                shareCapital={null}
-                credibility={null}
-                moatScore={null}
-            />,
+            await view({ model: null, analysts: null, livePrice: null, shareCapital: null, credibility: null, moatScore: null }),
         );
         expect(container).toBeEmptyDOMElement();
         expect(screen.queryByText('Vistazo rápido')).toBeNull();

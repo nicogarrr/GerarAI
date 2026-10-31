@@ -84,5 +84,30 @@
   "ingestItemsLabel": "Batch news (JSON)",
   "ingestItemsPlaceholder": "[{\"ticker\":\"MSFT\",\"title\":\"MSFT cuts guidance\",\"text\":\"results below expectations and guidance cut\",\"url\":\"https://...\"}]",
   "ingestSubmit": "Import batch",
-  "backToTicker": "Back to {ticker}"
+  "backToTicker": "Back to {ticker}",
+  "glance": {
+    "title": "Quick glance",
+    "modelValue": "Model value",
+    "modelValueWithPeriod": "Model value (data as of {period})",
+    "analystsLabel": "Analysts (Yahoo aggregate, unofficial)",
+    "medianUpside": "Upside to median: {pct}",
+    "medianValue": "Median {price}",
+    "buybacksLabel": "Buybacks (SEC filings)",
+    "buybackYes": "Yes, in {year}",
+    "buybackNone": "No declared buybacks",
+    "credibilityLabel": "Management commitments",
+    "commitmentsOpen": {
+      "one": "{count} open to verify",
+      "other": "{count} open to verify"
+    },
+    "moatLabel": "Financial quality (moat framework)"
+  },
+  "credibility": {
+    "grade": {
+      "high": "high",
+      "mixed": "mixed",
+      "low": "low",
+      "insufficientHistory": "insufficient history"
+    }
+  }
 }

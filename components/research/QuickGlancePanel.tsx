@@ -6,13 +6,14 @@ import type { ResearchLongTermModel, MoatScoreMetric } from '@/lib/actions/resea
 import type { ShareCapital } from '@/lib/actions/share-capital.actions';
 import type { ManagementCredibility } from '@/components/research/sections/ManagementCredibilitySection';
 import { formatNumber, formatPrice, formatPercent } from '@/lib/format';
+import { getT } from '@/lib/i18n/server';
 
-const GRADE_LABELS: Record<string, string> = {
-  high: 'alta',
-  mixed: 'mixta',
-  low: 'baja',
-  insufficient_history: 'historial insuficiente',
-};
+const GRADE_KEYS = {
+  high: 'research.credibility.grade.high',
+  mixed: 'research.credibility.grade.mixed',
+  low: 'research.credibility.grade.low',
+  insufficient_history: 'research.credibility.grade.insufficientHistory',
+} as const;
 
 function Row({ href, label, value, note }: { href: string; label: string; value: string; note?: string }) {
   return (
@@ -38,7 +39,7 @@ function Row({ href, label, value, note }: { href: string; label: string; value:
  * «venta fuerte» (descartado explícitamente). Una fila sin dato real no se
  * pinta: nada de relleno.
  */
-export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice, shareCapital, credibility, moatScore }: {
+export async function QuickGlancePanel({ ticker, currency, model, analysts, livePrice, shareCapital, credibility, moatScore }: {
   ticker: string;
   currency: string | null | undefined;
   model: ResearchLongTermModel | null;
@@ -48,7 +49,8 @@ export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice,
   credibility: ManagementCredibility | null;
   moatScore: MoatScoreMetric | null;
 }) {
-  const t = encodeURIComponent(ticker);
+  const t = await getT();
+  const tk = encodeURIComponent(ticker);
   const rows: React.ReactNode[] = [];
 
   // Valor del modelo propio: etiquetado como precio del modelo con su
@@ -59,9 +61,9 @@ export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice,
   if (baseValuation !== null && Number.isFinite(baseValuation)) {
     rows.push(
       <Row
-        href={`/research/${t}?view=valoracion#modelo`}
+        href={`/research/${tk}?view=valoracion#modelo`}
         key="modelo"
-        label={model?.as_of_period ? `Valor del modelo (datos a ${model.as_of_period})` : 'Valor del modelo'}
+        label={model?.as_of_period ? t('research.glance.modelValueWithPeriod', { period: model.as_of_period }) : t('research.glance.modelValue')}
         value={currency ? formatPrice(baseValuation, currency) : formatNumber(baseValuation)}
       />,
     );
@@ -76,9 +78,9 @@ export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice,
       <Row
         href="#analistas"
         key="analistas"
-        label="Analistas (agregado Yahoo, no oficial)"
-        note={recorrido !== null ? `Recorrido a la mediana: ${formatPercent(recorrido, { digits: 1, signDisplay: 'always' })}` : undefined}
-        value={`Mediana ${analysts?.currency ? formatPrice(median, analysts.currency) : formatNumber(median)}`}
+        label={t('research.glance.analystsLabel')}
+        note={recorrido !== null ? t('research.glance.medianUpside', { pct: formatPercent(recorrido, { digits: 1, signDisplay: 'always' }) }) : undefined}
+        value={t('research.glance.medianValue', { price: analysts?.currency ? formatPrice(median, analysts.currency) : formatNumber(median) })}
       />,
     );
   }
@@ -91,21 +93,21 @@ export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice,
       .sort((a, b) => b.date.localeCompare(a.date))[0];
     rows.push(
       <Row
-        href={`/research/${t}?view=finanzas#dilucion`}
+        href={`/research/${tk}?view=finanzas#dilucion`}
         key="recompras"
-        label="Recompras (registros SEC)"
-        value={ultimaRecompra ? `Sí, en ${ultimaRecompra.date.slice(0, 4)}` : 'Sin recompras declaradas'}
+        label={t('research.glance.buybacksLabel')}
+        value={ultimaRecompra ? t('research.glance.buybackYes', { year: ultimaRecompra.date.slice(0, 4) }) : t('research.glance.buybackNone')}
       />,
     );
   }
   if (credibility) {
-    const grade = GRADE_LABELS[credibility.grade] ?? credibility.grade;
+    const grade = Object.hasOwn(GRADE_KEYS, credibility.grade) ? t(GRADE_KEYS[credibility.grade as keyof typeof GRADE_KEYS]) : credibility.grade;
     rows.push(
       <Row
-        href={`/research/${t}?view=seguimiento#directiva`}
+        href={`/research/${tk}?view=seguimiento#directiva`}
         key="directiva"
-        label="Compromisos de la directiva"
-        note={credibility.counts.open > 0 ? `${credibility.counts.open} abierta${credibility.counts.open === 1 ? '' : 's'} por comprobar` : undefined}
+        label={t('research.glance.credibilityLabel')}
+        note={credibility.counts.open > 0 ? (credibility.counts.open === 1 ? t('research.glance.commitmentsOpen.one', { count: credibility.counts.open }) : t('research.glance.commitmentsOpen.other', { count: credibility.counts.open })) : undefined}
         value={`${formatPercent(credibility.score, { digits: 0 })} · ${grade}`}
       />,
     );
@@ -114,9 +116,9 @@ export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice,
   if (typeof moatTrace?.score === 'number') {
     rows.push(
       <Row
-        href={`/research/${t}?view=valoracion#foso`}
+        href={`/research/${tk}?view=valoracion#foso`}
         key="foso"
-        label="Calidad financiera (marco de foso)"
+        label={t('research.glance.moatLabel')}
         value={`${formatNumber(moatTrace.score, { maximumFractionDigits: 0 })}/100`}
       />,
     );
@@ -124,8 +126,8 @@ export function QuickGlancePanel({ ticker, currency, model, analysts, livePrice,
 
   if (!rows.length) return null;
   return (
-    <aside aria-label="Vistazo rápido" className="h-fit rounded-xl border border-gray-800 bg-surface-1 p-4">
-      <h2 className="text-sm font-semibold text-gray-200">Vistazo rápido</h2>
+    <aside aria-label={t('research.glance.title')} className="h-fit rounded-xl border border-gray-800 bg-surface-1 p-4">
+      <h2 className="text-sm font-semibold text-gray-200">{t('research.glance.title')}</h2>
       <ul className="mt-1">{rows}</ul>
     </aside>
   );

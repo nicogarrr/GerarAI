@@ -84,5 +84,30 @@
   "ingestItemsLabel": "Noticias del lote (JSON)",
   "ingestItemsPlaceholder": "[{\"ticker\":\"MSFT\",\"title\":\"MSFT recorta guía\",\"text\":\"resultado por debajo y recorte de guía\",\"url\":\"https://...\"}]",
   "ingestSubmit": "Importar lote",
-  "backToTicker": "Volver a {ticker}"
+  "backToTicker": "Volver a {ticker}",
+  "glance": {
+    "title": "Vistazo rápido",
+    "modelValue": "Valor del modelo",
+    "modelValueWithPeriod": "Valor del modelo (datos a {period})",
+    "analystsLabel": "Analistas (agregado Yahoo, no oficial)",
+    "medianUpside": "Recorrido a la mediana: {pct}",
+    "medianValue": "Mediana {price}",
+    "buybacksLabel": "Recompras (registros SEC)",
+    "buybackYes": "Sí, en {year}",
+    "buybackNone": "Sin recompras declaradas",
+    "credibilityLabel": "Compromisos de la directiva",
+    "commitmentsOpen": {
+      "one": "{count} abierta por comprobar",
+      "other": "{count} abiertas por comprobar"
+    },
+    "moatLabel": "Calidad financiera (marco de foso)"
+  },
+  "credibility": {
+    "grade": {
+      "high": "alta",
+      "mixed": "mixta",
+      "low": "baja",
+      "insufficientHistory": "historial insuficiente"
+    }
+  }
 }
