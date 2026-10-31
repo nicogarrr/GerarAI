@@ -14,6 +14,7 @@ pipeline, bajar por debajo del suelo vuelve a poner el test en rojo.
 
 from __future__ import annotations
 
+import pathlib
 from importlib.metadata import version
 
 
@@ -26,3 +27,20 @@ def test_pypdf_floor_6_21_4() -> None:
     assert installed >= (6, 21, 4), (
         f"pypdf {version('pypdf')} < 6.21.4: CVE-2026-119203..209 (DoS) sin parche"
     )
+
+_DECLARED_FLOOR = "pypdf>=6.21.4,<7"
+
+
+def test_declared_floor_matches_lock() -> None:
+    """pyproject y requirements declaran el mismo suelo que resuelve uv.lock.
+
+    El Docker de prod instala con pip desde requirements.txt: un suelo flojo
+    ahi dejaria prod en una pypdf vulnerable aunque uv.lock este parcheado
+    (objecion del piloto a #3754).
+    """
+    root = __file__.rsplit("/tests/", 1)[0]
+    pyproject = (pathlib.Path(root) / "pyproject.toml").read_text()
+    requirements = (pathlib.Path(root) / "requirements.txt").read_text()
+    assert _DECLARED_FLOOR in pyproject, "pyproject.toml sin el suelo pypdf>=6.21.4,<7"
+    assert _DECLARED_FLOOR in requirements, "requirements.txt sin el suelo pypdf>=6.21.4,<7 (regenerar con scripts/sync_requirements.py --write)"
+
