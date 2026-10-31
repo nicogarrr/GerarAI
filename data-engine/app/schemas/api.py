@@ -1543,7 +1543,12 @@ class PortfolioSummaryOut(BaseModel):
 # Formas medidas contra la ruta (L773+) y sus helpers reales:
 # _pnl_effects, _QUOTE_MISSING_PNL_KEYS, mask_cost_under_review,
 # reconcile_ibkr_costs, _fiscal_info/_fiscal_info_batch, tracked_statuses.
-# La ruta emite siempre todas las claves (ramas None; no omite ninguna).
+# El payload de cada posicion emite siempre todas sus claves (ramas None),
+# pero los objetos ANIDADOS omiten claves segun la rama: analysis solo
+# lleva missing_inputs con thesis_status insufficient_data y
+# cost_reconciliation not_comparable no lleva los importes de la rama
+# ok/review_required. La ruta usa response_model_exclude_unset=True para
+# preservar esas omisiones (los null explicitos se conservan).
 
 
 class PortfolioAnalysisStateOut(BaseModel):

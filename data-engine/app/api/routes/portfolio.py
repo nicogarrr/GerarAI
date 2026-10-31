@@ -770,7 +770,7 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     return TearsheetService().build(db)
 
 
-@router.get("/positions", response_model=PaginatedResponse[PortfolioPositionItemOut])
+@router.get("/positions", response_model=PaginatedResponse[PortfolioPositionItemOut], response_model_exclude_unset=True)
 def positions(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
