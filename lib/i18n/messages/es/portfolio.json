@@ -724,6 +724,8 @@
     "rmReasonFx": "sin histórico FX suficiente",
     "rmReasonNoValuation": "sin valoración en divisa base",
     "rmReasonCalendar": "calendario bursátil incompatible",
-    "rmReasonFallback": "sin datos suficientes"
+    "rmReasonFallback": "sin datos suficientes",
+    "rmColWeightIncluded": "Peso en la matriz",
+    "rmCoverageNote": "Contribuciones calculadas solo sobre las {n} posiciones incluidas: sus pesos se renormalizan para sumar 100 %. Las excluidas se listan abajo con su motivo."
   }
 }

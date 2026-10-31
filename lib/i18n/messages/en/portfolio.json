@@ -724,6 +724,8 @@
     "rmReasonFx": "not enough FX history",
     "rmReasonNoValuation": "no base-currency valuation",
     "rmReasonCalendar": "incompatible trading calendar",
-    "rmReasonFallback": "not enough data"
+    "rmReasonFallback": "not enough data",
+    "rmColWeightIncluded": "Weight in matrix",
+    "rmCoverageNote": "Contributions computed only over the {n} included positions: their weights are renormalized to sum to 100%. Excluded ones are listed below with their reason."
   }
 }

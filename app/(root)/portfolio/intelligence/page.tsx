@@ -234,11 +234,12 @@ export default async function PortfolioIntelligencePage({ searchParams }: { sear
           <div aria-label={ti('portfolio.intelligence.rmContributionTitle')} className="scroll-affordance-x mt-4 overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}>
             <table className="w-full min-w-[560px] text-left text-sm">
               <caption className="sr-only">{ti('portfolio.intelligence.rmContributionTitle')}</caption>
-              <thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">{ti('portfolio.intelligence.colTicker')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colWeight')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColVol')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColContribution')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColMarginal')}</th></tr></thead>
+              <thead className="text-xs uppercase text-gray-500"><tr><th className="border-b border-gray-800 py-2" scope="col">{ti('portfolio.intelligence.colTicker')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.colWeight')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColWeightIncluded')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColVol')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColContribution')}</th><th className="border-b border-gray-800 py-2 text-right" scope="col">{ti('portfolio.intelligence.rmColMarginal')}</th></tr></thead>
               <tbody>{rmIncluded.map((row) => (
                 <tr className="border-b border-gray-900" key={row.ticker}>
                   <th className="py-3 text-left text-sm font-semibold text-teal-300" scope="row">{row.ticker}</th>
                   <td className="py-3 text-right">{pct(row.weight)}</td>
+                  <td className="py-3 text-right">{pct(row.weight_included ?? null)}</td>
                   <td className="py-3 text-right">{pct(row.vol_annualized ?? null)}</td>
                   <td className="py-3 text-right">{pct(row.risk_contribution ?? null)}</td>
                   <td className="py-3 text-right">{ratio(row.marginal_contribution ?? null)}</td>
@@ -247,6 +248,9 @@ export default async function PortfolioIntelligencePage({ searchParams }: { sear
             </table>
           </div>
           <p className="mt-3 text-sm text-gray-400">{ti('portfolio.intelligence.rmPortfolioVol')}: <span className="font-semibold text-gray-100">{pct(riskMatrix.portfolio.vol_annualized)}</span></p>
+          {rmExcluded.length > 0 ? (
+            <p className="mt-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">{ti('portfolio.intelligence.rmCoverageNote', { n: rmIncluded.length })}</p>
+          ) : null}
         </>
       ) : null}
       {rmExcluded.length > 0 ? (
