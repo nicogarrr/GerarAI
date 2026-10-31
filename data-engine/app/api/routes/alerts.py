@@ -205,18 +205,18 @@ def list_alerts(
     # 2026-10-31 con volumen de prod (100 alertas): handler ~17,6 ms sin
     # tramo dominante; prod p50 263 ms. Coste con flag apagado: 7
     # time.monotonic() (~1 us). Los marcos no cambian ninguna consulta.
-    # Desde el 31-oct la compania viaja en el join del listado: companies_ms
-    # mide solo la construccion del dict (~0 ms), ya no una consulta.
+    # El join de compania del 31-oct se revirtio el mismo dia: el A/B del
+    # piloto lo midio peor (~4-10 %). companies_ms vuelve a ser una consulta.
     _t0 = time.monotonic()
     now = datetime.now(UTC)
     # Product feed is not an operations console. Filter BEFORE limit so an
     # operational alert cannot consume a user-visible slot. Keep stored rows.
     # Legacy TypeSafe incidents predate the explicit audience marker.
-    # Compañía en la MISMA pasada (outerjoin 1:1): antes era una segunda
-    # consulta IN por los company_id, un round-trip extra por request.
-    statement = select(ResearchAlert, Company).outerjoin(
-        Company, Company.id == ResearchAlert.company_id
-    ).where(
+    # La compañía va en una consulta IN aparte, NO en el join del listado:
+    # el A/B del 31-oct sobre restore PG midio el outerjoin 1:1 como
+    # regresion (p50 25,4 -> 27,9/26,3 ms, ~4-10 % peor) y la consulta IN
+    # separada como la forma rapida. Solo lo que mide mejor se queda.
+    statement = select(ResearchAlert).where(
         ResearchAlert.alert_type != "typesafe_credit_exhausted",
         or_(
             ResearchAlert.metadata_["audience"].as_string().is_(None),
@@ -248,15 +248,14 @@ def list_alerts(
     # «Ultimos disparos» se ordena por el ultimo disparo real: un re-disparo
     # reciente de una huella antigua debe salir primero. Filas antiguas sin
     # last_triggered_at caen al unico instante conocido (created_at).
-    rows = list(
-        db.execute(
+    alerts = list(
+        db.scalars(
             statement.order_by(
                 desc(func.coalesce(ResearchAlert.last_triggered_at, ResearchAlert.created_at)),
                 desc(ResearchAlert.id),
             ).limit(limit)
         ).all()
     )
-    alerts = [alert for alert, _ in rows]
     # Un GET no escribe. Antes el handler reabria las alertas cuyo snooze habia
     # caducado y hacia commit, lo que hacia la operacion no idempotente (dos
     # GET seguidos no dan el mismo resultado), rompia cualquier cache HTTP de la
@@ -267,9 +266,15 @@ def list_alerts(
     # mutarlas dejaba la sesion sucia y cualquier commit posterior del mismo
     # request podia flushear una escritura desde un GET.
     _t1 = time.monotonic()
-    companies = {
-        company.id: company for _, company in rows if company is not None
-    }
+    company_ids = {alert.company_id for alert in alerts if alert.company_id is not None}
+    companies = (
+        {
+            company.id: company
+            for company in db.scalars(select(Company).where(Company.id.in_(company_ids)))
+        }
+        if company_ids
+        else {}
+    )
     # F172: la URL de la fuente viene de metadata.source_url (alertas insider)
     # o del NewsEvent enlazado (alertas de filings/noticias). Sin URL no se
     # inventa enlace: source_url queda None y la UI solo ofrece la ficha.
