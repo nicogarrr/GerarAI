@@ -30,6 +30,7 @@ from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Transaction
 from app.services.audit_service import record_audit_event
+from app.services.document_ingestion_service import guard_ooxml_zip
 from app.services.number_parsing import parse_localized_number
 from app.services.portfolio_ledger_service import PortfolioLedgerService, PortfolioOversellError
 
@@ -67,6 +68,14 @@ class TransactionImportPreviewResponse(BaseModel):
 class TransactionImportCommitRequest(BaseModel):
     transactions: list[ParsedTransaction] = Field(min_length=1, max_length=2000)
     source_filename: str | None = None
+
+
+# Limites duros de ingesta para archivos subidos por el usuario: el parseo es
+# en memoria, asi que un archivo sin tope es un vector de denegacion de
+# servicio (memoria/CPU). 10 MB sobra para un extracto de broker real (el
+# commit admite lotes de 2000 operaciones); 20.000 filas es ~10x ese lote.
+MAX_IMPORT_BYTES = 10 * 1024 * 1024
+MAX_IMPORT_ROWS = 20_000
 
 
 def _normalize_header(header: str) -> str:
@@ -185,6 +194,10 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
     filename_lower = filename.lower()
 
     if filename_lower.endswith((".xlsx", ".xls")):
+        # Un XLSX es un ZIP: sin guarda, un archivo pequeno puede expandirse a
+        # cientos de MB en memoria (zip bomb). Misma guarda que la ingesta de
+        # documentos, aplicada antes de abrir con openpyxl.
+        guard_ooxml_zip(file_bytes)
         try:
             import openpyxl
             wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
@@ -197,6 +210,10 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
                 raise ValueError("El archivo Excel no contiene filas con datos")
             headers = rows[0]
             data_rows = rows[1:]
+            if len(data_rows) > MAX_IMPORT_ROWS:
+                raise ValueError(
+                    f"El archivo supera el maximo de {MAX_IMPORT_ROWS} filas; dividelo en varios lotes"
+                )
             return headers, data_rows
         except Exception as exc:
             raise ValueError(f"Error al leer el archivo Excel: {exc}") from exc
@@ -227,6 +244,10 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
 
     headers = [h.strip() for h in all_rows[0]]
     data_rows = [[cell.strip() for cell in row] for row in all_rows[1:] if any(c.strip() for c in row)]
+    if len(data_rows) > MAX_IMPORT_ROWS:
+        raise ValueError(
+            f"El archivo supera el maximo de {MAX_IMPORT_ROWS} filas; dividelo en varios lotes"
+        )
     return headers, data_rows
 
 

@@ -107,6 +107,12 @@ def _guard_ooxml_zip(content: bytes) -> None:
             raise ValueError("El documento tiene tamanos o CRC ZIP inconsistentes")
 
 
+# Nombre publico de la guarda OOXML: cualquier servicio que abra un DOCX/XLSX
+# subido por el usuario (p. ej. la importacion de transacciones) debe aplicarla
+# antes de parsear; el nombre con "_" era privado solo por historia del modulo.
+guard_ooxml_zip = _guard_ooxml_zip
+
+
 @dataclass
 class ParsedBlock:
     text: str

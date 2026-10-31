@@ -57,6 +57,7 @@ from app.services.tearsheet_service import TearsheetService
 from app.services.thesis_pdf_service import export_portfolio_pdf_report
 from app.services.tracked_analysis import enqueue_tracked_analysis, tracked_statuses
 from app.services.transaction_import_service import (
+    MAX_IMPORT_BYTES,
     TransactionImportCommitRequest,
     TransactionImportPreviewResponse,
     TransactionImportService,
@@ -1408,7 +1409,8 @@ def import_ibkr_csv(payload: IBKRCsvImportRequest, db: Session = Depends(get_db)
 
 
 class CsvPreviewRequest(BaseModel):
-    content: str
+    # Tope duro: el preview parsea el contenido entero en memoria.
+    content: str = Field(max_length=MAX_IMPORT_BYTES)
     filename: str = "import.csv"
     column_mapping: dict[str, str] | None = None
 
@@ -1447,7 +1449,17 @@ async def upload_transaction_import_file(
     file: UploadFile = File(...),
 ) -> TransactionImportPreviewResponse:
     """Sube un archivo CSV o Excel (.xlsx) y realiza la validación previa de transacciones."""
-    content = await file.read()
+    # Lectura acotada en bloques (como knowledge/sources): un upload sin tope
+    # agotaria la memoria del worker con un solo archivo grande.
+    content = bytearray()
+    while chunk := await file.read(1024 * 1024):
+        content.extend(chunk)
+        if len(content) > MAX_IMPORT_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"El archivo supera el maximo de {MAX_IMPORT_BYTES // (1024 * 1024)} MB para importacion",
+            )
+    content = bytes(content)
     try:
         service = TransactionImportService()
         return service.preview_import(
