@@ -6,11 +6,54 @@ import httpx
 
 from app.core.config import get_settings
 from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.connectors.global_pacing import GlobalPacer
 from app.services.data_source_health import get_data_source_registry
 
 # Clave en el registry de salud de fuentes. 400/404 son dato por ticker y NO
 # degradan; 401/403 (clave rechazada), 429 y 5xx SI (fuente inutilizable).
 REGISTRY_KEY = "finnhub"
+
+# Cuota FREE de Finnhub: 60 llamadas/min COMPARTIDA por todas las claves de
+# uso (watchlist, perfiles, metricas, IR). A 1 req/s GLOBAL el ritmo agregado
+# de todos los procesos queda en el limite: sin pacing compartido, 2 workers
+# con 6 conexiones cada uno generaron 1.077 HTTP 429 en 10 min (medido en
+# prod por el piloto, 31-oct-2026).
+FINNHUB_MIN_INTERVAL_SECONDS = 1.2  # ~50/min: colchon bajo la cuota FREE de 60/min
+
+
+def _finnhub_redis_client():
+    try:
+        import redis as _redis
+
+        from app.core.redis_retry import no_retry
+
+        url = get_settings().redis_url
+        if not url:
+            return None
+        return _redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=1.0, retry=no_retry())
+    except Exception:  # noqa: BLE001 - sin Redis: pacing local por proceso
+        return None
+
+
+_pacer = GlobalPacer(
+    "finnhub",
+    min_interval_seconds=FINNHUB_MIN_INTERVAL_SECONDS,
+    redis_client_factory=_finnhub_redis_client,
+    # Fallback local ACTIVO: con Redis caido cada proceso mantiene el ritmo
+    # ~50/min (peor caso agregado acotado por n_procesos, lejos de la rafaga
+    # sin limite de antes). Los tests inyectan reloj/sleep falsos, no
+    # desactivan la proteccion.
+)
+
+
+def finnhub_blocked_for() -> float:
+    """Segundos de cooldown 429 de Finnhub (compartido entre procesos)."""
+    return _pacer.blocked_for()
+
+
+def reset_finnhub_pacer() -> None:
+    """Solo para tests."""
+    _pacer.reset()
 
 
 class FinnhubClient:
@@ -41,12 +84,27 @@ class FinnhubClient:
         query = {**params, "token": self.settings.finnhub_api_key}
         retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
         registry = get_data_source_registry()
+        # Pacing global en CADA intento HTTP: los reintentos inline tambien
+        # gastan cuota, asi que pasan por el mismo hueco compartido de ~50/min
+        # (aplicar el pacer una sola vez fuera los dejaba eludir el limite).
+        # Jitter en esos reintentos: sin el, los workers que reciben 429 a la
+        # vez reintentan en el mismo segundo.
         try:
             async with httpx.AsyncClient(timeout=30) as client:
-                response = await get_with_retry(lambda: client.get(url, params=query), **retry_kwargs)
+
+                async def _paced_attempt():
+                    await _pacer.wait()
+                    return await client.get(url, params=query)
+
+                response = await get_with_retry(
+                    _paced_attempt, jitter=True, **retry_kwargs
+                )
                 payload = response.json()
-        except UpstreamRateLimited:
+        except UpstreamRateLimited as exc:
             registry.record_failure(REGISTRY_KEY, "HTTP 429: cuota/rate limit agotada")
+            # La ventana que pidio Finnhub la respetan TODOS los procesos, no
+            # solo esta corrida (suelo 60s si no mando Retry-After util).
+            _pacer.cool_down(exc.retry_after or 60.0)
             raise
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (400, 404):

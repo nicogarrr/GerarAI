@@ -9,7 +9,9 @@ from email.utils import parsedate_to_datetime
 
 import httpx
 
+from app.core.config import get_settings
 from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.connectors.global_pacing import GlobalPacer
 from app.services.data_source_health import get_data_source_registry
 
 # Clave de este proveedor en el registry de salud de fuentes. El 429 de GDELT
@@ -33,6 +35,34 @@ class GdeltRateLimited(Exception):
         self.retry_after = retry_after
 
 
+def _gdelt_redis_client():
+    try:
+        import redis as _redis
+
+        from app.core.redis_retry import no_retry
+
+        url = get_settings().redis_url
+        if not url:
+            return None
+        return _redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=1.0, retry=no_retry())
+    except Exception:  # noqa: BLE001 - sin Redis: cooldown solo de clase
+        return None
+
+
+# Cooldown 429 compartido entre procesos (scheduler + workers + API, misma IP
+# de salida). El pacing de 5s entre peticiones sigue siendo de clase: la cola
+# gdelt la consume un solo proceso por diseño.
+_gdelt_pacer = GlobalPacer(
+    "gdelt",
+    min_interval_seconds=5.0,
+    redis_client_factory=_gdelt_redis_client,
+    # Sin fallback local: el pacing por clase (_next_allowed_at) ya rige este
+    # proceso; el pacer aporta el ritmo ENTRE procesos via Redis. Un fallback
+    # con reloj monotonic real colgaria los tests de reloj falso.
+    fallback_local=False,
+)
+
+
 class GDELTClient:
     """Cliente GDELT DOC 2.0 con pacing global y respeto a 429.
 
@@ -54,9 +84,9 @@ class GDELTClient:
     _next_allowed_at = 0.0  # time.monotonic()
     # Ventana 429 POR IP compartida por TODOS los jobs del carril (un solo
     # proceso consume la cola gdelt por diseño: el estado de clase ES el
-    # cooldown global). Sin esto, tras reencolar un lote los demás mensajes
-    # (macro/empresa/backlog) entraban con el pacing de 5s y violaban la
-    # ventana de 45/3600s que GDELT acababa de imponer.
+    # cooldown global EN ESE PROCESO). Sin esto, tras reencolar un lote los
+    # demás mensajes (macro/empresa/backlog) entraban con el pacing de 5s y
+    # violaban la ventana de 45/3600s que GDELT acababa de imponer.
     _blocked_until = 0.0  # time.monotonic()
 
     DEFAULT_MIN_INTERVAL = 5.0
@@ -85,7 +115,10 @@ class GDELTClient:
         """Marca la ventana 429 como POR IP: todo el carril espera hasta ella.
 
         Solo extiende, nunca acorta una ventana ya marcada (dos 429 seguidos
-        se quedan con la ventana mayor).
+        se quedan con la ventana mayor). Ademas del estado de clase (un
+        proceso), la ventana se publica en Redis: scheduler, API y otros
+        workers comparten la MISMA IP de salida y deben respetarla (medido
+        31-oct-2026: rachas de 3-16 429 por relojes independientes).
         """
         if not math.isfinite(seconds) or seconds <= 0:
             # Ventana 0/ausente/no finita: el cooldown global tambien paga
@@ -96,6 +129,7 @@ class GDELTClient:
             until = time.monotonic() + seconds
             if until > GDELTClient._blocked_until:
                 GDELTClient._blocked_until = until
+        _gdelt_pacer.cool_down(seconds)
 
     async def _throttle(self) -> None:
         """Guarantee at least ``min_interval`` between two real requests.
@@ -110,12 +144,22 @@ class GDELTClient:
         next slot is measured from the real current time, so an overrun pushes
         the following request out instead of letting it through.
         """
+        blocked_redis = _gdelt_pacer.blocked_for_remote()
+        # Deadline monotono: esta llamada nunca duerme mas que la ventana
+        # remota que vio al entrar. Si el TTL remoto se re-extiende (otro
+        # proceso refrescando cooldown) o un Redis devuelve siempre el mismo
+        # valor, sin deadline el while dormiria ese delta para siempre.
+        deadline = time.monotonic() + blocked_redis if blocked_redis > 0 else None
         while True:
+            remote = _gdelt_pacer.blocked_for_remote()
+            if deadline is not None:
+                remote = min(remote, max(0.0, deadline - time.monotonic()))
             with GDELTClient._rate_lock:
                 now = time.monotonic()
                 wait = max(
                     GDELTClient._next_allowed_at - now,
                     GDELTClient._blocked_until - now,
+                    remote,
                 )
                 if wait > self.MAX_RETRY_AFTER:
                     # Ventana POR IP mas larga de lo que esta corrida puede
@@ -125,10 +169,13 @@ class GDELTClient:
                     raise GdeltRateLimited(wait)
                 if wait <= 0 and self.min_interval > 0:
                     GDELTClient._next_allowed_at = now + self.min_interval
-                    return
+                    break
                 if wait <= 0:
-                    return
+                    break
             await asyncio.sleep(wait)
+        # Ritmo global real (1 req / min_interval entre TODOS los procesos)
+        # via Redis; sin Redis es no-op y el pacing local por clase ya rige.
+        await _gdelt_pacer.wait()
 
     @classmethod
     def _raw_retry_after(cls, response: httpx.Response) -> float | None:

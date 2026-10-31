@@ -303,6 +303,14 @@ def _raise_gdelt_retry(exc: Exception) -> None:
     ) from exc
 
 
+def _retry_jitter_ms(max_ms: int = 30_000) -> int:
+    """Jitter [0, max_ms) para reencolados: decorrelaciona workers que
+    reciben 429 a la vez (sin el, todos reintentan en el mismo segundo)."""
+    import random
+
+    return random.randint(0, max_ms)
+
+
 def _handle_actor_error(actor: str, exc: Exception, **context: Any) -> dict[str, Any]:
     """Re-raise transient errors so Dramatiq retries; record permanent ones.
 
@@ -2258,9 +2266,25 @@ def refresh_valuation_metrics(
     refresh_propicks_prices. Las fuentes (yfinance/Finnhub) son las por
     defecto del servicio; en tests se inyectan fixtures.
     """
+    from app.services.connectors.finnhub import finnhub_blocked_for
+    from app.services.valuation_metrics_service import (
+        ValuationUniverseRateSuspended,
+    )
     from app.services.valuation_metrics_service import (
         refresh_valuation_metrics as _refresh,
     )
+
+    # Breaker compartido: si Finnhub cerro la ventana (429), el actor se
+    # reencola tras el Retry-After en vez de ocupar un hilo de default
+    # martilleando (medido 31-oct-2026: 2 corridas asi bloqueaban los 2
+    # hilos de la cola default con 1.077 HTTP 429 en 10 min).
+    blocked = finnhub_blocked_for()
+    if blocked > 0:
+        delay_ms = int(blocked * 1000) + _retry_jitter_ms()
+        raise dramatiq.Retry(
+            f"Finnhub en cooldown 429: reintento tras {delay_ms // 1000}s",
+            delay=delay_ms,
+        )
 
     db = _session(tenant_id, user_id)
     try:
@@ -2279,9 +2303,42 @@ def refresh_valuation_metrics(
             "actor": "refresh_valuation_metrics",
             "reason": "lease_held",
         }
+    cursor_key = f"valuation_metrics:cursor:{tenant_id}"
     try:
-        result = _refresh(db)
+        client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open: sin cursor, corrida entera
+        client = None
+    cursor: str | None = None
+    if client is not None:
+        try:
+            raw = client.get(cursor_key)
+            cursor = raw.decode() if isinstance(raw, bytes) else raw
+        except Exception:  # noqa: BLE001 - sonda best-effort
+            cursor = None
+    try:
+        result = _refresh(db, start_after_ticker=cursor)
+        if client is not None and cursor is not None:
+            try:
+                client.delete(cursor_key)
+            except Exception:  # noqa: BLE001 - expira por TTL solo
+                pass
         return {"actor": "refresh_valuation_metrics", **result}
+    except ValuationUniverseRateSuspended as exc:
+        # Suspender con cursor: la corrida siguiente reanuda DESPUES del
+        # ultimo ticker completado, no repite el universo ya hecho.
+        _rollback(db)
+        if client is not None and exc.last_completed_ticker:
+            try:
+                client.set(cursor_key, exc.last_completed_ticker, ex=20 * 3600)
+            except Exception:  # noqa: BLE001 - expira por TTL solo
+                pass
+        delay_seconds = exc.retry_after or finnhub_blocked_for() or 60.0
+        delay_ms = int(delay_seconds * 1000) + _retry_jitter_ms()
+        raise dramatiq.Retry(
+            f"Finnhub 429 en universo (cursor {exc.last_completed_ticker!r}): "
+            f"reintento tras {delay_ms // 1000}s",
+            delay=delay_ms,
+        ) from exc
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_valuation_metrics", exc, tenant_id=tenant_id)
