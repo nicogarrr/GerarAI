@@ -604,3 +604,39 @@ def test_market_prices_fallback_keeps_the_declared_unit_not_company_currency(db)
     assert state.data_source == "market_prices"
     assert state.currency == "GBp"
     assert float(state.close) == 70.0
+
+
+def test_stored_v1_state_is_refreshed_to_v2_and_pending_only_until_then(db):
+    """Reproduce el estado de prod del 31-oct-2026: estados privados nico-v1.
+
+    Tras un cambio de formula: (1) la cola manual marca el estado como
+    pendiente AUNQUE tenga <24h y no haya cierre nuevo (la version antigua es
+    motivo suficiente: el boton procesa solo lo desactualizado), y (2) la
+    siguiente evaluacion re-escribe la MISMA fila con la version vigente, sin
+    saltarsela por fresca y sin duplicar filas.
+    """
+    from app.services.dca_manual import pending_symbols
+    from app.services.dca_signal_engine import DEFAULT_PARAMS, NICO_V1_PARAMS
+
+    _company(db, 'VERST')
+    _watch(db, 'VERST')
+    fetcher = FakeFetcher()
+    fetcher.set('VERST', series(80.0))
+    # Estado persistido con la formula anterior, como quedo en prod.
+    evaluate_watchlist(db, fetcher=fetcher, now=NOW, today=NOW.date(), params=NICO_V1_PARAMS)
+    state = _state(db, 'VERST')
+    assert state.params_version == 'nico-v1'
+    # Fresco (<24h, sin cierre nuevo): pendiente SOLO por version antigua.
+    assert pending_symbols(db, now=NOW + timedelta(hours=1)) == ['VERST']
+    # La siguiente evaluacion (diaria o manual) re-escribe la misma fila a v2.
+    later = NOW + timedelta(hours=2)
+    evaluate_watchlist(db, fetcher=fetcher, now=later, today=later.date(), params=DEFAULT_PARAMS)
+    rows = list(db.scalars(select(DcaSignalState).where(DcaSignalState.symbol == 'VERST')))
+    assert len(rows) == 1
+    state = rows[0]
+    assert state.params_version == DEFAULT_PARAMS.version == 'nico-v2'
+    evaluated = state.evaluated_at
+    assert (evaluated if evaluated.tzinfo else evaluated.replace(tzinfo=UTC)) == later
+    assert state.hit_rates['params_version'] == 'nico-v2'
+    # Ya evaluado con la formula vigente: sale de la cola (solo lo desactualizado).
+    assert pending_symbols(db, now=later + timedelta(hours=1)) == []
