@@ -70,15 +70,20 @@ void test('la página pinta los tres estados sin 404, sin CTA y sin panel fuera 
     // La rama resuelve la identidad con el perfil del proveedor y pinta los
     // tres estados honestos.
     assert.match(branch, /resolveUnknownListingIdentity\(await getProfile\(ticker\), ticker\)/);
-    assert.match(branch, /Identidad del ticker no verificada/);
-    assert.match(branch, /puede no ser el emisor que buscas/);
-    assert.match(branch, /No encontramos este ticker en nuestras fuentes/);
-    assert.match(branch, /No pudimos comprobar este ticker/);
+    // i18n: los textos viven en messages/<locale>/research.json (identity.*).
+    for (const key of ['unverifiedTitle', 'unverifiedDesc', 'notInSourcesTitle', 'uncheckedTitle', 'searchOther']) {
+        assert.ok(branch.includes(`t('research.identity.${key}'`), `la rama usa research.identity.${key}`);
+    }
+    const identity = JSON.parse(readFileSync(new URL('../lib/i18n/messages/es/research.json', import.meta.url), 'utf8')).identity;
+    assert.equal(identity.unverifiedTitle, 'Identidad del ticker no verificada');
+    assert.match(identity.unverifiedDesc, /puede no ser el emisor que buscas/);
+    assert.equal(identity.notInSourcesTitle, 'No encontramos este ticker en nuestras fuentes');
+    assert.equal(identity.uncheckedTitle, 'No pudimos comprobar este ticker');
 
     // Fuera del master no hay CTA de generación, ni panel de mercado N/D,
     // ni una segunda consulta al master (la señal ya es exacta).
     assert.ok(!branch.includes('<ThesisGenerateButton'), 'sin CTA de generación fuera del master');
-    assert.match(branch, /Buscar otra empresa/, 'siguiente paso: buscar otra empresa');
+    assert.equal(identity.searchOther, 'Buscar otra empresa', 'siguiente paso: buscar otra empresa');
     assert.match(branch, /Reintentar/, 'siguiente paso: reintentar la comprobación');
     assert.ok(!branch.includes('<CompanyMarketPanel'), 'sin panel N/D fuera del master');
     assert.ok(!branch.includes('getCompanyMarketSnapshot'), 'sin fetch de mercado fuera del master');
