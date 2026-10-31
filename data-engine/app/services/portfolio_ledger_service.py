@@ -492,7 +492,7 @@ class PortfolioLedgerService:
     ) -> None:
         position.valuation_hold_reason = reason[:200]
         position.valuation_hold_effective_date = effective_date
-        position.valuation_hold_since = since or date.today()
+        position.valuation_hold_since = since or local_today()
         self._blank_valuation(position)
         db.flush()
 
