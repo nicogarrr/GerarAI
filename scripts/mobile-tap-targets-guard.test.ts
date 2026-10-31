@@ -107,6 +107,12 @@ describe('móvil: 44 px en inicio, índice research, watchlist y ProPicks (recor
         const src = readFileSync('app/(root)/inversores/_components/Pagination.tsx', 'utf8');
         assert.ok(src.includes('inline-flex min-h-[44px] items-center rounded-lg border border-gray-800'), 'paginación de inversores con 44 px');
     });
+    it('calendario de resultados: chips IR y botones de icono con 44 px', () => {
+        const src = readFileSync('components/calendar/FollowedEarningsList.tsx', 'utf8');
+        assert.ok(src.includes("inline-flex min-h-[44px] items-center gap-1 rounded-md border border-gray-700"), 'chips IR con 44 px');
+        const iconos = src.match(/inline-flex h-11 w-11 items-center justify-center rounded-lg/g) ?? [];
+        assert.equal(iconos.length, 2, 'fuente y abrir-ficha de 44x44 en móvil');
+    });
     it('ProPicks: el conmutador de filtros (solo icono) tiene 44x44', () => {
         const src = readFileSync('components/proPicks/EnhancedProPicksFilters.tsx', 'utf8');
         assert.ok(src.includes('min-h-[44px] min-w-[44px] xl:hidden'), 'conmutador de filtros 44x44');
