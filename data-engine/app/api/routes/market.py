@@ -395,10 +395,10 @@ def market_quotes_batch(body: MarketQuotesBatchIn) -> dict:
                 _quote_cache[symbol] = {"at": now, "data": data}
             if redis_client is not None:
                 try:
-                    redis_client.setex(
+                    redis_client.set(
                         _quote_redis_key(symbol),
-                        int(_QUOTE_CACHE_TTL),
                         json.dumps(data),
+                        ex=int(_QUOTE_CACHE_TTL),
                     )
                 except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
                     logger.warning("quote cache: escritura Redis fallo; se sirve sin cache", exc_info=True)

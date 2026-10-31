@@ -22,7 +22,7 @@ class FakeRedis:
     def __init__(self, values=None, exc=None, pttl_ms=None):
         self.values = dict(values or {})
         self.exc = exc
-        self.setex_calls = []
+        self.set_calls = []
         self._pttl_ms = pttl_ms
 
     def get(self, key):
@@ -35,10 +35,11 @@ class FakeRedis:
             raise self.exc
         return self._pttl_ms if self._pttl_ms is not None else -1
 
-    def setex(self, key, ttl, value):
+    def set(self, key, value, ex=None):
+        # redis-py depreco setex: el servicio usa set(..., ex=ttl).
         if self.exc:
             raise self.exc
-        self.setex_calls.append((key, ttl, value))
+        self.set_calls.append((key, ex, value))
         self.values[key] = value
 
 
@@ -86,7 +87,7 @@ def test_resolved_value_is_written_to_redis_with_status_ttl(monkeypatch):
 
     # Sin CIK el resultado es no_disponible (MISS): TTL corto de 10 min.
     assert out["TSLA|2026-07-22"]["status"] == "no_disponible"
-    assert redis.setex_calls == [
+    assert redis.set_calls == [
         (svc._materials_redis_key("TSLA|2026-07-22"), svc.MISS_TTL_S, json.dumps(out["TSLA|2026-07-22"]))
     ]
 
