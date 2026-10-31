@@ -13,6 +13,7 @@ from urllib.parse import quote
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import (
     Company,
     DividendRecord,
@@ -113,7 +114,7 @@ def _dividend_line(company: Company, record: DividendRecord) -> str:
 
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
     """Dividendos GUARDADOS (declarados por el proveedor); nada proyectado ni inventado."""
-    today = date.today()
+    today = local_today()  # año/día del usuario (Madrid), no el UTC del servidor
     portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobr\w*\b", question))
     company = None if portfolio else _company_in_question(db, question)
     if company is not None:
