@@ -22,7 +22,7 @@ def db():
 
 
 def payload(level=1, price_date='2026-10-28'):
-    return dict(status='ok', formula_version='nico-v1', price_date=price_date,
+    return dict(status='ok', formula_version='nico-v2', price_date=price_date,
                 current={'level': level}, confirmed={'level': 1}, price_verified=False)
 
 

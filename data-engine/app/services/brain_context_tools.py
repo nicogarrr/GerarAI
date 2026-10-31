@@ -508,7 +508,7 @@ def propicks_answer(db: Session, tenant: int) -> ChatResponse:
 
 
 def radar_answer(db: Session) -> ChatResponse:
-    """Señales claras del radar de precio (snapshots guardados, fórmula nico-v1)."""
+    """Señales claras del radar de precio (snapshots guardados, fórmula nico-v2)."""
     from app.services.propicks_radar_store import latest_public_signals
 
     # Misma fecha de corte que GET /radar/opportunities (date.today()).

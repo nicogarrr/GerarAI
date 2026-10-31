@@ -11,6 +11,12 @@ diarios asentados:
 * El mes en curso es *forming*: usa el ultimo cierre asentado y puede cambiar.
 * Cada mes solo ve datos hasta su propio cierre (sin look-ahead).
 
+La formula por defecto (``nico-v2``) es ``combined``: el nivel de compra es el
+maximo de la familia ``sma_gap`` (distancia a la SMA larga ajustada por
+volatilidad) y la familia ``drawdown`` (caida desde el maximo). Elegida por
+backtest comparativo sobre el S&P 500 (499 valores, validacion temporal y
+cruzada por activos): supera a ``sma_gap`` puro en todos los cortes.
+
 El modulo es puro (sin DB ni red) para poder testearlo y backtestearlo igual
 que se ejecuta en produccion.
 """
@@ -55,12 +61,20 @@ class DcaParams:
       de ``sma_months`` meses (``1 - cierre / SMA``; la SMA incluye el mes).
     * ``"drawdown"``: caida desde el maximo de cierres mensuales de
       ``high_lookback_months`` meses.
+    * ``"combined"``: el nivel de compra es el MAXIMO de las dos familias
+      (``sma_gap`` y ``drawdown``). Capta tanto caer bajo la media larga como
+      desplomes desde el maximo aunque el precio siga sobre la media (p.ej.
+      tras una subida parabolica). Los precios de nivel son el primero que se
+      alcanzaria al caer (el mayor de cada familia). ``metrics`` declara el
+      nivel de cada familia y cual fija el nivel (``binding``).
 
     Con ``sma_gap`` y menos de ``sma_months`` meses de historia (valores
-    jovenes) se usa ``drawdown`` como respaldo declarado en ``metrics``.
+    jovenes) se usa ``drawdown`` como respaldo declarado en ``metrics``; con
+    ``combined`` la familia ``drawdown`` siempre participa, asi que no hace
+    falta respaldo.
     """
 
-    signal: str = "sma_gap"
+    signal: str = "combined"
     sma_months: int = 30
     # Historia minima para la SMA larga: con menos de ``sma_months`` meses se
     # usa la media de los meses disponibles (>= este minimo). None = sma_months.
@@ -92,14 +106,19 @@ class DcaParams:
     trim_rsi_strong: float = 75.0
     rsi_period: int = 14
     min_months: int = 12
-    version: str = "nico-v1"
+    version: str = "nico-v2"
 
 
 DEFAULT_PARAMS = DcaParams()
 
+# Formula vigente hasta el 31-oct-2026 (sma_gap puro). Se conserva para
+# comparar y para los tests de regresion del comportamiento anterior.
+NICO_V1_PARAMS = DcaParams(signal="sma_gap", version="nico-v1")
+
 # Formula provisional anterior (SMA 40m sin ajuste de volatilidad). Se conserva
 # para comparar y para los tests de regresion del backtest original.
 NICO_V0_PARAMS = DcaParams(
+    signal="sma_gap",
     sma_months=40,
     sma_min_months=None,
     gap_thresholds=(0.0, 0.05, 0.10),
@@ -229,8 +248,6 @@ def evaluate_series(
         min_sma = params.sma_min_months or params.sma_months
         n_sma = min(params.sma_months, i + 1)
         long_sma = _sma(closes, i, n_sma) if n_sma >= min_sma else None
-        use_sma = params.signal == "sma_gap" and long_sma is not None
-        signal_used = "sma_gap" if use_sma else "drawdown"
         long_gap = (1.0 - close / long_sma) if long_sma else None
         vol = _trailing_vol(closes, i, params) if params.vol_beta else None
         vol_ratio = 1.0
@@ -239,29 +256,64 @@ def evaluate_series(
                 vol_ratio = min(max(vol / params.vol_ref, 1e-9), params.vol_ratio_cap)
         scale = vol_ratio**params.vol_beta if params.vol_beta else 1.0
         adj_gap = (long_gap / scale) if long_gap is not None else None
-        if use_sma:
+        # Familia drawdown: siempre se calcula (metricas y, en "combined", senal).
+        dd_level = _buy_level(dd, params.dd_thresholds)
+        # Con el maximo previo: si el mes cierra por encima, el maximo sube
+        # con el y el nivel es 1X.
+        dd_prices = {
+            f"{n}x": round(prev_high * (1.0 - t), 6)
+            for n, t in zip((2, 3, 4), params.dd_thresholds, strict=True)
+        }
+        dd_touched = _buy_level(1.0 - low / max(prev_high, low), params.dd_thresholds)
+        # Familia sma_gap: solo con SMA larga disponible.
+        sma_level: int | None = None
+        sma_prices: dict[str, float | None] = {}
+        sma_touched: int | None = None
+        sma_available = long_sma is not None and params.signal in ("sma_gap", "combined")
+        if sma_available:
             assert adj_gap is not None
-            level = _buy_level(adj_gap, params.gap_thresholds)
+            sma_level = _buy_level(adj_gap, params.gap_thresholds)
             # Cierre que activaria cada nivel: la SMA incluye ese mismo cierre y
             # la volatilidad solo usa meses anteriores, asi que es un precio exacto.
             prev_sum = sum(closes[i + 1 - n_sma : i])
             m = n_sma
-            level_prices = {}
             for n, t in zip((2, 3, 4), params.gap_thresholds, strict=True):
                 need = t * scale
                 price = (1.0 - need) * prev_sum / (m - 1 + need) if need < 1.0 and (m - 1 + need) > 0 else None
-                level_prices[f"{n}x"] = round(price, 6) if price and price > 0 else None
+                sma_prices[f"{n}x"] = round(price, 6) if price and price > 0 else None
             low_sma = (prev_sum + low) / m
-            touched = _buy_level((1.0 - low / low_sma) / scale, params.gap_thresholds)
+            sma_touched = _buy_level((1.0 - low / low_sma) / scale, params.gap_thresholds)
+        if params.signal == "combined":
+            # Nivel = maximo de las dos familias; precio de cada nivel = el
+            # primero que se alcanzaria al caer (el mayor de cada familia).
+            level = max(dd_level, sma_level or 1)
+            signal_used = "combined"
+            binding = (
+                "drawdown"
+                if sma_level is None
+                else (
+                    "empate"
+                    if sma_level == dd_level
+                    else ("drawdown" if dd_level > sma_level else "sma_gap")
+                )
+            )
+            level_prices = {}
+            for n in (2, 3, 4):
+                candidates = [p for p in (sma_prices.get(f"{n}x"), dd_prices[f"{n}x"]) if p]
+                level_prices[f"{n}x"] = round(max(candidates), 6) if candidates else None
+            touched = max(dd_touched, sma_touched or 1)
+        elif params.signal == "sma_gap" and sma_available:
+            level = sma_level if sma_level is not None else 1
+            signal_used = "sma_gap"
+            binding = None
+            level_prices = dict(sma_prices)
+            touched = sma_touched if sma_touched is not None else 1
         else:
-            level = _buy_level(dd, params.dd_thresholds)
-            # Con el maximo previo: si el mes cierra por encima, el maximo sube
-            # con el y el nivel es 1X.
-            level_prices = {
-                f"{n}x": round(prev_high * (1.0 - t), 6)
-                for n, t in zip((2, 3, 4), params.dd_thresholds, strict=True)
-            }
-            touched = _buy_level(1.0 - low / max(prev_high, low), params.dd_thresholds)
+            level = dd_level
+            signal_used = "drawdown"
+            binding = None
+            level_prices = dd_prices
+            touched = dd_touched
         trim_sma = _sma(closes, i, params.trim_sma_months)
         trim_gap = (close / trim_sma - 1.0) if trim_sma else None
         r = rsi[i]
@@ -301,6 +353,15 @@ def evaluate_series(
                     "trim_sma_gap": round(trim_gap, 6) if trim_gap is not None else None,
                     "rsi": round(r, 4) if r is not None else None,
                     "months_of_history": i + 1,
+                    **(
+                        {
+                            "level_sma_gap": sma_level,
+                            "level_drawdown": dd_level,
+                            "binding": binding,
+                        }
+                        if signal_used == "combined"
+                        else {}
+                    ),
                 },
                 level_prices=level_prices,
                 touched_level=touched if touched > max(level, 1) else None,

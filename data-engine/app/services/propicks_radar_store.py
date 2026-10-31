@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.models import Company, ProPicksRadarCursor, ProPicksRadarSnapshot
 from app.services.propicks_dca_radar import signal_change
 
-FORMULA_VERSION = 'nico-v1'
+FORMULA_VERSION = 'nico-v2'
 _PUBLIC_KEYS = frozenset({'status', 'reason', 'formula_version', 'price_verified', 'price_date',
                           'source', 'current', 'confirmed', 'clear_price_signal',
                           'daily_close_drawdown', 'drawdown_basis'})

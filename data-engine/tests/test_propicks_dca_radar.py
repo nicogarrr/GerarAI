@@ -122,7 +122,7 @@ def test_clear_opportunity_needs_both_quality_and_current_confirmed_prices():
 
 def test_recent_changes_need_comparable_prior_scans_not_month_status():
     from app.services.propicks_dca_radar import signal_change
-    current = dict(status='ok', formula_version='nico-v1', price_date='2026-10-29', current={'level': 4})
+    current = dict(status='ok', formula_version='nico-v2', price_date='2026-10-29', current={'level': 4})
     previous = {**current, 'price_date': '2026-10-28', 'current': {'level': 3}}
     assert signal_change(current, None) == {'status': 'history_pending', 'changed': None}
     assert signal_change(current, previous)['changed'] is True
@@ -146,5 +146,5 @@ def test_daily_drawdown_is_context_only_and_does_not_change_formula():
     rows[-1] = replace(rows[-1], close=120, adjusted_close=120)
     result = evaluate(rows)
     assert result['daily_close_drawdown'] == pytest.approx(1 - 120 / 134)
-    assert result['current']['metrics']['signal'] == 'sma_gap'
+    assert result['current']['metrics']['signal'] == 'combined'
     assert 'not intraday high' in result['drawdown_basis']
