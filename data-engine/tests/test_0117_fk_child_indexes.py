@@ -22,6 +22,16 @@ from app.core.config import get_settings
 from tests.test_0114_fk_ondelete import _scratch
 from tests.test_alembic_chain import VERSIONS_DIR, _url_postgres_ci
 
+
+def _head_revision() -> str:
+    """Head real de la cadena, sin literal: un head nuevo (0118, ...) no
+    debe romper este test, que vigila la reentrada de 0117, no el extremo."""
+    from alembic.script import ScriptDirectory
+
+    cfg = Config(str(VERSIONS_DIR.parent.parent / "alembic.ini"))
+    cfg.set_main_option("script_location", str(VERSIONS_DIR.parent))
+    return ScriptDirectory.from_config(cfg).get_current_head()
+
 _NOMBRES = [
     "ix_catalysts_source_id",
     "ix_connector_states_company_id",
@@ -128,7 +138,7 @@ def test_0117_repara_invalidos_propios_respeta_ajenos_y_es_reentrante_en_ci_post
             ).scalar_one()
         assert oids_despues == oids_antes, "recreo indices ya validos"
         assert all(v and r for v, r in estado2.values())
-        assert version == "0117_fk_child_indexes"
+        assert version == _head_revision()
     finally:
         engine.dispose()
         with admin.connect() as conn:
