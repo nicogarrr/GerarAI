@@ -158,7 +158,7 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
             <Input className="min-h-11" defaultValue="manual_feed" id="feed-source" name="source" />
           </div>
           <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400"><span>Noticias del lote (JSON)</span><Textarea
-            className="min-h-[180px] border-gray-800 bg-black/30 font-mono text-xs text-gray-200 focus-visible:ring-teal-500"
+            className="min-h-[180px] border-gray-800 bg-black/30 font-mono text-base text-gray-200 focus-visible:ring-teal-500 md:text-xs"
             name="items"
             placeholder='[{"ticker":"MSFT","title":"MSFT recorta guía","text":"resultado por debajo y recorte de guía","url":"https://..."}]'
             required
