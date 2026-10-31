@@ -174,12 +174,7 @@ export type WatchlistEntryData = {
     quoteSymbol: string | null;
 };
 
-type BackendWatchlistMetrics = {
-    market_cap: number | null;
-    per: number | null;
-    currency: string | null;
-    sources: string[];
-};
+type BackendWatchlistMetrics = components['schemas']['WatchlistMetricsOut'];
 
 function fetchBackendMetrics(symbol: string): Promise<BackendWatchlistMetrics | null> {
     return researchRequest<BackendWatchlistMetrics>(

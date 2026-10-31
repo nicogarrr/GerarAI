@@ -20863,6 +20863,58 @@
         "title": "WatchlistItemOut",
         "type": "object"
       },
+      "WatchlistMetricsOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "market_cap",
+          "per",
+          "currency",
+          "sources"
+        ],
+        "title": "WatchlistMetricsOut",
+        "type": "object"
+      },
       "WatchlistMonitorItemOut": {
         "properties": {
           "currency": {
@@ -84575,9 +84627,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Watchlist Metrics Api Watchlist Metrics  Symbol  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WatchlistMetricsOut"
                 }
               }
             },

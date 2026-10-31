@@ -2042,6 +2042,17 @@ class WatchlistMonitorItemOut(BaseModel):
 class WatchlistMonitorOut(BaseModel):
     items: dict[str, WatchlistMonitorItemOut]
     earnings_status: str
+# --- GET /api/watchlist/metrics/{symbol} ----------------------------------------
+# Forma medida contra la ruta: las cinco ramas de salida devuelven el mismo
+# envelope de 4 claves (market_cap, per, currency, sources); los huecos sin
+# base van a null, nunca se fabrica el numero (docstring de la ruta).
+
+
+class WatchlistMetricsOut(BaseModel):
+    market_cap: float | None
+    per: float | None
+    currency: str | None
+    sources: list[str]
 
 
 # --- GET /api/portfolio/snapshots --------------------------------------------

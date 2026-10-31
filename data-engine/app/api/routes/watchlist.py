@@ -25,7 +25,12 @@ from app.models import (
     MarketPrice,
     WatchItem,
 )
-from app.schemas.api import WatchlistAttentionThesisOut, WatchlistItemOut, WatchlistMonitorOut
+from app.schemas.api import (
+    WatchlistAttentionThesisOut,
+    WatchlistItemOut,
+    WatchlistMetricsOut,
+    WatchlistMonitorOut,
+)
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
@@ -240,7 +245,7 @@ async def watchlist_monitor(
     return {"items": items, "earnings_status": earnings_status}
 
 
-@router.get("/metrics/{symbol}")
+@router.get("/metrics/{symbol}", response_model=WatchlistMetricsOut)
 def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     """Market cap y PER de respaldo para emisoras sin cobertura del
     proveedor US (QA AENA/ASML): market_cap del proveedor o derivado

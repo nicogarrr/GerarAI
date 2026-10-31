@@ -13264,6 +13264,17 @@ export interface components {
             /** Updated At */
             updated_at: string | null;
         };
+        /** WatchlistMetricsOut */
+        WatchlistMetricsOut: {
+            /** Currency */
+            currency: string | null;
+            /** Market Cap */
+            market_cap: number | null;
+            /** Per */
+            per: number | null;
+            /** Sources */
+            sources: string[];
+        };
         /** WatchlistMonitorItemOut */
         WatchlistMonitorItemOut: {
             /** Currency */
@@ -28418,9 +28429,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WatchlistMetricsOut"];
                 };
             };
             /** @description Validation Error */
