@@ -278,3 +278,7 @@ from app.models.ibkr_connection import IBKRSyncReceipt as IBKRSyncReceipt  # noq
 
 __all__.append("IBKRSyncReceipt")
 from app.models.dca_alert_settings import DcaAlertSettings
+from app.models.propicks_radar import ProPicksRadarCursor as ProPicksRadarCursor
+from app.models.propicks_radar import ProPicksRadarSnapshot as ProPicksRadarSnapshot
+
+__all__.extend(["ProPicksRadarCursor", "ProPicksRadarSnapshot"])
