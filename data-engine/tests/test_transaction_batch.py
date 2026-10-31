@@ -4,12 +4,12 @@ VAL-PERF-008: POST /api/transactions/batch for bulk inserts.
 """
 
 
-from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from app.core.database import SessionLocal, init_db
 from app.models import Company, Transaction
 from main import app
+from tests.auth_helpers import csrf_client
 
 
 def _batch_post(client, transactions):
@@ -27,7 +27,7 @@ def _count_transactions(ticker):
 def test_batch_create_success():
     """Batch of valid transactions commits atomically."""
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     transactions = [
         {
@@ -71,7 +71,7 @@ def test_batch_create_success():
 def test_batch_rollback_on_validation_error():
     """If any transaction fails validation, entire batch rolls back."""
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     transactions = [
         {
@@ -103,7 +103,7 @@ def test_batch_rollback_on_validation_error():
 def test_batch_rollback_on_oversell():
     """If any transaction causes oversell, entire batch rolls back."""
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     # First create a position
     client.post("/api/portfolio/transactions", json={
@@ -146,7 +146,7 @@ def test_batch_fifty_transactions_performance():
     """Batch of 50 transactions completes in under 2 seconds."""
     import time
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     transactions = []
     for i in range(50):
@@ -172,7 +172,7 @@ def test_batch_fifty_transactions_performance():
 def test_batch_empty_rejected():
     """Empty batch is rejected."""
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     response = _batch_post(client, [])
     assert response.status_code == 422, response.text
@@ -181,7 +181,7 @@ def test_batch_empty_rejected():
 def test_batch_mixed_actions():
     """Batch can contain buy, sell, and cash transactions."""
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     # Setup: create position first
     client.post("/api/portfolio/transactions", json={
@@ -229,7 +229,7 @@ def test_batch_mixed_actions():
 def test_batch_preserves_order():
     """Transactions are processed in the order provided."""
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     
     transactions = [
         {
