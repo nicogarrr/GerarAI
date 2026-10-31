@@ -50,7 +50,13 @@ from app.valuation.engines.base import (
     default_wacc,
     is_adr_without_ratio,
 )
-from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
+from app.valuation.reverse_dcf import (
+    ReverseDCFInputs,
+    growth_sensitivity,
+    implied_perpetual_growth,
+    solve_required_growth,
+    value_split,
+)
 
 MODEL_VERSION = "long-term-fundamental-model-v2"
 ALGORITHM_VERSION = "driver-formulas-funding-rollforward-v2"
@@ -2130,23 +2136,40 @@ class LongTermModelService:
                 if value is None and not (name == "market_price" and price_missing)
             ]
             return {"status": "insufficient_data", "market_price": current_price, "missing_inputs": missing, "trace": {"method": "binary_search_reverse_dcf", "source_fact_ids": assumptions["fcf_margin"].source_fact_ids}}
-        solved = solve_required_growth(
-            ReverseDCFInputs(
-                market_price=current_price,
-                revenue=revenue,
-                fcf_margin=margin,
-                wacc=wacc,
-                terminal_growth=terminal,
-                net_debt=net_debt,
-                shares_outstanding=shares,
-                years=horizon,
-            )
+        reverse_inputs = ReverseDCFInputs(
+            market_price=current_price,
+            revenue=revenue,
+            fcf_margin=margin,
+            wacc=wacc,
+            terminal_growth=terminal,
+            net_debt=net_debt,
+            shares_outstanding=shares,
+            years=horizon,
         )
+        solved = solve_required_growth(reverse_inputs)
         required = solved.get("required_revenue_growth")
         base_growth = assumptions["revenue_growth"].value
+        # «Crecimiento implícito» (idea Jera Value): lectura simple g = WACC − FCF/EV, qué parte del
+        # valor que paga el precio llega en los años 1–5, 6–10 y 11+, y la rejilla WACC × margen.
+        enterprise_value = current_price * shares + net_debt
+        implied = {
+            "implied_perpetual_growth": implied_perpetual_growth(
+                fcf=revenue * margin, enterprise_value=enterprise_value, wacc=wacc
+            ),
+            "value_split": (
+                value_split(
+                    revenue=revenue, growth=required, fcf_margin=margin, wacc=wacc,
+                    terminal_growth=terminal, years=horizon,
+                )
+                if required is not None
+                else None
+            ),
+            "sensitivity": growth_sensitivity(reverse_inputs) if margin > 0 else None,
+        }
         return {
             "status": solved.get("status", "ok"),
             **solved,
+            **implied,
             "base_revenue_growth": assumptions["revenue_growth"].value,
             "fcf_margin": margin,
             "wacc": wacc,
