@@ -314,23 +314,24 @@ def manifest_synced_at(root: Path | None = None) -> str | None:
     return str(synced) if synced else None
 
 
-def _resolve_within(base: Path, path: Path) -> Path | None:
-    """path con symlinks resueltos (realpath) debe quedar dentro de base.
+def _resolve_within(base: Path, path: Path) -> str | None:
+    """path real (symlinks resueltos) si cuelga del root real de base; None si no.
 
     Un symlink de fichero O de directorio dentro del snapshot que apunte
     fuera del root autorizado hace que la ruta resuelta caiga fuera y se
-    rechaza. La comprobacion usa las rutas reales de ambos extremos.
+    rechaza. Se usa os.path.realpath/normpath + guardia startswith (la forma
+    de saneamiento que CodeQL reconoce; pathlib no la tiene modelada).
+    ``root + os.sep`` cierra el bypass de prefijo hermano: ``/snap-evil``
+    empieza por ``/snap`` como cadena sin estar bajo ``/snap``.
     """
     try:
-        root = Path(os.path.realpath(base))
-        resolved = Path(os.path.realpath(path))
+        root = os.path.realpath(base)
+        fullpath = os.path.normpath(os.path.realpath(path))
     except OSError:
         return None
-    try:
-        resolved.relative_to(root)
-    except ValueError:
+    if not fullpath.startswith(root + os.sep):
         return None
-    return resolved
+    return fullpath
 
 
 def _open_verified(base: Path, path: Path):
@@ -348,17 +349,17 @@ def _open_verified(base: Path, path: Path):
     sync local y no hay evidencia de escritores concurrentes, pero es una
     hipotesis sobre el despliegue, no una propiedad del codigo.
     """
-    resolved = _resolve_within(base, path)
-    if resolved is None:
+    fullpath = _resolve_within(base, path)
+    if fullpath is None:
         return None
     try:
-        parent_fd = os.open(resolved.parent, os.O_RDONLY | os.O_DIRECTORY)
+        parent_fd = os.open(os.path.dirname(fullpath), os.O_RDONLY | os.O_DIRECTORY)
     except OSError:
         return None
     fd = None
     try:
         fd = os.open(
-            resolved.name,
+            os.path.basename(fullpath),
             os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0),
             dir_fd=parent_fd,
         )
