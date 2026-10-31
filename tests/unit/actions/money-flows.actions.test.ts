@@ -53,6 +53,16 @@ describe('getFlowHoldings: solape con cartera y seguimiento', () => {
         expect([...result.watchlist].sort()).toEqual(['AAPL', 'GOOG']);
     });
 
+    it('pide posiciones con page_size=200 (contrato paginado del backend) y lee items', async () => {
+        researchRequest
+            .mockResolvedValueOnce({ items: [{ ticker: 'asts' }], page_info: { total: 1 } })
+            .mockResolvedValueOnce([{ symbol: 'ASTS' }]);
+        const result = await getFlowHoldings();
+        expect(result.unavailable).toBe(false);
+        expect([...result.portfolio]).toEqual(['ASTS']);
+        expect(researchRequest).toHaveBeenNthCalledWith(1, '/api/portfolio/positions?page=1&page_size=200', { fast: true });
+    });
+
     it('cualquier fallo o forma rara -> no disponible, nunca un "no tienes nada" inventado', async () => {
         researchRequest.mockRejectedValue(new Error('boom'));
         expect(await getFlowHoldings()).toEqual({ portfolio: new Set(), watchlist: new Set(), unavailable: true });

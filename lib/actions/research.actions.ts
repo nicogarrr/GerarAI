@@ -1,6 +1,7 @@
 'use server';
 
 import { isQuoteLandingEvent } from '@/lib/news-landing';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { revalidatePath } from 'next/cache';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
@@ -1437,14 +1438,12 @@ export async function submitThesisHumanInput(ticker: string, formData: FormData)
 /** Index relevance needs membership, not prices, FX totals or data quality. */
 export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: string; quantity: number }>> {
   await requireAuthenticatedUser();
-  return paginateAll(
-    async (offset) => {
-      const res = await researchRequest<Array<{ ticker: string; quantity: number }> | { items: Array<{ ticker: string; quantity: number }> }>(
-        `/api/portfolio/positions?limit=2000&offset=${offset}`, { fast: true },
-      );
-      return Array.isArray(res) ? res : (res as { items?: Array<{ ticker: string; quantity: number }> })?.items || [];
-    },
-    2000,
+  // El backend pagina con page/page_size (max 200): limit/offset NO existen
+  // en este endpoint y los ignoraba, repitiendo siempre la pagina 1.
+  return fetchAllBackendPages((page) =>
+    researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number }>>(
+      `/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true },
+    ),
     (position) => position.ticker,
   );
 }
