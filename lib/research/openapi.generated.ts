@@ -12039,6 +12039,72 @@ export interface components {
             /** Ranking Formula */
             ranking_formula?: string | null;
         };
+        /** ScreenerCriterionOut */
+        ScreenerCriterionOut: {
+            /** Left */
+            left: string;
+            /**
+             * Operator
+             * @enum {string}
+             */
+            operator: ">" | ">=" | "<" | "<=" | "==" | "!=";
+            /** Right */
+            right: string;
+        };
+        /** ScreenerCustomMetricOut */
+        ScreenerCustomMetricOut: {
+            /** Active */
+            active: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Formula */
+            formula: string;
+            /** Id */
+            id: number;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Metric Key */
+            metric_key: string;
+            /** Name */
+            name: string;
+            /** Unit */
+            unit: string;
+            /** Version */
+            version: number;
+        };
+        /** ScreenerSavedScreenOut */
+        ScreenerSavedScreenOut: {
+            /** Active */
+            active: boolean;
+            /** Alerts Enabled */
+            alerts_enabled: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Criteria */
+            criteria: components["schemas"]["ScreenerCriterionOut"][];
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Last Run At */
+            last_run_at: string | null;
+            /** Name */
+            name: string;
+            /** Ranking Direction */
+            ranking_direction: string;
+            /** Ranking Formula */
+            ranking_formula: string | null;
+        };
         /** SnapshotCountsOut */
         SnapshotCountsOut: {
             /**
@@ -24785,9 +24851,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ScreenerCustomMetricOut"][];
                 };
             };
             /** @description Validation Error */
@@ -24997,9 +25061,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["ScreenerSavedScreenOut"][];
                 };
             };
             /** @description Validation Error */

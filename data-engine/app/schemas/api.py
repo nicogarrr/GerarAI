@@ -1809,6 +1809,44 @@ class PortfolioIbkrCsvImportOut(BaseModel):
     row_errors: list[str]
 
 
+# --- GET /api/screeners/custom-metrics y /screens -------------------------------
+# Formas medidas contra _metric_payload y _screen_payload (serializan la fila
+# ORM tal cual). metadata es un dict libre del tenant y criteria la lista de
+# criterios tal como se guardaron: free-form declarado, nunca inventado.
+
+
+class ScreenerCustomMetricOut(BaseModel):
+    id: int
+    metric_key: str
+    name: str
+    formula: str
+    unit: str
+    description: str
+    version: int
+    active: bool
+    metadata: dict[str, Any]
+    created_at: datetime
+
+
+class ScreenerCriterionOut(BaseModel):
+    left: str
+    operator: Literal[">", ">=", "<", "<=", "==", "!="]
+    right: str
+
+
+class ScreenerSavedScreenOut(BaseModel):
+    id: int
+    name: str
+    description: str
+    criteria: list[ScreenerCriterionOut]
+    ranking_formula: str | None
+    ranking_direction: str
+    alerts_enabled: bool
+    active: bool
+    last_run_at: datetime | None
+    created_at: datetime
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto
