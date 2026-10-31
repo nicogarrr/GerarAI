@@ -505,7 +505,7 @@ export default async function WatchlistPage({
                                         <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable ? 'Sin dato: cotiza fuera de EE. UU. y la fuente no da capitalización ni PER fiables de ese mercado' : undefined)}>{formatPeRatio(stock.peRatio)}{stock.peRatio === null ? (stock.timedOut ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La lectura tardó más de 3 s; recarga para verla.</span> : stock.metricsNotApplicable ? <span className="mt-1 block font-sans text-[11px] text-gray-500">La fuente no cubre el PER de este mercado.</span> : null) : null}</dd>
                                     </div>
                                     <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente de mercado no oficial.">Obj. analistas</dt>
+                                        <dt className="text-[11px] text-gray-500" title="Consenso medio de precios objetivo por firma. Fuente no oficial.">Obj. analistas</dt>
                                         <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} /></dd>
                                     </div>
                                 </dl>
@@ -547,7 +547,7 @@ export default async function WatchlistPage({
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('pe')}>
                                         <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">PER{sortIndicator('pe')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" title="Consenso medio de precios objetivo por firma. Fuente de mercado no oficial.">
+                                    <TableHead className="text-right text-gray-300" title="Consenso medio de precios objetivo por firma. Fuente no oficial.">
                                         Obj. analistas
                                     </TableHead>
                                     <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('earnings')}>

@@ -98,8 +98,8 @@ export type QuoteCurrency = { currency: ValuationCurrency | null; basis: 'finnhu
 export function resolveQuoteCurrency(quote: ValuationQuote): QuoteCurrency {
     const declared = typeof quote.currency === 'string' ? quote.currency.trim() : '';
     if (declared === 'EUR' || declared === 'USD') return { currency: declared, basis: 'finnhub-listado', reason: null };
-    if (declared) return { currency: null, basis: null, reason: `El listado de Finnhub indica ${declared}: no hay conversión, N/D.` };
-    return { currency: null, basis: null, reason: 'Divisa de la cotización no verificada en el listado de Finnhub: N/D (no se infiere del símbolo).' };
+    if (declared) return { currency: null, basis: null, reason: `El listado indica ${declared}: no hay conversión, N/D.` };
+    return { currency: null, basis: null, reason: 'Divisa de la cotización no verificada en el listado: N/D (no se infiere del símbolo).' };
 }
 
 /** Mapa simbolo -> divisa del listado US de Finnhub (/stock/symbol); ignora entradas sin simbolo o divisa. */
@@ -127,18 +127,19 @@ function closeDateLabel(iso: string): string {
     return DATE_FORMAT.format(parsed).replace('.', '');
 }
 
-/** Etiqueta honesta de fuente + hora/fecha de una cotizacion. */
+/** Etiqueta honesta de hora/fecha de una cotizacion, sin nombrar la fuente. */
 export function quoteLabel(quote: ValuationQuote): string {
-    const source = quote.source ?? 'Proveedor';
+    // Etiqueta de calidad sin nombrar la fuente (orden de Nico, 31-oct): la
+    // procedencia sigue en la pestana Fuentes y en la API.
     if (quote.kind === 'live' && typeof quote.t === 'number' && quote.t > 0) {
-        return `${source} · ${TIME_FORMAT.format(new Date(quote.t * 1000))} (hora de Madrid) · en vivo`;
+        return `${TIME_FORMAT.format(new Date(quote.t * 1000))} (hora de Madrid) · en vivo`;
     }
-    if (quote.closeDate) return `${source} · cierre del ${closeDateLabel(quote.closeDate)}`;
+    if (quote.closeDate) return `cierre del ${closeDateLabel(quote.closeDate)}`;
     if (typeof quote.t === 'number' && quote.t > 0) {
         const d = new Date(quote.t * 1000);
-        return `${source} · último cierre, dato de ${DATE_FORMAT.format(d).replace('.', '')} ${TIME_FORMAT.format(d)}`;
+        return `último cierre, dato de ${DATE_FORMAT.format(d).replace('.', '')} ${TIME_FORMAT.format(d)}`;
     }
-    return `${source} · cierre de fecha desconocida`;
+    return `cierre de fecha desconocida`;
 }
 
 function unvalued(position: ValuationPosition, status: ValuationStatus, note: string, label: string | null = null): ValuedPosition {

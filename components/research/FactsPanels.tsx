@@ -73,7 +73,7 @@ export function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact
     <>
       {hasUnofficial ? (
         <p className="mb-3 text-xs text-amber-300" role="note">
-          Incluye cifras de una fuente no oficial, sin auditar ni contrastar con el emisor.
+          Incluye cifras no oficiales, sin auditar ni contrastar con el emisor.
         </p>
       ) : null}
       {/* Móvil: cards paginadas (Anterior/Siguiente), sin «ver más» ni corte silencioso */}

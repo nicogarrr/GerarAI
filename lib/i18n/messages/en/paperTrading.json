@@ -30,7 +30,7 @@
     "withTotals": " Totals only add up the valued ones, per currency:",
     "noTotals": " No totals: no position has a quote.",
     "totalLine": "{currency}: value {marketValue} · unrealized P&L {unrealized}",
-    "note": "Options are not valued (there is no quote for their premium). Valuation only uses Finnhub and the currency verified in its listing; the rest shows N/A. It updates roughly every minute while this tab is visible (if the provider fails, it deliberately waits longer). You can also request an update with the button",
+    "note": "Options are not valued (there is no quote for their premium). Valuation only uses the live quote and the currency verified in its listing; the rest shows N/A. It updates roughly every minute while this tab is visible (if the provider fails, it deliberately waits longer). You can also request an update with the button",
     "asOf": " · checked at {time} (Madrid time)",
     "refreshing": "Checking…",
     "refresh": "Update quotes",

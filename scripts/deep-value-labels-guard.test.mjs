@@ -27,6 +27,7 @@ test('criterio aprobado por Nico: sin etiqueta repetida por cifra', () => {
 test('el desacuerdo entre fuentes se muestra con ambas cifras', () => {
     assert.match(view, /Fuentes en desacuerdo/);
     assert.match(view, /finnhub_yield_indicated/);
+    assert.doesNotMatch(view, /Finnhub indica/, 'el distintivo de desacuerdo no nombra la fuente (orden 31-oct)');
     assert.match(service, /desacuerdo_fuentes/);
     const serviceVal = readFileSync('data-engine/app/services/valuation_metrics_service.py', 'utf8');
     assert.match(serviceVal, /fuentes_en_desacuerdo/);

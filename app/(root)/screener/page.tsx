@@ -28,7 +28,7 @@ export const revalidate = 0;
 export const metadata: Metadata = {
   title: 'Explorar acciones',
   description:
-    'Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline con Finnhub.',
+    'Large caps líquidos con precio y market cap reales, filtros guardados del motor de análisis y lectura offline de precios.',
 };
 
 /** Sectores que el Screener ofrece: etiqueta ES de lib/labels.ts + valor EN
@@ -411,7 +411,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
         <CardContent>
           {engineScreens.engineDown ? (
             <p className="text-sm text-gray-500">
-              La tabla muestra precios Finnhub como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.
+              La tabla muestra precios como lectura offline, sin análisis de cobertura. El motor de filtros guardados no está disponible.
             </p>
           ) : engineScreens.screens.length === 0 ? (
             <p className="text-sm text-gray-500">
