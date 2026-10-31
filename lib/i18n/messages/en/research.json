@@ -164,6 +164,19 @@
     "levelLow": "low",
     "impactNote": "Automatic rule-based reading of the headline; not a source data point.",
     "impactAria": "Impact {impact}. {note}",
-    "impactAriaReason": "Impact {impact}, reason: {reason}. {note}"
+    "impactAriaReason": "Impact {impact}, reason: {reason}. {note}",
+    "second": {
+      "benefited": "Benefited",
+      "harmed": "Harmed",
+      "uncertain": "Direction uncertain",
+      "loading": "Calculating…",
+      "error": "Not available right now. Reopen to retry.",
+      "noneWithSubject": "No other company in the universe appears exposed; the analysis deliberately excludes {ticker} itself.",
+      "none": "No companies in the universe are exposed to this news item.",
+      "hypotheses": "Unverified hypotheses",
+      "modeModel": "model",
+      "modeRules": "rules",
+      "more": "and {count} more"
+    }
   }
 }

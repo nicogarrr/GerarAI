@@ -48,8 +48,8 @@ test('decisional fields removed from columns stay reachable in row detail (audit
     assert.match(news, new RegExp(`<dt className="inline font-medium">\\{t\\('research\\.flow\\.${key}'\\)\\}</dt>`));
     assert.equal(flowEs[key], literal, `ES ${key} == literal histórico`);
   }
-  assert.match(news, /etiquetaTierFuente\(event\.source_tier\)/);
-  assert.match(news, /etiquetaDireccionImpacto\(event\.impact_direction\)/);
+  assert.match(news, /etiquetaTierFuente\(event\.source_tier, locale\)/);
+  assert.match(news, /etiquetaDireccionImpacto\(event\.impact_direction, locale\)/);
   assert.match(news, /formatPercent\(event\.portfolio_weight/);
 
   const portfolio = read('components/portfolio/PortfolioHoldings.tsx');

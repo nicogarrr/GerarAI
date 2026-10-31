@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
-import { getT } from '@/lib/i18n/server';
+import { getLocale, getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import Link from 'next/link';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
@@ -79,12 +80,12 @@ function NewsPager({label,lane,page,hasMore,ticker,inFicha,t}:{label:string;lane
 /** Fecha del evento; con hora solo si la fuente trae una hora real (no medianoche UTC por defecto).
  *  El día sin hora se pinta en es-ES con formatUserDate (día de calendario literal, sin
  *  desplazamiento por zona); antes se devolvía el ISO crudo («2026-10-27»). */
-export function eventDateText(value: string): string {
+export function eventDateText(value: string, locale: Locale = 'es'): string {
   const day = value.split('T')[0];
   const match = /T(\d{2}:\d{2})/.exec(value);
-  if (!match || match[1] === '00:00') return formatUserDate(day);
-  const formatted = formatUserDateTime(value);
-  return formatted === NA ? formatUserDate(day) : formatted;
+  if (!match || match[1] === '00:00') return formatUserDate(day, undefined, undefined, locale);
+  const formatted = formatUserDateTime(value, undefined, undefined, locale);
+  return formatted === NA ? formatUserDate(day, undefined, undefined, locale) : formatted;
 }
 
 /** Materialidad como indicador visual: barra proporcional + número, color por impacto. */
@@ -124,11 +125,13 @@ export function ImpactBadge({
   direction,
   eventType,
   t = createTranslator('es'),
+  locale = 'es',
 }: {
   direction?: string | null;
   eventType?: string | null;
   /** Traductor del locale activo; sin el, el badge pinta el español de siempre (llamadores sin getT). */
   t?: TranslateFn;
+  locale?: Locale;
 }) {
   if (!direction) return null;
   const estilo = IMPACTO_ESTILO[direction] ?? 'bg-gray-800/60 text-gray-400';
@@ -138,15 +141,15 @@ export function ImpactBadge({
   // omiten en vez de añadir relleno.
   const motivo =
     eventType && eventType !== 'general_news' && eventType !== 'unknown'
-      ? etiquetaTipoEvento(eventType)
+      ? etiquetaTipoEvento(eventType, locale)
       : null;
   return (
     <span
-      aria-label={motivo ? t('research.flow.impactAriaReason', { impact: etiquetaDireccionImpacto(direction), reason: motivo, note: nota }) : t('research.flow.impactAria', { impact: etiquetaDireccionImpacto(direction), note: nota })}
+      aria-label={motivo ? t('research.flow.impactAriaReason', { impact: etiquetaDireccionImpacto(direction, locale), reason: motivo, note: nota }) : t('research.flow.impactAria', { impact: etiquetaDireccionImpacto(direction, locale), note: nota })}
       className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilo}`}
       title={nota}
     >
-      {etiquetaDireccionImpacto(direction)}
+      {etiquetaDireccionImpacto(direction, locale)}
       {motivo ? ` · ${motivo}` : ''}
     </span>
   );
@@ -166,11 +169,11 @@ function CoverageChip({ event, t }: { event: ResearchNewsEvent; t: TranslateFn }
   );
 }
 
-function MacroChip({ event, t }: { event: ResearchNewsEvent; t: TranslateFn }) {
+function MacroChip({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
   if (event.news_lane !== 'macro') return null;
   return (
     <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">
-      {t('research.flow.macroChip')}{event.macro_theme ? ` · ${etiquetaTemaMacro(event.macro_theme)}` : ''}
+      {t('research.flow.macroChip')}{event.macro_theme ? ` · ${etiquetaTemaMacro(event.macro_theme, locale)}` : ''}
     </span>
   );
 }
@@ -201,23 +204,23 @@ function DateNotes({ event, t, inline = false }: { event: ResearchNewsEvent; t: 
 }
 
 /** Detalle de contexto de la fila; va dentro del único desplegable (NewsSecondOrder). */
-function ContextDetail({ event, t }: { event: ResearchNewsEvent; t: TranslateFn }) {
+function ContextDetail({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
   return (
     <dl className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
-      <div><dt className="inline font-medium">{t('research.flow.ctxType')}</dt><dd className="inline">{etiquetaTipoEvento(event.event_type)}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxType')}</dt><dd className="inline">{etiquetaTipoEvento(event.event_type, locale)}</dd></div>
       {/* Datos decisionales reubicados (SERIE 1, auditoria): nunca crudos, nulos etiquetados "sin datos". */}
-      <div><dt className="inline font-medium">{t('research.flow.ctxTier')}</dt><dd className="inline">{event.source_tier ? etiquetaTierFuente(event.source_tier) : NA}</dd></div>
-      <div><dt className="inline font-medium">{t('research.flow.ctxImpact')}</dt><dd className="inline">{event.impact_direction ? etiquetaDireccionImpacto(event.impact_direction) : NA}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxTier')}</dt><dd className="inline">{event.source_tier ? etiquetaTierFuente(event.source_tier, locale) : NA}</dd></div>
+      <div><dt className="inline font-medium">{t('research.flow.ctxImpact')}</dt><dd className="inline">{event.impact_direction ? etiquetaDireccionImpacto(event.impact_direction, locale) : NA}</dd></div>
       <div><dt className="inline font-medium">{t('research.flow.ctxWeight')}</dt><dd className="inline">{event.portfolio_weight != null ? formatPercent(event.portfolio_weight, { digits: 1 }) : NA}</dd></div>
-      {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">{t('research.flow.ctxTheme')}</dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme)}</dd></div> : null}
+      {event.news_lane === 'macro' && event.macro_theme ? <div><dt className="inline font-medium">{t('research.flow.ctxTheme')}</dt><dd className="inline">{etiquetaTemaMacro(event.macro_theme, locale)}</dd></div> : null}
     </dl>
   );
 }
 
-function ContextAndCoverage({ event, t }: { event: ResearchNewsEvent; t: TranslateFn }) {
+function ContextAndCoverage({ event, t, locale }: { event: ResearchNewsEvent; t: TranslateFn; locale: Locale }) {
   return (
     <>
-      <ContextDetail event={event} t={t} />
+      <ContextDetail event={event} t={t} locale={locale} />
     </>
   );
 }
@@ -244,13 +247,14 @@ export async function NewsEventsFlow({
   inFicha?: boolean;
 }) {
   const t = await getT();
+  const locale = await getLocale();
   const portfolioSet = new Set(portfolioTickers);
   const watchlistSet = new Set(watchlistTickers);
   // Carril macro sin frescura: la API sirve el archivo reciente (fuente
   // caída). Se anuncia con la fecha real del evento más reciente; nunca se
   // finge frescura (medido en prod 30-oct-2026: GDELT >72h sin responder).
   const macroArchive = lane === 'macro' && events.length > 0 && events.every((event) => event.archive);
-  const macroArchiveDate = macroArchive && events[0] ? eventDateText(events[0].date) : null;
+  const macroArchiveDate = macroArchive && events[0] ? eventDateText(events[0].date, locale) : null;
   return (
     <section className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
@@ -311,16 +315,17 @@ export async function NewsEventsFlow({
                 ) : null}
                 {event.ticker ? (
                   <TickerContextBadges
+                    locale={locale}
                     portfolioTickers={portfolioSet}
                     ticker={event.ticker}
                     watchlistTickers={watchlistSet}
                   />
                 ) : null}
-                <MacroChip event={event} t={t} />
+                <MacroChip event={event} t={t} locale={locale} />
                 <GobiernoChip event={event} t={t} />
 
                 <CoverageChip event={event} t={t} />
-                <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} />
+                <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} locale={locale} />
                 {event.requires_update ? (
                   <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">{t('research.flow.review')}</span>
                 ) : null}
@@ -331,11 +336,11 @@ export async function NewsEventsFlow({
               <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
                 <span className="min-w-0 break-words">{event.source || NA}</span>
                 <span aria-hidden="true">·</span>
-                <span>{formatTimeAgo(event.date)}</span>
+                <span>{formatTimeAgo(event.date, Date.now(), locale)}</span>
                 <DateNotes event={event} t={t} inline />
               </div>
               <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
-                <ContextAndCoverage event={event} t={t} />
+                <ContextAndCoverage event={event} t={t} locale={locale} />
               </NewsSecondOrder>
             </li>
           ))}
@@ -368,6 +373,7 @@ export async function NewsEventsFlow({
                     )}
                     {event.ticker ? (
                       <TickerContextBadges
+                    locale={locale}
                         portfolioTickers={portfolioSet}
                         ticker={event.ticker}
                         watchlistTickers={watchlistSet}
@@ -375,7 +381,7 @@ export async function NewsEventsFlow({
                     ) : null}
                     {event.news_lane === 'macro' || event.news_lane === 'gobierno' ? (
                       <div className="mt-1">
-                        <MacroChip event={event} t={t} />
+                        <MacroChip event={event} t={t} locale={locale} />
                         <GobiernoChip event={event} t={t} />
 
                       </div>
@@ -385,8 +391,8 @@ export async function NewsEventsFlow({
                     </div>
                   </th>
                   <td className="min-w-[120px] px-3 py-2.5 text-gray-400">
-                    <div>{formatTimeAgo(event.date)}</div>
-                    <div className="mt-0.5 text-xs text-gray-500">{eventDateText(event.date)}</div>
+                    <div>{formatTimeAgo(event.date, Date.now(), locale)}</div>
+                    <div className="mt-0.5 text-xs text-gray-500">{eventDateText(event.date, locale)}</div>
                     <DateNotes event={event} t={t} />
                   </td>
                   <td className="max-w-[420px] px-3 py-2.5 text-gray-300">
@@ -397,13 +403,13 @@ export async function NewsEventsFlow({
                   <td className="px-3 py-2.5 text-center">
                     <MaterialityIndicator score={event.materiality_score} t={t} />
                     <div className="mt-1">
-                      <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} />
+                      <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} locale={locale} />
                     </div>
                   </td>
                   <td className="py-2.5 text-gray-300">
                     {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">{t('research.flow.review')}</span> : null}
                     <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
-                      <ContextAndCoverage event={event} t={t} />
+                      <ContextAndCoverage event={event} t={t} locale={locale} />
                     </NewsSecondOrder>
                   </td>
                 </tr>

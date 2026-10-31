@@ -1,4 +1,4 @@
-import { TICKER_BADGE_LABELS, tickerBadgesFor } from '@/lib/ticker-badges';
+import { TICKER_BADGE_LABELS, TICKER_BADGE_LABELS_EN, tickerBadgesFor } from '@/lib/ticker-badges';
 
 const BADGE_CLASSES: Record<string, string> = {
     portfolio: 'bg-teal-950/60 text-teal-300',
@@ -13,10 +13,12 @@ export function TickerContextBadges({
     ticker,
     portfolioTickers,
     watchlistTickers,
+    locale = 'es',
 }: {
     ticker: string;
     portfolioTickers: ReadonlySet<string>;
     watchlistTickers: ReadonlySet<string>;
+    locale?: 'es' | 'en';
 }) {
     const badges = tickerBadgesFor(ticker, portfolioTickers, watchlistTickers);
     if (badges.length === 0) return null;
@@ -27,7 +29,7 @@ export function TickerContextBadges({
                     className={`rounded-full px-2 py-0.5 text-xs font-semibold ${BADGE_CLASSES[badge]}`}
                     key={badge}
                 >
-                    {TICKER_BADGE_LABELS[badge]}
+                    {(locale === 'en' ? TICKER_BADGE_LABELS_EN : TICKER_BADGE_LABELS)[badge]}
                 </span>
             ))}
         </span>

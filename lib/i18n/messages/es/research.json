@@ -164,6 +164,19 @@
     "levelLow": "baja",
     "impactNote": "Lectura automática del titular por reglas; no es un dato de la fuente.",
     "impactAria": "Impacto {impact}. {note}",
-    "impactAriaReason": "Impacto {impact}, motivo: {reason}. {note}"
+    "impactAriaReason": "Impacto {impact}, motivo: {reason}. {note}",
+    "second": {
+      "benefited": "Beneficiadas",
+      "harmed": "Perjudicadas",
+      "uncertain": "Dirección incierta",
+      "loading": "Calculando…",
+      "error": "No disponible ahora. Vuelve a abrir para reintentar.",
+      "noneWithSubject": "Ninguna otra empresa del universo aparece expuesta; el análisis excluye a propósito a la propia {ticker}.",
+      "none": "Sin empresas del universo expuestas a esta noticia.",
+      "hypotheses": "Hipótesis no verificadas",
+      "modeModel": "modelo",
+      "modeRules": "reglas",
+      "more": "y {count} más"
+    }
   }
 }

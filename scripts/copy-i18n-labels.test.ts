@@ -67,9 +67,9 @@ void test('los componentes usan las etiquetas, no la cadena cruda', () => {
     // La tabla ya no muestra la columna de tier (SERIE 1): si vuelve a
     // aparecer source_tier, debe pasar por la etiqueta, nunca crudo.
     if (news.includes('event.source_tier')) {
-        assert.match(news, /etiquetaTierFuente\(event\.source_tier\)/, 'source_tier solo se muestra via etiquetaTierFuente, nunca crudo');
+        assert.match(news, /etiquetaTierFuente\(event\.source_tier, locale\)/, 'source_tier solo se muestra via etiquetaTierFuente, nunca crudo');
     }
-    assert.match(news, /etiquetaTipoEvento\(event\.event_type\)/);
+    assert.match(news, /etiquetaTipoEvento\(event\.event_type, locale\)/);
 });
 
 test('industrias conocidas se traducen en la línea de sector del índice', () => {
