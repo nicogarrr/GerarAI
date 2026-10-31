@@ -7,6 +7,7 @@ Cache en memoria de 6 h: los calendarios oficiales cambian muy pocas veces.
 
 from __future__ import annotations
 
+import asyncio
 import time
 from datetime import UTC, date, datetime
 from typing import Any
@@ -96,13 +97,15 @@ async def get_macro_events(
     events: list[dict[str, Any]] = []
     fetched_at = datetime.now(UTC).isoformat()
 
-    async def run(name: str, url: str, loader, convert) -> None:
+    async def run(name: str, url: str, loader, convert) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         try:
             rows = await _cached(name, loader, use_cache=use_cache)
         except (httpx.HTTPError, ValueError):
-            sources.append({"name": name, "url": url, "status": "unavailable", "fetched_at": fetched_at,
-                            "covered_until": None})
-            return
+            return (
+                {"name": name, "url": url, "status": "unavailable", "fetched_at": fetched_at,
+                 "covered_until": None},
+                [],
+            )
         converted = [item for item in (convert(row) for row in rows) if item is not None]
         # Una fuente que responde pero ya no tiene eventos (formato cambiado)
         # no es "sin eventos": es no disponible.
@@ -112,14 +115,24 @@ async def get_macro_events(
         # lo supera, no se puede afirmar que no haya mas eventos de esa fuente.
         if status == "ready" and covered_until is not None and end.isoformat() > covered_until:
             status = "partial"
-        sources.append({"name": name, "url": url, "status": status, "fetched_at": fetched_at,
-                        "covered_until": covered_until})
-        events.extend(converted)
+        return (
+            {"name": name, "url": url, "status": status, "fetched_at": fetched_at,
+             "covered_until": covered_until},
+            converted,
+        )
 
-    await run("Reserva Federal (FOMC)", connector.FOMC_URL,
-              lambda: connector.fetch_fomc(agent, client), _fomc_event)
-    await run("BLS", connector.BLS_SCHEDULE_URL,
-              lambda: connector.fetch_bls(agent, client), _bls_event)
+    # Las dos fuentes en PARALELO (antes en serie: 479 ms medidos en el
+    # barrido 2026-10-31 con cache fria por worker). El orden del contrato
+    # (FOMC primero, BLS segundo) se conserva al ensamblar, no por llegada.
+    results = await asyncio.gather(
+        run("Reserva Federal (FOMC)", connector.FOMC_URL,
+            lambda: connector.fetch_fomc(agent, client), _fomc_event),
+        run("BLS", connector.BLS_SCHEDULE_URL,
+            lambda: connector.fetch_bls(agent, client), _bls_event),
+    )
+    for source, converted in results:
+        sources.append(source)
+        events.extend(converted)
 
     low, high = start.isoformat(), end.isoformat()
     inside = sorted(
