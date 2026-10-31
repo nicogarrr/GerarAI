@@ -3,15 +3,13 @@
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
+import type { components } from '@/lib/research/openapi.generated';
 import { requestCache } from '@/lib/cache/requestCache';
 
 /** Divisa base de la cartera (por tenant) y procedencia de los tipos de cambio. */
-export type PortfolioCurrencySettings = {
-    base_currency: string;
-    /** IRPF y Modelo 720: siempre EUR al tipo BCE, sea cual sea la base. */
-    tax_currency?: string;
-    fx_source?: { source: string | null; latest_rate_date: string | null; base_currency: string } | null;
-};
+export type PortfolioCurrencySettings = components['schemas']['PortfolioConfigurationOut'];
+/** Respuesta del PUT: shape distinta y más corta que la del GET (sin tax_currency ni fx_source). */
+export type PortfolioCurrencySettingsUpdate = components['schemas']['PortfolioConfigurationUpdateOut'];
 
 /** GET /api/portfolio/configuration. */
 export async function getPortfolioCurrencySettings(): Promise<PortfolioCurrencySettings> {
@@ -23,9 +21,9 @@ export async function getPortfolioCurrencySettings(): Promise<PortfolioCurrencyS
 const PORTFOLIO_READS_IN_BASE_CURRENCY = ['positions', 'summary', 'transactions', 'snapshots', 'tearsheet', 'dividends', 'scores', 'quality'] as const;
 
 /** PUT /api/portfolio/configuration: cambia la base y revalora la cartera (no reescribe operaciones). */
-export async function savePortfolioBaseCurrency(baseCurrency: string): Promise<PortfolioCurrencySettings> {
+export async function savePortfolioBaseCurrency(baseCurrency: string): Promise<PortfolioCurrencySettingsUpdate> {
     const user = await requireAuthenticatedUser();
-    const result = await researchRequest<PortfolioCurrencySettings>('/api/portfolio/configuration', {
+    const result = await researchRequest<PortfolioCurrencySettingsUpdate>('/api/portfolio/configuration', {
         method: 'PUT',
         body: JSON.stringify({ base_currency: baseCurrency }),
     });

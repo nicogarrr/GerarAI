@@ -32,6 +32,8 @@ from app.models import (
     Transaction,
 )
 from app.schemas.api import (
+    PortfolioConfigurationOut,
+    PortfolioConfigurationUpdateOut,
     PortfolioDataQualityOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
@@ -593,7 +595,7 @@ def _fx_source(db: Session, base_currency: str) -> dict:
     }
 
 
-@router.get("/configuration")
+@router.get("/configuration", response_model=PortfolioConfigurationOut)
 def portfolio_configuration(db: Session = Depends(get_db)) -> dict:
     portfolio = PortfolioFXService().portfolio(db)
     base_currency = portfolio.base_currency if portfolio else "EUR"
@@ -609,7 +611,7 @@ def portfolio_configuration(db: Session = Depends(get_db)) -> dict:
     }
 
 
-@router.put("/configuration")
+@router.put("/configuration", response_model=PortfolioConfigurationUpdateOut)
 def update_portfolio_configuration(
     payload: PortfolioConfigurationInput,
     db: Session = Depends(get_db),

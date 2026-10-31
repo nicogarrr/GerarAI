@@ -9921,6 +9921,31 @@ export interface components {
             /** Base Currency */
             base_currency: string;
         };
+        /** PortfolioConfigurationOut */
+        PortfolioConfigurationOut: {
+            /** Base Currency */
+            base_currency: string;
+            fx_source: components["schemas"]["PortfolioFxSourceOut"];
+            /** Id */
+            id: number | null;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+            /** Tax Currency */
+            tax_currency: string;
+        };
+        /** PortfolioConfigurationUpdateOut */
+        PortfolioConfigurationUpdateOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Id */
+            id: number;
+            /** Is Default */
+            is_default: boolean;
+            /** Name */
+            name: string;
+        };
         /**
          * PortfolioCostReconciliationOut
          * @description Resultado de reconcile_ibkr_costs para una posicion IBKR.
@@ -10056,6 +10081,15 @@ export interface components {
              * @enum {string}
              */
             scope: "cash" | "positions";
+        };
+        /** PortfolioFxSourceOut */
+        PortfolioFxSourceOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Latest Rate Date */
+            latest_rate_date: string | null;
+            /** Source */
+            source: string | null;
         };
         /** PortfolioIntelligenceOut */
         PortfolioIntelligenceOut: {
@@ -21520,9 +21554,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioConfigurationOut"];
                 };
             };
             /** @description Validation Error */
@@ -21564,9 +21596,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioConfigurationUpdateOut"];
                 };
             };
             /** @description Validation Error */
