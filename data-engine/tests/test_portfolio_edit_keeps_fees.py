@@ -70,3 +70,28 @@ def test_put_with_future_trade_date_is_rejected_like_create(monkeypatch):
     r = signed_request(client, SECRET, tenant, user, "GET", "/api/portfolio/transactions")
     mine = [row for row in r.json()["items"] if row["id"] == tid]
     assert mine and mine[0]["trade_date"] == "2026-01-02"
+
+
+
+def test_trade_date_422_field_alone_cannot_distinguish_cause():
+    """Por eso el front no afirma 'fecha futura': con el MISMO campo
+    trade_date fallan la fecha futura (validador del modelo), la fecha
+    imposible, el texto y el null (validacion de tipo de Pydantic), y el
+    detalle que llega al front conserva el campo, no el motivo."""
+    import pytest
+    from pydantic import ValidationError
+
+    from app.api.routes.portfolio import PortfolioTransactionInput
+
+    base = {"ticker": "ASTS", "action": "buy", "quantity": 1, "price": 10}
+    for bad in ("2999-01-02", "2026-02-30", "bad", None):
+        with pytest.raises(ValidationError) as excinfo:
+            PortfolioTransactionInput.model_validate({**base, "trade_date": bad})
+        assert any("trade_date" in error["loc"] for error in excinfo.value.errors())
+    # Solo la fecha futura nombra el motivo; parsing/null no lo distinguen.
+    with pytest.raises(ValidationError) as excinfo:
+        PortfolioTransactionInput.model_validate({**base, "trade_date": "2999-01-02"})
+    assert any("future" in error["msg"] for error in excinfo.value.errors())
+    with pytest.raises(ValidationError) as excinfo:
+        PortfolioTransactionInput.model_validate({**base, "trade_date": "bad"})
+    assert not any("future" in error["msg"] for error in excinfo.value.errors())
