@@ -1,7 +1,7 @@
 """Indices cobertores para los DISTINCT de /api/screeners/metric-coverage.
 
 Revision ID: 0119_metric_coverage_covering
-Revises: 0118_thesis_changes_attention_thesis
+Revises: 0118_thesis_attention_idx
 Create Date: 2026-10-31T13:35:00.000Z
 
 MEDIDO 2026-10-31 (benchmark local sqlite, 500 empresas, 240.000
@@ -33,7 +33,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0119_metric_coverage_covering"
-down_revision = "0118_thesis_changes_attention_thesis"
+down_revision = "0118_thesis_attention_idx"
 branch_labels = None
 depends_on = None
 

@@ -462,5 +462,5 @@ def test_migration_0119_has_upgrade_and_downgrade() -> None:
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     assert module.revision == "0119_metric_coverage_covering"
-    assert module.down_revision == "0118_thesis_changes_attention_thesis"
+    assert module.down_revision == "0118_thesis_attention_idx"
     assert callable(module.upgrade) and callable(module.downgrade)
