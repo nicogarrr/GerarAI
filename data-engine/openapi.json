@@ -19723,6 +19723,149 @@
         "title": "ThesisGraphOut",
         "type": "object"
       },
+      "ThesisHistoryDiffOut": {
+        "properties": {
+          "affected_assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Assumptions",
+            "type": "array"
+          },
+          "change_summary": {
+            "title": "Change Summary",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "derived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived"
+          },
+          "rating_changed": {
+            "title": "Rating Changed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "change_summary",
+          "affected_assumptions",
+          "rating_changed",
+          "created_at"
+        ],
+        "title": "ThesisHistoryDiffOut",
+        "type": "object"
+      },
+      "ThesisHistoryItemOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_confidence_score": {
+            "title": "Data Confidence Score",
+            "type": "integer"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisHistoryDiffOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "red_team_score": {
+            "title": "Red Team Score",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status",
+          "rating",
+          "red_team_score",
+          "data_confidence_score",
+          "created_at",
+          "updated_at",
+          "diff"
+        ],
+        "title": "ThesisHistoryItemOut",
+        "type": "object"
+      },
+      "ThesisHistoryOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisHistoryItemOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "count",
+          "history",
+          "data_as_of",
+          "provenance"
+        ],
+        "title": "ThesisHistoryOut",
+        "type": "object"
+      },
       "ThesisHumanInput": {
         "description": "Explicit human assumptions, never promoted to sourced financial facts.",
         "properties": {
@@ -81180,9 +81323,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thesis History Api Thesis  Ticker  History Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisHistoryOut"
                 }
               }
             },

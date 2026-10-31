@@ -14,6 +14,7 @@ from app.core.database import get_db
 from app.core.ui_errors import ui_error
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
 from app.schemas import ThesisGenerateRequest, ThesisGraphOut, ThesisOut
+from app.schemas.api import ThesisHistoryOut
 from app.services import thesis_audio_service
 from app.services.company_resolver import resolve_company
 from app.services.driver_assumption_service import DriverAssumptionService, driver_assumption_payload
@@ -280,7 +281,8 @@ def thesis_versions(
             for row in versions]
 
 
-@router.get("/{ticker}/history")
+@router.get("/{ticker}/history", response_model=ThesisHistoryOut,
+                    response_model_exclude_unset=True)
 def thesis_history(ticker: str, db: Session = Depends(get_db)) -> dict:
     """Historial de versiones/aprobaciones: que cambio, cuando y con que resultado.
 

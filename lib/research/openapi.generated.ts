@@ -12851,6 +12851,51 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** ThesisHistoryDiffOut */
+        ThesisHistoryDiffOut: {
+            /** Affected Assumptions */
+            affected_assumptions: string[];
+            /** Change Summary */
+            change_summary: string;
+            /** Created At */
+            created_at: string;
+            /** Derived */
+            derived?: boolean | null;
+            /** Rating Changed */
+            rating_changed: boolean;
+        };
+        /** ThesisHistoryItemOut */
+        ThesisHistoryItemOut: {
+            /** Created At */
+            created_at: string;
+            /** Data Confidence Score */
+            data_confidence_score: number;
+            diff: components["schemas"]["ThesisHistoryDiffOut"] | null;
+            /** Id */
+            id: number;
+            /** Rating */
+            rating: string;
+            /** Red Team Score */
+            red_team_score: number;
+            /** Status */
+            status: string;
+            /** Updated At */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** ThesisHistoryOut */
+        ThesisHistoryOut: {
+            /** Count */
+            count: number;
+            /** Data As Of */
+            data_as_of: string | null;
+            /** History */
+            history: components["schemas"]["ThesisHistoryItemOut"][];
+            provenance: components["schemas"]["ProvenanceOut"];
+            /** Ticker */
+            ticker: string;
+        };
         /**
          * ThesisHumanInput
          * @description Explicit human assumptions, never promoted to sourced financial facts.
@@ -27621,9 +27666,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ThesisHistoryOut"];
                 };
             };
             /** @description Validation Error */

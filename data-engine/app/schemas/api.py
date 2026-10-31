@@ -2103,6 +2103,40 @@ class ScreenerRealOut(BaseModel):
     unavailable: bool
     universe_size: int
 
+# --- GET /api/thesis/{ticker}/history -------------------------------------------
+# Forma medida contra la ruta: envelope de 5 claves; item de 9 claves con
+# diff null o bloque de 4 claves (change_summary, affected_assumptions,
+# rating_changed, created_at); la rama DERIVADA (derived_thesis_diff) anade
+# derived=true y la persistida lo OMITE: exclude_unset + test de ausencia.
+
+
+class ThesisHistoryDiffOut(BaseModel):
+    change_summary: str
+    affected_assumptions: list[str]
+    rating_changed: bool
+    created_at: str
+    derived: bool | None = None
+
+
+class ThesisHistoryItemOut(BaseModel):
+    id: int
+    version: int
+    status: str
+    rating: str
+    red_team_score: int
+    data_confidence_score: int
+    created_at: str
+    updated_at: str
+    diff: ThesisHistoryDiffOut | None
+
+
+class ThesisHistoryOut(BaseModel):
+    ticker: str
+    count: int
+    history: list[ThesisHistoryItemOut]
+    data_as_of: str | None
+    provenance: ProvenanceOut
+
 
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
