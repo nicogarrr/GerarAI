@@ -531,8 +531,9 @@ class DocumentIngestionService:
     def _parse_xlsx(self, content: bytes) -> ParsedDocument:
         # Comprobar coordenadas XML ANTES de iter_rows: con dimension ausente
         # openpyxl puede expandir una fila enorme antes de devolverla.
-        from xml.etree.ElementTree import iterparse
-
+        # defusedxml: el XLSX lo sube el usuario; sus XML internos no pueden
+        # declarar entidades (billion laughs) - se rechazan sin expandir.
+        from defusedxml.ElementTree import iterparse
         from openpyxl import load_workbook
         from openpyxl.utils.cell import coordinate_to_tuple
 
