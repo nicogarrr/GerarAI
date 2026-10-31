@@ -67,7 +67,7 @@ export default function WatchlistAddDialog({ followedSymbols }: { followedSymbol
     };
 
     return (
-        <DialogContent className="border-gray-700 bg-gray-900 text-gray-200 sm:max-w-md">
+        <DialogContent className="border-gray-700 bg-gray-900 text-gray-200 sm:max-w-md max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle>Añadir a la watchlist</DialogTitle>
                 <DialogDescription className="text-gray-400">

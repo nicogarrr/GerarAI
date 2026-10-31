@@ -146,7 +146,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                 que son los campos que sí se editan. El foco queda en el diálogo
                 y el primer Tab entra al formulario. */}
             <DialogContent
-                className="bg-gray-900 border-gray-700 max-w-md"
+                className="bg-gray-900 border-gray-700 max-w-md max-h-[90dvh] overflow-y-auto"
                 onOpenAutoFocus={(event) => event.preventDefault()}
             >
                 <DialogHeader>
