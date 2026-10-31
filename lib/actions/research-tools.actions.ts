@@ -844,6 +844,13 @@ export async function getPortfolioIntelligence(years = 5): Promise<PortfolioInte
   return requestJson(`/api/portfolio/intelligence?years=${Math.max(1, Math.min(20, years))}`);
 }
 
+export type PortfolioRiskMatrix = components['schemas']['PortfolioRiskMatrixOut'];
+
+/** GET /api/portfolio/risk-matrix — covarianza Ledoit-Wolf y contribución al riesgo por posición. */
+export async function getPortfolioRiskMatrix(): Promise<PortfolioRiskMatrix> {
+  return requestJson('/api/portfolio/risk-matrix');
+}
+
 export async function getKnowledgeGraph(input: { nodeTypes?: string; ticker?: string; limit?: number } = {}): Promise<KnowledgeGraph> {
   const params = new URLSearchParams({ limit: String(Math.max(1, Math.min(500, input.limit ?? 120))) });
   if (input.nodeTypes?.trim()) params.set('node_types', input.nodeTypes.trim());
