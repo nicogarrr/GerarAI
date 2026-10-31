@@ -151,7 +151,7 @@ export function CriterionFields({ suffix = '', initialLeft = '', initialRight = 
       <div className="min-w-0">
         <div className="mb-1.5 flex items-center justify-between gap-2"><label className="text-sm font-medium text-gray-200" htmlFor={`${id}-right`}>{rightMode === 'valor' ? `Valor${required ? ' *' : ''}` : `Otra métrica${required ? ' *' : ''}`}</label>
           <div role="radiogroup" aria-label="Tipo de comparación" className="flex rounded-md border border-gray-800 p-0.5 text-xs">
-            {([['valor', 'Valor'], ['metrica', 'Métrica']] as const).map(([mode, text]) => <label className={cn('cursor-pointer rounded px-2.5 py-1.5', rightMode === mode ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400')} key={mode}><input checked={rightMode === mode} className="sr-only" name={`${id}-mode`} onChange={() => setRightMode(mode)} type="radio" value={mode} />{text}</label>)}
+            {([['valor', 'Valor'], ['metrica', 'Métrica']] as const).map(([mode, text]) => <label className={cn('flex min-h-11 cursor-pointer items-center rounded px-2.5 py-1.5 sm:min-h-0', rightMode === mode ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400')} key={mode}><input checked={rightMode === mode} className="sr-only" name={`${id}-mode`} onChange={() => setRightMode(mode)} type="radio" value={mode} />{text}</label>)}
           </div>
         </div>
         {rightMode === 'valor' ? <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export function RankingFields({ initialFormula = '', initialDirection = 'desc', 
 export function DirectionToggle({ name, value, onChange }: { name: string; value: string; onChange: (next: 'asc' | 'desc') => void }) {
   return <div><span className={fieldLabel}>Orden</span>
     <div role="radiogroup" aria-label="Orden" className="grid grid-cols-2 gap-1 rounded-lg border border-gray-800 p-1">
-      {([['desc', 'Mayor primero'], ['asc', 'Menor primero']] as const).map(([v, text]) => <label className={cn('flex min-h-9 cursor-pointer items-center justify-center rounded-md px-2 text-center text-xs transition-colors', value === v ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-800')} key={v}>
+      {([['desc', 'Mayor primero'], ['asc', 'Menor primero']] as const).map(([v, text]) => <label className={cn('flex min-h-11 cursor-pointer items-center justify-center rounded-md px-2 text-center text-xs transition-colors sm:min-h-9', value === v ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400 hover:bg-gray-800')} key={v}>
         <input checked={value === v} className="sr-only" name={name} onChange={() => onChange(v)} type="radio" value={v} />{text}
       </label>)}
     </div>
