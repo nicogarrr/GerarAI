@@ -260,3 +260,25 @@ def test_liquidity_legacy_rows_on_non_usd_listing_do_not_count(db):
     _seed_prices(db, 10, close=100, volume=200_000, quote_currency=None)
     verdict = quality_for_companies(db, [10], as_of=AS_OF)[10]
     assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_without_declared_currency_do_not_count(db):
+    """Caso del piloto: ticker sin sufijo y Company.currency vacia. El default
+    USD de listing_currency convertia filas de unidad DESCONOCIDA en dolares:
+    fail-open. Sin divisa declarada, la unidad no es verificable -> ausente."""
+    company = Company(id=11, ticker="Q11", name="Quality blank", exchange="NASDAQ",
+                      currency="", sector="Technology", industry="Test",
+                      company_type="large_cap", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    _seed_prices(db, 11, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [11], as_of=AS_OF)[11]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_with_unknown_currency_do_not_count(db):
+    """Divisa declarada no-USD (CNY): las filas legacy no son dolares."""
+    company = _company(db, 12, currency="CNY")
+    _seed_prices(db, 12, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [12], as_of=AS_OF)[12]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
