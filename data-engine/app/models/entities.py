@@ -312,7 +312,10 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "positions"
     __table_args__ = (
         Index("ix_positions_portfolio_company", "portfolio_id", "company_id"),
-        CheckConstraint("quantity >= 0", name="ck_positions_quantity_non_negative"),
+        # Sin CHECK de quantity >= 0 (0108 la puso y 0111 la retira): el dominio
+        # admite cortos (quantity < 0) — tax_modelo720, historical_stress y
+        # portfolio_reconstruction los modelan, y un import IBKR con corto
+        # reventaba contra la restriccion.
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -384,7 +387,14 @@ class Transaction(TenantOwnedMixin, Base, TimestampMixin):
         Index("ix_transactions_portfolio_trade_date", "portfolio_id", "trade_date"),
         Index("ix_transactions_company_action", "company_id", "action"),
         CheckConstraint("quantity >= 0", name="ck_transactions_quantity_non_negative"),
-        CheckConstraint("price >= 0", name="ck_transactions_price_non_negative"),
+        # El signo solo es ilegal en las patas de compraventa: las filas de caja
+        # (withholding/fee/interest/cash_misc) llevan la direccion en el signo
+        # (IBKR Flex trae la retencion con importe NEGATIVO; ver
+        # test_xirr_withholding_and_fee_negative_amounts_are_outflows).
+        CheckConstraint(
+            "price >= 0 OR action NOT IN ('buy', 'sell')",
+            name="ck_transactions_price_non_negative",
+        ),
         CheckConstraint("fees >= 0", name="ck_transactions_fees_non_negative"),
     )
 
