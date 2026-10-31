@@ -1401,6 +1401,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/key-stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Company Key Stats
+         * @description Datos clave de la ficha (rango 52 semanas, proximos resultados,
+         *     ex-dividendo, beta). Fuentes gratuitas ya presentes; cada dato lleva su
+         *     fuente y un dato sin fuente queda vacio, nunca estimado.
+         */
+        get: operations["company_key_stats_api_companies__ticker__key_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/kpi-registry": {
         parameters: {
             query?: never;
@@ -6805,6 +6827,13 @@ export interface components {
              */
             key: "facts" | "calculations" | "hypotheses" | "inferences" | "contradictions" | "insufficient_data" | "conclusion";
         };
+        /** Beta */
+        Beta: {
+            /** Source */
+            source: string;
+            /** Value */
+            value: number;
+        };
         /** Body_ingest_document_file_api_sources_documents_ingest_file_post */
         Body_ingest_document_file_api_sources_documents_ingest_file_post: {
             /** File */
@@ -9516,6 +9545,32 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        /** KeyDate */
+        KeyDate: {
+            /** Confirmed */
+            confirmed?: boolean | null;
+            /** Date */
+            date: string;
+            /** Source */
+            source: string;
+            /** Upcoming */
+            upcoming: boolean;
+        };
+        /** KeyStats */
+        KeyStats: {
+            beta?: components["schemas"]["Beta"] | null;
+            /** Currency */
+            currency?: string | null;
+            ex_dividend?: components["schemas"]["KeyDate"] | null;
+            /** Fetched At */
+            fetched_at: number;
+            next_earnings?: components["schemas"]["KeyDate"] | null;
+            /** Note */
+            note?: string | null;
+            range_52w?: components["schemas"]["Range52w"] | null;
+            /** Symbol */
+            symbol: string;
+        };
         /** LLMProposalRequest */
         LLMProposalRequest: {
             /** Ticker */
@@ -11835,6 +11890,21 @@ export interface components {
             regiones: string[];
             /** Rotulo */
             rotulo: string;
+        };
+        /** Range52w */
+        Range52w: {
+            /** High */
+            high: number;
+            /** High Date */
+            high_date?: string | null;
+            /** Low */
+            low: number;
+            /** Low Date */
+            low_date?: string | null;
+            /** Sessions */
+            sessions?: number | null;
+            /** Source */
+            source: string;
         };
         /** RefreshMarketStageOut */
         RefreshMarketStageOut: {
@@ -16693,6 +16763,46 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    company_key_stats_api_companies__ticker__key_stats_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeyStats"];
                 };
             };
             /** @description Validation Error */
