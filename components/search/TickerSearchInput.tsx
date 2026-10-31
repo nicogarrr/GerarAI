@@ -57,7 +57,11 @@ interface TickerSearchInputProps {
  *  (F215), debounce de 300 ms y deadline de 6 s (patrón de la watchlist).
  *  El dropdown usa el Popover existente con portal y colisiones: se superpone
  *  al contenido sin quedar recortado por el scroll de un diálogo. */
-export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onEnterWithoutResults, onBlur, placeholder = 'Buscar por ticker o empresa', id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide, initialSelectedValue }: TickerSearchInputProps) {
+import { useT } from '@/lib/i18n/client';
+
+export function TickerSearchInput({ value: controlledValue, defaultValue = '', name, required, options, disabled = false, disabledSymbols = [], onValueChange, onSelect, onEnterWithoutResults, onBlur, placeholder, id, className = 'h-11 w-full bg-gray-900 text-base text-gray-100', maxLength, ariaLabel, dropdownSide, initialSelectedValue }: TickerSearchInputProps) {
+    const ti = useT();
+    const resolvedPlaceholder = placeholder ?? ti('search.tickerPlaceholder');
     const [localValue, setLocalValue] = useState(defaultValue);
     const value = controlledValue ?? localValue;
     const update = (next: string) => { setLocalValue(next); onValueChange?.(next); };
@@ -250,9 +254,9 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                     }
                     if (event.key === 'Enter') { event.preventDefault(); choose(results[active >= 0 ? active : 0]); }
                 }}
-                placeholder={placeholder}
+                placeholder={resolvedPlaceholder}
                 maxLength={maxLength}
-                aria-label={ariaLabel ?? placeholder}
+                aria-label={ariaLabel ?? resolvedPlaceholder}
                 autoComplete="off"
                 className={`${className} min-h-11 text-base`}
             />
@@ -261,11 +265,11 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
             ) : null}
             {error ? (
                 <p role="alert" className="mt-1 text-xs text-red-400">
-                    No se pudo buscar ahora mismo (fallo del proveedor de datos). Inténtalo de nuevo en unos segundos.
+                    {ti('search.providerError')}
                 </p>
             ) : null}
             {open && !loading && !error && results.length === 0 && trimmed ? (
-                <p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">Sin resultados para «{trimmed}».</p>
+                <p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">{ti('search.noResultsFor', { query: trimmed })}</p>
             ) : null}
             </div></PopoverAnchor>
                 <PopoverContent align="start" side={dropdownSide} avoidCollisions={dropdownSide === undefined} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (event.target instanceof Node && root.current?.contains(event.target)) event.preventDefault(); }} className="z-[80] w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] border-gray-700 bg-gray-800 p-0 shadow-lg">
@@ -273,7 +277,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                     Radix (sin colisiones): tope de clase 15rem/40dvh y, si se
                     pudo medir, la altura real bajo el input (visual viewport
                     con teclado). La lista lleva su propio scroll. */}
-                <div id={listId} role="listbox" aria-label="Empresas" style={dropdownSide ? listMaxHeightStyle(listMaxHeight) : undefined} className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
+                <div id={listId} role="listbox" aria-label={ti('search.companies')} style={dropdownSide ? listMaxHeightStyle(listMaxHeight) : undefined} className={`${dropdownSide ? 'max-h-[min(15rem,40dvh)]' : 'max-h-[min(15rem,var(--radix-popover-content-available-height))]'} w-full overscroll-contain overflow-auto rounded-md`}>
                     {results.map((stock, index) => (
                         <button
                             key={`${stock.symbol}-${index}`}
@@ -288,7 +292,7 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
                         >
                             <TrendingUp aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-400" />
                             <span className="min-w-0">
-                                <span className="block font-medium text-white">{stock.symbol}{disabledSymbols.includes(stock.symbol.toUpperCase()) ? ' · Siguiendo' : ''}</span>
+                                <span className="block font-medium text-white">{stock.symbol}{disabledSymbols.includes(stock.symbol.toUpperCase()) ? ` · ${ti('search.following')}` : ''}</span>
                                 <span className="block break-words text-sm text-gray-400 line-clamp-2">{formatCompanyName(stock.name)}</span>
                             </span>
                         </button>

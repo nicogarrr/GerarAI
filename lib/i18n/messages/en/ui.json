@@ -62,7 +62,8 @@
     "badge": "Analysis engine disconnected",
     "unavailable": "{feature} is not available right now",
     "needsServer": "This screen needs the GerarAI server.",
-    "failedDetail": "The GerarAI server could not complete the request. Try again in a few seconds."
+    "failedDetail": "The GerarAI server could not complete the request. Try again in a few seconds.",
+    "autoRetry": "Retrying automatically (attempt {attempt} of {total})…"
   },
   "pwa": {
     "title": "Install GerarAI",

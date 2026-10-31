@@ -133,7 +133,7 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         // QA de formularios (21-oct-2026): «Sin resultados» y «No se pudo
         // buscar» eran <p> sin role ni aria-live — invisibles para AT.
         assert.match(search, /<p role="alert" className="mt-1 text-xs text-red-400">/);
-        assert.match(search, /<p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">Sin resultados/);
+        assert.match(search, /<p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">\{ti\('search\.noResultsFor'/);
     });
 
     it('la identidad del contrato de opción sigue manual y etiquetada (sin cadena fabricada)', () => {

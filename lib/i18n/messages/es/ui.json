@@ -62,7 +62,8 @@
     "badge": "Motor de análisis desconectado",
     "unavailable": "{feature} no está disponible ahora mismo",
     "needsServer": "Esta pantalla necesita el servidor de GerarAI.",
-    "failedDetail": "El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos."
+    "failedDetail": "El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos.",
+    "autoRetry": "Reintentando automáticamente (intento {attempt} de {total})…"
   },
   "pwa": {
     "title": "Instalar GerarAI",
