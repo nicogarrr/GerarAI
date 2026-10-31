@@ -134,8 +134,35 @@ def _parse_decimal(raw: Any) -> Decimal | None:
     return val
 
 
-def parse_flexible_date(raw_date: Any) -> date:
-    """Parsea una fecha aceptando formatos estándar españoles e internacionales."""
+_DMY_LIKE = re.compile(r"^(\d{1,2})[/\-.](\d{1,2})[/\-.]\d{4}$")
+
+
+def detect_month_first(raw_dates: list[str]) -> bool:
+    """True si el fichero escribe las fechas como MM/DD/AAAA (formato americano).
+
+    Basta una fila que solo cabe como mes/día (12/31/2024) para saber el orden
+    del fichero entero; si también hay alguna que solo cabe como día/mes, el
+    fichero es incoherente y se mantiene el orden español por defecto.
+    """
+    month_first = day_first = False
+    for raw in raw_dates:
+        match = _DMY_LIKE.match(str(raw).strip().split("T")[0].split(" ")[0])
+        if not match:
+            continue
+        first, second = int(match.group(1)), int(match.group(2))
+        if first > 12 >= second:
+            day_first = True
+        elif second > 12 >= first:
+            month_first = True
+    return month_first and not day_first
+
+
+def parse_flexible_date(raw_date: Any, *, month_first: bool = False) -> date:
+    """Parsea una fecha aceptando formatos estándar españoles e internacionales.
+
+    ``month_first``: el fichero usa MM/DD/AAAA (ver ``detect_month_first``), así
+    que una fecha ambigua como 03/04/2024 es el 4 de marzo, no el 3 de abril.
+    """
     if isinstance(raw_date, datetime):
         return raw_date.date()
     if isinstance(raw_date, date):
@@ -157,6 +184,8 @@ def parse_flexible_date(raw_date: Any) -> date:
         "%m/%d/%Y",
         "%Y%m%d",
     ]
+    if month_first:
+        formats = ["%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y", "%Y/%m/%d", "%Y%m%d"]
 
     for fmt in formats:
         try:
@@ -303,6 +332,10 @@ class TransactionImportService:
         ticker_header = detected_mapping.get("ticker", "")
         ticker_is_isin = _normalize_header(ticker_header) == "isin"
         seen_row_keys: dict[tuple, int] = {}
+        date_idx = col_indices.get("date", -1)
+        month_first = detect_month_first(
+            [row[date_idx] for row in data_rows if 0 <= date_idx < len(row)]
+        )
 
         for row_idx, row in enumerate(data_rows, start=2):
             row_has_error = False
@@ -312,6 +345,25 @@ class TransactionImportService:
                 if 0 <= idx < len(row):
                     return row[idx].strip()
                 return ""
+
+            # Ingresos y retiradas de efectivo no son operaciones de cartera: el
+            # ledger no los admite y confirmar el lote fallaría entero. Se
+            # avisan y se omiten (antes la vista previa los daba por buenos).
+            try:
+                cash_action = normalize_action(get_val("action")) if get_val("action") else ""
+            except ValueError:
+                cash_action = ""
+            if cash_action in ("deposit", "withdrawal"):
+                label = "ingreso" if cash_action == "deposit" else "retirada"
+                warnings.append(
+                    RowValidationError(
+                        row_number=row_idx,
+                        field="action",
+                        message=f"Movimiento de efectivo ({label}): no es una operación de cartera y se omite",
+                        raw_value=get_val("action"),
+                    )
+                )
+                continue
 
             # Ticker
             ticker_raw = get_val("ticker").upper()
@@ -339,10 +391,10 @@ class TransactionImportService:
             date_raw = get_val("date")
             parsed_date_str = ""
             try:
-                dt = parse_flexible_date(date_raw)
+                dt = parse_flexible_date(date_raw, month_first=month_first)
                 parsed_date_str = dt.isoformat()
                 # Día <= 12 con formato DD/MM: ambiguo con MM/DD americano; se avisa.
-                if dt.day <= 12 and re.match(r"^\d{1,2}[/\-]\d{1,2}[/\-]\d{4}$", date_raw.strip()):
+                if not month_first and dt.day <= 12 and re.match(r"^\d{1,2}[/\-]\d{1,2}[/\-]\d{4}$", date_raw.strip()):
                     warnings.append(
                         RowValidationError(
                             row_number=row_idx,
@@ -399,8 +451,15 @@ class TransactionImportService:
             fees_num = 0.0
             if fees_raw:
                 pf = _parse_decimal(fees_raw)
-                if pf is not None and pf >= 0:
-                    fees_num = float(pf)
+                if pf is None:
+                    # Una comisión ilegible no puede pasar a 0 en silencio: el
+                    # coste de adquisición quedaría por debajo del real.
+                    errors.append(RowValidationError(row_number=row_idx, field="fees", message="Comisión no numérica", raw_value=fees_raw))
+                    row_has_error = True
+                else:
+                    # Los brokers (p. ej. DEGIRO) exportan los costes en negativo
+                    # ("-2,00"): una comisión siempre es un coste, nunca un abono.
+                    fees_num = float(abs(pf))
 
             # Divisa
             currency_raw = get_val("currency").upper() or "EUR"
