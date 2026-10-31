@@ -45,13 +45,13 @@
   "descriptions": {
     "screener": "Explore companies by sector and see gainers, losers and most active.",
     "panoramaMercado": "Indices, futures, stocks, commodities and currencies with the time of each quote.",
-    "insider": "Purchases disclosed by executives on Form 4.",
-    "ownership": "Positions disclosed by large funds on Form 13F.",
+    "insider": "Purchases disclosed by executives on Form\u00A04.",
+    "ownership": "Positions disclosed by large funds on Form\u00A013F.",
     "inversores": "Declared portfolios and changes in filings.",
     "propicks": "Ranking, selection rules and backtest.",
     "temas": "YTD and 1M returns of market themes.",
     "cuellos": "Scarcity detected in sources and inferred candidates.",
-    "calendarioMacro": "FOMC, CPI and jobs, plus summaries of your 8-Ks."
+    "calendarioMacro": "FOMC, CPI and jobs, plus summaries of your 8\u2011Ks."
   },
   "subroutes": {
     "terminalFinanciero": "Financial terminal",
