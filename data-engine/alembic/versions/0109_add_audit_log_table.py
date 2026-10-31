@@ -1,7 +1,7 @@
 """Add immutable audit log table for critical system operations.
 
 Revision ID: 0109_add_audit_log_table
-Revises: 0108_add_database_check_constraints
+Revises: 0108_add_db_check_constraints
 Create Date: 2026-10-30T23:00:00.000Z
 
 Creates the audit_logs table for tracking sensitive operations:
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "0109_add_audit_log_table"
-down_revision = "0108_add_database_check_constraints"
+down_revision = "0108_add_db_check_constraints"
 branch_labels = None
 depends_on = None
 
