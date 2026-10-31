@@ -18,7 +18,8 @@ vi.mock('next/navigation', () => ({ redirect: vi.fn() }));
 // La página pinta la cabecera al instante y los eventos llegan por
 // streaming (Suspense): estos estados se prueban sobre CalendarEvents, el
 // server component async que los renderiza.
-import CalendarPage, { CalendarEvents } from '@/app/(root)/calendar/page';
+import CalendarPage from '@/app/(root)/calendar/page';
+import { CalendarEvents } from '@/components/calendar/CalendarEvents';
 
 describe('calendario de catalizadores: estado vacío de un usuario nuevo', () => {
     it('sin posiciones ni watchlist enlaza a añadir empresa y a añadir inversión', async () => {

@@ -5,12 +5,13 @@ import { readFileSync } from 'node:fs';
 // Perf (31-oct-2026, medido en prod a 390px): /calendar tardaba 6,6 s de LCP
 // porque la página entera esperaba a getCatalystCalendar antes de pintar.
 const src = readFileSync('app/(root)/calendar/page.tsx', 'utf8');
+const events = readFileSync('components/calendar/CalendarEvents.tsx', 'utf8');
 
 test('una sola petición compartida por cabecera y lista (promesa sin await en la página)', () => {
   assert.match(src, /const calendarPromise = getCatalystCalendar\(\);/);
   const page = src.slice(src.indexOf('export default async function CalendarPage'));
   assert.ok(!page.includes('await getCatalystCalendar('), 'la página no espera el fetch');
-  assert.match(src, /calendar = await calendarPromise;/);
+  assert.match(events, /calendar = await calendarPromise;/);
 });
 
 test('cabecera y lista van en Suspense con skeleton', () => {
