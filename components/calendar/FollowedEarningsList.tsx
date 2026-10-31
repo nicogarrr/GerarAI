@@ -70,8 +70,13 @@ const ASSET_KEY = {
 export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: string; ti?: TiFn }) {
     const links = irLinksFor(ticker, date);
     if (!links) return null;
+<<<<<<< HEAD
+    const tip = `Enlace oficial de la empresa, verificado el ${links.verifiedOn}. El directo, la grabación y la transcripción aparecen ahí si la empresa los publica.`;
+    const chip = 'inline-flex min-h-[44px] items-center gap-1 rounded-md border border-gray-700 px-1.5 py-0.5 font-medium text-gray-300 hover:bg-gray-800 sm:min-h-0';
+=======
     const tip = ti('calendar.earnings.irTip', { date: links.verifiedOn });
     const chip = 'inline-flex items-center gap-1 rounded-md border border-gray-700 px-1.5 py-0.5 font-medium text-gray-300 hover:bg-gray-800';
+>>>>>>> origin/main
     return (
         <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
             {links.eventPage ? (
@@ -131,18 +136,30 @@ export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event:
                     href={event.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
+<<<<<<< HEAD
+                    aria-label={`Fuente de la fecha de ${event.ticker}: ${event.source}`}
+                    title={`Fuente: ${event.source}`}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-800 hover:text-gray-200 sm:h-9 sm:w-9"
+=======
                     aria-label={ti('calendar.earnings.sourceAria', { ticker: event.ticker, source: event.source })}
                     title={ti('calendar.earnings.sourceTitle', { source: event.source })}
                     className="rounded-lg p-2 text-gray-500 hover:bg-gray-800 hover:text-gray-200"
+>>>>>>> origin/main
                 >
                     <ExternalLink aria-hidden="true" className="h-4 w-4" />
                 </a>
             ) : null}
             <Link
                 href={`/research/${encodeURIComponent(event.ticker)}`}
+<<<<<<< HEAD
+                aria-label={`Abrir ${event.company || event.ticker}`}
+                title={`Fuente: ${event.source}`}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-800 hover:text-gray-100 sm:h-9 sm:w-9"
+=======
                 aria-label={ti('calendar.earnings.openAria', { name: event.company || event.ticker })}
                 title={ti('calendar.earnings.sourceTitle', { source: event.source })}
                 className="rounded-lg p-2 text-gray-400 hover:bg-gray-800 hover:text-gray-100"
+>>>>>>> origin/main
             >
                 <ChevronRight aria-hidden="true" className="h-5 w-5" />
             </Link>

@@ -96,7 +96,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
                 aria-expanded={open}
                 aria-controls="propicks-filtros-cuerpo"
                 aria-label={open ? 'Ocultar filtros' : 'Mostrar filtros'}
-                className="min-h-[44px] xl:hidden"
+                className="min-h-[44px] min-w-[44px] xl:hidden"
                 onClick={() => setOpen((v) => !v)}
                 size="sm"
                 type="button"

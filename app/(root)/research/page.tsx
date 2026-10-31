@@ -285,7 +285,7 @@ export default async function ResearchPage({
                                 options={ordered.map(company => ({symbol: company.ticker, name: company.name}))}
                             />
                             <button
-                                className="rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200 transition hover:border-teal-700"
+                                className="min-h-[44px] rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200 transition hover:border-teal-700 sm:min-h-0"
                                 type="submit"
                             >
                                 Filtrar
@@ -324,7 +324,7 @@ export default async function ResearchPage({
                             <nav aria-label="Paginación del índice" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
                                 {slice.page > 1 ? (
                                     <Link
-                                        className="rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
+                                        className="inline-flex min-h-[44px] items-center rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700 sm:min-h-0"
                                         href={researchIndexHref(query, slice.page - 1)}
                                     >
                                         Anterior
@@ -335,7 +335,7 @@ export default async function ResearchPage({
                                 </span>
                                 {slice.page < slice.pages ? (
                                     <Link
-                                        className="rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700"
+                                        className="inline-flex min-h-[44px] items-center rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700 sm:min-h-0"
                                         href={researchIndexHref(query, slice.page + 1)}
                                     >
                                         Siguiente

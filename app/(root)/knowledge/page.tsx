@@ -343,7 +343,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
             const busy = job?.status === 'queued' || job?.status === 'running';
             return (
               <article className="min-w-0 rounded-lg border border-gray-800 bg-black/30 p-4 break-words" key={document.id}>
-                <Link className="block min-w-0 font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link>
+                <Link className="flex min-h-[44px] min-w-0 items-center font-medium text-gray-200 hover:text-teal-200 hover:underline" href={documentReaderHref(document.id, documentOffset, searchQuery)}>{document.title}</Link>
                 <div className="mt-1 text-xs text-gray-500">{document.author ?? 'Autor desconocido'}{document.publication_date && formatDate(document.publication_date, undefined, '') ? ` · ${formatDate(document.publication_date)}` : ''}</div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{document.collection_id ? collectionNames.get(document.collection_id) : 'Sin colección'}</Badge>

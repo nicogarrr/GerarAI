@@ -75,7 +75,7 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                                 className="relative min-w-0 p-4 bg-surface-2 hover:bg-surface-1 rounded-lg border border-gray-800 transition-all duration-200 group"
                             >
                             <div className="mb-2 flex justify-end">
-                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">{t('home.news.generalMarket')}</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Mencionada · {badge.ticker}</> : badge.ticker}</Link>}
+                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">{t('home.news.generalMarket')}</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="relative before:absolute before:-inset-3.5 before:content-[''] text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Mencionada · {badge.ticker}</> : badge.ticker}</Link>}
                             </div>
                             <div>
                                 <div className="flex flex-col min-[420px]:flex-row gap-3 sm:gap-4">
