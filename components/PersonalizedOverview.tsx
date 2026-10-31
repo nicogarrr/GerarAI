@@ -77,7 +77,7 @@ function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; si
     if (!fair) return <span className="text-[11px] text-gray-500">{t('home.fair.none')}</span>;
     const gap = fairValueGapPercent(holding.currentPrice, holding.nativeCurrency, fair);
     return (
-        <span className="text-[11px] text-gray-400" title={t('home.fair.title', { label: fair.label })}>
+        <span className="whitespace-nowrap text-[11px] text-gray-400" title={t('home.fair.title', { label: fair.label })}>
             VJ {gap !== null ? formatPercent(gap, { fromRatio: false, digits: 0, signDisplay: 'always' }) : formatNumber(fair.value)}
             <span className="text-gray-500"> · {fair.source === 'tesis' ? t('home.fair.source.tesis') : fair.source === 'motor' ? t('home.fair.source.motor') : t('home.fair.source.orient')}</span>
         </span>
@@ -557,9 +557,9 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                         <Link
                                             key={h.symbol}
                                             href={`/research/${h.symbol}`}
-                                            className="flex min-h-[44px] items-center justify-between gap-2 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
+                                            className="flex min-h-[44px] flex-wrap items-center justify-between gap-3 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
                                         >
-                                            <span className="flex min-w-0 flex-col gap-1">
+                                            <span className="flex flex-1 flex-col gap-1">
                                                 <span className="text-white font-semibold">{h.symbol}</span>
                                                 <span className="flex flex-wrap items-center gap-1">
                                                     <DcaLevelChip symbol={h.symbol} signals={holdingSignals} />
@@ -567,20 +567,20 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                 </span>
                                             </span>
                                             {holdingDisplayMode(h) === 'gain' ? (
-                                                <span className={`font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
+                                                <span className={`ml-auto font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                     {formatPercent(h.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                                 </span>
                                             ) : holdingDisplayMode(h) === 'value' && isValidCurrencyCode(h.baseCurrency) ? (
                                                 // Sin base de coste no hay rentabilidad (N/D), pero el valor y el peso
                                                 // salen de la cotización y se muestran con su divisa.
-                                                <span className="text-right font-mono text-gray-300">
+                                                <span className="ml-auto text-right font-mono text-gray-300">
                                                     {formatMoney(h.value, h.baseCurrency)}
                                                     {portfolioSummary && portfolioSummary.equityValue > 0
-                                                        ? ` · ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
+                                                        ? `\u00a0\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
                                                         : ''}
                                                 </span>
                                             ) : (
-                                                <span className="font-mono text-gray-500">{NA}</span>
+                                                <span className="ml-auto font-mono text-gray-500">{NA}</span>
                                             )}
                                         </Link>
                                     ))}
