@@ -10279,6 +10279,22 @@
         "title": "ManualTranscriptImportRequest",
         "type": "object"
       },
+      "MarketQuotesBatchIn": {
+        "properties": {
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "title": "MarketQuotesBatchIn",
+        "type": "object"
+      },
       "MemoryItemCreate": {
         "properties": {
           "company_id": {
@@ -50724,6 +50740,180 @@
         ]
       }
     },
+    "/api/market/quotes/batch": {
+      "post": {
+        "description": "Cotizaciones por lote (shape Finnhub via Yahoo), cache Redis 60s.\n\nRespuesta por simbolo: payload o null (sin dato NUNCA es error global).",
+        "operationId": "market_quotes_batch_api_market_quotes_batch_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketQuotesBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Market Quotes Batch Api Market Quotes Batch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Market Quotes Batch",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/regime": {
       "get": {
         "operationId": "regime_api_market_regime_get",
@@ -81852,7 +82042,7 @@
     },
     "/api/valuation/{ticker}/fair-value": {
       "get": {
-        "description": "Valor justo \u00fanico de un ticker; recalcula el motor si la tesis no basta.",
+        "description": "Valor justo \u00fanico de un ticker; recalcula el motor si la tesis no basta.\n\nEl recalculo pasa por cache Redis (FAIR_VALUE_LIVE_CACHE_TTL_SECONDS):\nel sondeo de oportunidades de Inicio y la ficha piden el mismo ticker\nmuchas veces al dia y el motor no cambia hasta la proxima ingesta.",
         "operationId": "fair_value_api_valuation__ticker__fair_value_get",
         "parameters": [
           {
