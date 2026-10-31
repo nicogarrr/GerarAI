@@ -64,3 +64,36 @@ describe('watchlist: cotización en subunidad (peniques)', () => {
         expect(usd).toMatchObject({ price: 180, change: 1, currency: 'USD' });
     });
 });
+
+describe('watchlist: etiqueta visible de la fuente del PER', () => {
+    it('PER TTM de Finnhub se etiqueta «Finnhub»', async () => {
+        getResearchCompanyBasics.mockResolvedValue({ ticker: 'GOOGL', name: 'Alphabet', exchange: 'NASDAQ', currency: 'USD' });
+        getStockQuote.mockResolvedValue({ source: 'Finnhub', c: 279.84, d: 1, dp: 0.4, h: 0, l: 0, o: 0, pc: 278, t: Math.floor(Date.now() / 1000), kind: 'live' });
+        getStockValuationBasics.mockResolvedValue({ metrics: { metric: { peTTM: 14.5 } } });
+        const entry = await getWatchlistEntryData('GOOGL');
+        expect(entry.peRatio).toBe(14.5);
+        expect(entry.peKind).toBe('ttm');
+        expect(entry.peSourceLabel).toBe('Finnhub');
+    });
+
+    it('PER de respaldo del backend se etiqueta con la fuente entre paréntesis', async () => {
+        getResearchCompanyBasics.mockResolvedValue({ ticker: 'GOOGL', name: 'Alphabet', exchange: 'NASDAQ', currency: 'USD' });
+        getStockQuote.mockResolvedValue({ source: 'Finnhub', c: 279.84, d: 1, dp: 0.4, h: 0, l: 0, o: 0, pc: 278, t: Math.floor(Date.now() / 1000), kind: 'live' });
+        getStockValuationBasics.mockResolvedValue({ metrics: { metric: {} } });
+        researchRequest.mockResolvedValue({ market_cap: null, per: 13.66, currency: 'USD', sources: ['PER: cierre 2026-10-30 / EPS diluido FY2025 (SEC)'] });
+        const entry = await getWatchlistEntryData('GOOGL');
+        expect(entry.peRatio).toBe(13.66);
+        expect(entry.peKind).toBe('fy');
+        expect(entry.peSourceLabel).toBe('SEC');
+    });
+
+    it('sin fuente entre paréntesis no se inventa la etiqueta', async () => {
+        getResearchCompanyBasics.mockResolvedValue({ ticker: 'GOOGL', name: 'Alphabet', exchange: 'NASDAQ', currency: 'USD' });
+        getStockQuote.mockResolvedValue({ source: 'Finnhub', c: 279.84, d: 1, dp: 0.4, h: 0, l: 0, o: 0, pc: 278, t: Math.floor(Date.now() / 1000), kind: 'live' });
+        getStockValuationBasics.mockResolvedValue({ metrics: { metric: {} } });
+        researchRequest.mockResolvedValue({ market_cap: null, per: 13.66, currency: 'USD', sources: ['PER: cierre 2026-10-30 / EPS FY2025'] });
+        const entry = await getWatchlistEntryData('GOOGL');
+        expect(entry.peRatio).toBe(13.66);
+        expect(entry.peSourceLabel).toBeNull();
+    });
+});
