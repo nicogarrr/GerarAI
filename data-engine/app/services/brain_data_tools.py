@@ -40,6 +40,7 @@ def _money(value, currency) -> str:
     return f"{_number(value)} {currency or ''}".strip()
 
 
+from app.services.company_catalog import all_companies
 from app.services.display_es import fecha_es as _fecha_es
 from app.services.display_es import source_label as _source_label
 from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
@@ -96,7 +97,7 @@ def _company_in_question(db: Session, question: str) -> Company | None:
     """Empresa del catalogo nombrada por ticker o nombre; None si hay 0 o varias."""
     squashed = _squash(question)
     found: dict[int, Company] = {}
-    for company in db.scalars(select(Company)).all():
+    for company in all_companies(db):
         core = _squash(" ".join(w for w in re.split(r"[\s,.]+", company.name.lower()) if w and w not in _NAME_NOISE))
         by_ticker = re.search(rf"(?<![A-Za-z0-9]){re.escape(company.ticker)}(?![A-Za-z0-9])", question) is not None
         if by_ticker or (len(core) >= 4 and core in squashed):
