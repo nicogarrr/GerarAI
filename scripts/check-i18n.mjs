@@ -21,7 +21,7 @@
  * Uso: node scripts/check-i18n.mjs
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, extname } from "node:path";
 
 const ROOT = process.cwd();
@@ -350,7 +350,79 @@ if (legacyImports.length > 0) {
   for (const hit of legacyImports) console.error(`  - ${hit}`);
 }
 
-if (missingKeys.length > 0 || unique.length > 0 || newOrphans.length > 0 || legacyImports.length > 0) {
+
+/**
+ * 5. Ratchet de texto en español escrito a mano (fuera de los diccionarios).
+ * Heurística: literales y texto JSX con acentos o palabras españolas comunes,
+ * sin comentarios ni tests. Cada fichero tiene un techo en
+ * scripts/i18n-hardcoded-baseline.json: superarlo falla (pasa el texto a
+ * lib/i18n/messages/{es,en}). Al traducir, el techo se baja con
+ * `node scripts/check-i18n.mjs --update-baseline` (nunca se sube a mano).
+ */
+const HC_BASELINE_PATH = "scripts/i18n-hardcoded-baseline.json";
+const HC_SKIP = ["lib/i18n/messages/", "lib/actions/"];
+const hcWalk = (dir, out = []) => {
+  for (const entry of readdirSync(dir)) {
+    if (entry === "node_modules" || entry.startsWith(".")) continue;
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) hcWalk(full, out);
+    else if ([".ts", ".tsx"].includes(extname(full)) && !/\.(test|spec)\.tsx?$/.test(full)) out.push(full);
+  }
+  return out;
+};
+const hcVisible = (src) => {
+  const out = [];
+  const s = src
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
+  const lit = /(^|[=({\[,;:?&|!+\-*/%<>]\s*)('([^'\\\n]{2,})'|"([^"\\\n]{2,})"|`([^`\\]{2,})`)/g;
+  for (const m of s.matchAll(lit)) {
+    const v = m[3] ?? m[4] ?? m[5] ?? "";
+    if (/\p{L}/u.test(v)) out.push(v);
+  }
+  for (const m of s.matchAll(/>([^<>{}]*[a-zA-ZáéíóúñÁÉÍÓÚÑ][^<>{}]*)</g)) {
+    const v = m[1].trim();
+    if (v) out.push(v);
+  }
+  for (const m of s.matchAll(/\b(?:title|placeholder|aria-label|alt|label|description)=["']([^"']{3,})["']/g)) out.push(m[1]);
+  return out;
+};
+const HC_WORDS =
+  /(^|[\s(¿¡«])(de|la|el|que|los|las|para|con|sin|por|una|un|del|al|tu|tus|no|hay|más|es|está|son|aún|todavía|ver|cargar|guardar|cancelar|cerrar|buscar|eliminar|añadir|crear|editar|volver|precio|cartera|posiciones|datos|error|valor|fecha|ventas?|compras?|dividendos?|impuestos?|ganancias?|pérdidas?)(?=[\s.,:;!?)»…]|$)/i;
+const hcIsSpanish = (v) => {
+  if (/^[a-z0-9_.\-/:@#]+$/i.test(v)) return false;
+  if (/[áéíóúñÁÉÍÓÚÑ¿¡]/.test(v)) return true;
+  return HC_WORDS.test(v) && /\s/.test(v);
+};
+const hcCounts = {};
+for (const dir of ["app", "components", "lib", "hooks"]) {
+  for (const file of hcWalk(dir)) {
+    const rel = file.split("\\").join("/");
+    if (HC_SKIP.some((p) => rel.startsWith(p))) continue;
+    const n = hcVisible(readFileSync(file, "utf8")).filter(hcIsSpanish).length;
+    if (n > 0) hcCounts[rel] = n;
+  }
+}
+const hcSorted = Object.fromEntries(Object.entries(hcCounts).sort(([a], [b]) => a.localeCompare(b)));
+if (process.argv.includes("--update-baseline")) {
+  writeFileSync(HC_BASELINE_PATH, `${JSON.stringify(hcSorted, null, 2)}\n`);
+  console.log(`i18n: techo de texto en español escrito a mano actualizado (${Object.keys(hcSorted).length} ficheros).`);
+}
+const hcBaseline = JSON.parse(readFileSync(HC_BASELINE_PATH, "utf8"));
+const hardcodedOver = Object.entries(hcCounts)
+  .filter(([rel, n]) => n > (hcBaseline[rel] ?? 0))
+  .map(([rel, n]) => `${rel}: ${n} trozos en español escritos a mano (techo ${hcBaseline[rel] ?? 0})`);
+const hardcodedBelow = Object.entries(hcBaseline).filter(([rel, n]) => (hcCounts[rel] ?? 0) < n).length;
+if (hardcodedOver.length > 0) {
+  console.error(`\ni18n: ${hardcodedOver.length} fichero(s) con MAS texto en español escrito a mano que su techo (${HC_BASELINE_PATH}):`);
+  for (const hit of hardcodedOver) console.error(`  - ${hit}`);
+  console.error("  Pasa el texto a lib/i18n/messages/{es,en} y usa t()/useT()/getT().");
+}
+if (hardcodedBelow > 0) {
+  console.error(`\ni18n (aviso, no fallo): ${hardcodedBelow} fichero(s) ya tienen menos texto en español que su techo; bájalo con --update-baseline.`);
+}
+
+if (missingKeys.length > 0 || unique.length > 0 || newOrphans.length > 0 || legacyImports.length > 0 || hardcodedOver.length > 0) {
   console.error(
     "\nVer lib/i18n/README.md. Los anglicismos aceptados (Watchlist, Screeners, Sharpe, CAGR, PER (TTM)...) no deben aparecer aqui.\n",
   );
