@@ -19425,6 +19425,42 @@
         "title": "ThesisApproveRequest",
         "type": "object"
       },
+      "ThesisAudioStatusOut": {
+        "properties": {
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "key"
+        ],
+        "title": "ThesisAudioStatusOut",
+        "type": "object"
+      },
       "ThesisChangeCreate": {
         "properties": {
           "affected_claim_ids": {
@@ -19955,6 +19991,217 @@
           "inputs"
         ],
         "title": "ThesisInputsRequest",
+        "type": "object"
+      },
+      "ThesisJobPhaseOut": {
+        "properties": {
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "ThesisJobPhaseOut",
+        "type": "object"
+      },
+      "ThesisJobStatusOut": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "current_phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Phase"
+          },
+          "error_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Class"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "force": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Force"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisJobPhaseOut"
+            },
+            "title": "Phases",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "total_phases": {
+            "title": "Total Phases",
+            "type": "integer"
+          },
+          "workflow_name": {
+            "title": "Workflow Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workflow_name",
+          "status",
+          "ticker",
+          "force",
+          "phases",
+          "current_phase",
+          "total_phases",
+          "result",
+          "error_class",
+          "error_message",
+          "attempt",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "ThesisJobStatusOut",
+        "type": "object"
+      },
+      "ThesisLatestJobOut": {
+        "properties": {
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisJobStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "ThesisLatestJobOut",
         "type": "object"
       },
       "ThesisNodeOut": {
@@ -79549,9 +79796,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Latest Thesis Job Api Thesis Jobs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisLatestJobOut"
                 }
               }
             },
@@ -79721,9 +79966,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thesis Job Status Api Thesis Jobs  Run Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisJobStatusOut"
                 }
               }
             },
@@ -80468,9 +80711,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thesis Audio Status Api Thesis  Ticker  Audio Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisAudioStatusOut"
                 }
               }
             },

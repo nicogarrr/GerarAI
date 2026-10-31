@@ -14,7 +14,12 @@ from app.core.database import get_db
 from app.core.ui_errors import ui_error
 from app.models import Claim, ClaimEvidence, ThesisDiff, ThesisSection, ThesisVersion
 from app.schemas import ThesisGenerateRequest, ThesisGraphOut, ThesisOut
-from app.schemas.api import ThesisHistoryOut
+from app.schemas.api import (
+    ThesisAudioStatusOut,
+    ThesisHistoryOut,
+    ThesisJobStatusOut,
+    ThesisLatestJobOut,
+)
 from app.services import thesis_audio_service
 from app.services.company_resolver import resolve_company
 from app.services.driver_assumption_service import DriverAssumptionService, driver_assumption_payload
@@ -492,7 +497,8 @@ def _audio_context(db: Session, ticker: str, version: int | None = None) -> tupl
     return key, text
 
 
-@router.get("/{ticker}/audio/status")
+@router.get("/{ticker}/audio/status", response_model=ThesisAudioStatusOut,
+                    response_model_exclude_unset=True)
 def thesis_audio_status(
     ticker: str,
     version: int | None = Query(None, ge=1),
@@ -826,7 +832,7 @@ def generate_thesis_async(payload: ThesisGenerateRequest, db: Session = Depends(
     return job_payload(run)
 
 
-@router.get("/jobs/{run_id}")
+@router.get("/jobs/{run_id}", response_model=ThesisJobStatusOut)
 def thesis_job_status(run_id: int, db: Session = Depends(get_db)) -> dict:
     from app.models.entities import WorkflowRun
     from app.services.thesis_job_service import WORKFLOW_NAME, job_payload
@@ -837,7 +843,7 @@ def thesis_job_status(run_id: int, db: Session = Depends(get_db)) -> dict:
     return job_payload(run)
 
 
-@router.get("/jobs")
+@router.get("/jobs", response_model=ThesisLatestJobOut)
 def latest_thesis_job(ticker: str = Query(min_length=1, max_length=20), db: Session = Depends(get_db)) -> dict:
     """Recover the user's latest active/completed generation after navigation."""
     from app.services.thesis_job_service import job_payload, latest_generation
