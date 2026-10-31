@@ -3,6 +3,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from app.core.auth import MSG_IDENTITY_REQUIRED
+from app.core.cache import invalidate_dca_cache
 from app.core.database import get_db
 from app.services.dca_alert_settings_service import save_policy, settings_view
 
@@ -37,4 +38,6 @@ def read_settings(db: Session = Depends(get_db)) -> dict:
 @router.put("", response_model=DcaSettingsOut)
 def update_settings(payload: DcaSettingsUpdate, db: Session = Depends(get_db)) -> dict:
     _require_identity(db)
-    return save_policy(db, payload.up_min_level, payload.down_max_level)
+    view = save_policy(db, payload.up_min_level, payload.down_max_level)
+    invalidate_dca_cache(db=db)
+    return view

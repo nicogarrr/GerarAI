@@ -754,6 +754,12 @@ class MarketRefreshService:
                     "new_match_company_ids": result["new_match_company_ids"],
                 }
             )
+        # Precios y valoraciones recien escritos: fuera lo cacheado antes del
+        # refresh (lectores de mercado y /portfolio/summary).
+        from app.core.cache import invalidate_market_data_cache, invalidate_portfolio_cache
+
+        invalidate_market_data_cache()
+        invalidate_portfolio_cache(db=db)
         stages.append(
             {
                 "step": 5,
