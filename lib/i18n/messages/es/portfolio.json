@@ -75,7 +75,8 @@
     "tableCaption": "Posiciones abiertas: símbolo, cantidad, precio medio, precio actual, valor, peso y ganancia o pérdida. Eliminar una posición está en el menú de cada símbolo.",
     "options": "Opciones",
     "optionsAria": "Opciones de {symbol}",
-    "sincePrefix": "En cartera desde: {date}"
+    "sincePrefix": "En cartera desde: {date}",
+    "emptyRefresh": "No hay posiciones que actualizar todavía. Registra una compra para empezar."
   },
   "dividends": {
     "covNoData": "Sin dividendos declarados registrados",

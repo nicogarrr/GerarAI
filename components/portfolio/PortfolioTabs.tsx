@@ -334,7 +334,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                     <SavingsProjection />
                     <h2 className="mb-3 text-lg font-semibold text-gray-100">{ti('portfolio.tabs.forecastTitle')}</h2>
                     {forecast ? (
-                        <PortfolioForecast forecast={forecast} />
+                        <PortfolioForecast forecast={forecast} ti={ti} f={f} />
                     ) : (
                         <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
                             {ti('portfolio.tabs.forecastError')}
@@ -344,7 +344,7 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
 
                 <TabsContent value="dividendos" className="mt-0">
                     {dividends ? (
-                        <PortfolioDividends projection={dividends} userId={userId} />
+                        <PortfolioDividends projection={dividends} userId={userId} ti={ti} f={f} />
                     ) : (
                         <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
                             {ti('portfolio.tabs.dividendsError')}

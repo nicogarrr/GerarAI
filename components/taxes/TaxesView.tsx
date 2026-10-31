@@ -16,7 +16,6 @@ import { FilingSection, Modelo720Section } from '@/components/taxes/FilingSectio
 import { recordDetailKey } from '@/components/taxes/record-detail-key';
 import { reportForYear, type ReportOverride } from '@/lib/taxes/report-state';
 import { formatMoney, formatNumber, isValidCurrencyCode, USER_TZ } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
@@ -394,7 +393,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
         <div className="grid gap-6 [&_a.font-mono]:inline-flex [&_a.font-mono]:min-h-11 [&_a.font-mono]:items-center [&>*]:min-w-0">
             <div className="flex flex-wrap items-center gap-3">
                 <label htmlFor="tax-year" className="text-sm text-gray-400">
-                    {t('taxes.year')}
+                    {ti('taxes.year')}
                 </label>
                 <select
                     id="tax-year"
@@ -447,7 +446,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                 hiddenKeys={['trace']}
                 record={toDisplayReport(report, i18n)}
                 fetchRecord={async () => toDisplayReport((await getTaxReport(year)) as DataRecord | null, i18n)}
-                emptyMessage={t('taxes.noReport')}
+                emptyMessage={ti('taxes.noReport')}
                 actions={
                     <Button
                         size="sm"
@@ -457,7 +456,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                         className="gap-2 border-gray-600 text-gray-300 hover:text-teal-400"
                     >
                         <RotateCcw className={`h-4 w-4 ${regenerating ? 'animate-spin' : ''}`} />
-                        {t('taxes.regenerate')}
+                        {ti('taxes.regenerate')}
                     </Button>
                 }
             />

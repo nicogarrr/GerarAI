@@ -32,7 +32,6 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 
 /** Cartera sin posiciones: estado tranquilo, no un fallo del motor. */
-const EMPTY_REFRESH_MESSAGE = 'No hay posiciones que actualizar todavía. Registra una compra para empezar.';
 
 type Props = {
   holdings: PortfolioHolding[];
@@ -207,7 +206,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
 
   const handleRefresh = async () => {
     if (currentHoldings.length === 0) {
-      toast.info(EMPTY_REFRESH_MESSAGE);
+      toast.info(ti('portfolio.holdings.emptyRefresh'));
       return;
     }
     setRefreshing(true);
@@ -227,7 +226,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
       router.refresh();
       const attempted = result.updated.length + result.skipped.length + result.failed.length;
       if (attempted === 0) {
-        toast.info(EMPTY_REFRESH_MESSAGE);
+        toast.info(ti('portfolio.holdings.emptyRefresh'));
         return;
       }
       if (result.failed.length > 0) {

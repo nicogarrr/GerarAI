@@ -99,7 +99,8 @@
     "rulesActiveOne": "1 active rule",
     "rulesActiveOther": "{n} active rules",
     "evaluated": "the engine evaluates them every 5 min.",
-    "noneTriggered": "none has triggered yet."
+    "noneTriggered": "none has triggered yet.",
+    "createFirst": "Create your first alert"
   },
   "watchlist": {
     "recent": "Recently added",
@@ -110,7 +111,8 @@
     "noData": "no data",
     "lastNOfTotal": "The latest {n} added of {total}",
     "totalCount": "{total} in total",
-    "empty": "You are not following any companies yet."
+    "empty": "You are not following any companies yet.",
+    "seeFullList": "see the full list"
   },
   "opportunities": {
     "title": "Intrinsic value opportunities (DCF)",

@@ -233,7 +233,7 @@ export default function PortfolioForecast({ forecast, ti = esT, f = esF }: { for
                   <td className="py-2 pr-4">{signedPct(item.cagr.bull, 1, ti, f)}</td>
                   <td className="py-2 pr-4">
                     {item.expected_cagr !== null
-                      ? signedPct(item.expected_cagr)
+                      ? signedPct(item.expected_cagr, 1, ti, f)
                       : item.partial_expected_cagr !== null
                         ? ti('portfolio.forecast.partialExpected', { pct: signedPct(item.partial_expected_cagr, 1, ti, f), mass: pct(item.probability_mass, 0, ti, f) })
                         : ti('common.na')}

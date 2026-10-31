@@ -157,7 +157,15 @@
     "navAria": "Páginas de casillas por venta",
     "prev": "Anterior",
     "next": "Siguiente",
-    "sales": "{n} ventas"
+    "sales": "{n} ventas",
+    "doubleTaxation": {
+      "limitNote": "Límite de la deducción (art. 80 LIRPF, como lo aplica Hacienda): por país, el menor entre la retención soportada con el tope del convenio y el TME del ahorro aplicado al dividendo íntegro (bruto).",
+      "listAria": "Deducción 0588 por país",
+      "tmeMissing": "falta el TME",
+      "appliedGross": " (manda bruto × TME)",
+      "appliedTreaty": " (manda el tope del convenio)",
+      "row": "{country}: bruto {gross} · retenido {withheld} · tope convenio ({rate}) {cap} · bruto × TME {tme} · deducción {deduction}{applied}"
+    }
   },
   "modelo720": {
     "title": "Modelo 720 (bienes en el extranjero)",
