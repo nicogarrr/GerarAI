@@ -123,7 +123,7 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                         </p>
                         <p className="mt-1">
                             {t('landing.footer.chartsBy')}{' '}
-                            <a className="public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
+                            <a className="inline-flex min-h-11 items-center public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
                                 TradingView
                             </a>
                             .
@@ -131,12 +131,12 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                     </div>
                     <nav aria-label={t('landing.footer.navAria')} className="flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 sm:justify-end">
                         {legalLinks.map((link) => (
-                            <Link key={link.href} href={link.href} className="public-footer-link">
+                            <Link key={link.href} href={link.href} className="inline-flex min-h-11 items-center public-footer-link">
                                 {link.label}
                             </Link>
                         ))}
                         {SUPPORT_EMAIL && (
-                            <a href={`mailto:${SUPPORT_EMAIL}`} className="public-footer-link">
+                            <a href={`mailto:${SUPPORT_EMAIL}`} className="inline-flex min-h-11 items-center public-footer-link">
                                 {SUPPORT_EMAIL}
                             </a>
                         )}
