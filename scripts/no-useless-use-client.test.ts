@@ -248,7 +248,6 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/research/QuickAlertButton.tsx': 'useState, jsx-onOpenChange, jsx-onPointerDown, jsx-onFocus, importa cliente: components/ui/popover.tsx, dynamic (cuerpo del popover diferido en QuickAlertPopoverBody)',
   'components/research/LazyMemoControls.tsx': 'dynamic (frontera perezosa de las islas del memorando: ThesisHumanInputForm, ThesisInvalidationRulesForm, ThesisDebatePanel)',
   'components/research/QuickAlertPopoverBody.tsx': 'useSyncExternalStore, useState, jsx-onValueChange, jsx-onChange, jsx-onClick, libreria cliente: sonner, importa cliente: components/ui/select.tsx (chunk diferido: solo se descarga al abrir el popover de alerta)',
-  'components/research/ScrollToOnMount.tsx': 'useEffect, browser:document',
   'components/research/ShareCapitalPanel.tsx': 'jsx-onClick, useState, jsx-onChange, importa cliente: components/ui/panel.tsx, dynamic (gráfica recharts diferida en ShareCapitalChart)',
   'components/research/ShareCapitalChart.tsx': 'libreria cliente: recharts (chunk diferido: solo se descarga al cargar la gráfica de evolución)',
   'components/research/ThesisApproveButton.tsx': 'useRouter, useState, jsx-onClick, libreria cliente: sonner',
