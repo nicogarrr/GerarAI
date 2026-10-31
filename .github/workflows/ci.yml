@@ -822,6 +822,7 @@ jobs:
       - evals
       - e2e
       - browser-e2e
+      - dead-code
     # always(): sin esto el gate se saltaria en cuanto un `needs` fallara, que
     # es justo el caso en el que tiene que ejecutarse.
     if: ${{ always() }}
