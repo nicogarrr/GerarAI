@@ -164,13 +164,13 @@ def test_unrelated_question_is_not_routed_to_discovery(db):
 
 
 def test_radar_stale_scan_is_not_announced_as_current_signal(db):
-    """4X confirmado y verificado escaneado hace 4 dias: NO es señal de hoy."""
+    """4X confirmado y verificado escaneado hace 5 dias: NO es señal de hoy."""
     from datetime import timedelta
 
     comp = _company(db, "STAL")
     from app.services.propicks_radar_store import save_snapshot
 
-    four_days_ago = datetime.now(UTC) - timedelta(days=4)
+    five_days_ago = datetime.now(UTC) - timedelta(days=5)
     save_snapshot(
         db,
         comp.id,
@@ -178,7 +178,7 @@ def test_radar_stale_scan_is_not_announced_as_current_signal(db):
             "status": "ok",
             "formula_version": "nico-v1",
             "price_verified": True,
-            "price_date": four_days_ago.date().isoformat(),
+            "price_date": five_days_ago.date().isoformat(),
             "source": "test",
             "current": {"level": 4},
             "confirmed": [{"level": 4}],
@@ -186,7 +186,7 @@ def test_radar_stale_scan_is_not_announced_as_current_signal(db):
             "daily_close_drawdown": 0.35,
             "drawdown_basis": "close",
         },
-        now=four_days_ago,
+        now=five_days_ago,
     )
     db.commit()
     from app.services.brain_data_tools import answer_data_question

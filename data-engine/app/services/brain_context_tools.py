@@ -509,11 +509,10 @@ def propicks_answer(db: Session, tenant: int) -> ChatResponse:
 
 def radar_answer(db: Session) -> ChatResponse:
     """Señales claras del radar de precio (snapshots guardados, fórmula nico-v1)."""
-    from zoneinfo import ZoneInfo
-
     from app.services.propicks_radar_store import latest_public_signals
 
-    today = datetime.now(ZoneInfo("America/New_York")).date()
+    # Misma fecha de corte que GET /radar/opportunities (date.today()).
+    today = date.today()
     signals = latest_public_signals(db, as_of=today)
     if not signals:
         return _response([
