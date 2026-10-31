@@ -28,7 +28,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                 <p className="mt-2 text-sm text-gray-400" role="status">{data.note ?? 'Sin precios objetivo por analista para este valor.'}</p>
             ) : (
                 <>
-                    {!cur ? <p className="mt-2 text-xs text-gray-400">Divisa no declarada por Yahoo: importes sin unidad verificada y potencial N/D.</p> : null}
+                    {!cur ? <p className="mt-2 text-xs text-gray-400">Divisa no declarada por la fuente de mercado: importes sin unidad verificada y potencial N/D.</p> : null}
                     {cur && currency && cur.toUpperCase() !== currency.trim().toUpperCase() ? (
                         <p className="mt-2 text-xs text-gray-400" data-testid="analyst-targets-currency-note">
                             Objetivos {cur.toUpperCase() === 'USD' ? '(ADR, USD)' : `en ${cur.toUpperCase()}`}: la ficha cotiza en {currency.trim().toUpperCase()}.
@@ -37,7 +37,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     {data.consensus ? (
                         <div className="mt-1 text-sm text-gray-300">
                             <p>
-                                Consenso agregado de Yahoo: mediana {fmtTarget(data.consensus.median)} · media {fmtTarget(data.consensus.mean)} · rango {fmtTarget(data.consensus.low)} a {fmtTarget(data.consensus.high)}
+                                Consenso agregado de analistas: mediana {fmtTarget(data.consensus.median)} · media {fmtTarget(data.consensus.mean)} · rango {fmtTarget(data.consensus.low)} a {fmtTarget(data.consensus.high)}
                             </p>
 
                         </div>

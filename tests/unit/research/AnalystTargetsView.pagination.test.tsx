@@ -13,7 +13,7 @@ describe('analyst pagination by firm',()=>{
   expect(screen.queryByText('Firm 1')).not.toBeInTheDocument();
   expect(screen.getAllByText('Firm 6')).toHaveLength(2);
   expect(screen.getByRole('button',{name:'Siguiente'})).toBeDisabled();
-  expect(screen.getByText(/Consenso agregado de Yahoo: mediana/)).toBeInTheDocument();
+  expect(screen.getByText(/Consenso agregado de analistas: mediana/)).toBeInTheDocument();
   expect(screen.queryByText('Recorrido')).not.toBeInTheDocument();
   expect(screen.getAllByText('Potencial').length).toBeGreaterThan(0);
   fireEvent.click(screen.getByRole('button',{name:'Anterior'}));
