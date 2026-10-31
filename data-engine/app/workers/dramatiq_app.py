@@ -4159,7 +4159,7 @@ def sync_tenant_ibkr_connections() -> dict[str, Any]:
     return {"scheduled": scheduled}
 
 
-@dramatiq.actor(max_retries=0, time_limit=300_000)
+@dramatiq.actor(max_retries=2, time_limit=300_000)
 def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
     from app.services import ibkr_connection_service as ibkr
 
@@ -4174,8 +4174,22 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
                     xml = _run(ibkr.download(token, query_id))
                     return ibkr.import_report(db, xml, account_id, revision, receipt_id=receipt_id)
                 except Exception as exc:
+                    kind = ibkr.error_kind(exc)
                     ibkr.record_failure(db, revision=revision, receipt_id=receipt_id,
-                                        error_code=ibkr.error_kind(exc))
+                                        error_code=kind)
+                    if kind == "not_ready":
+                        # IBKR entrego el extracto antes de calcular su PyG:
+                        # transitorio por definicion. Mismo trato que el flujo
+                        # global sync_ibkr_flex: como mucho max_retries (2)
+                        # reintentos, una hora entre intentos, y cada uno pide
+                        # un extracto NUEVO (el diferido queda sellado en IBKR).
+                        # Solo not_ready reintenta: credentials/report/import no
+                        # las arregla la espera y reintentar un timeout en
+                        # caliente martillea la Flex Web API.
+                        raise dramatiq.Retry(
+                            "IBKR PyG aun no disponible; reintento en una hora",
+                            delay=3_600_000,
+                        ) from exc
                     return {
                         "status": "error",
                         "message": "IBKR no disponible; se conservan los datos anteriores.",
@@ -4202,7 +4216,7 @@ def sync_tenant_ibkr_connections_dedicated() -> dict[str, Any]:
     return sync_tenant_ibkr_connections.fn()
 
 
-@dramatiq.actor(queue_name="ibkr-sync", max_retries=0, time_limit=300_000)
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, time_limit=300_000)
 def sync_one_tenant_ibkr_dedicated(tenant_id: int, user_id: str) -> dict[str, Any]:
     """Same revision/date validation, separate bounded read-only consumer."""
     return sync_one_tenant_ibkr.fn(tenant_id, user_id)
