@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import BackendOffline from '@/components/system/BackendOffline';
+import { MacroEventRow, SourceBadge } from '@/components/calendar/MacroEventRow';
 import {
     getEightKDigest,
     getMacroEvents,
@@ -49,10 +50,6 @@ function Pager({ page, size, total, param, other, ti }: {
     );
 }
 
-function SourceBadge({ children }: { children: React.ReactNode }) {
-    return <span className="rounded border border-teal-400/30 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-teal-300">{children}</span>;
-}
-
 export default async function MacroCalendarPage({ searchParams }: PageProps) {
     const ti = await getT();
     const f = await getFormat();
@@ -98,16 +95,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                 ) : (
                     <ul className="mt-4 divide-y divide-gray-800 rounded-xl border border-gray-800">
                         {macro.events.map((event) => (
-                            <li key={`${event.kind}-${event.date}`} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3">
-                                <span className="w-28 text-sm font-medium text-gray-100">{f.formatMarketDate(event.date)}</span>
-                                <span className="flex-1 text-sm text-gray-200">
-                                    {event.title}
-                                    {event.detail ? <span className="text-gray-500"> · {event.detail}</span> : null}
-                                </span>
-                                {event.time_et && <span className="text-xs text-gray-500">{event.time_et} ET</span>}
-                                <SourceBadge>{ti('calendar.macro.official')}</SourceBadge>
-                                <a className="inline-flex min-h-11 min-w-11 items-center text-xs text-teal-300 hover:underline" href={event.source_url} target="_blank" rel="noopener noreferrer">{event.source}</a>
-                            </li>
+                            <MacroEventRow key={`${event.kind}-${event.date}`} event={event} dateLabel={f.formatMarketDate(event.date)} ti={ti} />
                         ))}
                     </ul>
                 )}

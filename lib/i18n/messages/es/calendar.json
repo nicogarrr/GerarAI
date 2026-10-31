@@ -157,6 +157,7 @@
     "k8Note": "Se revisan como máximo los 300 8-K más recientes de tus compañías.",
     "k8EmptyDefault": "Sin 8-K relevantes.",
     "dateUnavailable": "Fecha no disponible",
+    "docAria": "Abrir el documento oficial del evento (enlace externo)",
     "secDocument": "Documento en SEC",
     "excerptsAll": "Extractos literales del 8-K, en inglés. Sin cifras recalculadas.",
     "excerptsSome": "Extractos literales del 8-K cuando el texto completo está disponible, en inglés. Sin cifras recalculadas.",
