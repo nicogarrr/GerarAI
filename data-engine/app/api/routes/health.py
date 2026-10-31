@@ -168,4 +168,13 @@ def data_sources_health() -> dict:
     for source in summary["sources"]:
         if source["name"] == "Alpha Vantage":
             source["quota"] = quota
+    # Frenos por proveedor (429) abiertos, con TTL restante. Solo lectura en
+    # Redis (cero llamadas HTTP); incluye los breakers legacy de gdelt y sec.
+    try:
+        from app.core.cache import _redis_client
+        from app.services.provider_brake import open_brakes
+
+        summary["provider_brakes"] = open_brakes(_redis_client())
+    except Exception:  # noqa: BLE001 - el estado del freno nunca tumba el health
+        summary["provider_brakes"] = []
     return summary
