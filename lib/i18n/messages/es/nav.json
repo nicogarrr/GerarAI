@@ -45,13 +45,13 @@
   "descriptions": {
     "screener": "Explora empresas por sector y mira subidas, bajadas y más activas.",
     "panoramaMercado": "Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.",
-    "insider": "Compras declaradas por directivos en Form 4.",
-    "ownership": "Posiciones declaradas por los grandes fondos en el Form 13F.",
+    "insider": "Compras declaradas por directivos en Form\u00A04.",
+    "ownership": "Posiciones declaradas por los grandes fondos en el Form\u00A013F.",
     "inversores": "Carteras declaradas y cambios en los filings.",
     "propicks": "Ranking, reglas de selección y backtest.",
     "temas": "Rentabilidad YTD y 1M de temas de mercado.",
     "cuellos": "Escasez detectada en las fuentes y candidatos inferidos.",
-    "calendarioMacro": "FOMC, IPC y empleo, y resúmenes de tus 8-K."
+    "calendarioMacro": "FOMC, IPC y empleo, y resúmenes de tus 8\u2011K."
   },
   "subroutes": {
     "terminalFinanciero": "Terminal financiero",
