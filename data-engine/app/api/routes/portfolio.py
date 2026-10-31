@@ -32,6 +32,7 @@ from app.models import (
     Transaction,
 )
 from app.schemas.api import (
+    FXRateOut,
     PortfolioConfigurationOut,
     PortfolioConfigurationUpdateOut,
     PortfolioDataQualityOut,
@@ -639,7 +640,7 @@ def update_portfolio_configuration(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/fx-rates")
+@router.get("/fx-rates", response_model=PaginatedResponse[FXRateOut])
 def list_fx_rates(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
