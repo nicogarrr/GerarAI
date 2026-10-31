@@ -146,11 +146,19 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     if not rows:
         return _response(["No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
     lines, sources, totals, without, uncertain_tickers = [], [], {}, [], []
+    # Lote anti N+1: una consulta de dividendos del año para TODAS las
+    # posiciones (misma ventana y orden por ex_date), agrupada por empresa.
+    year_start, year_end = date(today.year, 1, 1), date(today.year, 12, 31)
+    company_ids = sorted({comp.id for _, comp in rows})
+    dividends_by_company: dict[int, list[DividendRecord]] = {cid: [] for cid in company_ids}
+    if company_ids:
+        for record in db.scalars(select(DividendRecord).where(
+            DividendRecord.company_id.in_(company_ids), DividendRecord.tenant_id == tenant,
+            DividendRecord.ex_date >= year_start, DividendRecord.ex_date <= year_end,
+        ).order_by(DividendRecord.company_id, DividendRecord.ex_date)).all():
+            dividends_by_company[record.company_id].append(record)
     for position, comp in sorted(rows, key=lambda r: r[1].ticker):
-        kept, uncertain = resolve_yahoo_events(db.scalars(select(DividendRecord).where(
-            DividendRecord.company_id == comp.id, DividendRecord.tenant_id == tenant,
-            DividendRecord.ex_date >= date(today.year, 1, 1), DividendRecord.ex_date <= date(today.year, 12, 31),
-        ).order_by(DividendRecord.ex_date)).all())
+        kept, uncertain = resolve_yahoo_events(dividends_by_company[comp.id])
         if uncertain:
             uncertain_tickers.append(comp.ticker)
             continue
