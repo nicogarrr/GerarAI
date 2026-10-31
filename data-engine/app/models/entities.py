@@ -138,7 +138,7 @@ class DcaSignalState(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     symbol: Mapped[str] = mapped_column(String(20), index=True)
-    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True)
+    company_id: Mapped[int | None] = mapped_column(ForeignKey("companies.id"), nullable=True, index=True)
     level: Mapped[int] = mapped_column(Integer)
     previous_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20))
@@ -822,7 +822,7 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     fiscal_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fiscal_quarter: Mapped[str | None] = mapped_column(String(10), nullable=True)
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     source_type: Mapped[str] = mapped_column(String(80), default="seed")
     is_reported: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -967,7 +967,7 @@ class FinancialStatement(TenantOwnedMixin, Base, TimestampMixin):
     fiscal_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fiscal_quarter: Mapped[str | None] = mapped_column(String(10), nullable=True)
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     facts: Mapped[dict] = mapped_column(JSON, default=dict)
 
@@ -1274,10 +1274,10 @@ class ExternalClaim(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int | None] = mapped_column(
-        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     claim: Mapped[str] = mapped_column(Text)
     claim_type: Mapped[str] = mapped_column(String(80))
@@ -1295,7 +1295,7 @@ class Transcript(TenantOwnedMixin, Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(500))
     period: Mapped[str] = mapped_column(String(40))
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     transcript_text: Mapped[str] = mapped_column(Text, default="")
 
@@ -1331,7 +1331,7 @@ class Catalyst(TenantOwnedMixin, Base, TimestampMixin):
     materiality_score: Mapped[int] = mapped_column(Integer, default=5)
     status: Mapped[str] = mapped_column(String(40), default="open")
     source_id: Mapped[int | None] = mapped_column(
-        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
 
 
@@ -1579,7 +1579,7 @@ class SourceAudit(TenantOwnedMixin, Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     thesis_version_id: Mapped[int | None] = mapped_column(
-        ForeignKey("thesis_versions.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("thesis_versions.id", ondelete="SET NULL"), nullable=True, index=True
     )
     passed: Mapped[bool] = mapped_column(Boolean, default=False)
     source_coverage_score: Mapped[int] = mapped_column(Integer, default=0)
@@ -1933,7 +1933,7 @@ class ConnectorState(TenantOwnedMixin, Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     connector: Mapped[str] = mapped_column(String(80), index=True)
     company_id: Mapped[int | None] = mapped_column(
-        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+        ForeignKey("companies.id", ondelete="SET NULL"), nullable=True, index=True
     )
     feed_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     cursor: Mapped[str | None] = mapped_column(String(500), nullable=True)
