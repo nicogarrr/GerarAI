@@ -36,7 +36,10 @@ const AccountStatusNotice = ({ state, onBack }: Props) => {
             {pending && (
                 <p className="mt-3 text-sm text-gray-500">{t('auth.pendingAccount.pendingHint')}</p>
             )}
-            <Link href="/sign-in" className="brand-btn mt-6 inline-block w-full text-center">
+            <Link
+                href="/sign-in"
+                className="brand-btn mt-6 flex w-full items-center justify-center text-center"
+            >
                 {t('auth.pendingAccount.signInLink')}
             </Link>
             {onBack && (
