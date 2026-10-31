@@ -76,7 +76,7 @@ def test_0115_tenant_nullable_en_ci_postgres():
     scratch = "nn115_" + uuid.uuid4().hex[:12]
     admin = sa.create_engine(url, isolation_level="AUTOCOMMIT")
     with admin.connect() as conn:
-        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))
+        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex generado por el propio test, sin input externo; BD efimera de CI
     base, sep, query = url.partition("?")
     base = re.sub(r"/[^/]+$", f"/{scratch}", base)
     scratch_url = base + (sep + query if sep else "")
@@ -95,5 +95,5 @@ def test_0115_tenant_nullable_en_ci_postgres():
         assert all(v == "YES" for v in estado.values()), estado
     finally:
         with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         admin.dispose()

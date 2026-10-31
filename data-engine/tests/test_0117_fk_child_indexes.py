@@ -142,5 +142,5 @@ def test_0117_repara_invalidos_propios_respeta_ajenos_y_es_reentrante_en_ci_post
     finally:
         engine.dispose()
         with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex del fixture _scratch (test_0114), sin input externo; BD efimera de CI
         admin.dispose()
