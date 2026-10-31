@@ -1947,3 +1947,14 @@ class PortfolioTearsheetOut(BaseModel):
     qualification: TearsheetQualificationOut | None
     exposure: TearsheetExposureOut | None
     trace: TearsheetTraceOut
+# --- GET /api/portfolio/cash -------------------------------------------------
+# Forma medida contra la propia ruta (SELECT CashBalance directo): emite
+# siempre las mismas cinco claves por divisa.
+
+
+class CashBalanceOut(BaseModel):
+    currency: str
+    balance: float
+    settled_cash: float
+    interest_rate: float
+    source: str

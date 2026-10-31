@@ -6861,6 +6861,19 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** CashBalanceOut */
+        CashBalanceOut: {
+            /** Balance */
+            balance: number;
+            /** Currency */
+            currency: string;
+            /** Interest Rate */
+            interest_rate: number;
+            /** Settled Cash */
+            settled_cash: number;
+            /** Source */
+            source: string;
+        };
         /**
          * ChatPageContext
          * @description Contexto de página explícito ("Viendo X") enviado por el cliente.
@@ -21906,9 +21919,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["CashBalanceOut"][];
                 };
             };
             /** @description Validation Error */

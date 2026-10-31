@@ -1102,6 +1102,39 @@
         "title": "CalculatedMetricsResponse",
         "type": "object"
       },
+      "CashBalanceOut": {
+        "properties": {
+          "balance": {
+            "title": "Balance",
+            "type": "number"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "interest_rate": {
+            "title": "Interest Rate",
+            "type": "number"
+          },
+          "settled_cash": {
+            "title": "Settled Cash",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "currency",
+          "balance",
+          "settled_cash",
+          "interest_rate",
+          "source"
+        ],
+        "title": "CashBalanceOut",
+        "type": "object"
+      },
       "ChatPageContext": {
         "description": "Contexto de p\u00e1gina expl\u00edcito (\"Viendo X\") enviado por el cliente.\n\nEl ticker es TEXTO: la Company se resuelve en servidor dentro del tenant\nde la sesi\u00f3n (brain_service.resolve_page_context). El cliente nunca\nmanda IDs de base de datos.",
         "properties": {
@@ -57849,8 +57882,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/CashBalanceOut"
                   },
                   "title": "Response Cash Api Portfolio Cash Get",
                   "type": "array"
