@@ -247,7 +247,7 @@ export default async function ResearchSourcesPage({
               {!documents.length ? (
                 <tr>
                   <td className="py-6 text-center text-gray-500" colSpan={6}>
-                    <div className="w-full max-w-[calc(100vw-4rem)] text-left sm:mx-auto sm:w-fit sm:text-center">
+                    <div className="w-full max-w-[calc(100vw-6rem)] text-left sm:mx-auto sm:w-fit sm:text-center">
                     {ticker ? (
                       <p>
                         Sin documentos de {ticker}.{' '}
