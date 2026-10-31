@@ -47,7 +47,7 @@ describe('QuickGlancePanel · datos clave (estilo Stock Analysis)', () => {
         expect(screen.queryByRole('link', { name: /Beta/ })).toBeNull();
     });
 
-    it('un ex-dividendo pasado se rotula como el último, y la fuente se muestra sin nombrar al proveedor (orden 31-oct)', async () => {
+    it('un ex-dividendo pasado se rotula como el último, sin etiqueta de fuente (orden 31-oct)', async () => {
         render(await QuickGlancePanel({
             ...base,
             keyStats: stats({
@@ -58,8 +58,8 @@ describe('QuickGlancePanel · datos clave (estilo Stock Analysis)', () => {
             }),
         }));
         expect(screen.getByText('Último ex-dividendo')).toBeVisible();
-        expect(screen.getAllByText('Fuente de mercado, no oficial')).toHaveLength(2);
         expect(screen.queryByText(/Yahoo/i)).toBeNull();
+        expect(screen.queryByText(/Fuente de mercado/i)).toBeNull();
         expect(screen.queryByText('Próximos resultados')).toBeNull();
         expect(screen.queryByText('Beta')).toBeNull();
     });

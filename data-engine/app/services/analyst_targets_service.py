@@ -260,7 +260,7 @@ class AnalystTargetsService:
             return AnalystTargets(
                 symbol=key,
                 fetched_at=fetched_at,
-                note="No se pudo consultar la fuente de mercado ahora; reintenta en unos minutos.",
+                note="No se pudo consultar el consenso ahora; reintenta en unos minutos.",
             )
         # Guard de identidad: si Yahoo dice que el ticker NO es una accion
         # (ETF, fondo, indice...), sus "objetivos de analistas" pertenecen a
@@ -275,7 +275,7 @@ class AnalystTargetsService:
                 fetched_at=fetched_at,
                 currency=data.get("currency"),
                 note=(
-                    f"La fuente de mercado identifica {key} como {label}, no como una "
+                    f"El valor {key} está identificado como {label}, no como una "
                     "acción, así que no hay precios objetivo de analistas que "
                     "mostrar para una empresa con este ticker."
                 ),
@@ -304,9 +304,9 @@ class AnalystTargetsService:
         if rows:
             note = None
         elif has_consensus:
-            note = "La fuente de mercado publica solo el consenso agregado, sin detalle por firma."
+            note = "Solo hay consenso agregado, sin detalle por firma."
         else:
-            note = "La fuente de mercado no publica precios objetivo por analista para este valor."
+            note = "No hay precios objetivo por analista para este valor."
         result = AnalystTargets(
             symbol=key,
             status="available" if rows or has_consensus else "empty",

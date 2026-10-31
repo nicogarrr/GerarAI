@@ -276,8 +276,7 @@
     "exDividendLast": "Last ex-dividend",
     "range52wLabel": "52-week range",
     "betaLabel": "Beta",
-    "betaNote": "Volatility vs the market, 5 years (Yahoo, unofficial)",
-    "sourceYahoo": "Market source, unofficial",
+    "betaNote": "Volatility vs the market, 5 years (unofficial)",
     "sourceOwnCloses": "From stored daily closes"
   },
   "credibility": {
