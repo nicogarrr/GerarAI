@@ -108,7 +108,7 @@
     "pricePriced": "price {price}",
     "priceRange": "range {price}",
     "offer": "offering {amount}",
-    "footnote": "Source: NASDAQ IPO calendar (EDGAR Online data). Coverage: only listings on US markets that NASDAQ publishes; other markets do not appear."
+    "footnote": "Coverage: only listings on US markets; other markets do not appear."
   },
   "subscription": {
     "offlineFeature": "Calendar subscription",

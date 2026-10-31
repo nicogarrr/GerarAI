@@ -108,7 +108,7 @@
     "pricePriced": "precio {price}",
     "priceRange": "rango {price}",
     "offer": "oferta {amount}",
-    "footnote": "Fuente: calendario de IPOs de NASDAQ (datos de EDGAR Online). Cobertura: solo salidas a bolsa en mercados de EE. UU. que NASDAQ publica; otros mercados no aparecen."
+    "footnote": "Cobertura: solo salidas a bolsa en mercados de EE. UU.; otros mercados no aparecen."
   },
   "subscription": {
     "offlineFeature": "Suscripción al calendario",
