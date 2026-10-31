@@ -10756,6 +10756,13 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** PortfolioPriceUpdateOut */
+        PortfolioPriceUpdateOut: {
+            /** Market Price */
+            market_price: number;
+            /** Ticker */
+            ticker: string;
+        };
         /** PortfolioReconstructionOut */
         PortfolioReconstructionOut: {
             /** Days Excluded */
@@ -23113,9 +23120,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioPriceUpdateOut"];
                 };
             };
             /** @description Validation Error */
