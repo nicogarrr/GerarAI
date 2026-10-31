@@ -352,6 +352,33 @@ def test_knowledge_upload_whitelist():
     assert validated.startswith("https://")
 
 
+def test_knowledge_upload_source_url_measured_after_normalization():
+    """La normalizacion HttpUrl ALARGA: '/' final (+1) e IDN -> punycode
+    (munch: +7). La cota de 1000 (String(1000)) se mide sobre la URL FINAL,
+    no sobre la entrada: una entrada de 1000 chars guarda 1001 y rompe PG."""
+    from app.api.routes.knowledge import validate_upload_metadata
+
+    # Entrada de exactamente 1000 chars sin '/': normaliza a 1001.
+    edge_slash = "https://example.com" + "a" * 981
+    assert len(edge_slash) == 1000
+    with pytest.raises(ValueError, match="Invalid knowledge source_url"):
+        validate_upload_metadata(document_type="book", language="en", source_url=edge_slash)
+
+    # IDN: 995 chars de entrada, punycode la deja en 1002.
+    edge_idn = "https://m\u00fcnchen.example/" + "a" * 971
+    assert len(edge_idn) == 995
+    with pytest.raises(ValueError, match="Invalid knowledge source_url"):
+        validate_upload_metadata(document_type="book", language="en", source_url=edge_idn)
+
+    # Control: 1000 chars ya normalizada (con '/') sigue aceptandose.
+    ok_url = "https://example.com/" + "a" * 980
+    assert len(ok_url) == 1000
+    _, _, validated = validate_upload_metadata(
+        document_type="book", language="en", source_url=ok_url
+    )
+    assert len(validated) == 1000
+
+
 def test_knowledge_upload_source_url_capped_at_column_length():
     """KnowledgeDocument.source_url es String(1000): una URL valida pero mas
     larga debe rechazarse en la whitelist (400), no romper el INSERT en
