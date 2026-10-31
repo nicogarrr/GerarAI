@@ -20863,6 +20863,227 @@
         "title": "WatchlistItemOut",
         "type": "object"
       },
+      "WatchlistMonitorItemOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "fair_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value"
+          },
+          "fair_value_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value As Of"
+          },
+          "fair_value_label": {
+            "title": "Fair Value Label",
+            "type": "string"
+          },
+          "fair_value_publishable": {
+            "title": "Fair Value Publishable",
+            "type": "boolean"
+          },
+          "fair_value_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Reason"
+          },
+          "fair_value_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tesis",
+                  "motor",
+                  "motor_orientativo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Source"
+          },
+          "fair_value_thesis_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Thesis Version"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "last_close_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close Date"
+          },
+          "low_52w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low 52W"
+          },
+          "low_52w_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low 52W Date"
+          },
+          "low_52w_sessions": {
+            "title": "Low 52W Sessions",
+            "type": "integer"
+          },
+          "next_earnings_confirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Confirmed"
+          },
+          "next_earnings_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Date"
+          },
+          "next_earnings_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Source"
+          },
+          "valuation_side": {
+            "anyOf": [
+              {
+                "enum": [
+                  "infravalorada",
+                  "sobrevalorada"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Side"
+          }
+        },
+        "required": [
+          "low_52w",
+          "low_52w_date",
+          "low_52w_sessions",
+          "last_close",
+          "last_close_date",
+          "fair_value",
+          "fair_value_thesis_version",
+          "fair_value_source",
+          "fair_value_label",
+          "fair_value_as_of",
+          "fair_value_publishable",
+          "fair_value_reason",
+          "valuation_side",
+          "currency",
+          "next_earnings_date",
+          "next_earnings_source",
+          "next_earnings_confirmed"
+        ],
+        "title": "WatchlistMonitorItemOut",
+        "type": "object"
+      },
+      "WatchlistMonitorOut": {
+        "properties": {
+          "earnings_status": {
+            "title": "Earnings Status",
+            "type": "string"
+          },
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/WatchlistMonitorItemOut"
+            },
+            "title": "Items",
+            "type": "object"
+          }
+        },
+        "required": [
+          "items",
+          "earnings_status"
+        ],
+        "title": "WatchlistMonitorOut",
+        "type": "object"
+      },
       "WorkProductRequest": {
         "properties": {
           "product_type": {
@@ -84529,9 +84750,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Watchlist Monitor Api Watchlist Monitor Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WatchlistMonitorOut"
                 }
               }
             },

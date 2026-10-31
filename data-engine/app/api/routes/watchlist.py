@@ -25,7 +25,7 @@ from app.models import (
     MarketPrice,
     WatchItem,
 )
-from app.schemas.api import WatchlistAttentionThesisOut, WatchlistItemOut
+from app.schemas.api import WatchlistAttentionThesisOut, WatchlistItemOut, WatchlistMonitorOut
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
@@ -124,7 +124,7 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
     db.commit()
     invalidate_dca_cache(db=db)
 
-@router.get("/monitor")
+@router.get("/monitor", response_model=WatchlistMonitorOut)
 async def watchlist_monitor(
     tickers: str = Query(..., description="CSV de tickers, max 60"),
     db: Session = Depends(get_db),
