@@ -25,7 +25,7 @@ function pageHref(basePath: string, page: number, params: Record<string, string>
 
 export function Pagination({ page, total, basePath, params = {} }: PaginationProps) {
     if (total <= 1) return null;
-    const linkClass = 'rounded-lg border border-gray-800 px-3 py-1.5 text-sm text-gray-300 hover:border-gray-700';
+    const linkClass = 'inline-flex min-h-[44px] items-center rounded-lg border border-gray-800 px-3 py-1.5 text-sm text-gray-300 hover:border-gray-700 sm:min-h-0';
     const offClass = 'rounded-lg border border-gray-900 px-3 py-1.5 text-sm text-gray-700';
     return (
         <nav aria-label="Paginación" className="flex items-center justify-between gap-4">

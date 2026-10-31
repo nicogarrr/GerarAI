@@ -99,6 +99,14 @@ describe('móvil: 44 px en inicio, índice research, watchlist y ProPicks (recor
         const src = readFileSync('components/research/RelatedTickersStrip.tsx', 'utf8');
         assert.ok(src.includes('inline-flex min-h-[44px] min-w-[44px] items-center font-medium text-gray-200'), 'ticker relacionado con 44 px');
     });
+    it('biblioteca: título del documento (tarjeta móvil) con 44 px', () => {
+        const src = readFileSync('app/(root)/knowledge/page.tsx', 'utf8');
+        assert.ok(src.includes('flex min-h-[44px] min-w-0 items-center font-medium text-gray-200'), 'título de documento con 44 px');
+    });
+    it('inversores: paginación Anterior/Siguiente con 44 px en móvil', () => {
+        const src = readFileSync('app/(root)/inversores/_components/Pagination.tsx', 'utf8');
+        assert.ok(src.includes('inline-flex min-h-[44px] items-center rounded-lg border border-gray-800'), 'paginación de inversores con 44 px');
+    });
     it('ProPicks: el conmutador de filtros (solo icono) tiene 44x44', () => {
         const src = readFileSync('components/proPicks/EnhancedProPicksFilters.tsx', 'utf8');
         assert.ok(src.includes('min-h-[44px] min-w-[44px] xl:hidden'), 'conmutador de filtros 44x44');
