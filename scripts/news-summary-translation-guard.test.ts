@@ -13,12 +13,15 @@ const types = readFileSync('lib/actions/research.actions.ts', 'utf8');
 const proxy = readFileSync('app/api/news/[eventId]/translation/summary/route.ts', 'utf8');
 
 test('provenance siempre que se muestra una traducción y cero relleno', () => {
-    assert.ok(component.includes('Traducción automática · español'));
-    assert.ok(component.includes('Ver original'));
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).translate;
+    assert.ok(component.includes("<span>{t('research.translate.autoLabel')}</span>"));
+    assert.equal(es.autoLabel, 'Traducción automática · español');
+    assert.ok(component.includes("t('research.translate.viewOriginal')"));
+    assert.equal(es.viewOriginal, 'Ver original');
     // Al fallar se queda el original; solo se permite el aviso de estado corto del botón.
     const unavailableMentions = component.split('no disponible').length - 1;
     assert.ok(unavailableMentions <= 1, 'nada de meta-texto de fallo más allá del aviso de estado');
-    assert.ok(unavailableMentions === 0 || (component.includes('role="status"') && component.includes('Traducción no disponible ahora mismo.')), 'el aviso va como status del botón');
+    assert.ok(unavailableMentions === 0 || (component.includes('role="status"') && component.includes("t('research.translate.genericFailure')") && es.genericFailure.startsWith('Traducción no disponible ahora mismo.')), 'el aviso va como status del botón');
     assert.ok(!component.includes('Resumen generado'), 'nunca inventar contenido: solo traducir');
 });
 

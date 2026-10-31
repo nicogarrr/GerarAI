@@ -33,7 +33,10 @@ test('el panel deduplica por el titular que se pinta', () => {
 test('sin relleno de traducción bajo el titular', () => {
     assert.ok(!headline.includes('traducción no disponible'), 'nada de meta-texto de fallo: el original ya es honesto');
     // La traducción, cuando existe, sigue etiquetada con su provenance.
-    assert.ok(headline.includes('Traducción automática · español'));
-    assert.ok(headline.includes('Ver original'), 'misma etiqueta que el resumen: una sola «Ver original» por fila');
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).translate;
+    assert.ok(headline.includes("{t('research.translate.autoLabel')}"));
+    assert.equal(es.autoLabel, 'Traducción automática · español');
+    assert.ok(headline.includes("<summary className=\"min-h-11 cursor-pointer py-3\">{t('research.translate.viewOriginal')}</summary>"), 'misma etiqueta que el resumen: una sola «Ver original» por fila');
+    assert.equal(es.viewOriginal, 'Ver original');
     assert.ok(!headline.includes('Ver titular original'), 'sin doble etiqueta «Ver titular original»/«Ver original» (Tester 4 nº4)');
 });
