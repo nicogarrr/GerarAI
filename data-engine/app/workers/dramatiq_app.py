@@ -3065,10 +3065,11 @@ def _gdelt_macro_cache_set(client, theme: str, result) -> None:
                 for item in result.items
             ],
         }
-        client.setex(
+        # redis-py depreco setex (DeprecationWarning desde 2.6.12): set con ex=ttl
+        client.set(
             _gdelt_macro_cache_key(theme),
-            _GDELT_MACRO_CACHE_TTL_SECONDS,
             _json.dumps(payload, ensure_ascii=False),
+            ex=_GDELT_MACRO_CACHE_TTL_SECONDS,
         )
     except Exception:  # noqa: BLE001 — cache fail-open
         return

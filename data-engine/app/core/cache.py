@@ -306,7 +306,8 @@ def cached(
             if client is not None:
                 try:
                     serialized = json.dumps(result, default=str)
-                    client.setex(cache_key, ttl, serialized)
+                    # redis-py depreco setex (DeprecationWarning desde 2.6.12): set con ex=ttl
+                    client.set(cache_key, serialized, ex=ttl)
                     logger.debug(f"Cached result: {cache_key} (TTL={ttl}s)")
                 except Exception as exc:
                     logger.debug(f"Cache write failed for {cache_key}: {exc}")
