@@ -31,7 +31,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
-from app.schemas.api import PortfolioIntelligenceOut, PortfolioSummaryOut
+from app.schemas.api import PortfolioIntelligenceOut, PortfolioPositionItemOut, PortfolioSummaryOut
 from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.audit_service import record_audit_event
@@ -770,7 +770,7 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     return TearsheetService().build(db)
 
 
-@router.get("/positions")
+@router.get("/positions", response_model=PaginatedResponse[PortfolioPositionItemOut])
 def positions(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,

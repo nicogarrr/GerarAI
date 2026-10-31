@@ -1537,3 +1537,76 @@ class PortfolioSummaryOut(BaseModel):
     valuation_dates_differ: bool
     valuation_hold: list[PortfolioValuationHoldOut]
     provenance: ProvenanceOut
+
+
+# --- GET /api/portfolio/positions ------------------------------------------
+# Formas medidas contra la ruta (L773+) y sus helpers reales:
+# _pnl_effects, _QUOTE_MISSING_PNL_KEYS, mask_cost_under_review,
+# reconcile_ibkr_costs, _fiscal_info/_fiscal_info_batch, tracked_statuses.
+# La ruta emite siempre todas las claves (ramas None; no omite ninguna).
+
+
+class PortfolioAnalysisStateOut(BaseModel):
+    """Estado de analisis tracked (tracked_statuses): clave por ticker."""
+
+    status: str
+    as_of: str
+    thesis_status: str | None = None
+    missing_inputs: list[str] | None = None
+
+
+class PositionValuationHoldOut(BaseModel):
+    reason: str
+    effective_date: str | None
+    since: str | None
+
+
+class PortfolioCostReconciliationOut(BaseModel):
+    """Resultado de reconcile_ibkr_costs para una posicion IBKR."""
+
+    status: Literal["ok", "review_required", "not_comparable"]
+    reason: str | None = None
+    message: str | None = None
+    snapshot_cost_native: float | None = None
+    trade_cost_native: float | None = None
+    difference_native: float | None = None
+    tolerance_native: float | None = None
+    currency: str | None = None
+    cost_unit_verified: bool | None = None
+
+
+class PortfolioPositionItemOut(BaseModel):
+    ticker: str
+    name: str
+    sector: str
+    analysis: PortfolioAnalysisStateOut | None
+    quantity: float
+    # mask_cost_under_review anula costes/plusvalias en revision: None.
+    average_cost: float | None
+    # Valoracion en suspenso: null con motivo, nunca un 0 como cotizacion.
+    market_price: float | None
+    market_value: float | None
+    valuation_hold: PositionValuationHoldOut | None
+    unrealized_pnl: float | None
+    realized_pnl: float
+    cost_basis: float | None
+    as_of: str
+    currency: str
+    native_currency: str
+    base_currency: str
+    market_value_native: float | None
+    market_value_base: float | None
+    cost_basis_native: float | None
+    cost_basis_base: float | None
+    unrealized_pnl_native: float | None
+    unrealized_pnl_base: float | None
+    realized_pnl_base: float | None
+    fx_rate: float | None
+    pnl_price_effect_base: float | None
+    pnl_fx_effect_base: float | None
+    source: str
+    first_buy_date: str | None
+    holding_days: int | None
+    fiscal_bucket: Literal["corto_plazo", "largo_plazo"] | None
+    quote_missing: bool
+    cost_reconciliation: PortfolioCostReconciliationOut | None

@@ -9698,6 +9698,30 @@ export interface components {
             /** Managers */
             managers: components["schemas"]["OwnershipManagerOut"][];
         };
+        /**
+         * PageInfo
+         * @description Pagination metadata.
+         */
+        PageInfo: {
+            /** Has Next */
+            has_next: boolean;
+            /** Has Prev */
+            has_prev: boolean;
+            /** Page */
+            page: number;
+            /** Page Size */
+            page_size: number;
+            /** Total Items */
+            total_items: number;
+            /** Total Pages */
+            total_pages: number;
+        };
+        /** PaginatedResponse[PortfolioPositionItemOut] */
+        PaginatedResponse_PortfolioPositionItemOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioPositionItemOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
         /** PaperProposal */
         PaperProposal: {
             /** Conviction */
@@ -9791,6 +9815,20 @@ export interface components {
             /** Target Allocations */
             target_allocations?: components["schemas"]["PlanTarget"][];
         };
+        /**
+         * PortfolioAnalysisStateOut
+         * @description Estado de analisis tracked (tracked_statuses): clave por ticker.
+         */
+        PortfolioAnalysisStateOut: {
+            /** As Of */
+            as_of: string;
+            /** Missing Inputs */
+            missing_inputs?: string[] | null;
+            /** Status */
+            status: string;
+            /** Thesis Status */
+            thesis_status?: string | null;
+        };
         /** PortfolioAttributionOut */
         PortfolioAttributionOut: {
             /** Basis */
@@ -9876,6 +9914,33 @@ export interface components {
         PortfolioConfigurationInput: {
             /** Base Currency */
             base_currency: string;
+        };
+        /**
+         * PortfolioCostReconciliationOut
+         * @description Resultado de reconcile_ibkr_costs para una posicion IBKR.
+         */
+        PortfolioCostReconciliationOut: {
+            /** Cost Unit Verified */
+            cost_unit_verified?: boolean | null;
+            /** Currency */
+            currency?: string | null;
+            /** Difference Native */
+            difference_native?: number | null;
+            /** Message */
+            message?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Snapshot Cost Native */
+            snapshot_cost_native?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "review_required" | "not_comparable";
+            /** Tolerance Native */
+            tolerance_native?: number | null;
+            /** Trade Cost Native */
+            trade_cost_native?: number | null;
         };
         /** PortfolioCoverageOut */
         PortfolioCoverageOut: {
@@ -10091,6 +10156,70 @@ export interface components {
             }[];
             /** Xirr */
             xirr: number | null;
+        };
+        /** PortfolioPositionItemOut */
+        PortfolioPositionItemOut: {
+            analysis: components["schemas"]["PortfolioAnalysisStateOut"] | null;
+            /** As Of */
+            as_of: string;
+            /** Average Cost */
+            average_cost: number | null;
+            /** Base Currency */
+            base_currency: string;
+            /** Cost Basis */
+            cost_basis: number | null;
+            /** Cost Basis Base */
+            cost_basis_base: number | null;
+            /** Cost Basis Native */
+            cost_basis_native: number | null;
+            cost_reconciliation: components["schemas"]["PortfolioCostReconciliationOut"] | null;
+            /** Currency */
+            currency: string;
+            /** First Buy Date */
+            first_buy_date: string | null;
+            /** Fiscal Bucket */
+            fiscal_bucket: ("corto_plazo" | "largo_plazo") | null;
+            /** Fx Rate */
+            fx_rate: number | null;
+            /** Holding Days */
+            holding_days: number | null;
+            /** Market Price */
+            market_price: number | null;
+            /** Market Value */
+            market_value: number | null;
+            /** Market Value Base */
+            market_value_base: number | null;
+            /** Market Value Native */
+            market_value_native: number | null;
+            /** Name */
+            name: string;
+            /** Native Currency */
+            native_currency: string;
+            /** Pnl Fx Effect Base */
+            pnl_fx_effect_base: number | null;
+            /** Pnl Price Effect Base */
+            pnl_price_effect_base: number | null;
+            /** Quantity */
+            quantity: number;
+            /** Quote Missing */
+            quote_missing: boolean;
+            /** Realized Pnl */
+            realized_pnl: number;
+            /** Realized Pnl Base */
+            realized_pnl_base: number | null;
+            /** Sector */
+            sector: string;
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+            /** Unrealized Pnl */
+            unrealized_pnl: number | null;
+            /** Unrealized Pnl Base */
+            unrealized_pnl_base: number | null;
+            /** Unrealized Pnl Native */
+            unrealized_pnl_native: number | null;
+            valuation_hold: components["schemas"]["PositionValuationHoldOut"] | null;
         };
         /** PortfolioPositionOut */
         PortfolioPositionOut: {
@@ -10312,6 +10441,15 @@ export interface components {
             reason: string;
             /** Ticker */
             ticker: string;
+        };
+        /** PositionValuationHoldOut */
+        PositionValuationHoldOut: {
+            /** Effective Date */
+            effective_date: string | null;
+            /** Reason */
+            reason: string;
+            /** Since */
+            since: string | null;
         };
         /** PrincipleAction */
         PrincipleAction: {
@@ -22211,9 +22349,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PaginatedResponse_PortfolioPositionItemOut_"];
                 };
             };
             /** @description Validation Error */
