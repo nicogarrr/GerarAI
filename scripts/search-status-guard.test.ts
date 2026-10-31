@@ -88,7 +88,10 @@ describe('F215: búsqueda con estado explícito', () => {
     const add = source('components/search/TickerSearchInput.tsx');
     assert.ok(add.includes('searchStocksWithStatus'), 'TickerSearchInput debe usar la variante con estado');
     assert.ok(add.includes("result.status === 'error'"), 'debe distinguir error de proveedor de lista vacía');
-    assert.ok(add.includes('Sin resultados para'), 'la lista vacía real se declara como tal');
+    // i18n: el texto vive en search.noResultsFor del diccionario.
+    assert.ok(add.includes("ti('search.noResultsFor'"), 'la lista vacía real se declara como tal');
+    const searchDict = JSON.parse(source('lib/i18n/messages/es/search.json'));
+    assert.ok(searchDict.noResultsFor.startsWith('Sin resultados para'), 'el copy de lista vacia se mantiene');
   });
 
   it('los buscadores de ticker de la app usan el componente compartido', () => {
@@ -108,11 +111,14 @@ describe('F322: el diagnóstico del motor no se presenta como badges primarios',
     const page = readFileSync('app/(root)/search/page.tsx', 'utf8');
 
     it('los pares crudos de retrieval van en un details «Detalles técnicos»', () => {
-        assert.match(page, /<summary className="cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-200">Detalles técnicos de la búsqueda<\/summary>/);
+        assert.ok(page.includes("t('search.techDetailsSearch')"), 'el details de diagnostico referencia la clave del diccionario');
+        const pageDict = JSON.parse(readFileSync('lib/i18n/messages/es/search.json', 'utf8'));
+        assert.equal(pageDict.techDetailsSearch, 'Detalles técnicos de la búsqueda', 'el rotulo se mantiene verbatim');
     });
 
     it('la puntuación del reranker no se etiqueta como «posición»', () => {
         assert.doesNotMatch(page, />posición \{/);
-        assert.match(page, />puntuación \{/);
+        assert.ok(page.includes("t('search.score'"), 'la puntuacion referencia la clave del diccionario');
+        assert.ok(JSON.parse(readFileSync('lib/i18n/messages/es/search.json', 'utf8')).score.startsWith('puntuación'), 'el prefijo «puntuación» se mantiene');
     });
 });
