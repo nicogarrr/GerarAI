@@ -282,3 +282,18 @@ def test_liquidity_legacy_rows_with_unknown_currency_do_not_count(db):
     _seed_prices(db, 12, close=100, volume=200_000, quote_currency=None)
     verdict = quality_for_companies(db, [12], as_of=AS_OF)[12]
     assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_pence_suffix_beats_declared_usd(db):
+    """Caso del piloto: ticker Q.L (sufijo .L = GBX) con currency='USD'. Las
+    fichas se crean con USD por defecto y el sufijo manda sobre la divisa
+    declarada (contrato de currency.py): las filas legacy son peniques,
+    unidad no-USD -> ausente."""
+    company = Company(id=13, ticker="Q13.L", name="Quality pence legacy",
+                      exchange="LSE", currency="USD", sector="Technology",
+                      industry="Test", company_type="large_cap", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    _seed_prices(db, 13, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [13], as_of=AS_OF)[13]
+    assert "liquidity_missing_or_low" in verdict["reasons"]

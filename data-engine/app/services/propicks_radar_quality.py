@@ -29,7 +29,12 @@ from app.models import (
 )
 from app.services.propicks_dca_radar import quality_checks
 from app.services.propicks_funnel_service import LEVERAGE_METRIC
-from app.valuation.currency import _ticker_suffix, listing_quote_unit, normalize_currency, SUFFIX_QUOTE_UNIT
+from app.valuation.currency import (
+    MINOR_UNITS,
+    SUFFIX_QUOTE_UNIT,
+    _ticker_suffix,
+    normalize_currency,
+)
 from app.valuation.financial_snapshot import _period_type
 
 FCF_METRIC = "free_cash_flow"
@@ -182,24 +187,25 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
     return {cid: (median(dollars), len(dollars)) for cid, dollars in by_company.items()}
 
 
-def _ticker_has_known_suffix(ticker: str | None) -> bool:
-    suffix = _ticker_suffix(ticker or "")
-    return bool(suffix and suffix in SUFFIX_QUOTE_UNIT)
-
-
 def _legacy_unit_is_verified_usd(ticker: str | None, company_currency: str | None) -> bool:
     """Unidad legacy compatible con USD SOLO con evidencia explicita.
 
-    Divisa declarada en la ficha que normaliza a USD, o sufijo del ticker
-    cuya unidad conocida normalice a USD (hoy ninguno: el mapa solo cubre
-    subunidades y divisas no-USD). ``listing_currency`` no sirve aqui: su
-    fallback USD por omision no es evidencia de la unidad real.
+    Misma precedencia que ``listing_quote_unit`` (subunidad declarada >
+    sufijo del ticker > divisa declarada), pero SIN su fallback USD por
+    omision: ``listing_currency("Q", "")`` devuelve USD sin saber nada de
+    la unidad real, y ``Q.L`` con ficha "USD" (el default del
+    enriquecimiento) cotiza en peniques. Sin evidencia positiva de USD la
+    fila legacy no cuenta.
     """
+    declared = (company_currency or "").strip()
+    if declared and (declared in MINOR_UNITS or declared.upper() in MINOR_UNITS):
+        return False  # subunidad declarada (GBX...): nunca USD
+    suffix = _ticker_suffix(ticker or "")
+    if suffix and suffix in SUFFIX_QUOTE_UNIT:
+        suffix_major, _ = normalize_currency(SUFFIX_QUOTE_UNIT[suffix])
+        return suffix_major == "USD"  # hoy ningun sufijo conocido es USD
     declared_major, _ = normalize_currency(company_currency)
-    if declared_major == "USD":
-        return True
-    suffix_major, _ = normalize_currency(listing_quote_unit(ticker, None))
-    return suffix_major == "USD" and bool(_ticker_has_known_suffix(ticker))
+    return declared_major == "USD"
 
 
 def quality_for_companies(db: Session, company_ids: list[int], *, as_of: date) -> dict[int, dict]:
