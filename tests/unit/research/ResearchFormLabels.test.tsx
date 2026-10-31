@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/components/forms/MutationForm', () => ({ MutationForm: ({ children, className }: {children: React.ReactNode; className?: string}) => <form className={className}>{children}</form> }));
 vi.mock('@/lib/actions/finnhub.actions', () => ({ searchStocksWithStatus: vi.fn(async () => ({status: 'ok', stocks: []})) }));
 vi.mock('@/components/knowledge/ExtractionRefresh', () => ({ ExtractionRefresh: () => null }));
