@@ -88,6 +88,22 @@ const ENTRY_POINTS = {
     'scripts/research-identity-guard.loader.mjs',
     'scripts/transaction-validation.loader.mjs',
     'infra/postgres/init.sql',
+    // Invocado por path desde CI: .github/workflows/agent-qa.yml corre
+    // `python qa-agents/run.py`; monitor.py/personas.py/report.py son sus
+    // modulos hermanos (import por sys.path[0], invisible al grafo).
+    'qa-agents/run.py',
+    'qa-agents/monitor.py',
+    'qa-agents/personas.py',
+    'qa-agents/report.py',
+    // thesis_audio_service.py lo lee/ejecuta construyendo el path con
+    // Path(__file__).parent / 'tts_sidecar' / 'server.py': nunca hay un
+    // import ni una cadena de path verbatim que el grafo pueda seguir.
+    'data-engine/tts_sidecar/server.py',
+    // Scripts operadores de reimportacion de datos, documentados en
+    // data/theme-fundamentals/README.md (`python scripts/theme-fundamentals/import_X.py`).
+    'scripts/theme-fundamentals/import_eia.py',
+    'scripts/theme-fundamentals/import_usgs.py',
+    'scripts/theme-fundamentals/import_world_bank.py',
   ],
   /** Globs: every match is an entry point. */
   globs: [
@@ -107,6 +123,16 @@ const ENTRY_POINTS = {
     // Playwright collects specs by path (playwright.config.ts testDir).
     'e2e/**/*.ts',
     'e2e/*.ts',
+    // Vitest collects unit specs by path (vitest.config.mts include:
+    // tests/unit/**/*.test.{ts,tsx}). setup.ts y stubs/server-only.ts los
+    // referencia vitest.config.mts (ver REFERRER_GLOBS).
+    'tests/unit/**/*.test.ts',
+    'tests/unit/**/*.test.tsx',
+    // `npx e2e run` (qa-e2e.yml) recoge los specs *.e2e.ts por path, igual
+    // que Playwright; assert-deps-security.mjs lo invoca el script
+    // test:deps de qa-e2e/package.json (ver REFERRER_GLOBS).
+    'qa-e2e/tests/*.e2e.ts',
+    'qa-e2e/tests/*.mjs',
     // `npm run` targets and standalone node utilities.
     'scripts/*.mjs',
     'scripts/*.ts',
@@ -408,6 +434,9 @@ function resolveTs(spec, fromRel) {
     const hit = firstExisting([
       ...TS_EXTS.map((e) => `${stem}${e}`),
       ...TS_EXTS.map((e) => `${stem}/index${e}`),
+      // Import relativo con extension explicita ('./public-ip.ts'): el stem ya
+      // es el fichero. Va el ultimo para no cambiar la resolucion habitual.
+      stem,
     ]);
     if (hit) return hit;
   }
@@ -457,6 +486,11 @@ const REFERRER_GLOBS = [
   'data-engine/Dockerfile*',
   'package.json',
   'playwright.config.ts',
+  // setupFiles y alias de Vitest nombran ficheros por path (tests/unit/setup.ts,
+  // tests/unit/stubs/server-only.ts).
+  'vitest.config.*',
+  // El script test:deps invoca tests/assert-deps-security.mjs por path.
+  'qa-e2e/package.json',
   'data-engine/alembic.ini',
   'data-engine/pyproject.toml',
   'docker-compose*.yml',
