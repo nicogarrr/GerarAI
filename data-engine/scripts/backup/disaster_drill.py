@@ -213,11 +213,51 @@ class DrillEnvironment:
                     print(f"[drill] {service} listo")
             if pending:
                 time.sleep(2)
-        require(
-            not pending,
-            f"los servicios {sorted(pending)} no respondieron en {timeout}s: "
-            "el drill no puede seguir (fallo, no un resultado verde)",
-        )
+        if pending:
+            raise FailClosedError(
+                f"los servicios {sorted(pending)} no respondieron en {timeout}s: "
+                "el drill no puede seguir (fallo, no un resultado verde).\n"
+                + self._diagnostico_contenedores(sorted(pending))
+            )
+
+    def _diagnostico_contenedores(self, servicios: list[str]) -> str:
+        """Estado y ultimas lineas de log de los contenedores que no arrancaron.
+
+        Un timeout de espera sin el log del contenedor es un fallo mudo: en CI
+        el runner se destruye y no hay forma de saber si la imagen no tiro del
+        entrypoint, pidio una variable o nunca llego a escuchar (medido
+        2026-10-31: bitnamilegacy/minio no acepta el comando `server ...` de la
+        imagen oficial y el drill solo decia "no respondio en 300s").
+        """
+        partes: list[str] = []
+        for servicio in servicios:
+            nombre = self.containers.get(servicio)
+            if not nombre:
+                continue
+            estado = run(
+                [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    "{{.State.Status}} exit={{.State.ExitCode}}",
+                    nombre,
+                ],
+                timeout=30,
+                check=False,
+                what="docker inspect",
+            ).stdout.strip()
+            logs = run(
+                ["docker", "logs", "--tail", "15", nombre],
+                timeout=30,
+                check=False,
+                what="docker logs",
+            )
+            lineas = (logs.stdout + logs.stderr).strip().splitlines()
+            partes.append(
+                f"{servicio} ({nombre}): {estado}; ultimas lineas: "
+                + redact(" | ".join(lineas[-8:]))
+            )
+        return "\n".join(partes)
 
     def _pg_query(self) -> bool:
         result = run(

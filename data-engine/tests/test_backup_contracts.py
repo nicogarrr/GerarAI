@@ -726,16 +726,31 @@ def test_block_on_main_exige_los_dos_drills():
     assert "needs.drill-script.result" in pasos
 
 
+def test_el_workflow_construye_la_imagen_minio_fijada_para_el_drill():
+    """El drill reproducible levanta el pin de _kit.MINIO_IMAGE (la imagen de
+    produccion, compilada desde docker/minio): el workflow la construye en el
+    runner, no la sustituye por otra de registro. La familia bitnamilegacy no
+    acepta el comando `server ...` de la imagen oficial (medido 2026-10-31, job
+    124386414236: contenedor muerto y espera de 300 s)."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "docker build" in text and "docker/minio" in text
+    assert "MINIO_IMAGE" in text, "el tag tiene que salir de _kit, no de una copia a mano"
+
+
 def test_el_drill_reproducible_acepta_override_de_registro_minio():
-    """Contrato con el workflow: CI no tiene la imagen local cavaai-minio (se
-    compila en la VM) y pasa --minio-image bitnamilegacy. Si el parser pierde
-    la opcion, el job drill-script se rompe."""
-    parser = DRILL  # disaster_drill.py
-    source = parser.read_text(encoding="utf-8")
-    assert '"--minio-image"' in source
+    """La opcion --minio-image sigue existiendo para hosts donde el build no
+    es posible; el parser no la puede perder."""
     mod = __import__("scripts.backup.disaster_drill", fromlist=["build_parser"])
     args = mod.build_parser().parse_args(["--minio-image", "bitnamilegacy/minio:2025.7.23-debian-12-r5"])
     assert args.minio_image == "bitnamilegacy/minio:2025.7.23-debian-12-r5"
+
+
+def test_el_drill_falla_con_diagnostico_de_contenedores():
+    """Un timeout de espera sin el log del contenedor es un fallo mudo: el
+    drill vuelca estado y ultimas lineas de cada servicio que no arranco."""
+    source = DRILL.read_text(encoding="utf-8")
+    assert "_diagnostico_contenedores" in source
+    assert '"logs"' in source and '"inspect"' in source
 
 
 def test_workflow_es_yaml_valido():
