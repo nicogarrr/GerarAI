@@ -3167,6 +3167,23 @@ def refresh_ticker_news(
     solo Yahoo y solo cotizadas en EEUU. Pacing 1,5 s entre peticiones.
     """
     actor_name = "refresh_ticker_news"
+    from app.services.provider_brake import PROVIDER_BRAKES, is_open, record_429, record_success
+
+    try:
+        brake_client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        brake_client = None
+    # Proveedores del barrido segun alcance: scope=all solo usa Yahoo.
+    brake_providers = ["yahoo"] if (scope == "all" and not ticker) else ["yahoo", "google-news"]
+    if all(is_open(brake_client, p) for p in brake_providers):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: no ack sin trabajar; reprogramar tras la pausa.
+            cooldown_ms = min(PROVIDER_BRAKES[p].cooldown_s for p in brake_providers) * 1000
+            raise dramatiq.Retry(
+                "Frenos de proveedor abiertos (429): barrido reprogramado tras la pausa",
+                delay=cooldown_ms,
+            )
+        return {"status": "skipped", "actor": actor_name, "reason": "provider_brakes_open"}
     try:
         from app.services.feed_ingestion_service import (
             FeedIngestionService,
@@ -3209,10 +3226,23 @@ def refresh_ticker_news(
                     lanes.append(("google-en", google_feed_url(company, lang="en")))
                     if company.ticker.upper() in PRIORITY_TICKERS:
                         lanes.append(("google-es", google_feed_url(company, lang="es")))
-                return lanes
+                # Freno por proveedor: el carril pausado (429) ni se intenta.
+                return [
+                    (lane, url)
+                    for lane, url in lanes
+                    if not is_open(brake_client, "yahoo" if lane == "yahoo" else "google-news")
+                ]
 
             def _fetch(company, lane, url):
+                provider = "yahoo" if lane == "yahoo" else "google-news"
                 result = _run(service.poll_rss(url, ticker=company.ticker, max_items=30))
+                if result.status == "error":
+                    # Solo el 429 alimenta el freno (fallo de cuota del
+                    # proveedor); un 404/500 es otro problema.
+                    if any(_status_from_message(str(m)) == 429 for m in result.errors):
+                        record_429(brake_client, provider)
+                else:
+                    record_success(brake_client, provider)
                 if lane == "yahoo":
                     return label_yahoo(result, company, _ticker_evidence_level)
                 return label_google(result, company, _ticker_evidence_level)
