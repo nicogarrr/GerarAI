@@ -647,7 +647,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     ) : (
                                         <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
                                     )}
-                                    {!item.alert_type.includes('news') && <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">{t('home.alerts.originalNotice')}</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>}
+                                    {!item.alert_type.includes('news') && <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-2 text-teal-300 sm:min-h-10">{t('home.alerts.originalNotice')}</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>}
                                     {(item.ticker || item.sourceUrl) && (
                                         <span className="mt-2 inline-flex flex-wrap gap-3">
                                             {item.ticker && (
