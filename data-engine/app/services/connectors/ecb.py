@@ -8,6 +8,10 @@ from xml.etree import ElementTree
 
 import httpx
 
+# XML externo (BCE): defusedxml solo para PARSEAR - entidades/DTD rechazadas
+# sin expandir (billion laughs); ParseError/Element siguen del stdlib.
+from defusedxml import ElementTree as DefusedElementTree
+
 from app.services.data_source_health import get_data_source_registry
 
 # Clave de este proveedor en el registry de salud de fuentes: sin registrar
@@ -33,7 +37,7 @@ class ECBClient:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.get(self.url)
                 response.raise_for_status()
-            root = ElementTree.fromstring(response.content)
+            root = DefusedElementTree.fromstring(response.content)
         except httpx.HTTPStatusError as exc:
             registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
             raise

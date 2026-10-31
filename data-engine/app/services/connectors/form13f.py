@@ -21,6 +21,9 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+# XML externo (SEC EDGAR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedET
+
 # Unica definicion de la URL de submissions (la de form4) y UN unico estado de
 # throttle, el de connectors/base.py.
 from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
@@ -197,7 +200,7 @@ def parse_information_table(xml_text: str) -> list[dict]:
                 return (child.text or "").strip() or None
         return None
 
-    root = ET.fromstring(xml_text)
+    root = DefusedET.fromstring(xml_text)
     if local(root.tag) != "informationTable":
         # Un 200 con HTML bien formado (challenge de WAF) parsea como XML;
         # la raíz oficial del esquema 13F es informationTable.
@@ -343,7 +346,7 @@ def parse_primary_summary(xml_text: str) -> dict:
         return tag.rsplit("}", 1)[-1]
 
     found: dict[str, str] = {}
-    root = ET.fromstring(xml_text)
+    root = DefusedET.fromstring(xml_text)
     # Raíz oficial del esquema thirteenffiler (ns sec.gov/edgar/thirteenffiler).
     if local(root.tag) != "edgarSubmission":
         raise ValueError("el documento no es un primary_doc 13F")

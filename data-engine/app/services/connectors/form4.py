@@ -30,6 +30,9 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+# XML externo (SEC EDGAR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedET
+
 from app.core.config import get_settings
 
 # El ritmo de la SEC es un estado UNICO de proceso (ver connectors/base.py):
@@ -215,7 +218,7 @@ def _is_form4_xml(text: str) -> bool:
     """Parseo real: solo vale XML bien formado con raíz <ownershipDocument>
     (esquema F345). `<div>AccessDenied</div>` o `<?xml><broken` no pasan."""
     try:
-        root = ET.fromstring(text)
+        root = DefusedET.fromstring(text)
     except ET.ParseError:
         return False
     return root.tag.rsplit("}", 1)[-1] == "ownershipDocument"
@@ -380,7 +383,7 @@ def parse_form4_xml(source: str | bytes) -> dict:
     Lanza ValueError si el XML no es un <ownershipDocument>.
     """
     try:
-        root = ET.fromstring(source)
+        root = DefusedET.fromstring(source)
     except ET.ParseError as exc:
         raise ValueError(f"malformed Form 4 XML: {exc}") from exc
     if root.tag != "ownershipDocument":
