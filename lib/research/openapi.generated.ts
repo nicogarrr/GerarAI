@@ -13264,6 +13264,52 @@ export interface components {
             /** Updated At */
             updated_at: string | null;
         };
+        /** WatchlistMonitorItemOut */
+        WatchlistMonitorItemOut: {
+            /** Currency */
+            currency: string | null;
+            /** Fair Value */
+            fair_value: number | null;
+            /** Fair Value As Of */
+            fair_value_as_of: string | null;
+            /** Fair Value Label */
+            fair_value_label: string;
+            /** Fair Value Publishable */
+            fair_value_publishable: boolean;
+            /** Fair Value Reason */
+            fair_value_reason: string | null;
+            /** Fair Value Source */
+            fair_value_source: ("tesis" | "motor" | "motor_orientativo") | null;
+            /** Fair Value Thesis Version */
+            fair_value_thesis_version: number | null;
+            /** Last Close */
+            last_close: number | null;
+            /** Last Close Date */
+            last_close_date: string | null;
+            /** Low 52W */
+            low_52w: number | null;
+            /** Low 52W Date */
+            low_52w_date: string | null;
+            /** Low 52W Sessions */
+            low_52w_sessions: number;
+            /** Next Earnings Confirmed */
+            next_earnings_confirmed: boolean | null;
+            /** Next Earnings Date */
+            next_earnings_date: string | null;
+            /** Next Earnings Source */
+            next_earnings_source: string | null;
+            /** Valuation Side */
+            valuation_side: ("infravalorada" | "sobrevalorada") | null;
+        };
+        /** WatchlistMonitorOut */
+        WatchlistMonitorOut: {
+            /** Earnings Status */
+            earnings_status: string;
+            /** Items */
+            items: {
+                [key: string]: components["schemas"]["WatchlistMonitorItemOut"];
+            };
+        };
         /** WorkProductRequest */
         WorkProductRequest: {
             /**
@@ -28415,9 +28461,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WatchlistMonitorOut"];
                 };
             };
             /** @description Validation Error */

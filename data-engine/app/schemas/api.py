@@ -2011,6 +2011,37 @@ class WatchlistItemOut(BaseModel):
     created_at: str | None
     updated_at: str | None
     analysis: WatchlistAnalysisStateOut | None
+# --- GET /api/watchlist/monitor -------------------------------------------------
+# Forma medida contra la ruta y fair_value_service.choose/_reading: item de 18
+# claves siempre (los huecos sin dato van a null, nunca se omiten).
+# valuation_side y fair_value_source son conjuntos cerrados medidos: Literal.
+# earnings_status: "skipped" o el estado del conector NASDAQ o "unavailable"
+# (no cerrado: str honesto).
+
+
+class WatchlistMonitorItemOut(BaseModel):
+    low_52w: float | None
+    low_52w_date: str | None
+    low_52w_sessions: int
+    last_close: float | None
+    last_close_date: str | None
+    fair_value: float | None
+    fair_value_thesis_version: int | None
+    fair_value_source: Literal["tesis", "motor", "motor_orientativo"] | None
+    fair_value_label: str
+    fair_value_as_of: str | None
+    fair_value_publishable: bool
+    fair_value_reason: str | None
+    valuation_side: Literal["infravalorada", "sobrevalorada"] | None
+    currency: str | None
+    next_earnings_date: str | None
+    next_earnings_source: str | None
+    next_earnings_confirmed: bool | None
+
+
+class WatchlistMonitorOut(BaseModel):
+    items: dict[str, WatchlistMonitorItemOut]
+    earnings_status: str
 
 
 # --- GET /api/portfolio/snapshots --------------------------------------------
