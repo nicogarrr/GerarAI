@@ -116,3 +116,5 @@ data-engine/htmlcov/
 reports/mutation/
 reports/mutation-baseline/
 data-engine/mutants/
+
+.env.frontend.production
