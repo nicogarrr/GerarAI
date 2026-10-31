@@ -114,6 +114,11 @@ def main() -> int:
             "synced_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "source": "SEC EDGAR (companyfacts/submissions oficiales)",
             # Proveniencia por archivo: sha1 del contenido oficial servido.
+            # Contrato del dataset HF ya publicado: el lector (sec_edgar.py)
+            # verifica cada fichero contra este digest; migrar a sha256
+            # exigiria cambiar escritor y lector y republicar el dataset.
+            # usedforsecurity=False es obligatorio (lo fija
+            # test_sec_hf_mirror_sha1_contract).
             "files": {p: hashlib.sha1(c, usedforsecurity=False).hexdigest() for p, c in uploads.items()},
         }).encode()
 

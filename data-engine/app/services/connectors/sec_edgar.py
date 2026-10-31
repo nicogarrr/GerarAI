@@ -309,6 +309,12 @@ async def mirror_get_json(url: str, *, direct_error: Exception | None = None) ->
             f"({mirror_response.status_code} {mirror_url})"
         ) from exc
     raw = mirror_response.content
+    # Contrato de proveniencia del mirror HF: sha1 verifica que el contenido
+    # servido casa con el declarado en el manifest del dataset ya publicado
+    # (detecta subidas parciales o corrupcion; usedforsecurity=False porque no
+    # es frontera criptografica: el manifest lo publica el mismo operador que
+    # sirve el contenido). Migrar a sha256 exigiria cambiar escritor y lector
+    # y republicar el dataset: queda abierto como mejora futura.
     actual_hash = hashlib.sha1(raw, usedforsecurity=False).hexdigest()
     if actual_hash != declared_hash:
         raise RuntimeError(
