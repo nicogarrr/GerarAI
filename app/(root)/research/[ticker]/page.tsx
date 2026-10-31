@@ -1649,6 +1649,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildDocumentsContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // Conexión 10a: las lecturas de la biblioteca enlazadas a este ticker se
     // piden en paralelo; si la biblioteca falla, la vista sigue sin ellas.
     const [documents, libraryReadings] = await Promise.all([
@@ -1658,18 +1659,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return (
       <div className="space-y-6">
         <details className="rounded-lg border border-gray-800 bg-surface-1 p-4" data-testid="add-source">
-          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">Añadir fuente (subir archivo o importar URL)</summary>
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">{t('research.fichaAddSource')}</summary>
           <div className="mt-4">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel title="Sube una fuente primaria"><MutationForm action={importResearchDocumentFile} className="grid grid-cols-1 gap-3" successMessage="Documento subido"><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder="Título del documento" required /><FileUploadInput name="file" required /><Button type="submit">Subir</Button></MutationForm></Panel>
-          <Panel title="Importar desde una URL"><MutationForm action={importResearchDocumentUrl} className="grid grid-cols-1 gap-3" successMessage="Documento importado"><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder="Título del documento" required /><Input name="url" type="url" placeholder="https://..." required /><Input name="source_type" placeholder="sec_filing / investor_relations" defaultValue="url" /><Button type="submit">Importar</Button></MutationForm></Panel>
+          <Panel title={t('research.fichaUploadPrimarySource')}><MutationForm action={importResearchDocumentFile} className="grid grid-cols-1 gap-3" successMessage={t('research.fichaDocUploaded')}><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder={t('research.fichaDocTitlePh')} required /><FileUploadInput name="file" required /><Button type="submit">{t('research.fichaUpload')}</Button></MutationForm></Panel>
+          <Panel title={t('research.fichaImportFromUrl')}><MutationForm action={importResearchDocumentUrl} className="grid grid-cols-1 gap-3" successMessage={t('research.fichaDocImported')}><input type="hidden" name="ticker" value={ticker} /><Input name="title" placeholder={t('research.fichaDocTitlePh')} required /><Input name="url" type="url" placeholder="https://..." required /><Input name="source_type" placeholder="sec_filing / investor_relations" defaultValue="url" /><Button type="submit">{t('research.fichaImport')}</Button></MutationForm></Panel>
         </div>
           </div>
         </details>
         {/* F249: las fichas enlazan a la fuente primaria cuando el
             documento tiene source_url (filings SEC la traen); sin URL la
             ficha queda como texto, nunca un enlace roto. */}
-        <Panel title="Documentos" actions={<Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/filings`}>Informe frente al año anterior</Link>}>
+        <Panel title={t('research.fichaDocuments')} actions={<Link className="text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}/filings`}>{t('research.fichaYearOverYearReport')}</Link>}>
           {documents.length ? (
             <DocumentsList
               documents={documents.map((document) => ({
@@ -1679,20 +1680,20 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                 tier: etiquetaTierFuente(document.source_tier),
                 tierRank: tierRankFuente(document.source_tier),
                 type: label(document.source_type),
-                published: document.published_at ? formatDate(document.published_at) : 'fecha desconocida',
+                published: document.published_at ? formatDate(document.published_at) : t('research.fichaUnknownDate'),
                 publishedTs: document.published_at ?? null,
               }))}
             />
           ) : (
             <EmptyState
-              action={<EmptyLink href="/research/sources">Importa tu primer documento</EmptyLink>}
-              title="Sin documentos ingeridos."
+              action={<EmptyLink href="/research/sources">{t('research.fichaImportFirstDoc')}</EmptyLink>}
+              title={t('research.fichaNoDocsIngested')}
             />
           )}
         </Panel>
-        <Panel title="Lecturas de la biblioteca" actions={<Link className="text-sm text-teal-300" href="/knowledge?tab=subir">Añadir a la biblioteca</Link>}>
+        <Panel title={t('research.fichaLibraryReadings')} actions={<Link className="text-sm text-teal-300" href="/knowledge?tab=subir">{t('research.fichaAddToLibrary')}</Link>}>
           {libraryReadings === null ? (
-            <EmptyState title="No se pudo cargar la biblioteca ahora mismo." />
+            <EmptyState title={t('research.fichaLibraryLoadError')} />
           ) : libraryReadings.length ? (
             <ul className="space-y-3">
               {libraryReadings.map((reading) => (
@@ -1701,14 +1702,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     <FileText className="h-4 w-4 text-teal-300" />
                     <Link className="font-medium text-gray-200 underline decoration-gray-700 underline-offset-4 transition hover:text-teal-200" href={libraryDocumentHref(reading.id)}>{reading.title}</Link>
                   </div>
-                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? 'Autor desconocido'}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
+                  <p className="mt-2 text-xs text-gray-500">{reading.author ?? t('research.fichaUnknownAuthor')}{reading.publication_date ? ` · ${formatDate(reading.publication_date)}` : ''}</p>
                 </li>
               ))}
             </ul>
           ) : (
             <EmptyState
-              action={<EmptyLink href="/knowledge">Asigna este ticker a un documento de la biblioteca</EmptyLink>}
-              title={`Ningún libro, carta o nota de la biblioteca está enlazado a ${ticker}.`}
+              action={<EmptyLink href="/knowledge">{t('research.fichaAssignTickerToDoc')}</EmptyLink>}
+              title={t('research.fichaNoLibraryLink', { ticker })}
             />
           )}
         </Panel>
@@ -1717,24 +1718,25 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildSourcesSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const audits = await viewData('sources');
     return (
-      <Panel title="Auditorías de fuentes">
+      <Panel title={t('research.fichaSourceAudits')}>
         {audits.length ? (
           <div className="space-y-3">
-            {audits.length > 100 ? <p className="text-xs text-gray-500">Se muestran 100 de {formatNumber(audits.length, { maximumFractionDigits: 0 })} auditorías: la última y hasta 99 anteriores.</p> : null}
+            {audits.length > 100 ? <p className="text-xs text-gray-500">{t('research.fichaAuditsShown', { total: formatNumber(audits.length, { maximumFractionDigits: 0 }) })}</p> : null}
             {/* Solo la auditoría más reciente a la vista; el historial de
                 versiones viejas queda plegado (era un muro de tarjetas casi
                 idénticas que se leía como bug). */}
             {(() => {
               const ordered = sortAuditsRecentFirst(audits);
-              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? `tesis v${audit.thesis_version}` : 'versión de tesis no registrada'}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>;
+              const renderAudit = (audit: (typeof ordered)[number]) => <div className="rounded-lg border border-gray-800 p-4" key={audit.id}><div className="flex flex-wrap gap-2"><Badge>{auditStatusLabel(audit.passed)}</Badge><Badge variant="outline">{auditScoreText(audit.passed, audit.source_coverage_score, String)}</Badge><Badge variant="outline">{audit.thesis_version != null ? t('research.fichaThesisVersionShort', { version: audit.thesis_version }) : t('research.fichaThesisVersionMissing')}</Badge></div><SourceAuditDetail audit={audit} ticker={ticker} /></div>;
               const previous = ordered.slice(1, 100);
               return <>
                 {renderAudit(ordered[0])}
                 {previous.length ? (
                   <details className="rounded-lg border border-gray-800 p-4">
-                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? 'auditoría anterior' : 'auditorías anteriores'} de versiones viejas de la tesis</summary>
+                    <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-gray-400">{formatNumber(previous.length, { maximumFractionDigits: 0 })} {previous.length === 1 ? t('research.fichaAuditPreviousSingular') : t('research.fichaAuditPreviousPlural')} {t('research.fichaAuditsOldVersions')}</summary>
                     <div className="mt-3 space-y-3">{previous.map(renderAudit)}</div>
                   </details>
                 ) : null}
@@ -1743,8 +1745,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         ) : (
           <EmptyState
-            action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>Genera una tesis para auditar fuentes</EmptyLink>}
-            title="Sin auditorías de fuentes persistidas."
+            action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>{t('research.fichaGenerateThesisForAudit')}</EmptyLink>}
+            title={t('research.fichaNoSourceAudits')}
           />
         )}
       </Panel>
@@ -1752,10 +1754,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildChatSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     return (
       <div className="space-y-6" id="chat-empresa" style={{ scrollMarginTop: '1rem' }}>
         <LegacyChatRedirect ticker={ticker} question={query.chat} />
-        <Panel title="Pregunta al Cerebro sobre esta empresa">
+        <Panel title={t('research.fichaAskBrain')}>
           {/* Sin chat propio: los atajos y el campo abren el Cerebro (panel
               global) con el ticker puesto, con su contexto de página e historial. */}
           <ChatIntentLinks ticker={ticker} />
