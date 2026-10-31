@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import type { DcaHitRates } from '@/lib/dca/types';
 import { dcaPercent } from '@/lib/dca/format';
 
@@ -12,9 +13,11 @@ function contrast(color: string | null): string {
 }
 
 /**
- * Tabla «¿Cuántas veces estaba más arriba?» por nivel de compra: % de meses
+ * Rejilla «¿Cuántas veces estaba más arriba?» por nivel de compra: % de meses
  * confirmados con señal cuyo cierre era más alto N meses después. Solo
- * histórico: sin dato en una celda se dice, no se rellena.
+ * histórico: sin dato en una celda se dice, no se rellena. Un solo DOM:
+ * en móvil cada señal es una tarjeta con sus horizontes etiquetados (sin
+ * scroll horizontal); desde sm se presenta como tabla de columnas.
  */
 const MONTHS = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
 
@@ -56,47 +59,52 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full' 
             {zoneVisitsLine(data) ? (
                 <p className="text-[11px] text-gray-400" data-testid="dca-zone-visits">{zoneVisitsLine(data)}</p>
             ) : null}
-            <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] border-separate border-spacing-y-1 text-xs">
-                    <caption className="sr-only">Porcentaje de meses con señal cuyo cierre era más alto N meses después</caption>
-                    <thead>
-                        <tr className="text-gray-400">
-                            <th scope="col" className="px-2 text-left font-medium">Señal</th>
-                            {data.horizons.map((h) => (
-                                <th key={h} scope="col" className="px-2 text-right font-medium">{h} m</th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {data.rows.map((row) => (
-                            <tr key={row.key}>
-                                <th scope="row" className="px-2 py-1 text-left">
-                                    <span
-                                        className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                                        style={{ backgroundColor: row.color ?? '#374151', color: contrast(row.color) }}
-                                    >
-                                        {row.label}
-                                    </span>
-                                    <span className="ml-2 text-[11px] font-normal text-gray-500">{INT.format(row.signal_months)} meses con señal</span>
-                                </th>
-                                {row.cells.map((cell) => {
-                                    const pct = dcaPercent(cell.pct_higher);
-                                    const avg = dcaPercent(cell.avg_return);
-                                    return (
-                                        <td key={cell.horizon_months} className="px-2 py-1 text-right tabular-nums text-gray-200">
-                                            {pct ?? <span className="text-gray-500">—</span>}
-                                            {!compact && cell.months > 0 ? (
-                                                <span className="block text-[10px] text-gray-500">
-                                                    n={INT.format(cell.months)}{avg ? ` · media ${avg}` : ''}
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            <div
+                role="table"
+                aria-label="Porcentaje de meses con señal cuyo cierre era más alto N meses después"
+                className="space-y-2 sm:space-y-1"
+                style={{ '--hcols': String(data.horizons.length) } as CSSProperties}
+            >
+                <div role="row" className="hidden border-b border-gray-800 pb-1 text-gray-400 sm:grid sm:grid-cols-[minmax(0,1.2fr)_repeat(var(--hcols),minmax(0,1fr))] sm:gap-x-2">
+                    <span role="columnheader" className="px-1 text-left text-[11px] font-medium">Señal</span>
+                    {data.horizons.map((h) => (
+                        <span key={h} role="columnheader" className="px-1 text-right text-[11px] font-medium">{h} m</span>
+                    ))}
+                </div>
+                {data.rows.map((row) => (
+                    <div
+                        key={row.key}
+                        role="row"
+                        className="rounded-lg border border-gray-800/80 p-2 sm:grid sm:grid-cols-[minmax(0,1.2fr)_repeat(var(--hcols),minmax(0,1fr))] sm:gap-x-2 sm:rounded-none sm:border-0 sm:border-b sm:border-gray-800/60 sm:p-0 sm:py-1"
+                    >
+                        <div role="rowheader" className="mb-1.5 flex items-center gap-2 sm:mb-0 sm:px-1">
+                            <span
+                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                style={{ backgroundColor: row.color ?? '#374151', color: contrast(row.color) }}
+                            >
+                                {row.label}
+                            </span>
+                            <span className="text-[11px] text-gray-500">{INT.format(row.signal_months)} meses con señal</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 sm:contents">
+                            {row.cells.map((cell) => {
+                                const pct = dcaPercent(cell.pct_higher);
+                                const avg = dcaPercent(cell.avg_return);
+                                return (
+                                    <div key={cell.horizon_months} role="cell" className="rounded bg-gray-900/60 px-2 py-1 tabular-nums text-gray-200 sm:bg-transparent sm:px-1 sm:py-0 sm:text-right">
+                                        <span className="block text-[10px] font-medium text-gray-500 sm:hidden">{cell.horizon_months} m</span>
+                                        {pct ?? <span className="text-gray-500">—</span>}
+                                        {!compact && cell.months > 0 ? (
+                                            <span className="block text-[10px] text-gray-500">
+                                                n={INT.format(cell.months)}{avg ? ` · media ${avg}` : ''}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
             </div>
             <p className="text-[11px] text-gray-500">
                 {data.disclaimer} Solo meses confirmados; mide el precio, no la rentabilidad de una cartera.
