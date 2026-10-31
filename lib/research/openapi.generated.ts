@@ -1235,6 +1235,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/companies/{ticker}/events/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Company Timeline Events
+         * @description Eventos guardados para el gráfico de precio (resultados, ex-dividendo, filings, insiders, noticias).
+         *
+         *     Lee solo la base de datos: no llama a Finnhub, GDELT, la SEC ni Yahoo. Todo evento lleva fecha y fuente.
+         */
+        get: operations["get_company_timeline_events_api_companies__ticker__events_timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/companies/{ticker}/expectation-reality": {
         parameters: {
             query?: never;
@@ -7384,6 +7406,22 @@ export interface components {
                 [key: string]: components["schemas"]["CompanySnapshotOut"];
             };
         };
+        /** CompanyTimelineEventsOut */
+        CompanyTimelineEventsOut: {
+            /** Currency */
+            currency?: string | null;
+            /** Desde */
+            desde: string;
+            /** Events */
+            events: components["schemas"]["TimelineEventOut"][];
+            /** Hasta */
+            hasta: string;
+            holding?: components["schemas"]["TimelineHoldingOut"] | null;
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+        };
         /** CompanyTtmOut */
         CompanyTtmOut: {
             /** As Of */
@@ -13111,6 +13149,30 @@ export interface components {
             /** Tickers */
             tickers: string[];
         };
+        /** TimelineEventOut */
+        TimelineEventOut: {
+            /** Date */
+            date: string;
+            /** Detail */
+            detail?: string | null;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Source */
+            source: string;
+            /** Source Url */
+            source_url?: string | null;
+            /** Title */
+            title: string;
+        };
+        /** TimelineHoldingOut */
+        TimelineHoldingOut: {
+            /** Average Cost */
+            average_cost?: number | null;
+            /** First Buy Date */
+            first_buy_date?: string | null;
+        };
         /** TransactionImportCommitRequest */
         TransactionImportCommitRequest: {
             /** Source Filename */
@@ -16184,6 +16246,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompanyEventsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_company_timeline_events_api_companies__ticker__events_timeline_get: {
+        parameters: {
+            query?: {
+                desde?: string | null;
+                hasta?: string | null;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyTimelineEventsOut"];
                 };
             };
             /** @description Validation Error */
