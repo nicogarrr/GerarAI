@@ -46,4 +46,9 @@ describe('Analistas: tooltips sin etiqueta de fuente', () => {
     assert.equal(esInsider.feed.canadaBadge, 'Canadá · fuente no oficial');
     assert.equal(enInsider.feed.canadaBadge, 'Canada · unofficial source');
   });
+  it('la nota de totales nombra a Canada sin proveedor y conserva el caracter no oficial', () => {
+    assert.match(esInsider.feed.totalsNote, /Canadá \(fuente no oficial\)/);
+    assert.match(enInsider.feed.totalsNote, /Canada \(unofficial source\)/);
+    assert.doesNotMatch(esInsider.feed.totalsNote + enInsider.feed.totalsNote, /Yahoo|Finnhub|FMP/i);
+  });
 });

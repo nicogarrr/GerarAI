@@ -107,7 +107,7 @@
     "statSells": "Ventas",
     "statClusters": "Clusters",
     "statCsuite": "Compras CEO/CFO",
-    "totalsNote": "Totales y señales: solo Form 4 (SEC, importes declarados en USD). Canadá (Yahoo, fuente no oficial) y PDMR del Reino Unido se listan en la tabla con su divisa declarada, sin sumarse aquí.",
+    "totalsNote": "Totales y señales: solo Form 4 (SEC, importes declarados en USD). Canadá (fuente no oficial) y PDMR del Reino Unido se listan en la tabla con su divisa declarada, sin sumarse aquí.",
     "clustersTitle": "Clusters de compra",
     "insiders": "{n} insiders",
     "bigBuysTitle": "Grandes compras",

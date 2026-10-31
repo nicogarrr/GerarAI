@@ -107,7 +107,7 @@
     "statSells": "Sales",
     "statClusters": "Clusters",
     "statCsuite": "CEO/CFO buys",
-    "totalsNote": "Totals and signals: Form 4 only (SEC, amounts declared in USD). Canada (Yahoo, unofficial source) and UK PDMR are listed in the table with their declared currency, without counting here.",
+    "totalsNote": "Totals and signals: Form 4 only (SEC, amounts declared in USD). Canada (unofficial source) and UK PDMR are listed in the table with their declared currency, without counting here.",
     "clustersTitle": "Buy clusters",
     "insiders": "{n} insiders",
     "bigBuysTitle": "Large buys",
