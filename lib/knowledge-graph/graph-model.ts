@@ -395,9 +395,9 @@ export type DetailField = {
 };
 
 /** Un campo ausente lleva su motivo: «N/D» solo, sin explicación, es una respuesta inutil. */
-function field(key: string, labelKey: TranslationKey, value: string | null, absent: string): DetailField {
+function field(key: string, labelKey: TranslationKey, value: string | null, absent: string, absentKey: TranslationKey, t?: (key: TranslationKey) => string): DetailField {
   const trimmed = typeof value === 'string' ? value.trim() : '';
-  return trimmed ? { key, labelKey, value: trimmed } : { key, labelKey, value: '', absent };
+  return trimmed ? { key, labelKey, value: trimmed } : { key, labelKey, value: '', absent: t ? t(absentKey) : absent };
 }
 
 /**
@@ -407,19 +407,19 @@ function field(key: string, labelKey: TranslationKey, value: string | null, abse
  * los atributos se nombran con la clave que devuelve el backend, igual que la
  * tabla de relaciones muestra `edge.type` tal cual.
  */
-export function describeDetail(scene: Scene, nodeId: number): DetailField[] {
+export function describeDetail(scene: Scene, nodeId: number, t?: (key: TranslationKey) => string): DetailField[] {
   const node = scene.nodeById.get(nodeId);
   if (!node) return [];
   const fields: DetailField[] = [
-    field('id', 'knowledgeGraph.detail.fields.id', `#${node.id}`, 'El backend no devolvio identificador para este nodo.'),
-    field('label', 'knowledgeGraph.detail.fields.label', node.label, 'El backend no devolvio etiqueta para este nodo.'),
-    field('type', 'knowledgeGraph.detail.fields.type', node.type, 'El backend no devolvio tipo para este nodo.'),
-    field('key', 'knowledgeGraph.detail.fields.key', node.key, 'El grafo no guarda clave propia para este tipo de nodo.'),
-    field('entityType', 'knowledgeGraph.detail.fields.entityType', node.entityType, 'Este nodo no esta enlazado con una entidad de otra tabla.'),
-    field('entityId', 'knowledgeGraph.detail.fields.entityId', node.entityId === null ? null : String(node.entityId), 'Este nodo no esta enlazado con una entidad de otra tabla.'),
-    field('confidence', 'knowledgeGraph.detail.fields.confidence', node.confidence === null ? null : `${Math.round(node.confidence * 100)}%`, 'El grafo no guarda confianza para este nodo.'),
-    field('degree', 'knowledgeGraph.detail.fields.degree', `${node.degree}`, 'Sin aristas incidentes: el grafo no relaciona este nodo con ninguno.'),
-    field('description', 'knowledgeGraph.detail.fields.description', node.description, 'El grafo no guarda descripción para este tipo de nodo.'),
+    field('id', 'knowledgeGraph.detail.fields.id', `#${node.id}`, 'El backend no devolvio identificador para este nodo.', 'knowledgeGraph.detail.absentReason.id', t),
+    field('label', 'knowledgeGraph.detail.fields.label', node.label, 'El backend no devolvio etiqueta para este nodo.', 'knowledgeGraph.detail.absentReason.label', t),
+    field('type', 'knowledgeGraph.detail.fields.type', node.type, 'El backend no devolvio tipo para este nodo.', 'knowledgeGraph.detail.absentReason.type', t),
+    field('key', 'knowledgeGraph.detail.fields.key', node.key, 'El grafo no guarda clave propia para este tipo de nodo.', 'knowledgeGraph.detail.absentReason.key', t),
+    field('entityType', 'knowledgeGraph.detail.fields.entityType', node.entityType, 'Este nodo no esta enlazado con una entidad de otra tabla.', 'knowledgeGraph.detail.absentReason.entity', t),
+    field('entityId', 'knowledgeGraph.detail.fields.entityId', node.entityId === null ? null : String(node.entityId), 'Este nodo no esta enlazado con una entidad de otra tabla.', 'knowledgeGraph.detail.absentReason.entity', t),
+    field('confidence', 'knowledgeGraph.detail.fields.confidence', node.confidence === null ? null : `${Math.round(node.confidence * 100)}%`, 'El grafo no guarda confianza para este nodo.', 'knowledgeGraph.detail.absentReason.confidence', t),
+    field('degree', 'knowledgeGraph.detail.fields.degree', `${node.degree}`, 'Sin aristas incidentes: el grafo no relaciona este nodo con ninguno.', 'knowledgeGraph.detail.absentReason.degree', t),
+    field('description', 'knowledgeGraph.detail.fields.description', node.description, 'El grafo no guarda descripción para este tipo de nodo.', 'knowledgeGraph.detail.absentReason.description', t),
   ];
   const attributes = Object.entries(node.attributes).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== '');
   if (!attributes.length) {
@@ -427,7 +427,7 @@ export function describeDetail(scene: Scene, nodeId: number): DetailField[] {
       key: 'attributes',
       labelKey: 'knowledgeGraph.detail.fields.attributes',
       value: '',
-      absent: 'El backend no devolvio atributos para este nodo.',
+      absent: t ? t('knowledgeGraph.detail.absentReason.attributes') : 'El backend no devolvio atributos para este nodo.',
     });
   } else {
     for (const [name, value] of attributes) {

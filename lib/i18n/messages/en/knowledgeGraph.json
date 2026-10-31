@@ -47,7 +47,6 @@
   "detail": {
     "title": "Node detail",
     "empty": "Select a node from the graph to see what the backend knows about it.",
-    "absent": "N/A",
     "neighborsTitle": "Neighbors ({count})",
     "noNeighbors": "This node has no relationships in the visible subgraph.",
     "directionOut": "out",
@@ -69,6 +68,18 @@
       "degree": "Degree",
       "description": "Description",
       "attributes": "Attributes"
+    },
+    "absent": "N/A",
+    "absentReason": {
+      "id": "The backend returned no identifier for this node.",
+      "label": "The backend returned no label for this node.",
+      "type": "The backend returned no type for this node.",
+      "key": "The graph keeps no key of its own for this node type.",
+      "entity": "This node is not linked to an entity in another table.",
+      "confidence": "The graph keeps no confidence for this node.",
+      "degree": "No incident edges: the graph does not relate this node to any other.",
+      "description": "The graph keeps no description for this node type.",
+      "attributes": "The backend returned no attributes for this node."
     }
   },
   "listing": {
