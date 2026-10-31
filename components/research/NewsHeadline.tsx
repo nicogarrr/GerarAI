@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import { newsDisplayTitle } from '@/lib/news-display';
 import { isTranslatable } from '@/lib/news-language';
+import { useT } from '@/lib/i18n/client';
 import { RelatedTickersStrip } from '@/components/research/RelatedTickersStrip';
 
 const queue: Array<() => void> = [];
@@ -20,6 +21,7 @@ function translate(id: number): Promise<string | null> {
 }
 
 export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
+  const t = useT();
   const original = event.original_headline ?? event.title;
   const [translated, setTranslated] = useState<string | null>(event.headline_translation?.text ?? null);
   const ref = useRef<HTMLDivElement>(null);
@@ -38,7 +40,7 @@ export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const title = translated ?? newsDisplayTitle(event.title, event.ticker, event.headline_from_source, event.original_headline);
   return <div ref={ref} className="break-words">
     {event.url ? <a className="inline-flex min-h-11 items-center hover:text-teal-200" href={event.url} rel="noreferrer" target="_blank">{title}</a> : title}
-    {translated ? <><span className="mt-1 block text-xs text-gray-500">Traducción automática · español</span><details className="mt-1 text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-3">Ver original</summary><p className="mt-1 break-words">{original}</p></details></> : null}
+    {translated ? <><span className="mt-1 block text-xs text-gray-500">{t('research.translate.autoLabel')}</span><details className="mt-1 text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-3">{t('research.translate.viewOriginal')}</summary><p className="mt-1 break-words">{original}</p></details></> : null}
     <RelatedTickersStrip items={event.related_tickers} />
   </div>;
 }

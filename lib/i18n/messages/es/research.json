@@ -46,5 +46,24 @@
     "incompletePrice": "precio incompleto",
     "blocked": "bloqueada",
     "insufficientData": "datos insuficientes"
+  },
+  "translate": {
+    "reason": {
+      "cooldown": "Reintento programado en unos minutos.",
+      "busy": "Otra traducción está en curso. Inténtalo en unos segundos.",
+      "budget": "Límite diario de traducción alcanzado.",
+      "quota": "Límite de traducciones por minuto alcanzado. Inténtalo en un minuto.",
+      "badOutput": "El traductor automático no dio un resultado fiable para este texto.",
+      "providerRateLimited": "Los traductores gratuitos están saturados ahora mismo. Inténtalo en unos minutos.",
+      "providerTimeout": "El traductor no respondió a tiempo. Inténtalo de nuevo en unos minutos.",
+      "provider": "El traductor falló. Inténtalo de nuevo en unos minutos.",
+      "changed": "La noticia cambió mientras se traducía. Inténtalo de nuevo."
+    },
+    "genericFailure": "Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.",
+    "autoLabel": "Traducción automática · español",
+    "viewTranslation": "Ver traducción",
+    "viewOriginal": "Ver original",
+    "translating": "Traduciendo…",
+    "translate": "Traducir"
   }
 }
