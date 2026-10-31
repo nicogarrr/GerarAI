@@ -26,5 +26,7 @@ class _Ticker:
 def test_volumen_nan_no_aborta_lote(monkeypatch):
     monkeypatch.setitem(sys.modules, "yfinance", SimpleNamespace(Ticker=_Ticker))
     bars = fetch_history_yfinance(["AAPL", "MSFT"])
-    assert [bar.volume for bar in bars["AAPL"]] == [0, 270]
+    # NaN de la fuente = volumen ausente (None), no 0: un 0 explicito es dato
+    # y un re-sync sin volumen no debe pisar el guardado (479abb3be).
+    assert [bar.volume for bar in bars["AAPL"]] == [None, 270]
     assert len(bars["MSFT"]) == 2
