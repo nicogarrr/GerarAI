@@ -10561,6 +10561,26 @@ export interface components {
             /** Source */
             source: string | null;
         };
+        /** PortfolioIbkrCsvImportOut */
+        PortfolioIbkrCsvImportOut: {
+            /** Duplicate Trades */
+            duplicate_trades: number;
+            /** Identity Warning */
+            identity_warning: string | null;
+            /** Legacy Reimport Blocked */
+            legacy_reimport_blocked: number;
+            /** Row Errors */
+            row_errors: string[];
+            /** Rows Skipped */
+            rows_skipped: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "imported";
+            /** Trades Imported */
+            trades_imported: number;
+        };
         /** PortfolioImportCommitOut */
         PortfolioImportCommitOut: {
             /** Duplicates Skipped */
@@ -23006,9 +23026,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIbkrCsvImportOut"];
                 };
             };
             /** @description Validation Error */

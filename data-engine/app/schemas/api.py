@@ -1792,6 +1792,21 @@ class PortfolioDividendSyncOut(BaseModel):
     currency_unknown: int
     results: list[DividendSyncResultOut]
     provenance: ProvenanceOut
+# --- POST /api/portfolio/import/ibkr/csv -------------------------------------
+# Forma medida contra IBKRImportService.import_ibkr_csv: exito -> las 8
+# claves siempre (identity_warning es null si todas las filas traen id;
+# CSV sin identificador -> aviso, medido en la rama has_rows_without_id).
+# Errores -> IBKRImportError -> 400, no wire.
+
+
+class PortfolioIbkrCsvImportOut(BaseModel):
+    status: Literal["imported"]
+    trades_imported: int
+    duplicate_trades: int
+    legacy_reimport_blocked: int
+    identity_warning: str | None
+    rows_skipped: int
+    row_errors: list[str]
 
 
 # --- GET /api/portfolio/snapshots --------------------------------------------

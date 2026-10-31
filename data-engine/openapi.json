@@ -12495,6 +12495,60 @@
         "title": "PortfolioFxSourceOut",
         "type": "object"
       },
+      "PortfolioIbkrCsvImportOut": {
+        "properties": {
+          "duplicate_trades": {
+            "title": "Duplicate Trades",
+            "type": "integer"
+          },
+          "identity_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Warning"
+          },
+          "legacy_reimport_blocked": {
+            "title": "Legacy Reimport Blocked",
+            "type": "integer"
+          },
+          "row_errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Row Errors",
+            "type": "array"
+          },
+          "rows_skipped": {
+            "title": "Rows Skipped",
+            "type": "integer"
+          },
+          "status": {
+            "const": "imported",
+            "title": "Status",
+            "type": "string"
+          },
+          "trades_imported": {
+            "title": "Trades Imported",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "trades_imported",
+          "duplicate_trades",
+          "legacy_reimport_blocked",
+          "identity_warning",
+          "rows_skipped",
+          "row_errors"
+        ],
+        "title": "PortfolioIbkrCsvImportOut",
+        "type": "object"
+      },
       "PortfolioImportCommitOut": {
         "properties": {
           "duplicates_skipped": {
@@ -62021,9 +62075,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Ibkr Csv Api Portfolio Import Ibkr Csv Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioIbkrCsvImportOut"
                 }
               }
             },

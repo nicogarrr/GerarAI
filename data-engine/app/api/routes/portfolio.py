@@ -41,6 +41,7 @@ from app.schemas.api import (
     PortfolioDividendSyncOut,
     PortfolioDividendYieldsOut,
     PortfolioForecastOut,
+    PortfolioIbkrCsvImportOut,
     PortfolioImportCommitOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
@@ -1504,7 +1505,7 @@ def import_ibkr_xml(payload: IBKRXmlImportRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/ibkr/csv")
+@router.post("/import/ibkr/csv", response_model=PortfolioIbkrCsvImportOut)
 def import_ibkr_csv(payload: IBKRCsvImportRequest, db: Session = Depends(get_db)) -> dict:
     try:
         return IBKRImportService().import_ibkr_csv(db, payload.csv)
