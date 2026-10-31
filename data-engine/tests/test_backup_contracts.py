@@ -44,6 +44,7 @@ RUNBOOK = BACKUP_DIR / "RUNBOOK.md"
 README = BACKUP_DIR / "README.md"
 DRILL = BACKUP_DIR / "disaster_drill.py"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "restore-drill.yml"
+CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
@@ -773,3 +774,40 @@ def test_exec_permission_denied_fails_closed_with_reason(monkeypatch):
     monkeypatch.setattr(_kit.subprocess, "run", denied)
     with pytest.raises(FailClosedError, match="no ejecutable"):
         _kit.run(["synthetic-command"], what="prueba")
+
+
+# --------------------------------------------------------------------------
+# Alcance del lint en el drill vs cobertura repo-wide en ci.yml
+# --------------------------------------------------------------------------
+
+
+def test_drill_lint_acotado_a_los_scripts_del_drill():
+    """El paso de lint del drill revisa SOLO scripts/backup y scripts/restore.
+
+    El lint de todo data-engine ya corre en el job backend-lint de ci.yml en
+    cada PR y push a main. Un `ruff check .` repo-wide dentro del drill
+    convertia errores de lint ajenos (acumulados en main por merges sin
+    esperar CI) en un drill rojo: una alarma falsa sobre los backups. Si
+    alguien vuelve a ampliarlo, este test lo detecta.
+    """
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "ruff check scripts/backup scripts/restore" in text, (
+        "el paso de lint del drill debe estar acotado a los scripts del drill"
+    )
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("run:") and "ruff" in stripped:
+            assert "check ." not in stripped, (
+                "el drill no debe volver a hacer `ruff check .` repo-wide: "
+                "eso ya lo cubre backend-lint en ci.yml"
+            )
+
+
+def test_ci_yml_mantiene_el_lint_repowide_que_cubre_el_resto():
+    """Si el drill va acotado, la cobertura repo-wide tiene que existir en
+    ci.yml; sin ella, estrechar el drill dejaria modulos sin lint."""
+    text = CI_WORKFLOW.read_text(encoding="utf-8")
+    assert "ruff check ." in text, (
+        "ci.yml debe mantener un job con `ruff check .` sobre data-engine "
+        "(hoy backend-lint): es la cobertura que permite acotar el drill"
+    )
