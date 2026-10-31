@@ -715,6 +715,18 @@ class Document(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "documents"
     __table_args__ = (
         Index("ix_documents_company_id", "company_id"),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_docs_health_src_cid",
+            "tenant_id", "source_type", "company_id",
+            postgresql_where=text("source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_docs_health_src_upd",
+            "tenant_id", "source_type", "updated_at",
+            postgresql_where=text("source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -815,6 +827,23 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "financial_facts"
     __table_args__ = (
         Index("ix_financial_facts_company_metric_year", "company_id", "metric", "fiscal_year"),
+        # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
+        Index(
+            "ix_facts_health_src_cid",
+            "tenant_id", "source_type", "company_id",
+            postgresql_where=text("is_reported AND source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
+        Index(
+            "ix_facts_health_src_upd",
+            "tenant_id", "source_type", "updated_at",
+            postgresql_where=text("is_reported AND source_type NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
+        Index(
+            "ix_facts_tenant_metric",
+            "tenant_id", "metric"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1091,6 +1120,13 @@ class MarketPrice(Base, TimestampMixin):
             "updated_at",
             postgresql_where=text("close > 0"),
         ),
+        # 0122: max(updated_at) por fuente en una sonda hacia atras.
+        Index(
+            "ix_prices_source_upd",
+            "source",
+            "updated_at",
+            postgresql_where=text("close > 0"),
+        ),
         CheckConstraint("close >= 0", name="ck_market_prices_close_non_negative"),
     )
 
@@ -1300,6 +1336,18 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "news_events"
     __table_args__ = (
         Index("ix_news_events_company_date", "company_id", "date"),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_news_health_src_cid",
+            "tenant_id", "source", "company_id",
+            postgresql_where=text("source NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
+        # 0122: barrido perezoso (skip scan) del panel data-health.
+        Index(
+            "ix_news_health_src_upd",
+            "tenant_id", "source", "updated_at",
+            postgresql_where=text("source NOT IN ('seed', 'manual', 'test', 'dummy', 'placeholder') AND company_id IS NOT NULL"),
+        ),
         # 0120: portada del feed ordena por (date DESC, id DESC) y para al
         # llenar la pagina; antes era Seq Scan + sort de toda la tabla.
         Index("ix_news_events_date_id", desc("date"), desc("id")),
