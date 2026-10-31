@@ -428,3 +428,34 @@ def test_portfolio_pdf_texto_dentro_del_area_visible(env):
         assert ys, "la página no tiene texto"
         assert min(ys) >= -1.0, f"texto por debajo del área visible (y={min(ys):.1f})"
         assert max(ys) <= height + 1.0, f"texto por encima del área visible (y={max(ys):.1f} > {height:.1f})"
+
+
+def test_portfolio_pdf_valuation_hold_shows_nd(env):
+    """Una posición con valoración en suspenso no inventa precio ni peso: muestra n/d
+    y se excluye del total (veracidad de datos, regla gerarai-money-none-to-zero)."""
+    client, factory, port_id = env
+
+    with factory() as s:
+        s.query(Position).filter(Position.portfolio_id == port_id).update(
+            {"valuation_hold_reason": "split pendiente de precio verificado"}
+        )
+        s.commit()
+
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    reader = PdfReader(io.BytesIO(res.content))
+    page1 = reader.pages[0].extract_text()
+    assert "n/d" in page1
+    assert "4.50" not in page1.replace("0,00", "")
+
+    # Sin suspensión no debe aparecer N/D en la tabla de cartera
+    with factory() as s:
+        s.query(Position).filter(Position.portfolio_id == port_id).update(
+            {"valuation_hold_reason": None}
+        )
+        s.commit()
+    res_ok = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res_ok.status_code == 200
+    page1_ok = PdfReader(io.BytesIO(res_ok.content)).pages[0].extract_text()
+    assert "n/d" not in page1_ok
+

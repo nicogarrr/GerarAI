@@ -1,3 +1,4 @@
+import logging
 import math
 from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal
@@ -63,6 +64,8 @@ from app.services.transaction_import_service import (
     TransactionImportService,
 )
 from app.valuation.currency import canonical_currency_code
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -1145,7 +1148,13 @@ def create_transaction_batch(
             try:
                 enqueue_fundamentals_seed(db, company.ticker)
             except Exception:  # noqa: BLE001
-                pass  # Never block batch on seed queue failures
+                # Nunca bloquear el lote por un fallo de la cola de seeds,
+                # pero dejar rastro: un fallo silencioso deja empresas sin fundamentales.
+                logger.warning(
+                    "No se pudo encolar fundamentals seed para %s; el lote continua",
+                    company.ticker,
+                    exc_info=True,
+                )
         
         # Commit the batch
         db.commit()

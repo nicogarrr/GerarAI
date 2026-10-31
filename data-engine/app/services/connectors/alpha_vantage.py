@@ -242,7 +242,7 @@ class AlphaVantageDailyBudget:
             try:
                 client.set(key, self.limit, ex=_BUDGET_KEY_TTL_SECONDS)
             except Exception:  # noqa: BLE001 — best-effort; la marca local ya corta
-                pass
+                logger.warning("No se pudo registrar el presupuesto diario en Redis; se usa la marca local", exc_info=True)
         with self._lock:
             self._memory_counts[day] = max(self._memory_counts.get(day, 0), self.limit)
 
@@ -255,7 +255,7 @@ class AlphaVantageDailyBudget:
                 if raw is not None:
                     return int(raw)
             except Exception:  # noqa: BLE001 — lectura degradada a memoria
-                pass
+                logger.warning("No se pudo leer el presupuesto diario de Redis; se degrada a memoria", exc_info=True)
         with self._lock:
             return self._memory_counts.get(day, 0)
 
