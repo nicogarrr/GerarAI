@@ -11,6 +11,8 @@ WORKDIR /app
 
 # Copiar archivos de dependencias
 COPY package.json package-lock.json* ./
+# npm prepare runs before the source tree is copied.
+COPY scripts/install-hooks.mjs ./scripts/install-hooks.mjs
 RUN npm ci
 
 # Builder - compilar la aplicación
