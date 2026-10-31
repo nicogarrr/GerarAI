@@ -163,12 +163,14 @@ class FinnhubClient:
         get_data_source_registry().record_success(REGISTRY_KEY)
         return [row for row in payload if isinstance(row, dict)]
 
-    async def metric(self, ticker: str) -> dict[str, Any]:
+    async def metric(self, ticker: str, *, max_retries: int | None = None) -> dict[str, Any]:
         """Basic financials (/stock/metric?metric=all): margenes, crecimiento,
         per-share, valoracion. Devuelve el dict "metric" tal cual (sin
         normalizar); el caller decide que hechos deriva y como los etiqueta.
         """
-        payload = await self._get("/stock/metric", {"symbol": ticker.upper(), "metric": "all"})
+        payload = await self._get(
+            "/stock/metric", {"symbol": ticker.upper(), "metric": "all"}, max_retries=max_retries
+        )
         if not isinstance(payload, dict) or not isinstance(payload.get("metric"), dict):
             get_data_source_registry().record_failure(
                 REGISTRY_KEY, "metrics sin objeto 'metric' (parse failed)"
