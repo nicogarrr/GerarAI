@@ -40,6 +40,8 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.models import FinancialFact
+from app.services.esef_fact_quarantine import fact_quarantine_reason
+from app.services.reviewed_eps_adjustments import eligible_fact
 from app.services.split_adjustment import split_factor_for_fact
 
 
@@ -71,6 +73,20 @@ class SourcedFact:
         if self.split_factor != 1.0:
             trace["split_factor"] = self.split_factor
         return trace
+
+
+
+def usable_fact(fact: FinancialFact) -> bool:
+    """Misma frontera que el snapshot del DCF: cuarentena ESEF y elegibilidad.
+
+    ``financial_snapshot._facts_for_metric``, watchlist, TTM, screener y el
+    market cap derivado rechazan estos hechos; una lectura directa que no lo
+    haga valora con una fila que el resto de superficies declara envenenada
+    (p. ej. el ``eps_diluted`` ESEF 1351 de EBRO, escala x1000: el PER saldria
+    mil veces menor). Un hecho en cuarentena no es "el ultimo": es ausente,
+    y se cae al limpio anterior si existe.
+    """
+    return not fact_quarantine_reason(fact) and eligible_fact(fact)
 
 
 def _to_sourced(fact: FinancialFact) -> SourcedFact | None:
@@ -125,14 +141,22 @@ def latest_facts(
     """
     resolved: dict[str, SourcedFact] = {}
     for metric in metrics:
-        row = db.scalar(
-            select(FinancialFact)
-            .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
-            .order_by(
-                FinancialFact.fiscal_year.desc().nullslast(),
-                desc(FinancialFact.created_at),
-            )
-            .limit(1)
+        # Sin LIMIT 1: la fila mas reciente puede estar en cuarentena y la
+        # usable es la anterior; el orden ya es "ultimo primero".
+        row = next(
+            (
+                candidate
+                for candidate in db.scalars(
+                    select(FinancialFact)
+                    .where(FinancialFact.company_id == company_id, FinancialFact.metric == metric)
+                    .order_by(
+                        FinancialFact.fiscal_year.desc().nullslast(),
+                        desc(FinancialFact.created_at),
+                    )
+                ).all()
+                if usable_fact(candidate)
+            ),
+            None,
         )
         if row is None:
             continue
