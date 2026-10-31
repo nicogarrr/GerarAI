@@ -228,7 +228,7 @@ class KeyStatsService:
         if stats.currency is None and yahoo:
             stats.currency = yahoo.get("currency")
         if yahoo is None:
-            stats.note = "No se pudo consultar Yahoo Finance ahora: faltan beta y ex-dividendo; reintenta en unos minutos."
+            stats.note = "No se pudo consultar el calendario del valor ahora: faltan beta y ex-dividendo; reintenta en unos minutos."
         return stats
 
 
