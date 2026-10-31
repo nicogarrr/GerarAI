@@ -1794,6 +1794,18 @@ class PortfolioDividendSyncOut(BaseModel):
     provenance: ProvenanceOut
 
 
+# --- GET /api/alerts/telegram-status -----------------------------------------
+# Forma medida contra la ruta: cuatro booleanos siempre (solo presencia de
+# config; ningun secreto sale por la API, ver docstring de la ruta).
+
+
+class AlertsTelegramStatusOut(BaseModel):
+    enabled: bool
+    has_bot_token: bool
+    has_chat_id: bool
+    configured: bool
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto

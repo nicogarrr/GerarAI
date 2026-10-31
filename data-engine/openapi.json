@@ -170,6 +170,34 @@
         "title": "AlertRuleOut",
         "type": "object"
       },
+      "AlertsTelegramStatusOut": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "has_bot_token": {
+            "title": "Has Bot Token",
+            "type": "boolean"
+          },
+          "has_chat_id": {
+            "title": "Has Chat Id",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "has_bot_token",
+          "has_chat_id",
+          "configured"
+        ],
+        "title": "AlertsTelegramStatusOut",
+        "type": "object"
+      },
       "AnalystConsensus": {
         "properties": {
           "high": {
@@ -22586,9 +22614,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Telegram Status Api Alerts Telegram Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AlertsTelegramStatusOut"
                 }
               }
             },

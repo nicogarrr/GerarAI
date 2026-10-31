@@ -1,5 +1,6 @@
 from app.schemas.api import (
     AlertRuleOut,
+    AlertsTelegramStatusOut,
     CalculatedMetricOut,
     CalculatedMetricsResponse,
     ChatPageContext,
@@ -95,6 +96,7 @@ __all__ = [
     "ResearchSessionOut",
     "ResearchAlertAction",
     "AlertRuleOut",
+    "AlertsTelegramStatusOut",
     "ResearchAlertChannels",
     "ResearchAlertOut",
     "ResearchReviewOut",

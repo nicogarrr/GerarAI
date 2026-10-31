@@ -6567,6 +6567,17 @@ export interface components {
              */
             updated_at: string;
         };
+        /** AlertsTelegramStatusOut */
+        AlertsTelegramStatusOut: {
+            /** Configured */
+            configured: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Has Bot Token */
+            has_bot_token: boolean;
+            /** Has Chat Id */
+            has_chat_id: boolean;
+        };
         /** AnalystConsensus */
         AnalystConsensus: {
             /** High */
@@ -13597,9 +13608,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["AlertsTelegramStatusOut"];
                 };
             };
             /** @description Validation Error */
