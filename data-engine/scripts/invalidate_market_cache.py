@@ -19,8 +19,14 @@ import sys
 def main() -> int:
     from app.core.cache import invalidate_market_data_cache
 
-    invalidate_market_data_cache()
-    print("Caché global de mercado invalidada (prefijo market_data:* borrado de Redis).")
+    deleted = invalidate_market_data_cache()
+    if deleted is None:
+        print(
+            "ERROR: Redis no disponible o fallo el borrado; la cache de mercado NO se ha invalidado.",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"Cache global de mercado invalidada: {deleted} claves borradas (prefijo market_data:*).")
     return 0
 
 

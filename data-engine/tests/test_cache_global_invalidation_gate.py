@@ -134,3 +134,72 @@ def test_tenant_scoped_invalidations_unaffected_when_gate_closed(monkeypatch):
     for path in ("/api/cache/invalidate/portfolio", "/api/cache/invalidate/dca"):
         res = signed_request(client, SECRET, tenant, "u1", "POST", path)
         assert res.status_code == 200, res.text
+
+
+# --- Contrato verificable del borrado (retencion del piloto en #3574) ---
+#
+# invalidate_market_data_cache devolvia None siempre y tragaba los fallos:
+# el script de ops salia 0 sin haber borrado nada. Ahora devuelve el numero
+# de claves borradas, o None si Redis no esta disponible o el borrado falla
+# (los llamadores que ignoran el retorno no cambian de comportamiento).
+
+import app.core.cache as cache_core
+from scripts import invalidate_market_cache as invalidate_script
+
+
+class _FakeRedis:
+    def __init__(self, keys: list[str], *, fail_scan: bool = False):
+        self._keys = keys
+        self._fail_scan = fail_scan
+        self.deleted: list[str] = []
+
+    def scan(self, cursor: int, match: str, count: int):
+        if self._fail_scan:
+            raise ConnectionError("redis down")
+        return 0, list(self._keys)
+
+    def delete(self, *keys: str) -> int:
+        self.deleted.extend(keys)
+        return len(keys)
+
+
+def test_invalidate_returns_none_when_redis_unavailable(monkeypatch):
+    monkeypatch.setattr(cache_core, "_redis_client", lambda: None)
+    assert cache_core.invalidate_market_data_cache() is None
+
+
+def test_invalidate_counts_deleted_keys(monkeypatch):
+    fake = _FakeRedis(["k1", "k2", "k3"])
+    monkeypatch.setattr(cache_core, "_redis_client", lambda: fake)
+    assert cache_core.invalidate_market_data_cache() == 3
+    assert fake.deleted == ["k1", "k2", "k3"]
+
+
+def test_invalidate_zero_keys_is_success(monkeypatch):
+    fake = _FakeRedis([])
+    monkeypatch.setattr(cache_core, "_redis_client", lambda: fake)
+    assert cache_core.invalidate_market_data_cache() == 0
+
+
+def test_invalidate_returns_none_on_error(monkeypatch):
+    fake = _FakeRedis([], fail_scan=True)
+    monkeypatch.setattr(cache_core, "_redis_client", lambda: fake)
+    assert cache_core.invalidate_market_data_cache() is None
+
+
+def test_script_exit_1_when_redis_unavailable(monkeypatch, capsys):
+    monkeypatch.setattr(cache_core, "invalidate_market_data_cache", lambda: None)
+    assert invalidate_script.main() == 1
+    assert "no disponible" in capsys.readouterr().err.lower()
+
+
+def test_script_prints_count_and_exits_0(monkeypatch, capsys):
+    monkeypatch.setattr(cache_core, "invalidate_market_data_cache", lambda: 7)
+    assert invalidate_script.main() == 0
+    assert "7" in capsys.readouterr().out
+
+
+def test_script_zero_keys_exits_0(monkeypatch, capsys):
+    monkeypatch.setattr(cache_core, "invalidate_market_data_cache", lambda: 0)
+    assert invalidate_script.main() == 0
+    assert "0" in capsys.readouterr().out
