@@ -519,7 +519,8 @@ def test_hold_consumers_risk_alert_snapshot_and_api_do_not_present_a_zero_quote(
     risk = RiskService().dashboard(db)
     assert [h["ticker"] for h in risk["valuation_hold"]] == [c.ticker]
     assert risk["status"] == "incomplete_valuation"
-    rows = list_positions(limit=500, offset=0, db=db)
+    # El endpoint devuelve el sobre paginado (items + page_info), no la lista.
+    rows = list_positions(limit=500, offset=0, db=db)["items"]
     row = next(r for r in rows if r["ticker"] == c.ticker)
     assert row["market_price"] is None and row["market_value"] is None
     assert row["market_value_native"] is None and row["unrealized_pnl_native"] is None

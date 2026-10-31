@@ -338,18 +338,20 @@ def test_pagination_caps_are_enforced(perf_db) -> None:
     from app.api.routes import portfolio as portfolio_routes
 
     db, _counter, _today = perf_db
-    assert len(portfolio_routes.transactions(limit=5, offset=0, db=db)) == 5
-    assert len(portfolio_routes.transactions(limit=5, offset=5, db=db)) == 5
-    assert len(portfolio_routes.positions(limit=5, offset=0, db=db)) == 5
-    assert len(portfolio_routes.positions(limit=5, offset=5, db=db)) == 5
-    assert len(portfolio_routes.list_fx_rates(limit=1, offset=0, db=db)) == 1
+    # Contrato paginado actual: /transactions/page y sobres items+page_info.
+    assert len(portfolio_routes.transactions_page(limit=5, offset=0, db=db)["items"]) == 5
+    assert len(portfolio_routes.transactions_page(limit=5, offset=5, db=db)["items"]) == 5
+    assert len(portfolio_routes.positions(limit=5, offset=0, db=db)["items"]) == 5
+    assert len(portfolio_routes.positions(limit=5, offset=5, db=db)["items"]) == 5
+    assert len(portfolio_routes.list_fx_rates(limit=1, offset=0, db=db)["items"]) == 1
     assert len(companies_routes.list_companies(limit=5, offset=0, db=db)) == 5
     assert len(companies_routes.list_companies(limit=5, offset=25, db=db)) == 0
     # Los techos existen en la firma (Query le=...).
     import inspect as _inspect
 
     for fn, name, ceiling in [
-        (portfolio_routes.transactions, "transactions", 1000),
+        # /transactions usa page/page_size; el listado limit/offset es /transactions/page.
+        (portfolio_routes.transactions_page, "transactions_page", 200),
         (portfolio_routes.positions, "positions", 2000),
         (portfolio_routes.list_fx_rates, "fx-rates", 2000),
         (companies_routes.list_companies, "companies", 500),
