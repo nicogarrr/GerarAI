@@ -22553,9 +22553,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["FXRateOut"];
                 };
             };
             /** @description Validation Error */
