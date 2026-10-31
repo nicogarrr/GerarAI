@@ -350,6 +350,34 @@ def _probe_client(provider: str) -> httpx.AsyncClient:
     )
 
 
+# Cota de lectura del /models de la prueba: el listado real de cualquier
+# proveedor cabe en decenas de KB, pero la base_url custom la define el
+# tenant y un endpoint roto o malicioso podria responder un cuerpo infinito:
+# sin cota, cada prueba de conexion bufferizaria todo en memoria del backend.
+_PROBE_MAX_BODY_BYTES = 512 * 1024
+
+
+async def _bounded_get(
+    client: httpx.AsyncClient, url: str, headers: dict[str, str]
+) -> httpx.Response:
+    """GET que nunca bufferiza mas de ``_PROBE_MAX_BODY_BYTES``.
+
+    Lee en streaming y corta al llegar a la cota; el cuerpo truncado hace
+    fallar el parseo despues (la prueba queda "no verificable", honesta) en
+    vez de inflar la memoria del worker.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    async with client.stream("GET", url, headers=headers) as response:
+        status = response.status_code
+        async for chunk in response.aiter_bytes(64 * 1024):
+            chunks.append(chunk)
+            total += len(chunk)
+            if total >= _PROBE_MAX_BODY_BYTES:
+                break
+    return httpx.Response(status, content=b"".join(chunks))
+
+
 def _model_ids(response: httpx.Response) -> set[str] | None:
     """Ids del listado /models (forma OpenAI {"data": [{"id": ...}]}).
 
@@ -381,7 +409,7 @@ async def probe_connection(
     }
     try:
         async with _probe_client(provider) as client:
-            response = await client.get(endpoint, headers=headers)
+            response = await _bounded_get(client, endpoint, headers)
     except httpx.TimeoutException:
         return {
             "ok": False,
