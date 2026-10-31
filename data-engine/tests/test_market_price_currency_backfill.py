@@ -159,3 +159,88 @@ def test_pacing_pausa_entre_llamadas_al_proveedor(db):
 
     assert pauses == [1.5]  # pausa ENTRE llamadas, no antes de la primera
     assert fetcher.calls == ["AAPL", "MSFT"]
+
+
+def test_dry_run_no_mantiene_transaccion_abierta_durante_la_red(db):
+    """Regresion prod 31-oct-2026: dry-run de 1000 tickers, ~27 min de red con
+    la transaccion de la lectura inicial abierta -> IdleInTransactionSessionTimeout.
+    Al llegar la llamada de red no puede haber transaccion viva."""
+    aapl = _company(db, "AAPL")
+    msft = _company(db, "MSFT")
+    _bar(db, aapl, date(2026, 10, 28), None)
+    _bar(db, msft, date(2026, 10, 28), None)
+    estados = []
+
+    async def espia(ticker: str):
+        estados.append(db.in_transaction())
+        return "USD"
+
+    result = asyncio.run(backfill_quote_currency(
+        db, fetch_currency=espia, dry_run=True, sleep=_no_sleep))
+
+    assert result["companies_updated"] == 2
+    assert estados == [False, False]  # red sin transaccion abierta, siempre
+
+
+def test_commit_acotado_por_empresa(db):
+    """Cada empresa commitea al terminar la suya: un corte a mitad no pierde
+    el trabajo ya hecho ni mantiene una transaccion viva entre tickers."""
+    aapl = _company(db, "AAPL")
+    msft = _company(db, "MSFT")
+    _bar(db, aapl, date(2026, 10, 28), None)
+    _bar(db, msft, date(2026, 10, 28), None)
+    commits = []
+    commit_real = db.commit
+
+    def espia_commit():
+        commits.append(1)
+        return commit_real()
+
+    db.commit = espia_commit
+    result = asyncio.run(backfill_quote_currency(
+        db, fetch_currency=_Fetcher({"AAPL": "USD", "MSFT": "EUR"}), sleep=_no_sleep))
+
+    assert result["companies_updated"] == 2
+    assert len(commits) == 2  # un commit por empresa, no uno global al final
+
+
+def test_fallo_de_bd_en_un_ticker_no_aborta_el_barrido(db):
+    aapl = _company(db, "AAPL")
+    msft = _company(db, "MSFT")
+    _bar(db, aapl, date(2026, 10, 28), None)
+    _bar(db, msft, date(2026, 10, 28), None)
+    execute_real = db.execute
+    llamadas = {"n": 0}
+
+    def execute_fallido(*args, **kwargs):
+        llamadas["n"] += 1
+        if llamadas["n"] == 2:  # 1=lectura de objetivos, 2=primer UPDATE
+            raise RuntimeError("IdleInTransactionSessionTimeout")
+        return execute_real(*args, **kwargs)
+
+    db.execute = execute_fallido
+    result = asyncio.run(backfill_quote_currency(
+        db, fetch_currency=_Fetcher({"AAPL": "USD", "MSFT": "EUR"}), sleep=_no_sleep))
+
+    assert result["companies_updated"] == 1
+    assert result["unresolved"] == [{"ticker": "AAPL", "reason": "db_error: RuntimeError"}]
+    unidades = dict(
+        db.execute(select(Company.ticker, MarketPrice.quote_currency)
+                   .join(Company, Company.id == MarketPrice.company_id)).all()
+    )
+    assert unidades == {"AAPL": None, "MSFT": "EUR"}  # el siguiente ticker siguió
+
+
+def test_log_de_progreso_por_ticker(db, caplog):
+    aapl = _company(db, "AAPL")
+    msft = _company(db, "MSFT")
+    _bar(db, aapl, date(2026, 10, 28), None)
+    _bar(db, msft, date(2026, 10, 28), None)
+
+    with caplog.at_level("INFO", logger="backfill_market_price_currency"):
+        asyncio.run(backfill_quote_currency(
+            db, fetch_currency=_Fetcher({"AAPL": "USD", "MSFT": "EUR"}), sleep=_no_sleep))
+
+    lineas = [r.getMessage() for r in caplog.records if r.name == "backfill_market_price_currency"]
+    assert any("[1/2] AAPL" in linea for linea in lineas)
+    assert any("[2/2] MSFT" in linea for linea in lineas)
