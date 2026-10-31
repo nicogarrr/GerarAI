@@ -40,6 +40,15 @@ class DataSourceStatus:
     # None hasta la primera comprobación real: la fuente nunca se ha sondeado.
     last_checked_at: str | None = None
     fallback_source: str | None = None
+    # True solo si hay codigo que EJECUTA el respaldo al fallar la fuente
+    # (medido 2026-10-31): sec_edgar->hf_snapshot (mirror en 401/403),
+    # esef->esef_snapshot (ingesta desde snapshot local), qdrant->keyword_search
+    # (modo lexical_only cuando el vector no responde), damodaran->settings_erp
+    # (WACC vuelve al ERP de settings declarando procedencia). False cuando es
+    # solo una intencion declarada: yahoo->alpha_vantage (AV sin consumidores),
+    # ecb->cached_fx (mecanismo inexistente), redis->in_memory_lru (cached es
+    # fail-open: sin Redis ejecuta la funcion, no hay LRU en memoria).
+    fallback_automatic: bool = False
     response_time_ms: float = 0.0
     _transition_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
@@ -99,6 +108,7 @@ class DataSourceStatus:
             "consecutive_failures": self.consecutive_failures,
             "last_checked_at": self.last_checked_at,
             "fallback_source": self.fallback_source,
+            "fallback_automatic": self.fallback_automatic,
             "response_time_ms": round(self.response_time_ms, 2),
         }
 
@@ -152,16 +162,19 @@ class DataSourceHealthRegistry:
                 name="Damodaran (NYU Stern)",
                 is_primary=False,
                 fallback_source="settings_erp",
+                fallback_automatic=True,
             ),
             "sec_edgar": DataSourceStatus(
                 name="SEC EDGAR",
                 is_primary=False,
                 fallback_source="hf_snapshot",
+                fallback_automatic=True,
             ),
             "esef": DataSourceStatus(
                 name="ESEF (filings.xbrl.org)",
                 is_primary=False,
                 fallback_source="esef_snapshot",
+                fallback_automatic=True,
             ),
             "openfigi": DataSourceStatus(
                 name="OpenFIGI",
@@ -187,6 +200,7 @@ class DataSourceHealthRegistry:
                 name="Qdrant Vector Database",
                 is_primary=True,
                 fallback_source="keyword_search",
+                fallback_automatic=True,
             ),
             "redis": DataSourceStatus(
                 name="Redis Cache",

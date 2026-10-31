@@ -100,16 +100,19 @@ def _message(source: dict[str, Any]) -> tuple[str, str, str]:
     if source.get("last_checked_at"):
         parts.append(f"Última comprobación: {source['last_checked_at']} (UTC).")
     if source.get("fallback_source"):
-        # VERACIDAD: el registry DECLARA un respaldo (yahoo->alpha_vantage,
-        # ecb->cached_fx) pero ningun codigo lo ejecuta (medido 2026-10-31:
-        # el cliente AV no tiene consumidores fuera de /health y "cached_fx"
-        # no existe como mecanismo). Decir "configurada" afirmaba una
-        # resiliencia que el sistema no tiene.
-        parts.append(
-            f"Fuente de respaldo prevista: {source['fallback_source']} "
-            "(declarada en el registry, sin degradación automática cableada: "
-            "la conmutación es manual hoy)."
-        )
+        # VERACIDAD por fuente: el registry distingue respaldo EJECUTADO por
+        # codigo (fallback_automatic=True: SEC->mirror HF, ESEF->snapshot,
+        # Qdrant->lexical, Damodaran->settings) de respaldo solo DECLARADO
+        # (yahoo->AV sin consumidores, ecb->cached_fx inexistente,
+        # redis->in_memory_lru sin LRU: cached es fail-open).
+        if source.get("fallback_automatic"):
+            parts.append(f"Fuente de respaldo automática: {source['fallback_source']}.")
+        else:
+            parts.append(
+                f"Fuente de respaldo prevista: {source['fallback_source']} "
+                "(declarada en el registry, sin degradación automática cableada: "
+                "la conmutación es manual hoy)."
+            )
     parts.append(
         "Causa posible: CAPTCHA, cambio de formato del proveedor, límite de cuota "
         "o bloqueo de IP; la causa registrada está en los logs del worker. "
