@@ -1759,6 +1759,39 @@ class PortfolioImportCommitOut(BaseModel):
     imported_count: int
     duplicates_skipped: int
     import_batch: str
+# --- POST /api/portfolio/dividends/sync --------------------------------------
+# Envelope medido contra DividendIngestionService.sync_portfolio (6 claves
+# siempre presentes). Los items de results varian por rama, medido contra
+# ProviderIngestionService.sync_company y el override de dividendos:
+# - ok: ticker/status/source/inserted/existing/skipped/fetched_at
+#   (+ split_readjustments_healed si hubo cura; + currency_unknown_rows y
+#   reason, con status currency_unknown, si el proveedor no informo divisa)
+# - unknown_company: ticker/status/inserted/existing
+# - no_safe_symbol / unavailable: + error
+# Por eso todo lo demas es opcional y la ruta usa exclude_unset.
+
+
+class DividendSyncResultOut(BaseModel):
+    ticker: str
+    status: Literal["ok", "unavailable", "unknown_company", "no_safe_symbol", "currency_unknown"]
+    inserted: int
+    existing: int
+    error: str | None = None
+    source: str | None = None
+    skipped: dict[str, int] | None = None
+    fetched_at: str | None = None
+    split_readjustments_healed: int | None = None
+    currency_unknown_rows: int | None = None
+    reason: str | None = None
+
+
+class PortfolioDividendSyncOut(BaseModel):
+    companies: int
+    synced: int
+    unavailable: int
+    currency_unknown: int
+    results: list[DividendSyncResultOut]
+    provenance: ProvenanceOut
 
 
 # --- GET /api/portfolio/snapshots --------------------------------------------

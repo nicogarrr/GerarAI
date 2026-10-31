@@ -5421,6 +5421,121 @@
         "title": "DividendProjectionPositionOut",
         "type": "object"
       },
+      "DividendSyncResultOut": {
+        "properties": {
+          "currency_unknown_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Unknown Rows"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "existing": {
+            "title": "Existing",
+            "type": "integer"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "inserted": {
+            "title": "Inserted",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "skipped": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "split_readjustments_healed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Readjustments Healed"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unavailable",
+              "unknown_company",
+              "no_safe_symbol",
+              "currency_unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "status",
+          "inserted",
+          "existing"
+        ],
+        "title": "DividendSyncResultOut",
+        "type": "object"
+      },
       "DividendUncertainEventOut": {
         "properties": {
           "amounts": {
@@ -12102,6 +12217,46 @@
           "coverage"
         ],
         "title": "PortfolioDividendProjectionOut",
+        "type": "object"
+      },
+      "PortfolioDividendSyncOut": {
+        "properties": {
+          "companies": {
+            "title": "Companies",
+            "type": "integer"
+          },
+          "currency_unknown": {
+            "title": "Currency Unknown",
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/DividendSyncResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "synced": {
+            "title": "Synced",
+            "type": "integer"
+          },
+          "unavailable": {
+            "title": "Unavailable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "companies",
+          "synced",
+          "unavailable",
+          "currency_unknown",
+          "results",
+          "provenance"
+        ],
+        "title": "PortfolioDividendSyncOut",
         "type": "object"
       },
       "PortfolioDividendYieldsOut": {
@@ -59720,9 +59875,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Sync Portfolio Dividends Api Portfolio Dividends Sync Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioDividendSyncOut"
                 }
               }
             },
