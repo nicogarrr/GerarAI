@@ -1537,7 +1537,7 @@ async def upload_transaction_import_file(
         if len(content) > MAX_IMPORT_BYTES:
             raise HTTPException(
                 status_code=413,
-                detail=f"El archivo supera el maximo de {MAX_IMPORT_BYTES // (1024 * 1024)} MB para importacion",
+                detail=f"El archivo supera el máximo de {MAX_IMPORT_BYTES // (1024 * 1024)} MB para importación",
             )
     content = bytes(content)
     try:

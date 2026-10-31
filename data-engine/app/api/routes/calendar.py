@@ -50,7 +50,7 @@ def _resolve_range(desde: date | None, hasta: date | None) -> tuple[date, date]:
     if (end - start).days + 1 > calendar_connector.MAX_DAYS_PER_REQUEST:
         raise HTTPException(
             status_code=400,
-            detail=f"rango maximo: {calendar_connector.MAX_DAYS_PER_REQUEST} dias",
+            detail=f"rango máximo: {calendar_connector.MAX_DAYS_PER_REQUEST} días",
         )
     return start, end
 
@@ -104,7 +104,7 @@ def followed_earnings_calendar(
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
     if (end - start).days > 366:
-        raise HTTPException(status_code=400, detail="rango maximo: 366 dias")
+        raise HTTPException(status_code=400, detail="rango máximo: 366 días")
     return followed_calendar(db, start, end)
 
 
