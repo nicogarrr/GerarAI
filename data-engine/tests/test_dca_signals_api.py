@@ -226,9 +226,13 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
     servidor el job diario sale «disabled» cada noche, ningun ticker tiene
     nivel y el panel decia «Sin evaluar» sin explicar por que. El listado
     declara ahora si la evaluacion diaria esta encendida."""
+    from app.core.cache import invalidate_dca_cache
     from app.core.config import get_settings
 
     client.post("/api/watchlist", json={"symbol": "DCATST"})
+    # El listado cachea el payload 5 min por tenant (flag incluida): sin
+    # invalidar, la respuesta depende de lo que otro test hubiera cacheado.
+    invalidate_dca_cache()
     monkeypatch.setenv("DCA_EVALUATION_ENABLED", "false")
     get_settings.cache_clear()
     try:
@@ -241,6 +245,10 @@ def test_list_reports_when_daily_evaluation_is_disabled(client, monkeypatch):
     finally:
         monkeypatch.delenv("DCA_EVALUATION_ENABLED")
         get_settings.cache_clear()
+        # Si el batch no llego a invalidar (puerta en cooldown, sin pendientes),
+        # el payload con la flag apagada sobrevive 5 min y el assert final lee
+        # la cache vieja (rojo en CI, verde en aislamiento).
+        invalidate_dca_cache()
     assert client.get("/api/watchlist/dca-signals").json()["evaluation_enabled"] is True
 
 
