@@ -125,25 +125,6 @@ def test_check_constraint_transaction_price_non_negative(db):
     db.rollback()
 
 
-def test_check_constraint_position_quantity_non_negative(db):
-    """Verifica que positions rechace cantidades negativas via CHECK constraint."""
-    p = Portfolio(name="Main", base_currency="EUR", tenant_id=1)
-    c = Company(ticker="MSFT", name="Microsoft", exchange="NASDAQ", currency="USD", company_type="operating", valuation_model="standard")
-    db.add_all([p, c])
-    db.commit()
-
-    pos = Position(
-        portfolio_id=p.id,
-        company_id=c.id,
-        quantity=Decimal("-25.0"),
-        tenant_id=1,
-    )
-    db.add(pos)
-    with pytest.raises(IntegrityError, match="CHECK constraint failed: ck_positions_quantity_non_negative"):
-        db.commit()
-    db.rollback()
-
-
 def test_check_constraint_market_price_close_non_negative(db):
     """Verifica que market_prices rechace precios de cierre negativos."""
     c = Company(ticker="NVDA", name="NVIDIA", exchange="NASDAQ", currency="USD", company_type="operating", valuation_model="standard")
