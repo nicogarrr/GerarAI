@@ -1,4 +1,4 @@
-"""Backtest DCA plano vs DCA por niveles (Formula Nico v1) para un ticker.
+"""Backtest DCA plano vs DCA por niveles (formula vigente del motor) para un ticker.
 
 Puro (sin DB ni red) y sin look-ahead, con las mismas convenciones que el
 backtest de investigacion con el que se calibro la formula:

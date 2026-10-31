@@ -72,7 +72,7 @@ export interface RadarDcaQuery {
     qualityClear?: boolean;
 }
 
-/** Radar ProPicks+DCA (nico-v1): oportunidades del barrido acotado. Solo lectura. */
+/** Radar ProPicks+DCA (nico-v2): oportunidades del barrido acotado. Solo lectura. */
 export async function getRadarDcaOpportunities(query: RadarDcaQuery = {}): Promise<RadarDcaResult> {
     const params = new URLSearchParams();
     params.set('page', String(query.page ?? 1));

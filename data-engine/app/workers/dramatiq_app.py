@@ -2227,7 +2227,7 @@ def propicks_radar_scan(
 ) -> dict[str, Any]:
     """Radar ProPicks+DCA: barrido acotado y resumible del universo.
 
-    Escritor explicito de snapshots PUBLICOS de precio (nico-v1). Sin red,
+    Escritor explicito de snapshots PUBLICOS de precio (nico-v2). Sin red,
     sin LLM y SIN outbox de alertas: no comparte cola con el evaluador DCA
     de watchlist. El lease es global (datos publicos, no de tenant) y el
     cursor por dia hace seguro reanudar tras un fallo o un corte de

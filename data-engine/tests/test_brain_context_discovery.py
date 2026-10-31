@@ -97,7 +97,7 @@ def test_radar_question_lists_clear_signals_from_saved_snapshots(db):
         comp.id,
         {
             "status": "ok",
-            "formula_version": "nico-v1",
+            "formula_version": "nico-v2",
             "price_verified": True,
             "price_date": "2026-10-30",
             "source": "test",
@@ -176,7 +176,7 @@ def test_radar_stale_scan_is_not_announced_as_current_signal(db):
         comp.id,
         {
             "status": "ok",
-            "formula_version": "nico-v1",
+            "formula_version": "nico-v2",
             "price_verified": True,
             "price_date": five_days_ago.date().isoformat(),
             "source": "test",
