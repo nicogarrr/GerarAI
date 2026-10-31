@@ -428,8 +428,19 @@ def portfolio_snapshots(
     start: date | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
+    # Contrato dual aditivo como en /positions (ver list_fx_rates).
+    if limit is not None:
+        page_size = limit
+        page = (offset or 0) // limit + 1
+    elif offset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset solo tiene efecto junto a limit.",
+        )
     service = PortfolioSnapshotService()
     # Get total count with the same filter
     total = service.count_history(db, start=start)
@@ -604,9 +615,22 @@ def update_portfolio_configuration(
 def list_fx_rates(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
-    offset = (page - 1) * page_size
+    # Contrato dual aditivo como en /positions: limit/offset (paginateAll del
+    # indice de /research) tiene precedencia; antes se descartaba en silencio.
+    if limit is not None:
+        page_size = limit
+        offset = offset or 0
+    elif offset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset solo tiene efecto junto a limit.",
+        )
+    else:
+        offset = (page - 1) * page_size
     total = db.scalar(
         select(func.count()).select_from(FXRate).where(*tenant_filters(db, FXRate))
     ) or 0
