@@ -43,7 +43,7 @@ def test_macro_feeds_oficiales_en_carril_macro():
 # ---------- disyuntor y dedupe del actor ----------
 
 class _FakeRedis:
-    """Redis mínimo en memoria (get/setex) para la cache de lotes."""
+    """Redis mínimo en memoria (get/set) para la cache de lotes."""
 
     def __init__(self):
         self.store: dict[str, str] = {}
@@ -51,7 +51,7 @@ class _FakeRedis:
     def get(self, key):
         return self.store.get(key)
 
-    def setex(self, key, _ttl, value):
+    def set(self, key, value, ex=None):
         self.store[key] = value
 
 
