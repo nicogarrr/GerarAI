@@ -6,6 +6,7 @@ import math
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from operator import mul
 from statistics import fmean, mean, pstdev
 from types import SimpleNamespace
 from typing import Any
@@ -91,7 +92,6 @@ def _fx_rate_with_date(
     return None
 
 
-
 def _live_benchmark_prices(cutoff: date) -> list[Any] | None:
     """SPY ajustado desde Yahoo (gratis, ya usado en Estrés histórico), sin filas en el master.
 
@@ -174,11 +174,7 @@ class PortfolioIntelligenceService:
         fx = PortfolioFXService()
         base_currency = fx.base_currency(db)
         rows = list(
-            db.execute(
-                select(Position, Company).join(
-                    Company, Position.company_id == Company.id
-                )
-            ).all()
+            db.execute(select(Position, Company).join(Company, Position.company_id == Company.id)).all()
         )
         # Honest valuation: a position without a base-currency value is excluded
         # from totals/weights and reported, never silently counted as zero.
@@ -186,7 +182,11 @@ class PortfolioIntelligenceService:
         missing_fx: list[dict[str, Any]] = []
         for position, company in rows:
             value_base = position.market_value_base
-            if value_base is None and position.currency == base_currency and (position.market_value_native or position.market_value) > 0:
+            if (
+                value_base is None
+                and position.currency == base_currency
+                and (position.market_value_native or position.market_value) > 0
+            ):
                 value_base = position.market_value_native or position.market_value
             if value_base is None:
                 missing_fx.append(
@@ -202,9 +202,7 @@ class PortfolioIntelligenceService:
             base_values[position.id] = float(value_base)
         total_value = sum(base_values.values())
         weights = {
-            company.id: (
-                base_values[position.id] / total_value if total_value > 0 else 0
-            )
+            company.id: (base_values[position.id] / total_value if total_value > 0 else 0)
             for position, company in rows
             if position.id in base_values
         }
@@ -233,13 +231,9 @@ class PortfolioIntelligenceService:
             for price in all_prices:
                 price_series.setdefault(price.company_id, []).append(price)
             price_series = {
-                company_id: self._fill_trailing_spot(series)
-                for company_id, series in price_series.items()
+                company_id: self._fill_trailing_spot(series) for company_id, series in price_series.items()
             }
-        returns = {
-            company_id: self._returns(series)
-            for company_id, series in price_series.items()
-        }
+        returns = {company_id: self._returns(series) for company_id, series in price_series.items()}
         indicative_returns = self._portfolio_returns(returns, weights)
         # Ventana COMPLETA (5 anos por defecto): con la paginacion del
         # endpoint llegaban solo las 20 sesiones mas antiguas y el TWR de la
@@ -272,9 +266,7 @@ class PortfolioIntelligenceService:
             else None
         )
         volatility = (
-            pstdev(portfolio_returns.values()) * math.sqrt(252)
-            if len(portfolio_returns) >= 2
-            else None
+            pstdev(portfolio_returns.values()) * math.sqrt(252) if len(portfolio_returns) >= 2 else None
         )
         # Sortino: el denominador es la DESVIACION DOWNSIDE sobre la muestra
         # completa, sqrt(mean(min(0, r - T)^2)), no la desviacion del subconjunto
@@ -284,10 +276,7 @@ class PortfolioIntelligenceService:
         # la misma serie). Es la definicion de quantstats/stats.py.
         n_returns = len(portfolio_returns)
         downside_deviation = (
-            math.sqrt(
-                sum(min(value, 0.0) ** 2 for value in portfolio_returns.values())
-                / n_returns
-            )
+            math.sqrt(sum(min(value, 0.0) ** 2 for value in portfolio_returns.values()) / n_returns)
             * math.sqrt(252)
             if n_returns >= 2
             else None
@@ -297,14 +286,8 @@ class PortfolioIntelligenceService:
         # geométrico de un unico camino realizado. El CAGR de una sola
         # realización es una muestra ruidosa de la deriva, asi que el ratio no
         # es comparable entre periodos. Es la definicion de quantstats.
-        mean_return = (
-            fmean(portfolio_returns.values()) * 252 if n_returns >= 2 else None
-        )
-        sharpe = (
-            mean_return / volatility
-            if mean_return is not None and volatility not in {None, 0}
-            else None
-        )
+        mean_return = fmean(portfolio_returns.values()) * 252 if n_returns >= 2 else None
+        sharpe = mean_return / volatility if mean_return is not None and volatility not in {None, 0} else None
         sortino = (
             mean_return / downside_deviation
             if mean_return is not None and downside_deviation not in {None, 0}
@@ -314,8 +297,7 @@ class PortfolioIntelligenceService:
         var_95, cvar_95 = self._historical_var(portfolio_returns)
         calmar = (
             annualized_return / abs(drawdown["max_drawdown"])
-            if annualized_return is not None
-            and drawdown["max_drawdown"] not in {None, 0}
+            if annualized_return is not None and drawdown["max_drawdown"] not in {None, 0}
             else None
         )
         xirr, xirr_trace = self._xirr(db, rows)
@@ -331,13 +313,9 @@ class PortfolioIntelligenceService:
             company.id: self._horizon_coverage(price_series.get(company.id, []), cutoff, today_)
             for _, company in rows
         }
-        positions_with_full_horizon = sum(
-            1 for _, full in horizon_coverages.values() if full
-        )
+        positions_with_full_horizon = sum(1 for _, full in horizon_coverages.values() if full)
         mean_horizon_coverage = (
-            round(100 * fmean(share for share, _ in horizon_coverages.values()), 1)
-            if rows
-            else 100.0
+            round(100 * fmean(share for share, _ in horizon_coverages.values()), 1) if rows else 100.0
         )
         return {
             "as_of": date.today(),
@@ -391,9 +369,7 @@ class PortfolioIntelligenceService:
                 "top_5": sum(sorted(weights.values(), reverse=True)[:5]),
                 "herfindahl": sum(weight**2 for weight in weights.values()),
                 "weights": {
-                    company.ticker: weights[company.id]
-                    for _, company in rows
-                    if company.id in weights
+                    company.ticker: weights[company.id] for _, company in rows if company.id in weights
                 },
             },
             "exposures": exposures,
@@ -405,9 +381,7 @@ class PortfolioIntelligenceService:
                 "positions_with_price_history": complete_price_series,
                 "positions_with_full_horizon": positions_with_full_horizon,
                 "price_history_window_percent": mean_horizon_coverage,
-                "price_history_percent": (
-                    round(100 * complete_price_series / len(rows), 1) if rows else 100
-                ),
+                "price_history_percent": (round(100 * complete_price_series / len(rows), 1) if rows else 100),
                 "portfolio_snapshots": len(snapshots),
                 "partial_trading_day": partial_day,
                 "spot_tail_positions": sorted(
@@ -426,9 +400,7 @@ class PortfolioIntelligenceService:
                         "TWR uses static current weights until complete daily position and cash snapshots exist.",
                     ]
                 )
-                + [
-                    "Attribution is an evidence-aware decomposition, not transaction-lot Brinson attribution."
-                ]
+                + ["Attribution is an evidence-aware decomposition, not transaction-lot Brinson attribution."]
                 + (
                     [
                         "Price/snapshot series may include the current trading day before the 22:00 UTC close cutoff (possible partial bar; conservative approximation, not a confirmed close): daily metrics (TWR, volatility, drawdown, VaR) use it as-is."
@@ -486,9 +458,7 @@ class PortfolioIntelligenceService:
         if now_utc >= cutoff:
             return False
         today = now_utc.date()
-        if any(
-            series and series[-1].date >= today for series in price_series.values()
-        ):
+        if any(series and series[-1].date >= today for series in price_series.values()):
             return True
         return any(snapshot.snapshot_date >= today for snapshot in snapshots)
 
@@ -522,7 +492,9 @@ class PortfolioIntelligenceService:
         filled = list(series[: last_valid + 1])
         for row in series[last_valid + 1 :]:
             if row.close and row.close > 0:
-                filled.append(SimpleNamespace(date=row.date, close=row.close, adj_close=row.close, source=row.source))
+                filled.append(
+                    SimpleNamespace(date=row.date, close=row.close, adj_close=row.close, source=row.source)
+                )
             else:
                 filled.append(row)
         return filled
@@ -532,9 +504,7 @@ class PortfolioIntelligenceService:
     _HORIZON_ANCHOR_TOLERANCE = timedelta(days=10)
 
     @classmethod
-    def _horizon_coverage(
-        cls, series: list[Any], cutoff: date, today: date
-    ) -> tuple[float, bool]:
+    def _horizon_coverage(cls, series: list[Any], cutoff: date, today: date) -> tuple[float, bool]:
         """(fraccion del horizonte cubierta, cubre_todo_el_horizonte).
 
         `len(series) >= 2` solo dice "hay algo"; una serie de 15 sesiones en
@@ -665,12 +635,16 @@ class PortfolioIntelligenceService:
         external = {id(t) for t in all_transactions if _is_external_transfer(t)}
         perspective = "account" if external else "investment"
         # Lote FX: 1 query para todos los flujos (anti N+1 por transacción).
-        flow_table = fx.fx_table(
-            db,
-            currencies={transaction.currency for transaction in all_transactions},
-            base_currency=base,
-            as_of_max=max((t.trade_date for t in all_transactions), default=None) or date.today(),
-        ) if all_transactions else {}
+        flow_table = (
+            fx.fx_table(
+                db,
+                currencies={transaction.currency for transaction in all_transactions},
+                base_currency=base,
+                as_of_max=max((t.trade_date for t in all_transactions), default=None) or date.today(),
+            )
+            if all_transactions
+            else {}
+        )
         for transaction in all_transactions:
             action = (transaction.action or "").lower()
             # Only included flows need FX. Internal account movements and
@@ -686,12 +660,14 @@ class PortfolioIntelligenceService:
                 as_of=transaction.trade_date,
             )
             if rate is None:
-                missing_fx.append({
-                    "kind": "cashflow",
-                    "transaction_id": transaction.id,
-                    "currency": transaction.currency,
-                    "as_of": transaction.trade_date.isoformat(),
-                })
+                missing_fx.append(
+                    {
+                        "kind": "cashflow",
+                        "transaction_id": transaction.id,
+                        "currency": transaction.currency,
+                        "as_of": transaction.trade_date.isoformat(),
+                    }
+                )
                 continue
             # Sign convention: a buy is an outflow, a sell an inflow, a
             # dividend/interest an inflow, and a fee or a withholding tax an
@@ -707,9 +683,7 @@ class PortfolioIntelligenceService:
                 if action == "cash_misc" and not cash_quantity_is_canonical(transaction):
                     ambiguous_cash_excluded += 1
                     continue
-                cashflows.append(
-                    (transaction.trade_date, _external_flow(transaction) * float(rate))
-                )
+                cashflows.append((transaction.trade_date, _external_flow(transaction) * float(rate)))
                 continue
             if action == "cash_misc":
                 # Perspectiva de inversión: un movimiento de caja sin
@@ -775,16 +749,17 @@ class PortfolioIntelligenceService:
             if value is None and position.currency.upper() == base and position.market_value > 0:
                 value = position.market_value
             if value is None:
-                missing_fx.append({
-                    "kind": "position", "ticker": company.ticker,
-                    "currency": position.currency,
-                })
+                missing_fx.append(
+                    {
+                        "kind": "position",
+                        "ticker": company.ticker,
+                        "currency": position.currency,
+                    }
+                )
             else:
                 ending_value += float(value)
         # La caja solo entra en el valor final de la perspectiva de CUENTA.
-        cash_rows = (
-            list(db.scalars(select(CashBalance)).all()) if perspective == "account" else []
-        )
+        cash_rows = list(db.scalars(select(CashBalance)).all()) if perspective == "account" else []
         # Lote FX: 1 query para todas las cajas (anti N+1).
         ending_rates = fx.rates_for(
             db,
@@ -831,10 +806,7 @@ class PortfolioIntelligenceService:
         origin = min(day for day, _ in cashflows)
 
         def npv(rate: float) -> float:
-            return sum(
-                value / ((1 + rate) ** ((day - origin).days / 365.0))
-                for day, value in cashflows
-            )
+            return sum(value / ((1 + rate) ** ((day - origin).days / 365.0)) for day, value in cashflows)
 
         low, high = -0.9999, 10.0
         if npv(low) * npv(high) > 0:
@@ -870,8 +842,7 @@ class PortfolioIntelligenceService:
 
     @classmethod
     def _correlations(
-        cls,
-        returns: dict[int, dict[date, float]], rows: list[tuple[Position, Company]]
+        cls, returns: dict[int, dict[date, float]], rows: list[tuple[Position, Company]]
     ) -> tuple[dict[str, dict[str, float | None]], dict[str, dict[str, int]]]:
         result: dict[str, dict[str, float | None]] = {}
         observations: dict[str, dict[str, int]] = {}
@@ -884,12 +855,39 @@ class PortfolioIntelligenceService:
         # (serie, fechas), no del par. Mismas operaciones en el mismo orden que
         # antes, asi que el coeficiente sale identico bit a bit; solo se dejan
         # de repetir 2 de las 3 sumas por par (30 posiciones = 435 pares).
-        deviations: dict[tuple[int, tuple[date, ...]], tuple[list[float], float]] = {}
+        # Fechas de cada serie ordenadas UNA vez: antes la interseccion se
+        # ordenaba por par (O(P^2) sorts de ~D fechas; con 500 posiciones,
+        # ~125.000 sorts de ~1.400 fechas, la mitad del tiempo del endpoint).
+        sorted_dates: dict[int, tuple[date, ...]] = {
+            company.id: tuple(sorted(returns.get(company.id, ()))) for _, company in rows
+        }
+        # Clases de calendario: series con exactamente las mismas fechas (lo
+        # habitual: mismo calendario bursatil) comparten UN objeto canonico,
+        # asi la interseccion dentro de la clase es una comprobacion de
+        # identidad O(1) por par en vez de un barrido O(D).
+        _by_hash: dict[int, list[tuple[date, ...]]] = {}
+        for cid, dates in sorted_dates.items():
+            bucket = _by_hash.setdefault(hash(dates), [])
+            for existing in bucket:
+                if existing == dates:
+                    sorted_dates[cid] = existing
+                    break
+            else:
+                bucket.append(dates)
+        # Tuplas de fechas canonicas por CONTENIDO (un hash O(D) por par, no
+        # dos por desviacion): todos los pares con el mismo calendario comun
+        # comparten objeto, asi las desviaciones se calculan una vez por
+        # (serie, calendario) aunque la interseccion salga de pares distintos.
+        canon: dict[tuple[date, ...], tuple[date, ...]] = {dates: dates for dates in sorted_dates.values()}
+        # Desviaciones por (serie, id de tupla canonica): hash O(1) por par.
+        # La tupla determina el calculo, y tuplas con el mismo contenido
+        # producen desviaciones identicas.
+        deviations: dict[tuple[int, int], tuple[list[float], float]] = {}
 
         def _cached_deviations(
             company_id: int, series: dict[date, float], dates: tuple[date, ...]
         ) -> tuple[list[float], float]:
-            key = (company_id, dates)
+            key = (company_id, id(dates))
             cached = deviations.get(key)
             if cached is None:
                 values = [series[day] for day in dates]
@@ -898,6 +896,33 @@ class PortfolioIntelligenceService:
                 cached = (deltas, sum(delta**2 for delta in deltas))
                 deviations[key] = cached
             return cached
+
+        def _common_dates(
+            left_id: int, left: dict[date, float], right_id: int, right: dict[date, float]
+        ) -> tuple[date, ...]:
+            """Interseccion ordenada de fechas, bit a bit igual que
+            tuple(sorted(left.keys() & right.keys())) pero sin re-ordenar:
+            si una serie contiene a la otra se reutiliza su tupla ya ordenada.
+            """
+            left_dates = sorted_dates[left_id]
+            right_dates = sorted_dates[right_id]
+            if left_dates is right_dates:
+                return left_dates
+            if len(left_dates) <= len(right_dates):
+                small_dates, big, big_dates = left_dates, right, right_dates
+            else:
+                small_dates, big, big_dates = right_dates, left, left_dates
+            common = 0
+            for day in small_dates:
+                if day in big:
+                    common += 1
+            if common == len(small_dates):
+                candidate = small_dates
+            elif common == len(big_dates):
+                candidate = big_dates
+            else:
+                candidate = tuple(day for day in small_dates if day in big)
+            return canon.setdefault(candidate, candidate)
 
         computed: dict[tuple[int, int], tuple[float | None, int]] = {}
         for _, left_company in rows:
@@ -912,7 +937,7 @@ class PortfolioIntelligenceService:
                     continue
                 left = returns.get(left_company.id, {})
                 right = returns.get(right_company.id, {})
-                dates = tuple(sorted(left.keys() & right.keys()))
+                dates = _common_dates(left_company.id, left, right_company.id, right)
                 observations[left_company.ticker][right_company.ticker] = len(dates)
                 if left_company.id == right_company.id and dates:
                     correlation: float | None = 1.0
@@ -922,7 +947,10 @@ class PortfolioIntelligenceService:
                 else:
                     x_dev, x_ss = _cached_deviations(left_company.id, left, dates)
                     y_dev, y_ss = _cached_deviations(right_company.id, right, dates)
-                    numerator = sum(x * y for x, y in zip(x_dev, y_dev, strict=True))
+                    # sum(map(mul, ...)) suma los mismos productos en el mismo
+                    # orden que el generador con zip: identico bit a bit, ~2x
+                    # mas rapido al ejecutar la multiplicacion en C.
+                    numerator = sum(map(mul, x_dev, y_dev))
                     denominator = math.sqrt(x_ss * y_ss)
                     correlation = numerator / denominator if denominator else None
                 computed[(left_company.id, right_company.id)] = (correlation, len(dates))
@@ -949,8 +977,7 @@ class PortfolioIntelligenceService:
         portfolio_mean = mean(portfolio)
         variance = sum((value - market_mean) ** 2 for value in market)
         covariance = sum(
-            (left - portfolio_mean) * (right - market_mean)
-            for left, right in zip(portfolio, market)
+            (left - portfolio_mean) * (right - market_mean) for left, right in zip(portfolio, market)
         )
         return (
             covariance / variance if variance else None,
@@ -1022,19 +1049,13 @@ class PortfolioIntelligenceService:
             # de 1 acción sobre una posición de 10), la fórmula contribution =
             # end_value - start - buys + sells + income pinta el valor íntegro
             # de la posición como ganancia inventada. Nulo honesto.
-            buy_legs = sum(
-                float(t.quantity) for t in ledger if t.action == "buy"
-            )
-            sell_legs = sum(
-                float(t.quantity) for t in ledger if t.action == "sell"
-            )
+            buy_legs = sum(float(t.quantity) for t in ledger if t.action == "buy")
+            sell_legs = sum(float(t.quantity) for t in ledger if t.action == "sell")
             current_qty = float(position.quantity)
             reconciliation: str | None = None
             if buy_legs == 0 and sell_legs == 0:
                 reconciliation = "missing_ledger"
-            elif abs((buy_legs - sell_legs) - current_qty) > max(
-                1e-6, abs(current_qty) * 1e-6
-            ):
+            elif abs((buy_legs - sell_legs) - current_qty) > max(1e-6, abs(current_qty) * 1e-6):
                 reconciliation = "incomplete_ledger"
             if reconciliation is not None:
                 reasons[reconciliation] += 1
@@ -1094,11 +1115,7 @@ class PortfolioIntelligenceService:
                 if start_price_row is not None
                 else None
             )
-            end_value = (
-                float(position.market_value_base)
-                if position.market_value_base is not None
-                else None
-            )
+            end_value = float(position.market_value_base) if position.market_value_base is not None else None
             reason = None
             contribution = None
             if end_value is None:
@@ -1183,17 +1200,9 @@ class PortfolioIntelligenceService:
         # solapadas (no por las del portfolio global): con menos de 60 sesiones
         # compartidas, extrapolar a un ano no es informativo.
         annualize = len(dates) >= MIN_ANNUALIZATION_SESSIONS
-        bench_annualized = (
-            (1 + bench_twr) ** (252 / len(bench)) - 1
-            if annualize and bench_twr > -1
-            else None
-        )
+        bench_annualized = (1 + bench_twr) ** (252 / len(bench)) - 1 if annualize and bench_twr > -1 else None
         port_twr = self._compound(port)
-        port_annualized = (
-            (1 + port_twr) ** (252 / len(port)) - 1
-            if annualize and port_twr > -1
-            else None
-        )
+        port_annualized = (1 + port_twr) ** (252 / len(port)) - 1 if annualize and port_twr > -1 else None
         active = [p - b for p, b in zip(port, bench)]
         tracking_error = pstdev(active) * math.sqrt(252) if len(active) >= 2 else None
         alpha = (
@@ -1244,9 +1253,7 @@ class PortfolioIntelligenceService:
                     continue
             weight = value / total_value if total_value else 0
             exposures["sectors"][company.sector] += weight
-            country = company.domicile_country or EXCHANGE_COUNTRY.get(
-                company.exchange.upper(), "Unknown"
-            )
+            country = company.domicile_country or EXCHANGE_COUNTRY.get(company.exchange.upper(), "Unknown")
             exposures["countries"][country] += weight
             exposures["currencies"][position.currency] += weight
             for factor in company.factor_tags:
@@ -1345,8 +1352,7 @@ class PortfolioIntelligenceService:
         fx_table = (
             fx.fx_table(
                 db,
-                currencies={position.currency for position, _ in rows if position.currency}
-                | {base_currency},
+                currencies={position.currency for position, _ in rows if position.currency} | {base_currency},
                 base_currency=base_currency,
                 as_of_max=date.today(),
             )
@@ -1418,22 +1424,17 @@ class PortfolioIntelligenceService:
             # Sin ningun dividendo en el registro no se distingue "no paga"
             # de "no esta registrado": N/D en vez de 0,0 %.
             dividends_known = (
-                company.id not in ambiguous_dividends
-                and company.id in companies_with_dividend_rows
+                company.id not in ambiguous_dividends and company.id in companies_with_dividend_rows
             )
             dividends = all_dividends.get(company.id, 0.0)
             dividend_return = (
                 dividends / float(position.cost_basis_native)
-                if dividends_known
-                and position.cost_basis_native
-                and position.cost_basis_native > 0
+                if dividends_known and position.cost_basis_native and position.cost_basis_native > 0
                 else None
             )
             period_start = prices[0].date if prices else cutoff
             period_end = prices[-1].date if prices else cutoff
-            fx_component = self._period_fx_return(
-                fx_table, position, base_currency, period_start, period_end
-            )
+            fx_component = self._period_fx_return(fx_table, position, base_currency, period_start, period_end)
             # El residuo se queda en None cuando el retorno total o el de FX
             # son desconocidos: restar un componente no medido (o medir uno
             # con un nivel) daria una cifra con apariencia de cierre.
@@ -1444,9 +1445,7 @@ class PortfolioIntelligenceService:
                 - (buybacks or 0)
                 + (dilution or 0)
                 - fx_component
-                if total_return is not None
-                and fx_component is not None
-                and dividend_return is not None
+                if total_return is not None and fx_component is not None and dividend_return is not None
                 else None
             )
             components = {
@@ -1456,11 +1455,7 @@ class PortfolioIntelligenceService:
                 "buybacks": buybacks,
                 "dilution": -dilution if dilution is not None else None,
                 "fx": fx_component,
-                "sizing": (
-                    total_return * weights.get(company.id, 0)
-                    if total_return is not None
-                    else None
-                ),
+                "sizing": (total_return * weights.get(company.id, 0) if total_return is not None else None),
             }
             positions.append(
                 {
@@ -1511,9 +1506,7 @@ class PortfolioIntelligenceService:
             "period_start": window_start,
             "period_end": window_end,
             "portfolio_components": dict(totals),
-            "incomplete_components": sorted(
-                key for key, value in totals.items() if value is None
-            ),
+            "incomplete_components": sorted(key for key, value in totals.items() if value is None),
             "excluded_partial_histories": sorted(partial_tickers),
             "positions": positions,
         }
@@ -1522,8 +1515,7 @@ class PortfolioIntelligenceService:
     def _window_facts(series: list[FinancialFact], start_year: int, end_year: int) -> list[FinancialFact]:
         """Facts anuales cuyo ano fiscal cae dentro del horizonte del retorno de precio."""
         return [
-            row for row in series
-            if row.fiscal_year is not None and start_year <= row.fiscal_year <= end_year
+            row for row in series if row.fiscal_year is not None and start_year <= row.fiscal_year <= end_year
         ]
 
     @staticmethod
@@ -1531,7 +1523,7 @@ class PortfolioIntelligenceService:
         # Homogeneous annual series only (F376 audit): quarterly rows (Q1-Q4)
         # must not be compared with full-year values; one value per fiscal year.
         by_year: dict[int, FinancialFact] = {}
-        for row in sorted(series, key=lambda r: (r.fiscal_year if r.fiscal_year is not None else 0)):
+        for row in sorted(series, key=lambda r: r.fiscal_year if r.fiscal_year is not None else 0):
             if row.fiscal_year is None or (row.fiscal_quarter or "").upper().startswith("Q"):
                 continue
             by_year.setdefault(row.fiscal_year, row)
