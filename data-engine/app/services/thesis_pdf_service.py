@@ -77,6 +77,21 @@ def sanitize_pdf_filename(raw_name: str, fallback: str = "gerarai-tesis") -> str
     return clean[:64] or fallback
 
 
+def _new_page() -> tuple[plt.Figure, plt.Axes]:
+    """Página A4 con lienzo fijo 0-1.
+
+    Sin límites explícitos, matplotlib autoescala los ejes con los artistas
+    (rectángulo de cabecera, líneas separadoras): la cabecera acababa ocupando
+    media página y los textos por debajo del separador salían del área visible.
+    """
+    fig = plt.figure(figsize=(8.27, 11.69), dpi=100)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_axis_off()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    return fig, ax
+
+
 def build_thesis_pdf(data: ThesisPdfData) -> bytes:
     """Construye un documento PDF vectorial de alta calidad con branding GerarAI."""
     buf = io.BytesIO()
@@ -84,9 +99,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
     # Formato A4 estándar
     with PdfPages(buf) as pdf:
         # Página 1: Portada, Resumen Ejecutivo y Cartera/Activos
-        fig1 = plt.figure(figsize=(8.27, 11.69), dpi=100)
-        ax1 = fig1.add_axes([0, 0, 1, 1])
-        ax1.set_axis_off()
+        fig1, ax1 = _new_page()
 
         # Cabecera superior con branding oscuro
         header_rect = plt.Rectangle((0, 0.88), 1, 0.12, facecolor="#0f172a", edgecolor="none")
@@ -213,9 +226,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
         plt.close(fig1)
 
         # Página 2: Análisis Detallado, Riesgos y Evidencias
-        fig2 = plt.figure(figsize=(8.27, 11.69), dpi=100)
-        ax2 = fig2.add_axes([0, 0, 1, 1])
-        ax2.set_axis_off()
+        fig2, ax2 = _new_page()
 
         # Mini cabecera
         ax2.plot([0.06, 0.94], [0.94, 0.94], color="#0f172a", lw=2)

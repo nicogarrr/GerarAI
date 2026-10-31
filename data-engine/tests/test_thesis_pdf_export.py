@@ -395,3 +395,36 @@ def test_portfolio_pdf_mixed_currencies_no_fake_weights(env):
     assert "n/d" in page1
     assert "Pesos no calculables" in full
     assert "Mayores posiciones por peso estimado" not in full
+
+
+def test_pdf_canvas_has_fixed_unit_limits():
+    """Regresión del layout: sin límites 0-1 fijos, matplotlib autoescala con los
+    artistas y la cabecera oscura cubría media página mientras el título se
+    solapaba con la tabla y el resumen salía del área visible."""
+    import matplotlib.pyplot as plt
+
+    from app.services.thesis_pdf_service import _new_page
+
+    fig, ax = _new_page()
+    try:
+        assert ax.get_xlim() == (0.0, 1.0)
+        assert ax.get_ylim() == (0.0, 1.0)
+    finally:
+        plt.close(fig)
+
+
+def test_portfolio_pdf_texto_dentro_del_area_visible(env):
+    """Todo el texto debe caer dentro del área visible de la página (regresión:
+    con el autoescalado de ejes, resumen y secciones quedaban fuera y el título
+    se solapaba con la tabla)."""
+    client, _, port_id = env
+    res = client.get(f"/api/portfolio/{port_id}/pdf")
+    assert res.status_code == 200
+    reader = PdfReader(io.BytesIO(res.content))
+    for page in reader.pages:
+        height = float(page.mediabox.height)
+        ys: list[float] = []
+        page.extract_text(visitor_text=lambda t, cm, tm, fd, fs: ys.append(tm[5] + cm[5]) if t.strip() else None)
+        assert ys, "la página no tiene texto"
+        assert min(ys) >= -1.0, f"texto por debajo del área visible (y={min(ys):.1f})"
+        assert max(ys) <= height + 1.0, f"texto por encima del área visible (y={max(ys):.1f} > {height:.1f})"
