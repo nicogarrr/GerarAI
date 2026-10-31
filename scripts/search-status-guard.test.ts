@@ -111,7 +111,8 @@ describe('F322: el diagnóstico del motor no se presenta como badges primarios',
     const page = readFileSync('app/(root)/search/page.tsx', 'utf8');
 
     it('los pares crudos de retrieval van en un details «Detalles técnicos»', () => {
-        assert.ok(page.includes("t('search.techDetailsSearch')"), 'el details de diagnostico referencia la clave del diccionario');
+        // i18n: el summary se mantiene con sus clases; el rotulo viene de la clave y el diccionario es conserva el copy verbatim.
+        assert.match(page, /<summary className="cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-200">\{t\('search\.techDetailsSearch'\)\}<\/summary>/, 'el details «Detalles técnicos» se mantiene con sus clases');
         const pageDict = JSON.parse(readFileSync('lib/i18n/messages/es/search.json', 'utf8'));
         assert.equal(pageDict.techDetailsSearch, 'Detalles técnicos de la búsqueda', 'el rotulo se mantiene verbatim');
     });
