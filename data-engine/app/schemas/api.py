@@ -1501,6 +1501,94 @@ class PortfolioIntelligenceOut(BaseModel):
     coverage: PortfolioCoverageOut
 
 
+# --- GET /api/portfolio/risk-matrix ----------------------------------------
+# Formas medidas contra PortfolioRiskMatrixService.build (servicio real):
+# claves siempre presentes en el sobre; estimator/covariance_annualized/
+# correlation/portfolio son None cuando no hay 60 sesiones comunes
+# (correlation cae a Pearson por pares si hay algo que emparejar). En cada
+# posicion, los numeros de riesgo SOLO existen cuando included=true
+# (exclude_unset + ausencia), y entonces excluded_reason no existe.
+
+
+class RiskMatrixWindowOut(BaseModel):
+    requested_days: int
+    sessions_common: int
+    min_sessions: int
+    start: str | None
+    end: str | None
+
+
+class RiskMatrixEstimatorOut(BaseModel):
+    name: str
+    shrinkage: float
+    annualization: int
+
+
+class RiskMatrixGridOut(BaseModel):
+    tickers: list[str]
+    matrix: list[list[float | None]]
+
+
+class RiskMatrixCorrelationOut(RiskMatrixGridOut):
+    source: str
+
+
+class RiskMatrixPortfolioOut(BaseModel):
+    vol_annualized: float
+    variance_annualized: float
+
+
+class RiskMatrixPositionOut(BaseModel):
+    ticker: str
+    weight: float
+    included: bool
+    sessions: int
+    sessions_common: int
+    fx_mode: str
+    weight_included: float | None = None
+    vol_annualized: float | None = None
+    risk_contribution: float | None = None
+    marginal_contribution: float | None = None
+    fx_dropped_returns: int | None = None
+    excluded_reason: str | None = None
+
+
+class RiskMatrixExcludedOut(BaseModel):
+    ticker: str
+    reason: str
+    sessions: int
+
+
+class RiskMatrixConcentrationOut(BaseModel):
+    top_1: float
+    top_5: float
+    herfindahl: float
+    effective_positions: float | None
+    weights: dict[str, float]
+
+
+class RiskMatrixWarningOut(BaseModel):
+    code: str
+    message: str
+
+
+class PortfolioRiskMatrixOut(BaseModel):
+    as_of: str
+    base_currency: str
+    status: str
+    window: RiskMatrixWindowOut
+    estimator: RiskMatrixEstimatorOut | None
+    covariance_annualized: RiskMatrixGridOut | None
+    correlation: RiskMatrixCorrelationOut | None
+    portfolio: RiskMatrixPortfolioOut | None
+    positions: list[RiskMatrixPositionOut]
+    excluded: list[RiskMatrixExcludedOut]
+    concentration: RiskMatrixConcentrationOut
+    warnings: list[RiskMatrixWarningOut]
+    trace: dict[str, Any]
+    provenance: dict[str, Any]
+
+
 # --- GET /api/portfolio/summary --------------------------------------------
 # Formas medidas contra RiskService.dashboard (servicio real): la ruta
 # devuelve siempre todas las claves (ramas None/[]; no omite ninguna).
