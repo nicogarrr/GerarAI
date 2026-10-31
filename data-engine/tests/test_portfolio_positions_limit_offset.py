@@ -51,6 +51,23 @@ def test_limit_offset_pagina_con_offset():
     assert len(payload["items"]) == POSITIONS - 20
 
 
+def test_offset_no_multiplo_de_limit_dice_la_verdad_en_page_info():
+    # Auditoria del piloto: total 25, limit 10, offset 19 -> 6 items y la
+    # ventana toca el final: has_next debe ser False aunque la pagina
+    # derivada por division entera (19 // 10 + 1 = 2 de 3) dijera True.
+    client = _client()
+    _seed_positions(client, POSITIONS)
+    payload = client.get("/api/portfolio/positions?limit=10&offset=19").json()
+    assert len(payload["items"]) == POSITIONS - 19
+    assert payload["page_info"]["has_next"] is False
+    assert payload["page_info"]["has_prev"] is True
+    assert payload["page_info"]["total_items"] == POSITIONS
+    assert payload["page_info"]["total_pages"] == 3
+    inicio = client.get("/api/portfolio/positions?limit=10&offset=0").json()
+    assert inicio["page_info"]["has_next"] is True
+    assert inicio["page_info"]["has_prev"] is False
+
+
 def test_page_page_size_siguen_funcionando():
     client = _client()
     _seed_positions(client, POSITIONS)

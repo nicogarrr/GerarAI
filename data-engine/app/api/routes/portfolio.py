@@ -28,7 +28,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
-from app.schemas.pagination import PaginatedResponse
+from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.audit_service import record_audit_event
 from app.services.company_resolver import resolve_company
@@ -829,6 +829,20 @@ def positions(
             payloads[-1].update(dict.fromkeys(_QUOTE_MISSING_PNL_KEYS))
     items = [mask_cost_under_review(payload, cost_checks.get(position.id))
             for payload, (position, _) in zip(payloads, rows, strict=True)]
+    if limit is not None:
+        # Con limit/offset la ventana no tiene por que alinearse con paginas
+        # enteras: has_next/has_prev se derivan de la ventana real, no de la
+        # division entera (offset 19 con limit 10 y total 25 -> 6 items y
+        # has_next False; la pagina derivada daria True).
+        page_info = PageInfo(
+            page=offset_val // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=offset_val + len(items) < total,
+            has_prev=offset_val > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
