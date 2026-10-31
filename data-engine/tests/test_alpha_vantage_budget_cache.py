@@ -480,3 +480,56 @@ async def test_quote_precio_nan_se_rechaza():
     with patch("httpx.AsyncClient.get", new=fake_get):
         with pytest.raises(RuntimeError, match="sin precio"):
             await client.quote("AAPL")
+
+
+@pytest.mark.anyio
+async def test_rate_limit_no_bloquea_el_event_loop():
+    """La espera de tasa es async: mientras una llamada espera su turno, otras
+    corrutinas del proceso siguen corriendo (antes time.sleep congelaba el
+    loop hasta 12 s por llamada)."""
+    limiter = AlphaVantageRateLimiter(min_interval=0.2)
+    limiter.reset()
+    progreso = 0
+
+    async def trabajo_paralelo():
+        nonlocal progreso
+        for _ in range(5):
+            await asyncio.sleep(0.02)
+            progreso += 1
+
+    async def llamada_limitada():
+        await limiter.wait_async()  # turno inmediato
+        await limiter.wait_async()  # espera ~0.2s
+
+    t0 = asyncio.get_running_loop().time()
+    await asyncio.gather(llamada_limitada(), trabajo_paralelo())
+    elapsed = asyncio.get_running_loop().time() - t0
+
+    assert elapsed >= 0.19  # el segundo turno sí esperó su intervalo
+    assert progreso == 5  # y mientras, el loop siguió corriendo otras tareas
+
+
+@pytest.mark.anyio
+async def test_cliente_usa_espera_async_sin_bloquear():
+    """Una llamada real del cliente con tasa mínima>0 no congela el loop."""
+    limiter = AlphaVantageRateLimiter(min_interval=0.15)
+    limiter.reset()
+    client = AlphaVantageClient(
+        api_key="TEST_KEY",
+        budget=AlphaVantageDailyBudget(redis_client_fn=lambda: None),
+        rate_limiter=limiter,
+    )
+    progreso = 0
+
+    async def trabajo_paralelo():
+        nonlocal progreso
+        for _ in range(3):
+            await asyncio.sleep(0.02)
+            progreso += 1
+
+    async def fake_get(self, url, params=None):
+        return _response(_quote_payload(params["symbol"]))
+
+    with patch("httpx.AsyncClient.get", new=fake_get):
+        await asyncio.gather(client.quote("AAPL"), client.quote("MSFT"), trabajo_paralelo())
+    assert progreso == 3

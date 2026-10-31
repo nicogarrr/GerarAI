@@ -145,6 +145,22 @@ class AlphaVantageRateLimiter:
                 time.sleep(min(remaining, 0.5))
             self._next_allowed_at = time.perf_counter() + self.min_interval
 
+    async def wait_async(self) -> None:
+        """Turno de tasa SIN bloquear el event loop.
+
+        ``wait()`` duerme con ``time.sleep`` dentro del lock: correcto entre
+        hilos, pero llamado desde código async congela TODO el event loop del
+        proceso hasta 12 s por llamada (60s / 5 req-min). Aquí la espera es
+        ``asyncio.sleep`` fuera del lock y el turno se recalcula al despertar.
+        """
+        while True:
+            with self._lock:
+                remaining = self._next_allowed_at - time.perf_counter()
+                if remaining <= 0:
+                    self._next_allowed_at = time.perf_counter() + self.min_interval
+                    return
+            await asyncio.sleep(min(remaining, 0.5))
+
     def reset(self) -> None:
         with self._lock:
             self._next_allowed_at = 0.0
@@ -414,8 +430,9 @@ class AlphaVantageClient:
         async def _call() -> httpx.Response:
             if not self.budget.reserve():
                 raise self._quota_exhausted()
-            # Control de tasa (5 req/min), también por intento real
-            self._limiter.wait()
+            # Control de tasa (5 req/min), también por intento real; versión
+            # async: la espera no congela el event loop del proceso.
+            await self._limiter.wait_async()
             async with httpx.AsyncClient(timeout=15.0) as client:
                 return await client.get(self.base_url, params=query_params)
 
