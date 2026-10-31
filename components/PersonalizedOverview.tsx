@@ -317,8 +317,12 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     const retrySection = (section: SectionKey) =>
         setRetryTokens((tokens) => ({ ...tokens, [section]: tokens[section] + 1 }));
 
-    // Primera carga: las cuatro lecturas en UNA server action (Next ejecuta en
-    // serie las server actions de un cliente; eran cuatro POST encadenados).
+    // Primera carga: las TRES lecturas rápidas en UNA server action (Next
+    // ejecuta en serie las server actions de un cliente). Oportunidades NO
+    // va en ese POST: su sondeo DCF cotiza con proveedores externos en
+    // síncrono (~7 s medidos en prod, 31-oct) y, al compartir promesa,
+    // hacía esperar a cartera, alertas y watchlist esos ~7 s antes de
+    // pintar. Se pide aparte, tras el primer pintado (debajo del pliegue).
     // Cada sección toma su parte; los «Reintentar» usan la lectura suelta.
     const bundleRef = useRef<{ userId: string; promise: Promise<HomeOverviewBundle> } | null>(null);
     const firstLoad = useCallback(<K extends keyof HomeOverviewBundle>(
@@ -330,9 +334,6 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 userId,
                 promise: getHomeOverviewBundle(userId, {
                     watchlistLimit: WATCHLIST_PREVIEW_LIMIT,
-                    marketCapMoreThan: MIN_MARKET_CAP,
-                    limit: 10,
-                    candidateLimit: DCF_CANDIDATE_LIMIT,
                 }),
             };
         }
@@ -433,16 +434,16 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setOpportunitiesLoading(true);
             setOpportunitiesError(null);
-            const probe = retryTokens.opportunities === 0
-                ? await firstLoad('opportunities', [])
-                : await settle(
-                    getHomeOpportunities({
-                        marketCapMoreThan: MIN_MARKET_CAP,
-                        limit: 10,
-                        candidateLimit: DCF_CANDIDATE_LIMIT,
-                    }),
-                    [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
-                );
+            // Siempre lectura propia, también en primera carga: no forma
+            // parte del bundle del primer pintado (ver nota sobre firstLoad).
+            const probe = await settle(
+                getHomeOpportunities({
+                    marketCapMoreThan: MIN_MARKET_CAP,
+                    limit: 10,
+                    candidateLimit: DCF_CANDIDATE_LIMIT,
+                }),
+                [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
+            );
             if (!active) return;
             if (probe.error) {
                 setOpportunities([]);
