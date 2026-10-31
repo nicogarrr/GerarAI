@@ -13286,6 +13286,24 @@
         "title": "PortfolioPriceInput",
         "type": "object"
       },
+      "PortfolioPriceUpdateOut": {
+        "properties": {
+          "market_price": {
+            "title": "Market Price",
+            "type": "number"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "market_price"
+        ],
+        "title": "PortfolioPriceUpdateOut",
+        "type": "object"
+      },
       "PortfolioReconstructionOut": {
         "properties": {
           "days_excluded": {
@@ -62522,9 +62540,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Price Api Portfolio Prices Patch",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioPriceUpdateOut"
                 }
               }
             },

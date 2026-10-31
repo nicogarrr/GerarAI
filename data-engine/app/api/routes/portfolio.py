@@ -42,6 +42,7 @@ from app.schemas.api import (
     PortfolioForecastOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
+    PortfolioPriceUpdateOut,
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTearsheetOut,
@@ -1392,7 +1393,7 @@ def delete_holding(ticker: str, db: Session = Depends(get_db)) -> None:
     db.commit()
 
 
-@router.patch("/prices")
+@router.patch("/prices", response_model=PortfolioPriceUpdateOut)
 def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) -> dict:
     company = resolve_company(db, payload.ticker)
     if not company:

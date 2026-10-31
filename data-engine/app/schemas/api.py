@@ -2047,3 +2047,10 @@ class PortfolioForecastOut(BaseModel):
     positions: list[ForecastPositionOut]
     excluded: list[ForecastExcludedOut]
     assumptions: list[str]
+# --- PATCH /api/portfolio/prices ---------------------------------------------
+# Forma medida contra la ruta (precio manual): siempre las mismas dos claves.
+
+
+class PortfolioPriceUpdateOut(BaseModel):
+    ticker: str
+    market_price: float
