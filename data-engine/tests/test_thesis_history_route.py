@@ -42,10 +42,14 @@ def _tenant_pk(tenant_ext: str) -> int:
     return tenant.id
 
 
-def _seed_company_with_versions(tenant_ext: str) -> None:
+def _seed_company_with_versions(tenant_ext: str) -> str:
     tenant_pk = _tenant_pk(tenant_ext)
     db = SessionLocal()
-    company = Company(ticker="ACME", name="Acme", exchange="NYSE", currency="USD",
+    # Ticker único por corrida: la sqlite del suite es compartida entre
+    # workers y un «ACME» fijo commiteado aqui rompia el INSERT de otros
+    # tests (UNIQUE companies.ticker en test_watchlist_monitor_route).
+    ticker = f"TH{uuid4().hex[:8].upper()}"
+    company = Company(ticker=ticker, name="Acme", exchange="NYSE", currency="USD",
                       company_type="operating", valuation_model="unassigned")
     db.add(company)
     db.flush()
@@ -57,6 +61,7 @@ def _seed_company_with_versions(tenant_ext: str) -> None:
         ))
     db.commit()
     db.close()
+    return ticker
 
 
 def test_history_unknown_ticker_404(monkeypatch) -> None:
@@ -69,14 +74,14 @@ def test_history_unknown_ticker_404(monkeypatch) -> None:
 
 def test_history_envelope_and_derived_diff(monkeypatch) -> None:
     client, tenant, user = _client(monkeypatch)
-    _seed_company_with_versions(tenant)
+    ticker = _seed_company_with_versions(tenant)
 
-    res = signed_request(client, SECRET, tenant, user, "GET", "/api/thesis/ACME/history")
+    res = signed_request(client, SECRET, tenant, user, "GET", f"/api/thesis/{ticker}/history")
 
     assert res.status_code == 200, res.text
     payload = res.json()
     assert set(payload) == {"ticker", "count", "history", "data_as_of", "provenance"}
-    assert payload["ticker"] == "ACME"
+    assert payload["ticker"] == ticker
     assert payload["count"] == 2
     assert set(payload["provenance"]) == {
         "source", "source_kind", "source_url", "fetched_at", "coverage", "note",

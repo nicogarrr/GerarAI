@@ -57,14 +57,17 @@ def test_monitor_unknown_ticker_empty_items(monkeypatch) -> None:
 def test_monitor_company_without_data_18_keys(monkeypatch) -> None:
     client, tenant, user = _client(monkeypatch)
     db = SessionLocal()
-    db.add(Company(ticker="ACME", name="Acme", exchange="NYSE", currency="USD", company_type="operating", valuation_model="unassigned"))
+    # Ticker único: la sqlite del suite es compartida entre workers y otros
+    # tests siembran «ACME» (test_thesis_history_route) sin limpiar; con un
+    # ticker genérico este INSERT chocaba con UNIQUE companies.ticker.
+    db.add(Company(ticker="WMNODAT", name="Acme", exchange="NYSE", currency="USD", company_type="operating", valuation_model="unassigned"))
     db.commit()
     db.close()
 
-    res = signed_request(client, SECRET, tenant, user, "GET", "/api/watchlist/monitor", params={"tickers": "ACME"})
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/watchlist/monitor", params={"tickers": "WMNODAT"})
 
     assert res.status_code == 200, res.text
-    item = res.json()["items"]["ACME"]
+    item = res.json()["items"]["WMNODAT"]
     # 18 claves siempre, nunca omitidas.
     assert set(item) == ITEM_KEYS
     # Sin precios, sin tesis ni motor: huecos a null y «Sin valor justo».
