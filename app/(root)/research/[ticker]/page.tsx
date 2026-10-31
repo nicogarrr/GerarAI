@@ -1,5 +1,6 @@
 import { getLocale, getT } from '@/lib/i18n/server';
 import { RATING_LABELS_EN, STATUS_LABELS_EN } from '@/lib/research/status-labels-en';
+import type { TranslationKey } from '@/lib/i18n/t';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { getParticipationFilings } from '@/lib/actions/research.actions';
@@ -152,7 +153,7 @@ import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
+import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, NA } from '@/lib/format';
 import { getInsiderFilings, getOwnershipSignals } from '@/lib/actions/insider.actions';
 import { OwnershipSignalsPanel } from '@/components/research/OwnershipSignalsPanel';
 import { insiderName, insiderRole } from '@/lib/insider/format';
@@ -268,13 +269,13 @@ const RATING_LABELS: Record<string, string> = {
 
 /** F24 (vista Comparables): etiquetas/prosa del backend en español,
  *  con fallback al original para no ocultar datos si el backend cambia. */
-const PEERS_BASIS_LABELS: Record<string, string> = {
-  traceable_calculated_metric: 'métrica calculada trazable',
-  evidence_backed_claim: 'afirmación con evidencia enlazada',
+const PEERS_BASIS_KEYS: Record<string, TranslationKey> = {
+  traceable_calculated_metric: 'research.peers.basisTraceable',
+  evidence_backed_claim: 'research.peers.basisEvidence',
 };
-const PEERS_METHODOLOGY_ES: Record<string, string> = {
+const PEERS_METHODOLOGY_KEYS: Record<string, TranslationKey> = {
   'Quantitative differences use traceable calculated metrics. Qualitative differences are emitted only when linked evidence exists.':
-    'Las diferencias cuantitativas usan métricas calculadas trazables. Las diferencias cualitativas solo se publican cuando existe evidencia enlazada.',
+    'research.peers.methodology',
 };
 
 /**
@@ -297,7 +298,7 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
   const subject = name ? `${ticker} · ${name}` : ticker;
   return {
     title: subject,
-    description: `Research de ${name ?? ticker}: tesis versionada, financieros canónicos, modelo a largo plazo, valoración y evidencia con fuentes trazables.`,
+    description: (await getT())('research.identity.metaDescription', { subject: name ?? ticker }),
   };
 }
 
@@ -810,7 +811,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     snapshot = await snapshotPromise;
   } catch (error) {
     if (isBackendUnavailableError(error)) {
-      return <BackendOffline feature={`Research de ${ticker}`} retryHref={`/research/${ticker}`} />;
+      return <BackendOffline feature={t('research.identity.feature', { ticker })} retryHref={`/research/${ticker}`} />;
     }
     throw error;
   }
@@ -844,9 +845,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           <div className="mx-auto max-w-[1600px] space-y-6">
             <Link className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
             <EmptyState
-              description={`La identidad de ${ticker} está verificada por doble coincidencia SEC + proveedor de mercado: «${verification.sec.name}» (${verification.provider.exchange}${verification.provider.currency ? `, ${verification.provider.currency}` : ', divisa N/D'}). La ficha aún no existe en GerarAI: se crea solo si la abres, y nacerá sin research generado.`}
+              description={t('research.identity.verifiedDesc', { ticker, name: verification.sec.name, exchange: verification.provider.exchange, currency: verification.provider.currency ? `, ${verification.provider.currency}` : t('research.identity.currencyNa') })}
               icon={ShieldAlert}
-              title="Identidad verificada por dos fuentes"
+              title={t('research.identity.verifiedTitle')}
               titleAs="h1"
               action={
                 <form action={openVerifiedFicha.bind(null, ticker)}>
@@ -869,22 +870,22 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     }
     const identity = resolveUnknownListingIdentity(await getProfile(ticker), ticker);
     const doubleCheckNote = verification
-      ? ' Se comprobó la doble coincidencia SEC + proveedor de mercado y no se cumplió, así que la identidad sigue sin verificar.'
+      ? t('research.identity.doubleCheckFailed')
       : '';
     const state =
       identity.kind === 'unverified'
         ? {
-            title: 'Identidad del ticker no verificada',
-            description: `${ticker} no tiene identidad de listado verificada en GerarAI: el proveedor de mercado conoce este símbolo como «${identity.providerName}», que puede no ser el emisor que buscas. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo.${doubleCheckNote}`,
+            title: t('research.identity.unverifiedTitle'),
+            description: t('research.identity.unverifiedDesc', { ticker, providerName: identity.providerName, note: doubleCheckNote }),
           }
         : identity.kind === 'not-in-sources'
           ? {
-              title: 'No encontramos este ticker en nuestras fuentes',
-              description: `Ninguna de nuestras fuentes reconoce ${ticker}: puede que el símbolo sea incorrecto o que aún no tenga cobertura verificada. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo.`,
+              title: t('research.identity.notInSourcesTitle'),
+              description: t('research.identity.notInSourcesDesc', { ticker }),
             }
           : {
-              title: 'No pudimos comprobar este ticker',
-              description: `${ticker} no está en la cobertura verificada de GerarAI y el proveedor de mercado no está disponible para comprobarlo. Sin identidad verificada no se pueden mostrar datos ni generar research de este símbolo; inténtalo de nuevo más tarde.`,
+              title: t('research.identity.uncheckedTitle'),
+              description: t('research.identity.uncheckedDesc', { ticker }),
             };
     return (
       <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
@@ -900,7 +901,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               // volver a comprobar (recarga completa: el proveedor pudo fallar).
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <EmptyLink className="min-h-11 px-4 text-sm" href="/search">
-                  Buscar otra empresa
+                  {t('research.identity.searchOther')}
                 </EmptyLink>
                 <a
                   className="inline-flex min-h-11 items-center rounded-md border border-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:border-gray-500 hover:text-gray-100"
@@ -931,7 +932,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   const unavailableView = findUnavailableViewFailure(entrySettled, isBackendUnavailableError);
   if (unavailableView) {
     console.warn(`[research] ${ticker} · ${activeView} motor no disponible: ${unavailableView.key}=${unavailableView.reason}`);
-    return <BackendOffline feature={`Research de ${ticker}`} retryHref={viewRetryHref(ticker, activeView)} />;
+    return <BackendOffline feature={t('research.identity.feature', { ticker })} retryHref={viewRetryHref(ticker, activeView)} />;
   }
   const isFollowed = watchlist?.some((item) => item.symbol.toUpperCase() === ticker) ?? false;
   /**
@@ -1204,7 +1205,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           title={t('research.fichaFinancialQuality')}
         >
           {moatScore ? (
-            <MoatPanel company={company} metric={moatScore} />
+            <MoatPanel company={company} metric={moatScore} ti={t} fmt={createFormatters(locale)} />
           ) : (
             <EmptyState title={t('research.fichaNoQualityEval')} />
           )}
@@ -1603,8 +1604,8 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaMoatRefreshed')}><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />{t('research.fichaReevaluateEvidence')}</Button></MutationForm>
-        <MoatClassificationPanel moat={moat} />
-        <MoatChecklistPanel moat={moat} />
+        <MoatClassificationPanel moat={moat} ti={t} />
+        <MoatChecklistPanel moat={moat} ti={t} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {moat?.moats.length ? moat.moats.map((item) => {
             const definition = moatDefinition(item.type);
@@ -1640,9 +1641,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const peers = await viewData('peers');
     return (
       <div className="space-y-6">
-        <Panel title={t('research.fichaPeerSet')}><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_LABELS[peers.comparison.basis] ?? peers.comparison.basis) : t('research.fichaNoPeerSet')} · {t('research.fichaPeersWithData', { count: peers.comparison?.peer_count ?? 0 })}{(peers.comparison?.peers_without_data ?? []).length > 0 ? t('research.fichaPeersWithoutDataSuffix', { list: (peers.comparison?.peers_without_data ?? []).join(', ') }) : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
+        <Panel title={t('research.fichaPeerSet')}><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_KEYS[peers.comparison.basis] ? t(PEERS_BASIS_KEYS[peers.comparison.basis]) : peers.comparison.basis) : t('research.fichaNoPeerSet')} · {t('research.fichaPeersWithData', { count: peers.comparison?.peer_count ?? 0 })}{(peers.comparison?.peers_without_data ?? []).length > 0 ? t('research.fichaPeersWithoutDataSuffix', { list: (peers.comparison?.peers_without_data ?? []).join(', ') }) : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
         <Panel title={t('research.fichaPeerMetrics')}><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Object.entries(peers.comparison?.benchmarks ?? {}).map(([metric, value]) => <div className="rounded-lg border border-gray-800 p-3" key={metric}><div className="text-sm text-gray-200">{metric}</div><div className="mt-2 text-xs text-gray-500">{t('research.fichaPeerTarget', { value: formatPeerValue(value.target_value, metric) })}{value.target_atypical ? t('research.fichaAtypicalSuffix') : ''}{t('research.fichaMedianSuffix', { value: peerMedianText(value, metric) })}{t('research.fichaSampleSuffix', { count: value.peer_sample_size })}</div>{(value.excluded_atypical ?? []).length > 0 ? <div className="mt-1 text-xs text-amber-300/80">{t('research.fichaOutsideMedian', { list: (value.excluded_atypical ?? []).map((ex) => `${ex.ticker} ${ex.value ?? t('research.fichaNoDataShort')}`).join(', ') })}</div> : null}</div>)}</div></Panel>
-        <Panel title={t('research.fichaAdvantages')}><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_ES[peers.analysis.methodology] ?? peers.analysis.methodology) : t('research.fichaNoPeerAnalysis')}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
+        <Panel title={t('research.fichaAdvantages')}><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_KEYS[peers.analysis.methodology] ? t(PEERS_METHODOLOGY_KEYS[peers.analysis.methodology]) : peers.analysis.methodology) : t('research.fichaNoPeerAnalysis')}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
       </div>
     );
   };

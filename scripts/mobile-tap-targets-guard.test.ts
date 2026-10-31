@@ -29,7 +29,9 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
         const guide = readFileSync('components/research/GuideBrainButton.tsx', 'utf8');
         assert.ok(guide.includes(AREA), 'GuideBrainButton con area tactil');
         const panel = readFileSync('components/research/ShareCapitalPanel.tsx', 'utf8');
-        const group = panel.slice(panel.indexOf('aria-label="Tipo de historial"'), panel.indexOf('aria-label="Tipo de historial"') + 900);
+        const groupAt = panel.indexOf("aria-label={t('research.shareCapital.historyType')}");
+        assert.ok(groupAt > -1, 'conmutador con nombre accesible del diccionario');
+        const group = panel.slice(groupAt, groupAt + 900);
         assert.ok((group.match(new RegExp(AREA.replace(/[[\]]/g, '\\$&'), 'g')) ?? []).length === 2, 'ambos botones del conmutador con area tactil');
     });
     it('las subrutas históricas redirigen a su sección; la navegación es la fila de pestañas (29-oct-2026)', () => {
