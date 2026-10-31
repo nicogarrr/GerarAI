@@ -151,3 +151,70 @@ export function barsSince<T extends { date: string }>(bars: T[], firstDate: stri
     const day = firstDate.slice(0, 10);
     return bars.filter((bar) => bar.date.slice(0, 10) >= day);
 }
+
+export const MOVE_SIGMA = 2.5;
+export const MOVE_MIN_PCT = 0.04;
+
+export interface Movement {
+    date: string;
+    change: number;
+    volumeRatio: number | null;
+    byPrice: boolean;
+    byVolume: boolean;
+}
+
+/**
+ * «Movimiento»: |variación diaria| ≥ máx(2,5 σ de las 60 sesiones previas, 4 %) o volumen ≥ 2,5× su media.
+ * Sin 20 sesiones previas no se juzga (no hay σ fiable).
+ */
+export function detectMovements(bars: EventBar[], window = VOLUME_WINDOW): Movement[] {
+    const returns = bars.map((bar, i) => (i > 0 && finite(bars[i - 1].close) && bars[i - 1].close > 0 && finite(bar.close) ? bar.close / bars[i - 1].close - 1 : null));
+    const out: Movement[] = [];
+    for (let i = 1; i < bars.length; i += 1) {
+        const change = returns[i];
+        if (change == null) continue;
+        const previous = returns.slice(Math.max(1, i - window), i).filter((r): r is number => r != null);
+        if (previous.length < 20) continue;
+        const mean = previous.reduce((s, r) => s + r, 0) / previous.length;
+        const sigma = Math.sqrt(previous.reduce((s, r) => s + (r - mean) ** 2, 0) / (previous.length - 1));
+        const volumes = bars.slice(Math.max(0, i - window), i).map((b) => b.volume).filter((v): v is number => finite(v) && v > 0);
+        const avgVolume = volumes.length >= 20 ? volumes.reduce((s, v) => s + v, 0) / volumes.length : null;
+        const volume = bars[i].volume;
+        const volumeRatio = avgVolume && finite(volume) ? volume / avgVolume : null;
+        const byPrice = Math.abs(change) >= Math.max(MOVE_SIGMA * sigma, MOVE_MIN_PCT);
+        const byVolume = volumeRatio != null && volumeRatio >= VOLUME_SPIKE_RATIO;
+        if (byPrice || byVolume) out.push({ date: bars[i].date.slice(0, 10), change, volumeRatio, byPrice, byVolume });
+    }
+    return out;
+}
+
+const pctText = (value: number) => `${value > 0 ? '+' : ''}${(value * 100).toLocaleString('es-ES', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`;
+
+function shiftDay(day: string, delta: number): string {
+    return new Date(Date.parse(`${day}T00:00:00Z`) + delta * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * «¿Por qué se movió?»: cada movimiento como evento, con lo que pasó ese día (±1) o «Sin noticias ese día».
+ * Nunca afirma la causa: «puede explicarlo».
+ */
+export function movementEvents(movements: Movement[], events: PriceEvent[]): PriceEvent[] {
+    return movements.map((move) => {
+        const near = events.filter((e) => e.kind !== 'movement' && e.date >= shiftDay(move.date, -1) && e.date <= shiftDay(move.date, 1));
+        const parts: string[] = [];
+        if (move.byPrice) parts.push(`${pctText(move.change)} en el día`);
+        if (move.byVolume && move.volumeRatio != null) parts.push(`volumen ${move.volumeRatio.toLocaleString('es-ES', { maximumFractionDigits: 1 })}× la media de 60 sesiones`);
+        const detail = near.length
+            ? `Puede explicarlo:\n${near.map((e) => `· ${e.date} ${EVENT_KINDS[e.kind].label}: ${e.title} (${e.source})`).join('\n')}`
+            : 'Sin noticias ese día (ni el anterior ni el siguiente) entre los eventos guardados.';
+        return {
+            id: `movement-${move.date}`,
+            date: move.date,
+            kind: 'movement' as const,
+            title: `¿Por qué se movió? ${parts.join(', ')}`,
+            detail,
+            source: 'Cálculo de GerarAI sobre los precios diarios',
+            source_url: null,
+        };
+    });
+}
