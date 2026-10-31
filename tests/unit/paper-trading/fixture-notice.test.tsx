@@ -3,6 +3,7 @@ import {render,screen} from '@testing-library/react';
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import PaperTradingPage from '@/app/(root)/paper-trading/page';
 const mocks=vi.hoisted(()=>({account:vi.fn(),history:vi.fn(),valuation:vi.fn()}));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/cache',()=>({revalidatePath:vi.fn()}));
 vi.mock('@/lib/actions/manual-demo.actions',()=>({getManualDemoAccount:mocks.account,getManualDemoValuation:mocks.valuation,placeManualOrder:vi.fn(),convertManualDemoCurrency:vi.fn()}));
 vi.mock('@/lib/actions/manual-demo-history.actions',()=>({getManualDemoHistory:mocks.history}));

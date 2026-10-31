@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 const { redirect, getCatalystCalendar } = vi.hoisted(() => ({ redirect: vi.fn(), getCatalystCalendar: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/navigation', () => ({ redirect }));
 vi.mock('@/lib/actions/catalysts.actions', () => ({ getCatalystCalendar }));
 vi.mock('@/components/alerts/AlertsManager', () => ({ default: () => <div>gestor-alertas</div> }));

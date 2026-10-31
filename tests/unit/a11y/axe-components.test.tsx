@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // texto visible (WCAG 2.5.3) y estructura de listas de definicion (1.3.1).
 // El contraste y el subrayado de enlaces se comprueban en el e2e.
 
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock('@/lib/actions/auth.actions', () => ({ signOut: vi.fn() }));
 const getFollowedEarnings = vi.fn();

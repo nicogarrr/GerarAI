@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   actions: vi.fn(), status: vi.fn(), calendar: vi.fn(), materials: vi.fn(),
   signals: vi.fn(), filings: vi.fn(), feed: vi.fn(), operations: vi.fn(),
 }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/actions/corporate-actions.actions', () => ({ getCorporateActions: mocks.actions, getCorporateActionsSyncStatus: mocks.status }));
 vi.mock('@/lib/actions/catalysts.actions', () => ({ getFollowedEarnings: mocks.calendar }));
 vi.mock('@/lib/actions/earnings-materials.actions', () => ({ getEarningsMaterials: mocks.materials }));
