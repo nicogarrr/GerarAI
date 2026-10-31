@@ -7,6 +7,9 @@
  * («net_debt_to_ebitda»). Si el backend añade una clave nueva, el fallback
  * la humaniza (guiones bajos -> espacios) en vez de ocultarla.
  */
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { METRIC_LABELS_EN } from './metric-labels-en.ts';
+
 export const METRIC_LABELS: Record<string, string> = {
     market_cap: 'Capitalización bursátil',
     // Screener conectado (screener_context_metrics.py).
@@ -173,13 +176,14 @@ export const METRIC_LABELS: Record<string, string> = {
     'segment_*_valuation_multiple': 'múltiplo de valoración por segmento',
 };
 
-/** Etiqueta en español de una métrica; humaniza la clave si es desconocida. */
-export function metricLabel(metric: string): string {
-    const known = (Object.hasOwn(METRIC_LABELS, metric) ? METRIC_LABELS[metric] : null) ?? (Object.hasOwn(METRIC_LABELS, metric.toLowerCase()) ? METRIC_LABELS[metric.toLowerCase()] : null);
+/** Etiqueta de una métrica (ES por defecto); humaniza la clave si es desconocida. */
+export function metricLabel(metric: string, locale: 'es' | 'en' = 'es'): string {
+    const table = locale === 'en' ? METRIC_LABELS_EN : METRIC_LABELS;
+    const known = (Object.hasOwn(table, metric) ? table[metric] : null) ?? (Object.hasOwn(table, metric.toLowerCase()) ? table[metric.toLowerCase()] : null);
     if (known) return known;
     // «fx_rate:CNY/USD» (valuation_service, DCF inverso): el tipo de cambio
     // que falta entre la divisa de reporte y la del listado.
     const fx = /^fx_rate:([a-z]{3})\/([a-z]{3})$/i.exec(metric);
-    if (fx) return `tipo de cambio ${fx[1].toUpperCase()}/${fx[2].toUpperCase()}`;
+    if (fx) return `${locale === 'en' ? 'exchange rate' : 'tipo de cambio'} ${fx[1].toUpperCase()}/${fx[2].toUpperCase()}`;
     return metric.replaceAll('_', ' ');
 }
