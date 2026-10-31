@@ -301,9 +301,13 @@ def cached(
             if extract_tenant is not None and tenant_id is None:
                 try:
                     tenant_id = extract_tenant(args, kwargs)  # type: ignore[arg-type]
-                except Exception:
-                    # nosemgrep: gerarai-broad-except-pass -- extraccion opcional de tenant_id; degrada a None de forma segura
-                    pass
+                except Exception:  # noqa: BLE001
+                    # Extraccion opcional de tenant_id: degrada a None de forma
+                    # segura, pero deja rastro en debug para poder diagnosticarlo.
+                    logger.debug(
+                        "extract_tenant fallo en cache_tenant_aware; se degrada a clave sin tenant",
+                        exc_info=True,
+                    )
             
             # Filtrar self y Session para una clave determinista entre requests
             clean_args = []
