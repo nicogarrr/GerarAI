@@ -36,6 +36,24 @@ def _url(value: str | None) -> str | None:
         return None
 
 
+_TICKER_TOKEN_RE = re.compile(r"\b[A-Z]{1,6}(?:\.[A-Z]{1,4})\b")
+
+
+def _foreign_ticker(db: Session, question: str, ticker: str) -> str | None:
+    """Ticker distinto al del contexto mencionado en la pregunta.
+
+    Con punto («ACS.MC») la forma ya es ticker aunque no este registrada; sin
+    punto solo cuenta un ticker registrado («CEO» o «PER» no son un cambio).
+    Con varios tickers ajenos (comparativas) no hay un destino unico.
+    """
+    tokens = [token for token in _TICKER_TOKEN_RE.findall(question) if token != ticker]
+    if not tokens:
+        return None
+    registered = set(db.scalars(select(Company.ticker).where(Company.ticker.in_(tokens))))
+    foreign = sorted({token for token in tokens if "." in token or token in registered})
+    return foreign[0] if len(foreign) == 1 else None
+
+
 def _company(db: Session, ticker: str) -> Company:
     company = db.scalar(select(Company).where(Company.ticker == ticker.upper()))
     if not company:
@@ -190,8 +208,9 @@ def _overview(citations: list[dict]) -> list[dict]:
     return picked
 
 
-def _rank(citations: list[dict], question: str, ticker: str) -> list[dict]:
-    terms = _tokens(question) - _tokens(ticker)
+def _rank(citations: list[dict], question: str, ticker: str, company_name: str | None = None) -> list[dict]:
+    stop = _tokens(ticker) | _tokens(company_name or "")
+    terms = _tokens(question) - stop
     if not terms:
         return []
     if not (terms - _GENERAL):
@@ -199,7 +218,7 @@ def _rank(citations: list[dict], question: str, ticker: str) -> list[dict]:
     groups = [frozenset({term}) | _ES_EN.get(term, frozenset()) for term in terms]
     ranked = []
     for citation in citations:
-        haystack = _tokens(f"{citation.get('source') or ''} {citation.get('excerpt') or ''}") - _tokens(ticker)
+        haystack = _tokens(f"{citation.get('source') or ''} {citation.get('excerpt') or ''}") - stop
         score = sum(1 for group in groups if group & haystack)
         if score:
             ranked.append((score, citation))
@@ -260,7 +279,7 @@ def _evidence(db: Session, company: Company, tenant_id: int, question: str) -> l
                           "source": doc.title, "url": _url(doc.source_url),
                           "as_of": doc.published_at.isoformat(), "excerpt": clip_words(chunk.text, 450, ellipsis="")})
     citations.extend(_thesis_citations(db, company, tenant_id))
-    return _rank(citations, question, company.ticker)
+    return _rank(citations, question, company.ticker, company.name)
 
 
 def _money(value, currency: str | None) -> str:
@@ -358,6 +377,14 @@ def answer(db: Session, payload) -> dict:
     if not payload.ticker:
         return _empty(payload.mode, "Indica un ticker para recuperar fuentes verificables del espacio de trabajo.")
     company = _company(db, payload.ticker)
+    foreign = _foreign_ticker(db, payload.question, company.ticker)
+    if foreign is not None:
+        target = db.scalar(select(Company).where(Company.ticker == foreign))
+        if target is None:
+            response = _empty(payload.mode, f"La pregunta es sobre {foreign}, sin empresa registrada; "
+                                           f"no se cita evidencia de {company.ticker}.")
+            return response
+        company = target
     review = _review(db, payload.review_id, company.id, tenant_id)
     anchored = review is not None and _asks_about_selected_review(payload.question, company.ticker)
     citations = (_linked_review_news(db, review, company, tenant_id) if anchored
