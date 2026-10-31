@@ -47,7 +47,10 @@ describe('ajustes', () => {
     assert.match(llmForm, /type="password"/);
     assert.doesNotMatch(llmForm, /initial\.api_key\b/);
     assert.doesNotMatch(llmForm, /defaultValue=\{[^}]*api[_-]?key/i);
-    assert.match(llmForm, /Los proveedores de pago los paga el usuario/);
+    assert.ok(llmForm.includes("t('settings.llm.paidNote')"));
+    for (const [locale, paid] of [['es', /Los proveedores de pago los paga el usuario/], ['en', /Paid providers are paid by the user/]] as const) {
+      assert.match(JSON.parse(read(`lib/i18n/messages/${locale}/settings.json`)).llm.paidNote, paid);
+    }
     assert.match(llmForm, /href="\/privacidad"/);
   });
   it('la accion solo devuelve la vista del backend (sin clave)', () => {
