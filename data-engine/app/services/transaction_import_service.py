@@ -23,7 +23,7 @@ from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
@@ -451,21 +451,15 @@ class TransactionImportService:
         )
         import_batch = f"csv-{hashlib.sha256(canonical.encode()).hexdigest()[:12]}"
 
-        def _fingerprint(company_id: int | None, portfolio_id: int | None, tx: ParsedTransaction) -> tuple | None:
-            """Huella de una pata del CSV: empresa + cartera + campos económicos.
+        def _core_fingerprint(company_id: int, tx: ParsedTransaction) -> tuple:
+            """Huella económica de la pata (sin cartera): qué operación es.
 
-            La huella NO prueba identidad por sí sola: dos operaciones reales
-            idénticas el mismo día comparten huella. La identidad se resuelve
-            con el contador de ocurrencias del fichero (ver _existing_count):
-            la ocurrencia k solo se omite si la cartera ya tiene k patas con
-            esa huella, así dos compras idénticas legítimas importan las dos y
-            reimportar el mismo CSV no duplica.
+            La huella sola NO prueba identidad: dos compras reales idénticas el
+            mismo día comparten huella. La identidad importada es
+            (lote, huella, nº de ocurrencia) — ver _leg_prefix / el bucle.
             """
-            if company_id is None:
-                return None
             return (
                 company_id,
-                portfolio_id,
                 date.fromisoformat(tx.date),
                 tx.action.lower(),
                 Decimal(str(tx.quantity)),
@@ -474,34 +468,29 @@ class TransactionImportService:
                 tx.currency.upper(),
             )
 
-        def _leg_external_id(fp: tuple, occurrence: int) -> str:
-            """Id estable de una pata importada: (lote, huella, nº de ocurrencia).
-
-            Dos compras idénticas el mismo día comparten huella pero no ocurrencia,
-            así ambas importan; reimportar el mismo fichero reproduce los mismos
-            ids y se omite; otro fichero con una pata idéntica tiene lote distinto
-            y sí importa. external_id es UNIQUE por tenant: la base lo garantiza.
-            """
+        def _leg_prefix(fp: tuple) -> str:
             digest = hashlib.sha256(repr(fp).encode()).hexdigest()[:16]
-            return f"{import_batch}-{digest}-{occurrence}"
+            return f"{import_batch}-{digest}-"
 
-        def _already_imported_leg(leg_id: str) -> bool:
+        def _legs_in_portfolio(prefix: str, portfolio_id: int | None) -> int:
             return db.scalar(
-                select(Transaction.id).where(
-                    Transaction.external_id == leg_id,
+                select(func.count(Transaction.id)).where(
+                    Transaction.portfolio_id == portfolio_id,
+                    Transaction.external_id.like(f"{prefix}%"),
                     *tenant_filters(db, Transaction),
-                ).limit(1)
-            ) is not None
+                )
+            ) or 0
+
+        def _legs_in_tenant(prefix: str) -> int:
+            return db.scalar(
+                select(func.count(Transaction.id)).where(
+                    Transaction.external_id.like(f"{prefix}%"),
+                    *tenant_filters(db, Transaction),
+                )
+            ) or 0
 
 
         seen_in_file: dict[tuple, int] = {}
-
-        def _resolve_company(ticker_or_isin: str) -> Company | None:
-            raw = ticker_or_isin.upper()
-            if re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", raw):
-                # Un ISIN no es un ticker: se resuelve a la empresa registrada por ISIN.
-                return db.scalar(select(Company).where(Company.isin == raw).limit(1))
-            return db.scalar(select(Company).where(Company.ticker == raw).limit(1))
 
         # Orden cronológico: una venta anterior a una compra listada después no
         # debe fallar por sobreventa. Mismo día: compras antes que ventas.
@@ -512,20 +501,32 @@ class TransactionImportService:
         try:
             target_portfolio = service.fx.ensure_portfolio(db)
             for tx in sorted(transactions, key=_chronological):
-                company = _resolve_company(tx.ticker)
-                if company is None and re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", tx.ticker.upper()):
-                    raise ValueError(
-                        f"ISIN {tx.ticker} sin empresa registrada (fila {tx.row_number}): "
-                        "importa primero por ticker o registra la empresa con su ISIN"
-                    )
-                fp = _fingerprint(company.id if company else None, target_portfolio.id, tx)
-                leg_id: str | None = None
-                if fp is not None:
-                    seen_in_file[fp] = seen_in_file.get(fp, 0) + 1
-                    leg_id = _leg_external_id(fp, seen_in_file[fp])
-                    if _already_imported_leg(leg_id):
-                        duplicates_skipped += 1
-                        continue
+                if re.match(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", tx.ticker.upper()):
+                    # Un ISIN no es un ticker: se resuelve a la empresa registrada.
+                    company = db.scalar(select(Company).where(Company.isin == tx.ticker.upper()).limit(1))
+                    if company is None:
+                        raise ValueError(
+                            f"ISIN {tx.ticker} sin empresa registrada (fila {tx.row_number}): "
+                            "importa primero por ticker o registra la empresa con su ISIN"
+                        )
+                else:
+                    # Ticker: la empresa se crea si no existe, para que la pata tenga
+                    # identidad estable desde la PRIMERA importación (si no, reimportar
+                    # el mismo fichero duplicaría las patas de empresas nuevas).
+                    company = service.ensure_company(db, tx.ticker)
+                fp = _core_fingerprint(company.id, tx)
+                seen_in_file[fp] = seen_in_file.get(fp, 0) + 1
+                prefix = _leg_prefix(fp)
+                # Omite la ocurrencia k solo si ESTA cartera ya tiene k patas del
+                # mismo lote y huella: dos compras idénticas legítimas importan las
+                # dos, reimportar el mismo fichero no duplica, y la misma pata en
+                # otra cartera del tenant no bloquea la importación en esta.
+                if _legs_in_portfolio(prefix, target_portfolio.id) >= seen_in_file[fp]:
+                    duplicates_skipped += 1
+                    continue
+                # external_id UNIQUE por tenant: la ocurrencia se numera en el
+                # tenant para no chocar con patas movidas a otra cartera.
+                leg_id = f"{prefix}{_legs_in_tenant(prefix) + 1}"
                 origin = f"Importación masiva ({source_filename}, fila {tx.row_number})" if source_filename else f"Importación masiva (fila {tx.row_number})"
                 service.create_transaction(
                     db,

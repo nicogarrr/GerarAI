@@ -462,3 +462,24 @@ def test_identical_legitimate_operations_all_import_and_reimport_skips(env):
 
         count = s.query(Transaction).filter(Transaction.action == "buy").count()
         assert count == 3
+
+
+def test_reimport_with_new_company_does_not_duplicate(env):
+    """Primera importación con empresa NO registrada: la pata recibe identidad
+    estable desde el primer momento, así reimportar el mismo CSV no duplica."""
+    _, factory, _, _ = env
+    from app.models.entities import Company, Transaction
+
+    service = TransactionImportService()
+    rows = [ParsedTransaction(row_number=2, ticker="NUEVA.MC", date="2024-03-01", action="buy",
+                              quantity=5, price=10.0, fees=0.0, currency="EUR")]
+    with factory() as s:
+        s.info["tenant_id"] = "tenant-csv-test"
+        first = service.commit_import(s, rows, source_filename="a.csv")
+        assert first["imported_count"] == 1
+        assert s.query(Company).filter(Company.ticker == "NUEVA.MC").count() == 1
+
+        second = service.commit_import(s, rows, source_filename="a.csv")
+        assert second["imported_count"] == 0
+        assert second["duplicates_skipped"] == 1
+        assert s.query(Transaction).filter(Transaction.action == "buy").count() == 1
