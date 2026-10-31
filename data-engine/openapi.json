@@ -6732,6 +6732,340 @@
         "title": "InvalidationRulesRequest",
         "type": "object"
       },
+      "InvestorDatumOut": {
+        "description": "Datum etiquetado de investor_portfolio.datum: N/D => todo null.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "label": {
+            "enum": [
+              "OFICIAL",
+              "INFERIDO",
+              "SIN_DATOS"
+            ],
+            "title": "Label",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "title": "InvestorDatumOut",
+        "type": "object"
+      },
+      "InvestorPortfolioOut": {
+        "description": "Respuesta de investor_portfolio(): ramas 13F y curated/Form4.",
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "firm": {
+            "title": "Firm",
+            "type": "string"
+          },
+          "has_13f": {
+            "title": "Has 13F",
+            "type": "boolean"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "limitations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Limitations"
+          },
+          "movements": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioMovementOut"
+            },
+            "title": "Movements",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "source_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Kinds",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "sin_datos"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "total_value_usd": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "firm",
+          "has_13f",
+          "status",
+          "labels",
+          "limitations",
+          "positions",
+          "movements",
+          "source_kinds",
+          "total_value_usd"
+        ],
+        "title": "InvestorPortfolioOut",
+        "type": "object"
+      },
+      "InvestorSummaryOut": {
+        "description": "Fila del listado de inversores (services/investors.list_investors).",
+        "properties": {
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "firm": {
+            "title": "Firm",
+            "type": "string"
+          },
+          "has_13f": {
+            "title": "Has 13F",
+            "type": "boolean"
+          },
+          "has_public_profile": {
+            "title": "Has Public Profile",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "person",
+              "firm",
+              "company"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "official_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Official Name"
+          },
+          "positions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions"
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "value_usd_thousands": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd Thousands"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "firm",
+          "kind",
+          "has_13f",
+          "has_public_profile"
+        ],
+        "title": "InvestorSummaryOut",
+        "type": "object"
+      },
+      "InvestorsListOut": {
+        "properties": {
+          "investors": {
+            "items": {
+              "$ref": "#/components/schemas/InvestorSummaryOut"
+            },
+            "title": "Investors",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          }
+        },
+        "required": [
+          "investors",
+          "limitations",
+          "provenance"
+        ],
+        "title": "InvestorsListOut",
+        "type": "object"
+      },
       "KPIExtractionAction": {
         "properties": {
           "action": {
@@ -8496,6 +8830,155 @@
         "title": "MemoryItemOut",
         "type": "object"
       },
+      "MostBoughtBuyerOut": {
+        "properties": {
+          "change": {
+            "enum": [
+              "new",
+              "increased"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "report_date": {
+            "title": "Report Date",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "change",
+          "report_date"
+        ],
+        "title": "MostBoughtBuyerOut",
+        "type": "object"
+      },
+      "MostBoughtItemOut": {
+        "properties": {
+          "buyers": {
+            "items": {
+              "$ref": "#/components/schemas/MostBoughtBuyerOut"
+            },
+            "title": "Buyers",
+            "type": "array"
+          },
+          "buyers_count": {
+            "title": "Buyers Count",
+            "type": "integer"
+          },
+          "cusip": {
+            "title": "Cusip",
+            "type": "string"
+          },
+          "name_of_issuer": {
+            "title": "Name Of Issuer",
+            "type": "string"
+          },
+          "name_of_issuer_filed": {
+            "title": "Name Of Issuer Filed",
+            "type": "string"
+          },
+          "new_count": {
+            "title": "New Count",
+            "type": "integer"
+          },
+          "sellers_count": {
+            "title": "Sellers Count",
+            "type": "integer"
+          },
+          "value_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd"
+          }
+        },
+        "required": [
+          "name_of_issuer",
+          "name_of_issuer_filed",
+          "cusip",
+          "buyers_count",
+          "new_count",
+          "sellers_count",
+          "buyers"
+        ],
+        "title": "MostBoughtItemOut",
+        "type": "object"
+      },
+      "MostBoughtOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MostBoughtItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "managers_compared": {
+            "title": "Managers Compared",
+            "type": "integer"
+          },
+          "managers_partial": {
+            "title": "Managers Partial",
+            "type": "integer"
+          },
+          "managers_without_history": {
+            "title": "Managers Without History",
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "report_dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Report Dates",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "sin_datos"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "managers_compared",
+          "managers_without_history",
+          "managers_partial",
+          "report_dates",
+          "items",
+          "limitations",
+          "provenance"
+        ],
+        "title": "MostBoughtOut",
+        "type": "object"
+      },
       "NarrativeSectionOut": {
         "properties": {
           "parrafos": {
@@ -8729,6 +9212,131 @@
           "source"
         ],
         "title": "NextEventOut",
+        "type": "object"
+      },
+      "OverlapHolderOut": {
+        "properties": {
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "filing_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Date"
+          },
+          "filing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Url"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "report_date": {
+            "title": "Report Date",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "report_date"
+        ],
+        "title": "OverlapHolderOut",
+        "type": "object"
+      },
+      "OverlapPositionOut": {
+        "properties": {
+          "cusip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cusip"
+          },
+          "holders": {
+            "items": {
+              "$ref": "#/components/schemas/OverlapHolderOut"
+            },
+            "title": "Holders",
+            "type": "array"
+          },
+          "identity_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Source"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "sin_identificador",
+              "sin_coincidencias",
+              "coincidencia"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "name",
+          "holders",
+          "status"
+        ],
+        "title": "OverlapPositionOut",
         "type": "object"
       },
       "OwnershipManagerOut": {
@@ -9063,6 +9671,271 @@
           "base_currency"
         ],
         "title": "PortfolioConfigurationInput",
+        "type": "object"
+      },
+      "PortfolioMovementOut": {
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date"
+          },
+          "filing_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Date"
+          },
+          "issuer": {
+            "title": "Issuer",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "price_usd": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          },
+          "shares": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          },
+          "shares_after": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          },
+          "source_form": {
+            "title": "Source Form",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "transaction_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transaction Code"
+          }
+        },
+        "required": [
+          "issuer",
+          "action",
+          "shares",
+          "price_usd",
+          "shares_after",
+          "source_form"
+        ],
+        "title": "PortfolioMovementOut",
+        "type": "object"
+      },
+      "PortfolioOverlapOut": {
+        "properties": {
+          "comparison_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Complete"
+          },
+          "kind": {
+            "const": "derivado",
+            "title": "Kind",
+            "type": "string"
+          },
+          "limitations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitations"
+          },
+          "managers_partial": {
+            "title": "Managers Partial",
+            "type": "integer"
+          },
+          "managers_with_data": {
+            "title": "Managers With Data",
+            "type": "integer"
+          },
+          "managers_without_data": {
+            "title": "Managers Without Data",
+            "type": "integer"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "not_owned": {
+            "items": {
+              "$ref": "#/components/schemas/MostBoughtItemOut"
+            },
+            "title": "Not Owned",
+            "type": "array"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/OverlapPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "report_dates": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Report Dates",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "sin_datos"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unresolved_positions": {
+            "title": "Unresolved Positions",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "kind",
+          "positions",
+          "not_owned",
+          "unresolved_positions",
+          "managers_with_data",
+          "managers_without_data",
+          "managers_partial",
+          "report_dates"
+        ],
+        "title": "PortfolioOverlapOut",
+        "type": "object"
+      },
+      "PortfolioPositionOut": {
+        "properties": {
+          "cusip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cusip"
+          },
+          "issuer": {
+            "title": "Issuer",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "ownership_pct": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          },
+          "shares": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          },
+          "source_form": {
+            "title": "Source Form",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "title_of_class": {
+            "title": "Title Of Class",
+            "type": "string"
+          },
+          "value_usd": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          },
+          "weight_pct": {
+            "$ref": "#/components/schemas/InvestorDatumOut"
+          }
+        },
+        "required": [
+          "issuer",
+          "title_of_class",
+          "shares",
+          "ownership_pct",
+          "value_usd",
+          "weight_pct",
+          "source_form"
+        ],
+        "title": "PortfolioPositionOut",
         "type": "object"
       },
       "PortfolioPriceInput": {
@@ -35129,9 +36002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Investors Api Investors Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InvestorsListOut"
                 }
               }
             },
@@ -35466,9 +36337,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Most Bought Route Api Investors Most Bought Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/MostBoughtOut"
                 }
               }
             },
@@ -35629,9 +36498,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Overlap Route Api Investors Portfolio Overlap Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioOverlapOut"
                 }
               }
             },
@@ -35975,9 +36842,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Investor Portfolio Route Api Investors  Slug  Portfolio Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InvestorPortfolioOut"
                 }
               }
             },

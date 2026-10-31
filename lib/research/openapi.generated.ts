@@ -8776,6 +8776,104 @@ export interface components {
             /** Rules */
             rules?: components["schemas"]["InvalidationRuleIn"][];
         };
+        /**
+         * InvestorDatumOut
+         * @description Datum etiquetado de investor_portfolio.datum: N/D => todo null.
+         */
+        InvestorDatumOut: {
+            /** As Of */
+            as_of?: string | null;
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "OFICIAL" | "INFERIDO" | "SIN_DATOS";
+            /** Source Url */
+            source_url?: string | null;
+            /** Value */
+            value?: number | null;
+        };
+        /**
+         * InvestorPortfolioOut
+         * @description Respuesta de investor_portfolio(): ramas 13F y curated/Form4.
+         */
+        InvestorPortfolioOut: {
+            /** As Of */
+            as_of?: string | null;
+            /** Coverage */
+            coverage?: string | null;
+            /** Firm */
+            firm: string;
+            /** Has 13F */
+            has_13f: boolean;
+            /** Labels */
+            labels: string[];
+            /** Limitations */
+            limitations: string[] | string;
+            /** Movements */
+            movements: components["schemas"]["PortfolioMovementOut"][];
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Positions */
+            positions: components["schemas"]["PortfolioPositionOut"][];
+            /** Slug */
+            slug: string;
+            /** Source Kinds */
+            source_kinds: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "sin_datos";
+            total_value_usd: components["schemas"]["InvestorDatumOut"];
+        };
+        /**
+         * InvestorSummaryOut
+         * @description Fila del listado de inversores (services/investors.list_investors).
+         */
+        InvestorSummaryOut: {
+            /** Cik */
+            cik?: string | null;
+            /** Coverage */
+            coverage?: string | null;
+            /** Firm */
+            firm: string;
+            /** Has 13F */
+            has_13f: boolean;
+            /** Has Public Profile */
+            has_public_profile: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "person" | "firm" | "company";
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Official Name */
+            official_name?: string | null;
+            /** Positions */
+            positions?: number | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Slug */
+            slug: string;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+            /** Verification */
+            verification?: string | null;
+        };
+        /** InvestorsListOut */
+        InvestorsListOut: {
+            /** Investors */
+            investors: components["schemas"]["InvestorSummaryOut"][];
+            /** Limitations */
+            limitations: string[];
+            provenance: components["schemas"]["ProvenanceOut"];
+        };
         /** KPIExtractionAction */
         KPIExtractionAction: {
             /**
@@ -9333,6 +9431,60 @@ export interface components {
              */
             updated_at: string;
         };
+        /** MostBoughtBuyerOut */
+        MostBoughtBuyerOut: {
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "increased";
+            /** Name */
+            name: string;
+            /** Report Date */
+            report_date: string;
+            /** Slug */
+            slug: string;
+        };
+        /** MostBoughtItemOut */
+        MostBoughtItemOut: {
+            /** Buyers */
+            buyers: components["schemas"]["MostBoughtBuyerOut"][];
+            /** Buyers Count */
+            buyers_count: number;
+            /** Cusip */
+            cusip: string;
+            /** Name Of Issuer */
+            name_of_issuer: string;
+            /** Name Of Issuer Filed */
+            name_of_issuer_filed: string;
+            /** New Count */
+            new_count: number;
+            /** Sellers Count */
+            sellers_count: number;
+            /** Value Usd */
+            value_usd?: number | null;
+        };
+        /** MostBoughtOut */
+        MostBoughtOut: {
+            /** Items */
+            items: components["schemas"]["MostBoughtItemOut"][];
+            /** Limitations */
+            limitations: string[];
+            /** Managers Compared */
+            managers_compared: number;
+            /** Managers Partial */
+            managers_partial: number;
+            /** Managers Without History */
+            managers_without_history: number;
+            provenance: components["schemas"]["ProvenanceOut"];
+            /** Report Dates */
+            report_dates: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "sin_datos";
+        };
         /** NarrativeSectionOut */
         NarrativeSectionOut: {
             /** Parrafos */
@@ -9404,6 +9556,41 @@ export interface components {
             source: string;
             /** Year */
             year?: number | null;
+        };
+        /** OverlapHolderOut */
+        OverlapHolderOut: {
+            /** Coverage */
+            coverage?: string | null;
+            /** Filing Date */
+            filing_date?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /** Name */
+            name: string;
+            /** Report Date */
+            report_date: string;
+            /** Slug */
+            slug: string;
+            /** Verification */
+            verification?: string | null;
+        };
+        /** OverlapPositionOut */
+        OverlapPositionOut: {
+            /** Cusip */
+            cusip?: string | null;
+            /** Holders */
+            holders: components["schemas"]["OverlapHolderOut"][];
+            /** Identity Source */
+            identity_source?: string | null;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "sin_identificador" | "sin_coincidencias" | "coincidencia";
+            /** Ticker */
+            ticker: string;
         };
         /** OwnershipManagerOut */
         OwnershipManagerOut: {
@@ -9516,6 +9703,80 @@ export interface components {
         PortfolioConfigurationInput: {
             /** Base Currency */
             base_currency: string;
+        };
+        /** PortfolioMovementOut */
+        PortfolioMovementOut: {
+            /** Action */
+            action: string;
+            /** Date */
+            date?: string | null;
+            /** Filing Date */
+            filing_date?: string | null;
+            /** Issuer */
+            issuer: string;
+            /** Note */
+            note?: string | null;
+            price_usd: components["schemas"]["InvestorDatumOut"];
+            shares: components["schemas"]["InvestorDatumOut"];
+            shares_after: components["schemas"]["InvestorDatumOut"];
+            /** Source Form */
+            source_form: string;
+            /** Ticker */
+            ticker?: string | null;
+            /** Transaction Code */
+            transaction_code?: string | null;
+        };
+        /** PortfolioOverlapOut */
+        PortfolioOverlapOut: {
+            /** Comparison Complete */
+            comparison_complete?: boolean | null;
+            /**
+             * Kind
+             * @constant
+             */
+            kind: "derivado";
+            /** Limitations */
+            limitations?: string[] | null;
+            /** Managers Partial */
+            managers_partial: number;
+            /** Managers With Data */
+            managers_with_data: number;
+            /** Managers Without Data */
+            managers_without_data: number;
+            /** Message */
+            message?: string | null;
+            /** Not Owned */
+            not_owned: components["schemas"]["MostBoughtItemOut"][];
+            /** Positions */
+            positions: components["schemas"]["OverlapPositionOut"][];
+            /** Report Dates */
+            report_dates: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "sin_datos";
+            /** Unresolved Positions */
+            unresolved_positions: number;
+        };
+        /** PortfolioPositionOut */
+        PortfolioPositionOut: {
+            /** Cusip */
+            cusip?: string | null;
+            /** Issuer */
+            issuer: string;
+            /** Note */
+            note?: string | null;
+            ownership_pct: components["schemas"]["InvestorDatumOut"];
+            shares: components["schemas"]["InvestorDatumOut"];
+            /** Source Form */
+            source_form: string;
+            /** Ticker */
+            ticker?: string | null;
+            /** Title Of Class */
+            title_of_class: string;
+            value_usd: components["schemas"]["InvestorDatumOut"];
+            weight_pct: components["schemas"]["InvestorDatumOut"];
         };
         /** PortfolioPriceInput */
         PortfolioPriceInput: {
@@ -16216,9 +16477,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["InvestorsListOut"];
                 };
             };
             /** @description Validation Error */
@@ -16298,9 +16557,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["MostBoughtOut"];
                 };
             };
             /** @description Validation Error */
@@ -16338,9 +16595,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioOverlapOut"];
                 };
             };
             /** @description Validation Error */
@@ -16422,9 +16677,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["InvestorPortfolioOut"];
                 };
             };
             /** @description Validation Error */

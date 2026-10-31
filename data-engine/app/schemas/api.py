@@ -1011,3 +1011,151 @@ class ManagerChangesOut(BaseModel):
     changes: list[ManagerChangeRowOut]
     limitations: list[str] | None = None
     provenance: ProvenanceOut | None = None
+
+
+class InvestorSummaryOut(BaseModel):
+    """Fila del listado de inversores (services/investors.list_investors)."""
+
+    slug: str
+    name: str
+    firm: str
+    kind: Literal["person", "firm", "company"]
+    cik: str | None = None
+    has_13f: bool
+    has_public_profile: bool
+    coverage: str | None = None
+    verification: str | None = None
+    # REVIEWED_MANAGERS.get(inv.cik or "") -> None (sin default) para inversores
+    # sin CIK revisado: 8 registros del listado real. Nullable, nunca "".
+    official_name: str | None = None
+    report_date: str | None = None
+    positions: int | None = None
+    value_usd_thousands: float | None = None
+    note: str | None = None
+
+
+class InvestorsListOut(BaseModel):
+    investors: list[InvestorSummaryOut]
+    limitations: list[str]
+    provenance: ProvenanceOut
+
+
+class MostBoughtBuyerOut(BaseModel):
+    slug: str
+    name: str
+    change: Literal["new", "increased"]
+    report_date: str
+
+
+class MostBoughtItemOut(BaseModel):
+    name_of_issuer: str
+    name_of_issuer_filed: str
+    cusip: str
+    buyers_count: int
+    new_count: int
+    sellers_count: int
+    value_usd: float | None = None
+    buyers: list[MostBoughtBuyerOut]
+
+
+class MostBoughtOut(BaseModel):
+    status: Literal["ok", "sin_datos"]
+    managers_compared: int
+    managers_without_history: int
+    managers_partial: int
+    report_dates: list[str]
+    items: list[MostBoughtItemOut]
+    limitations: list[str]
+    provenance: ProvenanceOut
+
+
+class OverlapHolderOut(BaseModel):
+    slug: str
+    name: str
+    report_date: str
+    filing_date: str | None = None
+    filing_url: str | None = None
+    coverage: str | None = None
+    verification: str | None = None
+
+
+class OverlapPositionOut(BaseModel):
+    ticker: str
+    name: str
+    cusip: str | None = None
+    identity_source: str | None = None
+    holders: list[OverlapHolderOut]
+    status: Literal["sin_identificador", "sin_coincidencias", "coincidencia"]
+
+
+class PortfolioOverlapOut(BaseModel):
+    # El payload "empty" (sin tenant/sin cartera) no trae comparison_complete
+    # ni limitations: quedan opcionales para cubrir ambas ramas.
+    status: Literal["ok", "sin_datos"]
+    kind: Literal["derivado"]
+    positions: list[OverlapPositionOut]
+    not_owned: list[MostBoughtItemOut]
+    unresolved_positions: int
+    managers_with_data: int
+    managers_without_data: int
+    managers_partial: int
+    report_dates: list[str]
+    message: str | None = None
+    comparison_complete: bool | None = None
+    limitations: list[str] | None = None
+
+
+class InvestorDatumOut(BaseModel):
+    """Datum etiquetado de investor_portfolio.datum: N/D => todo null."""
+
+    value: float | None = None
+    label: Literal["OFICIAL", "INFERIDO", "SIN_DATOS"]
+    as_of: str | None = None
+    source_url: str | None = None
+
+
+class PortfolioPositionOut(BaseModel):
+    issuer: str
+    ticker: str | None = None
+    cusip: str | None = None
+    title_of_class: str
+    shares: InvestorDatumOut
+    ownership_pct: InvestorDatumOut
+    value_usd: InvestorDatumOut
+    weight_pct: InvestorDatumOut
+    source_form: str
+    note: str | None = None
+
+
+class PortfolioMovementOut(BaseModel):
+    date: str | None = None
+    filing_date: str | None = None
+    issuer: str
+    ticker: str | None = None
+    action: str
+    transaction_code: str | None = None
+    shares: InvestorDatumOut
+    price_usd: InvestorDatumOut
+    shares_after: InvestorDatumOut
+    source_form: str
+    note: str | None = None
+
+
+class InvestorPortfolioOut(BaseModel):
+    """Respuesta de investor_portfolio(): ramas 13F y curated/Form4."""
+
+    slug: str
+    name: str
+    firm: str
+    has_13f: bool
+    status: Literal["ok", "sin_datos"]
+    labels: list[str]
+    # LIMITATIONS (lista) en la rama 13F; texto largo en la rama sin 13F.
+    limitations: list[str] | str
+    positions: list[PortfolioPositionOut]
+    movements: list[PortfolioMovementOut]
+    as_of: str | None = None
+    source_kinds: list[str]
+    total_value_usd: InvestorDatumOut
+    coverage: str | None = None
+    note: str | None = None
