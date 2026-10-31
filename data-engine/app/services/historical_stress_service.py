@@ -3,6 +3,7 @@
 Current equity weights are a buy-and-hold scenario, NOT the user's realized
 portfolio. No proxy, cash, FX or missing-position renormalization is used.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +20,9 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, Position
 from app.services.connectors.yahoo import YahooFinanceClient
+from app.services.data_source_health import get_data_source_registry
+
+_REGISTRY_KEY = "yahoo_finance"
 from app.services.propicks_price_service import yahoo_symbol
 
 YEARS = (2008, 2020, 2022)
@@ -35,14 +39,43 @@ async def load_history(ticker: str) -> dict[str, Any]:
     cached = _CACHE.get(ticker)
     if cached and time.monotonic() - cached[0] < 21600:
         return cached[1]
+    # Este servicio llama a Yahoo por HTTP propio (no pasa por el connector):
+    # registra sus outcomes en el MISMO registry, o un CAPTCHA/bloqueo de Yahoo
+    # quedaba invisible en /api/health/data-sources.
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     url = f"{YahooFinanceClient.base_url}/{quote(ticker, safe='')}"
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.get(url, headers=YahooFinanceClient.headers, params={
-            "period1": int(datetime(2007, 12, 1, tzinfo=UTC).timestamp()),
-            "period2": int(datetime.now(UTC).timestamp()), "interval": "1d",
-        })
-        response.raise_for_status()
-        node = response.json()["chart"]["result"][0]
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            response = await client.get(
+                url,
+                headers=YahooFinanceClient.headers,
+                params={
+                    "period1": int(datetime(2007, 12, 1, tzinfo=UTC).timestamp()),
+                    "period2": int(datetime.now(UTC).timestamp()),
+                    "interval": "1d",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status not in (400, 404):  # 400/404: ticker inexistente, no la fuente
+            reason = (
+                f"HTTP {status}: rate limit o CAPTCHA probable" if status in (429, 999) else f"HTTP {status}"
+            )
+            registry.record_failure(_REGISTRY_KEY, reason)
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "respuesta no JSON (posible CAPTCHA o cambio de HTML)")
+        raise
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    # A partir de aqui es dato por ticker (chart.error, serie incompleta):
+    # no degrada la fuente.
+    node = payload["chart"]["result"][0]
     timezone = ZoneInfo(node["meta"]["exchangeTimezoneName"])
     today = datetime.now(timezone).date()
     timestamps = node.get("timestamp", [])
@@ -54,8 +87,13 @@ async def load_history(ticker: str) -> dict[str, Any]:
         day = datetime.fromtimestamp(stamp, timezone).date()
         if day < today and value is not None and math.isfinite(float(value)) and value > 0:
             prices[day] = float(value)
-    result = {"prices": prices, "source": "Yahoo Finance", "source_url": str(response.url),
-              "fetched_at": datetime.now(UTC).isoformat(), "currency": node["meta"].get("currency")}
+    result = {
+        "prices": prices,
+        "source": "Yahoo Finance",
+        "source_url": str(response.url),
+        "fetched_at": datetime.now(UTC).isoformat(),
+        "currency": node["meta"].get("currency"),
+    }
     if len(_CACHE) >= 256:
         _CACHE.pop(next(iter(_CACHE)))
     _CACHE[ticker] = (time.monotonic(), result)
@@ -101,10 +139,16 @@ def calculate_window(prices: dict[date, float], year: int) -> dict[str, Any]:
     if max_dd == 0:
         recovery = trough
     return {
-        "year": year, "status": "calculated", "reason": None,
-        "start_date": days[0].isoformat(), "end_date": days[-1].isoformat(),
-        "observations": len(window_days), "return": prices[days[-1]] / prices[days[0]] - 1,
-        "max_drawdown": max_dd, "peak_date": worst_peak.isoformat(), "trough_date": trough.isoformat(),
+        "year": year,
+        "status": "calculated",
+        "reason": None,
+        "start_date": days[0].isoformat(),
+        "end_date": days[-1].isoformat(),
+        "observations": len(window_days),
+        "return": prices[days[-1]] / prices[days[0]] - 1,
+        "max_drawdown": max_dd,
+        "peak_date": worst_peak.isoformat(),
+        "trough_date": trough.isoformat(),
         "recovery_date": recovery.isoformat() if recovery else None,
         "recovery_days": (recovery - worst_peak).days if recovery else None,
         "recovery_status": "recovered" if recovery else "history_gaps" if recovery_gap else "not_recovered",
@@ -137,7 +181,9 @@ class HistoricalStressService:
             else:  # sin ficha de empresa: ticker pelado y divisa sin verificar (se declara)
                 instruments[tickers[0]] = {"symbol": tickers[0], "currency": None}
         else:
-            rows = db.execute(select(Position, Company).join(Company, Position.company_id == Company.id)).all()
+            rows = db.execute(
+                select(Position, Company).join(Company, Position.company_id == Company.id)
+            ).all()
             values: dict[str, float] = {}
             currencies: set[str] = set()
             for position, company in rows:
@@ -167,9 +213,15 @@ class HistoricalStressService:
 
         async def fetch(tick: str) -> tuple[str, dict[str, Any]]:
             instrument = instruments.get(tick) or {"symbol": None, "currency": None}
-            empty = {"prices": {}, "source": "Yahoo Finance", "source_url": None,
-                     "fetched_at": datetime.now(UTC).isoformat(), "currency": None,
-                     "symbol": instrument["symbol"], "failure": None}
+            empty = {
+                "prices": {},
+                "source": "Yahoo Finance",
+                "source_url": None,
+                "fetched_at": datetime.now(UTC).isoformat(),
+                "currency": None,
+                "symbol": instrument["symbol"],
+                "failure": None,
+            }
             if instrument["symbol"] is None:
                 return tick, {**empty, "failure": "no_safe_symbol"}
             if _FAILED_UNTIL.get(instrument["symbol"], 0.0) > time.monotonic():
@@ -184,8 +236,12 @@ class HistoricalStressService:
             got = (history.get("currency") or "").strip().upper() or None
             if expected and got != expected:
                 # Otra linea de cotizacion u otro emisor: nunca un sustituto.
-                return tick, {**empty, "source_url": history.get("source_url"), "currency": got,
-                              "failure": "currency_mismatch" if got else "currency_unverified"}
+                return tick, {
+                    **empty,
+                    "source_url": history.get("source_url"),
+                    "currency": got,
+                    "failure": "currency_mismatch" if got else "currency_unverified",
+                }
             return tick, {**history, "symbol": instrument["symbol"], "failure": None}
 
         tasks = {asyncio.ensure_future(fetch(tick)): tick for tick in tickers}
@@ -202,21 +258,46 @@ class HistoricalStressService:
         for tick in tickers:
             if tick not in histories:  # presupuesto agotado: parcial marcado, no inventado
                 instrument = instruments.get(tick) or {"symbol": None, "currency": None}
-                histories[tick] = {"prices": {}, "source": "Yahoo Finance", "source_url": None,
-                                   "fetched_at": datetime.now(UTC).isoformat(), "currency": None,
-                                   "symbol": instrument["symbol"], "failure": "provider_error"}
-        companies = [{"ticker": tick, "weight": weights.get(tick), "weight_as_of": weight_dates.get(tick),
-                      **{k: v for k, v in histories[tick].items() if k not in ("prices", "failure")},
-                      "history_failure": histories[tick]["failure"],
-                      "windows": (_failed_windows(histories[tick]["failure"]) if histories[tick]["failure"]
-                                  else [calculate_window(histories[tick]["prices"], year) for year in YEARS])}
-                     for tick in tickers]
+                histories[tick] = {
+                    "prices": {},
+                    "source": "Yahoo Finance",
+                    "source_url": None,
+                    "fetched_at": datetime.now(UTC).isoformat(),
+                    "currency": None,
+                    "symbol": instrument["symbol"],
+                    "failure": "provider_error",
+                }
+        companies = [
+            {
+                "ticker": tick,
+                "weight": weights.get(tick),
+                "weight_as_of": weight_dates.get(tick),
+                **{k: v for k, v in histories[tick].items() if k not in ("prices", "failure")},
+                "history_failure": histories[tick]["failure"],
+                "windows": (
+                    _failed_windows(histories[tick]["failure"])
+                    if histories[tick]["failure"]
+                    else [calculate_window(histories[tick]["prices"], year) for year in YEARS]
+                ),
+            }
+            for tick in tickers
+        ]
         portfolio = []
         for year in YEARS:
-            missing = [c["ticker"] for c in companies if next(w for w in c["windows"] if w["year"] == year)["status"] != "calculated"]
+            missing = [
+                c["ticker"]
+                for c in companies
+                if next(w for w in c["windows"] if w["year"] == year)["status"] != "calculated"
+            ]
             if missing or missing_values or not weights:
-                portfolio.append({"year": year, "status": "SIN_DATOS", "reason": "incomplete_portfolio",
-                                  "missing_tickers": sorted(set(missing + missing_values))})
+                portfolio.append(
+                    {
+                        "year": year,
+                        "status": "SIN_DATOS",
+                        "reason": "incomplete_portfolio",
+                        "missing_tickers": sorted(set(missing + missing_values)),
+                    }
+                )
                 continue
             start = date(year, 1, 1)
             common = set.intersection(*(set(histories[t]["prices"]) for t in weights))
@@ -225,11 +306,22 @@ class HistoricalStressService:
                 portfolio.append({"year": year, "status": "SIN_DATOS", "reason": "history_gaps"})
                 continue
             base = bases[-1]
-            path: dict[date, float] = {d: float(sum(weights[t] * histories[t]["prices"][d] / histories[t]["prices"][base]
-                           for t in weights)) for d in common if d >= base}
+            path: dict[date, float] = {
+                d: float(
+                    sum(
+                        weights[t] * histories[t]["prices"][d] / histories[t]["prices"][base] for t in weights
+                    )
+                )
+                for d in common
+                if d >= base
+            }
             portfolio.append(calculate_window(path, year))
-        return {"generated_at": datetime.now(UTC).isoformat(), "mode": "company" if ticker else "portfolio",
-                "data_kind": "observed" if ticker else "INFERIDO", "companies": companies,
-                "portfolio": portfolio if not ticker else [],
-                "methodology": "adjusted_close_calendar_year;current_equity_weights_buy_and_hold;local_currency;no_fx;no_cash;no_proxies",
-                "weight_sources": "positions.market_value_base" if not ticker else None}
+        return {
+            "generated_at": datetime.now(UTC).isoformat(),
+            "mode": "company" if ticker else "portfolio",
+            "data_kind": "observed" if ticker else "INFERIDO",
+            "companies": companies,
+            "portfolio": portfolio if not ticker else [],
+            "methodology": "adjusted_close_calendar_year;current_equity_weights_buy_and_hold;local_currency;no_fx;no_cash;no_proxies",
+            "weight_sources": "positions.market_value_base" if not ticker else None,
+        }
