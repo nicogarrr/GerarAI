@@ -21,7 +21,7 @@ test('el hook es NUL-delimitado, excluye borrados y es fail-closed', () => {
 // Banco de pruebas real: repo temporal + shims de npx/uv que registran args.
 function makeRepo() {
     const dir = mkdtempSync(join(tmpdir(), 'prepush-'));
-    const git = (...args) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
+    const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, stdio: 'pipe' });
     git('init', '-q', '-b', 'main');
     git('config', 'user.email', 't@t.t');
     git('config', 'user.name', 't');
@@ -43,7 +43,7 @@ function makeRepo() {
     return { dir, git, head: git('rev-parse', 'HEAD').toString().trim() };
 }
 
-function makeShims(dir) {
+function makeShims(dir: string) {
     const bin = join(dir, 'bin');
     mkdirSync(bin);
     const log = join(dir, 'lint.log');
@@ -53,8 +53,8 @@ function makeShims(dir) {
     return log;
 }
 
-function runHook(dir, { withOriginMain = true } = {}) {
-    const { git } = { git: (...a) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' }) };
+function runHook(dir: string, { withOriginMain = true } = {}) {
+    const { git } = { git: (...a: string[]) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' }) };
     if (withOriginMain) {
         git('update-ref', 'refs/remotes/origin/main', 'HEAD~1');
     }
@@ -67,7 +67,7 @@ function runHook(dir, { withOriginMain = true } = {}) {
         env: { ...process.env, PATH: `${join(dir, 'bin')}:${process.env.PATH}`, SKIP_TSC: '1' },
         encoding: 'utf8',
     });
-    let args = [];
+    let args: string[] = [];
     try {
         args = readFileSync(log, 'utf8').split('\n').filter(Boolean);
     } catch { /* sin lint */ }
