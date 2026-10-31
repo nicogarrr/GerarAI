@@ -940,3 +940,88 @@ def test_ddm_without_dividend_fact_nor_derivation_stays_insufficient(db):
 
     assert result["status"] == "insufficient_data"
     assert "dividend_per_share_or_payout_ratio" in result["missing_inputs"]
+
+
+def test_ddm_derived_dps_requires_same_fiscal_period():
+    """dividends_paid FY2025 con shares_diluted FY2024: N/D, no mezcla.
+
+    Una recompra/dilución entre ejercicios desvía el DPS derivado (misma
+    doctrina que gems en #3449 y que el P/B sectorial): sin par del mismo
+    periodo la derivación se omite y el motor declara el dividendo ausente.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        company = _company(db, "DDMMIXED")
+        facts = {
+            k: v
+            for k, v in DDM_FACTS.items()
+            if k not in ("dividend_per_share", "shares_diluted")
+        }
+        facts["dividends_paid"] = 180.0
+        _facts(db, company, facts, fiscal_year=2025)
+        db.add(
+            FinancialFact(
+                company_id=company.id,
+                metric="shares_diluted",
+                value=Decimal("100"),
+                unit="shares",
+                period="FY2024",
+                fiscal_year=2024,
+                fiscal_quarter="FY",
+                source_type="ddm_test",
+                is_reported=True,
+                confidence=Decimal("0.90"),
+            )
+        )
+        db.commit()
+        _price(db, company, 30.0)
+        context = DividendDiscountEngine().build_context(db, company, 30.0)
+        result = DividendDiscountEngine().value(context)
+
+        assert result["status"] == "insufficient_data"
+        assert "dividend_per_share_or_payout_ratio" in result["missing_inputs"]
+        detail = result["trace"]["missing_input_detail"]
+        note = detail["dividend_derivation_skipped"]
+        assert note is not None and "periodos distintos" in note
+
+
+def test_ddm_declares_dividend_units_for_the_fx_gate():
+    """El dividendo se lee fuera del snapshot: su unidad se declara al filtro FX.
+
+    Sin declaración, un dividendo en otra divisa que el precio se comparaba
+    sin convertir. Con hecho declarado se declara el dividend_per_share; sin
+    él (camino derivado) se declara el dividends_paid.
+    """
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        company = _company(db, "DDMEUR")
+        _facts(db, company, DDM_FACTS)  # incluye dividend_per_share (USD)
+        _price(db, company, 30.0)
+        context = DividendDiscountEngine().build_context(db, company, 30.0)
+        units = DividendDiscountEngine().currency_input_units(context)
+        assert "USD" in units
+
+        company2 = _company(db, "DDMEUR2")
+        facts = {k: v for k, v in DDM_FACTS.items() if k != "dividend_per_share"}
+        facts["dividends_paid"] = 180.0
+        _facts(db, company2, facts)
+        db.add(
+            FinancialFact(
+                company_id=company2.id,
+                metric="dividends_paid",
+                value=Decimal("150"),
+                unit="EUR",
+                period=PERIOD,
+                fiscal_year=FY,
+                fiscal_quarter="FY",
+                source_type="ddm_test",
+                is_reported=True,
+                confidence=Decimal("0.90"),
+            )
+        )
+        db.commit()
+        context2 = DividendDiscountEngine().build_context(db, company2, 30.0)
+        units2 = DividendDiscountEngine().currency_input_units(context2)
+        assert units2 == ["EUR"]  # el ultimo dividends_paid (EUR), no el USD viejo

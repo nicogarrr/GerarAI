@@ -57,6 +57,9 @@ class SourcedFact:
     # Splits posteriores al hecho ya aplicados a ``value`` (acciones x factor,
     # importes por accion / factor). 1.0 = sin ajuste.
     split_factor: float = 1.0
+    unit: str | None = None
+    fiscal_year: int | None = None
+    fiscal_quarter: str | None = None
 
     def as_trace(self) -> dict:
         trace = {
@@ -70,6 +73,11 @@ class SourcedFact:
         }
         if self.split_factor != 1.0:
             trace["split_factor"] = self.split_factor
+        if self.unit is not None:
+            trace["unit"] = self.unit
+        if self.fiscal_year is not None:
+            trace["fiscal_year"] = self.fiscal_year
+            trace["fiscal_quarter"] = self.fiscal_quarter
         return trace
 
 
@@ -92,6 +100,9 @@ def _to_sourced(fact: FinancialFact) -> SourcedFact | None:
         confidence=float(fact.confidence) if fact.confidence is not None else 0.0,
         source_type=fact.source_type or "unspecified",
         is_reported=bool(fact.is_reported),
+        unit=fact.unit,
+        fiscal_year=fact.fiscal_year,
+        fiscal_quarter=fact.fiscal_quarter,
     )
 
 
