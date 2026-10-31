@@ -4,7 +4,8 @@ import {
     intrinsicValue, isRealDate, newYorkDate, optionCashDelta,
     premiumTotal, validateOptionContract,
 } from '@/lib/paper-trading/options';
-import type { OptionContract, OptionOrderInput } from '@/lib/paper-trading/types';
+import type { OptionContract } from '@/lib/paper-trading/types';
+import type { OptionOrderInput } from '@/lib/paper-trading/options';
 
 const CONTRACT: OptionContract = {
     underlying: 'SAN', callPut: 'call', strike: 5, expiry: '2026-12-18',
