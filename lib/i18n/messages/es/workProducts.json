@@ -1,1 +1,23 @@
-{}
+{
+  "title": "Generar entregable",
+  "description": "Produce un documento de análisis (memo, tesis, revisión...) a partir del motor de research.",
+  "typeLabel": "Tipo de documento",
+  "types": {
+    "onePageMemo": "Memo de una página",
+    "fullThesis": "Tesis completa",
+    "earningsReview": "Revisión de earnings",
+    "valuationMemo": "Memo de valoración",
+    "capitalAllocation": "Análisis de asignación de capital",
+    "comparables": "Comparables",
+    "portfolioReview": "Revisión de cartera",
+    "riskReport": "Informe de riesgo"
+  },
+  "optional": "(opcional)",
+  "yearsLabel": "Años de histórico",
+  "generate": "Generar documento",
+  "generating": "Generando...",
+  "generated": "Entregable generado",
+  "result": "Resultado",
+  "emptyContent": "El entregable no trajo contenido.",
+  "loadingViewer": "Cargando visor..."
+}

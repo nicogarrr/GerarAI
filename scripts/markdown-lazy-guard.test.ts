@@ -33,6 +33,11 @@ describe('markdown: visor diferido en research', () => {
 
     it('ambos declaran un estado de carga (nunca un hueco en blanco)', () => {
         assert.match(pager, /loading:\s*\(\)\s*=>/);
-        assert.match(workProduct, /loading:\s*\(\)\s*=>/);
+        // i18n: el loading del entregable es el componente ViewerLoading (usa
+        // useT), que referencia workProducts.loadingViewer del diccionario.
+        assert.match(workProduct, /loading:\s*ViewerLoading/);
+        assert.ok(workProduct.includes("t('workProducts.loadingViewer')"), 'ViewerLoading referencia la clave del diccionario');
+        const dict = JSON.parse(readFileSync('lib/i18n/messages/es/workProducts.json', 'utf8'));
+        assert.equal(dict.loadingViewer, 'Cargando visor...', 'el texto de carga es el de siempre');
     });
 });
