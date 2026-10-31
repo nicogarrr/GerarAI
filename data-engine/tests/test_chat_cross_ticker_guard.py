@@ -87,3 +87,38 @@ def test_offtopic_question_does_not_get_newest_source(db):
         mode="explore", question="¿Quién es el CEO de Santander?", ticker="SAN.MC")))
     assert response.status == "insufficient_data"
     assert response.citations == []
+
+
+def test_question_about_registered_us_ticker_uses_its_evidence(db):
+    """Ticker US sin punto pero registrado («AAPL»): tambien reencuadra; la
+    evidencia citada es la de AAPL, no la del ticker de contexto."""
+    tenant, san = setup(db)
+    aapl = Company(ticker="AAPL", name="Apple", exchange="NASDAQ", currency="USD",
+                   company_type="holding", valuation_model="unassigned")
+    db.add(aapl)
+    db.flush()
+    doc = Document(tenant_id=tenant.id, company_id=aapl.id, title="Apple 10-K 2024",
+                   source_type="company_ir", source_url="https://www.apple.com/10k.pdf",
+                   published_at=datetime(2025, 3, 1, tzinfo=UTC))
+    db.add(doc)
+    db.flush()
+    db.add(FinancialFact(tenant_id=tenant.id, company_id=aapl.id, metric="revenue",
+                         value=Decimal("391000"), unit="USD", period="FY2024", fiscal_year=2024,
+                         source_id=doc.id, source_type="company_ir", is_reported=True))
+    db.commit()
+    response = AssistantResponse.model_validate(answer(db, AssistantRequest(
+        mode="explore", question="¿Qué ingresos tuvo AAPL?", ticker="SAN.MC")))
+    assert response.status == "answered"
+    assert len(response.citations) == 1
+    assert response.citations[0].source == "Apple 10-K 2024"
+
+
+def test_common_word_unregistered_is_not_a_ticker(db):
+    """Palabra en mayusculas sin registrar y sin punto («CEO», «PER»): no es un
+    cambio de ticker; el contexto sigue siendo el de la empresa seleccionada."""
+    from app.services.research_assistant_service import _foreign_ticker
+
+    setup(db)
+    assert _foreign_ticker(db, "¿Quién es el CEO?", "SAN.MC") is None
+    assert _foreign_ticker(db, "¿Cuál es el PER de SAN.MC?", "SAN.MC") is None
+    assert _foreign_ticker(db, "¿Qué ingresos tuvo AAPL?", "SAN.MC") is None  # no registrada

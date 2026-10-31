@@ -36,14 +36,15 @@ def _url(value: str | None) -> str | None:
         return None
 
 
-_TICKER_TOKEN_RE = re.compile(r"\b[A-Z]{1,6}(?:\.[A-Z]{1,4})\b")
+_TICKER_TOKEN_RE = re.compile(r"\b[A-Z]{1,6}(?:\.[A-Z]{1,4})?\b")
 
 
 def _foreign_ticker(db: Session, question: str, ticker: str) -> str | None:
     """Ticker distinto al del contexto mencionado en la pregunta.
 
     Con punto («ACS.MC») la forma ya es ticker aunque no este registrada; sin
-    punto solo cuenta un ticker registrado («CEO» o «PER» no son un cambio).
+    punto («AAPL», «BABA») solo cuenta un ticker registrado en BD, asi «CEO»
+    o «PER» no provocan un reencuadre falso.
     Con varios tickers ajenos (comparativas) no hay un destino unico.
     """
     tokens = [token for token in _TICKER_TOKEN_RE.findall(question) if token != ticker]
