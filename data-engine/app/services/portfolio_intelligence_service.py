@@ -11,7 +11,7 @@ from statistics import fmean, mean, pstdev
 from types import SimpleNamespace
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
@@ -1029,14 +1029,35 @@ class PortfolioIntelligenceService:
             as_of_max=date.today(),
         )
 
-        # Last close strictly before the cutoff per company (one query).
-        prior_prices: dict[int, MarketPrice] = {}
-        for price in db.scalars(
-            select(MarketPrice)
+        # Last close strictly before the cutoff per company, bounded in SQL:
+        # row_number() OVER (PARTITION BY company ORDER BY date DESC, id DESC)
+        # = 1 returns EXACTLY one row per company, deterministic even for
+        # same-date ties (the model forbids them with
+        # uq_market_price_company_date since migration 0001; the window makes
+        # the selection deterministic by construction, and MAX(date)+join
+        # would return every tied row and pick one by undefined order). Only
+        # the used columns are projected (company_id, date, adj_close); the
+        # full pre-cutoff history was loaded as ORM rows before.
+        ranked_prior = (
+            select(
+                MarketPrice.id.label("id"),
+                func.row_number()
+                .over(
+                    partition_by=MarketPrice.company_id,
+                    order_by=(MarketPrice.date.desc(), MarketPrice.id.desc()),
+                )
+                .label("rn"),
+            )
             .where(MarketPrice.company_id.in_(company_ids), MarketPrice.date < cutoff)
-            .order_by(MarketPrice.company_id, MarketPrice.date.desc())
+            .subquery("bounded_prior_prices")
+        )
+        prior_prices: dict[int, Any] = {}
+        for price in db.execute(
+            select(MarketPrice.company_id, MarketPrice.date, MarketPrice.adj_close)
+            .join(ranked_prior, ranked_prior.c.id == MarketPrice.id)
+            .where(ranked_prior.c.rn == 1)
         ).all():
-            prior_prices.setdefault(price.company_id, price)
+            prior_prices[price.company_id] = price
 
         positions_out = []
         reasons: dict[str, int] = defaultdict(int)
