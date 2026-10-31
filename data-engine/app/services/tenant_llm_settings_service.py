@@ -350,6 +350,23 @@ def _probe_client(provider: str) -> httpx.AsyncClient:
     )
 
 
+def _model_ids(response: httpx.Response) -> set[str] | None:
+    """Ids del listado /models (forma OpenAI {"data": [{"id": ...}]}).
+
+    None = la respuesta no es una lista de modelos legible: la prueba falla
+    honesta en vez de dar por bueno un modelo quizas inexistente.
+    """
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, list):
+        return None
+    ids = {item["id"] for item in data if isinstance(item, dict) and isinstance(item.get("id"), str)}
+    return ids if ids or not data else None
+
+
 async def probe_connection(
     *, provider: str, base_url: str | None, api_key: str, model: str
 ) -> dict:
@@ -388,18 +405,45 @@ async def probe_connection(
                 else "No se pudo conectar con el proveedor."
             ),
         }
-    ok = 200 <= response.status_code < 300
+    if not (200 <= response.status_code < 300):
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": f"El proveedor respondio HTTP {response.status_code}.",
+        }
+    # La conexion responde, pero la prueba tambien exige que el MODELO pedido
+    # exista en el proveedor: un "Conexion correcta" con un modelo inventado
+    # romperia cada llamada real despues (hallazgo front, medido en prod con
+    # model="modelo-inventado-123"). No gasta tokens: solo lee /models.
+    model_ids = _model_ids(response)
+    if model_ids is None:
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": "El proveedor respondio, pero sin una lista de modelos legible: no se pudo verificar el modelo.",
+        }
+    if model not in model_ids:
+        return {
+            "ok": False,
+            "status_code": response.status_code,
+            "provider": provider,
+            "base_url": url,
+            "model": model,
+            "message": f"El modelo '{model}' no existe en este proveedor. Revisa el nombre exacto en su lista de modelos.",
+        }
     return {
-        "ok": ok,
+        "ok": True,
         "status_code": response.status_code,
         "provider": provider,
         "base_url": url,
         "model": model,
-        "message": (
-            "Conexion correcta."
-            if ok
-            else f"El proveedor respondio HTTP {response.status_code}."
-        ),
+        "message": "Conexion correcta.",
     }
 
 

@@ -212,8 +212,14 @@ def test_tenant_key_bypasses_eur_caps_and_records_zero_cost() -> None:
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int) -> None:
+    def __init__(self, status_code: int, payload=None) -> None:
         self.status_code = status_code
+        self._payload = payload if payload is not None else {"data": [{"id": "gpt-4.1-mini"}]}
+
+    def json(self):
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
 
 
 class _FakeClient:
@@ -260,6 +266,48 @@ def test_probe_connection_uses_five_second_client_and_never_leaks_key(
     assert result["ok"] is True
     assert _FakeClient.calls[0][0] == expected
     assert API_KEY not in str(result)
+
+
+def _probe_with(monkeypatch, payload, model="gpt-4.1-mini"):
+    """probe_connection con la lista /models inyectada (sin red)."""
+    _FakeClient.calls.clear()
+
+    class _Client(_FakeClient):
+        async def get(self, url, headers):
+            type(self).calls.append((url, headers))
+            return _FakeResponse(200, payload)
+
+    monkeypatch.setattr(
+        "app.services.tenant_llm_settings_service.httpx.AsyncClient", _Client
+    )
+    import asyncio
+
+    return asyncio.run(
+        probe_connection(provider="openai", base_url=None, api_key=API_KEY, model=model)
+    )
+
+
+def test_probe_rechaza_modelo_inventado_aunque_la_conexion_responda(monkeypatch) -> None:
+    """Hallazgo front (medido en prod): model="modelo-inventado-123" decia
+    "Conexion correcta". Ahora el modelo debe aparecer en /models."""
+    result = _probe_with(monkeypatch, {"data": [{"id": "gpt-4.1-mini"}]}, model="modelo-inventado-123")
+    assert result["ok"] is False
+    assert "modelo-inventado-123" in result["message"]
+    assert "no existe" in result["message"]
+    assert API_KEY not in str(result)
+
+
+def test_probe_acepta_modelo_presente_en_la_lista(monkeypatch) -> None:
+    result = _probe_with(monkeypatch, {"data": [{"id": "otro"}, {"id": "gpt-4.1-mini"}]})
+    assert result["ok"] is True
+    assert result["message"] == "Conexion correcta."
+
+
+def test_probe_falla_honesto_si_la_lista_no_es_legible(monkeypatch) -> None:
+    for payload in (ValueError("no json"), {"error": "nope"}, {"data": "texto"}):
+        result = _probe_with(monkeypatch, payload)
+        assert result["ok"] is False
+        assert "no se pudo verificar el modelo" in result["message"]
 
 
 def _client(monkeypatch, *, required: bool = True) -> TestClient:
