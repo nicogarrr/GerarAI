@@ -118,3 +118,5 @@ reports/mutation-baseline/
 data-engine/mutants/
 
 .env.frontend.production
+
+!.env.frontend.production.example
