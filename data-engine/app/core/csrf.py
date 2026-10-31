@@ -32,10 +32,21 @@ _EXCLUDED_PATH_PREFIXES = (
 )
 
 
+# Secreto de respaldo por proceso (solo dev/test): en produccion la config
+# exige RESEARCH_AUTH_SECRET, asi que este camino nunca se alcanza ahi. Antes
+# era una constante publica en el repo: cualquiera podia firmar tokens CSRF
+# validos en un entorno mal configurado.
+_process_fallback_secret: str | None = None
+
+
 def _get_csrf_secret() -> str:
     settings = get_settings()
-    secret = settings.research_auth_secret or "gerarai-csrf-default-secret-key-32chars"
-    return secret
+    if settings.research_auth_secret:
+        return settings.research_auth_secret
+    global _process_fallback_secret
+    if _process_fallback_secret is None:
+        _process_fallback_secret = secrets.token_hex(32)
+    return _process_fallback_secret
 
 
 def generate_csrf_token() -> str:
