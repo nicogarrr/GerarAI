@@ -17,7 +17,13 @@ import dramatiq
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
-from app.workers.bounded_broker import BoundedRedisBroker, QueueCapacityError, max_pending
+from app.workers.bounded_broker import (
+    DEDUP_ENQUEUE_TTL_SECONDS,
+    BoundedRedisBroker,
+    DedupEnqueueMiddleware,
+    QueueCapacityError,
+    max_pending,
+)
 from app.workers.task_trace import TaskTraceMiddleware
 from app.workers.tenant_llm_middleware import TenantLLMSettingsMiddleware
 
@@ -25,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 broker = BoundedRedisBroker(url=settings.redis_url)
+broker.add_middleware(DedupEnqueueMiddleware())
 broker.add_middleware(TaskTraceMiddleware())
 broker.add_middleware(TenantLLMSettingsMiddleware())
 dramatiq.set_broker(broker)
@@ -1193,7 +1200,7 @@ def refresh_asts_catalog() -> dict[str, Any]:
     }
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Reconcile all local evidence, including historical letters, without AI."""
     from app.services.bottleneck_service import refresh_signals
@@ -2333,7 +2340,7 @@ def backfill_company_price_history(
         db.close()
 
 
-@dramatiq.actor(max_retries=2, min_backoff=15_000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 def refresh_sec_filings(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2428,7 +2435,7 @@ def refresh_sec_filings(
         )
 
 
-@dramatiq.actor(max_retries=2, min_backoff=15_000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 @_coalesce_on_success("refresh_ir_pages", 50 * 60, ("tenant_id", "ticker"))
 def refresh_ir_pages(
     tenant_id: int | None = None,
@@ -2513,7 +2520,7 @@ def refresh_ir_pages(
 _RSS_TIME_BUDGET_SECONDS = 480.0
 
 
-@dramatiq.actor(max_retries=2, min_backoff=15_000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 @_coalesce_on_success("refresh_rss_feeds", 12 * 60, ("tenant_id", "feed_url", "ticker"))
 def refresh_rss_feeds(
     tenant_id: int | None = None,
@@ -2895,7 +2902,7 @@ def refresh_news(
         )
 
 
-@dramatiq.actor(max_retries=1, min_backoff=15_000, time_limit=2 * 3600 * 1000)
+@dramatiq.actor(max_retries=1, min_backoff=15_000, time_limit=2 * 3600 * 1000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 @_coalesce_on_success(
     "refresh_ticker_news",
     lambda scope="tracked", **_: 20 * 60 if scope == "tracked" else 5 * 3600,
@@ -3409,7 +3416,7 @@ def consolidate_memory(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id, user_id=user_id)
 
 
-@dramatiq.actor(max_retries=1)
+@dramatiq.actor(max_retries=1, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 def scan_contradictions(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -3615,7 +3622,7 @@ def run_daily_research() -> dict[str, Any]:
     }
 
 
-@dramatiq.actor(max_retries=2, min_backoff=15_000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 @_coalesce_on_success("scan_insider_watchlist", 12 * 60, ("tenant_id", "lookback", "max_new_fetches"))
 def scan_insider_watchlist(
     tenant_id: int | None = None,
@@ -4046,7 +4053,7 @@ def generate_thesis_job(run_id: int) -> None:
 # La coalescencia hace que las copias encoladas bajo starvation se salten
 # casi gratis (patron rss/insider; la ventana 25 min < cadencia de 30 min,
 # como en refresh_news tracked).
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=900_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=900_000, dedup_enqueue_ttl=DEDUP_ENQUEUE_TTL_SECONDS)
 @_coalesce_on_success("refresh_paper_trades", 25 * 60, ("tenant_id",))
 def refresh_paper_trades(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     from app.services.paper_trading_service import refresh_trades
