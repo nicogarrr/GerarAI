@@ -375,6 +375,59 @@ def resolve_fair_values(
     return out
 
 
+# TTL de la cache Redis del recalculo "live" por ticker. 15 min: la ventana
+# mas corta que colapsa las cargas repetidas de Inicio (el sondeo de
+# oportunidades reprobando la MISMA lista de candidatas estables intradia,
+# medido 31-oct: POST del bundle de 6.959 ms en Vercel) sin cambiar la
+# semantica del dato: el recalculo lee fundamentales/KPIs persistidos
+# (ingesta diaria) y la ultima cotizacion en BD; la lectura por lotes
+# (/fair-value) ya sirve SOLO lo persistido, asi que 15 min de margen sobre
+# el single-ticker queda dentro de lo que la UI ya muestra en otras pantallas.
+# Una tesis publicada dentro de la ventana puede tardar <=15 min en verse;
+# la ingesta nueva idem. Sin invalidacion explicita: el TTL se autocorrige.
+FAIR_VALUE_LIVE_CACHE_TTL_SECONDS = 15 * 60
+
+
+def _live_cache_key(db: Session, company: Company) -> str:
+    tenant = db.info.get("tenant_id")
+    return f"fair_value_live:{tenant}:{int(company.id)}:{date.today().isoformat()}"
+
+
+def resolve_fair_value_cached(
+    db: Session, company: Company, *, live: bool = True, ttl: int = FAIR_VALUE_LIVE_CACHE_TTL_SECONDS
+) -> dict:
+    """resolve_fair_value con cache Redis por (tenant, empresa, dia).
+
+    El camino live recalcula el motor cuando no hay tesis fresca
+    (ValuationService().value_company, el coste real); la cache evita
+    recalcular lo mismo en cada carga de Inicio/watchlist. Fail-open: con
+    Redis caido se calcula igual y no se propaga la excepcion. La respuesta
+    cacheada y la recien calculada pasan por el mismo ciclo JSON.
+    """
+    import json as _json
+
+    from app.core.cache import _redis_client  # precedente: connectors/alpha_vantage
+
+    client = None
+    key = None
+    try:
+        client = _redis_client()
+        if client is not None:
+            key = _live_cache_key(db, company)
+            raw = client.get(key)
+            if raw is not None:
+                return _json.loads(raw)
+    except Exception:  # noqa: BLE001 - cache best-effort, fail-open
+        client, key = None, None
+    reading = resolve_fair_value(db, company, live=live)
+    if client is not None and key is not None:
+        try:
+            client.set(key, _json.dumps(reading, default=str), ex=max(int(ttl), 1))
+        except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
+            pass
+    return reading
+
+
 def resolve_fair_value(
     db: Session, company: Company, *, live: bool = True, today: date | None = None
 ) -> dict:
