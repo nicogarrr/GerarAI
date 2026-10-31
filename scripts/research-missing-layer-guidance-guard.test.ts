@@ -42,7 +42,9 @@ test('F305: el aviso de la vista general enlaza capa a capa (no un solo enlace a
 });
 
 test('F309: los estados vacíos de la vista financieros ya no mandan a importar documentos', () => {
-    const factTable = page.slice(page.indexOf('function FactTable'), page.indexOf('function MetricsGrid'));
+    // FactTable vive en FactsPanels (ultima funcion del fichero).
+    const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
+    const factTable = panels.slice(panels.indexOf('export function FactTable'));
     assert.doesNotMatch(factTable, /view=documents/);
     assert.match(factTable, /refreshLabel/);
     assert.match(factTable, /Pulsa «\$\{refreshLabel\}» arriba para traerlos del proveedor indicado/);

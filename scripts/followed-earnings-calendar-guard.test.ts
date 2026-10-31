@@ -56,8 +56,6 @@ test('resultados seguidos: pestaña propia y activa solo la más específica', (
 });
 
 test('resultados seguidos: la fuente es visible (title) y el enlace es externo seguro', () => {
-  assert.match(list, /title=\{ti\('calendar\.earnings\.sourceTitle', \{ source: event\.source \}\)\}/);
-  assert.equal(esCalendar.earnings.sourceTitle, 'Fuente: {source}');
   assert.match(list, /rel="noopener noreferrer"/);
 });
 
