@@ -22,7 +22,7 @@ from app.workers.dramatiq_app import broker as _broker  # noqa: F401
 KNOWLEDGE_QUEUE_NAME = "knowledge"
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, queue_name=KNOWLEDGE_QUEUE_NAME, time_limit=INGEST_TIME_LIMIT_MS)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, queue_name=KNOWLEDGE_QUEUE_NAME, time_limit=INGEST_TIME_LIMIT_MS)
 def ingest_knowledge_source(
     source_id: int,
     *,
