@@ -26,6 +26,13 @@ describe('DCA historical evidence display',()=>{
   expect(screen.queryByText(/n=4/)).not.toBeInTheDocument();
   expect(screen.getByText('2X')).toHaveStyle({color:color==='#000000'?'#FFFFFF':'#111827'});
  });
+ it('etiqueta cada celda con su horizonte para que en movil no se pierda ninguna columna',()=>{
+  const four=data({horizons:[1,3,6,12]});
+  four.rows=four.rows.map(r=>({...r,cells:[1,3,6,12].map((h,i)=>({horizon_months:h,months:4-i,pct_higher:0.5+i*0.1,avg_return:0.01}))}));
+  render(<DcaHitRatesCard data={four}/>);
+  // cabecera de escritorio (1) + una etiqueta movil por fila (1 fila) = 2 por horizonte
+  for(const h of ['1 m','3 m','6 m','12 m']) expect(screen.getAllByText(h)).toHaveLength(2);
+ });
  it('loads only on demand, reports loading and caches a successful response',async()=>{
   let resolve!:(d:DcaHitRates)=>void;mocks.load.mockReturnValue(new Promise(r=>resolve=r));
   render(<DcaHitRatesPopover symbol="TEST"/>);expect(mocks.load).not.toHaveBeenCalled();
