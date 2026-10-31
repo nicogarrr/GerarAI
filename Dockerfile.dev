@@ -17,6 +17,9 @@ USER node
 
 # Copiar archivos de dependencias
 COPY --chown=node:node package.json package-lock.json* ./
+# El prepare de npm ("node scripts/install-hooks.mjs") corre en el npm ci:
+# sin el script el build falla con "Cannot find module" (igual que en Dockerfile).
+COPY --chown=node:node scripts/install-hooks.mjs ./scripts/install-hooks.mjs
 
 # Instalar dependencias
 RUN npm ci
