@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -120,14 +120,28 @@ def get_run(
     )
     rows = db.execute(stmt).all()
     # Ultimo precio persistido por empresa (F2/yfinance); None honesto si aun no hay.
+    # row_number por empresa (anti lectura historica): antes se traia TODA la
+    # historia de barras de cada candidata para quedarse con la ultima fila.
     latest_prices: dict[int, MarketPrice] = {}
-    price_rows = db.scalars(
-        select(MarketPrice)
-        .where(MarketPrice.company_id.in_([c.company_id for c, _ in rows]))
-        .order_by(MarketPrice.date.desc())
-    ).all()
-    for price in price_rows:
-        latest_prices.setdefault(price.company_id, price)
+    company_ids = [c.company_id for c, _ in rows]
+    if company_ids:
+        numbered = (
+            select(
+                MarketPrice.id.label("id"),
+                func.row_number()
+                .over(
+                    partition_by=MarketPrice.company_id,
+                    order_by=(MarketPrice.date.desc().nullslast(), desc(MarketPrice.id)),
+                )
+                .label("rn"),
+            )
+            .where(MarketPrice.company_id.in_(company_ids))
+            .subquery("latest_market_price")
+        )
+        for price in db.scalars(
+            select(MarketPrice).join(numbered, numbered.c.id == MarketPrice.id).where(numbered.c.rn == 1)
+        ).all():
+            latest_prices.setdefault(price.company_id, price)
     out = ProPickRunDetailOut(**ProPickRunOut.model_validate(run).model_dump(), candidates=[])
     out.candidates = [
         ProPickCandidateOut(
