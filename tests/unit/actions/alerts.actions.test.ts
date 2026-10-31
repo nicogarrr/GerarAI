@@ -95,6 +95,33 @@ describe('createAlert', () => {
     });
 });
 
+describe('getUserAlerts: paginación completa de /api/alerts/rules', () => {
+    const pageOf = (from: number, count: number) =>
+        Array.from({ length: count }, (_, i) => ({ ...rule, id: from + i }));
+
+    it('pide limit=500 explícito (el defecto del backend, 100, cortaría la lista)', async () => {
+        researchRequest.mockResolvedValue([rule]);
+        await getUserAlerts();
+        expect(researchRequest).toHaveBeenCalledWith('/api/alerts/rules?active=true&limit=500&offset=0');
+    });
+
+    it('con página llena sigue pidiendo hasta la primera corta y entrega las 502', async () => {
+        researchRequest
+            .mockResolvedValueOnce(pageOf(1, 500))
+            .mockResolvedValueOnce(pageOf(501, 2))
+            .mockResolvedValue([]);
+        const alerts = await getUserAlerts();
+        expect(alerts).toHaveLength(502);
+        expect(researchRequest).toHaveBeenCalledWith('/api/alerts/rules?active=true&limit=500&offset=500');
+    });
+
+    it('backend que no avanza (página repetida) -> error, NUNCA lista parcial', async () => {
+        researchRequest.mockResolvedValue(pageOf(1, 500));
+        await expect(getUserAlerts()).rejects.toThrow(/no avanza/);
+        expect(await getUserAlertsResult()).toEqual({ ok: false, cause: 'unknown' });
+    });
+});
+
 describe('getUserAlertsResult: causa explícita, nunca inventada', () => {
     it('OK -> alertas mapeadas', async () => {
         researchRequest.mockResolvedValue([rule]);

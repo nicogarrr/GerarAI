@@ -16,7 +16,10 @@ test('desktop portfolio and watchlist keep destructive action within symbol menu
   const watchlist = read('app/(root)/watchlist/page.tsx');
   assert.doesNotMatch(portfolio, /<TableHead[^>]*>Fiscal<\/TableHead>|<TableHead[^>]*>Acciones<\/TableHead>/);
   assert.doesNotMatch(watchlist, /<TableHead[^>]*>Acciones<\/TableHead>/);
-  assert.match(portfolio, /<summary[^>]*Opciones/);
+  // i18n: la etiqueta del menú vive en messages/<locale>/portfolio.json.
+  assert.match(portfolio, /<summary[^>]*>\{ti\('portfolio\.holdings\.options'\)\}<\/summary>/);
+  const portfolioEs = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+  assert.equal(portfolioEs.holdings.options, 'Opciones');
   assert.match(portfolio, /setConfirmSymbol\(holding\.symbol\)/, 'la acción destructiva abre la confirmación');
   assert.match(portfolio, /onConfirm=\{\(\) => \{ if \(confirmSymbol\) handleDelete\(confirmSymbol\); \}\}/, 'la mutación solo corre al confirmar');
   assert.match(watchlist, /<summary[^>]*Opciones/);
@@ -44,8 +47,11 @@ test('decisional fields removed from columns stay reachable in row detail (audit
   // fiscalBucket/holdingDays/firstBuyDate fuera de columnas, pero accesibles en tarjeta móvil y menú Opciones.
   assert.match(portfolio, /holding\.fiscalBucket === 'largo_plazo'/);
   assert.match(portfolio, /holding\.holdingDays !== null/);
-  assert.match(portfolio, /En cartera desde: \{formatDate\(holding\.firstBuyDate\)\}/);
-  assert.match(portfolio, /Sin historial de compra registrado/);
+  assert.match(portfolio, /portfolio\.holdings\.sincePrefix/, 'fecha de entrada vía i18n');
+  const portfolioEs2 = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+  assert.match(portfolioEs2.holdings.sincePrefix, /^En cartera desde: /);
+  assert.equal(portfolioEs2.holdings.fiscalNoHistory, 'Sin historial de compra registrado');
+  assert.match(portfolio, /portfolio\.holdings\.fiscalNoHistory/);
 });
 
 

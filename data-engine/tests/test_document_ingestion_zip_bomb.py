@@ -114,3 +114,23 @@ def test_multiple_forged_entries_are_rejected_before_parser(monkeypatch):
     # Primera entrada se rechaza por discordancia antes de llegar al parser.
     with pytest.raises(ValueError, match="inconsistentes|limite real"):
         _guard_ooxml_zip(bytes(payload))
+
+
+def test_xlsx_with_xml_entities_is_rejected_not_expanded():
+    """Un XLSX con entidades en el XML de la hoja (billion laughs) se rechaza
+    sin expandir: el iterparse interno usa defusedxml."""
+    from defusedxml.common import EntitiesForbidden
+
+    bomb_sheet = (
+        b'<?xml version="1.0" encoding="UTF-8"?>'
+        b'<!DOCTYPE lolz [<!ENTITY lol "lollollollollollollollollollol">'
+        b'<!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">'
+        b'<!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]>'
+        b'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        b'<dimension ref="A1:B2"/><sheetData><row r="1"><c r="A1"><v>&lol3;</v></c></row></sheetData></worksheet>'
+    )
+    buf = BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("xl/worksheets/sheet1.xml", bomb_sheet)
+    with pytest.raises((EntitiesForbidden, ValueError)):
+        DocumentIngestionService()._parse_native(buf.getvalue(), ".xlsx")

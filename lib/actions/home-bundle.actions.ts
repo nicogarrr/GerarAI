@@ -12,7 +12,7 @@ import {
     getHomeWatchlistPreview,
     type HomeWatchlistPreview,
 } from '@/lib/actions/home-overview.actions';
-import { sectionError } from '@/lib/section-error';
+import { sectionErrorKey } from '@/lib/section-error';
 
 /**
  * Primera carga del inicio en UNA server action.
@@ -38,8 +38,9 @@ async function section<T>(read: () => Promise<T>, fallback: T): Promise<HomeSect
     try {
         return { data: await read(), error: null };
     } catch (error) {
-        // Solo el mensaje genérico por categoría viaja al cliente.
-        return { data: fallback, error: sectionError(error) };
+        // Solo la clave genérica por categoría viaja al cliente; el texto lo
+        // resuelve el cliente con t() en el idioma activo.
+        return { data: fallback, error: sectionErrorKey(error) };
     }
 }
 

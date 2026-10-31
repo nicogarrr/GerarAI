@@ -93,3 +93,6 @@ cryptography>=46.0,<51
 
 # Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
 pywebpush>=2.0.0,<3
+
+# Anadidas por sync_requirements.py (estaban en pyproject, no aqui):
+defusedxml>=0.7.1,<0.9

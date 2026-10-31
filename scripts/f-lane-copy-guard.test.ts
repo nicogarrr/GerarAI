@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 // @ts-expect-error TS5097: explicit extension for node strip-types.
 import { humanizeTaxText } from '../lib/taxes/humanize-text.ts';
@@ -6,6 +7,17 @@ import { humanizeTaxText } from '../lib/taxes/humanize-text.ts';
 import { changeSummaryText, changeTypeLabel } from '../lib/research/change-copy.ts';
 // @ts-expect-error TS5097: explicit extension for node strip-types.
 import { alertCardCopy } from '../lib/alerts/card-copy.ts';
+
+/** t() de test: resuelve alerts.card.* contra messages/es/alerts.json con
+ *  interpolación {var}: el guard comprueba el copy real que se renderiza. */
+const ES_ALERTS = JSON.parse(readFileSync('lib/i18n/messages/es/alerts.json', 'utf8'));
+const t = ((key: string, vars: Record<string, string | number> = {}): string => {
+  const value = key.split('.').slice(1).reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], ES_ALERTS);
+  assert.equal(typeof value, 'string', `falta ${key} en messages/es/alerts.json`);
+  return (value as string).replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? `{${name}}`));
+}) as never;
+const LOCALE = 'es' as never;
+
 
 test('claves internas del declarante no llegan a pantalla', () => {
   const text = humanizeTaxText("Declara tax_declarant.custody con la clave 'cash:USD' en la metadata del tenant");
@@ -47,7 +59,7 @@ test('el cuerpo del cambio no repite el titular y las etiquetas van en español'
 });
 
 test('alerta genérica usa su propio texto', () => {
-  const card = alertCardCopy({ id: 1, title: 'Posiciones cortas en aumento: ZS', message: 'ZS: posiciones cortas FINRA 1 → 2 acciones a 2026-10-01.', severity: 'medium', status: 'open', alert_type: 'shorts_rising', channels: [], deliveries: {}, ticker: 'ZS', companyName: 'Zscaler', triggeredAt: null, sourceUrl: null, createdAt: '2026-10-18T10:00:00Z', eventDate: null, eventDateSource: null, eventForm: null });
+  const card = alertCardCopy({ id: 1, title: 'Posiciones cortas en aumento: ZS', message: 'ZS: posiciones cortas FINRA 1 → 2 acciones a 2026-10-01.', severity: 'medium', status: 'open', alert_type: 'shorts_rising', channels: [], deliveries: {}, ticker: 'ZS', companyName: 'Zscaler', triggeredAt: null, sourceUrl: null, createdAt: '2026-10-18T10:00:00Z', eventDate: null, eventDateSource: null, eventForm: null }, t, LOCALE);
   assert.match(card.summary, /FINRA/);
   assert.doesNotMatch(card.summary, /consulta la regla/);
 });

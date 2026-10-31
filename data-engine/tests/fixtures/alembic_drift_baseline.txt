@@ -1,7 +1,3 @@
-('add_index', Index('ix_decision_lessons_expectation_review_id', Column('expectation_review_id', Integer(), table=<decision_lessons>), unique=True))
-('add_index', Index('ix_management_promises_call_claim_id', Column('call_claim_id', Integer(), table=<management_promises>), unique=True))
-('remove_constraint', UniqueConstraint(Column('call_claim_id', NullType(), table=<management_promises>)))
-('remove_constraint', UniqueConstraint(Column('expectation_review_id', NullType(), table=<decision_lessons>)))
 ('remove_index', Index('ix_api_latency_windows_route', Column('route_template', VARCHAR(length=200), table=<api_latency_windows>, nullable=False, server_default=DefaultClause(<sqlalchemy.sql.elements.TextClause object at 0x_>, for_update=False)), Column('window_start', TIMESTAMP(), table=<api_latency_windows>, nullable=False)))
 ('remove_index', Index('ix_api_latency_windows_tenant_id', Column('tenant_id', INTEGER(), table=<api_latency_windows>)))
 ('remove_index', Index('ix_api_latency_windows_tenant_window', Column('tenant_id', INTEGER(), table=<api_latency_windows>), Column('window_start', TIMESTAMP(), table=<api_latency_windows>, nullable=False)))

@@ -110,6 +110,29 @@ export interface DcaHitRateRow {
     cells: DcaHitRateCell[];
 }
 
+export interface DcaZoneVisit {
+    start: string;
+    end: string;
+    months: number;
+}
+
+export interface DcaZoneVisits {
+    available: boolean;
+    reason: string | null;
+    levels: number[];
+    months_completed: number;
+    first_period: string | null;
+    last_period: string | null;
+    completed_visits: number;
+    /** Visitas excluidas por huecos en el historico (meses sin dato dentro o junto a la racha). */
+    excluded_gap_visits?: number;
+    avg_months: number | null;
+    max_months: number | null;
+    visits: DcaZoneVisit[];
+    open_visit_months: number | null;
+    params_version: string | null;
+}
+
 export interface DcaHitRates {
     symbol: string;
     available: boolean;
@@ -121,6 +144,7 @@ export interface DcaHitRates {
     params_version: string | null;
     evaluated_at: string | null;
     rows: DcaHitRateRow[];
+    zone_visits?: DcaZoneVisits | null;
     disclaimer: string;
 }
 

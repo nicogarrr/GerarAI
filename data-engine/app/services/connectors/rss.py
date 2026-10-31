@@ -10,8 +10,32 @@ from xml.etree import ElementTree
 
 import httpx
 
+# Feeds RSS/Atom externos: defusedxml solo para PARSEAR - entidades/DTD
+# rechazadas sin expandir; ParseError/Element siguen del stdlib.
+from defusedxml import ElementTree as DefusedElementTree
+
 from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.data_source_health import get_data_source_registry
 from app.services.public_fetch import fetch_public_url_async
+
+_REGISTRY_KEY = "rss"
+# Raíces válidas de un feed: Atom (<feed>), RSS 2.0 (<rss>) y RSS 1.0/RDF (<RDF>).
+_FEED_ROOTS = {"feed", "rss", "rdf"}
+
+
+def _record_health_failure(exc: Exception) -> None:
+    """5xx/401/403/429/red/documento inválido degradan; 400/404/410 (feed
+    retirado o movido) son del feed concreto, no de la fuente: neutros."""
+    registry = get_data_source_registry()
+    if isinstance(exc, httpx.HTTPStatusError):
+        if exc.response.status_code in (400, 404, 410):
+            return
+        registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        return
+    if isinstance(exc, httpx.TransportError):
+        registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        return
+    registry.record_failure(_REGISTRY_KEY, f"documento inválido: {type(exc).__name__}")
 
 
 def _local_name(tag: str) -> str:
@@ -85,7 +109,11 @@ class RSSConnector:
         metadata: dict[str, Any] = {"feed_url": url, "ticker": ticker}
         try:
             content = await self._fetch(url)
-            root = ElementTree.fromstring(content)
+            root = DefusedElementTree.fromstring(content)
+            if _local_name(root.tag) not in _FEED_ROOTS:
+                # 200 bien formado que no es un feed (challenge HTML, sitemap,
+                # página de error): deriva de formato, no éxito.
+                raise ValueError(f"el documento no es un feed RSS/Atom (raíz <{_local_name(root.tag)}>)")
             feed_title, entries = self._entries(root)
             metadata["feed_title"] = feed_title
             items: list[ConnectorItem] = []
@@ -102,25 +130,21 @@ class RSSConnector:
                 if len(items) >= max_items:
                     break
             metadata["format"] = "atom" if _local_name(root.tag) == "feed" else "rss"
+            get_data_source_registry().record_success(_REGISTRY_KEY)
             return ConnectorResult(source="rss", items=items, metadata=metadata)
         except Exception as exc:
+            _record_health_failure(exc)
             return ConnectorResult.failed("rss", exc, metadata=metadata)
 
-    def _entries(
-        self, root: ElementTree.Element
-    ) -> tuple[str, list[ElementTree.Element]]:
+    def _entries(self, root: ElementTree.Element) -> tuple[str, list[ElementTree.Element]]:
         if _local_name(root.tag) == "feed":
-            return _child_text(root, "title"), [
-                child for child in root if _local_name(child.tag) == "entry"
-            ]
+            return _child_text(root, "title"), [child for child in root if _local_name(child.tag) == "entry"]
 
         channel = next(
             (child for child in root if _local_name(child.tag) == "channel"),
             root,
         )
-        return _child_text(channel, "title"), [
-            child for child in channel if _local_name(child.tag) == "item"
-        ]
+        return _child_text(channel, "title"), [child for child in channel if _local_name(child.tag) == "item"]
 
     def _parse_entry(
         self,
@@ -142,9 +166,7 @@ class RSSConnector:
                     break
         link = urljoin(feed_url, link) if link else None
         external_id = _child_text(entry, "guid", "id") or link
-        published = _published_at(
-            _child_text(entry, "pubdate", "published", "updated", "date")
-        )
+        published = _published_at(_child_text(entry, "pubdate", "published", "updated", "date"))
         author = _child_text(entry, "author", "creator")
         return ConnectorItem(
             source=feed_title or "rss",

@@ -17,15 +17,18 @@ import {
 } from '@/lib/actions/insider.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { isAppError, isAuthError } from '@/lib/types/errors';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Señales insider',
-    description:
-        'Compras insider con código P (Form 4, SEC EDGAR): clusters, compras de CEO/CFO y grandes operaciones por ticker.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return {
+        title: t('insider.meta.title'),
+        description: t('insider.meta.description'),
+    };
+}
 
 type PageProps = {
     searchParams: Promise<{ ticker?: string; lado?: string; dias?: string }>;
@@ -40,6 +43,7 @@ function isUnknownTicker(error: unknown): boolean {
 }
 
 export default async function InsiderPage({ searchParams }: PageProps) {
+    const t = await getT();
     const { ticker: rawTicker, lado, dias } = await searchParams;
     const side = lado === 'buy' || lado === 'sell' ? lado : 'all';
     const days = [30, 365].includes(Number(dias)) ? Number(dias) : 90;
@@ -60,7 +64,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
             [signals, filings] = await Promise.all([getInsiderSignals(ticker), getInsiderFilings(ticker)]);
         } catch (error) {
             if (isBackendUnavailableError(error)) {
-                return <BackendOffline feature="Señales Insider" retryHref={retryHref} />;
+                return <BackendOffline feature={t('insider.meta.backendFeature')} retryHref={retryHref} />;
             }
             if (!isUnknownTicker(error)) throw error;
             // Ticker sin datos: la vista lo explica en vez de mostrar un error.
@@ -85,7 +89,7 @@ export default async function InsiderPage({ searchParams }: PageProps) {
             }),
         ]);
         if (isBackendUnavailableError(feedError) && isBackendUnavailableError(opsError)) {
-            return <BackendOffline feature="Señales Insider" retryHref={retryHref} />;
+            return <BackendOffline feature={t('insider.meta.backendFeature')} retryHref={retryHref} />;
         }
     }
 
@@ -97,11 +101,11 @@ export default async function InsiderPage({ searchParams }: PageProps) {
                     href={`/research/${encodeURIComponent(ticker)}`}
                 >
                     <ArrowLeft aria-hidden="true" className="h-4 w-4" />
-                    Volver a {ticker}
+                    {t('insider.backToTicker', { ticker })}
                 </Link>
             ) : null}
             <header className="border-b border-gray-800 pb-4">
-                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">Señales insider</h1>
+                <h1 className="text-xl font-bold text-gray-100 sm:text-2xl">{t('insider.header.title')}</h1>
             </header>
 
             <InsiderSignalsView

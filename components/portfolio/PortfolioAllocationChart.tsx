@@ -2,6 +2,7 @@
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
+import { useT, useFormat } from '@/lib/i18n/client';
 import { AllocationTooltip } from './AllocationTooltip';
 import { COLORS } from './allocation-colors';
 import { buildAllocationSlices, CASH_SLICE_SYMBOL, type AllocationSliceData } from '@/lib/portfolio-allocation';
@@ -11,6 +12,8 @@ export { buildAllocationSlices, CASH_SLICE_SYMBOL };
 
 /** Donut de distribución: se carga solo en cliente (dynamic ssr:false desde el panel) */
 export default function PortfolioAllocationChart({ chartData, currency }: { chartData: AllocationSlice[]; currency?: string }) {
+    const ti = useT();
+    const f = useFormat();
     return (
         <ResponsiveContainer
             width="100%"
@@ -47,7 +50,7 @@ export default function PortfolioAllocationChart({ chartData, currency }: { char
                         />
                     ))}
                 </Pie>
-                <Tooltip content={<AllocationTooltip currency={currency} />} />
+                <Tooltip content={<AllocationTooltip currency={currency} f={f} labels={{ value: ti('portfolio.allocationTooltip.value'), weight: ti('portfolio.allocationTooltip.weight'), pnl: ti('portfolio.allocationTooltip.pnl') }} />} />
             </PieChart>
         </ResponsiveContainer>
     );

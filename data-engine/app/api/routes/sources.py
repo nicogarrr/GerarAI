@@ -43,9 +43,14 @@ router = APIRouter()
 class ManualTranscriptImportRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
     title: str = Field(min_length=3, max_length=500)
-    text: str = Field(min_length=20)
-    source_url: str | None = None
-    period: str = "unknown"
+    # Tope alineado con el presupuesto de 10MB que RawBodyMiddleware da a los
+    # cuerpos firmados: el texto se trocea en DocumentChunks y se indexa en
+    # RAG, y un cuerpo gigante merece un 422 claro, no un 413 seco.
+    text: str = Field(min_length=20, max_length=10 * 1024 * 1024)
+    # Document.source_url es String(1000) y Transcript.period String(40):
+    # sin cota, SQLite los tragaba y el INSERT rompia en Postgres (500, no 422).
+    source_url: str | None = Field(default=None, max_length=1000)
+    period: str = Field(default="unknown", max_length=40)
 
 
 class UrlIngestRequest(BaseModel):
@@ -222,8 +227,9 @@ def documents_count(
     presentaba el tamano de pagina como si fuera el inventario completo
     y el resto de documentos quedaba inalcanzable (F131).
     """
-    # with_loader_criteria no alcanza un SELECT de agregado: el tenant se
-    # filtra explicito para no contar documentos de otros tenants.
+    # Medido en SQLAlchemy 2.1.6: with_loader_criteria SI alcanza los SELECT
+    # de agregado; el filtro explicito queda como segunda capa y fail-closed
+    # para no contar documentos de otros tenants.
     company = None
     if ticker:
         # F313: alias europeo resuelto con la misma política que la ficha.
@@ -372,7 +378,9 @@ async def ingest_document_file(
     ticker: str = Form(..., min_length=1, max_length=20),
     title: str = Form(..., min_length=3, max_length=500),
     source_type: str = Form(default="manual_upload", min_length=2, max_length=80),
-    source_url: str | None = Form(default=None),
+    # Document.source_url es String(1000): sin tope, un valor mas largo
+    # rompia el INSERT en Postgres con un 500 en vez de un 422 de validacion.
+    source_url: str | None = Form(default=None, max_length=1000),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> dict:

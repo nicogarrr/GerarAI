@@ -12,7 +12,7 @@ def _fake(monkeypatch, counter):
         def __init__(self, model):
             counter["n"] += 1
 
-        def embed(self, texts):
+        def embed(self, texts, batch_size=None):
             return [[0.1, 0.2] for _ in texts]
 
     module.TextEmbedding = FakeDense

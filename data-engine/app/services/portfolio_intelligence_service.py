@@ -241,7 +241,10 @@ class PortfolioIntelligenceService:
             for company_id, series in price_series.items()
         }
         indicative_returns = self._portfolio_returns(returns, weights)
-        snapshots = PortfolioSnapshotService().history(db, start=cutoff)
+        # Ventana COMPLETA (5 anos por defecto): con la paginacion del
+        # endpoint llegaban solo las 20 sesiones mas antiguas y el TWR de la
+        # ventana era el de un mes, marcado ademas como exacto.
+        snapshots = PortfolioSnapshotService().history(db, start=cutoff, page_size=None)
         snapshot_returns = {
             snapshot.snapshot_date: float(snapshot.daily_return)
             for snapshot in snapshots

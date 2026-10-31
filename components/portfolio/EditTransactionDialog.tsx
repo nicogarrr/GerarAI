@@ -21,7 +21,9 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import { currencyOptions } from './transactionCurrencies';
 import { hasTransactionErrors, validateTransactionForm, type TransactionFormErrors } from './transactionValidation';
-import { formatNumberForInput, parseLocalizedNumber } from '@/lib/format';
+import { parseLocalizedNumber } from '@/lib/i18n/parse-number';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
+import type { Formatters } from '@/lib/format';
 
 type Transaction = {
     _id: string;
@@ -40,14 +42,14 @@ type Props = {
     userId: string;
 };
 
-function initialForm(transaction: Transaction) {
+function initialForm(transaction: Transaction, f: Formatters) {
     return {
         symbol: transaction.symbol,
         type: transaction.type,
-        quantity: formatNumberForInput(transaction.quantity),
-        price: formatNumberForInput(transaction.price),
+        quantity: f.formatNumberForInput(transaction.quantity),
+        price: f.formatNumberForInput(transaction.price),
         // Sin dato de comisión en la fila el campo queda vacío: guardar sin tocarlo OMITE fees y el backend conserva la registrada (nunca se resetea a 0).
-        fees: transaction.fees === undefined ? '' : formatNumberForInput(transaction.fees),
+        fees: transaction.fees === undefined ? '' : f.formatNumberForInput(transaction.fees),
         date: transaction.date.slice(0, 10),
         notes: transaction.notes || '',
         // La divisa guardada se conserva aunque no esté en la lista corta
@@ -57,18 +59,21 @@ function initialForm(transaction: Transaction) {
 }
 
 export default function EditTransactionDialog({ transaction, userId }: Props) {
+    const ti = useT();
+    const locale = useLocale();
+    const f = useFormat();
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<TransactionFormErrors>({});
 
-    const [formData, setFormData] = useState(() => initialForm(transaction));
+    const [formData, setFormData] = useState(() => initialForm(transaction, f));
     // Cada apertura parte de lo guardado: antes, cancelar tras tocar campos
     // dejaba esos cambios sin guardar en el formulario y al reabrirlo parecían
     // los datos reales del movimiento.
     const handleOpenChange = (next: boolean) => {
         if (next) {
-            setFormData(initialForm(transaction));
+            setFormData(initialForm(transaction, f));
             setFieldErrors({});
         }
         setOpen(next);
@@ -83,7 +88,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
             price: formData.price,
             fees: formData.fees,
             date: formData.date,
-        });
+        }, new Date(), { ti, locale });
         setFieldErrors(errors);
         if (hasTransactionErrors(errors)) return;
         setLoading(true);
@@ -94,23 +99,23 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                 transaction._id,
                 formData.symbol,
                 formData.type,
-                parseLocalizedNumber(formData.quantity) ?? 0,
-                parseLocalizedNumber(formData.price) ?? 0,
+                parseLocalizedNumber(formData.quantity, locale) ?? 0,
+                parseLocalizedNumber(formData.price, locale) ?? 0,
                 new Date(formData.date),
                 formData.notes || undefined,
                 formData.currency,
                 // Sin dato de comisión en la fila no se envía (el backend conserva la registrada).
                 transaction.fees === undefined && formData.fees.trim() === ''
                     ? undefined
-                    : (parseLocalizedNumber(formData.fees) ?? 0),
+                    : (parseLocalizedNumber(formData.fees, locale) ?? 0),
             );
             // Rechazo conocido del ledger: el diálogo sigue abierto con el motivo en español.
             if (result?.success === false) {
-                toast.error(result.error ?? 'No se pudo actualizar la transacción.');
+                toast.error(result.error ?? ti('portfolio.editTransaction.toastError'));
                 return;
             }
             setOpen(false);
-            toast.success('Transacción actualizada');
+            toast.success(ti('portfolio.editTransaction.toastSuccess'));
             router.refresh();
         } catch (error) {
             const digest = (error as { digest?: unknown })?.digest;
@@ -130,7 +135,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     className="text-blue-400 hover:text-blue-300 hover:bg-blue-950/20"
                     // Boton solo-icono: sin nombre accesible el boton es
                     // announces como "boton" y no se sabe que edita (WCAG 4.1.2).
-                    aria-label={`Editar transacción de ${transaction.symbol}`}
+                    aria-label={ti('portfolio.editTransaction.titleWithSymbol', { symbol: transaction.symbol })}
                 >
                     <Pencil aria-hidden="true" className="h-4 w-4" />
                 </Button>
@@ -145,14 +150,14 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                 onOpenAutoFocus={(event) => event.preventDefault()}
             >
                 <DialogHeader>
-                    <DialogTitle className="text-gray-100">Editar transacción</DialogTitle>
+                    <DialogTitle className="text-gray-100">{ti('portfolio.editTransaction.title')}</DialogTitle>
                     <DialogDescription className="text-gray-400">
-                        Modifica los detalles de la transacción
+                        {ti('portfolio.editTransaction.description')}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} noValidate className="space-y-4">
                     <div className="space-y-2">
-                        <Label htmlFor="symbol" className="text-gray-300">Símbolo</Label>
+                        <Label htmlFor="symbol" className="text-gray-300">{ti('portfolio.editTransaction.symbolLabel')}</Label>
                         <TickerSearchInput
                             id="symbol"
                             value={formData.symbol}
@@ -167,7 +172,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="edit-currency" className="text-gray-300">Moneda de la operación</Label>
+                        <Label htmlFor="edit-currency" className="text-gray-300">{ti('portfolio.addTransaction.currencyLabel')}</Label>
                         <Select value={formData.currency} onValueChange={(currency) => setFormData({ ...formData, currency })}>
                             <SelectTrigger id="edit-currency" className="bg-gray-800 border-gray-700 text-gray-100"><SelectValue /></SelectTrigger>
                             <SelectContent className="bg-gray-800 border-gray-700">
@@ -177,7 +182,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="type" className="text-gray-300">Tipo de operación</Label>
+                        <Label htmlFor="type" className="text-gray-300">{ti('portfolio.addTransaction.typeLabel')}</Label>
                         <Select
                             value={formData.type}
                             onValueChange={(value: 'buy' | 'sell') => setFormData({ ...formData, type: value })}
@@ -186,15 +191,15 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-gray-800 border-gray-700">
-                                <SelectItem value="buy">🟢 Compra</SelectItem>
-                                <SelectItem value="sell">🔴 Venta</SelectItem>
+                                <SelectItem value="buy">{ti('portfolio.addTransaction.typeBuy')}</SelectItem>
+                                <SelectItem value="sell">{ti('portfolio.addTransaction.typeSell')}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label htmlFor="quantity" className="text-gray-300">Cantidad</Label>
+                            <Label htmlFor="quantity" className="text-gray-300">{ti('portfolio.addTransaction.quantityLabel')}</Label>
                             <Input
                                 id="quantity"
                                 type="text"
@@ -210,7 +215,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="price" className="text-gray-300">Precio ({formData.currency})</Label>
+                            <Label htmlFor="price" className="text-gray-300">{ti('portfolio.addTransaction.priceLabel', { currency: formData.currency })}</Label>
                             <Input
                                 id="price"
                                 type="text"
@@ -227,12 +232,12 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="edit-fees" className="text-gray-300">Comisiones ({formData.currency}) (opcional)</Label>
+                      <Label htmlFor="edit-fees" className="text-gray-300">{ti('portfolio.addTransaction.feesLabel', { currency: formData.currency })}</Label>
                       <Input
                         id="edit-fees"
                         type="text"
                                 inputMode="decimal"
-                        placeholder="0,00"
+                        placeholder={ti('portfolio.addTransaction.feesPlaceholder')}
                         value={formData.fees}
                         onChange={(e) => setFormData({ ...formData, fees: e.target.value })}
                         className="bg-gray-800 border-gray-700 text-gray-100"
@@ -243,7 +248,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="date" className="text-gray-300">Fecha</Label>
+                        <Label htmlFor="date" className="text-gray-300">{ti('portfolio.addTransaction.dateLabel')}</Label>
                         <Input
                             id="date"
                             type="date"
@@ -258,7 +263,7 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="notes" className="text-gray-300">Notas (opcional)</Label>
+                        <Label htmlFor="notes" className="text-gray-300">{ti('portfolio.addTransaction.notesLabel')}</Label>
                         <Input
                             id="notes"
                             value={formData.notes}
@@ -269,14 +274,14 @@ export default function EditTransactionDialog({ transaction, userId }: Props) {
 
                     <div className="flex justify-end gap-2 pt-2">
                         <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                            Cancelar
+                            {ti('common.actions.cancel')}
                         </Button>
                         <Button
                             type="submit"
                             disabled={loading}
                             aria-busy={loading}
                         >
-                            {loading ? 'Guardando...' : 'Guardar cambios'}
+                            {loading ? ti('portfolio.addTransaction.saving') : ti('portfolio.editTransaction.save')}
                         </Button>
                     </div>
                 </form>

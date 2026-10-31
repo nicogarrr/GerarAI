@@ -26,10 +26,14 @@ No se anade ninguna dependencia: NO tocar requirements.txt por esto.
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from xml.etree import ElementTree as ET
 
 import httpx
+
+# XML externo (SEC EDGAR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedET
 
 from app.core.errors import redact_secrets
 
@@ -38,6 +42,25 @@ from app.core.errors import redact_secrets
 # la vez y la SEC devolveria 403 a todos los conectores.
 from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
 from app.services.connectors.form4 import default_headers
+from app.services.data_source_health import get_data_source_registry
+
+# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
+# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
+# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
+_REGISTRY_KEY = "sec_edgar"
+
+
+def _record_sec_outcome(registry, started: float) -> None:
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+
+
+def _record_sec_http_failure(registry, exc) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+
+
+def _record_sec_transport_failure(registry, exc: Exception) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+
 
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
@@ -84,14 +107,29 @@ def recent_form13dg_filings(
     # Cabeceras ANTES del throttle (ver form4.py: preparar despues se comia
     # parte del hueco entre peticiones, que es lo que la SEC mide).
     headers = default_headers()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     _throttle()
-    if client is not None:
-        response = client.get(url, headers=headers)
-    else:
-        with httpx.Client(timeout=30, headers=headers) as owned:
-            response = owned.get(url)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        if client is not None:
+            response = client.get(url, headers=headers)
+        else:
+            with httpx.Client(timeout=30, headers=headers) as owned:
+                response = owned.get(url)
+        response.raise_for_status()
+        payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (400, 404):
+            raise  # CIK sin datos: dato por emisor, no fuente caida
+        _record_sec_http_failure(registry, exc)
+        raise
+    except httpx.TransportError as exc:
+        _record_sec_transport_failure(registry, exc)
+        raise
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
+        raise
+    _record_sec_outcome(registry, started)
     recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
     cik_number = str(int(str(cik).strip()))
@@ -146,6 +184,16 @@ def raw_document_url(document_url: str) -> str:
     return urlunparse(parsed._replace(path=raw_path))
 
 
+def _is_13dg_xml(text: str) -> bool:
+    """Parseo real: solo vale XML bien formado con raíz <edgarSubmission>
+    (esquema schedule13d/13g). `<div>AccessDenied</div>` no pasa."""
+    try:
+        root = DefusedET.fromstring(text)
+    except ET.ParseError:
+        return False
+    return root.tag.rsplit("}", 1)[-1] == "edgarSubmission"
+
+
 def _looks_like_xml(text: str) -> bool:
     """XML con o sin declaracion `<?xml`; la version renderizada XSLT es HTML
     (<!DOCTYPE html> / <html) y eso es lo unico que hay que descartar."""
@@ -165,18 +213,29 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
     attempt = 0
     while True:
         _throttle()
-        if client is not None:
-            response = client.get(url, headers=headers)
-        else:
-            with httpx.Client(timeout=30, headers=headers) as owned:
-                response = owned.get(url)
+        try:
+            if client is not None:
+                response = client.get(url, headers=headers)
+            else:
+                with httpx.Client(timeout=30, headers=headers) as owned:
+                    response = owned.get(url)
+        except httpx.TransportError as exc:
+            _record_sec_transport_failure(get_data_source_registry(), exc)
+            raise
         if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
-            import time
-
             time.sleep(RETRY_BACKOFF_SECONDS[attempt])
             attempt += 1
             continue
-        response.raise_for_status()
+        registry = get_data_source_registry()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 404):
+                raise  # documento inexistente: dato por emisor
+            _record_sec_http_failure(registry, exc)
+            raise
+        # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El
+        # éxito lo registra el consumidor tras validar el formato.
         return response.text
 
 
@@ -197,18 +256,35 @@ def fetch_filing_document(
     hostname = (urlparse(document_url).hostname or "").lower()
     if hostname not in {"sec.gov", "www.sec.gov"}:
         raise ValueError("SC 13D/13G document URL must use sec.gov")
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     text = _get_text(document_url, client)
     if not _RENDERED_XSL_RE.search(urlparse(document_url).path):
         # Documento primario: puede ser XML (esquema nuevo) o HTML heredado
-        # (un 13D/G antiguo cuyo primario ES un .htm legitimo). No es un
-        # render XSL: se devuelve tal cual y el parse decide el formato.
+        # (un 13D/G antiguo cuyo primario ES un .htm legitimo). Un 200 que no
+        # es ni XML ni lleva la marca de tipo SC 13D/G (un challenge HTML de
+        # WAF no la lleva) no es un documento: deriva de formato, no éxito.
+        if (
+            not _is_13dg_xml(text)
+            and _SGML_TYPE_RE.search(text) is None
+            and _LEGACY_DOC_RE.search(text) is None
+        ):
+            registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
+            raise ValueError("SC 13D/13G document is neither XML nor a recognizable 13D/G text")
+        _record_sec_outcome(registry, started)
         return text
     # URL renderizada (…/xslSCHEDULE_13[DG]_Xnn/fichero): es HTML para
     # humanos; el documento crudo vive en el directorio del filing.
     raw_url = raw_document_url(document_url)
     raw_text = _get_text(raw_url, client)
-    if raw_text.lstrip().lower().startswith(("<!doctype", "<html")):
+    if (
+        not _is_13dg_xml(raw_text)
+        and _SGML_TYPE_RE.search(raw_text) is None
+        and _LEGACY_DOC_RE.search(raw_text) is None
+    ):
+        registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
         raise ValueError("SC 13D/13G raw document is rendered HTML too")
+    _record_sec_outcome(registry, started)
     return raw_text
 
 
@@ -216,6 +292,9 @@ def fetch_filing_document(
 
 # XML nuevo: <edgarSubmission xmlns="http://www.sec.gov/edgar/schedule13g" …>
 # (y schedule13d). Los tags llevan namespace; se compara por nombre local.
+# Portadas HTML heredadas llevan "SCHEDULE 13D/G" o "SC 13D/G" como texto
+# visible (sin la cabecera SGML): un challenge HTML de WAF no lleva ninguna.
+_LEGACY_DOC_RE = re.compile(r"(?:SCHEDULE|SC)\s+13[DG](?:/A)?", re.IGNORECASE)
 _SGML_TYPE_RE = re.compile(
     r"(?:CONFORMED\s+SUBMISSION\s+TYPE|<TYPE>)\s*:?\s*(SC\s*13[DG](?:/A)?|SCHEDULE\s+13[DG](?:/A)?)",
     re.IGNORECASE,
@@ -322,7 +401,7 @@ def _empty_parse(form: str | None = None) -> dict:
 
 def _parse_xml(text: str) -> dict:
     """Portada del esquema schedule13d/schedule13g (namespaces tolerantes)."""
-    root = ET.fromstring(text)
+    root = DefusedET.fromstring(text)
     if _local(root.tag) != "edgarSubmission":
         raise ValueError("root element is not edgarSubmission")
 
@@ -338,9 +417,7 @@ def _parse_xml(text: str) -> dict:
     holders: list[dict] = []
     if form_data is not None:
         person_details = [
-            elem
-            for elem in form_data
-            if _local(elem.tag) == "coverPageHeaderReportingPersonDetails"
+            elem for elem in form_data if _local(elem.tag) == "coverPageHeaderReportingPersonDetails"
         ]
     else:
         person_details = []
@@ -388,7 +465,8 @@ def _parse_xml(text: str) -> dict:
         "form": form,
         "is_amendment": bool(form and form.endswith("/A")),
         "filer_cik": (_text_local(filer, "cik") or "").lstrip("0") or _text_local(filer, "cik"),
-        "issuer_cik": (_text_local(issuer, "issuerCik") or "").lstrip("0") or _text_local(issuer, "issuerCik"),
+        "issuer_cik": (_text_local(issuer, "issuerCik") or "").lstrip("0")
+        or _text_local(issuer, "issuerCik"),
         "issuer_name": _text_local(issuer, "issuerName"),
         "cusip": _text_local(cusips, "issuerCusipNumber"),
         "securities_class_title": _text_local(cover, "securitiesClassTitle"),
@@ -401,9 +479,7 @@ def _parse_xml(text: str) -> dict:
         "sole_dispositive_power": primary.get("sole_dispositive_power"),
         "shared_dispositive_power": primary.get("shared_dispositive_power"),
         "holders": holders,
-        "snapshot_date": _parse_date(
-            _text_local(cover, "eventDateRequiresFilingThisStatement")
-        ),
+        "snapshot_date": _parse_date(_text_local(cover, "eventDateRequiresFilingThisStatement")),
         "signature_date": _parse_date(_text_local(signature, "date")),
     }
 
@@ -533,14 +609,16 @@ def parse_schedule13dg(text: str) -> dict:
     # El sobre SGML (<SEC-DOCUMENT>/<SEC-HEADER>) tambien empieza por "<":
     # sin esta guarda se intentaria parsear como XML y fallaria.
     head = text.lstrip()[:500].lower()
-    is_sgml = head.startswith(("<sec-document", "<sec-header")) or bool(
-        _SGML_TYPE_RE.search(text[:4000])
-    )
+    is_sgml = head.startswith(("<sec-document", "<sec-header")) or bool(_SGML_TYPE_RE.search(text[:4000]))
     if _looks_like_xml(text) and not is_sgml:
         try:
             return _parse_xml(text)
         except (ET.ParseError, ValueError) as exc:
-            return {**_empty_parse(), "format": "xml", "error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300]}
+            return {
+                **_empty_parse(),
+                "format": "xml",
+                "error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300],
+            }
 
     sgml_form = None
     match = _SGML_TYPE_RE.search(text)

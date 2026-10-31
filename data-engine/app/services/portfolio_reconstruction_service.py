@@ -167,6 +167,33 @@ class PortfolioReconstructionService:
                 )
                 if converted is not None:
                     prices[(price_company_id, price_date)] = converted
+        # Splits APLICADOS (corporate_actions_service reescribe las patas a
+        # terminos post-split: cantidad*ratio, precio/ratio): los cierres
+        # crudos anteriores a la fecha efectiva hay que dividirlos por el
+        # factor acumulado o la serie vale el doble antes del split y la TWR
+        # inventa un salto (un 2:1 se leia como -50 % el dia del split). Los
+        # splits ingeridos pero NO aplicados dejan patas y precios crudos:
+        # ajustarlos romperia la coherencia.
+        from app.models import CorporateAction
+        from app.services.split_adjustment import cumulative_split_factor_after
+
+        applied_events: dict[int, list[tuple[date, Decimal]]] = {}
+        for action in db.scalars(
+            select(CorporateAction).where(
+                CorporateAction.company_id.in_(company_ids),
+                CorporateAction.action_type.in_(["split", "reverse_split"]),
+                CorporateAction.applied.is_(True),
+            )
+        ):
+            if action.effective_date is not None and action.ratio is not None:
+                applied_events.setdefault(action.company_id, []).append(
+                    (action.effective_date, Decimal(str(action.ratio)))
+                )
+        if applied_events:
+            prices = {
+                key: close / cumulative_split_factor_after(applied_events.get(key[0], []), key[1])
+                for key, close in prices.items()
+            }
         days = sorted({d for (_, d) in prices if d >= warmup})
         fx_table = fx.fx_table(
             db,

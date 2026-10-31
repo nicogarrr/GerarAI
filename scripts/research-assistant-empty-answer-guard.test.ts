@@ -22,31 +22,37 @@ describe('asistente: respuesta vacía explicada, no tapada con «Sin datos»', (
   });
 
   it('el texto vacío se decide por el status del contrato', () => {
-    assert.match(src, /function emptyAnswerCopy\(status: 'answered' \| 'insufficient_data'\): string/);
-    assert.match(src, /function emptySectionCopy\(status: 'answered' \| 'insufficient_data'\): string/);
+    assert.match(src, /function emptyAnswerCopy\(t: ReturnType<typeof useT>, status: 'answered' \| 'insufficient_data'\): string/);
+    assert.match(src, /function emptySectionCopy\(t: ReturnType<typeof useT>, status: 'answered' \| 'insufficient_data'\): string/);
     assert.match(
       src,
-      /result\.answer\?\.trim\(\) \? result\.answer : emptyAnswerCopy\(result\.status\)/,
+      /result\.answer\?\.trim\(\) \? result\.answer : emptyAnswerCopy\(t, result\.status\)/,
       'la respuesta usa el status, no un literal fijo',
     );
     assert.match(
       src,
-      /section\.body\?\.trim\(\) \? section\.body : emptySectionCopy\(result\.status\)/,
+      /section\.body\?\.trim\(\) \? section\.body : emptySectionCopy\(t, result\.status\)/,
     );
   });
 
   it('insufficient_data explica la ausencia y remite a los datos que faltan', () => {
-    assert.match(src, /la evidencia disponible no permite confirmar una conclusión/);
-    assert.match(src, /Revisa «Datos que faltan»/);
+    const guide = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8')).guide;
+    assert.ok(guide.emptyAnswerInsufficient.includes('la evidencia disponible no permite confirmar una conclusión'), guide.emptyAnswerInsufficient);
+    assert.ok(guide.emptyAnswerInsufficient.includes('Revisa «Datos que faltan»'), guide.emptyAnswerInsufficient);
+    assert.ok(src.includes("t('brain.guide.emptyAnswerInsufficient')"));
   });
 
   it('answered con texto vacío lo dice como lo que es: una respuesta en blanco', () => {
-    assert.match(src, /El asistente ha devuelto la respuesta sin texto/);
-    assert.match(src, /Sección sin cuerpo: el asistente la ha enviado vacía/);
+    const guide = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8')).guide;
+    assert.ok(guide.emptyAnswer.includes('El asistente ha devuelto la respuesta sin texto'), guide.emptyAnswer);
+    assert.ok(guide.emptySection.includes('Sección sin cuerpo: el asistente la ha enviado vacía'), guide.emptySection);
+    assert.ok(src.includes("t('brain.guide.emptyAnswer')"));
+    assert.ok(src.includes("t('brain.guide.emptySection')"));
   });
 
   it('un as_of ausente usa el token canónico de fecha, no un «Sin datos»', () => {
-    assert.match(src, /citation\.as_of \|\| t\('signals\.noDate'\)/);
-    assert.match(src, /import \{ t \} from '@\/lib\/i18n\/t';/);
+    assert.match(src, /citation\.as_of \|\| legacyT\('signals\.noDate'\)/);
+    assert.match(src, /legacyT/);
+    assert.ok(src.includes('lib/i18n'));
   });
 });

@@ -3423,18 +3423,24 @@ def scan_contradictions(
 
         db = _session(tenant_id, user_id)
         try:
-            evidence = list(
-                db.scalars(select(ClaimEvidence).where(ClaimEvidence.evidence_type == "contradicts")).all()
-            )
-            claim_ids = {item.claim_id for item in evidence}
-            claims = list(db.scalars(select(Claim).where(Claim.id.in_(claim_ids))).all()) if claim_ids else []
-            existing_changes = list(
+            # Proyeccion: solo claim_id (las columnas Text de evidencia no se usan).
+            evidence_claim_ids = list(
                 db.scalars(
-                    select(ThesisChange).where(ThesisChange.change_type == claim_change_type("contradicted"))
+                    select(ClaimEvidence.claim_id).where(ClaimEvidence.evidence_type == "contradicts")
+                ).all()
+            )
+            claim_ids = set(evidence_claim_ids)
+            claims = list(db.scalars(select(Claim).where(Claim.id.in_(claim_ids))).all()) if claim_ids else []
+            # Proyeccion: solo affected_claim_ids (la columna Text summary no se usa).
+            existing_affected = list(
+                db.scalars(
+                    select(ThesisChange.affected_claim_ids).where(
+                        ThesisChange.change_type == claim_change_type("contradicted")
+                    )
                 ).all()
             )
             already_flagged = {
-                claim_id for change in existing_changes for claim_id in (change.affected_claim_ids or [])
+                claim_id for affected in existing_affected for claim_id in (affected or [])
             }
             created = 0
             for claim in claims:
@@ -3461,7 +3467,7 @@ def scan_contradictions(
             return {
                 "status": "ok",
                 "actor": actor_name,
-                "contradictory_evidence": len(evidence),
+                "contradictory_evidence": len(evidence_claim_ids),
                 "claims_flagged": len(claims),
                 "changes_created": created,
             }

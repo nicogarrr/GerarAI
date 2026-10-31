@@ -19,7 +19,7 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -367,47 +367,99 @@ def compute_momentum_metrics(
     *,
     as_of: date,
 ) -> dict[str, int]:
-    """Calcula y persiste momentum_6m/12m en calculated_metrics."""
+    """Calcula y persiste momentum_6m/12m en calculated_metrics.
+
+    Tres consultas para todo el lote (antes ~3 por empresa): recuento de
+    barras validas y ultima fecha VALIDA por empresa sobre TODA la historia
+    (los umbrales MIN_BARS no cambian), barras solo de la ventana que el
+    momentum puede mirar y metricas ya persistidas para este as_of. La
+    ingesta rechaza cierres no finitos, asi que IS NOT NULL + > 0 equivale
+    al filtro de finitud del calculo original.
+
+    La ventana es [d0 - 405 dias, d0] por empresa: el punto pasado de 12m
+    esta como mucho a 365+20 dias de la ultima barra d0, y un punto mas
+    viejo seria rechazado por la regla de +-20 dias de momentum_from_series,
+    asi que acotar no cambia ningun resultado.
+    """
     tenant_id = db.info.get("tenant_id")
     stats = {"momentum_6m": 0, "momentum_12m": 0, "skipped": 0}
-    for company in companies:
-        rows = db.execute(
-            select(MarketPrice.date, MarketPrice.adj_close)
-            .where(MarketPrice.company_id == company.id, MarketPrice.date <= as_of)
-            .order_by(MarketPrice.date)
-        ).all()
-        # F370: solo barras hasta as_of; un as_of historico no puede usar datos
-        # posteriores etiquetados con la fecha pedida.
+    if not companies:
+        return stats
+
+    valid_price = and_(MarketPrice.adj_close.is_not(None), MarketPrice.adj_close > 0)
+    company_ids = [c.id for c in companies]
+    totals = {
+        cid: (int(n), d0)
+        for cid, n, d0 in db.execute(
+            select(
+                MarketPrice.company_id,
+                func.count().filter(valid_price),
+                func.max(MarketPrice.date).filter(valid_price),
+            )
+            .where(MarketPrice.company_id.in_(company_ids), MarketPrice.date <= as_of)
+            .group_by(MarketPrice.company_id)
+        )
+    }
+    eligible = [
+        c
+        for c in companies
+        if (t := totals.get(c.id)) is not None and t[0] >= MIN_BARS_6M and t[1] is not None
+    ]
+    stats["skipped"] = len(companies) - len(eligible)
+    if not eligible:
+        return stats
+
+    window_start = min(totals[c.id][1] for c in eligible) - timedelta(days=405)
+    bars: dict[int, list[tuple[date, Decimal]]] = {c.id: [] for c in eligible}
+    for cid, day, px in db.execute(
+        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.adj_close)
+        .where(
+            MarketPrice.company_id.in_([c.id for c in eligible]),
+            MarketPrice.date <= as_of,
+            MarketPrice.date >= window_start,
+            valid_price,
+        )
+        .order_by(MarketPrice.company_id, MarketPrice.date)
+    ):
+        price = Decimal(str(px))
+        if price.is_finite():
+            bars[cid].append((day, price))
+
+    existing = {
+        (m.company_id, m.metric): m
+        for m in db.scalars(
+            select(CalculatedMetric).where(
+                CalculatedMetric.tenant_id == tenant_id,
+                CalculatedMetric.company_id.in_([c.id for c in eligible]),
+                CalculatedMetric.metric.in_(MOMENTUM_WINDOWS),
+                CalculatedMetric.period == as_of.isoformat(),
+                CalculatedMetric.definition_version == METRIC_VERSION,
+            )
+        )
+    }
+
+    for company in eligible:
+        n_bars, d0 = totals[company.id]
         series = [
-            (d, Decimal(str(p)))
-            for d, p in rows
-            if p is not None and Decimal(str(p)).is_finite() and p > 0
+            (day, price)
+            for day, price in bars[company.id]
+            if day >= d0 - timedelta(days=405)
         ]
-        if len(series) < MIN_BARS_6M:
-            stats["skipped"] += 1
-            continue
         for metric, days in MOMENTUM_WINDOWS.items():
-            if len(series) < (MIN_BARS_12M if days > 182 else MIN_BARS_6M):
+            if n_bars < (MIN_BARS_12M if days > 182 else MIN_BARS_6M):
                 continue
             value = momentum_from_series(series, days)
             if value is None:
                 continue
-            existing = db.scalar(
-                select(CalculatedMetric).where(
-                    CalculatedMetric.tenant_id == tenant_id,
-                    CalculatedMetric.company_id == company.id,
-                    CalculatedMetric.metric == metric,
-                    CalculatedMetric.period == as_of.isoformat(),
-                    CalculatedMetric.definition_version == METRIC_VERSION,
-                )
-            )
-            if existing is not None:
-                existing.value = value
-                existing.calculation_trace = {
-                    "window_days": days,
-                    "as_of": as_of.isoformat(),
-                    "last_bar_date": series[-1][0].isoformat(),
-                }
+            trace = {
+                "window_days": days,
+                "as_of": as_of.isoformat(),
+                "last_bar_date": series[-1][0].isoformat(),
+            }
+            row = existing.get((company.id, metric))
+            if row is not None:
+                row.value = value
+                row.calculation_trace = trace
             else:
                 db.add(
                     CalculatedMetric(
@@ -424,11 +476,7 @@ def compute_momentum_metrics(
                         numerator=None,
                         denominator=None,
                         source_fact_ids=[],
-                        calculation_trace={
-                            "window_days": days,
-                            "as_of": as_of.isoformat(),
-                            "last_bar_date": series[-1][0].isoformat(),
-                        },
+                        calculation_trace=trace,
                     )
                 )
             stats[metric] += 1

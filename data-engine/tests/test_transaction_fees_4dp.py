@@ -8,12 +8,12 @@ el coste fiscal de la compra quedaba inflado/redondeado. Ahora Numeric(20, 4)
 from datetime import date
 from decimal import Decimal
 
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.core.database import SessionLocal, init_db
 from app.models import Company, Transaction
 from main import app
+from tests.auth_helpers import csrf_client
 
 
 def _post(client, **overrides):
@@ -38,7 +38,7 @@ def _fees(ticker):
 
 def test_comision_de_fraccion_de_centimo_se_guarda_exacta():
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     response = _post(client)
     assert response.status_code == 201, response.text
     assert response.json()["fees"] == 0.355
@@ -50,7 +50,7 @@ def test_comision_de_fraccion_de_centimo_se_guarda_exacta():
 
 def test_mas_de_cuatro_decimales_se_rechaza_en_vez_de_redondear():
     init_db()
-    client = TestClient(app)
+    client = csrf_client(app)
     response = _post(client, ticker="FEE5DP", fees="0.35501")
     assert response.status_code == 422, response.text
     assert _fees("FEE5DP") == []

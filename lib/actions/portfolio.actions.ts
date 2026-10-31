@@ -594,16 +594,28 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
         // attached). Linear band documented here: 0% yield -> 0, 6% -> 100.
         // Sin posiciones con dividendos ingeridos la puntuación es null, no 0:
         // un yield de 0% es un hecho ("no reparte") y "no lo sabemos" no lo es.
+        // portfolio_yield es el yield de las posiciones CUBIERTAS: con la
+        // mitad del valor sin datos, puntuarlo como si fuera de toda la
+        // cartera inflaría el score. Se pondera por covered_value_fraction:
+        // el resultado es el límite inferior del yield del libro completo
+        // (lo desconocido no suma). Sin el campo (backend viejo) el yield
+        // ya venía diluido sobre el valor total: fracción 1 es consistente.
         let dividendScore: number | null = null;
         try {
             const dividends = await cachedFetch<{
                 portfolio_yield: number | null;
-                coverage: { positions_with_dividend_data: number };
+                coverage: {
+                    positions_with_dividend_data: number;
+                    covered_value_fraction?: number | null;
+                };
             }>(
                 `portfolio:${canonicalUserId}:dividends`,
                 () => researchRequest<{
                     portfolio_yield: number | null;
-                    coverage: { positions_with_dividend_data: number };
+                    coverage: {
+                        positions_with_dividend_data: number;
+                        covered_value_fraction?: number | null;
+                    };
                 }>('/api/portfolio/dividends', { fast: true }),
                 30,
             );
@@ -611,7 +623,8 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
                 dividends.coverage.positions_with_dividend_data > 0 &&
                 dividends.portfolio_yield != null
             ) {
-                dividendScore = clamp100((dividends.portfolio_yield / 0.06) * 100);
+                const coveredFraction = dividends.coverage.covered_value_fraction ?? 1;
+                dividendScore = clamp100(((dividends.portfolio_yield * coveredFraction) / 0.06) * 100);
             }
         } catch {
             // Endpoint unavailable: the yield is unknown, not zero.

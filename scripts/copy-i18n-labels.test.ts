@@ -57,8 +57,8 @@ void test('tipos de evento y fallback de códigos futuros (F175)', () => {
 
 void test('los componentes usan las etiquetas, no la cadena cruda', () => {
     const risk = readFileSync('components/risk/RiskDashboardView.tsx', 'utf8');
-    assert.match(risk, /exposureRecord\(value, etiquetaSector\)/);
-    assert.match(risk, /exposureRecord\(value, etiquetaFactor\)/);
+    assert.match(risk, /exposureRecord\(t, f, value, etiquetaSector\)/);
+    assert.match(risk, /exposureRecord\(t, f, value, etiquetaFactor\)/);
     assert.match(risk, /etiquetaSeveridad\(formatRecordValue\(alert\.severity\)\)/);
     assert.doesNotMatch(risk, /hace falta historia de precios/);
     const search = readFileSync('components/SearchCommand.tsx', 'utf8') + readFileSync('components/SearchCommandDialog.tsx', 'utf8');

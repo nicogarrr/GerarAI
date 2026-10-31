@@ -303,14 +303,55 @@ def _cached(key: str, loader) -> Any:
 # Lectura de capex reportado (SEC/ESEF vía financial_facts compartidos)
 # ---------------------------------------------------------------------------
 
-def _latest_quarterly_fact(
-    db: Session, company_id: int, metric: str, tenant: int | None
-) -> FinancialFact | None:
-    tenant_clause = (
+def _fact_tenant_clause(tenant: int | None):
+    return (
         or_(FinancialFact.tenant_id == tenant, FinancialFact.tenant_id.is_(None))
         if isinstance(tenant, int)
         else FinancialFact.tenant_id.is_(None)
     )
+
+
+_SPENDER_METRICS = ("capital_expenditure", "finance_lease_additions")
+
+
+def _latest_quarterly_facts_batch(
+    db: Session, company_ids: list[int], tenant: int | None
+) -> dict[tuple[int, str], FinancialFact]:
+    """Ultimo fact trimestral por (empresa, metrica) en UNA consulta.
+
+    Misma seleccion que ``_latest_quarterly_fact`` (periodo desc, id desc);
+    agrupar por (empresa, metrica) con el orden de la consulta la conserva.
+    """
+    if not company_ids:
+        return {}
+    rows = db.scalars(
+        select(FinancialFact)
+        .where(
+            _fact_tenant_clause(tenant),
+            FinancialFact.company_id.in_(company_ids),
+            FinancialFact.metric.in_(_SPENDER_METRICS),
+            FinancialFact.source_type.in_(["SEC", "ESEF"]),
+            FinancialFact.is_reported.is_(True),
+            FinancialFact.fiscal_quarter.in_(["Q1", "Q2", "Q3", "Q4"]),
+        )
+        .options(selectinload(FinancialFact.source))
+        .order_by(
+            FinancialFact.company_id,
+            FinancialFact.metric,
+            FinancialFact.period.desc(),
+            FinancialFact.id.desc(),
+        )
+    ).all()
+    latest: dict[tuple[int, str], FinancialFact] = {}
+    for row in rows:
+        latest.setdefault((row.company_id, row.metric), row)
+    return latest
+
+
+def _latest_quarterly_fact(
+    db: Session, company_id: int, metric: str, tenant: int | None
+) -> FinancialFact | None:
+    tenant_clause = _fact_tenant_clause(tenant)
     rows = db.scalars(
         select(FinancialFact)
         .where(
@@ -359,7 +400,12 @@ def fact_source(fact: FinancialFact) -> dict:
 # Construcción del payload
 # ---------------------------------------------------------------------------
 
-def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> dict:
+def _spender_payload(
+    cfg: SpenderConfig,
+    company: Company | None,
+    capex: FinancialFact | None,
+    lease: FinancialFact | None,
+) -> dict:
     base = {
         "key": cfg.key,
         "label": cfg.label,
@@ -374,11 +420,9 @@ def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> di
         "extra_label": None,
         "extra_source": None,
     }
-    company = db.scalar(select(Company).where(Company.ticker == cfg.ticker))
     if company is None:
         base["note"] = "Sin datos SEC en la app todavía"
         return base
-    capex = _latest_quarterly_fact(db, company.id, "capital_expenditure", tenant)
     if capex is None:
         base["note"] = "Sin capex trimestral reportado en los datos de la app"
         return base
@@ -390,7 +434,6 @@ def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> di
         period_label=period_label(capex),
         source=fact_source(capex),
     )
-    lease = _latest_quarterly_fact(db, company.id, "finance_lease_additions", tenant)
     if lease is not None and lease.period == capex.period:
         base.update(
             extra_amount=float(lease.value),
@@ -398,6 +441,37 @@ def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> di
             extra_source=fact_source(lease),
         )
     return base
+
+
+def build_sec_spender(db: Session, cfg: SpenderConfig, tenant: int | None) -> dict:
+    company = db.scalar(select(Company).where(Company.ticker == cfg.ticker))
+    capex = lease = None
+    if company is not None:
+        capex = _latest_quarterly_fact(db, company.id, "capital_expenditure", tenant)
+        if capex is not None:
+            lease = _latest_quarterly_fact(db, company.id, "finance_lease_additions", tenant)
+    return _spender_payload(cfg, company, capex, lease)
+
+
+def _build_sec_spenders_batch(
+    db: Session, configs: tuple[SpenderConfig, ...], tenant: int | None
+) -> list[dict]:
+    """Gastadores SEC del tema con 2 consultas en total (empresas + facts),
+    no ~3 por gastador."""
+    tickers = [cfg.ticker for cfg in configs if cfg.ticker]
+    companies = (
+        {c.ticker: c for c in db.scalars(select(Company).where(Company.ticker.in_(tickers)))}
+        if tickers
+        else {}
+    )
+    facts = _latest_quarterly_facts_batch(db, [c.id for c in companies.values()], tenant)
+    spenders = []
+    for cfg in configs:
+        company = companies.get(cfg.ticker)
+        capex = facts.get((company.id, "capital_expenditure")) if company else None
+        lease = facts.get((company.id, "finance_lease_additions")) if company else None
+        spenders.append(_spender_payload(cfg, company, capex, lease))
+    return spenders
 
 
 def build_usaspending_theme(
@@ -509,7 +583,7 @@ def build_theme_payload(db: Session, theme: FlowTheme, tenant: int | None) -> di
         )
         generated_at = datetime.now(UTC)
     else:
-        spenders = [build_sec_spender(db, cfg, tenant) for cfg in theme.spenders]
+        spenders = _build_sec_spenders_batch(db, theme.spenders, tenant)
         destinations = [
             {
                 "label": item.label,

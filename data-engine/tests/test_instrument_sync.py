@@ -51,3 +51,38 @@ def test_fixture_unknown_fields_are_null_not_invented(db):
     assert san is not None
     assert san.sector == "Financials"
     assert san.figi == "BBG000BSAN01"
+
+
+def test_refresh_weekly_delegates_to_sync_with_defaults(monkeypatch):
+    """El wrapper del scheduler llama a sync sin red en el test (delegacion medida)."""
+    import scripts.sync_instruments as mod
+
+    calls = {}
+
+    def _fake_sync(**kwargs):
+        calls.update(kwargs)
+        return {"status": "ok", "dry_run": False}
+
+    monkeypatch.setattr(mod, "sync", _fake_sync)
+    out = mod.refresh_weekly()
+    assert out["status"] == "ok"
+    assert calls["data_dir"] == mod.DEFAULT_DATA_DIR
+    assert calls["as_of"] == date.today()
+    assert "enrich_openfigi" not in calls or calls.get("enrich_openfigi") in (None, False)
+
+
+def test_scheduler_wrapper_calls_refresh_weekly(monkeypatch):
+    """El registro del scheduler pasa por scripts.sync_instruments.refresh_weekly."""
+    import scripts.sync_instruments as mod
+
+    called = {"n": 0}
+
+    def _fake():
+        called["n"] += 1
+        return {"status": "ok"}
+
+    monkeypatch.setattr(mod, "refresh_weekly", _fake)
+    from app.workers.scheduler import _refresh_instrument_references
+
+    assert _refresh_instrument_references()["status"] == "ok"
+    assert called["n"] == 1

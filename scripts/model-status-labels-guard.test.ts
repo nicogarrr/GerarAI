@@ -23,7 +23,13 @@ test('F306: el pie distingue cobertura histórica y respeta la concordancia 1 a�
 });
 
 test('F307: el estado sin alertas de /risk solo tranquiliza con estado ok y escribe «de la cartera»', () => {
-    assert.match(risk, /status === 'ok'\s*\?\s*'Sin alertas de concentración o liquidez en los datos calculados\.'/);
-    assert.match(risk, /La cobertura incompleta no permite descartar alertas en el resto de la cartera/);
+    // Las cadenas visibles viven en el diccionario i18n (carril C); la vista
+    // las referencia por clave. El guard verifica ambos extremos.
+    const esAlerts = JSON.parse(readFileSync('lib/i18n/messages/es/risk.json', 'utf8')).alerts;
+    assert.match(risk, /status === 'ok'\s*\?\s*t\('risk\.alerts\.emptyOk'\)/);
+    assert.equal(esAlerts.emptyOk, 'Sin alertas de concentración o liquidez en los datos calculados.');
+    assert.match(risk, /risk\.alerts\.emptyIncomplete/);
+    assert.match(esAlerts.emptyIncomplete, /La cobertura incompleta no permite descartar alertas en el resto de la cartera/);
     assert.doesNotMatch(risk, /del cartera/);
+    assert.ok(!JSON.stringify(esAlerts).includes('del cartera'), 'concordancia «de la cartera» en el diccionario');
 });

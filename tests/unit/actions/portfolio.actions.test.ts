@@ -270,6 +270,23 @@ describe('getPortfolioScores: null es ausencia, no un cero', () => {
         });
         expect((await getPortfolioScores('tenant-one')).dividend).toBeNull();
     });
+
+    it('dividendo: cobertura parcial por valor no puntúa como cartera completa', async () => {
+        seedSummary([position()]);
+        researchRequest.mockImplementation(async (path: string) => {
+            if (path === '/api/portfolio/positions?page=1&page_size=200') return [position()];
+            if (path === '/api/portfolio/summary') return backendSummary();
+            if (path === '/api/portfolio/data-quality') throw new Error('x');
+            if (path === '/api/portfolio/snapshots?page=1&page_size=200') return [];
+            if (path === '/api/portfolio/tearsheet') return { status: 'ok', metrics: null, exposure: null };
+            // Yield de las cubiertas 6 % pero solo la mitad del valor tiene
+            // datos: el score es el límite inferior del libro (3 % -> 50),
+            // nunca 100 como si la cobertura fuera total.
+            if (path === '/api/portfolio/dividends') return { portfolio_yield: 0.06, coverage: { positions_with_dividend_data: 1, covered_value_fraction: 0.5 } };
+            throw new AppError('404', 'RESEARCH_API_ERROR', 404);
+        });
+        expect((await getPortfolioScores('tenant-one')).dividend).toBe(50);
+    });
 });
 
 describe('pesos de cartera', () => {

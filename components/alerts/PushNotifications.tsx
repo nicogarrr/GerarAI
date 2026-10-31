@@ -2,6 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n/client';
+import type { TranslationKey } from '@/lib/i18n/t';
 import {
     getPushStatus,
     registerPushDevice,
@@ -11,15 +13,30 @@ import {
     type PushStatus,
 } from '@/lib/actions/push.actions';
 
+// Etiquetas es enlazadas al diccionario: export de compatibilidad para los
+// tests; la vista pinta con useT() via PUSH_TYPE_LABEL_KEYS.
+import esAlerts from '@/lib/i18n/messages/es/alerts.json';
+
 export const PUSH_TYPE_LABELS: Record<PushEventType, string> = {
-    macro_event: 'Eventos macro (IPC, empleo, FOMC): 24 h y 1 h antes',
-    earnings: 'Próximos resultados de cartera y watchlist: 7 días, 1 día y el mismo día',
-    dca_levels: 'Niveles DCA de tu watchlist',
-    new_filing: 'Nuevos documentos de la SEC',
-    thesis_broken: 'Tesis en riesgo',
-    insiders: 'Movimientos de directivos',
-    shorts_rising: 'Posiciones cortas al alza',
-    daily_digest: 'Resumen diario de tu cartera',
+    macro_event: esAlerts.push.types.macroEvent,
+    earnings: esAlerts.push.types.earnings,
+    dca_levels: esAlerts.push.types.dcaLevels,
+    new_filing: esAlerts.push.types.newFiling,
+    thesis_broken: esAlerts.push.types.thesisBroken,
+    insiders: esAlerts.push.types.insiders,
+    shorts_rising: esAlerts.push.types.shortsRising,
+    daily_digest: esAlerts.push.types.dailyDigest,
+};
+
+const PUSH_TYPE_LABEL_KEYS: Record<PushEventType, TranslationKey> = {
+    macro_event: 'alerts.push.types.macroEvent',
+    earnings: 'alerts.push.types.earnings',
+    dca_levels: 'alerts.push.types.dcaLevels',
+    new_filing: 'alerts.push.types.newFiling',
+    thesis_broken: 'alerts.push.types.thesisBroken',
+    insiders: 'alerts.push.types.insiders',
+    shorts_rising: 'alerts.push.types.shortsRising',
+    daily_digest: 'alerts.push.types.dailyDigest',
 };
 
 type Support = 'checking' | 'unsupported' | 'ios-install' | 'denied' | 'ready';
@@ -61,6 +78,7 @@ function detectSupport(): Support {
 }
 
 export default function PushNotifications() {
+    const ti = useT();
     const [support, setSupport] = useState<Support>('checking');
     const [status, setStatus] = useState<PushStatus | null>(null);
     const [thisDevice, setThisDevice] = useState(false);
@@ -114,7 +132,7 @@ export default function PushNotifications() {
             });
             await refresh();
         } catch {
-            setError('No se pudo activar en este dispositivo. Inténtalo de nuevo.');
+            setError(ti('alerts.push.errorEnable'));
         } finally {
             setBusy(false);
         }
@@ -132,7 +150,7 @@ export default function PushNotifications() {
             }
             await refresh();
         } catch {
-            setError('No se pudo desactivar. Inténtalo de nuevo.');
+            setError(ti('alerts.push.errorDisable'));
         } finally {
             setBusy(false);
         }
@@ -145,7 +163,7 @@ export default function PushNotifications() {
             await setPushPreference(eventType, enabled);
             await refresh();
         } catch {
-            setError('No se pudo guardar el cambio. Inténtalo de nuevo.');
+            setError(ti('alerts.push.errorSave'));
         } finally {
             setBusy(false);
         }
@@ -155,38 +173,38 @@ export default function PushNotifications() {
 
     return (
         <section data-testid="push-notifications" className="rounded-lg border border-gray-700/60 bg-surface-1 p-4 space-y-3">
-            <h2 className="text-lg font-semibold text-white">Avisos en este dispositivo</h2>
+            <h2 className="text-lg font-semibold text-white">{ti('alerts.push.title')}</h2>
             {support === 'checking' ? null : support === 'ios-install' ? (
                 <p className="text-sm text-gray-400" data-testid="push-ios">
-                    En iPhone o iPad los avisos solo funcionan con la app instalada (iOS 16.4 o posterior): en Safari toca{' '}
-                    <span className="text-gray-200">Compartir</span> y{' '}
-                    <span className="text-gray-200">Añadir a pantalla de inicio</span>, y vuelve a abrir esta página desde el icono.
+                    {ti('alerts.push.iosPre')}
+                    <span className="text-gray-200">{ti('alerts.push.iosShare')}</span>{ti('alerts.push.iosMid')}
+                    <span className="text-gray-200">{ti('alerts.push.iosAdd')}</span>{ti('alerts.push.iosPost')}
                 </p>
             ) : support === 'unsupported' ? (
                 <p className="text-sm text-gray-400" data-testid="push-unsupported">
-                    Este navegador no admite avisos push. Los avisos por Telegram y por correo siguen funcionando.
+                    {ti('alerts.push.unsupported')}
                 </p>
             ) : status && !serverReady ? (
                 <p className="text-sm text-gray-400" data-testid="push-server-off">
-                    Los avisos push aún no están activados en el servidor.
+                    {ti('alerts.push.serverOff')}
                 </p>
             ) : support === 'denied' ? (
                 <p className="text-sm text-gray-400" data-testid="push-denied">
-                    Bloqueaste las notificaciones de GerarAI. Para activarlas, permítelas en los ajustes del navegador o del sistema.
+                    {ti('alerts.push.denied')}
                 </p>
             ) : !thisDevice ? (
                 <>
                     <p className="text-sm text-gray-400">
-                        Recibe avisos aunque no tengas la app abierta. Tú eliges qué tipos; el aviso trae la fuente y la hora.
+                        {ti('alerts.push.intro')}
                     </p>
                     <Button type="button" onClick={enableDevice} disabled={busy || !serverReady}>
-                        Activar avisos en este dispositivo
+                        {ti('alerts.push.enable')}
                     </Button>
                 </>
             ) : (
                 <>
                     <fieldset className="space-y-2" disabled={busy}>
-                        <legend className="sr-only">Tipos de aviso push</legend>
+                        <legend className="sr-only">{ti('alerts.push.legend')}</legend>
                         {(status?.preferences ?? []).map((pref) => (
                             <label key={pref.event_type} className="flex min-h-11 items-center gap-3 text-sm text-gray-200">
                                 <input
@@ -195,12 +213,12 @@ export default function PushNotifications() {
                                     checked={pref.enabled}
                                     onChange={(event) => void toggle(pref.event_type, event.target.checked)}
                                 />
-                                {PUSH_TYPE_LABELS[pref.event_type] ?? pref.event_type}
+                                {PUSH_TYPE_LABELS[pref.event_type] ? ti(PUSH_TYPE_LABEL_KEYS[pref.event_type]) : pref.event_type}
                             </label>
                         ))}
                     </fieldset>
                     <Button type="button" variant="outline" onClick={disableDevice} disabled={busy}>
-                        Desactivar en este dispositivo
+                        {ti('alerts.push.disable')}
                     </Button>
                 </>
             )}

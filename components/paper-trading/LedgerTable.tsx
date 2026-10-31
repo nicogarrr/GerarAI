@@ -1,7 +1,9 @@
+'use client';
+
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatMoney, formatNumber, formatUserDateTime } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 import type { HistoryRow } from './submit';
 
 /**
@@ -12,24 +14,26 @@ import type { HistoryRow } from './submit';
  * que nadie las confunda con una ejecución de mercado.
  */
 export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
+    const ti = useT();
+    const f = useFormat();
     if (entries.length === 0) {
         return (
             <EmptyState
-                title="Sin operaciones registradas"
-                description="Usa el formulario de arriba para registrar tu primera operación simulada."
+                title={ti('paperTrading.ledger.emptyTitle')}
+                description={ti('paperTrading.ledger.emptyDescription')}
             />
         );
     }
     const sorted = [...entries].sort((a, b) => (b.executedAt ?? b.createdAt) - (a.executedAt ?? a.createdAt));
     return (
-        <Table dense regionLabel="Tabla del historial de operaciones, desplazable horizontalmente">
+        <Table dense regionLabel={ti('paperTrading.ledger.regionLabel')}>
             <TableHeader>
                 <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Operación</TableHead>
-                    <TableHead className="text-right">Cantidad</TableHead>
-                    <TableHead className="text-right">Precio / importe</TableHead>
-                    <TableHead>Estado</TableHead>
+                    <TableHead>{ti('paperTrading.ledger.colDate')}</TableHead>
+                    <TableHead>{ti('paperTrading.ledger.colOperation')}</TableHead>
+                    <TableHead className="text-right">{ti('paperTrading.ledger.colQuantity')}</TableHead>
+                    <TableHead className="text-right">{ti('paperTrading.ledger.colPrice')}</TableHead>
+                    <TableHead>{ti('paperTrading.ledger.colStatus')}</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -38,7 +42,7 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
                     return (
                         <TableRow key={row.clientOrderId}>
                             <TableCell className="whitespace-nowrap">
-                                {formatUserDateTime(row.executedAt ?? row.createdAt)}
+                                {f.formatUserDateTime(row.executedAt ?? row.createdAt)}
                             </TableCell>
                             <TableCell>
                                 <span className="block font-medium text-gray-100">
@@ -46,30 +50,30 @@ export function LedgerTable({ entries }: { entries: HistoryRow[] }) {
                                 </span>
                                 <span className="block text-xs text-gray-500">
                                     {row.kind === 'fx'
-                                        ? `cambio a ${formatNumber(row.fillPrice, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`
-                                        : `${row.side === 'buy' ? 'Compra' : 'Venta'}${
-                                              row.kind === 'opcion' ? (row.openClose === 'open' ? ' (abrir)' : ' (cerrar)') : ''
-                                          }${!rejected && row.fee > 0 ? ` · comisión ${formatMoney(row.fee, row.currency)}` : ''}`}
+                                        ? ti('paperTrading.ledger.fxChange', { rate: f.formatNumber(row.fillPrice, { minimumFractionDigits: 2, maximumFractionDigits: 4 }) })
+                                        : `${row.side === 'buy' ? ti('paperTrading.ledger.sideBuy') : ti('paperTrading.ledger.sideSell')}${
+                                              row.kind === 'opcion' ? ` ${ti(row.openClose === 'open' ? 'paperTrading.ledger.open' : 'paperTrading.ledger.close')}` : ''
+                                          }${!rejected && row.fee > 0 ? ti('paperTrading.ledger.feePart', { fee: f.formatMoney(row.fee, row.currency) }) : ''}`}
                                     {rejected && row.rejectReason ? ` · ${row.rejectReason}` : ''}
                                 </span>
                             </TableCell>
                             <TableCell className="text-right">
-                                {formatNumber(row.quantity, { maximumFractionDigits: 2 })}
+                                {f.formatNumber(row.quantity, { maximumFractionDigits: 2 })}
                             </TableCell>
                             <TableCell className="text-right">
                                 {rejected || row.fillPrice === null ? (
-                                    <span className="text-gray-500">N/D</span>
+                                    <span className="text-gray-500">{ti('paperTrading.ledger.nd')}</span>
                                 ) : row.kind === 'fx' ? (
-                                    formatMoney(row.quantity, row.currency)
+                                    f.formatMoney(row.quantity, row.currency)
                                 ) : (
-                                    formatMoney(row.fillPrice, row.currency)
+                                    f.formatMoney(row.fillPrice, row.currency)
                                 )}
                             </TableCell>
                             <TableCell>
                                 {rejected ? (
-                                    <Badge variant="destructive">Rechazada</Badge>
+                                    <Badge variant="destructive">{ti('paperTrading.ledger.rejectedBadge')}</Badge>
                                 ) : (
-                                    <Badge variant="outline">Manual simulada</Badge>
+                                    <Badge variant="outline">{ti('paperTrading.ledger.manualBadge')}</Badge>
                                 )}
                             </TableCell>
                         </TableRow>

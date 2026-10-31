@@ -19,12 +19,13 @@ const readSource = (rel: string) => readFileSync(join(root, rel), 'utf8');
 describe('alerts history traceability guard (F146)', () => {
     it('la tarjeta de disparo muestra la hora del disparo', () => {
         const src = readSource('components/alerts/AlertsManager.tsx');
+        // i18n: las etiquetas «Último disparo»/«Creada» viven en messages/<locale>/alerts.json.
         assert.ok(
-            src.includes('`Último disparo ${formatUserDateTime(item.triggeredAt)}`'),
+            src.includes("ti('alerts.triggered.lastShot', { date: f.formatUserDateTime(item.triggeredAt) })"),
             'con triggeredAt se etiqueta «Último disparo»',
         );
         assert.ok(
-            src.includes('`Creada ${formatUserDateTime(item.createdAt)}`'),
+            src.includes("ti('alerts.triggered.created', { date: f.formatUserDateTime(item.createdAt) })"),
             'sin triggeredAt (fila antigua) el fallback se etiqueta «Creada», nunca como disparo',
         );
     });

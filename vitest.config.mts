@@ -37,17 +37,18 @@ export default defineConfig({
             exclude: ['**/*.d.ts', 'lib/research/openapi.generated.ts', 'lib/e2e-*.ts'],
             reporter: ['text-summary', 'json-summary', 'lcov'],
             reportsDirectory: 'coverage/frontend',
-            // Trinquete: suelo = lo medido al introducir la suite (27-oct-2026:
-            // líneas 2,71 %, sentencias 2,60 %, funciones 3,17 %, ramas
-            // 1,76 %), redondeado a la baja con un pequeño margen. Es bajo
-            // porque mide SOLO los tests de Vitest; la foto completa (con los
-            // guards node:test) la da `npm run coverage:summary`. Solo se
-            // sube, nunca se baja: ver docs/FRONTEND_TESTS.md.
+            // Trinquete: suelo ~1-2 puntos por debajo de lo medido en main
+            // (31-oct-2026), con margen para el ruido entre corridas:
+            // lineas 73,46 % (lcov, denominador 15215; algo mas tras los PRs
+            // de tests de paper-trading y research-identity), sentencias
+            // 72,05 %, funciones 70,74 %, ramas 65,47 % (union de shards con
+            // reporter=json). Solo se sube, nunca se baja: ver
+            // docs/FRONTEND_TESTS.md.
             thresholds: {
-                lines: 2.5,
-                statements: 2.5,
-                functions: 3,
-                branches: 1.5,
+                lines: 73,
+                statements: 71,
+                functions: 69,
+                branches: 64,
             },
         },
     },

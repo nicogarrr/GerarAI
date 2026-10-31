@@ -6,7 +6,7 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -53,6 +53,13 @@ METRIC_DEFINITIONS_TEXT = {
 }
 
 
+def _year_window(column, earliest_year: int):
+    """Ventana [earliest_year, ...] dejando pasar los años NULL (una fila sin
+    año no se puede descartar por ventana: mismo criterio que el filtro en
+    Python que sustituye)."""
+    return (column.is_(None)) | (column >= earliest_year)
+
+
 class FinancialTerminalService:
     def build(
         self,
@@ -67,12 +74,34 @@ class FinancialTerminalService:
         years = max(1, min(years, 20))
         if periodicity not in {"all", "annual", "quarterly"}:
             raise ValueError("periodicity must be all, annual or quarterly")
+        # La ventana de años se acota ANTES de leer las series: dos MAX
+        # agregados baratos fijan el ultimo año y cada lectura grande trae
+        # solo su ventana (las filas con fiscal_year NULL pasan, igual que
+        # con el filtro en Python de abajo).
+        latest_year = max(
+            db.scalar(
+                select(func.max(FinancialFact.fiscal_year)).where(
+                    FinancialFact.company_id == company.id,
+                    FinancialFact.metric.in_(requested),
+                )
+            )
+            or 0,
+            db.scalar(
+                select(func.max(CalculatedMetric.fiscal_year)).where(
+                    CalculatedMetric.company_id == company.id,
+                    CalculatedMetric.metric.in_(requested),
+                )
+            )
+            or 0,
+        ) or date.today().year
+        earliest_year = latest_year - years + 1
         facts = list(
             db.scalars(
                 select(FinancialFact)
                 .where(
                     FinancialFact.company_id == company.id,
                     FinancialFact.metric.in_(requested),
+                    _year_window(FinancialFact.fiscal_year, earliest_year),
                 )
                 .order_by(
                     FinancialFact.metric,
@@ -87,6 +116,7 @@ class FinancialTerminalService:
                 .where(
                     CalculatedMetric.company_id == company.id,
                     CalculatedMetric.metric.in_(requested),
+                    _year_window(CalculatedMetric.fiscal_year, earliest_year),
                 )
                 .order_by(
                     CalculatedMetric.metric,
@@ -102,11 +132,6 @@ class FinancialTerminalService:
                 select(Document).where(Document.id.in_(document_ids))
             ).all()
         } if document_ids else {}
-        latest_year = max(
-            [row.fiscal_year for row in [*facts, *calculated] if row.fiscal_year],
-            default=date.today().year,
-        )
-        earliest_year = latest_year - years + 1
         series: dict[str, list[dict[str, Any]]] = defaultdict(list)
         # Deduplicacion con criterio explicito: un (metrica, periodo, segmento)
         # tenia DOS filas cuando convivian el dato del filing (reported) y la

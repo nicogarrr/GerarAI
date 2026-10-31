@@ -3,10 +3,14 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree
 
 import httpx
+
+# XML externo (BCE): defusedxml solo para PARSEAR - entidades/DTD rechazadas
+# sin expandir (billion laughs); ParseError/Element siguen del stdlib.
+from defusedxml import ElementTree as DefusedElementTree
 
 from app.services.data_source_health import get_data_source_registry
 
@@ -33,7 +37,7 @@ class ECBClient:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.get(self.url)
                 response.raise_for_status()
-            root = ElementTree.fromstring(response.content)
+            root = DefusedElementTree.fromstring(response.content)
         except httpx.HTTPStatusError as exc:
             registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
             raise
@@ -45,19 +49,35 @@ class ECBClient:
             # cambio de formato de la fuente.
             registry.record_failure(REGISTRY_KEY, "XML invalido (posible cambio de formato o HTML de error)")
             raise RuntimeError("ECB no devolvio el XML esperado (posible cambio de formato)") from exc
-        registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+        # El éxito se registra DESPUÉS de validar el contenido: un XML bien
+        # formado sin la fecha, sin la divisa base o con una tasa no decimal
+        # es deriva de formato, no salud.
         rate_date: date | None = None
         per_eur: dict[str, Decimal] = {"EUR": Decimal("1")}
-        for element in root.iter():
-            if element.attrib.get("time"):
-                rate_date = date.fromisoformat(element.attrib["time"])
-            currency = element.attrib.get("currency")
-            rate = element.attrib.get("rate")
-            if currency and rate:
-                per_eur[currency.upper()] = Decimal(rate)
+        try:
+            for element in root.iter():
+                if element.attrib.get("time"):
+                    rate_date = date.fromisoformat(element.attrib["time"])
+                currency = element.attrib.get("currency")
+                rate = element.attrib.get("rate")
+                if currency and rate:
+                    value = Decimal(rate)
+                    # Decimal("NaN") y Decimal("Infinity") PARSEAN sin error:
+                    # sin esta comprobacion colarian al registry como salud y
+                    # una tasa cero romperia la division de abajo.
+                    if not value.is_finite() or value <= 0:
+                        raise ValueError(f"tasa no finita o no positiva para {currency}: {rate}")
+                    per_eur[currency.upper()] = value
+        except (ValueError, InvalidOperation) as exc:
+            registry.record_failure(REGISTRY_KEY, "XML con fecha o tasa inválida o no positiva (parse failed)")
+            raise RuntimeError("ECB devolvió una fecha o tasa inválida (posible cambio de formato)") from exc
         base = base_currency.upper()
         if rate_date is None or base not in per_eur:
+            registry.record_failure(
+                REGISTRY_KEY, "XML sin fecha de tasas o sin la divisa base (parse failed)"
+            )
             raise RuntimeError(f"ECB does not provide the base currency {base}")
+        registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         rates = {}
         for quote in quote_currencies:
             normalized = quote.upper()

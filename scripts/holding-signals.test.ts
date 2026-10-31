@@ -82,7 +82,10 @@ describe('cableado en Cartera e Inicio', () => {
     });
 
     it('la tabla de posiciones y el inicio pintan nivel DCA y valor justo', () => {
-        assert.match(holdings, /DCA · Valor justo/);
+        // i18n: la cabecera vive en messages/<locale>/portfolio.json.
+        assert.match(holdings, /portfolio\.holdings\.colDcaFair/);
+        const portfolioEs = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+        assert.equal(portfolioEs.holdings.colDcaFair, 'DCA · Valor justo');
         assert.match(holdings, /<DcaLevelChip symbol=\{holding\.symbol\}/);
         assert.match(holdings, /<FairValueLine symbol=\{holding\.symbol\}/);
         assert.match(home, /<DcaLevelChip symbol=\{h\.symbol\}/);

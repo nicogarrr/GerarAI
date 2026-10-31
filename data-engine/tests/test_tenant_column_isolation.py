@@ -794,16 +794,96 @@ def test_insider_filings_and_feed_totals_are_tenant_scoped(two):
     from app.services.insider_feed import build_feed
 
     _as(db, tenant_a)
-    assert insider_filings(ticker="AAA", limit=20, db=db)["total"] == 1
+    resp_a = insider_filings(ticker="AAA", limit=20, db=db)
+    assert resp_a["total"] == 1
+    # La LISTA (entity load, scoped por with_loader_criteria) tambien queda
+    # aislada: antes solo el count (column select con tenant_filters) tenia
+    # asercion, y la lista podia filtrar filings del otro tenant sin test.
+    assert [f["accession_number"] for f in resp_a["filings"]] == ["0000000000-26-000001"]
+    assert resp_a["filings"][0]["transaction_count"] == 1
     feed_a = build_feed(db, today=date.today())
     assert feed_a["totals"]["filings_total"] == 1
     assert feed_a["totals"]["filings_with_transactions"] == 1
 
     _as(db, tenant_b)
-    assert insider_filings(ticker="AAA", limit=20, db=db)["total"] == 1
+    resp_b = insider_filings(ticker="AAA", limit=20, db=db)
+    assert resp_b["total"] == 1
+    assert [f["accession_number"] for f in resp_b["filings"]] == ["0000000000-26-000002"]
+    assert resp_b["filings"][0]["transaction_count"] == 1
     feed_b = build_feed(db, today=date.today())
     assert feed_b["totals"]["filings_total"] == 1
     assert feed_b["totals"]["filings_with_transactions"] == 1
+
+
+def test_insider_filings_empty_for_tenant_without_rows(two):
+    """A ingiere, B no ve nada: lista vacia, count 0, total 0 y FPI label None.
+
+    Cubre las tres lecturas de /api/insider/filings de golpe: la lista
+    (entity load), el total (count con tenant_filters) y _foreign_issuer
+    (column select sobre Document.metadata). Sin aislamiento, B veria el
+    filing de A y el estatus FPI derivado de los documentos SEC de A.
+    """
+    db, tenant_a, tenant_b, _, _ = two
+    today = date.today().isoformat()
+    fpia = _company(db, "FPIA")
+
+    _as(db, tenant_a)
+    db.add(
+        InsiderFiling(
+            accession_number="0000000000-26-000101",
+            form="4",
+            issuer_cik="0000000101",
+            issuer_ticker="FPIA",
+            filing_date=today,
+            parser_version="test",
+        )
+    )
+    db.add(
+        Document(
+            company_id=fpia.id,
+            title="10-K FPIA",
+            source_type="SEC",
+            metadata_={"form": "10-K"},
+        )
+    )
+    db.commit()
+
+    from app.api.routes.insider import insider_filings
+
+    _as(db, tenant_b)
+    resp_b = insider_filings(ticker="FPIA", limit=20, db=db)
+    assert resp_b["status"] == "ok"
+    assert resp_b["filings"] == []
+    assert resp_b["count"] == 0
+    assert resp_b["total"] == 0
+    assert resp_b["foreign_issuer"] is None
+
+    _as(db, tenant_a)
+    resp_a = insider_filings(ticker="FPIA", limit=20, db=db)
+    assert [f["accession_number"] for f in resp_a["filings"]] == ["0000000000-26-000101"]
+    assert resp_a["count"] == 1
+    assert resp_a["total"] == 1
+    assert resp_a["foreign_issuer"] is False
+
+
+def test_propicks_radar_tracked_symbols_are_tenant_scoped(two):
+    """_tracked_symbols mezcla dos column selects (WatchItem.symbol y
+    Company.ticker via Position) con tenant_filters explicito: si cualquiera
+    lo pierde, el radar de B marca como "seguidos" los simbolos de A."""
+    db, tenant_a, tenant_b, company_a, _ = two
+
+    _as(db, tenant_a)
+    db.add(WatchItem(symbol="AAA"))
+    db.add(Position(company_id=company_a.id, quantity=1))
+    db.commit()
+
+    from app.api.routes.propicks_radar import _tracked_symbols
+
+    _as(db, tenant_b)
+    assert "AAA" not in _tracked_symbols(db)
+
+    _as(db, tenant_a)
+    assert "AAA" in _tracked_symbols(db)
 
 
 def test_earnings_and_catalyst_followed_companies_are_tenant_scoped(two):
@@ -1109,3 +1189,52 @@ def test_tenant_filters_fail_closed_when_context_is_required(db, monkeypatch):
 
     db.info["tenant_id"] = 42
     assert len(tenant_filters(db, FinancialFact)) == 1
+
+
+def test_loader_criteria_scopes_column_and_aggregate_selects_too(two):
+    """Fija el comportamiento medido en SQLAlchemy 2.1.6 (rango fijado
+    >=2.0.32,<2.2): el with_loader_criteria de app/core/database.py acota
+    TAMBIEN los column selects, agregados, GROUP BY, joins, subqueries IN y
+    window functions de modelos tenant-owned, no solo los entity loads.
+
+    Si un bump de SQLAlchemy cambia este comportamiento, este test rompe CI
+    y hay que re-auditar todas las lecturas que hoy llevan tenant_filters
+    explicito como segunda capa. Los predicados explicitos siguen siendo
+    obligatorios: defensa en profundidad, fail-closed sin contexto y
+    ejecuciones no-ORM (db.connection()/text()), que nunca ven el criteria.
+    """
+    db, tenant_a, tenant_b, company_a, _ = two
+
+    from sqlalchemy import func, select
+
+    _as(db, tenant_a)
+    db.add(WatchItem(symbol="AAA"))
+    db.add(Position(company_id=company_a.id, quantity=1))
+    db.commit()
+
+    _as(db, tenant_b)
+    # Column select (scalars y execute): acotado sin tenant_filters explicito.
+    assert db.scalars(select(WatchItem.symbol)).all() == []
+    assert db.execute(select(WatchItem.symbol)).all() == []
+    # Agregados count y max: acotados.
+    assert db.scalar(select(func.count()).select_from(WatchItem)) == 0
+    assert db.scalar(select(func.max(WatchItem.id))) is None
+    # GROUP BY multicolumna via db.execute: acotado.
+    grouped = select(WatchItem.symbol, func.count()).group_by(WatchItem.symbol)
+    assert db.execute(grouped).all() == []
+    # Join y subquery IN sobre entidad tenant-owned: acotados.
+    joined = (
+        select(Company.ticker).join(Position, Position.company_id == Company.id).where(Position.quantity > 0)
+    )
+    assert db.scalars(joined).all() == []
+    subquery = select(Company.ticker).where(
+        Company.id.in_(select(Position.company_id).where(Position.quantity > 0))
+    )
+    assert db.scalars(subquery).all() == []
+    # Window function: acotada.
+    windowed = select(func.row_number().over(order_by=WatchItem.id)).select_from(WatchItem)
+    assert db.scalars(windowed).all() == []
+
+    _as(db, tenant_a)
+    assert db.scalars(select(WatchItem.symbol)).all() == ["AAA"]
+    assert db.scalar(select(func.count()).select_from(WatchItem)) == 1

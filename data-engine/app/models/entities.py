@@ -588,6 +588,14 @@ class InsiderFiling(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "accession_number", name="uq_insider_filings_tenant_accession"),
         Index("ix_insider_filings_issuer", "issuer_cik"),
+        # /api/insider/filings lista y cuenta por issuer_ticker ordenando por
+        # filing_date DESC; sin este indice era Seq Scan por peticion.
+        Index(
+            "ix_insider_filings_tenant_ticker_date",
+            "tenant_id",
+            "issuer_ticker",
+            "filing_date",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -2379,13 +2387,19 @@ class InvestmentCaseStudy(TenantOwnedMixin, Base, TimestampMixin):
 
 class DecisionLesson(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "decision_lessons"
+    # MEDIDO: la migracion creo un CONSTRAINT unique (no indice) con este
+    # nombre; el modelo lo declara igual para que la deriva sea cero. La
+    # unicidad (y su indice de soporte en PG) es identica.
+    __table_args__ = (
+        UniqueConstraint("expectation_review_id", name="uq_decision_lesson_expectation_review"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     decision_journal_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("decision_journal_entries.id"), nullable=True, index=True
     )
     expectation_review_id: Mapped[int | None] = mapped_column(
-        ForeignKey("expectation_reviews.id"), nullable=True, unique=True, index=True
+        ForeignKey("expectation_reviews.id"), nullable=True
     )
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id"), nullable=True, index=True
@@ -2558,6 +2572,11 @@ class KnowledgeGraphEdge(TenantOwnedMixin, Base, TimestampMixin):
 
 class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "management_promises"
+    # MEDIDO: la BD tiene el unique como constraint con nombre automatico de
+    # PG (columna UNIQUE en el CREATE TABLE); el modelo lo declara igual.
+    __table_args__ = (
+        UniqueConstraint("call_claim_id", name="management_promises_call_claim_id_key"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
@@ -2565,7 +2584,7 @@ class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     call_claim_id: Mapped[int | None] = mapped_column(
-        ForeignKey("call_claims.id", ondelete="SET NULL"), nullable=True, unique=True, index=True
+        ForeignKey("call_claims.id", ondelete="SET NULL"), nullable=True
     )
     promise: Mapped[str] = mapped_column(Text)
     promise_date: Mapped[date] = mapped_column(Date, index=True)

@@ -44,12 +44,18 @@ test('registro IR: pagina de evento solo con fecha exacta; si no, seccion genera
 
 test('calendario: el historial dice "Resultados recientes" y el pie no afirma que la fecha no este publicada', () => {
     const page = readFileSync('app/(root)/calendar/resultados/page.tsx', 'utf8');
-    assert.ok(page.includes('Resultados recientes (últimos {HISTORY_DAYS} días)'));
-    assert.ok(page.includes('Sin fecha vigente en el calendario:'));
-    assert.ok(page.includes('Fecha pendiente de actualizar'));
-    assert.ok(!page.includes('Publicados en los últimos'));
-    assert.ok(!page.includes('Sin fecha publicada'));
-    assert.ok(!page.includes('aún sin publicar'));
+    // Las cadenas visibles viven en el diccionario i18n (carril C); la
+    // página las referencia por clave. El guard verifica ambos extremos.
+    const esEarnings = JSON.parse(readFileSync('lib/i18n/messages/es/calendar.json', 'utf8')).earnings;
+    assert.ok(page.includes('calendar.earnings.recentTitle'));
+    assert.equal(esEarnings.recentTitle, 'Resultados recientes (últimos {days} días)');
+    assert.ok(page.includes('calendar.earnings.withoutDate'));
+    assert.match(esEarnings.withoutDate, /^Sin fecha vigente en el calendario: /);
+    assert.ok(page.includes('calendar.earnings.staleDates'));
+    assert.match(esEarnings.staleDates, /^Fecha pendiente de actualizar/);
+    for (const banned of ['Publicados en los últimos', 'Sin fecha publicada', 'aún sin publicar']) {
+        assert.ok(!page.includes(banned) && !JSON.stringify(esEarnings).includes(banned), `prohibido: "${banned}"`);
+    }
 });
 
 test('registro IR: BN T2 enlaza grabacion y transcripcion solo con fecha exacta', () => {
@@ -67,6 +73,8 @@ test('registro IR: META T1 enlaza presentacion y transcripcion (fecha exacta); T
 
 test('registro IR: el tooltip no atribuye extraccion de una pagina fuente no leida', () => {
     const list = readFileSync('components/calendar/FollowedEarningsList.tsx', 'utf8');
-    assert.ok(list.includes('Archivo oficial · verificado el'));
-    assert.ok(!list.includes('anunciado en'));
+    const esEarnings = JSON.parse(readFileSync('lib/i18n/messages/es/calendar.json', 'utf8')).earnings;
+    assert.ok(list.includes('calendar.earnings.irAssetTip') && list.includes('calendar.earnings.irTip'));
+    assert.match(esEarnings.irAssetTip, /^Archivo oficial · verificado el /);
+    assert.ok(!list.includes('anunciado en') && !JSON.stringify(esEarnings).includes('anunciado en'));
 });

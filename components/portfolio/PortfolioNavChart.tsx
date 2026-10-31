@@ -2,7 +2,7 @@
 
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-import { formatMoney } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 
 export type NavPoint = {
     date: string;
@@ -18,6 +18,8 @@ type Props = {
 
 /** Gráfico de área del NAV (carga diferida: recharts no va al bundle inicial). */
 export default function PortfolioNavChart({ data, positive, currency = 'USD' }: Props) {
+    const ti = useT();
+    const f = useFormat();
     const color = positive ? '#14b8a6' : '#ef4444';
     return (
         <ResponsiveContainer
@@ -53,7 +55,7 @@ export default function PortfolioNavChart({ data, positive, currency = 'USD' }: 
                         borderRadius: '8px',
                     }}
                     labelStyle={{ color: '#9ca3af' }}
-                    formatter={(value) => [formatMoney(Number(value), currency), 'Valor']}
+                    formatter={(value) => [f.formatMoney(Number(value), currency), ti('portfolio.navChart.valueLabel')]}
                 />
                 <Area
                     type="monotone"

@@ -193,6 +193,21 @@ class DataSourceHealthRegistry:
                 is_primary=True,
                 fallback_source="in_memory_lru",
             ),
+            "rss": DataSourceStatus(
+                name="Feeds RSS/Atom",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "ir": DataSourceStatus(
+                name="Páginas de relación con inversores (IR)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "celestrak": DataSourceStatus(
+                name="CelesTrak",
+                is_primary=False,
+                fallback_source=None,
+            ),
             "fred": DataSourceStatus(
                 name="FRED (St. Louis Fed)",
                 is_primary=False,
@@ -210,6 +225,11 @@ class DataSourceHealthRegistry:
             ),
             "bls_calendar": DataSourceStatus(
                 name="BLS (calendario de publicaciones)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "tracefour": DataSourceStatus(
+                name="Tracefour (PDMR UK)",
                 is_primary=False,
                 fallback_source=None,
             ),

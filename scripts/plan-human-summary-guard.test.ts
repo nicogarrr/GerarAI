@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
+// Las cadenas visibles viven en el diccionario i18n (carril C); los
+// componentes las referencian por clave. El guard verifica ambos extremos.
+const esPlan=JSON.parse(readFileSync('lib/i18n/messages/es/plan.json','utf8'));
+const esAlerts=JSON.parse(readFileSync('lib/i18n/messages/es/alerts.json','utf8'));
 test('plan formats amounts only with declared base currency and hides technical id',()=>{
  const s=readFileSync('components/plan/PlanView.tsx','utf8');
  assert.match(s,/typeof record.base_currency === 'string'/);
@@ -9,8 +13,10 @@ test('plan formats amounts only with declared base currency and hides technical 
  assert.match(s,/hiddenKeys=\{planHiddenKeys\(initialPlan\)\}/);
  const base=s.slice(s.indexOf('const BASE_HIDDEN_PLAN_KEYS'),s.indexOf('\n',s.indexOf('const BASE_HIDDEN_PLAN_KEYS')));
  assert.ok(!base.includes("'base_currency'"),'la divisa base sigue visible en la tarjeta del plan');
- assert.match(s,/target_pct: 'Peso objetivo'/);
- assert.match(s,/band_pct: 'Banda de tolerancia'/);
+ assert.match(s,/target_pct: t\('plan\.fieldKeys\.target_pct'\)/);
+ assert.match(s,/band_pct: t\('plan\.fieldKeys\.band_pct'\)/);
+ assert.equal(esPlan.fieldKeys.target_pct,'Peso objetivo');
+ assert.equal(esPlan.fieldKeys.band_pct,'Banda de tolerancia');
 });
 test('alert removal requires confirmation before mutation and names its rule',()=>{
  const s=readFileSync('components/alerts/AlertsManager.tsx','utf8');
@@ -18,7 +24,8 @@ test('alert removal requires confirmation before mutation and names its rule',()
  assert.match(s,/onConfirm=\{\(\) => \{ if \(confirmAlert\) handleDeleteAlert\(confirmAlert\._id\); \}\}/,'la mutación solo corre al confirmar');
  const block=s.slice(s.indexOf('const handleDeleteAlert'),s.indexOf('const getAlertLabel'));
  assert.ok(!block.includes('window.confirm'),'la confirmación vive en ConfirmDialog, no en window.confirm');
- assert.match(s,/Eliminar alerta: \$\{getAlertLabel\(alert\)\}/);
+ assert.match(s,/alerts\.list\.deleteAria/);
+ assert.equal(esAlerts.list.deleteAria,'Eliminar alerta: {label}');
 });
 test('screeners pluralize counts; ProPicks uses Spanish score labels',()=>{
  const s=readFileSync('app/(root)/screeners/page.tsx','utf8');
@@ -28,9 +35,12 @@ test('screeners pluralize counts; ProPicks uses Spanish score labels',()=>{
 });
 test('plan formats nested money, all weights, details and date',()=>{
  const s=readFileSync('components/plan/PlanView.tsx','utf8');
- for(const fragment of ["direction: 'Operación'", "detail: 'Detalle'", "within_band: 'Dentro de la banda'", "key === 'amount_base'", "key === 'current_weights'", 'formatMarketDate(value as string)', 'whitespace']) {
+ for(const fragment of ["direction: t('plan.fieldKeys.direction')", "detail: t('plan.fieldKeys.detail')", "within_band: t('plan.fieldKeys.within_band')", "key === 'amount_base'", "key === 'current_weights'", 'formatMarketDate(value as string)', 'whitespace']) {
   if(fragment==='whitespace') continue;
   assert.ok(s.includes(fragment),fragment);
  }
+ assert.equal(esPlan.fieldKeys.direction,'Operación');
+ assert.equal(esPlan.fieldKeys.detail,'Detalle');
+ assert.equal(esPlan.fieldKeys.within_band,'Dentro de la banda');
  assert.match(readFileSync('components/data/RecordViews.tsx','utf8'),/whitespace-pre-line/);
 });

@@ -9,7 +9,20 @@ from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from xml.etree import ElementTree
+from xml.etree import ElementTree  # constructores (Element) y ParseError: defusedxml no los exporta
+
+from defusedxml import ElementTree as DefusedElementTree
+from defusedxml.common import EntitiesForbidden
+
+# XML externo (Flex Query subido por el usuario o servicio web de IBKR):
+# defusedxml rechaza entidades/DTDs (billion laughs) antes de expandirlas.
+# Solo se usa para PARSEAR; los constructores (Element, SubElement) siguen en
+# el stdlib porque defusedxml no los exporta (_merge_lot_rows construye la
+# fila resumen con xml.etree.ElementTree.Element).
+_XML_ENTITIES_MSG = (
+    "El XML declara entidades (DOCTYPE): no es un Flex Query exportado por IBKR. "
+    "Descarga el fichero de nuevo desde IBKR sin editarlo."
+)
 
 from sqlalchemy import select, union_all
 from sqlalchemy.exc import IntegrityError
@@ -102,7 +115,9 @@ def _is_date(value: str | None) -> bool:
 def validate_flex_xml(xml_text: str) -> list[str]:
     """Valida un Flex Query XML de IBKR (fechas con barra: orden por fichero)."""
     try:
-        root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        root = DefusedElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+    except EntitiesForbidden:
+        return [_XML_ENTITIES_MSG]
     except ElementTree.ParseError:
         root = None
     day_first = _flex_slash_day_first(root) if root is not None else False
@@ -126,7 +141,9 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
     if not xml_text or not xml_text.strip():
         return ["El fichero está vacío: descarga de nuevo el Flex Query XML desde IBKR (Informes > Flex Queries)."]
     try:
-        root = ElementTree.fromstring(xml_text)
+        root = DefusedElementTree.fromstring(xml_text)
+    except EntitiesForbidden:
+        return [_XML_ENTITIES_MSG]
     except ElementTree.ParseError as exc:
         return [
             f"El XML no se puede leer ({exc}): el fichero está incompleto o no es XML. "
@@ -1136,7 +1153,9 @@ class IBKRImportService:
         omitía el 15/03 por «fecha no reconocida».
         """
         try:
-            root = ElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+            root = DefusedElementTree.fromstring(xml_text) if xml_text and xml_text.strip() else None
+        except EntitiesForbidden as exc:
+            raise IBKRImportError(_XML_ENTITIES_MSG) from exc
         except ElementTree.ParseError:
             root = None
         day_first = _flex_slash_day_first(root) if root is not None else False
@@ -1205,7 +1224,7 @@ class IBKRImportService:
         if fatal_errors:
             raise IBKRImportError(" ".join(fatal_errors))
         row_errors = [error for error in parse_errors if error not in fatal_errors]
-        root = ElementTree.fromstring(xml_text)
+        root = DefusedElementTree.fromstring(xml_text)
         if reconcile and not (expected_account_id or "").strip():
             raise IBKRImportError(
                 "reconcile exige expected_account_id: sin cuenta esperada no se puede probar que el extracto es completo."

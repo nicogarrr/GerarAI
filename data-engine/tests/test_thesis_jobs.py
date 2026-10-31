@@ -4,7 +4,6 @@ failure classification, duplicate-delivery safety, status endpoint."""
 from datetime import timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
@@ -13,6 +12,7 @@ from app.models.entities import WorkflowRun, WorkflowStepRun
 from app.seed import seed
 from app.services import thesis_job_service as jobs
 from app.services.thesis_service import ThesisService
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture(autouse=True)
@@ -190,7 +190,7 @@ def test_status_endpoint_payload(monkeypatch):
     run, _ = _enqueue_without_dispatch(monkeypatch)
     jobs.run_thesis_job(run.id)
 
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.get(f"/api/thesis/jobs/{run.id}")
     assert response.status_code == 200
     payload = response.json()
@@ -257,7 +257,7 @@ def test_generate_async_defers_company_enrichment_to_worker(monkeypatch):
         "app.services.company_enrichment_service.ensure_company_stub",
         no_enrichment_on_request,
     )
-    response = TestClient(main.app).post(
+    response = csrf_client(main.app).post(
         "/api/thesis/generate-async",
         json={"ticker": "ZZTEST", "force_new_version": False},
     )
@@ -392,7 +392,7 @@ def test_different_click_ids_recover_same_active_generation(monkeypatch):
 
 def test_latest_endpoint_recovers_after_request_session_is_closed(monkeypatch):
     run, _ = _enqueue_without_dispatch(monkeypatch, request_id="leaving-page")
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.get("/api/thesis/jobs", params={"ticker": "aapl"})
     assert response.status_code == 200
     assert response.json()["job"]["id"] == run.id

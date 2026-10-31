@@ -3,9 +3,11 @@ import test from 'node:test';
 import {readFileSync} from 'node:fs';
 test('corporate action structured money and dates use display formatters',()=>{
  const s=readFileSync('components/corporate-actions/CorporateActionsView.tsx','utf8');
- assert.ok(s.includes('formatMoney(record.amount_per_share, record.currency)'));
- assert.ok(s.includes('effective_date: (value) => formatMarketDate'));
- assert.ok(s.includes('formatMarketDate(record.pay_date as string)'));
+ // Los formateadores salen de useFormat()/getFormat() (carril C): mismas
+ // reglas de presentacion, prefijo f. en el componente.
+ assert.ok(s.includes('f.formatMoney(record.amount_per_share, record.currency)'));
+ assert.ok(s.includes('effective_date: (value) => f.formatMarketDate'));
+ assert.ok(s.includes('f.formatMarketDate(record.pay_date as string)'));
 });
 test('forecast and dividend Spanish prose has no raw excluded token or lost accents',()=>{
  const s=readFileSync('data-engine/app/api/routes/portfolio.py','utf8');

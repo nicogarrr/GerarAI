@@ -4,17 +4,20 @@ import TaxesView from '@/components/taxes/TaxesView';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getModelo720File, getModelo720Thresholds, getTaxHoldings, getTaxReport, type TaxRecord } from '@/lib/actions/taxes.actions';
 import { USER_TZ } from '@/lib/format';
+import { getT } from '@/lib/i18n/server';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { isAppError, isAuthError } from '@/lib/types/errors';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Impuestos',
-    description:
-        'Posiciones con base de coste, reportes fiscales anuales y plusvalías latentes de tu cartera.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return {
+        title: t('taxes.meta.title'),
+        description: t('taxes.meta.description'),
+    };
+}
 
 type PageProps = {
     searchParams: Promise<{ year?: string }>;
@@ -55,6 +58,7 @@ function asFiscalYear(raw: string | undefined): number {
 }
 
 export default async function TaxesPage({ searchParams }: PageProps) {
+    const t = await getT();
     const fiscalYear = asFiscalYear((await searchParams)?.year);
     const [holdingsRead, reportRead, thresholdsRead, fileRead] = await Promise.all([
         read(getTaxHoldings(), [] as TaxRecord[]),
@@ -89,7 +93,7 @@ export default async function TaxesPage({ searchParams }: PageProps) {
         (holdingsError && isBackendUnavailableError(holdingsError)) ||
         (reportError && isBackendUnavailableError(reportError))
     ) {
-        return <BackendOffline feature="El informe fiscal" retryHref={`/taxes?year=${fiscalYear}`} />;
+        return <BackendOffline feature={t('taxes.meta.backendFeature')} retryHref={`/taxes?year=${fiscalYear}`} />;
     }
     if (holdingsError && !isNotGeneratedYet(holdingsError)) throw holdingsError;
     if (reportError && !isNotGeneratedYet(reportError)) throw reportError;
@@ -103,12 +107,12 @@ export default async function TaxesPage({ searchParams }: PageProps) {
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-6">
             <header className="flex flex-col gap-3 border-b border-gray-800 pb-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p className="text-sm font-semibold uppercase text-teal-300">Fiscal</p>
-                    <h1 className="mt-1 text-3xl font-bold text-gray-100">Impuestos</h1>
+                    <p className="text-sm font-semibold uppercase text-teal-300">{t('taxes.header.eyebrow')}</p>
+                    <h1 className="mt-1 text-3xl font-bold text-gray-100">{t('taxes.header.title')}</h1>
                 </div>
                 <div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <Receipt className="h-4 w-4 text-teal-300" />
-                    Ejercicio {fiscalYear}
+                    {t('taxes.header.yearBadge', { year: fiscalYear })}
                 </div>
             </header>
 

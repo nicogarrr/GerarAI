@@ -212,7 +212,7 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
             data_rows = rows[1:]
             if len(data_rows) > MAX_IMPORT_ROWS:
                 raise ValueError(
-                    f"El archivo supera el maximo de {MAX_IMPORT_ROWS} filas; dividelo en varios lotes"
+                    f"El archivo supera el máximo de {MAX_IMPORT_ROWS} filas; divídelo en varios lotes"
                 )
             return headers, data_rows
         except Exception as exc:
@@ -246,7 +246,7 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
     data_rows = [[cell.strip() for cell in row] for row in all_rows[1:] if any(c.strip() for c in row)]
     if len(data_rows) > MAX_IMPORT_ROWS:
         raise ValueError(
-            f"El archivo supera el maximo de {MAX_IMPORT_ROWS} filas; dividelo en varios lotes"
+            f"El archivo supera el máximo de {MAX_IMPORT_ROWS} filas; divídelo en varios lotes"
         )
     return headers, data_rows
 
