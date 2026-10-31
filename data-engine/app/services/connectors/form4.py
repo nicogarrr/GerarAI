@@ -26,7 +26,7 @@ import re
 import time
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 
 import httpx
 

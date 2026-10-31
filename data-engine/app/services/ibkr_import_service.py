@@ -9,7 +9,7 @@ from collections import Counter
 from contextvars import ContextVar
 from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from xml.etree import ElementTree  # constructores (Element) y ParseError: defusedxml no los exporta
+from xml.etree import ElementTree  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 
 from defusedxml import ElementTree as DefusedElementTree
 from defusedxml.common import EntitiesForbidden
