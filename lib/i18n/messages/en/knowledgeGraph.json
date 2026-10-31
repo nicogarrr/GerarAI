@@ -110,5 +110,16 @@
     "noEdges": "No relationship matches the current scope.",
     "confidence": "Confidence {value}",
     "truncated": "Showing 30 of {total} relationships: filter to narrow the scope."
+  },
+  "nodeType": {
+    "company": "Company",
+    "principle": "Principle",
+    "author": "Author",
+    "decision": "Decision",
+    "decisionLesson": "Lesson",
+    "kpi": "Indicator",
+    "risk": "Risk",
+    "concept": "Concept",
+    "caseStudy": "Case study"
   }
 }

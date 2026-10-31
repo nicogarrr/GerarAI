@@ -110,5 +110,16 @@
     "noEdges": "Ninguna relación coincide con el ámbito actual.",
     "confidence": "Confianza {value}",
     "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito."
+  },
+  "nodeType": {
+    "company": "Empresa",
+    "principle": "Principio",
+    "author": "Autor",
+    "decision": "Decisión",
+    "decisionLesson": "Lección",
+    "kpi": "Indicador",
+    "risk": "Riesgo",
+    "concept": "Concepto",
+    "caseStudy": "Caso de estudio"
   }
 }
