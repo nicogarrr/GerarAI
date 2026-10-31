@@ -761,11 +761,21 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: data-engine/requirements.txt
+      # uv + lock congelado (mismo patron que los demas jobs del repo):
+      # `pip install -r requirements.txt` media 1 min 36 s en CI (run
+      # 41101995078) incluso con cache de pip (la cache ahorra descargas, no
+      # la instalacion); uv sync con cache caliente ~1 s (medido en local).
+      # dep-parity garantiza requirements.txt == [project].dependencies, asi
+      # que el conjunto instalado es identico.
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: "data-engine/uv.lock"
       - run: npm ci
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -r data-engine/requirements.txt
+      - name: Dependencias del backend (uv, lock congelado)
+        working-directory: data-engine
+        run: uv sync --frozen --no-install-project
       # El 7-oct varios runs agotaron los 30 min en este paso unico (~26 min de
       # `playwright install --with-deps`). Se cachea el navegador por version de
       # Playwright y se separan las dependencias del sistema (apt) de la descarga,
@@ -789,6 +799,10 @@ jobs:
         timeout-minutes: 8
         run: npx playwright install chromium
       - run: npm run test:e2e
+        env:
+          # El webServer de playwright.config.ts usa `python` salvo que
+          # PYTHON_BIN lo pise: hay que apuntarlo al venv de uv.
+          PYTHON_BIN: ${{ github.workspace }}/data-engine/.venv/bin/python
       - name: Upload browser report and traces
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
