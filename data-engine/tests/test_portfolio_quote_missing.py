@@ -14,7 +14,12 @@ from main import app
 
 def _client():
     init_db()
-    return TestClient(app)
+    client = TestClient(app)
+    # VAL-SEC-001: los POST exigen token CSRF; el frontend lo pide en
+    # /api/csrf-token y lo manda como x-csrf-token. El test hace lo mismo.
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
+    return client
 
 
 def _buy(client, ticker, price="10"):
@@ -26,7 +31,9 @@ def _buy(client, ticker, price="10"):
 
 
 def _position(client, ticker):
-    return {p["ticker"]: p for p in client.get("/api/portfolio/positions").json()}[ticker]
+    # /positions devuelve sobre paginado {"items": [...], "page_info": {...}}.
+    payload = client.get("/api/portfolio/positions").json()
+    return {p["ticker"]: p for p in payload["items"]}[ticker]
 
 
 def test_sin_cotizacion_la_plusvalia_es_null_no_cero():
