@@ -67,10 +67,24 @@ def test_0120_reentrada_en_postgres() -> None:
     url = _url_postgres_ci()
     if not url:
         pytest.skip("Runs only on the CI Postgres migration service")
-    cfg = Config(str(VERSIONS_DIR.parent.parent / "alembic.ini"))
-    cfg.set_main_option("script_location", str(VERSIONS_DIR.parent))
-    cfg.set_main_option("sqlalchemy.url", url)
-    command.upgrade(cfg, "head")
+    # env.py fuerza sqlalchemy.url = get_settings().database_url (lee
+    # DATABASE_URL), asi que set_main_option("sqlalchemy.url", ...) no hace
+    # nada: hay que pasar la URL por entorno. En subproceso, como el test de
+    # sqlite de este archivo: env.py hace fileConfig y un upgrade en proceso
+    # tumba el logging del resto de la suite.
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "CI": "true", "DATABASE_URL": url}
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=VERSIONS_DIR.parent.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr[-800:]
     engine = sa.create_engine(url)
     with engine.connect() as conn:
         oids_antes = {
@@ -86,7 +100,14 @@ def test_0120_reentrada_en_postgres() -> None:
         }
     assert set(oids_antes) == set(_NOMBRES)
     # Reentrada: upgrade sobre head ya migrado no recrea (oids estables).
-    command.upgrade(cfg, "head")
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=VERSIONS_DIR.parent.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr[-800:]
     with engine.connect() as conn:
         oids_despues = {
             row[0]: row[1]
