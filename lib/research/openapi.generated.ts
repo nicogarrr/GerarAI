@@ -10517,6 +10517,19 @@ export interface components {
             /** Source */
             source: string | null;
         };
+        /** PortfolioImportCommitOut */
+        PortfolioImportCommitOut: {
+            /** Duplicates Skipped */
+            duplicates_skipped: number;
+            /** Import Batch */
+            import_batch: string;
+            /** Imported Count */
+            imported_count: number;
+            /** Message */
+            message: string;
+            /** Success */
+            success: boolean;
+        };
         /** PortfolioIntelligenceOut */
         PortfolioIntelligenceOut: {
             /**
@@ -22805,9 +22818,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioImportCommitOut"];
                 };
             };
             /** @description Validation Error */

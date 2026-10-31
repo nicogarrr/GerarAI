@@ -12340,6 +12340,39 @@
         "title": "PortfolioFxSourceOut",
         "type": "object"
       },
+      "PortfolioImportCommitOut": {
+        "properties": {
+          "duplicates_skipped": {
+            "title": "Duplicates Skipped",
+            "type": "integer"
+          },
+          "import_batch": {
+            "title": "Import Batch",
+            "type": "string"
+          },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "imported_count",
+          "duplicates_skipped",
+          "import_batch"
+        ],
+        "title": "PortfolioImportCommitOut",
+        "type": "object"
+      },
       "PortfolioIntelligenceOut": {
         "properties": {
           "as_of": {
@@ -61270,9 +61303,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Commit Transaction Import Api Portfolio Import Commit Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioImportCommitOut"
                 }
               }
             },
