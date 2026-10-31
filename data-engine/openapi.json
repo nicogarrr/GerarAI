@@ -64588,9 +64588,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Update Transaction Api Portfolio Transactions  Transaction Id  Put",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTransactionOut"
                 }
               }
             },
