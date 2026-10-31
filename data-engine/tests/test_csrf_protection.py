@@ -7,6 +7,7 @@ Assertion: POST /api/portfolio/add without CSRF token returns 403 Forbidden.
 from __future__ import annotations
 
 import time
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -121,3 +122,16 @@ def test_safe_get_methods_do_not_require_csrf(client: TestClient):
     response = client.get("/api/health")
     assert response.status_code == 200
 
+
+
+# --- Contrato de tipos (pyright) -------------------------------------------
+
+
+def test_dispatch_anota_call_next_awaitable():
+    """pyright fallaba con '"Response" is not awaitable' (x3): la anotacion
+    decia Callable[[Request], Response] pero el codigo hace await call_next.
+    Si alguien la revierte, CI (backend-lint) y este test vuelven a fallar."""
+    source = (Path(__file__).resolve().parents[1] / "app" / "core" / "csrf.py").read_text(
+        encoding="utf-8"
+    )
+    assert "Callable[[Request], Awaitable[Response]]" in source

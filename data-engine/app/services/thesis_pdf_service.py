@@ -18,7 +18,10 @@ import unicodedata
 from dataclasses import dataclass, field
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -77,7 +80,7 @@ def sanitize_pdf_filename(raw_name: str, fallback: str = "gerarai-tesis") -> str
     return clean[:64] or fallback
 
 
-def _new_page() -> tuple[plt.Figure, plt.Axes]:
+def _new_page() -> tuple[Figure, Axes]:
     """Página A4 con lienzo fijo 0-1.
 
     Sin límites explícitos, matplotlib autoescala los ejes con los artistas
@@ -85,7 +88,7 @@ def _new_page() -> tuple[plt.Figure, plt.Axes]:
     media página y los textos por debajo del separador salían del área visible.
     """
     fig = plt.figure(figsize=(8.27, 11.69), dpi=100)
-    ax = fig.add_axes([0, 0, 1, 1])
+    ax = fig.add_axes((0, 0, 1, 1))
     ax.set_axis_off()
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
@@ -102,7 +105,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
         fig1, ax1 = _new_page()
 
         # Cabecera superior con branding oscuro
-        header_rect = plt.Rectangle((0, 0.88), 1, 0.12, facecolor="#0f172a", edgecolor="none")
+        header_rect = Rectangle((0, 0.88), 1, 0.12, facecolor="#0f172a", edgecolor="none")
         ax1.add_patch(header_rect)
 
         ax1.text(0.06, 0.95, "GERAR AI", fontsize=20, weight="bold", color="#38bdf8", va="center")
@@ -147,7 +150,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
                 "insufficient_data": ("#64748b", "DATOS INSUFICIENTES"),
             }
             badge_bg, badge_lbl = rating_map.get(data.rating.lower(), ("#475569", data.rating.upper()))
-            badge_rect = plt.Rectangle((0.06, 0.77), 0.22, 0.035, facecolor=badge_bg, edgecolor="none")
+            badge_rect = Rectangle((0.06, 0.77), 0.22, 0.035, facecolor=badge_bg, edgecolor="none")
             ax1.add_patch(badge_rect)
             ax1.text(0.17, 0.787, badge_lbl, fontsize=9.5, weight="bold", color="white", ha="center", va="center")
             meta_x = 0.31
@@ -259,7 +262,7 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
                 y2 -= 0.02
 
         # Aviso legal en español (es-ES)
-        disclaimer_box = plt.Rectangle((0.06, 0.06), 0.88, 0.06, facecolor="#f8fafc", edgecolor="#e2e8f0")
+        disclaimer_box = Rectangle((0.06, 0.06), 0.88, 0.06, facecolor="#f8fafc", edgecolor="#e2e8f0")
         ax2.add_patch(disclaimer_box)
         disclaimer_text = (
             "Aviso legal: Este informe tiene fines exclusivamente informativos y formativos. No constituye "
