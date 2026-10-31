@@ -583,12 +583,28 @@ export function searchNodes(scene: Scene, query: string, limit = 8): SceneNode[]
   return matches;
 }
 
-/** Display label only; persisted type keys and filters stay unchanged. */
-export function graphNodeTypeLabel(type: string): string {
+/**
+ * Display label only; persisted type keys and filters stay unchanged.
+ * Sin `t` devuelve el literal ES de siempre (guards y scripts puros); con `t`
+ * (getT()/useT()) usa las claves knowledgeGraph.nodeType.* del locale activo.
+ */
+const NODE_TYPE_KEYS = {
+  company: 'knowledgeGraph.nodeType.company', principle: 'knowledgeGraph.nodeType.principle',
+  author: 'knowledgeGraph.nodeType.author', decision: 'knowledgeGraph.nodeType.decision',
+  decision_lesson: 'knowledgeGraph.nodeType.decisionLesson', kpi: 'knowledgeGraph.nodeType.kpi',
+  risk: 'knowledgeGraph.nodeType.risk', concept: 'knowledgeGraph.nodeType.concept',
+  case_study: 'knowledgeGraph.nodeType.caseStudy',
+} as const satisfies Record<string, TranslationKey>;
+
+export function graphNodeTypeLabel(type: string, t?: (key: TranslationKey) => string): string {
+  const normalized = type.toLowerCase();
+  if (t && Object.hasOwn(NODE_TYPE_KEYS, normalized)) {
+    return t(NODE_TYPE_KEYS[normalized as keyof typeof NODE_TYPE_KEYS]);
+  }
   const labels: Record<string, string> = {
     company: 'Empresa', principle: 'Principio', author: 'Autor',
     decision: 'Decisión', decision_lesson: 'Lección', kpi: 'Indicador',
     risk: 'Riesgo', concept: 'Concepto', case_study: 'Caso de estudio',
   };
-  return labels[type.toLowerCase()] ?? type.replaceAll('_', ' ');
+  return labels[normalized] ?? type.replaceAll('_', ' ');
 }

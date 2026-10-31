@@ -27,7 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { t } from '@/lib/i18n/t';
+import { useT } from '@/lib/i18n/client';
 import {
     boundsFor,
     graphNodeTypeLabel,
@@ -86,6 +86,7 @@ function download(filename: string, content: string, mime: string) {
 }
 
 export default function KnowledgeGraphCanvas({ graph }: Props) {
+    const t = useT();
     const scene = useMemo(() => buildScene(graph), [graph]);
     const nodeById = scene.nodeById;
 
@@ -543,7 +544,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                             <g data-testid={`kg-node-${node.id}`} key={node.id} opacity={dim ? 0.18 : 1}>
                                                 {active ? <circle cx={node.x} cy={node.y} fill="none" r={node.radius + 6} stroke="#5eead4" strokeWidth={2} /> : null}
                                                 <circle
-                                                    aria-label={t('knowledgeGraph.canvas.nodeLabel', { label: node.label, type: graphNodeTypeLabel(node.type) })}
+                                                    aria-label={t('knowledgeGraph.canvas.nodeLabel', { label: node.label, type: graphNodeTypeLabel(node.type, t) })}
                                                     className="cursor-pointer"
                                                     cx={node.x}
                                                     cy={node.y}
@@ -711,7 +712,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                                                 </button>
                                             </th>
                                             <td className="py-2">
-                                                <Badge variant="outline">{graphNodeTypeLabel(node.type)}</Badge>
+                                                <Badge variant="outline">{graphNodeTypeLabel(node.type, t)}</Badge>
                                             </td>
                                             <td className="px-3 py-2 text-right text-gray-400">{node.degree}</td>
                                         </tr>
@@ -743,7 +744,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                 ) : (
                     <div className="mt-3 space-y-4">
                         <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline">{graphNodeTypeLabel(selectedNode.type)}</Badge>
+                            <Badge variant="outline">{graphNodeTypeLabel(selectedNode.type, t)}</Badge>
                             {selectedId !== null ? <span className="font-mono text-xs text-gray-500">#{selectedId}</span> : null}
                         </div>
                         <p className="text-sm font-medium text-gray-200">{selectedNode.label}</p>
