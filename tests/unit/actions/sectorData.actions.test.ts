@@ -39,13 +39,24 @@ describe('honestidad: sin datos reales, null (nunca inventados)', () => {
 describe('promedios del sector', () => {
     it('media de las métricas disponibles; porcentajes como FRACCIÓN (15% = 0.15)', async () => {
         fetchJSON.mockImplementation(async (url: string) => {
-            if (String(url).includes('AAPL')) return { metric: { peTTM: 20, pbTTM: 5, psTTM: 4, roeTTM: 30, roaTTM: 15, netProfitMarginTTM: 25, revenueGrowthTTM: 12, debtToEquityTTM: 50, currentRatioTTM: 2 } };
+            // Claves REALES del payload de Finnhub /stock/metric?metric=all (verificado en vivo
+            // con AAPL el 2026-10-31: no existen pbTTM, revenueGrowthTTM, debtToEquityTTM
+            // ni currentRatioTTM; las reales son pbQuarterly, revenueGrowthTTMYoy,
+            // 'totalDebt/totalEquityQuarterly' y currentRatioQuarterly).
+            if (String(url).includes('AAPL')) return { metric: { peTTM: 20, pbQuarterly: 5, psTTM: 4, roeTTM: 30, roaTTM: 15, netProfitMarginTTM: 25, revenueGrowthTTMYoy: 12, 'totalDebt/totalEquityQuarterly': 0.5, currentRatioQuarterly: 2 } };
             throw new Error('sin datos');
         });
         const result = await getSectorAverages('Technology');
         expect(result).not.toBeNull();
         expect(result!.sampleSize).toBe(1);
         expect(result!.metrics.avgPE).toBe(20);
+        expect(result!.metrics.avgPB).toBe(5);
+        expect(result!.metrics.avgRevenueGrowth).toBeCloseTo(0.12, 10);
+        expect(result!.metrics.avgDebtToEquity).toBe(0.5);
+        expect(result!.metrics.avgCurrentRatio).toBe(2);
+        expect(result!.averages.value).not.toBeNull();
+        expect(result!.averages.growth).not.toBeNull();
+        expect(result!.averages.debtLiquidity).not.toBeNull();
         expect(result!.metrics.avgROE).toBeCloseTo(0.3, 10); // fracción, no 30
         expect(result!.metrics.avgNetMargin).toBeCloseTo(0.25, 10);
         expect(result!.averages.cashFlow).toBeNull(); // sin datos sectoriales de FCF
@@ -71,10 +82,12 @@ describe('promedios del sector', () => {
         fetchJSON.mockImplementation(async () => {
             calls += 1;
             if (calls === 1) throw new Error('timeout');
-            return { metric: { peTTM: 10, pbTTM: 2, psTTM: 1, roeTTM: 10, roaTTM: 5, netProfitMarginTTM: 10, revenueGrowthTTM: 6, debtToEquityTTM: 30, currentRatioTTM: 1.5 } };
+            return { metric: { peTTM: 10, pbQuarterly: 2, psTTM: 1, roeTTM: 10, roaTTM: 5, netProfitMarginTTM: 10, revenueGrowthTTMYoy: 6, 'totalDebt/totalEquityQuarterly': 0.3, currentRatioQuarterly: 1.5 } };
         });
         const result = await getSectorAverages('Technology');
         expect(result!.sampleSize).toBe(9); // 10 intentos - 1 fallido
         expect(result!.averages.value).not.toBeNull();
+        expect(result!.averages.growth).not.toBeNull();
+        expect(result!.averages.debtLiquidity).not.toBeNull();
     });
 });
