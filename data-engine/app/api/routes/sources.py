@@ -43,9 +43,14 @@ router = APIRouter()
 class ManualTranscriptImportRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=20)
     title: str = Field(min_length=3, max_length=500)
-    text: str = Field(min_length=20)
-    source_url: str | None = None
-    period: str = "unknown"
+    # Tope alineado con el presupuesto de 10MB que RawBodyMiddleware da a los
+    # cuerpos firmados: el texto se trocea en DocumentChunks y se indexa en
+    # RAG, y un cuerpo gigante merece un 422 claro, no un 413 seco.
+    text: str = Field(min_length=20, max_length=10 * 1024 * 1024)
+    # Document.source_url es String(1000) y Transcript.period String(40):
+    # sin cota, SQLite los tragaba y el INSERT rompia en Postgres (500, no 422).
+    source_url: str | None = Field(default=None, max_length=1000)
+    period: str = Field(default="unknown", max_length=40)
 
 
 class UrlIngestRequest(BaseModel):
