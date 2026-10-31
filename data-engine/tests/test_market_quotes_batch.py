@@ -22,17 +22,17 @@ class FakeRedis:
     def __init__(self, values=None, exc=None):
         self.values = dict(values or {})
         self.exc = exc
-        self.setex_calls = []
+        self.set_calls = []
 
     def get(self, key):
         if self.exc:
             raise self.exc
         return self.values.get(key)
 
-    def setex(self, key, ttl, value):
+    def set(self, key, value, ex=None):
         if self.exc:
             raise self.exc
-        self.setex_calls.append((key, ttl, value))
+        self.set_calls.append((key, ex, value))
         self.values[key] = value
 
 
@@ -84,7 +84,7 @@ def test_batch_miss_fetches_once_and_caches_redis_and_memory(monkeypatch, clean_
     assert out["quotes"]["MISSING"] is None
     assert sorted(calls) == ["MISSING", "SAN.MC"]
     # Redis: clave con prefijo estable y TTL igual a la frescura del single (60s).
-    assert redis.setex_calls == [
+    assert redis.set_calls == [
         (market._quote_redis_key("SAN.MC"), 60, json.dumps(QUOTE_SAN))
     ]
     # Memoria del single reutilizada: una segunda llamada no refetchea.

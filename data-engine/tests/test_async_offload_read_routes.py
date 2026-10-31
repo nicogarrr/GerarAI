@@ -66,7 +66,15 @@ def test_sync_portfolio_dividends_off_the_event_loop(monkeypatch):
         calls.append(_off_loop())
 
         async def _result():
-            return {"status": "ok", "ingested": 0}
+            # Forma real de sync_portfolio (response_model PortfolioDividendSyncOut).
+            return {
+                "companies": 0, "synced": 0, "unavailable": 0,
+                "currency_unknown": 0, "results": [],
+                "provenance": {
+                    "source": "test", "source_kind": "provider",
+                    "fetched_at": "2026-01-01T00:00:00+00:00", "coverage": "full",
+                },
+            }
 
         return _result()
 

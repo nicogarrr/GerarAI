@@ -163,7 +163,15 @@ def test_refresh_market_runs_service(monkeypatch):
 
     class _FakeService:
         async def refresh(self, db, as_of=None):
-            return {"refreshed": 5, "as_of": str(as_of) if as_of else None}
+            # Forma real de MarketRefreshService.refresh (PortfolioRefreshMarketOut).
+            return {
+                "status": "ok", "as_of": "2026-01-02",
+                "started_at": "2026-01-02T08:00:00+00:00",
+                "completed_at": "2026-01-02T08:00:05+00:00",
+                "order": ["prices"],
+                "stages": [{"step": 1, "name": "prices", "status": "ok", "updated": 5}],
+                "risk": {}, "alert_results": [], "screen_results": [],
+            }
 
     monkeypatch.setattr(portfolio_routes, "MarketRefreshService", _FakeService)
     client, tenant = _setup(monkeypatch)
@@ -171,4 +179,5 @@ def test_refresh_market_runs_service(monkeypatch):
         client, SECRET, tenant, "u1", "POST", "/api/portfolio/refresh-market",
     )
     assert res.status_code == 200, res.text
-    assert res.json()["refreshed"] == 5
+    body = res.json()
+    assert body["status"] == "ok" and body["stages"][0]["updated"] == 5

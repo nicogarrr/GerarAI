@@ -289,7 +289,7 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
         _cache[key] = (time.monotonic(), value)
         if redis_client is not None:
             try:
-                redis_client.setex(_materials_redis_key(key), _redis_ttl_for(value), json.dumps(value))
+                redis_client.set(_materials_redis_key(key), json.dumps(value), ex=_redis_ttl_for(value))
             except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
                 logger.warning("materials cache: escritura Redis fallo; se sirve sin cache", exc_info=True)
 
