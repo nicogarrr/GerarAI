@@ -1,52 +1,52 @@
 {
   "assertions": {
     "VAL-CONTENT-001": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-002": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-003": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-004": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-005": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-006": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-007": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CONTENT-008": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-COV-001": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-COV-002": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-COV-003": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-COV-004": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-COV-005": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-COV-006": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CROSS-001": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CROSS-002": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CROSS-003": {
       "status": "passed",
@@ -59,16 +59,16 @@
       "evidence": "tests/test_transaction_import_csv.py (7 passed): complete flow from file upload through validation and atomic commit"
     },
     "VAL-CROSS-005": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CROSS-006": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CROSS-007": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-CROSS-008": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DATA-001": {
       "status": "passed",
@@ -135,22 +135,22 @@
       "status": "passed"
     },
     "VAL-DOC-001": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DOC-002": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DOC-003": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DOC-004": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DOC-005": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DOC-006": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-DOC-007": {
       "status": "passed"
@@ -206,34 +206,34 @@
       "status": "passed"
     },
     "VAL-UX-001": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-002": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-003": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-004": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-005": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-006": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-007": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-008": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-009": {
-      "status": "pending"
+      "status": "passed"
     },
     "VAL-UX-010": {
-      "status": "pending"
+      "status": "passed"
     }
   }
 }
