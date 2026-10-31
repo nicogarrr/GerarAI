@@ -9,9 +9,12 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const page = readFileSync('app/(root)/knowledge-graph/page.tsx', 'utf8');
+const kgDict = JSON.parse(readFileSync('lib/i18n/messages/es/knowledgeGraph.json', 'utf8'));
 
 test('el campo limit va dentro de una etiqueta visible que lo nombra', () => {
-    assert.match(page, /<label className="[^"]*">Máximo de nodos<Input[^>]*name="limit"[^>]*\/><\/label>/);
+    // i18n: la etiqueta referencia la clave y el diccionario es conserva «Máximo de nodos» verbatim.
+    assert.match(page, /<label className="[^"]*">\{t\('knowledgeGraph\.page\.maxNodes'\)\}<Input[^>]*name="limit"[^>]*\/><\/label>/);
+    assert.equal(kgDict.page.maxNodes, 'Máximo de nodos', 'la etiqueta del campo limit se mantiene verbatim');
 });
 
 test('el campo sigue siendo numérico con sus límites (1-500)', () => {

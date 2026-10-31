@@ -84,5 +84,31 @@
     },
     "empty": "No hay nodos que listar.",
     "caption": "Tabla de nodos del grafo: etiqueta, tipo y número de relaciones de cada nodo."
+  },
+  "page": {
+    "metadataDescription": "Enlaces deterministas entre autores, principios, empresas, KPIs, riesgos, decisiones, lecciones y conceptos, con su procedencia.",
+    "kicker": "Research conectado",
+    "description": "Enlaces trazables entre autores, principios, empresas y decisiones.",
+    "sync": "Sincronizar grafo",
+    "synced": "Grafo sincronizado",
+    "neighborhood": "Entorno del nodo #{id}",
+    "fullGraph": "Grafo completo",
+    "nodeTypesLabel": "Tipos de nodo",
+    "nodeTypesPlaceholder": "Tipos de nodo, separados por comas",
+    "maxNodes": "Máximo de nodos",
+    "filter": "Filtrar",
+    "statNodes": "Nodos",
+    "statEdges": "Aristas",
+    "showing": "Mostrando {shown} de {total} nodos con estos filtros. Primero los de más relaciones; solo se muestran relaciones entre los nodos incluidos.",
+    "edgesTitle": "Relaciones",
+    "edgesAria": "Relaciones del grafo",
+    "colFrom": "Desde",
+    "colRelation": "Relación",
+    "colTo": "Hasta",
+    "colConfidence": "Confianza",
+    "nodeFallback": "Nodo {id}",
+    "noEdges": "Ninguna relación coincide con el ámbito actual.",
+    "confidence": "Confianza {value}",
+    "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito."
   }
 }
