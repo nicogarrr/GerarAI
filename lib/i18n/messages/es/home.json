@@ -99,7 +99,8 @@
     "rulesActiveOne": "1 regla activa",
     "rulesActiveOther": "{n} reglas activas",
     "evaluated": "el motor las evalúa cada 5 min.",
-    "noneTriggered": "ninguna se ha disparado todavía."
+    "noneTriggered": "ninguna se ha disparado todavía.",
+    "createFirst": "Crear la primera alerta"
   },
   "watchlist": {
     "recent": "Últimas añadidas",
@@ -110,7 +111,8 @@
     "noData": "sin datos",
     "lastNOfTotal": "Las {n} últimas añadidas de {total}",
     "totalCount": "{total} en total",
-    "empty": "Aún no sigues ninguna empresa."
+    "empty": "Aún no sigues ninguna empresa.",
+    "seeFullList": "ver la lista completa"
   },
   "opportunities": {
     "title": "Oportunidades por valor intrínseco (DCF)",

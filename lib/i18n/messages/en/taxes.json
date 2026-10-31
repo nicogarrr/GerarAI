@@ -157,7 +157,15 @@
     "navAria": "Per-sale box pages",
     "prev": "Previous",
     "next": "Next",
-    "sales": "{n} sales"
+    "sales": "{n} sales",
+    "doubleTaxation": {
+      "limitNote": "Deduction limit (art. 80 LIRPF, as the Spanish Tax Agency applies it): per country, the lower of the tax withheld capped at the treaty rate and the average effective savings tax rate (TME) applied to the gross dividend.",
+      "listAria": "Box 0588 deduction by country",
+      "tmeMissing": "TME missing",
+      "appliedGross": " (gross × TME applies)",
+      "appliedTreaty": " (treaty cap applies)",
+      "row": "{country}: gross {gross} · withheld {withheld} · treaty cap ({rate}) {cap} · gross × TME {tme} · deduction {deduction}{applied}"
+    }
   },
   "modelo720": {
     "title": "Modelo 720 (assets abroad)",

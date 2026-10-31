@@ -122,23 +122,27 @@ function DoubleTaxationByCountry({ countries }: { countries: DataRecord[] }) {
     if (countries.length === 0) return null;
     return (
         <div className="mt-3 space-y-1 text-xs leading-5 text-gray-400">
-            <p>
-                Límite de la deducción (art. 80 LIRPF, como lo aplica Hacienda): por país, el menor entre la retención
-                soportada con el tope del convenio y el TME del ahorro aplicado al dividendo íntegro (bruto).
-            </p>
-            <ul aria-label="Deducción 0588 por país" className="space-y-1">
+            <p>{t('taxes.filing.doubleTaxation.limitNote')}</p>
+            <ul aria-label={t('taxes.filing.doubleTaxation.listAria')} className="space-y-1">
                 {countries.map((c) => {
                     const tmeLimit = c.tme_limit_base == null
-                        ? 'falta el TME'
+                        ? t('taxes.filing.doubleTaxation.tmeMissing')
                         : money(c.tme_limit_base, f, t);
                     const applied = c.limit_applied === 'bruto_x_tme'
-                        ? ' (manda bruto × TME)'
-                        : c.limit_applied === 'tope_convenio' ? ' (manda el tope del convenio)' : '';
+                        ? t('taxes.filing.doubleTaxation.appliedGross')
+                        : c.limit_applied === 'tope_convenio' ? t('taxes.filing.doubleTaxation.appliedTreaty') : '';
                     return (
                         <li key={String(c.country)}>
-                            {String(c.country)}: bruto {money(c.gross_base, f, t)} · retenido {money(c.withheld_base, f, t)} · tope
-                            convenio ({percent(c.treaty_rate, f, t)}) {money(c.treaty_cap_base, f, t)} · bruto × TME {tmeLimit} ·
-                            deducción {c.deduction_base == null ? t('common.na') : money(c.deduction_base, f, t)}{applied}
+                            {t('taxes.filing.doubleTaxation.row', {
+                                country: String(c.country),
+                                gross: money(c.gross_base, f, t),
+                                withheld: money(c.withheld_base, f, t),
+                                rate: percent(c.treaty_rate, f, t),
+                                cap: money(c.treaty_cap_base, f, t),
+                                tme: tmeLimit,
+                                deduction: c.deduction_base == null ? t('common.na') : money(c.deduction_base, f, t),
+                                applied,
+                            })}
                         </li>
                     );
                 })}

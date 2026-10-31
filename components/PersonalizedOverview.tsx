@@ -31,7 +31,8 @@ import { alertCardDestination, alertThesisHref } from '@/lib/alerts/card-destina
 import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { useLocale, useT } from '@/lib/i18n/client';
-import { t as legacyT } from '@/lib/i18n/t';
+import type { Locale } from '@/lib/i18n/locale';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
 import HomeAttention from '@/components/HomeAttention';
 
@@ -271,17 +272,17 @@ function alertHeading(heading: string, dateSuffix: string | null, createdAt: str
 }
 
 /** Una regla de alerta en una línea legible: "AAPL: precio por encima de 200". */
-function alertRuleLabel(alert: Alert): string {
+function alertRuleLabel(alert: Alert, tr: TranslateFn, locale: Locale): string {
     const labels: Record<Alert['type'], string> = {
-        price_above: legacyT('alerts.types.priceAbove'),
-        price_below: legacyT('alerts.types.priceBelow'),
-        price_change: legacyT('alerts.types.priceChange'),
-        news: legacyT('alerts.types.news'),
-        earnings: legacyT('alerts.types.earnings'),
+        price_above: tr('alerts.types.priceAbove'),
+        price_below: tr('alerts.types.priceBelow'),
+        price_change: tr('alerts.types.priceChange'),
+        news: tr('alerts.types.news'),
+        earnings: tr('alerts.types.earnings'),
     };
     if (alert.type === 'news' || alert.type === 'earnings') return `${alert.symbol}: ${labels[alert.type]}`;
     const value = typeof alert.condition.value === 'number'
-        ? formatNumber(alert.condition.value, { maximumFractionDigits: 2 })
+        ? formatNumber(alert.condition.value, { maximumFractionDigits: 2 }, undefined, locale)
         : String(alert.condition.value);
     return `${alert.symbol}: ${labels[alert.type]} ${value}`;
 }
@@ -693,7 +694,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     className="block min-w-0 break-words rounded px-1 -mx-1 py-0.5 text-sm text-gray-300 transition-colors hover:text-amber-300"
                                     key={alert._id}
                                 >
-                                    {alertRuleLabel(alert)}
+                                    {alertRuleLabel(alert, t, locale)}
                                 </Link>
                             ))}
                             <p className="text-xs text-gray-500">
@@ -705,7 +706,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             <p className="text-gray-400 text-sm">{t('common.states.noAlerts')}</p>
                             <p className="text-gray-500 text-sm mt-2">{t('common.states.noAlertsHint')}</p>
                             <Link href="/alerts" className="mt-3 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-teal-400/20 px-5 text-sm text-teal-400 transition-colors hover:text-teal-300">
-                                Crear la primera alerta
+                                {t('home.alerts.createFirst')}
                             </Link>
                         </div>
                     )}
@@ -771,7 +772,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             <p className="text-xs text-gray-500">
                                 {watchlistTotal > watchlist.length ? t('home.watchlist.lastNOfTotal', { n: watchlist.length, total: watchlistTotal }) : t('home.watchlist.totalCount', { total: watchlistTotal })} ·{' '}
                                 <Link href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 hover:underline">
-                                    ver la lista completa
+                                    {t('home.watchlist.seeFullList')}
                                 </Link>
                             </p>
                         </div>

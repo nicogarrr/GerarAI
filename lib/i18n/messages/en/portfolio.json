@@ -75,7 +75,8 @@
     "tableCaption": "Open positions: symbol, quantity, average price, current price, value, weight and gain or loss. Deleting a position is in each symbol's menu.",
     "options": "Options",
     "optionsAria": "Options for {symbol}",
-    "sincePrefix": "Held since: {date}"
+    "sincePrefix": "Held since: {date}",
+    "emptyRefresh": "No positions to update yet. Record a purchase to get started."
   },
   "dividends": {
     "covNoData": "No declared dividends on record",
