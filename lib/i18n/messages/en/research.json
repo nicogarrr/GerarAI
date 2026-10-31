@@ -268,7 +268,17 @@
       "one": "{count} open to verify",
       "other": "{count} open to verify"
     },
-    "moatLabel": "Financial quality (moat framework)"
+    "moatLabel": "Financial quality (moat framework)",
+    "earningsLabel": "Next earnings",
+    "earningsConfirmed": "Confirmed date",
+    "earningsEstimated": "Estimated date",
+    "exDividendNext": "Next ex-dividend",
+    "exDividendLast": "Last ex-dividend",
+    "range52wLabel": "52-week range",
+    "betaLabel": "Beta",
+    "betaNote": "Volatility vs the market, 5 years (Yahoo, unofficial)",
+    "sourceYahoo": "Yahoo Finance, unofficial",
+    "sourceOwnCloses": "From stored daily closes"
   },
   "credibility": {
     "grade": {

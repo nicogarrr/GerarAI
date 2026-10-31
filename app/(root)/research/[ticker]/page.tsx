@@ -31,6 +31,7 @@ import { DecisionLessonsSection } from '@/components/research/sections/DecisionL
 import { SectionLoadError } from '@/components/research/sections/SectionLoadError';
 import { QuickGlancePanel } from '@/components/research/QuickGlancePanel';
 import { getAnalystTargets } from '@/lib/research/analyst-targets';
+import { getKeyStats } from '@/lib/research/key-stats';
 import { researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -1034,11 +1035,12 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Panel de vistazo rápido: datos reales ya existentes, cada fila a su
     // sección. En móvil va arriba (bajo el precio de la cabecera); en PC
     // es la columna lateral derecha (estilo Investing, opción 1).
-    const [glanceModel, glanceCapital, glanceCredibility, glanceAnalysts] = await Promise.all([
+    const [glanceModel, glanceCapital, glanceCredibility, glanceAnalysts, glanceKeyStats] = await Promise.all([
       glanceModelPromise ?? Promise.resolve(null),
       glanceCapitalPromise ?? Promise.resolve(null),
       glanceCredibilityPromise ?? Promise.resolve(null),
       getAnalystTargets(quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker).catch(() => null),
+      getKeyStats(ticker).catch(() => null),
     ]);
     return (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(280px,320px)]">
@@ -1047,6 +1049,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             analysts={glanceAnalysts}
             credibility={glanceCredibility}
             currency={company.currency}
+            keyStats={glanceKeyStats}
             livePrice={headerMarket?.quote?.price ?? null}
             moatScore={moatScore}
             model={glanceModel}

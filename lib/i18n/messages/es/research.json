@@ -268,7 +268,17 @@
       "one": "{count} abierta por comprobar",
       "other": "{count} abiertas por comprobar"
     },
-    "moatLabel": "Calidad financiera (marco de foso)"
+    "moatLabel": "Calidad financiera (marco de foso)",
+    "earningsLabel": "Próximos resultados",
+    "earningsConfirmed": "Fecha confirmada",
+    "earningsEstimated": "Fecha estimada",
+    "exDividendNext": "Próximo ex-dividendo",
+    "exDividendLast": "Último ex-dividendo",
+    "range52wLabel": "Rango 52 semanas",
+    "betaLabel": "Beta",
+    "betaNote": "Volatilidad frente al mercado, 5 años (Yahoo, no oficial)",
+    "sourceYahoo": "Yahoo Finance, no oficial",
+    "sourceOwnCloses": "Con los cierres diarios guardados"
   },
   "credibility": {
     "grade": {
