@@ -16,13 +16,13 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.tenancy import tenant_filters
-from app.models import Company, MarketPrice, Position, WatchItem
+from app.models import Company, Position, WatchItem
 from app.services.propicks_dca_radar import PAGE_SIZE, page_candidates
 from app.services.propicks_radar_job import universe_company_ids
 from app.services.propicks_radar_store import latest_public_signals
@@ -52,10 +52,16 @@ def enqueue_radar_scan(db: Session = Depends(get_db)) -> dict:
     """
     from app.workers.dramatiq_app import propicks_radar_scan
 
-    message = propicks_radar_scan.send(
-        tenant_id=db.info.get("tenant_id"),
-        user_id=db.info.get("user_id"),
-    )
+    tenant_id = db.info.get("tenant_id")
+    user_id = db.info.get("user_id")
+    # MEDIDO: el actor exige tenant_id y user_id (sesion de tenant); encolar
+    # sin ellos crea un mensaje que siempre muere en el worker. Mejor 400 aqui.
+    if tenant_id is None or not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="El barrido manual exige contexto de tenant firmado.",
+        )
+    message = propicks_radar_scan.send(tenant_id=tenant_id, user_id=user_id)
     return {"status": "queued", "broker_message_id": str(message.message_id)}
 
 

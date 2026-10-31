@@ -127,9 +127,11 @@ def test_outside_tracked_excludes_watchlist(client):
     assert res["counts_by_level"]["4"] == 2
 
 
-def test_post_scan_enqueues_actor(client, monkeypatch):
+def test_post_scan_enqueues_actor(client, db_session, monkeypatch):
     from app.workers import dramatiq_app
 
+    db_session.info["tenant_id"] = 1
+    db_session.info["user_id"] = "ops"
     sent = {}
 
     class _Msg:
@@ -143,6 +145,14 @@ def test_post_scan_enqueues_actor(client, monkeypatch):
     res = client.post("/api/propicks/radar/scan")
     assert res.status_code == 202
     assert res.json() == {"status": "queued", "broker_message_id": "msg-1"}
+    assert sent == {"tenant_id": 1, "user_id": "ops"}
+
+
+def test_post_scan_sin_tenant_devuelve_400(client):
+    # Sin contexto firmado el actor rechaza el mensaje siempre (ValueError en
+    # _session): la ruta lo corta antes con 400 en vez de encolar un muerto.
+    res = client.post("/api/propicks/radar/scan")
+    assert res.status_code == 400
 
 
 def test_actor_is_registered_on_computed_queue():
