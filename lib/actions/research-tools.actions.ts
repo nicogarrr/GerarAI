@@ -700,7 +700,7 @@ export async function getScreenerMetricCoverage(): Promise<string[] | null> {
   // answer, so the UI keeps its full static suggestion list instead of
   // offering nothing.
   try {
-    const payload = await requestJson<{ metrics_with_data: string[] }>('/api/screeners/metric-coverage');
+    const payload = await requestJson<components['schemas']['ScreenerMetricCoverageOut']>('/api/screeners/metric-coverage');
     return Array.isArray(payload.metrics_with_data) ? payload.metrics_with_data : null;
   } catch {
     return null;

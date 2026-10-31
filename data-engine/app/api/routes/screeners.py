@@ -15,7 +15,12 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import CustomMetricDefinition, SavedScreen
-from app.schemas.api import ScreenerCustomMetricOut, ScreenerSavedScreenOut
+from app.schemas.api import (
+    ScreenerCustomMetricOut,
+    ScreenerMetricCoverageOut,
+    ScreenerRealOut,
+    ScreenerSavedScreenOut,
+)
 from app.services.screener_service import (
     DUPLICATE_SCREEN_NAME,
     CustomMetricService,
@@ -175,7 +180,7 @@ def run_saved_screen(screen_id: int, db: Session = Depends(get_db)) -> dict:
     return ScreenerService().run_saved(db, screen)
 
 
-@router.get("/metric-coverage")
+@router.get("/metric-coverage", response_model=ScreenerMetricCoverageOut)
 def metric_coverage(db: Session = Depends(get_db)) -> dict:
     """Metric names with data for at least one company.
 
@@ -851,7 +856,7 @@ def active_vendor_allows_cold_wait(vendor: str, settings) -> bool:
     return not bool(settings.finnhub_api_key)
 
 
-@router.get("/real")
+@router.get("/real", response_model=ScreenerRealOut)
 def real_time_screener(
     marketCapMoreThan: float | None = None,
     sector: str | None = None,

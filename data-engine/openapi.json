@@ -17923,6 +17923,261 @@
         "title": "ScreenerCustomMetricOut",
         "type": "object"
       },
+      "ScreenerMetricCoverageOut": {
+        "properties": {
+          "metrics_with_data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics With Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "metrics_with_data"
+        ],
+        "title": "ScreenerMetricCoverageOut",
+        "type": "object"
+      },
+      "ScreenerRealItemOut": {
+        "properties": {
+          "beta": {
+            "title": "Beta",
+            "type": "null"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "changePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changepercent"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "has_fundamentals": {
+            "title": "Has Fundamentals",
+            "type": "boolean"
+          },
+          "marketCap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketcap"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "prevClose": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prevclose"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "priceAsOf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priceasof"
+          },
+          "priceDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricedate"
+          },
+          "priceTimestampKind": {
+            "enum": [
+              "daily_candle_open",
+              "quote"
+            ],
+            "title": "Pricetimestampkind",
+            "type": "string"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "sector": {
+            "title": "Sector",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "ETF",
+              "Stock"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "price",
+          "priceAsOf",
+          "priceTimestampKind",
+          "priceDate",
+          "currency",
+          "change",
+          "changePercent",
+          "marketCap",
+          "volume",
+          "prevClose",
+          "sector",
+          "exchange",
+          "type",
+          "pe",
+          "pb",
+          "roe",
+          "has_fundamentals",
+          "beta"
+        ],
+        "title": "ScreenerRealItemOut",
+        "type": "object"
+      },
+      "ScreenerRealOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "number"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "refreshing": {
+            "title": "Refreshing",
+            "type": "boolean"
+          },
+          "screener": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenerRealItemOut"
+            },
+            "title": "Screener",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "unavailable": {
+            "title": "Unavailable",
+            "type": "boolean"
+          },
+          "universe_size": {
+            "title": "Universe Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "as_of",
+          "count",
+          "screener",
+          "refreshing",
+          "unavailable",
+          "universe_size"
+        ],
+        "title": "ScreenerRealOut",
+        "type": "object"
+      },
       "ScreenerSavedScreenOut": {
         "properties": {
           "active": {
@@ -71415,9 +71670,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Metric Coverage Api Screeners Metric Coverage Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ScreenerMetricCoverageOut"
                 }
               }
             },
@@ -71621,9 +71874,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Real Time Screener Api Screeners Real Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ScreenerRealOut"
                 }
               }
             },
