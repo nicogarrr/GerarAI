@@ -30,7 +30,7 @@ from app.services.thesis_epub_service import (
 )
 from app.services.thesis_graph_service import ThesisGraphService
 from app.services.thesis_memo import build_memo_markdown
-from app.services.thesis_pdf_service import export_thesis_pdf_for_ticker
+from app.services.thesis_pdf_service import export_thesis_pdf_for_ticker, sanitize_pdf_filename
 from app.services.thesis_publication_gate import (
     archived_thesis_notice,
     thesis_withheld_reason,
@@ -209,7 +209,8 @@ def thesis_epub(ticker: str, db: Session = Depends(get_db)) -> Response:
         citations=[] if reason else _epub_citations(db, list(claims)),
     )
     content = build_thesis_epub(data)
-    filename = f"gerarai-thesis-{company.ticker}-v{thesis.version}.epub"
+    # Mismo saneado que el PDF: el ticker va a una cabecera Content-Disposition.
+    filename = f"gerarai-thesis-{sanitize_pdf_filename(company.ticker)}-v{thesis.version}.epub"
     return Response(
         content=content,
         media_type="application/epub+zip",

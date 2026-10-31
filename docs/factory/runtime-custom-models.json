@@ -3,7 +3,7 @@
     {
       "model": "claude-opus-5-5",
       "baseUrl": "https://api.oneprovider.dev",
-      "apiKey": "sk-627e98b5bdc7fdd0670a151e404e92e7cb605d3362782210102cd4b6a75fd945",
+      "apiKey": "<REDACTED-clave-expuesta-en-repo-ver-docs/ROTACION_CLAVES.md>",
       "provider": "anthropic",
       "id": "custom:claude-opus-5-5-0",
       "index": 0,
@@ -13,7 +13,7 @@
     {
       "model": "claude-sonnet-5-5",
       "baseUrl": "https://api.oneprovider.dev",
-      "apiKey": "sk-627e98b5bdc7fdd0670a151e404e92e7cb605d3362782210102cd4b6a75fd945",
+      "apiKey": "<REDACTED-clave-expuesta-en-repo-ver-docs/ROTACION_CLAVES.md>",
       "provider": "anthropic",
       "id": "custom:claude-sonnet-5-5-0",
       "index": 1,
