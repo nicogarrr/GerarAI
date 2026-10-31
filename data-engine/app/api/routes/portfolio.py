@@ -43,6 +43,7 @@ from app.schemas.api import (
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
     PortfolioPriceUpdateOut,
+    PortfolioRefreshMarketOut,
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTearsheetOut,
@@ -1417,7 +1418,7 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/refresh-market")
+@router.post("/refresh-market", response_model=PortfolioRefreshMarketOut, response_model_exclude_unset=True)
 def refresh_portfolio_market_data(
     as_of: date | None = None,
     db: Session = Depends(get_db),

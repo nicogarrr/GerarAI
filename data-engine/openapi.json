@@ -13399,6 +13399,81 @@
         "title": "PortfolioReconstructionOut",
         "type": "object"
       },
+      "PortfolioRefreshMarketOut": {
+        "properties": {
+          "alert_results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Alert Results",
+            "type": "array"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Order",
+            "type": "array"
+          },
+          "risk": {
+            "additionalProperties": true,
+            "title": "Risk",
+            "type": "object"
+          },
+          "screen_results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Screen Results",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/RefreshMarketStageOut"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "as_of",
+          "started_at",
+          "completed_at",
+          "order",
+          "stages",
+          "risk",
+          "alert_results",
+          "screen_results"
+        ],
+        "title": "PortfolioRefreshMarketOut",
+        "type": "object"
+      },
       "PortfolioRiskOut": {
         "properties": {
           "beta": {
@@ -15452,6 +15527,125 @@
           "candidatos"
         ],
         "title": "RadarResponse",
+        "type": "object"
+      },
+      "RefreshMarketStageOut": {
+        "properties": {
+          "alert_rules": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Rules"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "market_data_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Data Status"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "portfolio_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Snapshot Id"
+          },
+          "saved_screens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Screens"
+          },
+          "snapshot_pricing_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Pricing Coverage"
+          },
+          "stale_prices": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Prices"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated"
+          }
+        },
+        "required": [
+          "step",
+          "name",
+          "status"
+        ],
+        "title": "RefreshMarketStageOut",
         "type": "object"
       },
       "ResearchAlertAction": {
@@ -62839,9 +63033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Refresh Portfolio Market Data Api Portfolio Refresh Market Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioRefreshMarketOut"
                 }
               }
             },
