@@ -47,9 +47,16 @@ test('actions preserve structured endpoint copy instead of guessing from substri
         ['AUTH_UNAVAILABLE', 'El servicio de acceso no está disponible. Inténtalo más tarde.', 503],
     ] as const) {
         errorState.__authBoundaryEndpointError = new AppError(message, code, status);
-        // El formulario necesita `code` para abrir la pantalla de cuenta
-        // pendiente/rechazada en lugar del toast generico.
-        assert.deepEqual(await signInWithEmail(credentials), { success: false, error: message, code });
+        // El formulario necesita `code` SOLO para abrir la pantalla de cuenta
+        // pendiente/rechazada en lugar del toast generico; el resto de errores
+        // mantiene la forma exacta de siempre (sin `code`).
+        const expectsCode = code === 'AUTH_ENDPOINT_ACCOUNT_PENDING' || code === 'AUTH_ENDPOINT_ACCOUNT_REJECTED';
+        const expectedSignIn: Record<string, unknown> = { success: false, error: message };
+        if (expectsCode) {
+            // Codigo estable hacia el front (no el crudo AUTH_ENDPOINT_*).
+            expectedSignIn.code = code === 'AUTH_ENDPOINT_ACCOUNT_PENDING' ? 'ACCOUNT_PENDING' : 'ACCOUNT_REJECTED';
+        }
+        assert.deepEqual(await signInWithEmail(credentials), expectedSignIn);
         assert.deepEqual(await signUpWithEmail({ ...credentials, fullName: 'Synthetic', country: 'ES', investmentGoals: 'Growth', riskTolerance: 'Medium', preferredIndustry: 'Technology', acceptTerms: true }), { success: false, error: message });
     }
     delete errorState.__authBoundaryEndpointError;

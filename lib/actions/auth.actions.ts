@@ -75,8 +75,19 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         // The endpoint maps documented status/code pairs to safe Spanish copy.
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
-            // Preserve endpoint codes for the pending/rejected UI contract.
-            return { success: false, error: getSafeErrorMessage(appError), code: appError.code };
+            // Código estable para el front solo donde el contrato lo pide
+            // (ACCOUNT_PENDING / ACCOUNT_REJECTED enrutan a /cuenta-pendiente);
+            // el resto mantiene la forma exacta de siempre.
+            const stableCode = appError.code === 'AUTH_ENDPOINT_ACCOUNT_PENDING'
+                ? 'ACCOUNT_PENDING'
+                : appError.code === 'AUTH_ENDPOINT_ACCOUNT_REJECTED'
+                    ? 'ACCOUNT_REJECTED'
+                    : undefined;
+            return {
+                success: false,
+                error: getSafeErrorMessage(appError),
+                ...(stableCode ? { code: stableCode } : {}),
+            };
         }
 
 
