@@ -11,9 +11,10 @@ import { useLocale, useT } from '@/lib/i18n/client';
 /**
  * Consenso de precios objetivo de analistas para las listas (watchlist y
  * cartera): la media del consenso y el recorrido contra el precio de la
- * fila. Fuente gratuita y no oficial (Yahoo Finance): se pide en cliente
- * tras el primer pintado para no frenar la carga, la fuente y la hora van
- * en el title, y sin dato se pinta N/D — nunca una cifra inventada.
+ * fila. Fuente gratuita y no oficial: se pide en cliente tras el primer
+ * pintado para no frenar la carga, el caracter no oficial y la hora van en
+ * el title (el proveedor no se pinta), y sin dato se pinta N/D — nunca una
+ * cifra inventada.
  *
  * Divisa: la declarada por Yahoo para el listado consultado. Si difiere de
  * la de la fila (p. ej. ASML en EUR con objetivos del ADR en USD) y la página
@@ -113,7 +114,10 @@ export default function AnalystTargetLine({
     const firmsNote = data.firms > 0
         ? t(data.firms === 1 ? 'ui.analystTargets.firmsOne' : 'ui.analystTargets.firmsOther', { n: data.firms })
         : t('ui.analystTargets.firmsNone');
-    const title = `${data.source} · ${firmsNote}${fetchedNote}${mismatchNote}`;
+    // El proveedor (data.source) no se pinta: es una etiqueta de fuente y la
+    // fuente sigue viajando en la API. El title conserva el caracter no
+    // oficial del consenso, el detalle por firma, la hora y la conversion.
+    const title = `${t('ui.analystTargets.notOfficial')} · ${firmsNote}${fetchedNote}${mismatchNote}`;
     return (
         <span title={title}>
             <span className="font-mono text-gray-200">
