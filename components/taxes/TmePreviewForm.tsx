@@ -45,7 +45,7 @@ export default function TmePreviewForm({ year, onPreview, onReset }: {
                 <input id="tax-tme" value={input} onChange={(event) => { setInput(event.target.value); setError(null); }}
                     inputMode="decimal" placeholder={t('taxes.tme.placeholder')} disabled={busy}
                     aria-invalid={Boolean(error)} aria-describedby={error ? 'tax-tme-error' : 'tax-tme-note'}
-                    className="h-9 w-32 rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-100" />
+                    className="h-11 w-32 rounded-md border border-gray-700 bg-black px-3 text-base text-gray-100 sm:h-9 sm:text-sm" />
                 <Button type="submit" size="sm" disabled={busy}>{busy ? t('taxes.tme.calculating') : t('taxes.tme.calculate')}</Button>
                 {applied && <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => {
                     onReset(); setApplied(false); setInput('');

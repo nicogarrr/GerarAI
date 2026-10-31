@@ -400,7 +400,7 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
                     id="tax-year"
                     value={year}
                     onChange={(event) => handleYearChange(event.target.value)}
-                    className="h-11 rounded-md border border-gray-800 bg-black px-3 text-sm text-gray-200"
+                    className="h-11 rounded-md border border-gray-800 bg-black px-3 text-base text-gray-200 sm:text-sm"
                 >
                     {yearOptions.map((option) => (
                         <option key={option} value={option}>

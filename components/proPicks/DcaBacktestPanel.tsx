@@ -130,18 +130,18 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                     <input
                         value={symbol}
                         onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                        className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100"
+                        className="mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-base text-gray-100 sm:min-h-0 sm:text-sm"
                         required
                         maxLength={24}
                     />
                 </label>
                 <label className="text-xs text-gray-400">
                     Desde (mes)
-                    <input type="month" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    <input type="month" value={start} onChange={(e) => setStart(e.target.value)} className="mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-base text-gray-100 sm:min-h-0 sm:text-sm" />
                 </label>
                 <label className="text-xs text-gray-400">
                     Hasta (mes)
-                    <input type="month" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} aria-invalid={rangeError !== null} aria-describedby={rangeError ? 'dca-range-error' : undefined} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    <input type="month" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} aria-invalid={rangeError !== null} aria-describedby={rangeError ? 'dca-range-error' : undefined} className="mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-base text-gray-100 sm:min-h-0 sm:text-sm" />
                     {rangeError && (
                         <span id="dca-range-error" role="alert" className="mt-1 block text-xs text-red-400">
                             {rangeError}
@@ -150,7 +150,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
                 </label>
                 <label className="text-xs text-gray-400">
                     Aportación base
-                    <input type="text" inputMode="decimal" value={base} onChange={(e) => setBase(e.target.value)} aria-invalid={baseError !== null} aria-describedby={baseError ? 'dca-base-error' : undefined} className="mt-1 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-sm text-gray-100" />
+                    <input type="text" inputMode="decimal" value={base} onChange={(e) => setBase(e.target.value)} aria-invalid={baseError !== null} aria-describedby={baseError ? 'dca-base-error' : undefined} className="mt-1 min-h-11 w-full rounded border border-gray-600 bg-gray-900 px-2 py-1.5 text-base text-gray-100 sm:min-h-0 sm:text-sm" />
                     {baseError && (
                         <span id="dca-base-error" role="alert" className="mt-1 block text-xs text-red-400">
                             {baseError}
