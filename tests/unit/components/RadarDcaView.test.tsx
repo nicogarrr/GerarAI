@@ -52,7 +52,51 @@ describe('RadarDcaView', () => {
         expect(screen.getByText(/Cambio 3X → 4X/)).toBeInTheDocument();
         expect(screen.getByText('Precio sin verificación independiente')).toBeInTheDocument();
         expect(screen.getByText(/25 vigentes · 26 evaluadas de 27/)).toBeInTheDocument();
-        expect(screen.getAllByText(/barrido del 2026-10-30/)).toHaveLength(2);
+        // Sin etiquetas de fuente por tarjeta (petición de Nico); los datos
+        // de fuente siguen en la API, solo se van de la vista.
+        expect(screen.queryByText(/Fuente yfinance/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/barrido del 2026-10-30/)).not.toBeInTheDocument();
+    });
+
+
+    it('badge con etiqueta única: nada de "4X · 4X DCA" duplicado', async () => {
+        render(<RadarDcaView />);
+        await waitFor(() => expect(screen.getByText('T04')).toBeInTheDocument());
+        // Una sola ocurrencia del label, sin la doble escritura anterior.
+        expect(screen.getAllByText('4X DCA')).toHaveLength(1);
+        expect(screen.getAllByText('1X DCA')).toHaveLength(1);
+        expect(screen.queryByText(/· \dX DCA/)).not.toBeInTheDocument();
+    });
+
+    it('recorte: etiqueta única RECORTE LIGERO sin el artefacto "-1X"', async () => {
+        mockGet.mockResolvedValue({
+            ...RESULT,
+            total: 1,
+            items: [
+                {
+                    ...RESULT.items[0],
+                    ticker: 'TRIM',
+                    level: -1,
+                    level_label: 'RECORTE LIGERO',
+                    clear_price_signal: false,
+                },
+            ],
+        });
+        render(<RadarDcaView />);
+        await waitFor(() => expect(screen.getByText('TRIM')).toBeInTheDocument());
+        expect(screen.getByText('RECORTE LIGERO')).toBeInTheDocument();
+        expect(screen.queryByText(/-1X/)).not.toBeInTheDocument();
+    });
+
+    it('sin level_label del backend: fallback "N X DCA" derivado del nivel', async () => {
+        mockGet.mockResolvedValue({
+            ...RESULT,
+            total: 1,
+            items: [{ ...RESULT.items[0], level: 2, level_label: null }],
+        });
+        render(<RadarDcaView />);
+        await waitFor(() => expect(screen.getByText('T04')).toBeInTheDocument());
+        expect(screen.getByText('2X DCA')).toBeInTheDocument();
     });
 
     it('pide la página 2 con los mismos filtros al pulsar Siguiente', async () => {
