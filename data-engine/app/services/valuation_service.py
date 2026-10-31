@@ -329,7 +329,7 @@ logger = logging.getLogger(__name__)
 def _relative_multiples_cross_check(
     db: Session,
     company: Company,
-    context: "ValuationContext",
+    context: ValuationContext,
     *,
     resolved_engine: str,
     to_listing: float | None,
@@ -527,10 +527,16 @@ class ValuationService:
 
             result["moat"] = MoatService().assess(db, company, persist=False)
         except Exception as exc:
+            # Detalle completo al log (redactado); al cliente solo un codigo
+            # estable (py/stack-trace-exposure).
+            logger.warning(
+                "moat assess %s fallo: %s: %s",
+                company.ticker, type(exc).__name__, redact_secrets(str(exc))[:300],
+            )
             result["moat"] = {
                 "status": "unavailable",
                 "moats": [],
-                "error": redact_secrets(str(exc)),
+                "error": "moat_no_disponible",
             }
         result["trace"] = result.get("trace") or {}
         result["trace"].setdefault("engine", resolve_engine_key(company))
