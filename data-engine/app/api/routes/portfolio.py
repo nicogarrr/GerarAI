@@ -38,6 +38,7 @@ from app.schemas.api import (
     PortfolioConfigurationUpdateOut,
     PortfolioDataQualityOut,
     PortfolioDividendProjectionOut,
+    PortfolioDividendSyncOut,
     PortfolioDividendYieldsOut,
     PortfolioForecastOut,
     PortfolioImportCommitOut,
@@ -742,7 +743,7 @@ def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/dividends/sync")
+@router.post("/dividends/sync", response_model=PortfolioDividendSyncOut, response_model_exclude_unset=True)
 async def sync_portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     """Ingest declared dividends for every held company from the data provider.
 

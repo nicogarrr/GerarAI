@@ -8324,6 +8324,36 @@ export interface components {
             /** Withholding Kind */
             withholding_kind: ("techo_convenio" | "escenario_convenio" | "sin_impuesto_origen_escenario") | null;
         };
+        /** DividendSyncResultOut */
+        DividendSyncResultOut: {
+            /** Currency Unknown Rows */
+            currency_unknown_rows?: number | null;
+            /** Error */
+            error?: string | null;
+            /** Existing */
+            existing: number;
+            /** Fetched At */
+            fetched_at?: string | null;
+            /** Inserted */
+            inserted: number;
+            /** Reason */
+            reason?: string | null;
+            /** Skipped */
+            skipped?: {
+                [key: string]: number;
+            } | null;
+            /** Source */
+            source?: string | null;
+            /** Split Readjustments Healed */
+            split_readjustments_healed?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "unavailable" | "unknown_company" | "no_safe_symbol" | "currency_unknown";
+            /** Ticker */
+            ticker: string;
+        };
         /** DividendUncertainEventOut */
         DividendUncertainEventOut: {
             /** Amounts */
@@ -10439,6 +10469,20 @@ export interface components {
             sources: {
                 [key: string]: string;
             };
+        };
+        /** PortfolioDividendSyncOut */
+        PortfolioDividendSyncOut: {
+            /** Companies */
+            companies: number;
+            /** Currency Unknown */
+            currency_unknown: number;
+            provenance: components["schemas"]["ProvenanceOut"];
+            /** Results */
+            results: components["schemas"]["DividendSyncResultOut"][];
+            /** Synced */
+            synced: number;
+            /** Unavailable */
+            unavailable: number;
         };
         /** PortfolioDividendYieldsOut */
         PortfolioDividendYieldsOut: {
@@ -22461,9 +22505,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDividendSyncOut"];
                 };
             };
             /** @description Validation Error */
