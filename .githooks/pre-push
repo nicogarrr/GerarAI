@@ -3,34 +3,72 @@
 # Solo ficheros CAMBIADOS respecto al remoto: eslint (ts/tsx) y ruff (py de
 # data-engine), mas tsc --noEmit si hay cambios ts/tsx (salta con SKIP_TSC=1).
 # Saltar todo: git push --no-verify. Sin dependencias nuevas.
+#
+# Reglas duras (feedback del piloto):
+# - --diff-filter=ACMR: los borrados NO se mandan a lint (falso rojo).
+# - Rutas NUL-delimitadas de punta a punta (-z / read -d '' / xargs -0):
+#   un nombre con espacios es UN fichero, no varios.
+# - FAIL-CLOSED: sin ref remoto ni merge-base no se chequea nada y se sale 1;
+#   nunca se pasa de largo sin lint por un fetch ausente.
 set -u
 zero=0000000000000000000000000000000000000000
-base=""
+tmp=$(mktemp) || exit 1
+trap 'rm -f "$tmp"' EXIT
+
+ensure_origin_main() {
+  if ! git rev-parse --verify -q refs/remotes/origin/main >/dev/null 2>&1; then
+    git fetch -q origin main 2>/dev/null || true
+  fi
+  git rev-parse --verify -q refs/remotes/origin/main >/dev/null 2>&1
+}
+
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$zero" ] && continue
   if [ "$remote_sha" = "$zero" ]; then
+    if ! ensure_origin_main; then
+      echo "pre-push: falta origin/main y no se pudo descargar; no se chequea nada (fail-closed)" >&2
+      exit 1
+    fi
     mb=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
-    range="${mb:-$zero}..$local_sha"
+    if [ -z "$mb" ]; then
+      echo "pre-push: sin merge-base contra origin/main; no se chequea nada (fail-closed)" >&2
+      exit 1
+    fi
+    range="$mb..$local_sha"
   else
     range="$remote_sha..$local_sha"
   fi
-  base="$base $(git diff --name-only "$range" 2>/dev/null)"
+  if ! git diff --name-only --diff-filter=ACMR -z "$range" >> "$tmp"; then
+    echo "pre-push: git diff fallo para $range (fail-closed)" >&2
+    exit 1
+  fi
 done
-files=$(echo "$base" | tr ' ' '\n' | grep -v '^$' | sort -u || true)
-[ -z "$files" ] && exit 0
-ts=$(echo "$files" | grep -E '\.(ts|tsx|mts)$' || true)
-py=$(echo "$files" | grep -E '^data-engine/.*\.py$' || true)
+
+[ ! -s "$tmp" ] && exit 0
+
+ts_count=0
+py_count=0
+ts_list=$(mktemp) || exit 1
+py_list=$(mktemp) || { rm -f "$ts_list"; exit 1; }
+trap 'rm -f "$tmp" "$ts_list" "$py_list"' EXIT
+while IFS= read -r -d '' f; do
+  case "$f" in
+    *.ts|*.tsx|*.mts) printf '%s\0' "$f" >> "$ts_list"; ts_count=$((ts_count+1)) ;;
+    data-engine/*.py) printf '%s\0' "${f#data-engine/}" >> "$py_list"; py_count=$((py_count+1)) ;;
+  esac
+done < "$tmp"
+
 rc=0
-if [ -n "$ts" ]; then
-  echo "pre-push: eslint ($(echo "$ts" | wc -l) ficheros)"
-  echo "$ts" | xargs npx eslint || rc=1
+if [ "$ts_count" -gt 0 ]; then
+  echo "pre-push: eslint ($ts_count ficheros)"
+  xargs -0 npx eslint < "$ts_list" || rc=1
   if [ "${SKIP_TSC:-0}" != "1" ]; then
     echo "pre-push: tsc --noEmit (proyecto completo; SKIP_TSC=1 lo salta)"
     npx tsc --noEmit || rc=1
   fi
 fi
-if [ -n "$py" ]; then
-  echo "pre-push: ruff ($(echo "$py" | wc -l) ficheros)"
-  (cd data-engine && echo "$py" | sed 's|^data-engine/||' | xargs uv run --frozen --extra dev ruff check) || rc=1
+if [ "$py_count" -gt 0 ]; then
+  echo "pre-push: ruff ($py_count ficheros)"
+  (cd data-engine && xargs -0 uv run --frozen --extra dev ruff check < "$py_list") || rc=1
 fi
 exit $rc
