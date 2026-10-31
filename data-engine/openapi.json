@@ -2313,6 +2313,29 @@
         "title": "CompanyTtmOut",
         "type": "object"
       },
+      "ComparedAccessionsOut": {
+        "properties": {
+          "latest": {
+            "title": "Latest",
+            "type": "string"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "string"
+          },
+          "rule": {
+            "title": "Rule",
+            "type": "string"
+          }
+        },
+        "required": [
+          "latest",
+          "previous",
+          "rule"
+        ],
+        "title": "ComparedAccessionsOut",
+        "type": "object"
+      },
       "ConfirmInput": {
         "additionalProperties": false,
         "properties": {
@@ -7586,6 +7609,474 @@
         "title": "ManagementPromiseCreate",
         "type": "object"
       },
+      "ManagerChangeRowOut": {
+        "properties": {
+          "change": {
+            "enum": [
+              "new",
+              "closed",
+              "increased",
+              "decreased",
+              "unchanged"
+            ],
+            "title": "Change",
+            "type": "string"
+          },
+          "cusip": {
+            "title": "Cusip",
+            "type": "string"
+          },
+          "name_of_issuer": {
+            "title": "Name Of Issuer",
+            "type": "string"
+          },
+          "put_call": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Put Call"
+          },
+          "shares_latest": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Latest"
+          },
+          "shares_previous": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Previous"
+          },
+          "title_of_class": {
+            "title": "Title Of Class",
+            "type": "string"
+          },
+          "value_usd_thousands_latest": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd Thousands Latest"
+          },
+          "value_usd_thousands_previous": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd Thousands Previous"
+          }
+        },
+        "required": [
+          "change",
+          "name_of_issuer",
+          "title_of_class",
+          "cusip"
+        ],
+        "title": "ManagerChangeRowOut",
+        "type": "object"
+      },
+      "ManagerChangesOut": {
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerChangeRowOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "cik": {
+            "title": "Cik",
+            "type": "string"
+          },
+          "compared_accessions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparedAccessionsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "latest_report": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Report"
+          },
+          "limitations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitations"
+          },
+          "manager": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager"
+          },
+          "previous_report": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Report"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvenanceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient_history",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "cik",
+          "changes"
+        ],
+        "title": "ManagerChangesOut",
+        "type": "object"
+      },
+      "ManagerHoldingRowOut": {
+        "description": "Una posicion 13F tal como se sirvio. La via snapshot (sin sync en vivo)\ndeja en None lo que el snapshot no tiene (accession, filing_url, ...).",
+        "properties": {
+          "accession_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accession Number"
+          },
+          "cusip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cusip"
+          },
+          "filing_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filing Url"
+          },
+          "investment_discretion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Investment Discretion"
+          },
+          "is_amendment": {
+            "default": false,
+            "title": "Is Amendment",
+            "type": "boolean"
+          },
+          "name_of_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Of Issuer"
+          },
+          "name_of_issuer_filed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name Of Issuer Filed"
+          },
+          "put_call": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Put Call"
+          },
+          "share_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Type"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "title_of_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title Of Class"
+          },
+          "value_usd_thousands": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd Thousands"
+          }
+        },
+        "title": "ManagerHoldingRowOut",
+        "type": "object"
+      },
+      "ManagerHoldingsOut": {
+        "properties": {
+          "cik": {
+            "title": "Cik",
+            "type": "string"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/ManagerHoldingRowOut"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "limitations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limitations"
+          },
+          "manager": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manager"
+          },
+          "provenance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProvenanceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date"
+          },
+          "snapshot_synced_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Synced At"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "mismatch",
+              "unverified",
+              "partial",
+              "unavailable",
+              "snapshot"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "transport": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification"
+          }
+        },
+        "required": [
+          "status",
+          "cik",
+          "holdings"
+        ],
+        "title": "ManagerHoldingsOut",
+        "type": "object"
+      },
       "ManualAlertCreate": {
         "properties": {
           "alert_type": {
@@ -8238,6 +8729,48 @@
           "source"
         ],
         "title": "NextEventOut",
+        "type": "object"
+      },
+      "OwnershipManagerOut": {
+        "properties": {
+          "cik": {
+            "title": "Cik",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cik",
+          "name"
+        ],
+        "title": "OwnershipManagerOut",
+        "type": "object"
+      },
+      "OwnershipManagersOut": {
+        "properties": {
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "managers": {
+            "items": {
+              "$ref": "#/components/schemas/OwnershipManagerOut"
+            },
+            "title": "Managers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "managers",
+          "limitations"
+        ],
+        "title": "OwnershipManagersOut",
         "type": "object"
       },
       "PaperProposal": {
@@ -9113,6 +9646,57 @@
           "params"
         ],
         "title": "ProPickRunOut",
+        "type": "object"
+      },
+      "ProvenanceOut": {
+        "description": "Bloque de proveniencia estandar (app/services/provenance.py).",
+        "properties": {
+          "coverage": {
+            "title": "Coverage",
+            "type": "string"
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_kind": {
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          }
+        },
+        "required": [
+          "source",
+          "source_kind",
+          "fetched_at",
+          "coverage"
+        ],
+        "title": "ProvenanceOut",
         "type": "object"
       },
       "PushConfigOut": {
@@ -17188,7 +17772,7 @@
     },
     "/api/cache/invalidate/all": {
       "post": {
-        "description": "Invalidate all cache entries for current tenant.",
+        "description": "Invalidate all cache entries for current tenant. GLOBAL leg: gated.",
         "operationId": "invalidate_all_api_cache_invalidate_all_post",
         "parameters": [
           {
@@ -17520,7 +18104,7 @@
     },
     "/api/cache/invalidate/market-data": {
       "post": {
-        "description": "Invalidate all market data cache entries.",
+        "description": "Invalidate all market data cache entries. GLOBAL: gated in production.",
         "operationId": "invalidate_market_data_api_cache_invalidate_market_data_post",
         "parameters": [
           {
@@ -47087,9 +47671,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Managers Api Ownership Managers Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/OwnershipManagersOut"
                 }
               }
             },
@@ -47604,9 +48186,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Manager Changes Api Ownership Managers  Cik  Changes Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagerChangesOut"
                 }
               }
             },
@@ -47777,9 +48357,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Manager Holdings Api Ownership Managers  Cik  Holdings Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ManagerHoldingsOut"
                 }
               }
             },

@@ -471,7 +471,7 @@ export interface paths {
         put?: never;
         /**
          * Invalidate All
-         * @description Invalidate all cache entries for current tenant.
+         * @description Invalidate all cache entries for current tenant. GLOBAL leg: gated.
          */
         post: operations["invalidate_all_api_cache_invalidate_all_post"];
         delete?: never;
@@ -511,7 +511,7 @@ export interface paths {
         put?: never;
         /**
          * Invalidate Market Data
-         * @description Invalidate all market data cache entries.
+         * @description Invalidate all market data cache entries. GLOBAL: gated in production.
          */
         post: operations["invalidate_market_data_api_cache_invalidate_market_data_post"];
         delete?: never;
@@ -7293,6 +7293,15 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** ComparedAccessionsOut */
+        ComparedAccessionsOut: {
+            /** Latest */
+            latest: string;
+            /** Previous */
+            previous: string;
+            /** Rule */
+            rule: string;
+        };
         /** ConfirmInput */
         ConfirmInput: {
             /** Confirmed */
@@ -9044,6 +9053,117 @@ export interface components {
             /** Unit */
             unit?: string | null;
         };
+        /** ManagerChangeRowOut */
+        ManagerChangeRowOut: {
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "new" | "closed" | "increased" | "decreased" | "unchanged";
+            /** Cusip */
+            cusip: string;
+            /** Name Of Issuer */
+            name_of_issuer: string;
+            /** Put Call */
+            put_call?: string | null;
+            /** Shares Latest */
+            shares_latest?: number | null;
+            /** Shares Previous */
+            shares_previous?: number | null;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Value Usd Thousands Latest */
+            value_usd_thousands_latest?: number | null;
+            /** Value Usd Thousands Previous */
+            value_usd_thousands_previous?: number | null;
+        };
+        /** ManagerChangesOut */
+        ManagerChangesOut: {
+            /** Changes */
+            changes: components["schemas"]["ManagerChangeRowOut"][];
+            /** Cik */
+            cik: string;
+            compared_accessions?: components["schemas"]["ComparedAccessionsOut"] | null;
+            /** Detail */
+            detail?: string | null;
+            /** Latest Report */
+            latest_report?: string | null;
+            /** Limitations */
+            limitations?: string[] | null;
+            /** Manager */
+            manager?: string | null;
+            /** Previous Report */
+            previous_report?: string | null;
+            provenance?: components["schemas"]["ProvenanceOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_history" | "unavailable";
+        };
+        /**
+         * ManagerHoldingRowOut
+         * @description Una posicion 13F tal como se sirvio. La via snapshot (sin sync en vivo)
+         *     deja en None lo que el snapshot no tiene (accession, filing_url, ...).
+         */
+        ManagerHoldingRowOut: {
+            /** Accession Number */
+            accession_number?: string | null;
+            /** Cusip */
+            cusip?: string | null;
+            /** Filing Url */
+            filing_url?: string | null;
+            /** Investment Discretion */
+            investment_discretion?: string | null;
+            /**
+             * Is Amendment
+             * @default false
+             */
+            is_amendment: boolean;
+            /** Name Of Issuer */
+            name_of_issuer?: string | null;
+            /** Name Of Issuer Filed */
+            name_of_issuer_filed?: string | null;
+            /** Put Call */
+            put_call?: string | null;
+            /** Share Type */
+            share_type?: string | null;
+            /** Shares */
+            shares?: number | null;
+            /** Title Of Class */
+            title_of_class?: string | null;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+        };
+        /** ManagerHoldingsOut */
+        ManagerHoldingsOut: {
+            /** Cik */
+            cik: string;
+            /** Coverage */
+            coverage?: string | null;
+            /** Errors */
+            errors?: unknown[] | null;
+            /** Holdings */
+            holdings: components["schemas"]["ManagerHoldingRowOut"][];
+            /** Limitations */
+            limitations?: string[] | null;
+            /** Manager */
+            manager?: string | null;
+            provenance?: components["schemas"]["ProvenanceOut"] | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Snapshot Synced At */
+            snapshot_synced_at?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "mismatch" | "unverified" | "partial" | "unavailable" | "snapshot";
+            /** Transport */
+            transport?: string | null;
+            /** Verification */
+            verification?: string | null;
+        };
         /** ManualAlertCreate */
         ManualAlertCreate: {
             /**
@@ -9284,6 +9404,20 @@ export interface components {
             source: string;
             /** Year */
             year?: number | null;
+        };
+        /** OwnershipManagerOut */
+        OwnershipManagerOut: {
+            /** Cik */
+            cik: string;
+            /** Name */
+            name: string;
+        };
+        /** OwnershipManagersOut */
+        OwnershipManagersOut: {
+            /** Limitations */
+            limitations: string[];
+            /** Managers */
+            managers: components["schemas"]["OwnershipManagerOut"][];
         };
         /** PaperProposal */
         PaperProposal: {
@@ -9574,6 +9708,24 @@ export interface components {
             top_n: number;
             /** Universe Size */
             universe_size: number;
+        };
+        /**
+         * ProvenanceOut
+         * @description Bloque de proveniencia estandar (app/services/provenance.py).
+         */
+        ProvenanceOut: {
+            /** Coverage */
+            coverage: string;
+            /** Fetched At */
+            fetched_at: string;
+            /** Note */
+            note?: string | null;
+            /** Source */
+            source: string;
+            /** Source Kind */
+            source_kind: string;
+            /** Source Url */
+            source_url?: string | null;
         };
         /** PushConfigOut */
         PushConfigOut: {
@@ -19016,9 +19168,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["OwnershipManagersOut"];
                 };
             };
             /** @description Validation Error */
@@ -19140,9 +19290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ManagerChangesOut"];
                 };
             };
             /** @description Validation Error */
@@ -19182,9 +19330,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ManagerHoldingsOut"];
                 };
             };
             /** @description Validation Error */

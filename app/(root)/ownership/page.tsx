@@ -201,21 +201,25 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                                 ) : null}
                                             </th>
                                             <td className="py-3 text-gray-400">{row.title_of_class || NA}</td>
-                                            <td className="py-3 font-mono text-xs text-gray-400">{row.cusip}</td>
+                                            <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
                                             <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands, holdings.report_date)}</td>
                                             <td className="py-3 text-right text-gray-400">{formatShares(row.shares)}</td>
                                             <td className="py-3 text-gray-400">{row.put_call ?? row.share_type}</td>
                                             <td className="py-3">
-                                                <a
-                                                    className="inline-flex min-h-11 items-center gap-1 text-teal-300 hover:text-teal-200"
-                                                    href={row.filing_url}
-                                                    rel="noreferrer"
-                                                    target="_blank"
-                                                >
-                                                    <FileText aria-hidden="true" className="h-3.5 w-3.5" />
-                                                    XML
-                                                    <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                                                </a>
+                                                {row.filing_url ? (
+                                                    <a
+                                                        className="inline-flex min-h-11 items-center gap-1 text-teal-300 hover:text-teal-200"
+                                                        href={row.filing_url}
+                                                        rel="noreferrer"
+                                                        target="_blank"
+                                                    >
+                                                        <FileText aria-hidden="true" className="h-3.5 w-3.5" />
+                                                        XML
+                                                        <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                                    </a>
+                                                ) : (
+                                                    NA
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -267,8 +271,8 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 <tbody>
                                     {changes.changes.filter((row) => row.change !== 'unchanged').map((row) => (
                                         <tr className="border-b border-gray-900" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
-                                            <th className="py-3 text-left text-sm font-normal text-gray-200" scope="row">{row.name_of_issuer}</th>
-                                            <td className="py-3 font-mono text-xs text-gray-400">{row.cusip}</td>
+                                            <th className="py-3 text-left text-sm font-normal text-gray-200" scope="row">{row.name_of_issuer ?? NA}</th>
+                                            <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
                                             <td className="py-3">
                                                 <Badge variant="outline">{CHANGE_LABELS[row.change]}</Badge>
                                             </td>
