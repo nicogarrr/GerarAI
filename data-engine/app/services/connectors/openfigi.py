@@ -258,12 +258,21 @@ class OpenFIGIConnector:
         self.limiter.wait_if_needed()
         last_error: str | None = None
         response: httpx.Response | None = None
+        registry = get_data_source_registry()
         for attempt in range(self.max_retries + 1):
             self.limiter.record()
-            response = self._post([job])
+            try:
+                response = self._post([job])
+            except httpx.TransportError as exc:
+                registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+                raise
             if response.status_code == 200:
                 break
             if not is_retryable_status(response.status_code):
+                if response.status_code not in (400, 404):
+                    # 401/403 (clave rechazada/bloqueo) degrada igual que en el
+                    # async; 400/404 (job mal formado) es dato por consulta.
+                    registry.record_failure(REGISTRY_KEY, f"HTTP {response.status_code}")
                 result: dict[str, Any] = {
                     "status": "error",
                     "identifier": normalized,
@@ -290,12 +299,19 @@ class OpenFIGIConnector:
                 "source_url": self.base_url,
             }
             return result
-        payload = response.json()
+        try:
+            payload = response.json()
+        except ValueError:
+            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
+            raise
         if not isinstance(payload, list) or len(payload) != 1 or not isinstance(payload[0], dict):
-            get_data_source_registry().record_failure(REGISTRY_KEY, "payload de mapeo invalido")
+            registry.record_failure(REGISTRY_KEY, "payload de mapeo invalido")
             raise RuntimeError("OpenFIGI returned an invalid mapping response")
         body = payload[0]
         if body.get("error"):
+            # Error por identificador (dato por consulta): la fuente respondio,
+            # cuenta como exito de salud igual que en la via async.
+            registry.record_success(REGISTRY_KEY)
             result = {
                 "status": "error",
                 "identifier": normalized,

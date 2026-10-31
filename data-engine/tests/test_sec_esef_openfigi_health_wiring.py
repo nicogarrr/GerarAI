@@ -240,3 +240,66 @@ def test_openfigi_sync_429_agotado_degrada():
     result = connector.map_identifier("US0378331005")
     assert result["status"] == "error"
     assert registry.get_status("openfigi").consecutive_failures == before + 1
+
+
+# ---------- Bloqueo del piloto (#3440): simetría sync OpenFIGI ----------
+
+
+def _sync_connector(response_or_exc, monkeypatch=None):
+    class _FakeSyncClient:
+        def post(self, url, json=None, headers=None):
+            if isinstance(response_or_exc, Exception):
+                raise response_or_exc
+            return response_or_exc
+
+    return openfigi.OpenFIGIConnector(client=_FakeSyncClient(), max_retries=0)
+
+
+def test_openfigi_sync_red_caida_degrada():
+    registry = get_data_source_registry()
+    before = registry.get_status("openfigi").consecutive_failures
+    connector = _sync_connector(httpx.ConnectError("down"))
+    with pytest.raises(httpx.ConnectError):
+        connector.map_identifier("US0378331005")
+    assert registry.get_status("openfigi").consecutive_failures == before + 1
+
+
+def test_openfigi_sync_no_json_degrada():
+    registry = get_data_source_registry()
+    before = registry.get_status("openfigi").consecutive_failures
+    connector = _sync_connector(
+        httpx.Response(
+            200,
+            text="<html>no json</html>",
+            request=httpx.Request("POST", "https://api.openfigi.com/v3/mapping"),
+        )
+    )
+    with pytest.raises(ValueError):
+        connector.map_identifier("US0378331005")
+    assert registry.get_status("openfigi").consecutive_failures == before + 1
+
+
+def test_openfigi_sync_401_degrada():
+    registry = get_data_source_registry()
+    before = registry.get_status("openfigi").consecutive_failures
+    connector = _sync_connector(
+        httpx.Response(401, request=httpx.Request("POST", "https://api.openfigi.com/v3/mapping"))
+    )
+    result = connector.map_identifier("US0378331005")
+    assert result["status"] == "error"
+    assert registry.get_status("openfigi").consecutive_failures == before + 1
+
+
+def test_openfigi_sync_error_por_identificador_es_exito():
+    registry = get_data_source_registry()
+    registry.record_failure("openfigi", "fallo previo")
+    connector = _sync_connector(
+        httpx.Response(
+            200,
+            json=[{"error": "No identifier found"}],
+            request=httpx.Request("POST", "https://api.openfigi.com/v3/mapping"),
+        )
+    )
+    result = connector.map_identifier("US0378331005")
+    assert result["status"] == "error"
+    assert registry.get_status("openfigi").consecutive_failures == 0
