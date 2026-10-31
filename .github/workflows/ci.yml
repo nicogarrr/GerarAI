@@ -94,6 +94,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:routes
+          # contract-drift: deriva front<->back sobre el OpenAPI comiteado
+          # (la frescura del propio openapi.json se verifica en su job).
+          # Llevaba verde pero SIN cablear en CI: una deriva nueva no
+          # rompia nada. Hallazgos conocidos: contract-drift.allowlist.json.
+      - run: npm run test:contract
       - run: npm run check:i18n
       - name: ProPicks guard (R1-R5 + turnover cap)
         run: node --experimental-strip-types --test scripts/propicks-guard.test.ts
