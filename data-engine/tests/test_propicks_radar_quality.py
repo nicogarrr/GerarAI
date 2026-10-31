@@ -179,6 +179,9 @@ def test_liquidity_dedupes_same_session_rows():
         def all(self):
             return self._rows
 
+        def __iter__(self):
+            return iter(self._rows)
+
     class _Db:
         def __init__(self, rows):
             self._rows = rows
@@ -186,15 +189,111 @@ def test_liquidity_dedupes_same_session_rows():
         def execute(self, _stmt):
             return _Result(self._rows)
 
+        def scalars(self, _stmt):
+            return _Result([])
+
     day = date(2026, 10, 30)
     # 10 fechas x 2 proveedores = 20 filas -> 10 sesiones.
-    rows = [(1, day - timedelta(days=i), 100, 200_000)
+    rows = [(1, day - timedelta(days=i), 100, 200_000, "USD")
             for i in range(10) for _ in range(2)]
     median_dollars, sessions = _liquidity(_Db(rows), [1])[1]
     assert sessions == 10
     assert median_dollars == 100 * 200_000
     # 20 fechas distintas x 2 proveedores -> 20 sesiones (suficiente).
-    rows20 = [(1, day - timedelta(days=i), 100, 200_000)
+    rows20 = [(1, day - timedelta(days=i), 100, 200_000, "USD")
               for i in range(20) for _ in range(2)]
     _, sessions20 = _liquidity(_Db(rows20), [1])[1]
     assert sessions20 == 20
+
+
+def _seed_prices(db, cid: int, *, close: float, volume: int, quote_currency: str | None,
+                 days: int = 20) -> None:
+    day = AS_OF - timedelta(days=1)
+    for i in range(days):
+        db.add(MarketPrice(company_id=cid, date=day - timedelta(days=i), open=close,
+                           high=close, low=close, close=close, adj_close=close,
+                           volume=volume, quote_currency=quote_currency, source="test"))
+    db.commit()
+
+
+def test_liquidity_in_pence_does_not_pass_as_dollars(db):
+    """Un listado en peniques (GBp) con ~1,27M USD/dia reales NO supera 5M USD.
+
+    close*volume = 1000 GBp x 100.000 = 100.000.000 PENIQUES (~1M GBP): sin
+    mirar la unidad, la mediana leia 100M como si fueran dolares y la accion
+    pasaba la liquidez de quality-v1 con un decimo del umbral real.
+    """
+    company = Company(id=7, ticker="Q7.L", name="Quality pence", exchange="LSE",
+                      currency="GBP", sector="Technology", industry="Test",
+                      company_type="large_cap", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    _seed_prices(db, 7, close=1000, volume=100_000, quote_currency="GBp")
+    verdict = quality_for_companies(db, [7], as_of=AS_OF)[7]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_in_yen_does_not_pass_as_dollars(db):
+    """50M JPY/dia (~330k USD) leidos como 50M dolares: mismo fallo de unidad."""
+    company = Company(id=8, ticker="Q8.T", name="Quality yen", exchange="TSE",
+                      currency="JPY", sector="Technology", industry="Test",
+                      company_type="large_cap", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    _seed_prices(db, 8, close=500, volume=100_000, quote_currency="JPY")
+    verdict = quality_for_companies(db, [8], as_of=AS_OF)[8]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_on_usd_listing_still_count(db):
+    """Filas legacy (quote_currency NULL) en listado USD: unidad compatible,
+    siguen contando (contrato legacy de price_units)."""
+    company = _company(db, 9)
+    _seed_prices(db, 9, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [9], as_of=AS_OF)[9]
+    assert "liquidity_missing_or_low" not in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_on_non_usd_listing_do_not_count(db):
+    """Filas legacy en listado EUR: unidad no verificable -> ausente, nunca USD."""
+    company = _company(db, 10, currency="EUR")
+    _seed_prices(db, 10, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [10], as_of=AS_OF)[10]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_without_declared_currency_do_not_count(db):
+    """Caso del piloto: ticker sin sufijo y Company.currency vacia. El default
+    USD de listing_currency convertia filas de unidad DESCONOCIDA en dolares:
+    fail-open. Sin divisa declarada, la unidad no es verificable -> ausente."""
+    company = Company(id=11, ticker="Q11", name="Quality blank", exchange="NASDAQ",
+                      currency="", sector="Technology", industry="Test",
+                      company_type="large_cap", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    _seed_prices(db, 11, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [11], as_of=AS_OF)[11]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_with_unknown_currency_do_not_count(db):
+    """Divisa declarada no-USD (CNY): las filas legacy no son dolares."""
+    company = _company(db, 12, currency="CNY")
+    _seed_prices(db, 12, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [12], as_of=AS_OF)[12]
+    assert "liquidity_missing_or_low" in verdict["reasons"]
+
+
+def test_liquidity_legacy_rows_pence_suffix_beats_declared_usd(db):
+    """Caso del piloto: ticker Q.L (sufijo .L = GBX) con currency='USD'. Las
+    fichas se crean con USD por defecto y el sufijo manda sobre la divisa
+    declarada (contrato de currency.py): las filas legacy son peniques,
+    unidad no-USD -> ausente."""
+    company = Company(id=13, ticker="Q13.L", name="Quality pence legacy",
+                      exchange="LSE", currency="USD", sector="Technology",
+                      industry="Test", company_type="large_cap", valuation_model="dcf")
+    db.add(company)
+    db.commit()
+    _seed_prices(db, 13, close=100, volume=200_000, quote_currency=None)
+    verdict = quality_for_companies(db, [13], as_of=AS_OF)[13]
+    assert "liquidity_missing_or_low" in verdict["reasons"]

@@ -29,6 +29,12 @@ from app.models import (
 )
 from app.services.propicks_dca_radar import quality_checks
 from app.services.propicks_funnel_service import LEVERAGE_METRIC
+from app.valuation.currency import (
+    MINOR_UNITS,
+    SUFFIX_QUOTE_UNIT,
+    _ticker_suffix,
+    normalize_currency,
+)
 from app.valuation.financial_snapshot import _period_type
 
 FCF_METRIC = "free_cash_flow"
@@ -130,8 +136,12 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
     """Mediana de close*volume y nº de sesiones, sobre las últimas 20 con datos."""
     if not company_ids:
         return {}
+    companies = {
+        c.id: c for c in db.scalars(select(Company).where(Company.id.in_(company_ids)))
+    }
     rows = db.execute(
-        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.close, MarketPrice.volume)
+        select(MarketPrice.company_id, MarketPrice.date, MarketPrice.close, MarketPrice.volume,
+               MarketPrice.quote_currency)
         .where(
             MarketPrice.company_id.in_(company_ids),
             MarketPrice.close.is_not(None),
@@ -145,8 +155,29 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
     ).all()
     by_company: dict[int, list[float]] = {}
     seen_dates: dict[int, set] = {}
-    for cid, day, close, volume in rows:
+    for cid, day, close, volume, quote_currency in rows:
         cid = int(cid)
+        # El umbral de quality-v1 esta en USD: solo cuentan sesiones con
+        # unidad USD verificable. Un close en peniques o yenes multiplicado
+        # por el volumen se leia como dolares y coronaba como liquida una
+        # accion con una fraccion del umbral real. Filas legacy (NULL) solo
+        # son compatibles si el listado es USD (contrato de price_units);
+        # cualquier otra divisa se declara AUSENTE, como el market_cap,
+        # antes que convertir con un tipo de cambio no verificado.
+        unit = (quote_currency or "").strip().upper() or None
+        if unit is None:
+            # Fila legacy sin unidad: solo cuenta con USD VERIFICABLE, es
+            # decir divisa USD declarada explicitamente en la ficha o un
+            # sufijo de ticker cuya unidad conocida sea USD. NUNCA el default
+            # USD de listing_currency: con la ficha vacia ese default
+            # convertia una unidad desconocida en dolares (fail-open).
+            company = companies.get(cid)
+            if company is None or not _legacy_unit_is_verified_usd(
+                company.ticker, company.currency
+            ):
+                continue
+        elif unit != "USD":
+            continue
         if day in seen_dates.setdefault(cid, set()):
             continue
         seen_dates[cid].add(day)
@@ -154,6 +185,27 @@ def _liquidity(db: Session, company_ids: list[int]) -> dict[int, tuple[float | N
         if len(dollars) < LIQUIDITY_SESSIONS:
             dollars.append(float(close) * float(volume))
     return {cid: (median(dollars), len(dollars)) for cid, dollars in by_company.items()}
+
+
+def _legacy_unit_is_verified_usd(ticker: str | None, company_currency: str | None) -> bool:
+    """Unidad legacy compatible con USD SOLO con evidencia explicita.
+
+    Misma precedencia que ``listing_quote_unit`` (subunidad declarada >
+    sufijo del ticker > divisa declarada), pero SIN su fallback USD por
+    omision: ``listing_currency("Q", "")`` devuelve USD sin saber nada de
+    la unidad real, y ``Q.L`` con ficha "USD" (el default del
+    enriquecimiento) cotiza en peniques. Sin evidencia positiva de USD la
+    fila legacy no cuenta.
+    """
+    declared = (company_currency or "").strip()
+    if declared and (declared in MINOR_UNITS or declared.upper() in MINOR_UNITS):
+        return False  # subunidad declarada (GBX...): nunca USD
+    suffix = _ticker_suffix(ticker or "")
+    if suffix and suffix in SUFFIX_QUOTE_UNIT:
+        suffix_major, _ = normalize_currency(SUFFIX_QUOTE_UNIT[suffix])
+        return suffix_major == "USD"  # hoy ningun sufijo conocido es USD
+    declared_major, _ = normalize_currency(company_currency)
+    return declared_major == "USD"
 
 
 def quality_for_companies(db: Session, company_ids: list[int], *, as_of: date) -> dict[int, dict]:
