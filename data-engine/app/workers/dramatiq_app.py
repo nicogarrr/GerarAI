@@ -2263,13 +2263,21 @@ def propicks_radar_scan(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=EXTERNA_QUEUE_NAME)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
+              queue_name=EXTERNA_QUEUE_NAME)
 @_coalesce_on_success("refresh_valuation_metrics", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def refresh_valuation_metrics(
     tenant_id: int | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
     """Metricas de valoracion (P/B, yield TTM) de todo el universo del tenant.
+
+    time_limit de 1 h: sin limite, una corrida lenta (universo grande con
+    pacing ~50/min sobre Finnhub) ocupaba un hilo del carril externa durante
+    horas (31-oct: 2 corridas sosteniendo 7.617 pendientes en default). Si el
+    limite mata la corrida, el cursor en Redis la reanuda por el ultimo
+    ticker comprometido y la cache de 24h no repite lo fresco: cortar no
+    rehace trabajo.
 
     Corre tras los cierres oficiales; mismo patron de lease que
     refresh_propicks_prices. Las fuentes (yfinance/Finnhub) son las por

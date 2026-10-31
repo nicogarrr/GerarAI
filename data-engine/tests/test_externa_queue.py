@@ -67,3 +67,22 @@ def test_worker_externa_consume_la_cola_con_claves_de_fuente():
         valor = float(memoria.rstrip("MG"))
         total += int(valor * 1024) if memoria.endswith("G") else int(valor)
     assert total <= 16384, f"los limites suman {total} MiB"
+
+
+def test_refresh_valuation_metrics_tiene_time_limit_acotado():
+    """Sin limite, una corrida lenta de universo ocupaba un hilo del carril
+    horas (31-oct: 2 corridas sosteniendo 7.617 pendientes). 1 h acota la
+    ocupacion; el cursor en Redis reanuda sin rehacer lo comprometido."""
+    from app.workers.dramatiq_app import broker
+
+    actor = broker.get_actor("refresh_valuation_metrics")
+    assert actor.options["time_limit"] == 3_600_000
+
+
+def test_worker_externa_sin_prefetch_extra():
+    """Trabajos pesados y largos: prefetch 1 como worker-knowledge; un
+    mensaje prefetcheado espera en local invisible para HLEN."""
+    compose = yaml.load(COMPOSE_PATH.read_text(), Loader=_ComposeLoader)
+    env = compose["services"]["worker-externa"]["environment"]
+    assert env["dramatiq_queue_prefetch"] == "1"
+    assert env["dramatiq_delay_queue_prefetch"] == "1"
