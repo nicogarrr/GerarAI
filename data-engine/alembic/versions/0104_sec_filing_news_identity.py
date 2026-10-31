@@ -1,6 +1,7 @@
 """Unique tenant/accession identity for SEC filing news (nullable for other news)."""
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0104_sec_filing_news_identity"
