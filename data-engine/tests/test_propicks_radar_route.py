@@ -31,7 +31,15 @@ def _payload(level: int, *, status: str = "ok") -> dict:
 
 
 @pytest.fixture
-def client():
+def db_session(monkeypatch):
+    # Fecha fija: la vigencia de un snapshot (regla >3 días) depende de
+    # date.today(); sin esto el test se rompería al correrlo otra semana.
+    class _FixedDate(date):
+        @classmethod
+        def today(cls) -> date:
+            return date(2026, 10, 31)
+
+    monkeypatch.setattr(radar_module, "date", _FixedDate)
     engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False},
                            poolclass=StaticPool)
     Base.metadata.create_all(engine)
@@ -57,11 +65,16 @@ def client():
     db.add(WatchItem(tenant_id=1, symbol="T01"))
     db.commit()
 
+    return db
+
+
+@pytest.fixture
+def client(db_session):
     app = FastAPI()
     app.include_router(radar_module.router, prefix="/api/propicks")
 
     def _override_db():
-        yield db
+        yield db_session
 
     app.dependency_overrides[get_db] = _override_db
     return TestClient(app)
@@ -80,7 +93,8 @@ def test_pagination_20_per_page_and_counts(client):
     assert [i["level"] for i in page1["items"][:3]] == [4, 4, 4]
     assert page1["counts_by_level"] == {"4": 3, "3": 7, "1": 15}
     # Cobertura honesta: la inválida cuenta aparte; NOSNAP no está evaluada.
-    assert page1["coverage"] == {"universe": 27, "evaluated": 26, "ok": 25, "invalid": 1}
+    assert page1["coverage"] == {"universe": 27, "evaluated": 26, "ok": 25, "invalid": 1,
+                                        "stale": 0}
     row = page1["items"][0]
     assert row["formula_version"] == "nico-v1"
     assert row["status"] == "forming"
@@ -88,6 +102,7 @@ def test_pagination_20_per_page_and_counts(client):
     assert row["signal_date"] == "2026-10-29"
     assert row["source"] == "yfinance"
     assert row["clear_price_signal"] is True
+    assert row["scan_date"] == "2026-10-30"
 
 
 def test_level_and_sector_filters(client):
@@ -98,6 +113,9 @@ def test_level_and_sector_filters(client):
     assert energy["total"] == 12
     assert {i["sector"] for i in energy["items"]} == {"Energy"}
     assert set(client.get("/api/propicks/radar/opportunities").json()["sectors"]) == {"Energy", "Technology"}
+    # La cobertura es global: no baja al filtrar por sector.
+    assert energy["coverage"]["ok"] == 25
+    assert energy["total"] == 12
 
 
 def test_outside_tracked_excludes_watchlist(client):
@@ -136,3 +154,24 @@ def test_actor_is_registered_on_computed_queue():
     assert propicks_radar_scan.queue_name == "computed"
     # Radar sin outbox: no comparte la cola de alertas del evaluador DCA.
     assert propicks_radar_scan.queue_name != "alerts"
+
+
+def test_stale_scan_is_not_an_opportunity(client, db_session):
+    # Scan antiguo y NINGUNA corrida nueva: el snapshot viejo deja de ser
+    # vigente (cuenta en coverage.stale, no aparece como oportunidad).
+    save_snapshot(db_session, 99, _payload(4), now=datetime(2026, 10, 10, 22, 0, tzinfo=UTC))
+    db_session.commit()
+    res = client.get("/api/propicks/radar/opportunities").json()
+    assert "NOSNAP" not in {i["ticker"] for i in res["items"]}
+    assert res["total"] == 25
+    assert res["coverage"] == {"universe": 27, "evaluated": 27, "ok": 25, "invalid": 1,
+                               "stale": 1}
+
+
+def test_snapshot_at_three_days_is_still_fresh(client, db_session):
+    # Frontera de la regla (>3 días): a los 3 días exactos sigue vigente.
+    save_snapshot(db_session, 99, _payload(2), now=datetime(2026, 10, 28, 22, 0, tzinfo=UTC))
+    db_session.commit()
+    res = client.get("/api/propicks/radar/opportunities").json()
+    assert "NOSNAP" in {i["ticker"] for i in res["items"]}
+    assert res["coverage"]["stale"] == 0

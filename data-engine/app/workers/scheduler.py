@@ -524,10 +524,11 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         hour=22,
         minute=30,
     )
-    # Radar ProPicks+DCA (universo 1.000): barrido acotado y resumible tras
-    # los precios del cierre US. El cursor por dia reanuda lo que el
-    # presupuesto deje sin completar en la siguiente corrida; el lease
-    # global evita solapes entre lotes.
+    # Radar ProPicks+DCA (universo 1.000): barrido nocturno acotado y
+    # resumible. Persiste snapshots SOLO con sesiones asentadas: la sesion
+    # del dia en curso nunca entra, asi que esta corrida NO usa el cierre
+    # de hoy aunque se encole despues de el. El cursor por dia reanuda lo
+    # que el presupuesto deje sin completar; el lease global evita solapes.
     _register(
         scheduler,
         partial(enqueue_for_all_tenants, propicks_radar_scan),

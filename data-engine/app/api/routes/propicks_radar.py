@@ -6,7 +6,10 @@ una petición de lectura. Datos públicos de precio por empresa; el filtro
 
 Cada fila separa el mes CONFIRMADO del mes EN FORMACIÓN, con fecha, precio,
 fuente y versión de fórmula. Las empresas con evaluación inválida no son
-oportunidades: cuentan en ``coverage``, no en los items.
+oportunidades: cuentan en ``coverage``, no en los items. Un snapshot con
+más de STALE_SCAN_DAYS días sin corrida nueva tampoco es vigente: cuenta en
+``coverage.stale``. La cobertura es global: no cambia con los filtros de la
+lista (el tamaño filtrado está en ``total``).
 """
 
 from __future__ import annotations
@@ -25,6 +28,10 @@ from app.services.propicks_radar_job import universe_company_ids
 from app.services.propicks_radar_store import latest_public_signals
 
 router = APIRouter()
+
+# Misma regla de vigencia que el núcleo (evaluate_candidate): más de 3 días
+# sin corrida nueva y el snapshot deja de presentarse como oportunidad.
+STALE_SCAN_DAYS = 3
 
 
 def _tracked_symbols(db: Session) -> set[str]:
@@ -70,6 +77,7 @@ def list_radar_opportunities(
 
     rows: list[dict] = []
     invalid = 0
+    stale = 0
     for signal in signals:
         company = companies.get(signal["company_id"])
         if company is None:
@@ -77,6 +85,11 @@ def list_radar_opportunities(
         payload = signal["payload"]
         if payload.get("status") != "ok":
             invalid += 1
+            continue
+        scan_day = date.fromisoformat(signal["scan_date"])
+        if (as_of - scan_day).days > STALE_SCAN_DAYS:
+            # Scan antiguo sin corrida nueva: no es una oportunidad vigente.
+            stale += 1
             continue
         current = payload.get("current") or {}
         confirmed = payload.get("confirmed") or {}
@@ -99,7 +112,18 @@ def list_radar_opportunities(
             "clear_price_signal": payload.get("clear_price_signal"),
             "change": signal["change"],
             "formula_version": payload.get("formula_version"),
+            "scan_date": signal["scan_date"],
         })
+
+    # Cobertura GLOBAL del universo: se calcula antes de los filtros y no
+    # cambia con ellos (el tamaño filtrado está en ``total``).
+    coverage = {
+        "universe": len(universe_company_ids(db)),
+        "evaluated": len(signals),
+        "ok": len(rows),
+        "invalid": invalid,
+        "stale": stale,
+    }
 
     if sector:
         rows = [r for r in rows if r["sector"] == sector]
@@ -120,10 +144,5 @@ def list_radar_opportunities(
         "items": paged["items"],
         "counts_by_level": counts_by_level,
         "sectors": sorted({r["sector"] for r in rows if r["sector"]}),
-        "coverage": {
-            "universe": len(universe_company_ids(db)),
-            "evaluated": len(signals),
-            "ok": len(rows),
-            "invalid": invalid,
-        },
+        "coverage": coverage,
     }
