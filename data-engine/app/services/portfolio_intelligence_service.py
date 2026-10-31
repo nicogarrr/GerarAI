@@ -15,7 +15,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.local_date import local_today
-from app.models import CashBalance, Company, FinancialFact, MarketPrice, Position, Transaction
+from app.models import (
+    CashBalance,
+    Company,
+    FinancialFact,
+    MarketPrice,
+    PortfolioDailySnapshot,
+    Position,
+    Transaction,
+)
 from app.services.async_bridge import run_from_any_context
 from app.services.portfolio_fx_service import PortfolioFXService, currency_key
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
@@ -119,9 +127,12 @@ def _benchmark_prices(db: Session, cutoff: date) -> list[Any] | None:
     """Serie SPY: la del master si existe con precios; si no, la de Yahoo."""
     benchmark = db.scalar(select(Company).where(Company.ticker == "SPY"))
     if benchmark is not None:
+        # Solo date/adj_close (como el SimpleNamespace del camino live):
+        # hidratar MarketPrice entero costaba ~1250 entidades por llamada y
+        # _beta y _benchmark_comparison llaman cada una (medido 2026-10-31).
         stored = list(
-            db.scalars(
-                select(MarketPrice)
+            db.execute(
+                select(MarketPrice.date, MarketPrice.adj_close)
                 .where(MarketPrice.company_id == benchmark.id, MarketPrice.date >= cutoff)
                 .order_by(MarketPrice.date)
             ).all()
@@ -242,7 +253,31 @@ class PortfolioIntelligenceService:
         # Ventana COMPLETA (5 anos por defecto): con la paginacion del
         # endpoint llegaban solo las 20 sesiones mas antiguas y el TWR de la
         # ventana era el de un mes, marcado ademas como exacto.
-        snapshots = PortfolioSnapshotService().history(db, start=cutoff, page_size=None)
+        # Ventana completa SIN entidades ORM: solo se leen snapshot_date,
+        # daily_return, pricing_coverage y metadata_ (ver
+        # _snapshot_history_is_exact, _partial_trading_day y el dict de
+        # retornos). history() sigue intacto para el endpoint paginado;
+        # hidratar ~1250 snapshots enteros eran ~40 de ~190 ms del build
+        # (medido 2026-10-31 con 19 posiciones x 1250 dias).
+        portfolio = fx.portfolio(db)
+        if portfolio is None:
+            snapshots: list[Any] = []
+        else:
+            snapshots = list(
+                db.execute(
+                    select(
+                        PortfolioDailySnapshot.snapshot_date,
+                        PortfolioDailySnapshot.daily_return,
+                        PortfolioDailySnapshot.pricing_coverage,
+                        PortfolioDailySnapshot.metadata_,
+                    )
+                    .where(
+                        PortfolioDailySnapshot.portfolio_id == portfolio.id,
+                        PortfolioDailySnapshot.snapshot_date >= cutoff,
+                    )
+                    .order_by(PortfolioDailySnapshot.snapshot_date)
+                ).all()
+            )
         snapshot_returns = {
             snapshot.snapshot_date: float(snapshot.daily_return)
             for snapshot in snapshots
