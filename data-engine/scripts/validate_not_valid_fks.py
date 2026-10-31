@@ -85,7 +85,7 @@ def _muestra_infractores(conn, conname: str, tabla: str, quote) -> list[str]:
     )
     cols = ", ".join(quote(l) for l in locales)
     sql = _MUESTRA_INFRACTORAS.format(cols=cols, tabla=quote(tabla), cond=cond)
-    return [str(tuple(r)) for r in conn.execute(sa.text(sql)).all()]
+    return [str(tuple(r)) for r in conn.execute(sa.text(sql)).all()]  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- script admin: identificadores de introspeccion pg_constraint escapados con quote(); sin valores interpolados
 
 
 def main() -> int:
@@ -115,7 +115,7 @@ def main() -> int:
         try:
             with engine.begin() as conn:
                 conn.execute(
-                    sa.text(
+                    sa.text(  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- script admin: ALTER TABLE ... VALIDATE CONSTRAINT con identificadores de introspeccion escapados con quote(); sin valores interpolados
                         f"ALTER TABLE {quote(tabla)} VALIDATE CONSTRAINT {quote(nombre)}"
                     )
                 )

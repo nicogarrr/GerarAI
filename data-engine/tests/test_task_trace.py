@@ -73,7 +73,7 @@ def test_snapshot_private_and_retained(tmp_path, monkeypatch):
     m = msg()
     mw.before_process_message(None, m)
     target.mkdir(mode=0o700)
-    os.chmod(target, 0o700)
+    os.chmod(target, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- test: chmod deliberado para fijar los permisos del escenario bajo prueba
     for i in range(4):  # ficheros viejos: la retencion debe borrarlos primero
         (target / f"inflight-2000010{i}T000000-1.json").write_text("{}")
     mw.before_worker_shutdown(None, object())
@@ -188,13 +188,13 @@ def test_stale_partials_are_cleaned_fresh_ones_kept(tmp_path):
 def test_existing_dir_validated_not_chmodded(tmp_path):
     loose = tmp_path / "loose"
     loose.mkdir()
-    os.chmod(loose, 0o755)
+    os.chmod(loose, 0o755)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- test: chmod deliberado para fijar los permisos del escenario bajo prueba
     with pytest.raises(PermissionError):
         TaskTraceMiddleware()._write_snapshot(str(loose), [msg()])
     assert stat.S_IMODE(loose.stat().st_mode) == 0o755  # no se toco
     ok = tmp_path / "ok"
     ok.mkdir()
-    os.chmod(ok, 0o700)
+    os.chmod(ok, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- test: chmod deliberado para fijar los permisos del escenario bajo prueba
     TaskTraceMiddleware()._write_snapshot(str(ok), [msg()])
     notdir = tmp_path / "f"
     notdir.write_text("x")

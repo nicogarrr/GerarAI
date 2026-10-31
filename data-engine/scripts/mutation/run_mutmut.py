@@ -427,7 +427,7 @@ def main() -> int:
         if line_range is not None:
             command = [sys.executable, str(workdir / "_mutmut_scoped.py")]
         run = subprocess.run(
-            [*command, "run", "--max-children", str(args.max_children)],
+            [*command, "run", "--max-children", str(args.max_children)],  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args -- script manual local de mutation testing; el env heredado es el del propio desarrollador, no input remoto
             cwd=workdir,
         )
         found = results(workdir)
@@ -440,7 +440,7 @@ def main() -> int:
         if args.survivors:
             for name, status in sorted(found.items()):
                 if status in {"survived", "timeout", "no tests"}:
-                    subprocess.run([MUTMUT, "show", name], cwd=workdir)
+                    subprocess.run([MUTMUT, "show", name], cwd=workdir)  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-tainted-env-args.dangerous-subprocess-use-tainted-env-args -- script manual local de mutation testing; el env heredado es el del propio desarrollador, no input remoto
         if args.keep:
             print(f"directorio conservado: {workdir}")
         return run.returncode
