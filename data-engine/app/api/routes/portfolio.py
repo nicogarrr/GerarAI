@@ -1290,7 +1290,7 @@ def create_transaction_batch(
         ) from exc
 
 
-@router.put("/transactions/{transaction_id}")
+@router.put("/transactions/{transaction_id}", response_model=PortfolioTransactionOut)
 def update_transaction(
     transaction_id: int,
     payload: PortfolioTransactionInput,
