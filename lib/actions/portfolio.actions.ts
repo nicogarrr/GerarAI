@@ -152,7 +152,9 @@ export async function addTransaction(
         throw new ValidationError('Las comisiones no pueden ser negativas.');
     }
     try {
-        await researchRequest<ResearchPortfolioTransaction>('/api/portfolio/transactions', {
+        // El POST admite acciones de caja (dividend/interest/fee/cash_misc):
+        // su contrato es PortfolioTransactionCreateOut, mas amplio que el del listado.
+        await researchRequest<components['schemas']['PortfolioTransactionCreateOut']>('/api/portfolio/transactions', {
             method: 'POST',
             body: jsonBody({
                 ticker: symbol.toUpperCase(),

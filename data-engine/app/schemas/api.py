@@ -1639,6 +1639,27 @@ class PortfolioTransactionOut(BaseModel):
     updated_at: str
 
 
+class PortfolioTransactionCreateOut(BaseModel):
+    """Respuesta de POST /api/portfolio/transactions (201).
+
+    Igual que PortfolioTransactionOut pero el POST acepta acciones de caja
+    (dividend/interest/fee/cash_misc), no solo buy/sell.
+    """
+
+    id: int
+    ticker: str
+    action: Literal["buy", "sell", "dividend", "interest", "fee", "cash_misc"]
+    quantity: float
+    price: float
+    fees: float
+    currency: str
+    trade_date: str
+    notes: str | None
+    review_flag: str | None
+    created_at: str
+    updated_at: str
+
+
 class PortfolioTransactionPageOut(BaseModel):
     """Respuesta de GET /api/portfolio/transactions/page (limit/offset)."""
 
