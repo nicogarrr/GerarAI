@@ -373,7 +373,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     {reviewId ? (
                         <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300">
                             {t('brain.panel.review', { id: reviewId })}
-                            <button type="button" aria-label={t('brain.panel.removeReviewAria')} onClick={() => setReviewId(undefined)} className="relative text-indigo-400 hover:text-indigo-200 before:absolute before:-inset-x-5 before:-inset-y-4 before:content-['']">×</button>
+                            <button type="button" aria-label={t('brain.panel.removeReviewAria')} onClick={() => setReviewId(undefined)} className="inline-flex min-h-11 min-w-11 items-center justify-center text-indigo-400 hover:text-indigo-200 sm:min-h-0 sm:min-w-0">×</button>
                         </span>
                     ) : null}
                     {viewing && (

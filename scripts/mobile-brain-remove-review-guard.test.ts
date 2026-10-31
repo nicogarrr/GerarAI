@@ -3,18 +3,18 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 /**
- * Guard: el × de quitar la revisión en el panel del Cerebro tiene área
- * táctil de 44px (medido con elementFromPoint a 390px, 2026-10-31).
- * La caja real es 10x16px; el pseudo-elemento invisible la amplía a
- * 44+ en las cuatro direcciones (convención de la casa para chips).
+ * Guard: el × de quitar la revisión en el panel del Cerebro reserva un
+ * área táctil real de 44x44px en móvil (revisión del piloto, 2026-10-31:
+ * un pseudo-elemento por encima invadiría los chips vecinos). En sm+
+ * vuelve al tamaño compacto (sm:min-h-0 sm:min-w-0).
  */
 
-test('× quitar revisión del Cerebro con área táctil invisible 44px', () => {
+test('× quitar revisión del Cerebro con área real 44px en móvil', () => {
     const src = readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
     const i = src.indexOf('removeReviewAria');
     assert.ok(i >= 0, 'botón quitar revisión existe');
     const btn = src.slice(i, src.indexOf('</button>', i));
-    assert.ok(btn.includes('before:absolute'), '× con pseudo-elemento de área');
-    assert.ok(btn.includes('before:-inset-x-5'), 'área horizontal ≥44px');
-    assert.ok(btn.includes('before:-inset-y-4'), 'área vertical ≥44px');
+    assert.ok(btn.includes('min-h-11 min-w-11'), '× con área real 44px');
+    assert.ok(btn.includes('sm:min-h-0 sm:min-w-0'), '× compacto en sm+');
+    assert.ok(!btn.includes('before:'), 'sin pseudo-elemento que invada vecinos');
 });
