@@ -36,7 +36,11 @@
     "shotDesktopAlt": "Ficha de empresa de GerarAI: precio con su fuente, variación y gráfico de evolución",
     "shotTabletAlt": "GerarAI en tablet: la misma ficha adaptada a pantalla mediana",
     "shotMobileAlt": "GerarAI en móvil: precio y gráfico de la ficha de empresa",
-    "caption": "Capturas reales de la aplicación con datos de ejemplo. La interfaz declara de dónde sale cada cifra que muestra, o que no hay fuente disponible."
+    "caption": "Capturas reales de la aplicación con datos de ejemplo. La interfaz declara de dónde sale cada cifra que muestra, o que no hay fuente disponible.",
+    "deviceAria": "Elige el dispositivo de la vista previa",
+    "devicePc": "Ver en ordenador",
+    "deviceTablet": "Ver en tablet",
+    "deviceMobile": "Ver en móvil"
   },
   "help": {
     "metaTitle": "Centro de ayuda",
