@@ -276,3 +276,98 @@ def test_investor_portfolio_13f_branch_list_limitations_and_coverage(monkeypatch
     assert body["limitations"] == ["solo gestores revisados"]
     assert body["coverage"] == "partial"
     assert body["as_of"] is None
+
+
+def test_investor_detail_real_service_with_cik(monkeypatch) -> None:
+    """Servicio real (BD vacia): detalle con CIK -> holdings [], changes presente
+    (insufficient_history real), videos anulados (red externa ajena al contrato)."""
+    client, tenant, user = _client(monkeypatch)
+    monkeypatch.setattr("app.api.routes.investors.investor_videos", lambda slug: [])
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/investors/buffett")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["slug"] == "buffett"
+    assert body["official_name"] == "Berkshire Hathaway Inc"
+    assert body["holdings"] == []
+    assert body["coverage"] is None
+    assert body["verification"] is None
+    assert body["positions"] is None
+    assert body["value_usd_thousands"] is None
+    # Sin gestor en BD el servicio real responde unavailable (no insufficient_history).
+    assert body["changes"]["status"] == "unavailable"
+    assert body["videos"] == []
+    assert body["provenance"]["source"]
+
+
+def test_investor_detail_real_service_without_cik_omits_changes(monkeypatch) -> None:
+    """Sin CIK: official_name None (mismo get() sin default del review) y la
+    clave changes no existe en el wire (exclude_unset conserva la omision)."""
+    client, tenant, user = _client(monkeypatch)
+    monkeypatch.setattr("app.api.routes.investors.investor_videos", lambda slug: [])
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/investors/mark-leonard")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["cik"] is None
+    assert body["official_name"] is None
+    assert body["note"] is not None
+    assert body["has_13f"] is False
+    assert "changes" not in body
+    assert body["holdings"] == []
+
+
+def test_investor_detail_real_holdings_rows_with_nulls(monkeypatch) -> None:
+    """Filas ORM reales del ultimo periodo: value/shares null sobreviven al wire
+    y filing_url viaja como string (default "" del ORM, nunca null)."""
+    from datetime import date as dt_date
+
+    from app.models.entities import FundManager, ManagerHolding
+
+    client, tenant, user = _client(monkeypatch)
+    monkeypatch.setattr("app.api.routes.investors.investor_videos", lambda slug: [])
+    db = SessionLocal()
+    tenant_row = db.query(Tenant).filter(Tenant.external_id.like("investors-read-%")).order_by(Tenant.id.desc()).first()
+    manager = FundManager(
+        tenant_id=tenant_row.id,
+        cik="0001067983",
+        name="Berkshire Hathaway Inc",
+        last_report_date=dt_date(2026, 6, 30),
+        coverage="partial",
+    )
+    db.add(manager)
+    db.flush()
+    db.add(
+        ManagerHolding(
+            tenant_id=tenant_row.id,
+            manager_id=manager.id,
+            accession_number="0001067983-26-000001",
+            report_date=dt_date(2026, 6, 30),
+            filing_date=dt_date(2026, 8, 14),
+            name_of_issuer="APPLE INC",
+            title_of_class="COM",
+            cusip="037833100",
+            value_usd_thousands=None,
+            shares=None,
+            put_call="",
+            filing_url="",
+        )
+    )
+    db.commit()
+    db.close()
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/investors/buffett")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["positions"] == 1
+    assert body["coverage"] == "partial"
+    row = body["holdings"][0]
+    assert row["name_of_issuer"] == "APPLE INC"
+    assert row["value_usd_thousands"] is None
+    assert row["shares"] is None
+    assert row["weight_pct"] is None
+    assert row["put_call"] is None
+    assert row["filing_url"] == ""
+
+
+def test_investor_detail_unknown_slug_404(monkeypatch) -> None:
+    client, tenant, user = _client(monkeypatch)
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/investors/no-existe")
+    assert res.status_code == 404, res.text

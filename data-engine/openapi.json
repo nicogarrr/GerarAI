@@ -6784,6 +6784,264 @@
         "title": "InvestorDatumOut",
         "type": "object"
       },
+      "InvestorDetailOut": {
+        "description": "Ficha de inversor: _entry + holdings + provenance; la ruta anade\nchanges solo si hay CIK (clave ausente si no) y videos siempre.",
+        "properties": {
+          "changes": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ManagerChangesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cik": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cik"
+          },
+          "coverage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage"
+          },
+          "firm": {
+            "title": "Firm",
+            "type": "string"
+          },
+          "has_13f": {
+            "title": "Has 13F",
+            "type": "boolean"
+          },
+          "has_public_profile": {
+            "title": "Has Public Profile",
+            "type": "boolean"
+          },
+          "holdings": {
+            "items": {
+              "$ref": "#/components/schemas/InvestorHoldingOut"
+            },
+            "title": "Holdings",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "person",
+              "firm",
+              "company"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "official_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Official Name"
+          },
+          "positions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "public_profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublicProfileOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "report_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Report Date"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "value_usd_thousands": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd Thousands"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification"
+          },
+          "videos": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/InvestorVideoOut"
+            },
+            "title": "Videos",
+            "type": "array"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "firm",
+          "kind",
+          "has_13f",
+          "has_public_profile",
+          "holdings",
+          "limitations",
+          "provenance"
+        ],
+        "title": "InvestorDetailOut",
+        "type": "object"
+      },
+      "InvestorHoldingOut": {
+        "description": "Fila de cartera del detalle: ORM con defaults \"\" (filing_url nunca null).",
+        "properties": {
+          "cusip": {
+            "title": "Cusip",
+            "type": "string"
+          },
+          "filing_url": {
+            "title": "Filing Url",
+            "type": "string"
+          },
+          "name_of_issuer": {
+            "title": "Name Of Issuer",
+            "type": "string"
+          },
+          "name_of_issuer_filed": {
+            "title": "Name Of Issuer Filed",
+            "type": "string"
+          },
+          "put_call": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Put Call"
+          },
+          "shares": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares"
+          },
+          "title_of_class": {
+            "title": "Title Of Class",
+            "type": "string"
+          },
+          "value_usd_thousands": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Usd Thousands"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          }
+        },
+        "required": [
+          "name_of_issuer",
+          "name_of_issuer_filed",
+          "title_of_class",
+          "cusip",
+          "filing_url"
+        ],
+        "title": "InvestorHoldingOut",
+        "type": "object"
+      },
       "InvestorPortfolioOut": {
         "description": "Respuesta de investor_portfolio(): ramas 13F y curated/Form4.",
         "properties": {
@@ -7036,6 +7294,49 @@
           "has_public_profile"
         ],
         "title": "InvestorSummaryOut",
+        "type": "object"
+      },
+      "InvestorVideoOut": {
+        "properties": {
+          "channel_kind": {
+            "enum": [
+              "personal_confirmed",
+              "firm_confirmed",
+              "archive"
+            ],
+            "title": "Channel Kind",
+            "type": "string"
+          },
+          "channel_name": {
+            "title": "Channel Name",
+            "type": "string"
+          },
+          "channel_url": {
+            "title": "Channel Url",
+            "type": "string"
+          },
+          "published_at": {
+            "title": "Published At",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "video_id": {
+            "title": "Video Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "video_id",
+          "title",
+          "published_at",
+          "channel_name",
+          "channel_url",
+          "channel_kind"
+        ],
+        "title": "InvestorVideoOut",
         "type": "object"
       },
       "InvestorsListOut": {
@@ -10570,6 +10871,213 @@
           "coverage"
         ],
         "title": "ProvenanceOut",
+        "type": "object"
+      },
+      "PublicFactOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "oficial",
+              "inferido",
+              "prensa"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value",
+          "as_of",
+          "source_url",
+          "kind"
+        ],
+        "title": "PublicFactOut",
+        "type": "object"
+      },
+      "PublicProfileLetterOut": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "date",
+          "url"
+        ],
+        "title": "PublicProfileLetterOut",
+        "type": "object"
+      },
+      "PublicProfileLinkOut": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "url"
+        ],
+        "title": "PublicProfileLinkOut",
+        "type": "object"
+      },
+      "PublicProfileMeetingOut": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          },
+          "year": {
+            "title": "Year",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "year",
+          "url"
+        ],
+        "title": "PublicProfileMeetingOut",
+        "type": "object"
+      },
+      "PublicProfileOut": {
+        "description": "Ficha p\u00fablica curada (investor_profiles.PUBLIC_PROFILES) + provenance_note.",
+        "properties": {
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/PublicFactOut"
+            },
+            "title": "Facts",
+            "type": "array"
+          },
+          "holdings": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holdings"
+          },
+          "holdings_note": {
+            "title": "Holdings Note",
+            "type": "string"
+          },
+          "letters": {
+            "items": {
+              "$ref": "#/components/schemas/PublicProfileLetterOut"
+            },
+            "title": "Letters",
+            "type": "array"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/PublicProfileLinkOut"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "meetings": {
+            "items": {
+              "$ref": "#/components/schemas/PublicProfileMeetingOut"
+            },
+            "title": "Meetings",
+            "type": "array"
+          },
+          "provenance_note": {
+            "title": "Provenance Note",
+            "type": "string"
+          },
+          "vehicle": {
+            "$ref": "#/components/schemas/PublicProfileVehicleOut"
+          }
+        },
+        "required": [
+          "vehicle",
+          "facts",
+          "letters",
+          "meetings",
+          "holdings_note",
+          "provenance_note",
+          "links"
+        ],
+        "title": "PublicProfileOut",
+        "type": "object"
+      },
+      "PublicProfileVehicleOut": {
+        "properties": {
+          "manager_company": {
+            "title": "Manager Company",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "regulator_id": {
+            "title": "Regulator Id",
+            "type": "string"
+          },
+          "source_url": {
+            "title": "Source Url",
+            "type": "string"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "regulator_id",
+          "manager_company",
+          "start_date",
+          "source_url"
+        ],
+        "title": "PublicProfileVehicleOut",
         "type": "object"
       },
       "PushConfigOut": {
@@ -37154,9 +37662,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Investor Api Investors  Slug  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InvestorDetailOut"
                 }
               }
             },

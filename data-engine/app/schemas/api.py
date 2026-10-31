@@ -1239,3 +1239,85 @@ class Schedule13DGResponseOut(BaseModel):
     count: int
     filings: list[Schedule13DGFilingOut]
     limitations: list[str]
+
+
+class InvestorHoldingOut(BaseModel):
+    """Fila de cartera del detalle: ORM con defaults "" (filing_url nunca null)."""
+
+    name_of_issuer: str
+    name_of_issuer_filed: str
+    title_of_class: str
+    cusip: str
+    shares: float | None = None
+    value_usd_thousands: float | None = None
+    weight_pct: float | None = None
+    put_call: str | None = None
+    filing_url: str
+
+
+class PublicFactOut(BaseModel):
+    label: str
+    value: str
+    as_of: str
+    source_url: str
+    kind: Literal["oficial", "inferido", "prensa"]
+
+
+class PublicProfileVehicleOut(BaseModel):
+    name: str
+    type: str
+    regulator_id: str
+    manager_company: str
+    start_date: str
+    source_url: str
+
+
+class PublicProfileLetterOut(BaseModel):
+    title: str
+    date: str
+    url: str
+
+
+class PublicProfileMeetingOut(BaseModel):
+    title: str
+    year: str
+    url: str
+
+
+class PublicProfileLinkOut(BaseModel):
+    label: str
+    url: str
+
+
+class PublicProfileOut(BaseModel):
+    """Ficha pública curada (investor_profiles.PUBLIC_PROFILES) + provenance_note."""
+
+    vehicle: PublicProfileVehicleOut
+    facts: list[PublicFactOut]
+    letters: list[PublicProfileLetterOut]
+    meetings: list[PublicProfileMeetingOut]
+    holdings: list | None = None
+    holdings_note: str
+    provenance_note: str
+    links: list[PublicProfileLinkOut]
+
+
+class InvestorVideoOut(BaseModel):
+    video_id: str
+    title: str
+    published_at: str
+    channel_name: str
+    channel_url: str
+    channel_kind: Literal["personal_confirmed", "firm_confirmed", "archive"]
+
+
+class InvestorDetailOut(InvestorSummaryOut):
+    """Ficha de inversor: _entry + holdings + provenance; la ruta anade
+    changes solo si hay CIK (clave ausente si no) y videos siempre."""
+
+    public_profile: PublicProfileOut | None = None
+    holdings: list[InvestorHoldingOut]
+    limitations: list[str]
+    provenance: ProvenanceOut
+    changes: ManagerChangesOut | None = None
+    videos: list[InvestorVideoOut] = []
