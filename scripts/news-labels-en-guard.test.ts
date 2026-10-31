@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { etiquetaDireccionImpacto, etiquetaTemaMacro, etiquetaTierFuente, etiquetaTipoEvento } from '../lib/labels.ts';
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
 import { TICKER_BADGE_LABELS, TICKER_BADGE_LABELS_EN } from '../lib/ticker-badges.ts';
 
 test('sin locale las etiquetas siguen siendo el literal ES histórico', () => {
