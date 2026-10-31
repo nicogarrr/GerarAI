@@ -8,6 +8,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.local_date import local_today
 from app.llm.base import LLMProvider
 from app.llm.chat_provider import create_chat_llm_provider
 from app.llm.errors import ProviderTransportError
@@ -2320,7 +2321,7 @@ class ChatService:
             f"{intro} Si vendieras {sale_text}: valor {_fmt_money_es(float(res.value_eur))} €, "
             f"coste {_fmt_money_es(float(res.cost_eur))} €"
         )
-        year = date.today().year
+        year = local_today().year
         if res.gain_eur > 0 and res.tax_eur is not None:
             rate = res.tax_eur / res.gain_eur * 100
             answer = (
@@ -2418,7 +2419,7 @@ class ChatService:
         source = self._source_entry(
             "position", pos.id, f"Posición {company.ticker}", url="/portfolio", as_of=str(pos.as_of)
         )
-        today = date.today()
+        today = local_today()
         fifo = simulate_fifo_sale(
             db, tenant_id=tenant_id, company_id=company.id, quantity=qty, held_quantity=held, sale_date=today,
         )

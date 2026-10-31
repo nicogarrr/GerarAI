@@ -29,6 +29,7 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import Transaction
 from app.services.tax_report_service import (
     BUY_ACTIONS,
@@ -117,7 +118,7 @@ def simulate_fifo_sale(
     ventas guardadas no explican la posición actual (``held_quantity``): en
     ese caso el llamante usa el coste medio y lo dice.
     """
-    sale_date = sale_date or date.today()
+    sale_date = sale_date or local_today()
     rows = list(
         db.scalars(
             select(Transaction).where(
