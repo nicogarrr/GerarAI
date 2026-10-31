@@ -53,7 +53,7 @@ export function DcaLevelChip({ symbol, signals }: { symbol: string; signals: Hol
     return (
         <span
             className={cn(
-                'inline-flex items-center rounded border px-1.5 py-0.5 text-[11px] font-semibold',
+                'inline-flex shrink-0 items-center rounded border px-1.5 py-0.5 text-[11px] font-semibold',
                 level ? 'border-transparent' : 'border-gray-700 text-gray-500',
             )}
             style={level?.color ? { backgroundColor: level.color, color: level.fg ?? undefined } : undefined}
