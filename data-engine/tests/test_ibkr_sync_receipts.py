@@ -156,7 +156,7 @@ def test_receipt_counts_never_persist_raw_row_errors(monkeypatch):
         save(db)
         _, _, account, revision = service.credentials(db, settings())
         result = service.import_report(db, report(), account, revision)
-        assert result['last_sync']['counts'] == {'positions_imported': 1, 'rows_skipped': 2, 'row_errors': 1, 'reconcile_blocked': 0}
+        assert result['last_sync']['counts'] == {'origin': 'manual', 'positions_imported': 1, 'rows_skipped': 2, 'row_errors': 1, 'reconcile_blocked': 0}
         assert 'secret' not in str(result)
 
 

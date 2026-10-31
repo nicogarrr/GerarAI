@@ -4170,11 +4170,12 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
             with ibkr.sync_lease(db):
                 try:
                     token, query_id, account_id, revision = ibkr.credentials(db, get_settings())
-                    receipt_id = ibkr.start_receipt(db, revision=revision)
+                    receipt_id = ibkr.start_receipt(db, revision=revision, origin="scheduled")
                     xml = _run(ibkr.download(token, query_id))
                     return ibkr.import_report(db, xml, account_id, revision, receipt_id=receipt_id)
-                except Exception:
-                    ibkr.record_failure(db, revision=revision, receipt_id=receipt_id)
+                except Exception as exc:
+                    ibkr.record_failure(db, revision=revision, receipt_id=receipt_id,
+                                        error_code=ibkr.error_kind(exc))
                     return {
                         "status": "error",
                         "message": "IBKR no disponible; se conservan los datos anteriores.",

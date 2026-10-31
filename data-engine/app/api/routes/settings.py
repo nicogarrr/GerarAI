@@ -343,13 +343,14 @@ async def sync_ibkr_connection(db: Session = Depends(get_db)) -> dict:
         await run_in_threadpool(lease.__enter__)
         entered = True
         token, query_id, account_id, revision = await run_in_threadpool(ibkr.credentials, db, get_settings())
-        receipt_id = await run_in_threadpool(ibkr.start_receipt, db, revision=revision)
+        receipt_id = await run_in_threadpool(ibkr.start_receipt, db, revision=revision, origin="manual")
         xml = await ibkr.download(token, query_id)
         return await run_in_threadpool(ibkr.import_report, db, xml, account_id, revision, receipt_id=receipt_id)
     except ibkr.SyncBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
     except Exception as exc:
-        await run_in_threadpool(ibkr.record_failure, db, revision=revision, receipt_id=receipt_id)
+        await run_in_threadpool(ibkr.record_failure, db, revision=revision, receipt_id=receipt_id,
+                                error_code=ibkr.error_kind(exc))
         detail = str(exc) if isinstance(exc, ibkr.ConnectionError) else "No se pudo sincronizar IBKR. Conservamos los datos anteriores."
         raise HTTPException(status_code=422, detail=detail) from None
     finally:
