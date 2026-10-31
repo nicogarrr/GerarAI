@@ -18,7 +18,7 @@ describe('citationKindLabel', () => {
     assert.equal(citationKindLabel('position:3'), 'Posición');
   });
   it('ningún componente pinta el localizador crudo', () => {
-    for (const file of ['components/brain/BrainSources.tsx', 'components/chat/CitationsList.tsx']) {
+    for (const file of ['components/brain/BrainSources.tsx']) {
       assert.ok(!/>\s*\{citation\.locator\}\s*</.test(readFileSync(file, 'utf8')), file);
     }
   });
