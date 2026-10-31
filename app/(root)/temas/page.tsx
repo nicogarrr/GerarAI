@@ -317,11 +317,14 @@ export default async function TemasPage({ searchParams }: PageProps) {
         </nav>
       ) : null}
 
+      {/* El proveedor no se pinta: es una etiqueta de fuente y la fuente ya
+          viaja en la API. Se conservan la frescura del dato, el metodo y los
+          avisos de calidad (parcial / recalculando). */}
       <footer className="border-t border-gray-800 pt-3 text-xs text-gray-500">
         <p>
           {data.as_of
-            ? `${data.source} · ${data.intraday ? 'intradía' : 'cierre'} del ${formatMarketDate(data.as_of)} · ${data.method}`
-            : `${data.source} · sin fecha de datos disponible · ${data.method}`}
+            ? `${data.intraday ? 'Intradía' : 'Cierre'} del ${formatMarketDate(data.as_of)} · ${data.method}`
+            : `Sin fecha de datos disponible · ${data.method}`}
           {data.status === 'parcial' ? ' · datos parciales' : ''}
           {data.stale ? ' · recalculando: se muestra la última versión calculada' : ''}
         </p>
