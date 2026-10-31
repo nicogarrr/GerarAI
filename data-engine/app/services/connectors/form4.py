@@ -23,6 +23,7 @@ No se anade ninguna dependencia: NO tocar requirements.txt por esto.
 from __future__ import annotations
 
 import re
+import time
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from xml.etree import ElementTree as ET
@@ -36,6 +37,25 @@ from app.core.config import get_settings
 # permitiria que un fetch 13F y un Form 4 disparasen juntos y la SEC devolviese
 # 403 a los dos. ``form13f`` comparte este mismo throttle.
 from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
+from app.services.data_source_health import get_data_source_registry
+
+# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
+# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
+# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
+_REGISTRY_KEY = "sec_edgar"
+
+
+def _record_sec_outcome(registry, started: float) -> None:
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+
+
+def _record_sec_http_failure(registry, exc) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+
+
+def _record_sec_transport_failure(registry, exc: Exception) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+
 
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
@@ -48,9 +68,7 @@ MIN_INTERVAL_SECONDS = SEC_MIN_INTERVAL_SECONDS
 _throttle = sec_throttle
 
 
-BROWSER_USER_AGENT = (
-    "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
-)
+BROWSER_USER_AGENT = "Mozilla/5.0 (compatible; GerarAI/0.1; +mailto:{contact}) GerarAI Research"
 DEFAULT_CONTACT = "contact@example.com"
 _EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
@@ -105,14 +123,29 @@ def recent_form4_filings(
     # ~15 ms) se comia parte del hueco y acortaba la separacion real entre
     # peticiones, que es justo lo que la SEC mide.
     headers = default_headers()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     _throttle()
-    if client is not None:
-        response = client.get(url, headers=headers)
-    else:
-        with httpx.Client(timeout=30, headers=headers) as owned:
-            response = owned.get(url)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        if client is not None:
+            response = client.get(url, headers=headers)
+        else:
+            with httpx.Client(timeout=30, headers=headers) as owned:
+                response = owned.get(url)
+        response.raise_for_status()
+        payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (400, 404):
+            raise  # CIK sin datos: dato por emisor, no fuente caida
+        _record_sec_http_failure(registry, exc)
+        raise
+    except httpx.TransportError as exc:
+        _record_sec_transport_failure(registry, exc)
+        raise
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
+        raise
+    _record_sec_outcome(registry, started)
     recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
     cik_number = str(int(str(cik).strip()))
@@ -194,16 +227,28 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
     attempt = 0
     while True:
         _throttle()
-        if client is not None:
-            response = client.get(url, headers=headers)
-        else:
-            with httpx.Client(timeout=30, headers=headers) as owned:
-                response = owned.get(url)
+        try:
+            if client is not None:
+                response = client.get(url, headers=headers)
+            else:
+                with httpx.Client(timeout=30, headers=headers) as owned:
+                    response = owned.get(url)
+        except httpx.TransportError as exc:
+            _record_sec_transport_failure(get_data_source_registry(), exc)
+            raise
         if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
             _sleep(RETRY_BACKOFF_SECONDS[attempt])
             attempt += 1
             continue
-        response.raise_for_status()
+        registry = get_data_source_registry()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 404):
+                raise  # documento inexistente: dato por emisor
+            _record_sec_http_failure(registry, exc)
+            raise
+        _record_sec_outcome(registry, time.perf_counter())
         return response.text
 
 
@@ -268,7 +313,6 @@ def _rule_10b5_1(node: ET.Element, footnotes: dict[str, str]) -> bool:
         if note and _RULE_10B51_RE.search(note):
             return True
     return False
-
 
 
 def _text(elem: ET.Element | None, path: str) -> str | None:
@@ -395,7 +439,11 @@ def parse_form4_xml(source: str | bytes) -> dict:
                     "multi_reporter": multi_reporter,
                     "reporters_count": len(reporters),
                     "attribution": "joint_filing" if multi_reporter else "single_reporter",
-                    "role": ("multiple insiders" if multi_reporter else (_role(main_rep) if reporters else "insider")),
+                    "role": (
+                        "multiple insiders"
+                        if multi_reporter
+                        else (_role(main_rep) if reporters else "insider")
+                    ),
                     "officer_title": main_rep.get("officer_title"),
                     "is_officer": bool(main_rep.get("is_officer")),
                     "type": code,  # codigo SEC crudo: P = compra (mercado abierto O privada), S = venta

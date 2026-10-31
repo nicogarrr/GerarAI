@@ -26,6 +26,7 @@ No se anade ninguna dependencia: NO tocar requirements.txt por esto.
 from __future__ import annotations
 
 import re
+import time
 from datetime import datetime
 from xml.etree import ElementTree as ET
 
@@ -38,6 +39,25 @@ from app.core.errors import redact_secrets
 # la vez y la SEC devolveria 403 a todos los conectores.
 from app.services.connectors.base import SEC_MIN_INTERVAL_SECONDS, sec_throttle
 from app.services.connectors.form4 import default_headers
+from app.services.data_source_health import get_data_source_registry
+
+# Clave compartida con el resto de conectores SEC (sec.py, sec_edgar.py):
+# mismo proveedor, mismo circuito. 400/404 (CIK o documento inexistente) son
+# dato por emisor y NO degradan; 403/429/5xx/red/no-JSON SI.
+_REGISTRY_KEY = "sec_edgar"
+
+
+def _record_sec_outcome(registry, started: float) -> None:
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+
+
+def _record_sec_http_failure(registry, exc) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+
+
+def _record_sec_transport_failure(registry, exc: Exception) -> None:
+    registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+
 
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data"
@@ -84,14 +104,29 @@ def recent_form13dg_filings(
     # Cabeceras ANTES del throttle (ver form4.py: preparar despues se comia
     # parte del hueco entre peticiones, que es lo que la SEC mide).
     headers = default_headers()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     _throttle()
-    if client is not None:
-        response = client.get(url, headers=headers)
-    else:
-        with httpx.Client(timeout=30, headers=headers) as owned:
-            response = owned.get(url)
-    response.raise_for_status()
-    payload = response.json()
+    try:
+        if client is not None:
+            response = client.get(url, headers=headers)
+        else:
+            with httpx.Client(timeout=30, headers=headers) as owned:
+                response = owned.get(url)
+        response.raise_for_status()
+        payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code in (400, 404):
+            raise  # CIK sin datos: dato por emisor, no fuente caida
+        _record_sec_http_failure(registry, exc)
+        raise
+    except httpx.TransportError as exc:
+        _record_sec_transport_failure(registry, exc)
+        raise
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "respuesta no JSON")
+        raise
+    _record_sec_outcome(registry, started)
     recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
     cik_number = str(int(str(cik).strip()))
@@ -165,18 +200,28 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
     attempt = 0
     while True:
         _throttle()
-        if client is not None:
-            response = client.get(url, headers=headers)
-        else:
-            with httpx.Client(timeout=30, headers=headers) as owned:
-                response = owned.get(url)
+        try:
+            if client is not None:
+                response = client.get(url, headers=headers)
+            else:
+                with httpx.Client(timeout=30, headers=headers) as owned:
+                    response = owned.get(url)
+        except httpx.TransportError as exc:
+            _record_sec_transport_failure(get_data_source_registry(), exc)
+            raise
         if getattr(response, "status_code", 200) in RETRY_STATUSES and attempt < len(RETRY_BACKOFF_SECONDS):
-            import time
-
             time.sleep(RETRY_BACKOFF_SECONDS[attempt])
             attempt += 1
             continue
-        response.raise_for_status()
+        registry = get_data_source_registry()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 404):
+                raise  # documento inexistente: dato por emisor
+            _record_sec_http_failure(registry, exc)
+            raise
+        _record_sec_outcome(registry, time.perf_counter())
         return response.text
 
 
@@ -338,9 +383,7 @@ def _parse_xml(text: str) -> dict:
     holders: list[dict] = []
     if form_data is not None:
         person_details = [
-            elem
-            for elem in form_data
-            if _local(elem.tag) == "coverPageHeaderReportingPersonDetails"
+            elem for elem in form_data if _local(elem.tag) == "coverPageHeaderReportingPersonDetails"
         ]
     else:
         person_details = []
@@ -388,7 +431,8 @@ def _parse_xml(text: str) -> dict:
         "form": form,
         "is_amendment": bool(form and form.endswith("/A")),
         "filer_cik": (_text_local(filer, "cik") or "").lstrip("0") or _text_local(filer, "cik"),
-        "issuer_cik": (_text_local(issuer, "issuerCik") or "").lstrip("0") or _text_local(issuer, "issuerCik"),
+        "issuer_cik": (_text_local(issuer, "issuerCik") or "").lstrip("0")
+        or _text_local(issuer, "issuerCik"),
         "issuer_name": _text_local(issuer, "issuerName"),
         "cusip": _text_local(cusips, "issuerCusipNumber"),
         "securities_class_title": _text_local(cover, "securitiesClassTitle"),
@@ -401,9 +445,7 @@ def _parse_xml(text: str) -> dict:
         "sole_dispositive_power": primary.get("sole_dispositive_power"),
         "shared_dispositive_power": primary.get("shared_dispositive_power"),
         "holders": holders,
-        "snapshot_date": _parse_date(
-            _text_local(cover, "eventDateRequiresFilingThisStatement")
-        ),
+        "snapshot_date": _parse_date(_text_local(cover, "eventDateRequiresFilingThisStatement")),
         "signature_date": _parse_date(_text_local(signature, "date")),
     }
 
@@ -533,14 +575,16 @@ def parse_schedule13dg(text: str) -> dict:
     # El sobre SGML (<SEC-DOCUMENT>/<SEC-HEADER>) tambien empieza por "<":
     # sin esta guarda se intentaria parsear como XML y fallaria.
     head = text.lstrip()[:500].lower()
-    is_sgml = head.startswith(("<sec-document", "<sec-header")) or bool(
-        _SGML_TYPE_RE.search(text[:4000])
-    )
+    is_sgml = head.startswith(("<sec-document", "<sec-header")) or bool(_SGML_TYPE_RE.search(text[:4000]))
     if _looks_like_xml(text) and not is_sgml:
         try:
             return _parse_xml(text)
         except (ET.ParseError, ValueError) as exc:
-            return {**_empty_parse(), "format": "xml", "error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300]}
+            return {
+                **_empty_parse(),
+                "format": "xml",
+                "error": redact_secrets(f"{type(exc).__name__}: {exc}")[:300],
+            }
 
     sgml_form = None
     match = _SGML_TYPE_RE.search(text)
