@@ -247,9 +247,7 @@ class ScreenerService:
         db.refresh(screen)
         return screen
 
-    def claim_screen_name(
-        self, db: Session, name: str, *, exclude_id: int | None = None
-    ) -> str:
+    def claim_screen_name(self, db: Session, name: str, *, exclude_id: int | None = None) -> str:
         """Valida y reserva ``name`` para un filtro activo del tenant.
 
         ``uq_saved_screen_tenant_name`` cubre también los filtros archivados
@@ -261,9 +259,7 @@ class ScreenerService:
         if not clean:
             raise ValueError("El nombre no puede estar vacío")
         holders = db.scalars(
-            select(SavedScreen).where(
-                SavedScreen.name == clean, *tenant_filters(db, SavedScreen)
-            )
+            select(SavedScreen).where(SavedScreen.name == clean, *tenant_filters(db, SavedScreen))
         ).all()
         for holder in holders:
             if holder.id == exclude_id:
@@ -297,9 +293,7 @@ class ScreenerService:
         )
         facts = set(
             db.scalars(
-                select(FinancialFact.metric)
-                .where(*tenant_filters(db, FinancialFact))
-                .distinct()
+                select(FinancialFact.metric).where(*tenant_filters(db, FinancialFact)).distinct()
             ).all()
         )
         return sorted(calculated | facts | set(context_metrics_with_data(db)))
@@ -390,13 +384,36 @@ class ScreenerService:
         companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
         # Batch-fetch observations once: two queries per table instead of two
         # queries per company (2N -> 2 on every screener run).
-        calculated_by_company: dict[int, list[CalculatedMetric]] = {}
-        for row in db.scalars(
-            select(CalculatedMetric)
+        # Solo la ultima fila por (empresa, metrica) se usa (la primera en el
+        # orden fiscal_year DESC NULLS LAST, id DESC): row_number con ese mismo
+        # orden y rn = 1 la acota en SQL. Antes se leian TODOS los años y
+        # periodos de TODAS las metricas calculadas en cada corrida del
+        # screener (y de cada saved screen en cada market refresh).
+        ranked_calculated = (
+            select(
+                CalculatedMetric.id.label("id"),
+                func.row_number()
+                .over(
+                    partition_by=(CalculatedMetric.company_id, CalculatedMetric.metric),
+                    order_by=(
+                        CalculatedMetric.fiscal_year.desc().nullslast(),
+                        desc(CalculatedMetric.id),
+                    ),
+                )
+                .label("rn"),
+            )
             .where(
                 CalculatedMetric.value.is_not(None),
                 CalculatedMetric.status == "ok",
+                *tenant_filters(db, CalculatedMetric),
             )
+            .subquery("bounded_calculated_metrics")
+        )
+        calculated_by_company: dict[int, list[CalculatedMetric]] = {}
+        for row in db.scalars(
+            select(CalculatedMetric)
+            .join(ranked_calculated, ranked_calculated.c.id == CalculatedMetric.id)
+            .where(ranked_calculated.c.rn == 1)
             .order_by(
                 CalculatedMetric.company_id,
                 CalculatedMetric.metric,
@@ -405,9 +422,7 @@ class ScreenerService:
             )
         ).all():
             calculated_by_company.setdefault(row.company_id, []).append(row)
-        facts_by_company = self._facts_by_company(
-            db, self._required_fact_metrics(used_names, definitions)
-        )
+        facts_by_company = self._facts_by_company(db, self._required_fact_metrics(used_names, definitions))
         # Valoracion, tesis y nivel DCA como nombres del screener (tambien
         # dentro de metricas personalizadas). Solo se leen si se usan.
         context_names = set(used_names)
@@ -479,9 +494,7 @@ class ScreenerService:
                 try:
                     rank_value = ranking.evaluate(values)
                 except MissingVariables as exc:
-                    ranking_missing.update(
-                        self._expand_missing(exc.names, definitions, values)
-                    )
+                    ranking_missing.update(self._expand_missing(exc.names, definitions, values))
                 except ValueError as exc:
                     # Same isolation as the criteria: an unrankable company keeps
                     # its result row and simply sorts on the `rank_value is None`
@@ -509,9 +522,7 @@ class ScreenerService:
                 "name": company.name,
                 "matched": not criteria_missing and all(item["passed"] for item in criterion_results),
                 "rank_value": str(rank_value) if rank_value is not None else None,
-                "coverage_percent": round(100 * len(available) / len(used_names), 1)
-                if used_names
-                else 100.0,
+                "coverage_percent": round(100 * len(available) / len(used_names), 1) if used_names else 100.0,
                 "confidence": str(sum(confidence_values, Decimal("0")) / len(confidence_values))
                 if confidence_values
                 else "0",
@@ -549,9 +560,7 @@ class ScreenerService:
     # per metric is plenty of history while still bounding the read.
     MAX_FACTS_PER_METRIC = 60
 
-    def _facts_by_company(
-        self, db: Session, metrics: set[str]
-    ) -> dict[int, list[FinancialFact]]:
+    def _facts_by_company(self, db: Session, metrics: set[str]) -> dict[int, list[FinancialFact]]:
         """Financial facts for the metrics this screen references, bounded.
 
         Unfiltered, this read the WHOLE `financial_facts` table (every metric of
@@ -571,13 +580,15 @@ class ScreenerService:
         ranked = (
             select(
                 FinancialFact.id.label("id"),
-                func.row_number().over(
+                func.row_number()
+                .over(
                     partition_by=(FinancialFact.company_id, FinancialFact.metric),
                     order_by=(
                         FinancialFact.fiscal_year.desc().nullslast(),
                         desc(FinancialFact.id),
                     ),
-                ).label("rn"),
+                )
+                .label("rn"),
             )
             .where(
                 FinancialFact.metric.in_(sorted(metrics)),
@@ -600,9 +611,7 @@ class ScreenerService:
             facts_by_company.setdefault(fact.company_id, []).append(fact)
         return facts_by_company
 
-    def _required_fact_metrics(
-        self, names: set[str], definitions: list[CustomMetricDefinition]
-    ) -> set[str]:
+    def _required_fact_metrics(self, names: set[str], definitions: list[CustomMetricDefinition]) -> set[str]:
         """Fact metrics behind the names a screen references.
 
         Walks the same graph the observations do: a `*_cagr` name needs its base
@@ -857,9 +866,7 @@ class ScreenerService:
                     # data (division by zero, non-finite) is left unobserved, so
                     # the screen reports it as missing instead of the whole run
                     # raising out of here.
-                    logger.warning(
-                        "custom metric %s unevaluable: %s", definition.metric_key, exc
-                    )
+                    logger.warning("custom metric %s unevaluable: %s", definition.metric_key, exc)
                     continue
                 dependencies = [observations[name] for name in formula.names]
                 observations[definition.metric_key] = Observation(
