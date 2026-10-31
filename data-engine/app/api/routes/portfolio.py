@@ -1010,7 +1010,7 @@ def transactions_page(
     }
 
 
-@router.post("/add", status_code=201)
+@router.post("/add", status_code=201, response_model=PortfolioTransactionCreateOut)
 def add_portfolio_transaction(
     payload: PortfolioTransactionInput, db: Session = Depends(get_db)
 ) -> dict:
