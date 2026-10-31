@@ -8,7 +8,6 @@ import {
     type TriggeredAlertDelivery,
 } from '@/lib/actions/alerts.actions';
 import {
-    getHomeOpportunities,
     getHomeWatchlistPreview,
     type HomeWatchlistPreview,
 } from '@/lib/actions/home-overview.actions';
@@ -18,11 +17,18 @@ import { sectionErrorKey } from '@/lib/section-error';
  * Primera carga del inicio en UNA server action.
  *
  * Next ejecuta en serie las server actions que lanza un mismo cliente: las
- * cuatro secciones del inicio (cartera, alertas, watchlist, oportunidades)
- * eran cuatro POST encadenados y el contenido esperaba a la suma de los
- * cuatro. Aquí las lecturas corren a la vez en el servidor y llegan en un solo
- * viaje. Cada sección conserva su propio resultado y su propio error (un fallo
- * no tumba a las demás); los «Reintentar» siguen usando la lectura suelta.
+ * tres secciones rápidas del inicio (cartera, alertas, watchlist) eran POST
+ * encadenados y el contenido esperaba a la suma. Aquí las lecturas corren a
+ * la vez en el servidor y llegan en un solo viaje. Cada sección conserva su
+ * propio resultado y su propio error (un fallo no tumba a las demás); los
+ * «Reintentar» siguen usando la lectura suelta.
+ *
+ * OPORTUNIDADES NO VIAJA EN ESTE POST: su sondeo DCF cotiza candidatas con
+ * proveedores externos en síncrono (~7 s medidos en prod, 31-oct) y, al
+ * compartir promesa, obligaba a las tres secciones rápidas a esperar esos
+ * ~7 s antes de pintar (skeletons persistentes en Inicio) además de quemar
+ * Fluid Active CPU de Vercel en el primer pintado. La sección se pide
+ * DESPUÉS del primer pintado con su propia llamada (debajo del pliegue).
  */
 
 export type HomeSection<T> = { data: T; error: string | null };
@@ -31,7 +37,6 @@ export type HomeOverviewBundle = {
     portfolio: HomeSection<PortfolioSummary | null>;
     alerts: HomeSection<{ rules: Alert[]; triggered: TriggeredAlertDelivery[] }>;
     watchlist: HomeSection<HomeWatchlistPreview>;
-    opportunities: HomeSection<Awaited<ReturnType<typeof getHomeOpportunities>>>;
 };
 
 async function section<T>(read: () => Promise<T>, fallback: T): Promise<HomeSection<T>> {
@@ -46,9 +51,9 @@ async function section<T>(read: () => Promise<T>, fallback: T): Promise<HomeSect
 
 export async function getHomeOverviewBundle(
     userId: string,
-    params: { watchlistLimit: number; marketCapMoreThan: number; limit: number; candidateLimit: number },
+    params: { watchlistLimit: number },
 ): Promise<HomeOverviewBundle> {
-    const [portfolio, alerts, watchlist, opportunities] = await Promise.all([
+    const [portfolio, alerts, watchlist] = await Promise.all([
         section(() => getPortfolioSummary(userId), null as PortfolioSummary | null),
         section(
             () => Promise.all([getUserAlerts(), getRecentTriggeredAlerts(3)]).then(([rules, triggered]) => ({ rules, triggered })),
@@ -61,14 +66,6 @@ export async function getHomeOverviewBundle(
             }),
             { unavailable: false, total: 0, items: [] } as HomeWatchlistPreview,
         ),
-        section(
-            () => getHomeOpportunities({
-                marketCapMoreThan: params.marketCapMoreThan,
-                limit: params.limit,
-                candidateLimit: params.candidateLimit,
-            }),
-            [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
-        ),
     ]);
-    return { portfolio, alerts, watchlist, opportunities };
+    return { portfolio, alerts, watchlist };
 }
