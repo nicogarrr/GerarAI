@@ -74,7 +74,8 @@ def export_year(
         select(Transaction, Company)
         .join(Company, Transaction.company_id == Company.id)
         .where(Transaction.trade_date >= start, Transaction.trade_date <= end)
-        .order_by(Transaction.trade_date)
+        # Desempate determinista: trade_date solo empata a diario.
+        .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
     ).all()
 
     tx_rows = [

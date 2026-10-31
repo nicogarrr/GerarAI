@@ -492,7 +492,7 @@ def list_jobs(
     return [
         _job(job)
         for job in db.scalars(
-            statement.order_by(desc(ProcessingJob.created_at)).limit(limit)
+            statement.order_by(desc(ProcessingJob.created_at), desc(ProcessingJob.id)).limit(limit)
         ).all()
     ]
 
