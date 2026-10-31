@@ -818,3 +818,19 @@ def test_los_imports_del_build_apuntan_a_ficheros_del_contexto():
             if is_excluded(rel, patterns):
                 rotos.append(f"{fichero} importa '{espec}' -> {rel} queda FUERA del contexto de build")
     assert not rotos, "\n".join(rotos[:10])
+
+
+def test_todo_dockerfile_con_npm_ci_copia_antes_el_prepare():
+    # package.json declara "prepare": "node scripts/install-hooks.mjs": npm ci lo
+    # ejecuta siempre, tambien en Docker. Si el Dockerfile no copia ese script
+    # antes del `RUN npm ci`, el build falla con "Cannot find module" (le paso a
+    # frontend-dev cuando el prepare aterrizo: prod lo tenia y dev no).
+    rotos: list[str] = []
+    for dockerfile in (REPO / "Dockerfile", REPO / "Dockerfile.dev"):
+        lineas = dockerfile.read_text(encoding="utf-8").splitlines()
+        for i, linea in enumerate(lineas):
+            if re.match(r"\s*RUN\s+npm ci\b", linea):
+                antes = "\n".join(lineas[:i])
+                if "scripts/install-hooks.mjs" not in antes:
+                    rotos.append(f"{dockerfile.name}: `RUN npm ci` (linea {i + 1}) sin copiar antes scripts/install-hooks.mjs")
+    assert not rotos, "\n".join(rotos)
