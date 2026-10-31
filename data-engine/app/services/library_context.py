@@ -325,18 +325,30 @@ def _vector_library_context(db: Session, question: str, limit: int, tenant_id: i
     hits = [hit for group in zip_longest(*per_query) for hit in group if hit is not None]
     if not hits:
         return []
+    # Hidratacion en lote (anti N+1): una consulta para todos los candidatos
+    # con los mismos filtros (tenant, documento ready); el orden y el cap se
+    # siguen decidiendo al recorrer los hits.
+    candidate_ids = [
+        hit["entity_id"]
+        for hit in hits
+        if hit.get("entity_type") == "knowledge_chunk" and type(hit.get("entity_id")) is int
+    ]
+    hydrated: dict[int, tuple[KnowledgeChunk, KnowledgeDocument]] = {}
+    if candidate_ids:
+        for row in db.execute(
+            select(KnowledgeChunk, KnowledgeDocument)
+            .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.knowledge_document_id)
+            .where(KnowledgeChunk.id.in_(candidate_ids), KnowledgeChunk.tenant_id == tenant_id,
+                   KnowledgeDocument.tenant_id == tenant_id, KnowledgeDocument.status == "ready")
+        ).all():
+            hydrated[row[0].id] = (row[0], row[1])
     contexts = []
     seen = set()
     for hit in hits:
         chunk_id = hit.get("entity_id")
         if hit.get("entity_type") != "knowledge_chunk" or type(chunk_id) is not int or chunk_id in seen:
             continue
-        row = db.execute(
-            select(KnowledgeChunk, KnowledgeDocument)
-            .join(KnowledgeDocument, KnowledgeDocument.id == KnowledgeChunk.knowledge_document_id)
-            .where(KnowledgeChunk.id == chunk_id, KnowledgeChunk.tenant_id == tenant_id,
-                   KnowledgeDocument.tenant_id == tenant_id, KnowledgeDocument.status == "ready")
-        ).first()
+        row = hydrated.get(chunk_id)
         if not row:
             continue
         chunk, document = row
