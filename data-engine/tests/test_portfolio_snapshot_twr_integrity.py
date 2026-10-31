@@ -68,6 +68,42 @@ def test_broken_series_does_not_restart_from_zero(setup):
     assert third.cumulative_twr is None
 
 
+def test_clean_link_after_gap_flow_block_does_not_restart_series(setup):
+    """Caracterizacion: tras un bloqueo por flujo en dia sin foto, un enlace
+    posterior limpio NO reinicia la cadena (fail-closed por diseno).
+
+    La foto bloqueada esta completa y valorable, y el tramo nuevo seria
+    calculable, pero ``_restart_base`` solo admite base nueva tras un tramo
+    NO valorable (cobertura < 1 o valor <= 0), no tras un bloqueo por flujos
+    sin valorar. La reparacion es la herramienta twr_rebuild, nunca un
+    reinicio silencioso. Comportamiento actual (fail-closed documentado en
+    el servicio).
+    """
+    db, portfolio, position = setup
+    _snap(db, D0, position, "100")  # base, total 1000
+    # Deposito en D1 (dia SIN foto) y foto en D2: el enlace D0->D2 se bloquea.
+    db.add(
+        Transaction(
+            portfolio_id=portfolio.id, trade_date=D1, action="deposit",
+            quantity=Decimal("1"), price=Decimal("500"), currency="EUR",
+            external_id="dep-gap-nr",
+        )
+    )
+    position.quantity = Decimal("15")
+    db.commit()
+    blocked = _snap(db, D2, position, "110")  # completa, pero sin retorno
+    assert blocked.pricing_coverage == Decimal("1")
+    assert blocked.daily_return is None and blocked.cumulative_twr is None
+    assert blocked.metadata_["unvalued_intermediate_flows"] == 1
+    # Enlace D2->D3 completamente limpio (ambas completas, sin flujos): la
+    # serie sigue sin reiniciarse.
+    d3 = D2 + timedelta(days=1)
+    clean = _snap(db, d3, position, "112")
+    assert clean.pricing_coverage == Decimal("1")
+    assert clean.daily_return is None
+    assert clean.cumulative_twr is None
+
+
 def test_previous_different_currency_gives_no_return(setup):
     db, portfolio, position = setup
     first = _snap(db, D0, position, "100")
