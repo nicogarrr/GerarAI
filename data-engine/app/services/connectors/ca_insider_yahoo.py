@@ -21,7 +21,23 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
 SOURCE_NAME = "yahoo_quoteSummary"
+_REGISTRY_KEY = "yahoo_finance"
+
+
+def _record_http_failure(exc: httpx.HTTPStatusError) -> None:
+    # 400/404: simbolo sin quoteSummary (consulta concreta), no fuente caida.
+    if exc.response.status_code in (400, 404):
+        return
+    get_data_source_registry().record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+
+
+def _record_transport_failure(exc: Exception) -> None:
+    get_data_source_registry().record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+
+
 PARSER_VERSION = "yahoo-ca-1"
 FORM = "CA-INSIDER"
 SEDI_URL = "https://www.sedi.ca"
@@ -35,6 +51,7 @@ def yahoo_insider_url(symbol: str) -> str:
     """
     return f"https://finance.yahoo.com/quote/{symbol}/insider-transactions/"
 
+
 TIMEOUT_SECONDS = 15
 PAUSE_SECONDS = 3.0
 QUOTESUMMARY_URL = "https://query2.finance.yahoo.com/v10/finance/quoteSummary"
@@ -46,8 +63,18 @@ _BUY_HINTS = ("acquisition", "purchase", "buy")
 _SELL_HINTS = ("sale", "disposition", "sell")
 # Flujos mecanicos: no son senal (mismo criterio fail-closed que PDMR UK).
 _NEUTRAL_HINTS = (
-    "exercise", "option", "award", "grant", "vest", "dividend", "drip",
-    "subscription", "plan", "gift", "transfer", "conversion",
+    "exercise",
+    "option",
+    "award",
+    "grant",
+    "vest",
+    "dividend",
+    "drip",
+    "subscription",
+    "plan",
+    "gift",
+    "transfer",
+    "conversion",
 )
 
 
@@ -56,24 +83,68 @@ def yahoo_session(client: httpx.Client | None = None) -> tuple[httpx.Client, str
     owned = client or httpx.Client(
         headers={"User-Agent": "Mozilla/5.0"}, timeout=TIMEOUT_SECONDS, follow_redirects=True
     )
-    owned.get("https://fc.yahoo.com")  # 404 esperado: solo fija la cookie
-    crumb = owned.get("https://query1.finance.yahoo.com/v1/test/getcrumb").text.strip()
+    try:
+        owned.get("https://fc.yahoo.com")  # 404 esperado: solo fija la cookie
+        crumb = owned.get("https://query1.finance.yahoo.com/v1/test/getcrumb").text.strip()
+    except httpx.TransportError as exc:
+        _record_transport_failure(exc)
+        raise
     if not crumb or " " in crumb or len(crumb) > 40:
+        # Yahoo bloquea o cambia el flujo de crumb: fuente degradada.
+        _record_transport_failure(RuntimeError("yahoo_crumb_unavailable"))
         raise RuntimeError("yahoo_crumb_unavailable")
     return owned, crumb
 
 
-def fetch_insider_transactions(
-    symbol: str, client: httpx.Client, crumb: str
-) -> list[dict[str, Any]]:
+def fetch_insider_transactions(symbol: str, client: httpx.Client, crumb: str) -> list[dict[str, Any]]:
     """Movimientos crudos de Yahoo para un simbolo; [] si no hay modulo."""
-    response = client.get(
-        f"{QUOTESUMMARY_URL}/{symbol}",
-        params={"modules": "insiderTransactions", "crumb": crumb},
-    )
-    response.raise_for_status()
-    payload = response.json()
-    result = (payload.get("quoteSummary") or {}).get("result") or []
+    try:
+        response = client.get(
+            f"{QUOTESUMMARY_URL}/{symbol}",
+            params={"modules": "insiderTransactions", "crumb": crumb},
+        )
+    except httpx.TransportError as exc:
+        _record_transport_failure(exc)
+        raise
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        _record_http_failure(exc)
+        raise
+    try:
+        payload = response.json()
+    except ValueError:
+        get_data_source_registry().record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
+        raise
+    if not isinstance(payload, dict) or "quoteSummary" not in payload:
+        # Un 200 con JSON lista o sin la envoltura quoteSummary no es el
+        # contrato de Yahoo: deriva de formato (challenge, cambio de API).
+        get_data_source_registry().record_failure(
+            _REGISTRY_KEY, "200 con JSON sin 'quoteSummary' (parse failed)"
+        )
+        raise ValueError("yahoo quoteSummary payload is not the expected object")
+    summary = payload["quoteSummary"]
+    if not isinstance(summary, dict):
+        get_data_source_registry().record_failure(
+            _REGISTRY_KEY, "200 con 'quoteSummary' no objeto (parse failed)"
+        )
+        raise ValueError("yahoo quoteSummary payload is not the expected object")
+    error = summary.get("error")
+    if error is not None:
+        # Yahoo responde 200 con error interno (p.ej. {"code": "Unauthorized"}
+        # cuando el crumb caduca): es un fallo de auth/formato, NO salud.
+        code = error.get("code") if isinstance(error, dict) else None
+        get_data_source_registry().record_failure(_REGISTRY_KEY, f"200 con error interno de Yahoo ({code})")
+        raise ValueError(f"yahoo quoteSummary returned an error: {code}")
+    result = summary.get("result")
+    if not isinstance(result, list):
+        # result=null con error=null no es una forma documentada de Yahoo:
+        # ausencia ambigua -> fallo de formato, nunca "sin actividad".
+        get_data_source_registry().record_failure(_REGISTRY_KEY, "200 con 'result' no lista (parse failed)")
+        raise ValueError("yahoo quoteSummary result is not a list")
+    # Éxito tras validar envoltura, error nulo y result lista (vacía = símbolo
+    # sin módulo, dato ausente legítimo; no vacía = hay movimientos).
+    get_data_source_registry().record_success(_REGISTRY_KEY)
     if not result:
         return []
     module = result[0].get("insiderTransactions") or {}
