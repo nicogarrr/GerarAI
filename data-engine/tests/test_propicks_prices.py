@@ -222,3 +222,148 @@ def test_upsert_descarta_la_barra_de_hoy_con_sesion_abierta():
         db.commit()
         days = {row.date for row in db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id)).all()}
         assert days == {date(2026, 10, 16), date(2026, 10, 19)}
+
+
+def test_volume_parser_distinguishes_absent_from_explicit_zero():
+    """_volume: None/NaN/basura/negativo -> None (ausente); 0 explicito -> 0."""
+    from app.services.propicks_price_service import _volume
+
+    assert _volume(None) is None
+    assert _volume(float("nan")) is None
+    assert _volume("no-numerico") is None
+    assert _volume(-3) is None
+    assert _volume(0) == 0
+    assert _volume(0.0) == 0
+    assert _volume(1_234_567) == 1_234_567
+
+
+class _FakeInstrument:
+    """yfinance.Ticker falso: una sesion con Volume=NaN y otra con Volume=0."""
+
+    def __init__(self, symbol, volumes):
+        self._volumes = volumes
+
+    def history(self, **kwargs):
+        import pandas as pd
+
+        idx = pd.to_datetime(["2026-10-28", "2026-10-29"])
+        return pd.DataFrame(
+            {
+                "Close": [100.0, 101.0],
+                "Adj Close": [100.0, 101.0],
+                "Volume": self._volumes,
+            },
+            index=idx,
+        )
+
+    def get_history_metadata(self):
+        return {"currency": "USD", "exchangeTimezoneName": "America/New_York"}
+
+
+def _fetch_with_fake_yf(volumes):
+    import sys
+    import types
+
+    from app.services import propicks_price_service as svc
+
+    fake = types.ModuleType("yfinance")
+    fake.Ticker = lambda symbol: _FakeInstrument(symbol, volumes)
+    old = sys.modules.get("yfinance")
+    sys.modules["yfinance"] = fake
+    try:
+        return svc.fetch_history_yfinance(["FAKE"], period="1y")["FAKE"]
+    finally:
+        if old is not None:
+            sys.modules["yfinance"] = old
+        else:
+            del sys.modules["yfinance"]
+
+
+def test_fetch_then_upsert_nan_is_null_and_explicit_zero_is_zero():
+    """Cadena real parser->upsert: NaN llega como NULL; 0 explicito llega 0."""
+    bars = _fetch_with_fake_yf([float("nan"), 0])
+    assert bars[0].volume is None and bars[1].volume == 0
+    db = _db()
+    company = _company("VOL1")
+    db.add(company)
+    db.commit()
+    upsert_prices(db, company, bars, now=datetime(2026, 11, 2, tzinfo=UTC))
+    db.commit()
+    rows = db.scalars(
+        select(MarketPrice).where(MarketPrice.company_id == company.id)
+        .order_by(MarketPrice.date)
+    ).all()
+    assert rows[0].volume is None
+    assert rows[1].volume == 0
+
+
+def test_upsert_absent_volume_does_not_overwrite_real_volume():
+    """Un re-sync con volumen ausente (None) NO borra el volumen real."""
+    db = _db()
+    company = _company("VOL2")
+    db.add(company)
+    db.commit()
+    day = date(2026, 10, 28)
+    db.add(MarketPrice(company_id=company.id, date=day, open=100, high=100,
+                       low=100, close=100, adj_close=100, volume=5_000_000,
+                       quote_currency="USD", source="yfinance"))
+    db.commit()
+    bar = PriceBar(day=day, close=Decimal("101"), adj_close=Decimal("101"),
+                   volume=None, quote_currency="USD")
+    written = upsert_prices(db, company, [bar], now=datetime(2026, 10, 30, tzinfo=UTC))
+    db.commit()
+    row = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert written == 1
+    assert row.close == Decimal("101")
+    assert row.volume == 5_000_000
+
+
+def test_upsert_explicit_zero_overwrites_real_volume():
+    """Un 0 EXPLICITO de la fuente si actualiza: es dato, no ausencia."""
+    db = _db()
+    company = _company("VOL3")
+    db.add(company)
+    db.commit()
+    day = date(2026, 10, 28)
+    db.add(MarketPrice(company_id=company.id, date=day, open=100, high=100,
+                       low=100, close=100, adj_close=100, volume=5_000_000,
+                       quote_currency="USD", source="yfinance"))
+    db.commit()
+    bar = PriceBar(day=day, close=Decimal("101"), adj_close=Decimal("101"),
+                   volume=0, quote_currency="USD")
+    upsert_prices(db, company, [bar], now=datetime(2026, 10, 30, tzinfo=UTC))
+    db.commit()
+    row = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert row.volume == 0
+
+
+def test_upsert_pg_on_conflict_coalesces_volume():
+    """Contrato Postgres: el ON CONFLICT lleva coalesce(excluded, actual).
+
+    Sin bind PG se ejecuta contra un stub con dialecto postgresql y se
+    compila la sentencia capturada con su dialecto real.
+    """
+    from sqlalchemy.dialects import postgresql
+
+    class _Bind:
+        class dialect:
+            name = "postgresql"
+
+    class _Db:
+        bind = _Bind()
+        executed = None
+        info: dict = {}
+
+        def execute(self, stmt):
+            _Db.executed = stmt
+
+    from app.services.propicks_price_service import PriceBar as _PB, upsert_prices as _up
+
+    company = _company("VOL4")
+    bar = _PB(day=date(2026, 10, 28), close=Decimal("101"),
+              adj_close=Decimal("101"), volume=None, quote_currency="USD")
+    written = _up(_Db(), company, [bar], now=datetime(2026, 10, 30, tzinfo=UTC))
+    assert written == 1
+    compiled = str(_Db.executed.compile(dialect=postgresql.dialect()))
+    assert "ON CONFLICT" in compiled.upper()
+    assert "coalesce" in compiled.lower()

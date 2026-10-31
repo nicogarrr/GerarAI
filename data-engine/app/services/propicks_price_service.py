@@ -19,6 +19,7 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import sqlalchemy as sa
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -151,24 +152,31 @@ class PriceBar:
     day: date
     close: Decimal
     adj_close: Decimal
-    volume: int
+    volume: int | None  # None = la fuente no da el dato; 0 explicito es dato
     quote_currency: str | None = None
     market_timezone: str | None = None
     session_end: datetime | None = None
 
 
-def _volume(raw: Any) -> int:
-    """Volumen entero; NaN/None/no numerico -> 0.
+def _volume(raw: Any) -> int | None:
+    """Volumen entero; NaN/None/no numerico/negativo -> None (ausente).
 
     yfinance devuelve Volume=NaN en algunas sesiones (indices, LSE, dias
     festivos parciales). ``int(nan)`` lanzaba ValueError fuera del try por
     simbolo y abortaba la descarga ENTERA del lote: ningun cierre escrito.
+    Un 0 EXPLICITO de la fuente se conserva como 0: None y 0 no son lo
+    mismo (None = sin dato; 0 = dato), y mezclarlos hacia que una ausencia
+    pisara el volumen real guardado o que un 0 legitimo se perdiera.
     """
+    if raw is None:
+        return None
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return 0
-    return int(value) if math.isfinite(value) and value > 0 else 0
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return int(value)
 
 
 def fetch_history_yfinance(
@@ -292,6 +300,8 @@ def upsert_prices(
             continue
         if not bar_unit_is_known(company, bar):
             continue
+        # None = ausente -> NULL/preserva; 0 explicito de la fuente es dato.
+        volume = bar.volume
         values = {
             "company_id": company.id,
             "date": bar.day,
@@ -300,7 +310,7 @@ def upsert_prices(
             "low": bar.close,
             "close": bar.close,
             "adj_close": bar.adj_close,
-            "volume": bar.volume,
+            "volume": volume,
             "source": "yfinance",
             "quote_currency": bar.quote_currency,
         }
@@ -311,7 +321,9 @@ def upsert_prices(
                 set_={
                     "close": stmt.excluded.close,
                     "adj_close": stmt.excluded.adj_close,
-                    "volume": stmt.excluded.volume,
+                    # Un re-sync sin volumen (NaN de la fuente) NO pisa el
+                    # volumen real ya guardado: ausente no borra dato.
+                    "volume": sa.func.coalesce(stmt.excluded.volume, MarketPrice.volume),
                     "source": stmt.excluded.source,
                     "quote_currency": stmt.excluded.quote_currency,
                 },
@@ -327,7 +339,9 @@ def upsert_prices(
             if existing is not None:
                 existing.close = bar.close
                 existing.adj_close = bar.adj_close
-                existing.volume = bar.volume
+                # Igual que la via Postgres: ausente no borra dato real.
+                if volume is not None:
+                    existing.volume = volume
                 existing.source = "yfinance"
                 existing.quote_currency = bar.quote_currency
             else:
