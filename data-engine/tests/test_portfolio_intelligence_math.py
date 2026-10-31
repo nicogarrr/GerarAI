@@ -104,14 +104,14 @@ def test_historical_var_requires_enough_observations():
 def test_xirr_money_weighted_return(db, monkeypatch):
     today = date.today()
 
-    class _FixedDate(date):
-        @classmethod
-        def today(cls):
-            return today
-
     import app.services.portfolio_intelligence_service as pi_module
 
-    monkeypatch.setattr(pi_module, "date", _FixedDate)
+    # El servicio fecha el valor final con local_today() (hoy en Madrid):
+    # congelar ESA base. Parchear date.today ya no gobierna al servicio y en
+    # CI (TZ=UTC) entre las 23:00 y 00:00 el valor final quedaba un dia por
+    # delante de los flujos y el XIRR se movia lo suficiente para romper las
+    # tolerancias.
+    monkeypatch.setattr(pi_module, "local_today", lambda: today)
     company = _company(db)
     service = PortfolioIntelligenceService()
     from app.services.portfolio_fx_service import PortfolioFXService
@@ -141,14 +141,14 @@ def test_xirr_money_weighted_return(db, monkeypatch):
 def _freeze_today(monkeypatch):
     today = date.today()
 
-    class _FixedDate(date):
-        @classmethod
-        def today(cls):
-            return today
-
     import app.services.portfolio_intelligence_service as pi_module
 
-    monkeypatch.setattr(pi_module, "date", _FixedDate)
+    # El servicio fecha el valor final con local_today() (hoy en Madrid):
+    # congelar ESA base. Parchear date.today ya no gobierna al servicio y en
+    # CI (TZ=UTC) entre las 23:00 y 00:00 el valor final quedaba un dia por
+    # delante de los flujos y el XIRR se movia lo suficiente para romper las
+    # tolerancias.
+    monkeypatch.setattr(pi_module, "local_today", lambda: today)
     return today
 
 
@@ -404,14 +404,14 @@ def test_xirr_withholding_and_fee_negative_amounts_are_outflows(db, monkeypatch)
     """
     today = date.today()
 
-    class _FixedDate(date):
-        @classmethod
-        def today(cls):
-            return today
-
     import app.services.portfolio_intelligence_service as pi_module
 
-    monkeypatch.setattr(pi_module, "date", _FixedDate)
+    # El servicio fecha el valor final con local_today() (hoy en Madrid):
+    # congelar ESA base. Parchear date.today ya no gobierna al servicio y en
+    # CI (TZ=UTC) entre las 23:00 y 00:00 el valor final quedaba un dia por
+    # delante de los flujos y el XIRR se movia lo suficiente para romper las
+    # tolerancias.
+    monkeypatch.setattr(pi_module, "local_today", lambda: today)
     company = _company(db)
     service = PortfolioIntelligenceService()
     from app.services.portfolio_fx_service import PortfolioFXService

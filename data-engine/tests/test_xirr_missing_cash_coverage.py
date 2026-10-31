@@ -1,5 +1,5 @@
 """XIRR perspectiva cuenta: sin saldo de caja no se publica cifra sesgada."""
-from datetime import date, timedelta
+from datetime import timedelta
 from decimal import Decimal
 
 import pytest
@@ -7,6 +7,7 @@ from scipy.optimize import brentq
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models.entities import Base, CashBalance, Company, Portfolio, Position, Transaction
 from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
 
@@ -41,7 +42,7 @@ def _position(db, company, mv_base, currency="USD"):
                  market_price=Decimal("110"), market_value=Decimal(mv_base),
                  unrealized_pnl=Decimal("0"), realized_pnl=Decimal("0"), currency=currency,
                  base_currency="USD", market_value_native=Decimal(mv_base),
-                 market_value_base=Decimal(mv_base), as_of=date.today(), source="probe")
+                 market_value_base=Decimal(mv_base), as_of=local_today(), source="probe")
     db.add(p); db.commit(); return p
 
 
@@ -53,7 +54,7 @@ def _ref_xirr(flows):
 
 
 def test_xirr_account_perspective_missing_cash_is_not_published(db):
-    today = date.today()
+    today = local_today()
     c = _company(db)
     _tx(db, c, "deposit", "1000", "1", today - timedelta(days=365))
     _tx(db, c, "buy", "5", "100", today - timedelta(days=364))
@@ -66,7 +67,7 @@ def test_xirr_account_perspective_missing_cash_is_not_published(db):
 
 
 def test_xirr_account_perspective_with_cash_still_calculated(db):
-    today = date.today()
+    today = local_today()
     c = _company(db)
     _tx(db, c, "deposit", "1000", "1", today - timedelta(days=365))
     _tx(db, c, "buy", "5", "100", today - timedelta(days=364))
@@ -82,7 +83,7 @@ def test_xirr_account_perspective_with_cash_still_calculated(db):
 
 
 def test_xirr_investment_perspective_without_deposits_unaffected(db):
-    today = date.today()
+    today = local_today()
     c = _company(db)
     _tx(db, c, "buy", "10", "100", today - timedelta(days=365))
     p = _position(db, c, "1100")
