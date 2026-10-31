@@ -136,3 +136,26 @@ describe('calculateAdvancedStockScore - corte temporal point-in-time', () => {
         expect(r.reasons.opportunities).toContain('Cerca del máximo de 52 semanas');
     });
 });
+
+describe('claves reales de Finnhub (/stock/metric?metric=all, verificado en vivo 2026-10-31)', () => {
+    it('lee P/B desde pbQuarterly/pbAnnual cuando no hay pbTTM ni pb', async () => {
+        mocks.sector.mockResolvedValue(null);
+        const r = await calculateAdvancedStockScore({
+            metrics: { metric: { pbQuarterly: 1.5 } }, profile: PROFILE, quote: {},
+        });
+        // pb 1.5 < 2 -> 25 puntos de valor; sin la clave real el P/B no puntuaba.
+        expect(r.categoryScores.value).toBe(25);
+        expect(r.facts.pb).toBe(1.5);
+    });
+
+    it('lee D/E y liquidez desde las claves reales del payload', async () => {
+        mocks.sector.mockResolvedValue(null);
+        const r = await calculateAdvancedStockScore({
+            metrics: { metric: { 'totalDebt/totalEquityQuarterly': 0.3, currentRatioQuarterly: 2.5 } },
+            profile: PROFILE, quote: {},
+        });
+        expect(r.categoryScores.debtLiquidity).toBe(60); // 35 (D/E bajo) + 25 (current > 2)
+        expect(r.facts.debtToEquity).toBe(0.3);
+        expect(r.facts.currentRatio).toBe(2.5);
+    });
+});

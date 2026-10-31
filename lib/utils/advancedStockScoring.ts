@@ -210,7 +210,7 @@ export async function calculateAdvancedStockScore(
 
     // ========== 1. VALUE (Valor Relativo) ==========
     const pe = getMetric('peTTM', 'pe', 'priceToEarnings', 'peRatio');
-    const pb = getMetric('pbTTM', 'pb', 'priceToBook');
+    const pb = getMetric('pbTTM', 'pb', 'pbQuarterly', 'pbAnnual', 'priceToBook');
     const ps = getMetric('psTTM', 'ps', 'priceToSales');
     const evEbitda = getMetric('evEbitdaTTM', 'evEbitda', 'enterpriseValueToEbitda');
 
@@ -484,7 +484,7 @@ export async function calculateAdvancedStockScore(
         }
     };
     snapshot('pe', getMetric('peTTM', 'pe', 'priceToEarnings', 'peRatio'));
-    snapshot('pb', getMetric('pbTTM', 'pb', 'priceToBook'));
+    snapshot('pb', getMetric('pbTTM', 'pb', 'pbQuarterly', 'pbAnnual', 'priceToBook'));
     snapshot('ps', getMetric('psTTM', 'ps', 'priceToSales'));
     snapshot('evEbitda', getMetric('evEbitdaTTM', 'evEbitda', 'enterpriseValueToEbitda'));
     snapshot('revenueGrowth', getMetric('revenueGrowthTTMYoy', 'revenueGrowth3Y', 'revenueGrowthTTM', 'revenueGrowth'));

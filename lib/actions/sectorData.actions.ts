@@ -112,14 +112,14 @@ export const getSectorAverages = cache(async (sector: string): Promise<SectorAve
 
         // Calcular promedios
         const avgPE = calculateAverage(metrics, ['peTTM', 'pe', 'priceToEarnings']);
-        const avgPB = calculateAverage(metrics, ['pbTTM', 'pb', 'priceToBook']);
+        const avgPB = calculateAverage(metrics, ['pbTTM', 'pb', 'pbQuarterly', 'pbAnnual', 'priceToBook']);
         const avgPS = calculateAverage(metrics, ['psTTM', 'ps', 'priceToSales']);
         const avgROE = calculateAverage(metrics, ['roeTTM', 'roe', 'returnOnEquity'], 'percent');
         const avgROA = calculateAverage(metrics, ['roaTTM', 'roa', 'returnOnAssets'], 'percent');
         const avgNetMargin = calculateAverage(metrics, ['netProfitMarginTTM', 'netProfitMargin', 'profitMargin'], 'percent');
-        const avgRevenueGrowth = calculateAverage(metrics, ['revenueGrowthTTM', 'revenueGrowth', 'salesGrowth'], 'percent');
-        const avgDebtToEquity = calculateAverage(metrics, ['debtToEquityTTM', 'debtToEquity', 'totalDebtToEquity']);
-        const avgCurrentRatio = calculateAverage(metrics, ['currentRatioTTM', 'currentRatio']);
+        const avgRevenueGrowth = calculateAverage(metrics, ['revenueGrowthTTMYoy', 'revenueGrowthQuarterlyYoy', 'revenueGrowthTTM', 'revenueGrowth', 'salesGrowth'], 'percent');
+        const avgDebtToEquity = calculateAverage(metrics, ['totalDebt/totalEquityQuarterly', 'totalDebt/totalEquityAnnual', 'debtToEquityTTM', 'debtToEquity', 'totalDebtToEquity']);
+        const avgCurrentRatio = calculateAverage(metrics, ['currentRatioQuarterly', 'currentRatioAnnual', 'currentRatioTTM', 'currentRatio']);
 
         // Normalizar promedios a 0-100 para cada categoría
         const averages = {
