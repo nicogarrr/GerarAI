@@ -17,19 +17,19 @@ from app.services.manager_holding_ingestion_service import ManagerHoldingIngesti
 router = APIRouter()
 
 
-@router.get("", response_model=InvestorsListOut)
+@router.get("", response_model=InvestorsListOut, response_model_exclude_unset=True)
 def investors(db: Session = Depends(get_db)) -> dict:
     """Lista de inversores con resumen de su ultimo 13F (o 'Sin datos')."""
     return list_investors(db)
 
 
-@router.get("/most-bought", response_model=MostBoughtOut)
+@router.get("/most-bought", response_model=MostBoughtOut, response_model_exclude_unset=True)
 def most_bought_route(db: Session = Depends(get_db)) -> dict:
     """Acciones mas compradas por los gestores revisados (13F, trimestre vs anterior)."""
     return most_bought(db)
 
 
-@router.get("/portfolio-overlap", response_model=PortfolioOverlapOut)
+@router.get("/portfolio-overlap", response_model=PortfolioOverlapOut, response_model_exclude_unset=True)
 def overlap_route(db: Session = Depends(get_db)) -> dict:
     from app.services.investor_overlap import portfolio_overlap
 
@@ -47,7 +47,7 @@ def holders_by_ticker_route(ticker: str, db: Session = Depends(get_db)) -> dict:
     return result
 
 
-@router.get("/{slug}/portfolio", response_model=InvestorPortfolioOut)
+@router.get("/{slug}/portfolio", response_model=InvestorPortfolioOut, response_model_exclude_unset=True)
 def investor_portfolio_route(slug: str, db: Session = Depends(get_db)) -> dict:
     """Posiciones, pesos y ultimos movimientos, cada dato con etiqueta y fecha."""
     from app.services.investor_portfolio import investor_portfolio

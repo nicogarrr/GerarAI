@@ -8854,7 +8854,7 @@ export interface components {
             /** Note */
             note?: string | null;
             /** Official Name */
-            official_name: string;
+            official_name?: string | null;
             /** Positions */
             positions?: number | null;
             /** Report Date */

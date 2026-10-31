@@ -6968,8 +6968,15 @@
             "title": "Note"
           },
           "official_name": {
-            "title": "Official Name",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Official Name"
           },
           "positions": {
             "anyOf": [
@@ -7026,8 +7033,7 @@
           "firm",
           "kind",
           "has_13f",
-          "has_public_profile",
-          "official_name"
+          "has_public_profile"
         ],
         "title": "InvestorSummaryOut",
         "type": "object"

@@ -17,7 +17,6 @@ import main
 from app.core import auth as auth_module
 from app.core.database import SessionLocal, init_db
 from app.models import Tenant
-
 from tests.auth_helpers import auth_settings, signed_request
 
 SECRET = "investors-read-routes-test-secret-at-least-32-chars"
@@ -47,59 +46,30 @@ def _client(monkeypatch) -> tuple[TestClient, str, str]:
     return TestClient(main.app), tenant_ext, "investors-read-user"
 
 
-def test_list_investors_wire_shape_with_nulls(monkeypatch) -> None:
+def test_list_investors_real_service_official_name_null_without_cik(monkeypatch) -> None:
+    """Servicio real (sin mock del payload): los inversores sin CIK revisado
+    emiten official_name=None (REVIEWED_MANAGERS.get sin default). Con un
+    modelo str obligatorio esta ruta pasaba de 200 a 500 en el listado real."""
     client, tenant, user = _client(monkeypatch)
-    payload = {
-        "investors": [
-            {
-                "slug": "buffett",
-                "name": "Warren Buffett",
-                "firm": "Berkshire Hathaway",
-                "kind": "person",
-                "cik": "0001067983",
-                "has_13f": True,
-                "has_public_profile": False,
-                "coverage": "ok",
-                "verification": "verified",
-                "official_name": "Berkshire Hathaway Inc",
-                "report_date": "2026-06-30",
-                "positions": 41,
-                "value_usd_thousands": 257000000.0,
-                "note": None,
-            },
-            {
-                # Sin 13F: lo que el listado no tiene va en null; official_name
-                # es "" (REVIEWED_MANAGERS.get), nunca null.
-                "slug": "mark-leonard",
-                "name": "Mark Leonard",
-                "firm": "Constellation Software",
-                "kind": "person",
-                "cik": None,
-                "has_13f": False,
-                "has_public_profile": True,
-                "coverage": None,
-                "verification": None,
-                "official_name": "",
-                "report_date": None,
-                "positions": None,
-                "value_usd_thousands": None,
-                "note": "Sin 13F: no declara cartera publica.",
-            },
-        ],
-        "limitations": ["solo gestores revisados"],
-        "provenance": PROVENANCE,
-    }
-    monkeypatch.setattr("app.api.routes.investors.list_investors", lambda db: payload)
+    # El auto-encolado es un side-trigger ajeno a la forma del payload.
+    monkeypatch.setattr(
+        "app.services.investor_autosync.maybe_autosync_holdings", lambda db: False
+    )
     res = signed_request(client, SECRET, tenant, user, "GET", "/api/investors")
     assert res.status_code == 200, res.text
     body = res.json()
-    sin_datos = body["investors"][1]
-    assert sin_datos["cik"] is None
-    assert sin_datos["positions"] is None
-    assert sin_datos["value_usd_thousands"] is None
-    assert sin_datos["verification"] is None
-    assert sin_datos["official_name"] == ""
-    assert body["provenance"]["source_kind"] == "sec_edgar"
+    by_slug = {inv["slug"]: inv for inv in body["investors"]}
+    # 8 inversores sin CIK en la tabla real (BD vacia: ninguno tiene datos).
+    sin_cik = [inv for inv in body["investors"] if inv["cik"] is None]
+    assert len(sin_cik) >= 8
+    assert all(inv["official_name"] is None for inv in sin_cik)
+    assert all(inv["positions"] is None and inv["value_usd_thousands"] is None for inv in sin_cik)
+    # Con CIK revisado pero sin 13F ingerido: official_name resuelve, datos null.
+    buffett = by_slug["buffett"]
+    assert buffett["official_name"] == "Berkshire Hathaway Inc"
+    assert buffett["positions"] is None
+    assert buffett["report_date"] is None
+    assert body["provenance"]["source"]
 
 
 def test_most_bought_wire_shape(monkeypatch) -> None:
@@ -212,6 +182,10 @@ def test_portfolio_overlap_empty_branch_omits_optional_keys(monkeypatch) -> None
     body = res.json()
     assert body["status"] == "sin_datos"
     assert body["message"] == "Cartera sin posiciones abiertas."
+    # response_model_exclude_unset conserva la omision original del wire:
+    # la rama empty nunca emitio estas claves y no deben aparecer como null.
+    assert "comparison_complete" not in body
+    assert "limitations" not in body
 
 
 def test_investor_portfolio_wire_shape_sin_datos_and_string_limitations(monkeypatch) -> None:
@@ -265,6 +239,7 @@ def test_investor_portfolio_wire_shape_sin_datos_and_string_limitations(monkeypa
     res = signed_request(client, SECRET, tenant, user, "GET", "/api/investors/bezos/portfolio")
     assert res.status_code == 200, res.text
     body = res.json()
+    assert "coverage" not in body  # la rama sin-13F nunca emitio coverage
     assert body["limitations"] == "Sin 13F: solo posiciones documentadas en 13D/Forms 3/4."
     pos = body["positions"][0]
     assert pos["ownership_pct"]["label"] == "SIN_DATOS"

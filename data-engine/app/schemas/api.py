@@ -1025,7 +1025,9 @@ class InvestorSummaryOut(BaseModel):
     has_public_profile: bool
     coverage: str | None = None
     verification: str | None = None
-    official_name: str
+    # REVIEWED_MANAGERS.get(inv.cik or "") -> None (sin default) para inversores
+    # sin CIK revisado: 8 registros del listado real. Nullable, nunca "".
+    official_name: str | None = None
     report_date: str | None = None
     positions: int | None = None
     value_usd_thousands: float | None = None
