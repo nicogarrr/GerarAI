@@ -9745,6 +9745,26 @@
         "title": "PaginatedResponse[PortfolioPositionItemOut]",
         "type": "object"
       },
+      "PaginatedResponse_PortfolioTransactionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioTransactionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "PaginatedResponse[PortfolioTransactionOut]",
+        "type": "object"
+      },
       "PaperProposal": {
         "additionalProperties": false,
         "properties": {
@@ -12135,6 +12155,114 @@
           "trade_date"
         ],
         "title": "PortfolioTransactionInput",
+        "type": "object"
+      },
+      "PortfolioTransactionOut": {
+        "properties": {
+          "action": {
+            "enum": [
+              "buy",
+              "sell"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "fees": {
+            "title": "Fees",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "review_flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Flag"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "trade_date": {
+            "title": "Trade Date",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ticker",
+          "action",
+          "quantity",
+          "price",
+          "fees",
+          "currency",
+          "trade_date",
+          "notes",
+          "review_flag",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PortfolioTransactionOut",
+        "type": "object"
+      },
+      "PortfolioTransactionPageOut": {
+        "description": "Respuesta de GET /api/portfolio/transactions/page (limit/offset).",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioTransactionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PortfolioTransactionPageOut",
         "type": "object"
       },
       "PortfolioTwrPeriodOut": {
@@ -61356,9 +61484,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Transactions Api Portfolio Transactions Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PaginatedResponse_PortfolioTransactionOut_"
                 }
               }
             },
@@ -61924,9 +62050,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Transactions Page Api Portfolio Transactions Page Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTransactionPageOut"
                 }
               }
             },

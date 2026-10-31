@@ -31,7 +31,13 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
-from app.schemas.api import PortfolioIntelligenceOut, PortfolioPositionItemOut, PortfolioSummaryOut
+from app.schemas.api import (
+    PortfolioIntelligenceOut,
+    PortfolioPositionItemOut,
+    PortfolioSummaryOut,
+    PortfolioTransactionOut,
+    PortfolioTransactionPageOut,
+)
 from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.audit_service import record_audit_event
@@ -945,7 +951,7 @@ def _list_trades(db: Session, limit: int, offset: int, ticker: str | None = None
     return [_transaction_payload(transaction, transaction.company) for transaction in rows]
 
 
-@router.get("/transactions")
+@router.get("/transactions", response_model=PaginatedResponse[PortfolioTransactionOut])
 def transactions(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
@@ -971,7 +977,7 @@ def transactions(
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.get("/transactions/page")
+@router.get("/transactions/page", response_model=PortfolioTransactionPageOut)
 def transactions_page(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,

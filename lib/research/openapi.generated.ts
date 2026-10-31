@@ -9722,6 +9722,12 @@ export interface components {
             items: components["schemas"]["PortfolioPositionItemOut"][];
             page_info: components["schemas"]["PageInfo"];
         };
+        /** PaginatedResponse[PortfolioTransactionOut] */
+        PaginatedResponse_PortfolioTransactionOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioTransactionOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
         /** PaperProposal */
         PaperProposal: {
             /** Conviction */
@@ -10417,6 +10423,46 @@ export interface components {
              * Format: date
              */
             trade_date: string;
+        };
+        /** PortfolioTransactionOut */
+        PortfolioTransactionOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "buy" | "sell";
+            /** Created At */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Fees */
+            fees: number;
+            /** Id */
+            id: number;
+            /** Notes */
+            notes: string | null;
+            /** Price */
+            price: number;
+            /** Quantity */
+            quantity: number;
+            /** Review Flag */
+            review_flag: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Trade Date */
+            trade_date: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * PortfolioTransactionPageOut
+         * @description Respuesta de GET /api/portfolio/transactions/page (limit/offset).
+         */
+        PortfolioTransactionPageOut: {
+            /** Items */
+            items: components["schemas"]["PortfolioTransactionOut"][];
+            /** Total */
+            total: number;
         };
         /** PortfolioTwrPeriodOut */
         PortfolioTwrPeriodOut: {
@@ -22645,9 +22691,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PaginatedResponse_PortfolioTransactionOut_"];
                 };
             };
             /** @description Validation Error */
@@ -22778,9 +22822,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTransactionPageOut"];
                 };
             };
             /** @description Validation Error */
