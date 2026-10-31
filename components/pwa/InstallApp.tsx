@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { Button } from '@/components/ui/button';
 
 // Evento no estandarizado de Chromium (Chrome, Edge, Android). Safari/iOS y
@@ -24,6 +25,7 @@ function isIos(): boolean {
 }
 
 export default function InstallApp() {
+    const t = useT();
     const [mode, setMode] = useState<Mode>('checking');
     const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
 
@@ -68,28 +70,26 @@ export default function InstallApp() {
             data-testid="install-app"
             className="rounded-lg border border-gray-700/60 bg-surface-1 p-4 space-y-3"
         >
-            <h2 className="text-lg font-semibold text-white">Instalar GerarAI</h2>
+            <h2 className="text-lg font-semibold text-white">{t('ui.pwa.title')}</h2>
             {mode === 'checking' ? null : mode === 'installed' ? (
-                <p className="text-sm text-gray-300">GerarAI ya está instalada en este dispositivo.</p>
+                <p className="text-sm text-gray-300">{t('ui.pwa.installed')}</p>
             ) : mode === 'prompt' ? (
                 <>
                     <p className="text-sm text-gray-400">
-                        Ábrela como una app, sin barra del navegador. Necesita conexión: no guarda tus tesis
-                        ni datos para leer sin red.
+                        {t('ui.pwa.description')}
                     </p>
                     <Button type="button" onClick={install}>
-                        Instalar la aplicación
+                        {t('ui.pwa.installButton')}
                     </Button>
                 </>
             ) : mode === 'ios' ? (
                 <p className="text-sm text-gray-400" data-testid="install-ios">
-                    En iPhone o iPad: toca <span className="text-gray-200">Compartir</span> y después{' '}
-                    <span className="text-gray-200">Añadir a pantalla de inicio</span>. Hazlo desde Safari.
+                    {t('ui.pwa.iosPre')} <span className="text-gray-200">{t('ui.pwa.iosShare')}</span>{t('ui.pwa.iosMid')}{' '}
+                    <span className="text-gray-200">{t('ui.pwa.iosAddHome')}</span>{t('ui.pwa.iosPost')}
                 </p>
             ) : (
                 <p className="text-sm text-gray-400" data-testid="install-manual">
-                    Tu navegador no ofrece el botón de instalar aquí. En Chrome o Edge abre el menú y elige
-                    «Instalar GerarAI» (o «Añadir a la pantalla de inicio» en el móvil).
+                    {t('ui.pwa.manualInstructions')}
                 </p>
             )}
         </section>

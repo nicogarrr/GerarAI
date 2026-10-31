@@ -11,6 +11,9 @@ test('no hay tarjeta "Tu cartera en una línea"', () => {
 });
 
 test('se conserva el enlace al cambio de la posición top y la fila de ganancia/pérdida', () => {
-    assert.ok(SRC.includes('Revisar ${topMover.symbol} (mayor variación desde la compra)'));
-    assert.ok(SRC.includes('Ganancia/Pérdida desde la compra'));
+    assert.ok(SRC.includes('home.portfolio.reviewMover'));
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.equal(dict.portfolio.reviewMover, 'Revisar {symbol} (mayor variación desde la compra)');
+    assert.ok(SRC.includes('home.portfolio.gainLoss'));
+    assert.equal(dict.portfolio.gainLoss, 'Ganancia/Pérdida desde la compra');;
 });

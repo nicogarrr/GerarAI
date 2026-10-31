@@ -18,7 +18,9 @@ test('Inicio: bruto, saldos positivos, deuda y neto tienen etiquetas distintas',
     for (const label of ['Posiciones (bruto)', 'Caja (saldos positivos)', 'Deuda de margen', 'Patrimonio neto']) {
         assert.ok(breakdown.includes(label), label);
     }
-    assert.ok(source.includes('Pesos sobre el valor bruto de las posiciones'));
+    assert.ok(source.includes('home.portfolio.weightsNote'));
+    const dictHome = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.equal(dictHome.portfolio.weightsNote, 'Pesos sobre el valor bruto de las posiciones.');
     assert.ok(source.includes('(h.value / portfolioSummary.equityValue)'));
 });
 test('Inicio: backend previo no se presenta como deuda bruta y falta FX se declara', () => {

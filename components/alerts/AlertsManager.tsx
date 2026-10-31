@@ -37,6 +37,7 @@ import SectionLoadError from '@/components/system/SectionLoadError';
 import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/lib/types/errors';
 import { formatDate, formatNumber, formatUserDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
+import { useLocale, useT } from '@/lib/i18n/client';
 import { reviewResearchExpectations } from '@/lib/actions/research.actions';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
@@ -55,6 +56,8 @@ const isAlertType = (value: string | null | undefined): value is AlertType =>
     value === 'price_above' || value === 'price_below' || value === 'price_change' || value === 'news' || value === 'earnings';
 
 function AlertsManager() {
+    const cardT = useT();
+    const cardLocale = useLocale();
     const searchParams = useSearchParams();
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
@@ -581,7 +584,7 @@ function AlertsManager() {
                                 className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3"
                             >
                                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                    <p className="text-sm font-medium text-gray-200">{alertCardCopy(item).heading}</p>
+                                    <p className="text-sm font-medium text-gray-200">{alertCardCopy(item, cardT, cardLocale).heading}</p>
                                     <time
                                         className="text-xs text-gray-500"
                                         dateTime={item.triggeredAt ?? item.createdAt}
@@ -592,8 +595,8 @@ function AlertsManager() {
                                             : `Creada ${formatUserDateTime(item.createdAt)}`}
                                     </time>
                                 </div>
-                                {alertSummaryIsSourceHeadline(item) ? <ExternalNewsHeadline headline={alertCardCopy(item).summary} url={item.sourceUrl} className="mt-1 text-sm text-gray-300" /> : <p className="mt-1 text-sm text-gray-300">{alertCardCopy(item).summary}</p>}
-                                <details className="mt-2 text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap break-words">{alertCardCopy(item).technical}</p></details>
+                                {alertSummaryIsSourceHeadline(item) ? <ExternalNewsHeadline headline={alertCardCopy(item, cardT, cardLocale).summary} url={item.sourceUrl} className="mt-1 text-sm text-gray-300" /> : <p className="mt-1 text-sm text-gray-300">{alertCardCopy(item, cardT, cardLocale).summary}</p>}
+                                <details className="mt-2 text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap break-words">{alertCardCopy(item, cardT, cardLocale).technical}</p></details>
                                 {(item.ticker || item.sourceUrl) && (
                                     <span className="mt-1 inline-flex flex-wrap gap-x-3">
                                         {item.ticker && (

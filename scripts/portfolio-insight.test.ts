@@ -93,7 +93,12 @@ describe('guardas de regresion de /inicio', () => {
     );
     assert.ok(!overview.includes('setAiInsight'), 'PersonalizedOverview no debe recalcular el insight tras el waterfall');
     assert.ok(
-      overview.includes('Entre las posiciones con base de coste'),
+      overview.includes("t('home.portfolio.partial')"),
+      'la frase parcial se pinta desde el diccionario i18n',
+    );
+    const dictHome = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.ok(
+      dictHome.portfolio.partial.includes('Entre las posiciones con base de coste'),
       'la frase parcial debe declarar que cubre solo las posiciones con base de coste',
     );
   });

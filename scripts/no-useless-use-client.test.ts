@@ -84,6 +84,10 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/LoadingState.tsx': 'useT lee el contexto de locale para estados de carga accesibles',
+  'components/brain/BrainGuideAnswer.tsx': 'useT lee locale para el copy de respuestas guía (vacía/insuficiente) del Cerebro',
+  'components/brain/BrainLibraryAnswer.tsx': 'useT lee locale para el copy de respuestas de biblioteca del Cerebro',
+  'components/brain/BrainSources.tsx': 'useT lee locale para las etiquetas de fuentes del Cerebro',
+  'components/chat/CitationsList.tsx': 'useT lee locale para las etiquetas de citas',
   'components/ui/methodology-disclosure.tsx': 'useT lee locale para título predeterminado; también usado desde componentes client',
   'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',

@@ -1,1 +1,26 @@
-{}
+{
+  "create": "Create alert",
+  "new": "New alert",
+  "types": {
+    "priceAbove": "Price above",
+    "priceBelow": "Price below",
+    "priceChange": "Price change %",
+    "news": "New news item",
+    "earnings": "Earnings report"
+  },
+  "card": {
+    "kindNews": "News",
+    "kindMaterialNews": "Material news",
+    "kindAlert": "Alert",
+    "dateDetected": "detected {date}",
+    "summaryDailyDigest": "Daily portfolio digest; open the details to see data coverage.",
+    "summaryMacroEvent": "Reminder from the official macro calendar; the details show source and time.",
+    "summaryUnlinked": "Alert with no associated company.",
+    "formSummary": "{form} filing associated with {company}.",
+    "trackedNewsFallback": "News about {company}.",
+    "newsNoHeadline": "News about {company}; the alert carries no verifiable headline.",
+    "ruleMatched": "The rule \"{title}\" matched for {company}.",
+    "fallback": "Alert for {company}: {title}.",
+    "fallbackNoDetail": "no details available"
+  }
+}

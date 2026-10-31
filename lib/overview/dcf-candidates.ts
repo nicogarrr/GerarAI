@@ -6,6 +6,8 @@
  * alcance real de la sonda y los textos honestos que lo declaran.
  */
 
+import type { TranslateFn } from '@/lib/i18n/translate';
+
 /** Candidatas del screener que se prueban por visita (DCF + precio). */
 export const DCF_CANDIDATE_LIMIT = 6;
 
@@ -33,22 +35,22 @@ export function summarizeDcfProbe<T>(outcomes: DcfProbeOutcome<T>[]): DcfScope {
 }
 
 /** Alcance real cuando hay oportunidades que mostrar. */
-export function dcfScopeNote(scope: DcfScope, marketCapLabel: string): string {
-    const base = `Las ${scope.probed} primeras candidatas del screener (market cap > ${marketCapLabel}), sin filtro de sector`;
-    return scope.failed > 0 ? `${base}; ${scope.failed} no se pudieron evaluar.` : `${base}.`;
+export function dcfScopeNote(t: TranslateFn, scope: DcfScope, marketCapLabel: string): string {
+    const vars = { probed: scope.probed, cap: marketCapLabel, failed: scope.failed };
+    return scope.failed > 0 ? t('home.dcf.scopeWithFailures', vars) : t('home.dcf.scopeOk', vars);
 }
 
 /**
  * Estado vacío honesto: distingue «evaluadas y ninguna supera el umbral» de
  * «no se pudo evaluar», que no permite concluir nada sobre el potencial.
  */
-export function dcfEmptyNote(scope: DcfScope): string {
+export function dcfEmptyNote(t: TranslateFn, scope: DcfScope): string {
     if (scope.probed === 0) {
-        return 'El screener no devolvió candidatas sobre las que calcular el valor intrínseco.';
+        return t('home.dcf.noCandidates');
     }
     if (scope.evaluated === 0) {
-        return `No se pudo calcular el valor intrínseco de las ${scope.probed} candidatas del screener probadas.`;
+        return t('home.dcf.noneEvaluated', { probed: scope.probed });
     }
-    const base = `Ninguna de las ${scope.evaluated} candidatas del screener evaluadas supera hoy un ${DCF_MIN_UPSIDE_PCT} % de potencial sobre su valor intrínseco`;
-    return scope.failed > 0 ? `${base}; ${scope.failed} no se pudieron evaluar.` : `${base}.`;
+    const vars = { evaluated: scope.evaluated, min: DCF_MIN_UPSIDE_PCT, failed: scope.failed };
+    return scope.failed > 0 ? t('home.dcf.noneAboveWithFailures', vars) : t('home.dcf.noneAbove', vars);
 }

@@ -58,7 +58,28 @@
     "firmsNone": "aggregate consensus only, no per-firm detail",
     "convertedFrom": "(converted from {currency})"
   },
-  "system": {},
-  "pwa": {},
-  "sectionError": {}
+  "system": {
+    "badge": "Analysis engine disconnected",
+    "unavailable": "{feature} is not available right now",
+    "needsServer": "This screen needs the GerarAI server.",
+    "failedDetail": "The GerarAI server could not complete the request. Try again in a few seconds."
+  },
+  "pwa": {
+    "title": "Install GerarAI",
+    "installed": "GerarAI is already installed on this device.",
+    "description": "Open it like an app, with no browser bar. It needs a connection: it does not store your theses or data for offline reading.",
+    "installButton": "Install the app",
+    "iosPre": "On iPhone or iPad: tap",
+    "iosShare": "Share",
+    "iosMid": " and then",
+    "iosAddHome": "Add to Home Screen",
+    "iosPost": ". Do it from Safari.",
+    "manualInstructions": "Your browser doesn't offer the install button here. In Chrome or Edge, open the menu and choose \"Install GerarAI\" (or \"Add to Home Screen\" on mobile)."
+  },
+  "sectionError": {
+    "network": "Could not connect to the service. Try again in a few seconds.",
+    "session": "Your session has expired. Sign in again to see this section.",
+    "server": "The service has failed. Try again in a few seconds.",
+    "generic": "The data could not be loaded. Try again in a few seconds."
+  }
 }

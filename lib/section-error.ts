@@ -1,18 +1,21 @@
 /**
- * Mensaje generico por categoria para estados de seccion caidos.
+ * Clave de mensaje genérico por categoría para estados de sección caídos.
  * El error crudo (rutas internas, detalles de red, fragments de respuesta,
- * URLs firmadas) nunca llega al usuario.
+ * URLs firmadas) nunca llega al usuario. El texto lo resuelve el llamador
+ * con t() en el idioma activo (ui.sectionError.*).
  */
-export function sectionError(error: unknown): string {
+import type { TranslationKey } from '@/lib/i18n/messages';
+
+export function sectionErrorKey(error: unknown): TranslationKey {
     const message = error instanceof Error ? error.message : '';
     if (/fetch|network|econn|timeout|timed out|abort/i.test(message)) {
-        return 'No se pudo conectar con el servicio. Reintenta en unos segundos.';
+        return 'ui.sectionError.network';
     }
     if (/401|403|unauthor|forbidden|sesion|session/i.test(message)) {
-        return 'Tu sesion ha caducado. Vuelve a entrar para ver esta seccion.';
+        return 'ui.sectionError.session';
     }
     if (/5\d\d|server|interno|internal/i.test(message)) {
-        return 'El servicio ha fallado. Reintenta en unos segundos.';
+        return 'ui.sectionError.server';
     }
-    return 'No se pudieron cargar los datos. Reintenta en unos segundos.';
+    return 'ui.sectionError.generic';
 }
