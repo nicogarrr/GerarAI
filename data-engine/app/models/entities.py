@@ -948,13 +948,16 @@ class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
         ),
         # 0120: la ventana row_number del screener (particion company+metric,
         # orden fiscal_year DESC NULLS LAST, id DESC) la recorre sin sort.
+        # text() a proposito: con desc() el NULLS LAST se perderia (en PG
+        # DESC por defecto es NULLS FIRST) y el indice declarado no seria
+        # el que crea la migracion.
         Index(
             "ix_calc_metrics_screener_window",
             "tenant_id",
             "company_id",
             "metric",
-            desc("fiscal_year"),
-            desc("id"),
+            text("fiscal_year DESC NULLS LAST"),
+            text("id DESC"),
             postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
         ),
     )
