@@ -1879,6 +1879,26 @@ class PortfolioIbkrXmlImportOut(BaseModel):
     portfolio_snapshot_id: int
 
 
+# --- GET /api/watchlist/attention-thesis -------------------------------------
+# Forma medida contra la ruta + home_attention_service.pending_thesis_changes:
+# envelope fijo {items, truncated}; item de 5 claves siempre presentes.
+# direction es String(40) en el modelo con escritores que usan
+# neutral/negative/mixed (medido); no es un conjunto cerrado: str honesto.
+
+
+class WatchlistAttentionThesisItemOut(BaseModel):
+    id: int
+    symbol: str
+    summary: str
+    direction: str
+    createdAt: str
+
+
+class WatchlistAttentionThesisOut(BaseModel):
+    items: list[WatchlistAttentionThesisItemOut]
+    truncated: bool
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto

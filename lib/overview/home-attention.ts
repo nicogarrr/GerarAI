@@ -1,12 +1,10 @@
+import type { components } from '@/lib/research/openapi.generated';
+
 import type { DcaSignalsResponse } from '@/lib/dca/types';
 
-export interface AttentionThesis {
-    id: number;
-    symbol: string;
-    summary: string;
-    direction: string;
-    createdAt: string;
-}
+// Tipo generado desde el OpenAPI del backend (response_model en la ruta);
+// regenerar con `npx openapi-typescript data-engine/openapi.json`.
+export type AttentionThesis = components['schemas']['WatchlistAttentionThesisItemOut'];
 export interface AttentionDca {
     id: string;
     symbol: string;
