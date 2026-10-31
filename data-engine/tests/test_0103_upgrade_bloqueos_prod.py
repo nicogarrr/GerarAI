@@ -124,7 +124,7 @@ def _insert(conn, tabla: str, overrides: dict) -> int:
     campos = ", ".join(f'"{k}"' for k in valores)
     marcas = ", ".join(f":{k}" for k in valores)
     return conn.execute(
-        sa.text(f'INSERT INTO "{tabla}" ({campos}) VALUES ({marcas}) RETURNING id'),
+        sa.text(f'INSERT INTO "{tabla}" ({campos}) VALUES ({marcas}) RETURNING id'),  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- identificadores de information_schema escapados con comillas; valores ligados; sin input externo
         valores,
     ).scalar_one()
 
@@ -141,7 +141,7 @@ def bd_en_0103_con_bloqueos():
     admin = sa.create_engine(url, isolation_level="AUTOCOMMIT")
     try:
         with admin.connect() as conn:
-            conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))
+            conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         base, sep, query = url.partition("?")
         url_scratch = re.sub(r"/[^/]+$", f"/{scratch}", base) + (sep + query if sep else "")
         try:
@@ -179,7 +179,7 @@ def bd_en_0103_con_bloqueos():
             yield scratch, url_scratch
         finally:
             with admin.connect() as conn:
-                conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))
+                conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
     finally:
         admin.dispose()
 

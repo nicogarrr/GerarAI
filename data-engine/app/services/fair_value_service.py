@@ -33,6 +33,7 @@ justo, 2026-10-30):
 
 from __future__ import annotations
 
+import logging
 import math
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -44,6 +45,8 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
 from app.services.thesis_publication_gate import thesis_withheld_reasons
+
+logger = logging.getLogger(__name__)
 
 THESIS_MAX_AGE_DAYS = 180
 PRECEDENCE = ("tesis_vigente", "motor_publicable", "tesis_antigua", "motor_orientativo")
@@ -424,7 +427,7 @@ def resolve_fair_value_cached(
         try:
             client.set(key, _json.dumps(reading, default=str), ex=max(int(ttl), 1))
         except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
-            pass
+            logger.warning("fair value: escritura cache Redis fallo; se devuelve el calculo", exc_info=True)
     return reading
 
 

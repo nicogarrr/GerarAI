@@ -22,8 +22,11 @@ absorben los leases/coalescing del carril; perder el tick seria peor).
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 _KEY_PREFIX = "provider_brake"
 
@@ -96,7 +99,7 @@ def record_429(client, provider: str) -> bool:
             client.delete(_streak_key(provider))
             return True
     except Exception:  # noqa: BLE001 - best-effort
-        pass
+        logger.warning("provider_brake: Redis fallo registrando racha de %s; fail-open", provider, exc_info=True)
     return False
 
 
@@ -107,7 +110,7 @@ def record_success(client, provider: str) -> None:
         if client is not None:
             client.delete(_streak_key(provider))
     except Exception:  # noqa: BLE001 - best-effort
-        pass
+        logger.warning("provider_brake: Redis fallo rompiendo racha de %s", provider, exc_info=True)
 
 
 def open_brakes(client) -> list[dict[str, Any]]:

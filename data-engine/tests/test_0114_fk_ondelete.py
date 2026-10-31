@@ -91,7 +91,7 @@ def _scratch(url: str):
     admin = sa.create_engine(url, isolation_level="AUTOCOMMIT")
     try:
         with admin.connect() as conn:
-            conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))
+            conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         base, sep, query = url.partition("?")
         base = re.sub(r"/[^/]+$", f"/{scratch}", base)
         scratch_url = base + (sep + query if sep else "")
@@ -117,7 +117,7 @@ def _scratch(url: str):
         # error original, que es el que explica por que fallo el fixture.
         try:
             with admin.connect() as conn:
-                conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))
+                conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         except Exception:
             pass
         finally:
@@ -199,7 +199,7 @@ def test_0114_fks_coinciden_con_modelos_en_ci_postgres():
         assert len(rever) == 53  # los recreados NO ACTION quedan NOT VALID
     finally:
         with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         admin.dispose()
 
 
@@ -220,7 +220,7 @@ def test_0114_ondelete_rige_sin_validate_en_ci_postgres():
     scratch = "fk114del_" + uuid.uuid4().hex[:12]
     admin = sa.create_engine(url, isolation_level="AUTOCOMMIT")
     with admin.connect() as conn:
-        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))
+        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
     base, sep, query = url.partition("?")
     base = re.sub(r"/[^/]+$", f"/{scratch}", base)
     scratch_url = base + (sep + query if sep else "")
@@ -284,7 +284,7 @@ def test_0114_ondelete_rige_sin_validate_en_ci_postgres():
         engine.dispose()
     finally:
         with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         admin.dispose()
 class _ConnFalsa:
     """Conexion minima que solo registra el SQL ejecutado (tests del guard)."""

@@ -6,6 +6,7 @@ Cache en memoria de 60s para no golpear Yahoo en cada carga de la home.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import threading
 import time
@@ -131,6 +132,8 @@ def close_shared_yahoo_client() -> None:
 # La conversión de clases US punto->guion (BRK.B -> BRK-B) vive en el
 # conector Yahoo (fuente única); aquí se reexporta con el nombre histórico.
 from app.services.connectors.yahoo import yahoo_chart_symbol as _yahoo_chart_symbol
+
+logger = logging.getLogger(__name__)
 
 
 def _bar_in_open_session(meta: dict, bar_ts, *, now_ts: float | None = None) -> bool:
@@ -375,7 +378,7 @@ def market_quotes_batch(body: MarketQuotesBatchIn) -> dict:
                     quotes[symbol] = json.loads(raw)
                     continue
             except Exception:  # noqa: BLE001 - fail-open al fetch
-                pass
+                logger.warning("quote cache: lectura Redis fallo; fail-open al fetch", exc_info=True)
         misses.append(symbol)
 
     if misses:
@@ -398,7 +401,7 @@ def market_quotes_batch(body: MarketQuotesBatchIn) -> dict:
                         json.dumps(data),
                     )
                 except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
-                    pass
+                    logger.warning("quote cache: escritura Redis fallo; se sirve sin cache", exc_info=True)
     return {"quotes": quotes}
 
 
