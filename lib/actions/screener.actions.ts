@@ -5,6 +5,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import { formatNumber } from '@/lib/format';
 import { fetchDatedChanges } from '@/lib/market/dated-change';
+import type { components } from '@/lib/research/openapi.generated';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
 const FINNHUB_API_KEY = process.env.FINNHUB_API_KEY;
@@ -226,47 +227,9 @@ export type RealScreenerFilters = {
   limit?: number;
 };
 
-export type RealScreenerRow = {
-  /** Vendor quote time in epoch seconds, never response retrieval time. */
-  priceAsOf?: number | null;
-  priceTimestampKind?: 'daily_candle_open' | 'quote';
-  /** Día de mercado (YYYY-MM-DD) de la vela diaria que publica el precio: es un cierre. */
-  priceDate?: string | null;
-  symbol: string;
-  currency?: string | null;
-  name: string;
-  price: number;
-  change: number | null;
-  changePercent: number | null;
-  marketCap: number | null;
-  volume: number | null;
-  prevClose: number | null;
-  sector: string;
-  exchange: string;
-  type: string;
-  pe: number | null;
-  pb: number | null;
-  roe: number | null;
-  beta: number | null;
-  /** true = hay fundamentales SEC/ESEF persistidos (revenue y acciones
-   *  diluidas): el DCF de la tarjeta de inicio es calculable. */
-  has_fundamentals?: boolean;
-};
+export type RealScreenerRow = components['schemas']['ScreenerRealItemOut'];
 
-export type RealScreenerResponse = {
-  source: string;
-  as_of: number;
-  count: number;
-  screener: RealScreenerRow[];
-  /** true = sin datos todavía y un refresco en vuelo (carga fría), no un filtro
-   *  sin resultados. */
-  refreshing?: boolean;
-  /** true = el universo entero está vacío (proveedor sin datos): no es un
-   *  filtro sin coincidencias. */
-  unavailable?: boolean;
-  /** Tamaño del universo seguido, para declarar el alcance real del listado. */
-  universe_size?: number;
-};
+export type RealScreenerResponse = components['schemas']['ScreenerRealOut'];
 
 /**
  * Screener real: consulta el backend (Finnhub free) con precios y market caps

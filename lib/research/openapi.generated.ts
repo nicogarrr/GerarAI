@@ -12279,6 +12279,77 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ScreenerMetricCoverageOut */
+        ScreenerMetricCoverageOut: {
+            /** Metrics With Data */
+            metrics_with_data: string[];
+        };
+        /** ScreenerRealItemOut */
+        ScreenerRealItemOut: {
+            /** Beta */
+            beta: null;
+            /** Change */
+            change: number | null;
+            /** Changepercent */
+            changePercent: number | null;
+            /** Currency */
+            currency: string | null;
+            /** Exchange */
+            exchange: string;
+            /** Has Fundamentals */
+            has_fundamentals: boolean;
+            /** Marketcap */
+            marketCap: number | null;
+            /** Name */
+            name: string;
+            /** Pb */
+            pb: number | null;
+            /** Pe */
+            pe: number | null;
+            /** Prevclose */
+            prevClose: number | null;
+            /** Price */
+            price: number;
+            /** Priceasof */
+            priceAsOf: number | null;
+            /** Pricedate */
+            priceDate: string | null;
+            /**
+             * Pricetimestampkind
+             * @enum {string}
+             */
+            priceTimestampKind: "daily_candle_open" | "quote";
+            /** Roe */
+            roe: number | null;
+            /** Sector */
+            sector: string;
+            /** Symbol */
+            symbol: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "ETF" | "Stock";
+            /** Volume */
+            volume: number | null;
+        };
+        /** ScreenerRealOut */
+        ScreenerRealOut: {
+            /** As Of */
+            as_of: number;
+            /** Count */
+            count: number;
+            /** Refreshing */
+            refreshing: boolean;
+            /** Screener */
+            screener: components["schemas"]["ScreenerRealItemOut"][];
+            /** Source */
+            source: string;
+            /** Unavailable */
+            unavailable: boolean;
+            /** Universe Size */
+            universe_size: number;
+        };
         /** ScreenerSavedScreenOut */
         ScreenerSavedScreenOut: {
             /** Active */
@@ -25271,9 +25342,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScreenerMetricCoverageOut"];
                 };
             };
             /** @description Validation Error */
@@ -25315,9 +25384,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["ScreenerRealOut"];
                 };
             };
             /** @description Validation Error */

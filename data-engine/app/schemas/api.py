@@ -2054,6 +2054,55 @@ class WatchlistMetricsOut(BaseModel):
     currency: str | None
     sources: list[str]
 
+# --- GET /api/screeners/metric-coverage -----------------------------------------
+# Forma medida contra la ruta: envelope de 1 clave; la lista sale de
+# ScreenerService.metric_coverage (nombres de metrica con datos).
+
+
+class ScreenerMetricCoverageOut(BaseModel):
+    metrics_with_data: list[str]
+
+
+# --- GET /api/screeners/real ------------------------------------------------------
+# Envelope medido contra _real_response_payload: 7 claves siempre. Item medido
+# contra el builder de _refetch_real_items: 21 claves siempre; los huecos del
+# proveedor van a null ("Nulos honestos" de FinnhubScreenVendor.fetch_quote),
+# beta es siempre null en el codigo medido. priceTimestampKind y type son
+# conjuntos cerrados medidos: Literal.
+
+
+class ScreenerRealItemOut(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    priceAsOf: float | None
+    priceTimestampKind: Literal["daily_candle_open", "quote"]
+    priceDate: str | None
+    currency: str | None
+    change: float | None
+    changePercent: float | None
+    marketCap: float | None
+    volume: float | None
+    prevClose: float | None
+    sector: str
+    exchange: str
+    type: Literal["ETF", "Stock"]
+    pe: float | None
+    pb: float | None
+    roe: float | None
+    has_fundamentals: bool
+    beta: None
+
+
+class ScreenerRealOut(BaseModel):
+    source: str
+    as_of: float
+    count: int
+    screener: list[ScreenerRealItemOut]
+    refreshing: bool
+    unavailable: bool
+    universe_size: int
+
 
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
