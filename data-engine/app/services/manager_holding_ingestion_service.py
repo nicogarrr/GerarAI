@@ -234,6 +234,50 @@ def _latest_accession(rows: list) -> str:
     )
 
 
+
+def _snapshot_holdings_payload(fallback: dict) -> dict:
+    """Payload de lectura para holdings servidos desde el snapshot edgartools.
+
+    Mismo contrato de claves que la via persistida; lo que el snapshot no
+    tiene queda en None. status="snapshot" (nunca "ok"): el snapshot no
+    contrasta totales contra el filing, asi que no es "verified".
+    """
+    holdings = []
+    for h in fallback.get("holdings") or []:
+        value = h.get("value_usd_thousands")
+        shares = h.get("ssh_prnamt")
+        holdings.append(
+            {
+                "accession_number": None,
+                "is_amendment": False,
+                "name_of_issuer": h.get("name_of_issuer"),
+                "name_of_issuer_filed": h.get("name_of_issuer"),
+                "title_of_class": h.get("title_of_class"),
+                "cusip": h.get("cusip"),
+                "value_usd_thousands": float(value) if value is not None else None,
+                "shares": float(shares) if shares is not None else None,
+                "share_type": h.get("ssh_prnamt_type"),
+                "put_call": h.get("put_call") or None,
+                "investment_discretion": h.get("investment_discretion"),
+                "filing_url": None,
+            }
+        )
+    return {
+        "cik": fallback.get("cik"),
+        "manager": REVIEWED_MANAGERS.get(str(fallback.get("cik") or "").zfill(10)),
+        "status": "snapshot",
+        "verification": "snapshot_unverified",
+        "report_date": fallback.get("report_date"),
+        "coverage": "snapshot",
+        "holdings": holdings,
+        "errors": fallback.get("errors") or [],
+        "limitations": fallback.get("limitations") or list(LIMITATIONS),
+        "transport": fallback.get("transport"),
+        "snapshot_synced_at": fallback.get("snapshot_synced_at"),
+        "provenance": fallback.get("provenance"),
+    }
+
+
 class ManagerHoldingIngestionService:
     def __init__(self, client: httpx.Client | None = None) -> None:
         self.client = client
@@ -681,6 +725,17 @@ class ManagerHoldingIngestionService:
         cik = str(cik).strip().zfill(10)
         manager = db.scalar(select(FundManager).where(FundManager.cik == cik))
         if manager is None or manager.last_report_date is None:
+            # Sin sync en vivo todavia (o la via principal fallo): servir el
+            # snapshot edgartools si existe, marcado como tal y sin persistir.
+            # Import perezoso: edgartools_ingestion_service importa LIMITATIONS
+            # de este modulo.
+            from app.services.edgartools_ingestion_service import (
+                refresh_13f_from_edgartools,
+            )
+
+            fallback = refresh_13f_from_edgartools(cik)
+            if fallback.get("status") == "ok":
+                return _snapshot_holdings_payload(fallback)
             return {
                 "cik": cik,
                 "status": "unavailable",
