@@ -300,7 +300,7 @@ export default async function ResearchSourcesPage({
                 Anterior
               </Link>
             ) : null}
-            <span className="text-xs text-gray-500">
+            <span className="text-xs whitespace-nowrap text-gray-500">
               Página {formatNumber(pageInfo.page, { maximumFractionDigits: 0 })} de{' '}
               {formatNumber(pageInfo.pages, { maximumFractionDigits: 0 })}
             </span>
