@@ -15,11 +15,19 @@ responde o su formato cambia, devuelven lista vacia y el servicio lo marca como
 from __future__ import annotations
 
 import re
+import time
 from datetime import date
 from html import unescape
 from typing import Any
 
 import httpx
+
+from app.services.data_source_health import get_data_source_registry
+
+# Claves en el registry de salud de fuentes. Las URLs son fijas (no llevan
+# ticker): un 404 aqui SI es fuente caida o movida, a diferencia de Yahoo/SEC.
+FOMC_REGISTRY_KEY = "fomc_calendar"
+BLS_REGISTRY_KEY = "bls_calendar"
 
 FOMC_URL = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
 BLS_ICS_URL = "https://www.bls.gov/schedule/news_release/bls.ics"
@@ -29,16 +37,26 @@ _MONTHS = {
     name: index
     for index, name in enumerate(
         [
-            "jan", "feb", "mar", "apr", "may", "jun",
-            "jul", "aug", "sep", "oct", "nov", "dec",
+            "jan",
+            "feb",
+            "mar",
+            "apr",
+            "may",
+            "jun",
+            "jul",
+            "aug",
+            "sep",
+            "oct",
+            "nov",
+            "dec",
         ],
         start=1,
     )
 }
 _YEAR_PANEL = re.compile(r'<h4><a id="\d+">(\d{4}) FOMC Meetings</a>')
 _MEETING = re.compile(
-    r'fomc-meeting__month[^>]*>\s*<strong>([^<]*)</strong>.*?'
-    r'fomc-meeting__date[^>]*>([^<]*)<',
+    r"fomc-meeting__month[^>]*>\s*<strong>([^<]*)</strong>.*?"
+    r"fomc-meeting__date[^>]*>([^<]*)<",
     re.S,
 )
 _DAYS = re.compile(r"^\s*(\d{1,2})(?:\s*-\s*(\d{1,2}))?\s*(\*)?\s*$")
@@ -135,12 +153,34 @@ async def _get_text(url: str, user_agent: str, client: httpx.AsyncClient | None)
 
 
 async def fetch_fomc(user_agent: str, client: httpx.AsyncClient | None = None) -> list[dict[str, Any]]:
-    return parse_fomc_html(await _get_text(FOMC_URL, user_agent, client))
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        text = await _get_text(FOMC_URL, user_agent, client)
+    except httpx.HTTPStatusError as exc:
+        registry.record_failure(FOMC_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(FOMC_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    registry.record_success(FOMC_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    return parse_fomc_html(text)
 
 
 async def fetch_bls(user_agent: str, client: httpx.AsyncClient | None = None) -> list[dict[str, Any]]:
-    text = await _get_text(BLS_ICS_URL, user_agent, client)
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        text = await _get_text(BLS_ICS_URL, user_agent, client)
+    except httpx.HTTPStatusError as exc:
+        registry.record_failure(BLS_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(BLS_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
     if "BEGIN:VCALENDAR" not in text:
         # BLS responde 200 con una pagina "Access Denied" a clientes no conformes.
+        registry.record_failure(BLS_REGISTRY_KEY, "200 sin iCalendar (Access Denied o cambio de formato)")
         raise ValueError("BLS no devolvio un iCalendar")
+    registry.record_success(BLS_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
     return parse_bls_ics(text)

@@ -10,6 +10,12 @@ from email.utils import parsedate_to_datetime
 import httpx
 
 from app.services.connectors.base import ConnectorItem, ConnectorResult
+from app.services.data_source_health import get_data_source_registry
+
+# Clave de este proveedor en el registry de salud de fuentes. El 429 de GDELT
+# es POR IP (afecta a todo el carril), asi que SI degrada la fuente; un 400
+# es una query invalida (nivel de consulta, no de fuente) y NO degrada.
+REGISTRY_KEY = "gdelt"
 
 
 class GdeltRateLimited(Exception):
@@ -71,14 +77,8 @@ class GDELTClient:
         max_429_retries: int | None = None,
     ) -> None:
         self.client = client
-        self.min_interval = (
-            self.DEFAULT_MIN_INTERVAL if min_interval is None else min_interval
-        )
-        self.max_429_retries = (
-            self.DEFAULT_MAX_429_RETRIES
-            if max_429_retries is None
-            else max_429_retries
-        )
+        self.min_interval = self.DEFAULT_MIN_INTERVAL if min_interval is None else min_interval
+        self.max_429_retries = self.DEFAULT_MAX_429_RETRIES if max_429_retries is None else max_429_retries
 
     @classmethod
     def _block_for(cls, seconds: float) -> None:
@@ -172,21 +172,28 @@ class GDELTClient:
             "maxrecords": max_records,
             "sort": "hybridrel",
         }
+        registry = get_data_source_registry()
         attempt = 0
         while True:
             await self._throttle()
-            if self.client is not None:
-                response = await self.client.get(self.base_url, params=params)
-            else:
-                async with httpx.AsyncClient(timeout=30) as client:
-                    response = await client.get(self.base_url, params=params)
+            # monotonic (no perf_counter): los tests de pacing sustituyen el
+            # reloj del modulo por uno falso que solo conoce monotonic.
+            started = time.monotonic()
+            try:
+                if self.client is not None:
+                    response = await self.client.get(self.base_url, params=params)
+                else:
+                    async with httpx.AsyncClient(timeout=30) as client:
+                        response = await client.get(self.base_url, params=params)
+            except httpx.TransportError as exc:
+                registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+                raise
             if response.status_code == 429:
+                registry.record_failure(REGISTRY_KEY, "HTTP 429: rate limit por IP")
                 raw_retry_after = self._raw_retry_after(response)
                 # El 429 es POR IP: la ventana la respetan TODOS los jobs del
                 # carril, no solo este mensaje.
-                self._block_for(
-                    raw_retry_after if raw_retry_after is not None else self.DEFAULT_RETRY_AFTER
-                )
+                self._block_for(raw_retry_after if raw_retry_after is not None else self.DEFAULT_RETRY_AFTER)
                 if raw_retry_after is not None and raw_retry_after > self.MAX_RETRY_AFTER:
                     # Ventana prohibida demasiado larga para esta corrida:
                     # no se trunca ni se reintenta inline; sube tipada con la
@@ -199,8 +206,22 @@ class GDELTClient:
                 # Reintentos inline agotados: sube tipada con la ventana
                 # acotada; el actor reencola el lote tras ella.
                 raise GdeltRateLimited(self._retry_after_seconds(response))
-            response.raise_for_status()
-            return response.json()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 400:
+                    # Query invalida: la fuente respondio; no se degrada.
+                    raise
+                registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+                raise
+            try:
+                payload = response.json()
+            except ValueError:
+                # 200 con HTML (pagina de error de GDELT): la fuente cambio.
+                registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
+                raise
+            registry.record_success(REGISTRY_KEY, (time.monotonic() - started) * 1000)
+            return payload
 
 
 def _gdelt_datetime(value: str | None) -> datetime | None:
