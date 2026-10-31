@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
+import stat
 import threading
 import time
 from dataclasses import dataclass
@@ -290,14 +292,7 @@ def read_manifest(root: Path | None = None) -> dict[str, Any] | None:
     base = root or snapshot_root()
     if base is None:
         return None
-    path = base / "manifest.json"
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    return data if isinstance(data, dict) else None
+    return _read_json(base / "manifest.json", base)
 
 
 def manifest_cik(ticker: str, root: Path | None = None) -> str | None:
@@ -319,30 +314,114 @@ def manifest_synced_at(root: Path | None = None) -> str | None:
     return str(synced) if synced else None
 
 
-def _read_json(path: Path) -> dict[str, Any] | None:
-    if not path.exists():
+def _resolve_within(base: Path, path: Path) -> Path | None:
+    """path con symlinks resueltos (realpath) debe quedar dentro de base.
+
+    Un symlink de fichero O de directorio dentro del snapshot que apunte
+    fuera del root autorizado hace que la ruta resuelta caiga fuera y se
+    rechaza. La comprobacion usa las rutas reales de ambos extremos.
+    """
+    try:
+        root = Path(os.path.realpath(base))
+        resolved = Path(os.path.realpath(path))
+    except OSError:
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+        resolved.relative_to(root)
+    except ValueError:
         return None
+    return resolved
+
+
+def _open_verified(base: Path, path: Path):
+    """Resuelve path y lo abre anclado al root real del snapshot.
+
+    El ancla es siempre el root REAL (realpath de base): si un directorio
+    intermedio (p.ej. ``filings``) es un symlink a un destino externo, la
+    ruta final resuelta cae fuera del root y se rechaza - nunca se toma el
+    destino externo como raiz autorizada. La apertura se hace relativa al
+    directorio padre ya resuelto (dir_fd) y con O_NOFOLLOW en el fichero,
+    para no depender de repetir la resolucion.
+
+    Hipotesis residual (no garantia): entre la resolucion y la apertura el
+    arbol real del snapshot no lo reescribe otro proceso. Lo escribe el
+    sync local y no hay evidencia de escritores concurrentes, pero es una
+    hipotesis sobre el despliegue, no una propiedad del codigo.
+    """
+    resolved = _resolve_within(base, path)
+    if resolved is None:
+        return None
+    try:
+        parent_fd = os.open(resolved.parent, os.O_RDONLY | os.O_DIRECTORY)
+    except OSError:
+        return None
+    fd = None
+    try:
+        fd = os.open(
+            resolved.name,
+            os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_fd,
+        )
+        # Solo ficheros regulares: un directorio o una FIFO (o cualquier
+        # otro tipo) en el lugar del fichero se rechaza como None.
+        # O_NONBLOCK evita que la apertura de una FIFO bloquee.
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            os.close(fd)
+            return None
+        return fd
+    except OSError:
+        if fd is not None:
+            os.close(fd)
+        return None
+    finally:
+        os.close(parent_fd)
+
+
+def _read_json(path: Path, base: Path) -> dict[str, Any] | None:
+    fd = _open_verified(base, path)
+    if fd is None:
+        return None
+    try:
+        fh = os.fdopen(fd, encoding="utf-8")
+    except OSError:
+        os.close(fd)
+        return None
+    with fh:
+        try:
+            data = json.loads(fh.read())
+        except (OSError, ValueError):
+            return None
     return data if isinstance(data, dict) else None
+
+
+def _safe_cik(cik: str | int) -> str | None:
+    """CIK normalizado a 10 digitos, o None si no es numerico.
+
+    Sin esta validacion un cik con separadores ("../..") escapaba del
+    directorio del snapshot al interpolarse en la ruta del JSON.
+    """
+    padded = str(cik).strip().zfill(10)
+    return padded if padded.isdigit() else None
 
 
 def read_companyfacts(cik: str | int, root: Path | None = None) -> dict[str, Any] | None:
     base = root or snapshot_root()
     if base is None:
         return None
-    padded = str(cik).strip().zfill(10)
-    return _read_json(base / "companyfacts" / f"CIK{padded}.json")
+    padded = _safe_cik(cik)
+    if padded is None:
+        return None
+    return _read_json(base / "companyfacts" / f"CIK{padded}.json", base)
 
 
 def read_submissions(cik: str | int, root: Path | None = None) -> dict[str, Any] | None:
     base = root or snapshot_root()
     if base is None:
         return None
-    padded = str(cik).strip().zfill(10)
-    return _read_json(base / "submissions" / f"CIK{padded}.json")
+    padded = _safe_cik(cik)
+    if padded is None:
+        return None
+    return _read_json(base / "submissions" / f"CIK{padded}.json", base)
 
 
 def read_filing_xml(accession_number: str, filename: str, root: Path | None = None) -> str | None:
@@ -351,13 +430,27 @@ def read_filing_xml(accession_number: str, filename: str, root: Path | None = No
     if base is None:
         return None
     folder = str(accession_number).replace("-", "")
-    path = base / "filings" / folder / filename
-    if not path.exists():
+    if not folder.isdigit():
+        return None
+    name = str(filename)
+    if not name or name in (".", "..") or "/" in name or "\\" in name or ".." in name:
+        return None
+    # Ancla: el root REAL del snapshot. Si ``filings`` (o cualquier
+    # intermedio) es un symlink externo, la ruta resuelta cae fuera y se
+    # rechaza; el destino externo nunca actua de raiz autorizada.
+    fd = _open_verified(base, base / "filings" / folder / name)
+    if fd is None:
         return None
     try:
-        return path.read_text(encoding="utf-8")
+        fh = os.fdopen(fd, encoding="utf-8")
     except OSError:
+        os.close(fd)
         return None
+    with fh:
+        try:
+            return fh.read()
+        except OSError:
+            return None
 
 
 @dataclass(frozen=True)

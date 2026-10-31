@@ -434,8 +434,9 @@ def refresh_form4_from_edgartools(
                 list(parsed.get("transactions", [])), {**filing, "ticker": wanted}
             )
             transactions.extend(filing_tx)
-        except Exception as exc:  # noqa: BLE001 - best-effort por filing
-            errors.append(f"{accession}: {type(exc).__name__}: {redact_secrets(str(exc))[:200]}")
+        except Exception:  # noqa: BLE001 - best-effort por filing
+            # Sin texto de la excepcion: el detalle interno no sale en el payload.
+            errors.append(f"{accession}: form4_xml_parse_error")
     synced_at = client.manifest_synced_at(snapshot_root)
     return {
         "ticker": wanted,
@@ -542,8 +543,9 @@ def refresh_13f_from_edgartools(
             continue
         try:
             holdings.extend(infotable_holdings(xml))
-        except Exception as exc:  # noqa: BLE001 - cobertura parcial, se sigue
-            errors.append({"accession": accession, "error": redact_secrets(f"{type(exc).__name__}: {exc}")})
+        except Exception:  # noqa: BLE001 - cobertura parcial, se sigue
+            # Sin texto de la excepcion: el detalle interno no sale en el payload.
+            errors.append({"accession": accession, "error": "information_table_parse_error"})
     synced_at = client.manifest_synced_at(snapshot_root)
     return {
         "cik": padded,
