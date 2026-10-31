@@ -24,6 +24,7 @@ const MIXED_BASE_PAYLOAD: PortfolioForecast = {
             name: 'Holding sin conversión',
             weight: null,
             currency: 'USD',
+            reason_code: 'no_base_value',
             reason: 'Sin valor en moneda base (conversión N/D): no se suma a la cartera.',
         },
     ],

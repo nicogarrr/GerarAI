@@ -7101,6 +7101,421 @@
         "title": "FlowTotalOut",
         "type": "object"
       },
+      "ForecastCoveredOnlyOut": {
+        "properties": {
+          "expected_cagr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Cagr"
+          },
+          "scenarios": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ForecastCoveredScenarioOut"
+            },
+            "title": "Scenarios",
+            "type": "object"
+          }
+        },
+        "required": [
+          "scenarios",
+          "expected_cagr"
+        ],
+        "title": "ForecastCoveredOnlyOut",
+        "type": "object"
+      },
+      "ForecastCoveredScenarioOut": {
+        "properties": {
+          "cagr": {
+            "title": "Cagr",
+            "type": "number"
+          },
+          "coverage": {
+            "title": "Coverage",
+            "type": "number"
+          },
+          "horizon_scope": {
+            "enum": [
+              "uniform",
+              "mixed"
+            ],
+            "title": "Horizon Scope",
+            "type": "string"
+          },
+          "total_return": {
+            "title": "Total Return",
+            "type": "number"
+          }
+        },
+        "required": [
+          "cagr",
+          "total_return",
+          "coverage",
+          "horizon_scope"
+        ],
+        "title": "ForecastCoveredScenarioOut",
+        "type": "object"
+      },
+      "ForecastExcludedOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "reason_code": {
+            "enum": [
+              "valuation_hold",
+              "no_base_value",
+              "no_published_thesis",
+              "valuation_basis_unverified",
+              "no_computable_intrinsic"
+            ],
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight"
+          }
+        },
+        "required": [
+          "ticker",
+          "name",
+          "weight",
+          "currency",
+          "reason_code",
+          "reason"
+        ],
+        "title": "ForecastExcludedOut",
+        "type": "object"
+      },
+      "ForecastPortfolioOut": {
+        "properties": {
+          "covered_count": {
+            "title": "Covered Count",
+            "type": "integer"
+          },
+          "covered_only": {
+            "$ref": "#/components/schemas/ForecastCoveredOnlyOut"
+          },
+          "covered_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Weight"
+          },
+          "excluded_count": {
+            "title": "Excluded Count",
+            "type": "integer"
+          },
+          "expected_cagr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Cagr"
+          },
+          "expected_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Coverage"
+          },
+          "position_count": {
+            "title": "Position Count",
+            "type": "integer"
+          },
+          "scenarios": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/ForecastScenarioOut"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenarios"
+          },
+          "total_value_base": {
+            "title": "Total Value Base",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total_value_base",
+          "position_count",
+          "covered_count",
+          "excluded_count",
+          "covered_weight",
+          "scenarios",
+          "expected_cagr",
+          "expected_coverage",
+          "covered_only"
+        ],
+        "title": "ForecastPortfolioOut",
+        "type": "object"
+      },
+      "ForecastPositionOut": {
+        "properties": {
+          "cagr": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Cagr",
+            "type": "object"
+          },
+          "comparison_basis": {
+            "title": "Comparison Basis",
+            "type": "string"
+          },
+          "contribution_expected": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Expected"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "expected_cagr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Cagr"
+          },
+          "horizon_years": {
+            "title": "Horizon Years",
+            "type": "integer"
+          },
+          "intrinsic": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Intrinsic",
+            "type": "object"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "partial_expected_cagr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Partial Expected Cagr"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "price_as_of": {
+            "title": "Price As Of",
+            "type": "string"
+          },
+          "price_source": {
+            "title": "Price Source",
+            "type": "string"
+          },
+          "price_veracity": {
+            "enum": [
+              "OFICIAL",
+              "MANUAL/NO OFICIAL",
+              "NO VERIFICADA"
+            ],
+            "title": "Price Veracity",
+            "type": "string"
+          },
+          "probabilities": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probabilities"
+          },
+          "probability_mass": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probability Mass"
+          },
+          "thesis_status": {
+            "title": "Thesis Status",
+            "type": "string"
+          },
+          "thesis_version": {
+            "title": "Thesis Version",
+            "type": "integer"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "total_return": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Total Return",
+            "type": "object"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          },
+          "weight_scope": {
+            "enum": [
+              "total_portfolio",
+              "valued_subset"
+            ],
+            "title": "Weight Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "name",
+          "weight",
+          "currency",
+          "weight_scope",
+          "price",
+          "price_as_of",
+          "price_source",
+          "price_veracity",
+          "intrinsic",
+          "comparison_basis",
+          "probabilities",
+          "probability_mass",
+          "horizon_years",
+          "thesis_version",
+          "thesis_status",
+          "model_version",
+          "cagr",
+          "total_return",
+          "expected_cagr",
+          "partial_expected_cagr",
+          "contribution_expected"
+        ],
+        "title": "ForecastPositionOut",
+        "type": "object"
+      },
+      "ForecastScenarioOut": {
+        "properties": {
+          "contribution_cagr": {
+            "title": "Contribution Cagr",
+            "type": "number"
+          },
+          "contribution_total_return": {
+            "title": "Contribution Total Return",
+            "type": "number"
+          },
+          "coverage": {
+            "title": "Coverage",
+            "type": "number"
+          },
+          "horizon_scope": {
+            "enum": [
+              "uniform",
+              "mixed"
+            ],
+            "title": "Horizon Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contribution_cagr",
+          "contribution_total_return",
+          "coverage",
+          "horizon_scope"
+        ],
+        "title": "ForecastScenarioOut",
+        "type": "object"
+      },
       "GemOut": {
         "properties": {
           "market_cap": {
@@ -11787,6 +12202,73 @@
           "factors"
         ],
         "title": "PortfolioExposuresOut",
+        "type": "object"
+      },
+      "PortfolioForecastOut": {
+        "properties": {
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastExcludedOut"
+            },
+            "title": "Excluded",
+            "type": "array"
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ForecastPortfolioOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ForecastPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "as_of",
+          "base_currency",
+          "portfolio",
+          "positions",
+          "excluded",
+          "assumptions"
+        ],
+        "title": "PortfolioForecastOut",
         "type": "object"
       },
       "PortfolioFxRateOut": {
@@ -59038,9 +59520,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Forecast Api Portfolio Forecast Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioForecastOut"
                 }
               }
             },

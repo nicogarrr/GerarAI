@@ -39,6 +39,7 @@ from app.schemas.api import (
     PortfolioDataQualityOut,
     PortfolioDividendProjectionOut,
     PortfolioDividendYieldsOut,
+    PortfolioForecastOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
     PortfolioSnapshotOut,
@@ -1691,7 +1692,7 @@ def _intrinsic_for_comparison(
     return None, "legacy_basis_unverified"
 
 
-@router.get("/forecast")
+@router.get("/forecast", response_model=PortfolioForecastOut)
 def portfolio_forecast(db: Session = Depends(get_db)) -> dict:
     """Prevision de rentabilidad de la cartera desde el valor intrinseco.
 

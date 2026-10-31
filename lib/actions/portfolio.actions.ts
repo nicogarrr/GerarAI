@@ -872,75 +872,19 @@ export async function getPortfolioTearsheet(userId: string): Promise<PortfolioTe
 
 // Tipos + fetcher para lib/actions/portfolio.actions.ts
 
-export type PortfolioForecastScenario = {
-  contribution_cagr: number;
-  contribution_total_return: number;
-  coverage: number;
-  horizon_scope: 'uniform' | 'mixed';
-};
+// Tipos generados desde el OpenAPI del backend (response_model en la ruta);
+// regenerar con `npx openapi-typescript data-engine/openapi.json`. El tipo
+// manuscrito no contemplaba reason_code "valuation_hold" ni intrinsic con
+// escenarios null.
+export type PortfolioForecastScenario = components['schemas']['ForecastScenarioOut'];
 
-export type PortfolioForecastCoveredScenario = {
-  cagr: number;
-  total_return: number;
-  coverage: number;
-  horizon_scope: 'uniform' | 'mixed';
-};
+export type PortfolioForecastCoveredScenario = components['schemas']['ForecastCoveredScenarioOut'];
 
-export type PortfolioForecastPosition = {
-  ticker: string;
-  name: string;
-  weight: number;
-  currency: string;
-  price: number;
-  price_as_of: string;
-  price_source: string;
-  intrinsic: { bear: number | null; base: number | null; bull: number | null };
-  probabilities: Record<string, number> | null;
-  horizon_years: number;
-  thesis_version: number;
-  thesis_status: string;
-  model_version: number | null;
-  cagr: Partial<Record<'bear' | 'base' | 'bull', number>>;
-  total_return: Partial<Record<'bear' | 'base' | 'bull', number>>;
-  expected_cagr: number | null;
-  partial_expected_cagr: number | null;
-  contribution_expected: number | null;
-  weight_scope: 'total_portfolio' | 'valued_subset';
-  price_veracity: 'OFICIAL' | 'MANUAL/NO OFICIAL' | 'NO VERIFICADA';
-  probability_mass: number | null;
-  comparison_basis?: string;
-};
+export type PortfolioForecastPosition = components['schemas']['ForecastPositionOut'];
 
-export type PortfolioForecastExcluded = {
-  ticker: string;
-  name: string;
-  weight: number | null;
-  currency: string;
-  reason: string;
-  reason_code?: 'no_base_value' | 'no_published_thesis' | 'valuation_basis_unverified' | 'no_computable_intrinsic';
-};
+export type PortfolioForecastExcluded = components['schemas']['ForecastExcludedOut'];
 
-export type PortfolioForecast = {
-  as_of: string | null;
-  base_currency: string | null;
-  portfolio: {
-    total_value_base: number;
-    position_count: number;
-    covered_count: number;
-    excluded_count: number;
-    covered_weight: number | null;
-    scenarios: Partial<Record<'bear' | 'base' | 'bull', PortfolioForecastScenario>> | null;
-    expected_cagr: number | null;
-    expected_coverage: number | null;
-    covered_only: {
-      scenarios: Partial<Record<'bear' | 'base' | 'bull', PortfolioForecastCoveredScenario>>;
-      expected_cagr: number | null;
-    };
-  } | null;
-  positions: PortfolioForecastPosition[];
-  excluded: PortfolioForecastExcluded[];
-  assumptions: string[];
-};
+export type PortfolioForecast = components['schemas']['PortfolioForecastOut'];
 
 export async function getPortfolioForecast(): Promise<PortfolioForecast> {
   // Sin cache: la prevision depende de la ultima sincronizacion IBKR y de
