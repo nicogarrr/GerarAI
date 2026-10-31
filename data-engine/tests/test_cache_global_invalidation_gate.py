@@ -203,3 +203,77 @@ def test_script_zero_keys_exits_0(monkeypatch, capsys):
     monkeypatch.setattr(cache_core, "invalidate_market_data_cache", lambda: 0)
     assert invalidate_script.main() == 0
     assert "0" in capsys.readouterr().out
+
+
+# --- CLI real por subprocess (retencion 2 del piloto en #3574) ---
+#
+# `python scripts/invalidate_market_cache.py` desde data-engine debe
+# funcionar tal cual lo documenta el runbook (antes fallaba con
+# ModuleNotFoundError: app: sys.path[0] era scripts/).
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+DATA_ENGINE = Path(__file__).resolve().parent.parent
+
+
+def _fake_redis_pkg(tmp_path: Path, keys: list[str]) -> Path:
+    pkg = tmp_path / "redis"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(
+        "def from_url(url, **kwargs):\n"
+        "    class _C:\n"
+        "        def ping(self):\n"
+        "            return True\n"
+        "        def scan(self, cursor, match, count):\n"
+        f"            return (0, {keys!r})\n"
+        "        def delete(self, *keys):\n"
+        "            return len(keys)\n"
+        "    return _C()\n"
+    )
+    (pkg / "backoff.py").write_text("class NoBackoff:\n    pass\n")
+    (pkg / "retry.py").write_text(
+        "class Retry:\n    def __init__(self, *a, **k):\n        pass\n"
+    )
+    return tmp_path
+
+
+def _cli_env(tmp_path: Path | None, redis_url: str) -> dict[str, str]:
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "HOME": os.environ.get("HOME", ""),
+        "REDIS_URL": redis_url,
+        "APP_ENV": "local",
+    }
+    if tmp_path is not None:
+        env["PYTHONPATH"] = str(tmp_path)
+    return env
+
+
+def test_cli_subprocess_success(tmp_path):
+    fake_root = _fake_redis_pkg(tmp_path, ["k1", "k2"])
+    res = subprocess.run(
+        [sys.executable, "scripts/invalidate_market_cache.py"],
+        cwd=DATA_ENGINE,
+        env=_cli_env(fake_root, "redis://fake:6379/0"),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert res.returncode == 0, res.stderr
+    assert "2 claves" in res.stdout
+
+
+def test_cli_subprocess_redis_down_exits_1(tmp_path):
+    res = subprocess.run(
+        [sys.executable, "scripts/invalidate_market_cache.py"],
+        cwd=DATA_ENGINE,
+        env=_cli_env(None, ""),
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert res.returncode == 1
+    assert "no disponible" in res.stderr.lower()

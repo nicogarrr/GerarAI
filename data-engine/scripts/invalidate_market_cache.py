@@ -14,6 +14,12 @@ Uso (desde data-engine/, con DATABASE_URL/REDIS_URL del entorno):
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+
+# Convención del repo (sync_instruments, validate_not_valid_fks): el comando
+# documentado `python scripts/invalidate_market_cache.py` pone scripts/ en
+# sys.path[0]; sin este bootstrap `import app` falla fuera del venv editable.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
 def main() -> int:
