@@ -26,8 +26,7 @@ test('el error es honesto: no se sirven candidatos inventados', () => {
 });
 
 test('decision de Nico (28-oct y 31-oct): sin rotulo largo ni nombre de proveedor visible', () => {
-    assert.doesNotMatch(view, /fuente no oficial/, 'sin rotulo "fuente no oficial" por cifra (28-oct)');
     assert.doesNotMatch(view, /SOLO propone candidatos/);
-    assert.doesNotMatch(view, /Yahoo/i, 'el nombre del proveedor no aparece en etiquetas visibles (orden 31-oct; la procedencia vive en Fuentes/ayuda)');
-    assert.match(view, /Candidatos de fuente de mercado no oficial; conviene cotejo oficial/);
+    assert.doesNotMatch(view, /Yahoo|Finnhub|FMP|fuente de mercado|fuente no oficial/i, 'sin etiqueta de fuente visible (28-oct y 31-oct; la procedencia vive en Fuentes/ayuda)');
+    assert.match(view, /Candidatos sin verificar; conviene cotejo oficial/, 'aviso de calidad sin nombrar fuente');
 });
