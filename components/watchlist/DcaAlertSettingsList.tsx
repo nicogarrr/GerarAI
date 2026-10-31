@@ -42,10 +42,13 @@ export default function DcaAlertSettingsList({ items }: { items: DcaSignalItem[]
                     </li>
                 ))}
             </ul>
-            <nav aria-label="Paginación del histórico DCA" className="grid grid-cols-2 items-center gap-2 text-xs text-gray-300">
-                <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="min-h-11 justify-self-start rounded border border-gray-600 px-3 disabled:opacity-40">Anterior</button>
-                <p role="status" aria-live="polite" aria-atomic="true" className="col-span-2 row-start-1 text-center">{start + 1}-{Math.min(start + PAGE_SIZE, items.length)} de {items.length} · <span className="whitespace-nowrap">Página {page + 1} de {pages}</span></p>
-                <button type="button" disabled={page === pages - 1} onClick={() => setPage(page + 1)} className="min-h-11 justify-self-end rounded border border-gray-600 px-3 disabled:opacity-40">Siguiente</button>
+            <nav aria-label="Paginación del histórico DCA" className="grid grid-cols-[auto_1fr_auto] items-center gap-2 text-xs text-gray-300">
+                <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="min-h-11 rounded border border-gray-600 px-3 disabled:opacity-40">Anterior</button>
+                {/* El estado va en su propia pista (1fr, min-w-0): con col-span-2
+                    por debajo de los botones, un histórico largo («Página 120 de
+                    240») se superponía a Anterior/Siguiente y les robaba el toque. */}
+                <p role="status" aria-live="polite" aria-atomic="true" className="min-w-0 text-center">{start + 1}-{Math.min(start + PAGE_SIZE, items.length)} de {items.length} · <span className="whitespace-nowrap">Página {page + 1} de {pages}</span></p>
+                <button type="button" disabled={page === pages - 1} onClick={() => setPage(page + 1)} className="min-h-11 rounded border border-gray-600 px-3 disabled:opacity-40">Siguiente</button>
             </nav>
         </div>
     );
