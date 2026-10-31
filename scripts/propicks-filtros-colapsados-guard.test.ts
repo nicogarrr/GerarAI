@@ -9,7 +9,8 @@ const SRC = readFileSync('components/proPicks/EnhancedProPicksFilters.tsx', 'utf
 test('cuerpo colapsado por defecto en móvil, visible en xl', () => {
     assert.ok(SRC.includes("useState(false)"), 'el panel debe arrancar colapsado');
     assert.ok(SRC.includes("hidden'} xl:block"), 'el cuerpo debe ocultarse en móvil y mostrarse en xl');
-    assert.ok(SRC.includes('min-h-[44px] xl:hidden'), 'el toggle debe seguir accesible hasta xl');
+    // El toggle lleva tambien min-w-[44px] (objetivos tactiles 390px): comprobar ambas condiciones, no la adyacencia.
+    assert.ok(/min-h-\[44px\][^"\n]*xl:hidden/.test(SRC), 'el toggle debe seguir accesible hasta xl');
     assert.ok(SRC.includes('aria-expanded={open}') && SRC.includes('aria-controls="propicks-filtros-cuerpo"'));
 });
 

@@ -35,6 +35,8 @@ describe('cortes de lista declarados', () => {
         assert.match(list, /paginate\(main, page, PAGE\)/);
         assert.match(list, /total=\{main\.length\}/);
         assert.match(list, /total=\{pending\.length\}/);
-        assert.match(pager, /Página \{page\} de \{pages\} · \{total\}/);
+        // «Página x de y» va en su propio span (huérfanos 390px): el contrato es paginación con total, no la adyacencia literal.
+        assert.match(pager, /Página \{page\} de \{pages\}/);
+        assert.match(pager, /· \{total\} \{label\}/);
     });
 });
