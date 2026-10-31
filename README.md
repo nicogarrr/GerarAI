@@ -18,6 +18,31 @@
 > The user interface is in Spanish (es-ES); code, APIs and this document are in English.
 > **Not financial advice.** See the [disclaimer](#disclaimer).
 
+## Un vistazo / A quick look
+
+<p><img src="docs/images/readme/hero.jpg" alt="GerarAI: resumen de la cartera en escritorio y en móvil, con datos de ejemplo" width="100%" /></p>
+
+**Tu cartera, tus tesis y tu borrador fiscal en un solo sitio.** Capturas reales de la interfaz (en español, como la app), con una cartera de ejemplo inventada.
+*Your portfolio, theses and Spanish tax draft in one place. Real UI captures with an invented sample portfolio.*
+
+<p><img src="docs/images/readme/demo.gif" alt="Recorrido por GerarAI: resumen de cartera, posiciones, informe fiscal y watchlist" width="100%" /></p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/images/readme/cartera-posiciones.jpg" alt="Posiciones de la cartera con coste medio, valor y G/P latente" /></td>
+    <td width="33%"><img src="docs/images/readme/impuestos-irpf.jpg" alt="Informe fiscal IRPF en borrador con FIFO y regla de los 2 meses" /></td>
+    <td width="33%"><img src="docs/images/readme/watchlist.jpg" alt="Watchlist con señales y análisis por valor" /></td>
+  </tr>
+  <tr>
+    <td><b>Cartera</b><br/>Posiciones con coste medio, valor y G/P latente en euros.<br/><sub>Positions with average cost, value and unrealised P/L.</sub></td>
+    <td><b>Impuestos (IRPF)</b><br/>Borrador de ganancias y dividendos con FIFO y la regla de los 2 meses.<br/><sub>Draft capital-gains and dividend report (FIFO, 2-month rule).</sub></td>
+    <td><b>Watchlist</b><br/>Los valores que sigues, con su análisis y señales.<br/><sub>The names you follow, with analysis and signals.</sub></td>
+  </tr>
+</table>
+
+<sub>Capturas de la app real ejecutada en local (Next.js + backend con SQLite) con la cuenta de prueba E2E y datos inventados: Northwind, Contoso, Fabrikam, Acme y Litware son empresas de ejemplo; precios, importes y operaciones son ficticios. No hay datos de usuarios reales. Composición con <a href="https://github.com/benjitaylor/skills/tree/main/stageshow">Stageshow</a>.<br/>
+Real app screenshots from a local run with the E2E test account and invented data (sample companies, fictional prices and trades). No real user data. Framed with Stageshow.</sub>
+
 ## The research loop
 
 1. Open a company workspace and inspect its data coverage and sources.
@@ -48,6 +73,7 @@ The wordmark above is exported from the existing `GerarAIWordmark` header compon
 
 ## Contents
 
+- [Un vistazo / A quick look](#un-vistazo--a-quick-look)
 - [The research loop](#the-research-loop)
 - [App preview](#app-preview)
 - [What it is](#what-it-is)
@@ -384,6 +410,8 @@ Please do not open public issues for vulnerabilities. Report them privately as d
 ## License
 
 Copyright © 2025 Nicolás Iglesias García. Licensed under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified version as a network service, the AGPL requires you to make its source available to its users.
+
+The README images in `docs/images/readme/` were framed following [Stageshow](https://github.com/benjitaylor/skills/tree/main/stageshow) by Benji Taylor (MIT License); no Stageshow brand icons or third-party artwork are included.
 
 A historical Spanish README is kept in [docs/README.es.md](docs/README.es.md); it is not the current setup or capability reference.
 
