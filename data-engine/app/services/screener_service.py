@@ -6,6 +6,8 @@ import ast
 import logging
 import operator
 import re
+import threading
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -17,6 +19,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
+
+_METRIC_COVERAGE_CACHE: dict[int, tuple[float, list[str]]] = {}
+_METRIC_COVERAGE_LOCK = threading.Lock()
+_METRIC_COVERAGE_TTL_SECONDS = 600.0
 from app.core.tenancy import tenant_filters
 from app.models import (
     CalculatedMetric,
@@ -279,7 +285,25 @@ class ScreenerService:
         missing it" outcome, so offering it in the datalist sets the user up
         to fail. Mirrors what run() tracks as names_with_data: calculated
         metrics with a value plus raw financial facts.
+
+        Tres agregaciones (calculated metrics, facts, contexto) sobre tablas
+        grandes: en frio tarda >15 s en prod (medido 15,8 s). Se cachea por
+        tenant unos minutos: las sugerencias del datalist no necesitan
+        frescura en tiempo real.
         """
+        tenant = db.info.get("tenant_id")
+        with _METRIC_COVERAGE_LOCK:
+            cached = _METRIC_COVERAGE_CACHE.get(tenant)
+            if cached and time.monotonic() - cached[0] < _METRIC_COVERAGE_TTL_SECONDS:
+                return list(cached[1])
+        result = self._metric_coverage_uncached(db)
+        with _METRIC_COVERAGE_LOCK:
+            if len(_METRIC_COVERAGE_CACHE) > 128:
+                _METRIC_COVERAGE_CACHE.clear()
+            _METRIC_COVERAGE_CACHE[tenant] = (time.monotonic(), result)
+        return list(result)
+
+    def _metric_coverage_uncached(self, db: Session) -> list[str]:
         calculated = set(
             db.scalars(
                 select(CalculatedMetric.metric)
