@@ -19,6 +19,7 @@ test('conmutador Valor/Métrica con área táctil 44px en móvil', () => {
     const bloque = src.slice(i, i + 700);
     assert.ok(bloque.includes('min-h-11'), 'Valor/Métrica con min-h-11 en móvil');
     assert.ok(bloque.includes('sm:min-h-0'), 'Valor/Métrica conserva altura compacta en sm+');
+    assert.ok(bloque.includes('items-center justify-center'), 'Valor/Métrica centrado como el conmutador Orden');
 });
 
 test('conmutador Orden con área táctil 44px en móvil', () => {

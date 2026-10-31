@@ -151,7 +151,7 @@ export function CriterionFields({ suffix = '', initialLeft = '', initialRight = 
       <div className="min-w-0">
         <div className="mb-1.5 flex items-center justify-between gap-2"><label className="text-sm font-medium text-gray-200" htmlFor={`${id}-right`}>{rightMode === 'valor' ? `Valor${required ? ' *' : ''}` : `Otra métrica${required ? ' *' : ''}`}</label>
           <div role="radiogroup" aria-label="Tipo de comparación" className="flex rounded-md border border-gray-800 p-0.5 text-xs">
-            {([['valor', 'Valor'], ['metrica', 'Métrica']] as const).map(([mode, text]) => <label className={cn('flex min-h-11 cursor-pointer items-center rounded px-2.5 py-1.5 sm:min-h-0', rightMode === mode ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400')} key={mode}><input checked={rightMode === mode} className="sr-only" name={`${id}-mode`} onChange={() => setRightMode(mode)} type="radio" value={mode} />{text}</label>)}
+            {([['valor', 'Valor'], ['metrica', 'Métrica']] as const).map(([mode, text]) => <label className={cn('flex min-h-11 cursor-pointer items-center justify-center rounded px-2.5 py-1.5 sm:min-h-0', rightMode === mode ? 'bg-teal-400/10 text-teal-300' : 'text-gray-400')} key={mode}><input checked={rightMode === mode} className="sr-only" name={`${id}-mode`} onChange={() => setRightMode(mode)} type="radio" value={mode} />{text}</label>)}
           </div>
         </div>
         {rightMode === 'valor' ? <div className="flex items-center gap-2">
