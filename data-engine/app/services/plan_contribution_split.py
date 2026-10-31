@@ -249,8 +249,9 @@ def build_contribution_split(db: Session) -> dict[str, Any]:
         stale = False
         if level is not None:
             age = _months_old(period, today)
-            # Sin mes legible o de hace mas de un mes: no se usa (pesa 1X).
-            stale = age is None or age > DCA_MAX_AGE_MONTHS
+            # Sin mes legible, EN EL FUTURO (dato corrupto: ese mes aun no se
+            # puede haber evaluado) o de hace mas de un mes: no se usa (1X).
+            stale = age is None or age < 0 or age > DCA_MAX_AGE_MONTHS
         candidates.append(
             SplitCandidate(
                 ticker=ticker,

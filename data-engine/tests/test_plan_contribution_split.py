@@ -276,6 +276,29 @@ def test_stale_dca_level_does_not_drive_this_months_split(db):
     assert any("POOL" in note and "más de un mes" in note for note in result["notes"])
 
 
+def test_future_dca_period_is_suspect_and_does_not_drive_this_months_split(db):
+    """Un nivel con periodo EN EL FUTURO (dato corrupto, no evaluable hoy) no reparte dinero."""
+    pool = _company(db, "POOL")
+    uber = _company(db, "UBER")
+    _plan(
+        db,
+        [
+            {"kind": "ticker", "label": "POOL", "target_pct": 50, "band_pct": 5},
+            {"kind": "ticker", "label": "UBER", "target_pct": 50, "band_pct": 5},
+        ],
+    )
+    db.add(_real_dca_row(tenant=TENANT, symbol="POOL", level=4, company_id=pool.id,
+                         status="confirmed", period="2026-12"))
+    db.add(_real_dca_row(tenant=TENANT, symbol="UBER", level=1, company_id=uber.id,
+                         status="confirmed", period="2026-09"))
+    db.commit()
+    result = build_contribution_split(db)
+    rows = {row["ticker"]: row for row in result["allocations"]}
+    assert rows["POOL"]["dca_stale"] is True and rows["POOL"]["multiplier"] == 1
+    assert rows["POOL"]["dca_level"] is None and rows["POOL"]["dca_period"] == "2026-12"
+    assert rows["POOL"]["amount"] == 150.0 and rows["UBER"]["amount"] == 150.0
+
+
 def test_stale_trim_level_does_not_freeze_the_contribution(db):
     pool = _company(db, "POOL")
     _plan(db, [{"kind": "ticker", "label": "POOL", "target_pct": 100, "band_pct": 5}])
