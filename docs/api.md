@@ -39,53 +39,52 @@ Las peticiones internas entre Next.js y FastAPI incorporan las siguientes cabece
 
 ## 3. Endpoints Principales y Ejemplos
 
+Selección de endpoints representativos con ejemplos verificados contra el código y el esquema OpenAPI vigente (`data-engine/openapi.json`, regenerado en CI en cada merge). La referencia completa de los más de 300 endpoints es la documentación interactiva: Swagger UI en `/docs` y ReDoc en `/redoc` del servicio data-engine.
+
 ### 3.1 Salud y Monitorización
 
 #### `GET /api/health`
-Endpoint público para sondas de liveness y readiness.
+Endpoint público para sondas de liveness y readiness. `status` es `ok` solo si la base de datos responde y el esquema está migrado al día; en cualquier otro caso es `degraded`. `database` es `ok` o `error:<Clase>` (solo la clase del error, nunca texto con SQL o rutas). `version` es la versión corta `main-<sha>` del commit desplegado (`APP_VERSION` si está fijada, `main-unknown` si no hay git).
 
 **Respuesta (`200 OK`):**
 ```json
 {
-  "status": "healthy",
-  "database": "connected",
+  "status": "ok",
+  "database": "ok",
   "scheduler": {
-    "enabled": true,
-    "running": true,
-    "jobs": 12,
-    "last_run_at": "2026-10-31T00:00:00Z"
+    "enabled": false,
+    "running": null,
+    "jobs": 0,
+    "last_run_at": null,
+    "external": true,
+    "note": "El scheduler corre como servicio aparte; esta instancia no lo observa."
   },
-  "version": "1.0.0"
+  "version": "main-1a2b3c4",
+  "schema": []
 }
 ```
 
 #### `GET /api/health/data-sources`
-Verificación de conectores externos (FMP, Alpha Vantage, ECB) y estado de sus Circuit Breakers.
+Estado, latencia y circuit breakers de las fuentes de datos externas (FMP, Alpha Vantage, ECB, Redis, FRED, GDELT…). `overall_status` es `healthy`, `degraded` (algún circuito abierto o entreabierto) o `unknown` (ninguna fuente sondeada aún). La entrada de Alpha Vantage añade `quota` con el consumo del free tier leído del contador local (la sonda nunca gasta cuota del proveedor).
 
 **Respuesta (`200 OK`):**
 ```json
 {
-  "sources": {
-    "fmp": {
-      "circuit": "CLOSED",
-      "healthy": true,
+  "overall_status": "healthy",
+  "checked_at": "2026-10-31T00:25:00+00:00",
+  "sources": [
+    {
+      "name": "Alpha Vantage",
+      "is_primary": false,
+      "status": "healthy",
+      "circuit_state": "CLOSED",
       "consecutive_failures": 0,
-      "latency_ms": 124.5
-    },
-    "alpha_vantage": {
-      "circuit": "CLOSED",
-      "healthy": true,
-      "consecutive_failures": 0,
-      "latency_ms": 280.1
-    },
-    "ecb_fx": {
-      "circuit": "CLOSED",
-      "healthy": true,
-      "consecutive_failures": 0,
-      "latency_ms": 45.2
+      "last_checked_at": "2026-10-31T00:24:41+00:00",
+      "fallback_source": null,
+      "response_time_ms": 280.1,
+      "quota": { "used": 12, "limit": 25, "remaining": 13 }
     }
-  },
-  "all_healthy": true
+  ]
 }
 ```
 
@@ -93,53 +92,65 @@ Verificación de conectores externos (FMP, Alpha Vantage, ECB) y estado de sus C
 
 ### 3.2 Cartera y Movimientos
 
-#### `GET /api/portfolio/{portfolio_id}/summary`
-Obtiene la valoración agregada de la cartera, coste base y rentabilidades no realizadas.
+#### `GET /api/portfolio/summary`
+Valoración agregada de la cartera del tenant autenticado (la cartera se resuelve por la firma, no por un `portfolio_id` en la ruta). Los importes van en la divisa base de la cartera. Caché Redis de 10 minutos por tenant, invalidada al escribir posiciones, transacciones, caja o FX.
 
 **Respuesta (`200 OK`):**
 ```json
 {
-  "portfolio_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+  "total_value": 48451.25,
+  "equity_value": 45250.75,
+  "cash_assets_base": 3200.50,
+  "margin_debt_base": 0.0,
+  "cash": 3200.50,
+  "top_1_weight": 0.312,
+  "top_5_weight": 0.784,
+  "alerts": [],
+  "status": "ok",
   "base_currency": "EUR",
-  "total_market_value": 45250.75,
-  "total_cost_basis": 38100.00,
-  "unrealized_pnl": 7150.75,
-  "unrealized_pnl_pct": 18.77,
-  "cash_balance": 3200.50,
-  "positions_count": 8,
-  "last_updated": "2026-10-31T00:25:00Z"
+  "cash_native": [{ "currency": "EUR", "amount": 3200.50 }],
+  "missing_fx": [],
+  "data_as_of": "2026-10-30",
+  "cash_as_of": "2026-10-30",
+  "fx_rates": [],
+  "valuation_dates_differ": false,
+  "valuation_hold": [],
+  "provenance": null
 }
 ```
 
 #### `POST /api/portfolio/transactions`
-Registra una transacción contable y reconstruye la posición de forma idempotente.
+Registra una transacción y reconstruye la posición de forma idempotente. El tenant se toma de la firma: el cuerpo no lleva `portfolio_id`. Obligatorios: `ticker`, `action`, `quantity`, `price`, `trade_date`. `action` admite `buy`, `sell`, `dividend`, `interest`, `fee` y `cash_misc`; en las acciones de caja el importe va en `price` y `quantity` debe ser 0 o 1 (otro valor se rechaza con `400` por ambiguo). Errores de negocio: `409 Insufficient shares for sale` y `422 Position cannot mix transaction currencies`.
 
 **Petición (`POST`):**
 ```json
 {
-  "portfolio_id": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
   "ticker": "SAN.MC",
   "action": "buy",
   "quantity": 100,
   "price": 4.55,
   "fees": 2.50,
   "currency": "EUR",
-  "trade_date": "2026-10-15"
+  "trade_date": "2026-10-15",
+  "notes": "Compra mensual del plan"
 }
 ```
 
 **Respuesta (`201 Created`):**
 ```json
 {
-  "id": "c1f2e3d4-b5a6-7c8d-9e0f-1a2b3c4d5e6f",
+  "id": 1024,
   "ticker": "SAN.MC",
   "action": "buy",
   "quantity": 100.0,
   "price": 4.55,
-  "fees": 2.50,
+  "fees": 2.5,
   "currency": "EUR",
   "trade_date": "2026-10-15",
-  "status": "confirmed"
+  "notes": "Compra mensual del plan",
+  "review_flag": null,
+  "created_at": "2026-10-15T09:32:11+00:00",
+  "updated_at": "2026-10-15T09:32:11+00:00"
 }
 ```
 
@@ -148,17 +159,23 @@ Registra una transacción contable y reconstruye la posición de forma idempoten
 ### 3.3 Importación y Previsualización Masiva
 
 #### `POST /api/portfolio/import/preview`
-Valida un fichero CSV o Excel delimitado (`.csv`, `.xlsx`) antes de consolidar cambios.
+Valida un CSV de operaciones antes de consolidar cambios. El cuerpo es JSON con el contenido del fichero (no multipart): `content` (texto CSV, obligatorio), `filename` (por defecto `import.csv`) y `column_mapping` opcional. La respuesta separa filas válidas de errores por fila y campo; nada se persiste en este paso (la consolidación es `POST /api/portfolio/import/commit`).
 
-**Petición (`POST multipart/form-data`):**
-- `file`: Archivo con operaciones bróker.
+**Petición (`POST`):**
+```json
+{
+  "filename": "operaciones.csv",
+  "content": "Fecha Operación,Símbolo,Tipo,Títulos,Precio Ejecución\n2026-09-01,ITX.MC,buy,50,42.10"
+}
+```
 
 **Respuesta (`200 OK`):**
 ```json
 {
+  "success": true,
   "total_rows": 25,
-  "valid_rows": 24,
-  "invalid_rows": 1,
+  "valid_rows_count": 24,
+  "invalid_rows_count": 1,
   "detected_columns": {
     "date": "Fecha Operación",
     "ticker": "Símbolo",
@@ -168,27 +185,32 @@ Valida un fichero CSV o Excel delimitado (`.csv`, `.xlsx`) antes de consolidar c
   },
   "preview_items": [
     {
-      "row_index": 1,
+      "row_number": 1,
       "ticker": "ITX.MC",
+      "date": "2026-09-01",
       "action": "buy",
-      "quantity": 50,
-      "price": 42.10,
-      "trade_date": "2026-09-01",
-      "valid": true
+      "quantity": 50.0,
+      "price": 42.1,
+      "fees": 0.0,
+      "currency": "EUR",
+      "notes": null
     }
   ],
-  "validation_errors": [
+  "errors": [
     {
-      "row_index": 14,
-      "message": "Fecha futura no admitida para transacciones de cartera"
+      "row_number": 14,
+      "field": "date",
+      "message": "Fecha futura no admitida para transacciones de cartera",
+      "raw_value": "2027-01-05"
     }
-  ]
+  ],
+  "warnings": []
 }
 ```
 
 ---
 
-### 3.4 Informes PDF Institucionales (EUR0)
+### 3.4 Informes PDF Institucionales
 
 #### `GET /api/portfolio/{portfolio_id}/pdf`
 Genera un informe institucional completo de la cartera en PDF.
@@ -201,55 +223,84 @@ Genera un informe institucional completo de la cartera en PDF.
 
 ### 3.5 Fiscalidad Española (IRPF)
 
-#### `GET /api/taxes/reports/{year}`
-Calcula las casillas del Modelo 100 del IRPF español y el resumen de ganancias/pérdidas.
+#### `GET /api/taxes/report/{fiscal_year}`
+Informe fiscal de un ejercicio (Modelo 100). Solo lectura y sin efectos: si ya hay informe persistido lo devuelve (`persisted: true`); si no, lo calcula en memoria sin escribir (`persisted: false`, `generated_at: null`). El recálculo con persistencia es `POST /api/taxes/report/{fiscal_year}/regenerate`. IRPF y Modelo 720 se declaran siempre en EUR al tipo del BCE de cada operación, sea cual sea la divisa base de la cartera. Los totales quedan en `null` cuando algún componente no se pudo convertir: un total parcial parecería exacto y sería incorrecto.
 
 **Respuesta (`200 OK`):**
 ```json
 {
-  "fiscal_year": 2026,
-  "base_currency": "EUR",
   "summary": {
+    "fiscal_year": 2026,
+    "base_currency": "EUR",
     "total_dividends_base": 1250.00,
     "total_withholding_base": 187.50,
     "total_realized_gain_base": 3400.00,
-    "net_taxable_base": 3400.00,
-    "method": "fifo",
-    "securities_fx_criterion": "dgt_native_gain_sale_date_v1"
+    "total_blocked_loss_base": 0.00,
+    "net_taxable_base": 4650.00,
+    "wash_sale_rule": "es_2m_12m_repurchase",
+    "dividend_count": 9
   },
-  "casillas": {
-    "0029": 1250.00,
-    "0328": 15400.00,
-    "0331": 12000.00,
-    "0336": 3400.00,
-    "0588": 187.50
-  }
+  "dividends": [],
+  "realized": [],
+  "misc": {},
+  "filing": {
+    "available": true,
+    "casillas": {
+      "0029": 1250.00,
+      "0328": 15400.00,
+      "0331": 12000.00,
+      "0336": 3400.00,
+      "0588": 187.50
+    }
+  },
+  "generated_at": "2026-10-31T00:25:00+00:00",
+  "persisted": true,
+  "versioning": { "version": 3, "supersedes": 2 }
 }
 ```
+
+> [!NOTE]
+> `filing.available` es `false` (con `reason`) cuando la cartera no usa EUR como divisa base: las casillas del Modelo 100 son importes en euros y no se publican cifras en otra divisa.
 
 ---
 
 ### 3.6 Motor DCA (Dollar Cost Averaging)
 
-#### `GET /api/dca/signals/{ticker}`
-Obtiene el veredicto mensual y zonas activas de compra (1X-4X) o recorte.
+#### `GET /api/watchlist/dca-signals`
+Nivel DCA actual de cada ticker de la watchlist y de la cartera, con el mínimo de aviso efectivo por ticker y la política global. Caché Redis de 5 minutos por tenant.
 
 **Respuesta (`200 OK`):**
 ```json
 {
-  "ticker": "AAPL",
-  "status": "confirmed",
-  "verdict": {
-    "level": 2,
-    "label": "2X DCA",
-    "zone": "Zona de compra",
-    "signal_date": "2026-10-31",
-    "close": 175.40,
-    "level_prices": {
-      "2x": 175.40,
-      "3x": 158.20,
-      "4x": 139.10
+  "alerts_enabled": true,
+  "evaluation_enabled": true,
+  "global_min_level": 2,
+  "directional_policy": true,
+  "up_min_level": 2,
+  "down_max_level": 0,
+  "trims_enabled": false,
+  "channels": ["email"],
+  "email_configured": true,
+  "signal_months": 10,
+  "zones": [
+    { "level": 1, "label": "1X", "kind": "buy" },
+    { "level": 2, "label": "2X", "kind": "buy" }
+  ],
+  "items": [
+    {
+      "symbol": "AAPL",
+      "company_name": "Apple Inc.",
+      "sources": ["watchlist"],
+      "in_watchlist": true,
+      "in_portfolio": false,
+      "min_level_override": null,
+      "effective_min_level": 2,
+      "alerts_on": true,
+      "state": null,
+      "evaluation_status": "pending",
+      "evaluation_reason": "sin evaluación este mes"
     }
-  }
+  ],
+  "last_run": null
 }
 ```
