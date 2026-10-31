@@ -222,3 +222,40 @@ def test_upsert_descarta_la_barra_de_hoy_con_sesion_abierta():
         db.commit()
         days = {row.date for row in db.scalars(select(MarketPrice).where(MarketPrice.company_id == company.id)).all()}
         assert days == {date(2026, 10, 16), date(2026, 10, 19)}
+
+
+def test_upsert_nan_volume_does_not_overwrite_real_volume():
+    """Un re-sync con Volume=NaN (yfinance: LSE, indices, sesiones parciales)
+    NO pisa a 0 el volumen real ya guardado: 0 es ausencia fabricada."""
+    db = _db()
+    company = _company("VOL1")
+    db.add(company)
+    db.commit()
+    day = date(2026, 10, 28)
+    db.add(MarketPrice(company_id=company.id, date=day, open=100, high=100,
+                       low=100, close=100, adj_close=100, volume=5_000_000,
+                       quote_currency="USD", source="yfinance"))
+    db.commit()
+    bar = PriceBar(day=day, close=Decimal("101"), adj_close=Decimal("101"),
+                   volume=0, quote_currency="USD")
+    written = upsert_prices(db, company, [bar], now=datetime(2026, 10, 30, tzinfo=UTC))
+    db.commit()
+    row = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert written == 1
+    assert row.close == Decimal("101")
+    assert row.volume == 5_000_000
+
+
+def test_upsert_absent_volume_inserts_null_not_zero():
+    """En insercion, volumen ausente se guarda NULL (contrato del modelo:
+    NULL = la fuente no da el dato), nunca un 0 fabricado."""
+    db = _db()
+    company = _company("VOL2")
+    db.add(company)
+    db.commit()
+    bar = PriceBar(day=date(2026, 10, 28), close=Decimal("50"),
+                   adj_close=Decimal("50"), volume=0, quote_currency="USD")
+    upsert_prices(db, company, [bar], now=datetime(2026, 10, 30, tzinfo=UTC))
+    db.commit()
+    row = db.scalar(select(MarketPrice).where(MarketPrice.company_id == company.id))
+    assert row.volume is None

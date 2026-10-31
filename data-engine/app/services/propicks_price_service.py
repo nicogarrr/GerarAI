@@ -19,6 +19,7 @@ from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
+import sqlalchemy as sa
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
@@ -292,6 +293,9 @@ def upsert_prices(
             continue
         if not bar_unit_is_known(company, bar):
             continue
+        # Volumen ausente (yfinance NaN -> 0) es NULL, nunca un 0 fabricado
+        # (contrato del modelo: 0 coronaba al ticker como el menos activo).
+        volume = bar.volume if bar.volume > 0 else None
         values = {
             "company_id": company.id,
             "date": bar.day,
@@ -300,7 +304,7 @@ def upsert_prices(
             "low": bar.close,
             "close": bar.close,
             "adj_close": bar.adj_close,
-            "volume": bar.volume,
+            "volume": volume,
             "source": "yfinance",
             "quote_currency": bar.quote_currency,
         }
@@ -311,7 +315,9 @@ def upsert_prices(
                 set_={
                     "close": stmt.excluded.close,
                     "adj_close": stmt.excluded.adj_close,
-                    "volume": stmt.excluded.volume,
+                    # Un re-sync sin volumen (NaN de la fuente) NO pisa el
+                    # volumen real ya guardado: ausente no borra dato.
+                    "volume": sa.func.coalesce(stmt.excluded.volume, MarketPrice.volume),
                     "source": stmt.excluded.source,
                     "quote_currency": stmt.excluded.quote_currency,
                 },
@@ -327,7 +333,9 @@ def upsert_prices(
             if existing is not None:
                 existing.close = bar.close
                 existing.adj_close = bar.adj_close
-                existing.volume = bar.volume
+                # Igual que la via Postgres: ausente no borra dato real.
+                if volume is not None:
+                    existing.volume = volume
                 existing.source = "yfinance"
                 existing.quote_currency = bar.quote_currency
             else:
