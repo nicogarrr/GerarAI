@@ -94,7 +94,7 @@ export async function syncInvestorPortfoliosNow(): Promise<SyncPortfoliosResult>
 }
 
 export async function getInvestors(): Promise<{ investors: InvestorSummary[]; limitations: string[] }> {
-  return requestJson('/api/investors');
+  return requestJson<{ investors: InvestorSummary[]; limitations: string[] }>('/api/investors');
 }
 
 /** Ficha de un inversor; `null` si el slug no existe (la página responde 404). */
@@ -128,7 +128,7 @@ export type MostBought = {
 };
 
 export async function getMostBought(): Promise<MostBought> {
-  return requestJson('/api/investors/most-bought');
+  return requestJson<MostBought>('/api/investors/most-bought');
 }
 
 export type PortfolioOverlap = {
@@ -144,13 +144,13 @@ export type PortfolioOverlap = {
   positions: {
     ticker: string; name: string; cusip: string | null; identity_source: string | null;
     status: 'sin_identificador' | 'sin_coincidencias' | 'coincidencia';
-    holders: { slug: string; name: string; report_date: string; filing_date: string | null; filing_url: string; coverage: string | null }[];
+    holders: { slug: string; name: string; report_date: string; filing_date: string | null; filing_url: string | null; coverage: string | null; verification?: string | null }[];
   }[];
   not_owned: MostBoughtItem[];
 };
 
 export async function getPortfolioOverlap(): Promise<PortfolioOverlap> {
-  return requestJson('/api/investors/portfolio-overlap');
+  return requestJson<PortfolioOverlap>('/api/investors/portfolio-overlap');
 }
 
 export type CompanyHolder = {
@@ -232,5 +232,5 @@ export type InvestorPortfolio = {
 export async function getInvestorPortfolio(
   slug: string,
 ): Promise<InvestorPortfolio> {
-  return requestJson(`/api/investors/${encodeURIComponent(slug)}/portfolio`);
+  return requestJson<InvestorPortfolio>(`/api/investors/${encodeURIComponent(slug)}/portfolio`);
 }
