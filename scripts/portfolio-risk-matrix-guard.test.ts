@@ -15,7 +15,7 @@ test('RISKMATRIX-1: la tabla de contribución muestra el peso renormalizado', ()
 
 test('RISKMATRIX-2: con exclusiones, aviso visible de cobertura renormalizada', () => {
     // El aviso existe SOLO cuando hay excluidas y dice "sobre las incluidas".
-    assert.match(page, /rmExcluded\.length > 0 \?\s*\(\s*<p[^>]*>\{ti\('portfolio\.intelligence\.rmCoverageNote', \{ n: rmIncluded\.length \}\)\}<\/p>/s);
+    assert.match(page, /rmExcluded\.length > 0 \?\s*\(\s*<p[^>]*>\{ti\('portfolio\.intelligence\.rmCoverageNote', \{ n: rmIncluded\.length \}\)\}<\/p>/);
     assert.match(es.intelligence.rmCoverageNote, /incluidas/);
     assert.match(es.intelligence.rmCoverageNote, /renormalizan/);
     assert.match(en.intelligence.rmCoverageNote, /included/);
