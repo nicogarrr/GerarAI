@@ -71,7 +71,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
       // produjo un error inesperado» y no podía saber si había escrito mal la
       // consulta o el motor estaba apagado.
       if (isBackendUnavailableError(error)) {
-        return <BackendOffline feature="Búsqueda universal" retryHref={currentHref} />;
+        return <BackendOffline feature={t('search.title')} retryHref={currentHref} />;
       }
       throw error;
     }
