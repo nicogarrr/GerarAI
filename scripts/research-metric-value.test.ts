@@ -6,7 +6,7 @@ import { formatResearchMetric } from '../lib/research/metric-value.ts';
 test('financial facts retain their declared currency and share-count basis', () => {
  assert.equal(formatResearchMetric('148401000000','USD'),'148,4 mil M\u00a0US$');
  assert.equal(formatResearchMetric('89800000000','CAD'),'89,80 mil M\u00a0CAD');
- assert.equal(formatResearchMetric('1023670000000','CNY'),'1.023,67 mil M\u00a0CNY');
+ assert.equal(formatResearchMetric('1023670000000','CNY'),'1,02 B\u00a0CNY');
  assert.match(formatResearchMetric('19240000000','shares'), /acciones$/);
  assert.ok(!formatResearchMetric('19240000000','shares').includes('ADS'));
  assert.equal(formatResearchMetric('1.25','USD/share'),'1,25\u00a0US$/acción');
