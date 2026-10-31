@@ -1,12 +1,12 @@
 from decimal import Decimal
 
-from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 import main
 from app.core.database import SessionLocal, init_db
 from app.models import CalculatedMetric, Company, FinancialFact
 from app.services.metric_calculation_service import MetricCalculationService
+from tests.auth_helpers import csrf_client
 
 TEST_TICKER = "TCALC"
 PEER_TICKERS = ["TPEER1", "TPEER2"]
@@ -91,7 +91,7 @@ def test_calculated_metrics_are_persisted_with_trace():
     finally:
         db.close()
 
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.post(f"/api/companies/{TEST_TICKER}/metrics/refresh")
     assert response.status_code == 200
     payload = response.json()
@@ -138,7 +138,7 @@ def test_calculated_metrics_report_unavailable_when_inputs_are_missing():
     finally:
         db.close()
 
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.post(f"/api/companies/{TEST_TICKER}/metrics/refresh")
     assert response.status_code == 200
     metrics = {item["metric"]: item for item in response.json()["metrics"]}
@@ -376,7 +376,7 @@ def test_peer_comparison_uses_traceable_metrics_and_multifactor_peers():
     finally:
         db.close()
 
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.get(f"/api/companies/{TEST_TICKER}/peers/comparison?metrics=fcf_margin,net_margin&limit=2")
     assert response.status_code == 200
     payload = response.json()
@@ -1079,7 +1079,7 @@ def test_peer_comparison_excludes_atypical_from_median_but_keeps_it_visible():
     finally:
         db.close()
 
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.get(f"/api/companies/{TEST_TICKER}/peers/comparison?metrics=net_margin&limit=2")
     assert response.status_code == 200
     payload = response.json()
@@ -1130,7 +1130,7 @@ def test_peer_benchmark_with_three_peers_and_peer_without_data():
     finally:
         db.close()
     try:
-        client = TestClient(main.app)
+        client = csrf_client(main.app)
         response = client.get(f"/api/companies/{TEST_TICKER}/peers/comparison?metrics=fcf_margin&limit=4")
         assert response.status_code == 200
         payload = response.json()

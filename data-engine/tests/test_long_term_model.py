@@ -1,13 +1,13 @@
 from decimal import Decimal
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import delete, select
 
 import main
 from app.core.database import SessionLocal, init_db
 from app.models import CalculatedMetric, Company, FinancialFact, Position
 from app.services.long_term_model_service import LongTermModelService
+from tests.auth_helpers import csrf_client
 
 TICKER = "TLM"
 
@@ -106,7 +106,7 @@ def test_long_term_model_returns_scenarios_and_source_trace():
     finally:
         db.close()
 
-    response = TestClient(main.app).post(
+    response = csrf_client(main.app).post(
         f"/api/companies/{TICKER}/long-term-model/generate?horizon=5"
     )
     assert response.status_code == 200
