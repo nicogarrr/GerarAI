@@ -50,6 +50,7 @@ import { researchRequest } from '@/lib/research/client';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import type { ExtendedQuote } from '@/lib/market/extended-quote';
 import { isE2EMarketFixtureEnabled } from '@/lib/e2e-market-fixture';
+import { getT } from '@/lib/i18n/server';
 import { e2eExtendedQuoteFixture } from '@/lib/e2e-extended-quote-fixture';
 import { MoatTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
@@ -965,6 +966,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // Constructores de secciones: cada pestaña compone sus módulos como
   // secciones seguidas con título claro («Una fila, no tres menús», 29-oct-2026).
   const buildOverviewContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // marketPromise ya se lanzó en paralelo al snapshot más arriba.
     try {
       // headerMarket ya guarda esta misma promesa resuelta (se esperó en la
@@ -973,7 +975,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       await marketPromise;
     } catch (error) {
       if (isBackendUnavailableError(error)) {
-        return <BackendOffline feature={`Datos de mercado de ${ticker}`} retryHref={`/research/${ticker}`} />;
+        return <BackendOffline feature={t('research.fichaMarketDataFeature', { ticker })} retryHref={`/research/${ticker}`} />;
       }
       throw error;
     }
@@ -1013,10 +1015,10 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     // Conexión 10b: insiders + 13F en paralelo con el PER; si falla, el panel lo dice.
     // La posición real solo se pide si la empresa está en cartera (misma lectura que Cartera).
     const [per, ownershipSignals, holdingContext] = await Promise.all([
-      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: 'No se pudo consultar el PER' })),
+      getCompanyPer(ticker, { exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }).catch(() => ({ value: null, note: t('research.fichaPerUnavailable') })),
       getOwnershipSignals(ticker).catch(() => null),
       snapshot.in_portfolio
-        ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: 'No se pudo cargar tu posición en esta empresa.' }))
+        ? getCompanyHolding(ticker).catch(() => ({ status: 'error' as const, message: t('research.fichaHoldingLoadError') }))
         : Promise.resolve(null),
     ]);
     // Panel de vistazo rápido: datos reales ya existentes, cada fila a su
@@ -1044,7 +1046,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
         </div>
         <div className="min-w-0 space-y-6 xl:order-1">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <Panel density="compact" title="Última tesis">
+          <Panel density="compact" title={t('research.fichaLatestThesis')}>
             {snapshot.latest_thesis ? (
               <>
                 <div className="flex flex-wrap gap-2">
@@ -1063,18 +1065,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   */}
                   <Button asChild variant="outline">
                     <Link href={`/research/${encodeURIComponent(ticker)}?view=thesis`}>
-                      <FileText className="mr-2 h-4 w-4" />Leer tesis completa
+                      <FileText className="mr-2 h-4 w-4" />{t('research.fichaReadFullThesis')}
                     </Link>
                   </Button>
-                  <ThesisGenerateButton ticker={ticker} label="Regenerar tesis" />
+                  <ThesisGenerateButton ticker={ticker} label={t('research.fichaRegenerateThesis')} />
                 </div>
               </>
             ) : (
-              <ThesisGenerateButton ticker={ticker} label="Genera la primera tesis" emptyCopy="Sin tesis todavía." />
+              <ThesisGenerateButton ticker={ticker} label={t('research.fichaGenerateFirstThesis')} emptyCopy={t('research.fichaNoThesisYet')} />
             )}
           <dl className="mt-3 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
-            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">PER (TTM)</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
-            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">Modelo</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{snapshot.model_summary.publishable ? 'publicable' : 'bloqueado'}</Link></dd></div> : null}
+            <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaPerTtm')}</dt><dd className="font-semibold text-gray-100">{per.value !== null ? `${formatNumber(per.value, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x` : NA}</dd></div>
+            {snapshot.model_summary ? <div className="flex items-baseline gap-1.5"><dt className="text-gray-500">{t('research.fichaModel')}</dt><dd className="font-semibold text-gray-100"><Link className="inline-flex min-h-11 min-w-11 items-center underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{snapshot.model_summary.publishable ? t('research.fichaModelPublishable') : t('research.fichaModelBlocked')}</Link></dd></div> : null}
           </dl>
           {per.note ? <p className="mt-1 text-xs text-gray-500">{per.note}</p> : null}
           </Panel>
@@ -1091,18 +1093,18 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className="inline-flex min-h-[44px] items-center sm:min-h-0 text-sm text-teal-300 hover:text-teal-200"
               href="#noticias"
             >
-              Ver todas
+              {t('research.fichaViewAll')}
             </Link>
           }
-          description="Las 5 noticias de mayor materialidad entre las 25 más recientes de esta empresa, con fuente y fecha."
-          title="Últimas noticias"
+          description={t('research.fichaLatestNewsDesc')}
+          title={t('research.fichaLatestNews')}
         >
           {overviewNewsError ? (
             <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-              No se pudieron cargar las noticias. Reintenta en unos segundos.
+              {t('research.fichaNewsLoadError')}
             </p>
           ) : overviewNews.length === 0 ? (
-            <EmptyState title="Sin noticias recientes de esta empresa." />
+            <EmptyState title={t('research.fichaNoRecentNews')} />
           ) : (
             <ul className="space-y-3">
               {overviewNews.map((event) => (
@@ -1128,11 +1130,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className="inline-flex min-h-[44px] sm:min-h-0 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=seguimiento`}
             >
-              Ver todos los cambios
+              {t('research.fichaViewAllChanges')}
             </Link>
           }
           density="compact"
-          title="Últimos cambios"
+          title={t('research.fichaLatestChanges')}
         >
           {snapshot.recent_changes?.length ? (
             <ul className="space-y-2">
@@ -1141,7 +1143,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                     <Badge variant="outline">{label(change.impact_direction)}</Badge>
                     <span className="text-xs text-gray-500">
-                      Materialidad {change.materiality_score} · {formatDate(change.created_at)}
+                      {t('research.fichaMaterialityScore', { score: change.materiality_score })} · {formatDate(change.created_at)}
                     </span>
                   </div>
                   <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary)}</p>
@@ -1149,13 +1151,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">Sin cambios registrados desde la última revisión.</p>
+            <p className="text-sm text-gray-500">{t('research.fichaNoChangesSinceReview')}</p>
           )}
         </Panel>
         {snapshot.research_health.missing?.length ? (
-          <MobileCollapse title={`Capas de research que faltan (${snapshot.research_health.missing.length})`}>
+          <MobileCollapse title={t('research.fichaMissingLayersTitle', { count: snapshot.research_health.missing.length })}>
           <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-4 text-sm text-amber-200">
-            <p>Capas de research que faltan:</p>
+            <p>{t('research.fichaMissingLayersHeading')}</p>
             <ul className="mt-2 space-y-1">
               {snapshot.research_health.missing.map((layer) => {
                 const action = missingLayerAction(ticker, layer);
@@ -1183,15 +1185,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               className="inline-flex min-h-11 min-w-11 items-center text-sm text-teal-300 hover:text-teal-200"
               href={`/research/${encodeURIComponent(ticker)}?view=valoracion#foso`}
             >
-              Ver la evaluación del foso
+              {t('research.fichaViewMoatEval')}
             </Link>
           ) : undefined}
-          title="Calidad financiera según la empresa"
+          title={t('research.fichaFinancialQuality')}
         >
           {moatScore ? (
             <MoatPanel company={company} metric={moatScore} />
           ) : (
-            <EmptyState title="Sin evaluación de calidad generada todavía: aparece con el refresco de las métricas financieras de la empresa." />
+            <EmptyState title={t('research.fichaNoQualityEval')} />
           )}
         </Panel>
         {/*
@@ -1200,16 +1202,16 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             planas que había antes.
         */}
         <Panel className="hidden md:block" collapsible="mobile"
-          description="Dónde está el resto del análisis de esta empresa."
+          description={t('research.fichaWhereNextDesc')}
           density="compact"
-          title="Por dónde seguir"
+          title={t('research.fichaWhereNext')}
         >
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
             {[
-              ['Modelo a largo plazo', 'valoracion#modelo'],
-              ['Oportunidad de mercado', 'valoracion#oportunidad'],
-              ['Comparables', 'valoracion#comparables'],
-              ['Documentos y fuentes', 'fuentes#documentos'],
+              [t('research.fichaNextModel'), 'valoracion#modelo'],
+              [t('research.fichaNextOpportunity'), 'valoracion#oportunidad'],
+              [t('research.fichaNextPeers'), 'valoracion#comparables'],
+              [t('research.fichaNextDocs'), 'fuentes#documentos'],
             ].map(([nextLabel, nextView]) => (
               <NextStepLink href={`/research/${encodeURIComponent(ticker)}?view=${nextView}`} key={nextView}>
                 {nextLabel}
@@ -1218,7 +1220,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           </div>
         </Panel>
         <OwnershipSignalsPanel signals={ownershipSignals} ticker={ticker} />
-        {ticker === 'ASTS' ? <Panel collapsible="mobile" title="Satélites AST"><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>Ver señal orbital exploratoria</Link></Panel> : null}
+        {ticker === 'ASTS' ? <Panel collapsible="mobile" title={t('research.fichaSatellitesPanel')}><Link className="mt-2 inline-block text-sm text-teal-300" href={`/research/${encodeURIComponent(ticker)}?view=seguimiento#satellites`}>{t('research.fichaOrbitalSignal')}</Link></Panel> : null}
         <p role="status" className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
           {researchValuability(snapshot)}
         </p>
@@ -1229,6 +1231,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildNoticiasSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // Noticias de la empresa dentro de su ficha (cohesión: sin salir a
     // /research/news). Mismo componente y misma paginación que la portada de
     // noticias, filtrado por ticker en la API. La lectura sale del lote con
@@ -1242,9 +1245,9 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     const newsEvents = dedupeNewsEvents(fetchedNews.slice(0, NEWS_PAGE_SIZE));
     // El flujo ya trae su propia sección con cabecera; sin Panel extra.
     return fichaNewsError ? (
-      <Panel title="Noticias de la empresa">
+      <Panel title={t('research.fichaCompanyNews')}>
         <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-          No se pudieron cargar las noticias. Reintenta en unos segundos.
+          {t('research.fichaNewsLoadError')}
         </p>
       </Panel>
     ) : (

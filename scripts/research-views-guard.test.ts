@@ -116,7 +116,7 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
 
     it('el resumen conserva el acceso al modelo completo en su ancla canónica', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        assert.match(page, /\?view=valoracion#modelo`\}[^>]*>\{snapshot\.model_summary\.publishable \? 'publicable' : 'bloqueado'\}/, 'el estado sigue enlazando al modelo');
+        assert.match(page, /\?view=valoracion#modelo`\}[^>]*>\{snapshot\.model_summary\.publishable \? t\('research\.fichaModelPublishable'\) : t\('research\.fichaModelBlocked'\)\}/, 'el estado sigue enlazando al modelo');
         const modelStart = page.indexOf('const buildModelSection');
         const modelEnd = page.indexOf('const buildMarketOpportunitySection', modelStart);
         assert.ok(modelStart > 0 && modelEnd > modelStart, 'sección Modelo identificada');
@@ -132,14 +132,17 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
 
     it('los paneles del resumen van plegados por defecto en móvil (feedback Nico)', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        for (const title of ['Últimas noticias', 'Calidad financiera según la empresa', 'Últimos cambios', 'Por dónde seguir', 'Satélites AST']) {
-            const i = page.indexOf(`title="${title}"`);
+        const expectedTitles = { fichaLatestNews: 'Últimas noticias', fichaFinancialQuality: 'Calidad financiera según la empresa', fichaLatestChanges: 'Últimos cambios', fichaWhereNext: 'Por dónde seguir', fichaSatellitesPanel: 'Satélites AST' };
+        const ES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+        for (const [key, title] of Object.entries(expectedTitles)) {
+            assert.equal(ES[key], title, `clave ${key} conserva el título visible`);
+            const i = page.indexOf(`title={t('research.${key}')}`);
             assert.ok(i > 0, `panel ${title} existe`);
             const openTag = page.slice(page.lastIndexOf('<Panel', i), i);
             assert.ok(openTag.includes('collapsible="mobile"'), `panel ${title} plegable en móvil`);
         }
         // «Última tesis» es lo esencial de la ficha: abierta en móvil, con veredicto y cifras clave.
-        const tesis = page.indexOf('title="Última tesis"');
+        const tesis = page.indexOf("title={t('research.fichaLatestThesis')}");
         assert.ok(!page.slice(page.lastIndexOf('<Panel', tesis), tesis).includes('collapsible'), 'Última tesis no se pliega');
     });
 });

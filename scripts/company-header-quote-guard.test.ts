@@ -36,7 +36,7 @@ test('overview conserva su BackendOffline ante un backend caído', () => {
     // propaga el rechazo a la ruta estricta), no el texto de la asignacion.
     assert.match(page, /^\s*await marketPromise;$/m);
     assert.match(page, /isBackendUnavailableError\(error\)/);
-    assert.match(page, /return <BackendOffline feature=\{`Datos de mercado de \$\{ticker\}`\}/);
+    assert.match(page, /return <BackendOffline feature=\{t\('research\.fichaMarketDataFeature', \{ ticker \}\)\}/);
 });
 
 test('el fixture E2E solo se activa en la combinación exacta de prueba', () => {

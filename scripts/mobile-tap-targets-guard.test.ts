@@ -67,10 +67,10 @@ describe('móvil: 44 px en biblioteca, estados vacíos y enlaces de panel (audit
     });
     it('enlaces de acción de los paneles de la ficha', () => {
         const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-        for (const texto of ['Ver todas', 'Ver todos los cambios']) {
-            const i = page.indexOf(`              ${texto}\n`);
-            assert.ok(i > 0, `${texto} existe`);
-            assert.ok(page.slice(page.lastIndexOf('<Link', i), i).includes(AREA), `${texto} con area tactil`);
+        for (const key of ['fichaViewAll', 'fichaViewAllChanges']) {
+            const i = page.indexOf(`              {t('research.${key}')}\n`);
+            assert.ok(i > 0, `${key} existe`);
+            assert.ok(page.slice(page.lastIndexOf('<Link', i), i).includes(AREA), `${key} con area tactil`);
         }
         const own = readFileSync('components/research/OwnershipSignalsPanel.tsx', 'utf8');
         assert.ok(own.includes(`inline-flex ${AREA} sm:min-h-0 items-center text-sm text-teal-300" href={holdersHref}`), 'Ver propietarios con area tactil');
