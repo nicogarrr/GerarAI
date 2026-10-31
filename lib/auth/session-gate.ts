@@ -22,6 +22,10 @@ const PUBLIC_PATHS = new Set([
     '/terminos',
     '/sign-in',
     '/sign-up',
+    // Pantalla de estado tras el alta (autoSignIn=false) o el acceso
+    // rechazado: la cuenta pendiente/rechazada NUNCA tiene sesión, así que
+    // exigir cookie aquí la redirigía a /sign-in en bucle.
+    '/cuenta-pendiente',
     '/forgot-password',
     '/reset-password',
 ]);
