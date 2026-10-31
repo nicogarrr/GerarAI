@@ -22,6 +22,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    desc,
     event,
     text,
 )
@@ -945,6 +946,17 @@ class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
             "metric",
             postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
         ),
+        # 0120: la ventana row_number del screener (particion company+metric,
+        # orden fiscal_year DESC NULLS LAST, id DESC) la recorre sin sort.
+        Index(
+            "ix_calc_metrics_screener_window",
+            "tenant_id",
+            "company_id",
+            "metric",
+            desc("fiscal_year"),
+            desc("id"),
+            postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1262,6 +1274,16 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "news_events"
     __table_args__ = (
         Index("ix_news_events_company_date", "company_id", "date"),
+        # 0120: portada del feed ordena por (date DESC, id DESC) y para al
+        # llenar la pagina; antes era Seq Scan + sort de toda la tabla.
+        Index("ix_news_events_date_id", desc("date"), desc("id")),
+        # 0120: carril macro (lane + frescura 72h) sondea este parcial.
+        Index(
+            "ix_news_events_macro_date_id",
+            desc("date"),
+            desc("id"),
+            postgresql_where=text("(metadata ->> 'news_lane') = 'macro'"),
+        ),
         UniqueConstraint("sec_filing_identity", name="uq_news_sec_filing_identity"),
     )
 
