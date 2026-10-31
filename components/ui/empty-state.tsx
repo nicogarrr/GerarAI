@@ -44,11 +44,11 @@ function EmptyState({
       {Icon ? <Icon aria-hidden className="mx-auto h-8 w-8 text-gray-500" /> : null}
       {React.createElement(
         titleAs,
-        { className: cn('text-base font-semibold text-gray-100', Icon && 'mt-3') },
+        { className: cn('break-words text-base font-semibold text-gray-100', Icon && 'mt-3') },
         title
       )}
       {description ? (
-        <p className="mx-auto mt-1 max-w-xl text-sm text-gray-500">{description}</p>
+        <p className="mx-auto mt-1 max-w-xl break-words text-sm text-gray-500">{description}</p>
       ) : null}
       {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
     </div>
