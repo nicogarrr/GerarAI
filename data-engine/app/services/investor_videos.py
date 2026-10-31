@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 import time
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 from datetime import datetime
 from threading import Lock
 

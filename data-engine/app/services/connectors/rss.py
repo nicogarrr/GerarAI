@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Any
 from urllib.parse import urljoin
-from xml.etree import ElementTree
+from xml.etree import ElementTree  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 
 import httpx
 

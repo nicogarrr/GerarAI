@@ -9,7 +9,7 @@ emisor declaro, con su contexto (periodo + miembro + eje).
 
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
 from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal, InvalidOperation
