@@ -86,7 +86,7 @@ def test_api_does_not_expose_legacy_invented_profit_for_zero_cost():
                         market_value_base=Decimal('1000'), cost_basis_base=Decimal('0'),
                         unrealized_pnl=Decimal('1000'), unrealized_pnl_base=Decimal('1000'), as_of=date(2026, 10, 15)))
         db.commit()
-        row = positions(limit=500, offset=0, db=db)[0]
+        row = positions(db=db)["items"][0]  # sobre paginado {items, page_info}
         assert row['market_value_base'] == 1000
         assert row['unrealized_pnl'] is None
         assert row['unrealized_pnl_native'] is None
