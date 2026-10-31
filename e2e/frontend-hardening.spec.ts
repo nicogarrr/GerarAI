@@ -76,7 +76,11 @@ test.describe("hardening frontend estático", () => {
     const uiMessages = JSON.parse(source("lib", "i18n", "messages", "es", "ui.json")) as { command: { error: string } };
     expect(uiMessages.command.error).toContain("No se pudo completar la búsqueda");
     expect(searchCommand).not.toMatch(/catch \(error: any\)[\s\S]*?setStocks\(\[\]\);[\s\S]*?\n\s*}/);
-    expect(portfolioChat).toContain("Abrir el cerebro");
+    // El aria-label del boton del cerebro vive en i18n: la fuente referencia
+    // la clave y el texto real se verifica en los mensajes «es».
+    expect(portfolioChat).toContain("aria-label={t('brain.openAria')}");
+    const brainMessages = JSON.parse(source("lib", "i18n", "messages", "es", "brain.json")) as { openAria: string };
+    expect(brainMessages.openAria).toBe("Abrir el cerebro");
     expect(portfolioChat).toContain("aria-labelledby=\"global-brain-title\"");
   });
 });
