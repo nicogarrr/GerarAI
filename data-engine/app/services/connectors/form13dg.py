@@ -221,7 +221,8 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
                 raise  # documento inexistente: dato por emisor
             _record_sec_http_failure(registry, exc)
             raise
-        _record_sec_outcome(registry, time.perf_counter())
+        # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El
+        # éxito lo registra el consumidor tras validar el formato.
         return response.text
 
 
@@ -242,18 +243,31 @@ def fetch_filing_document(
     hostname = (urlparse(document_url).hostname or "").lower()
     if hostname not in {"sec.gov", "www.sec.gov"}:
         raise ValueError("SC 13D/13G document URL must use sec.gov")
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     text = _get_text(document_url, client)
     if not _RENDERED_XSL_RE.search(urlparse(document_url).path):
         # Documento primario: puede ser XML (esquema nuevo) o HTML heredado
-        # (un 13D/G antiguo cuyo primario ES un .htm legitimo). No es un
-        # render XSL: se devuelve tal cual y el parse decide el formato.
+        # (un 13D/G antiguo cuyo primario ES un .htm legitimo). Un 200 que no
+        # es ni XML ni lleva la marca de tipo SC 13D/G (un challenge HTML de
+        # WAF no la lleva) no es un documento: deriva de formato, no éxito.
+        if (
+            not _looks_like_xml(text)
+            and _SGML_TYPE_RE.search(text) is None
+            and _LEGACY_DOC_RE.search(text) is None
+        ):
+            registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
+            raise ValueError("SC 13D/13G document is neither XML nor a recognizable 13D/G text")
+        _record_sec_outcome(registry, started)
         return text
     # URL renderizada (…/xslSCHEDULE_13[DG]_Xnn/fichero): es HTML para
     # humanos; el documento crudo vive en el directorio del filing.
     raw_url = raw_document_url(document_url)
     raw_text = _get_text(raw_url, client)
     if raw_text.lstrip().lower().startswith(("<!doctype", "<html")):
+        registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
         raise ValueError("SC 13D/13G raw document is rendered HTML too")
+    _record_sec_outcome(registry, started)
     return raw_text
 
 
@@ -261,6 +275,9 @@ def fetch_filing_document(
 
 # XML nuevo: <edgarSubmission xmlns="http://www.sec.gov/edgar/schedule13g" …>
 # (y schedule13d). Los tags llevan namespace; se compara por nombre local.
+# Portadas HTML heredadas llevan "SCHEDULE 13D/G" o "SC 13D/G" como texto
+# visible (sin la cabecera SGML): un challenge HTML de WAF no lleva ninguna.
+_LEGACY_DOC_RE = re.compile(r"(?:SCHEDULE|SC)\s+13[DG](?:/A)?", re.IGNORECASE)
 _SGML_TYPE_RE = re.compile(
     r"(?:CONFORMED\s+SUBMISSION\s+TYPE|<TYPE>)\s*:?\s*(SC\s*13[DG](?:/A)?|SCHEDULE\s+13[DG](?:/A)?)",
     re.IGNORECASE,

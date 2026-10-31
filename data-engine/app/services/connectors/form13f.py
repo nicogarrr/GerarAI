@@ -57,7 +57,6 @@ def _get(url: str, client: httpx.Client | None) -> httpx.Response:
     # del intervalo debe fijarse lo mas pegado posible a la salida a la red.
     headers = default_headers()
     registry = get_data_source_registry()
-    started = time.perf_counter()
     _throttle()
     try:
         if client is not None:
@@ -74,7 +73,8 @@ def _get(url: str, client: httpx.Client | None) -> httpx.Response:
     except httpx.TransportError as exc:
         _record_sec_transport_failure(registry, exc)
         raise
-    _record_sec_outcome(registry, started)
+    # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El éxito
+    # lo registra el consumidor tras validar el formato (JSON o XML).
     return response
 
 
@@ -86,7 +86,14 @@ def recent_13f_filings(
 ) -> list[dict]:
     """13F-HR y 13F-HR/A recientes del manager, mas reciente primero."""
     url = SUBMISSIONS_URL.format(cik=str(cik).strip().zfill(10))
-    payload = _get(url, client).json()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        payload = _get(url, client).json()
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
+        raise
+    _record_sec_outcome(registry, started)
     recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
     items: list[dict] = []
@@ -123,7 +130,14 @@ def information_table_url(
 ) -> str | None:
     """URL del information table XML dentro del filing; None si no se localiza."""
     base = filing_index_url(cik, accession_number)
-    payload = _get(f"{base}index.json", client).json()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        payload = _get(f"{base}index.json", client).json()
+    except ValueError:
+        registry.record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
+        raise
+    _record_sec_outcome(registry, started)
     items = (payload.get("directory") or {}).get("item") or []
     candidates: list[str] = []
     for item in items:
@@ -152,7 +166,16 @@ def information_table_url(
 
 
 def fetch_information_table(url: str, *, client: httpx.Client | None = None) -> list[dict]:
-    return parse_information_table(_get(url, client).text)
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    text = _get(url, client).text
+    try:
+        rows = parse_information_table(text)
+    except (ET.ParseError, ValueError):
+        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
+        raise
+    _record_sec_outcome(registry, started)
+    return rows
 
 
 def parse_information_table(xml_text: str) -> list[dict]:
@@ -168,6 +191,10 @@ def parse_information_table(xml_text: str) -> list[dict]:
         return None
 
     root = ET.fromstring(xml_text)
+    if local(root.tag) != "informationTable":
+        # Un 200 con HTML bien formado (challenge de WAF) parsea como XML;
+        # la raíz oficial del esquema 13F es informationTable.
+        raise ValueError("el documento no es un information table 13F")
     rows: list[dict] = []
     for info in root.iter():
         if local(info.tag) != "infoTable":
@@ -309,7 +336,11 @@ def parse_primary_summary(xml_text: str) -> dict:
         return tag.rsplit("}", 1)[-1]
 
     found: dict[str, str] = {}
-    for elem in ET.fromstring(xml_text).iter():
+    root = ET.fromstring(xml_text)
+    # Raíz oficial del esquema thirteenffiler (ns sec.gov/edgar/thirteenffiler).
+    if local(root.tag) != "edgarSubmission":
+        raise ValueError("el documento no es un primary_doc 13F")
+    for elem in root.iter():
         name = local(elem.tag)
         if name in {"tableEntryTotal", "tableValueTotal", "amendmentType"} and (elem.text or "").strip():
             found.setdefault(name, (elem.text or "").strip())
@@ -327,7 +358,19 @@ def fetch_primary_summary(
 ) -> dict | None:
     """Resumen declarado por el propio filing; None si no se puede leer."""
     url = filing_index_url(cik, accession_number) + "primary_doc.xml"
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     try:
-        return parse_primary_summary(_get(url, client).text)
-    except Exception:  # noqa: BLE001 - sin resumen => "no verificado", nunca invent
+        text = _get(url, client).text
+    except Exception:  # noqa: BLE001 - sin resumen => "no verificado", nunca inventado
+        # Los fallos HTTP/red ya quedaron registrados dentro de _get.
         return None
+    try:
+        summary = parse_primary_summary(text)
+    except (ET.ParseError, ValueError):
+        # Formato drift (p.ej. challenge HTML): fuente degradada, pero el
+        # contrato "None = no verificado" se mantiene para el llamador.
+        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
+        return None
+    _record_sec_outcome(registry, started)
+    return summary

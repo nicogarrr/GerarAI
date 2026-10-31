@@ -248,7 +248,8 @@ def _get_text(url: str, client: httpx.Client | None) -> str:
                 raise  # documento inexistente: dato por emisor
             _record_sec_http_failure(registry, exc)
             raise
-        _record_sec_outcome(registry, time.perf_counter())
+        # Sin éxito aquí: un 200 no basta (puede ser un challenge HTML). El
+        # éxito lo registra el consumidor tras validar que el cuerpo es XML.
         return response.text
 
 
@@ -267,15 +268,21 @@ def fetch_filing_xml(
     hostname = (urlparse(document_url).hostname or "").lower()
     if hostname not in {"sec.gov", "www.sec.gov"}:
         raise ValueError("Form 4 document URL must use sec.gov")
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     text = _get_text(document_url, client)
     if _looks_like_xml(text):
+        _record_sec_outcome(registry, started)
         return text
     raw_url = raw_document_url(document_url)
     if raw_url == document_url:
+        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
         raise ValueError("Form 4 document is not XML and has no raw variant")
     raw_text = _get_text(raw_url, client)
     if not _looks_like_xml(raw_text):
+        registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
         raise ValueError("Form 4 raw document is not XML either")
+    _record_sec_outcome(registry, started)
     return raw_text
 
 

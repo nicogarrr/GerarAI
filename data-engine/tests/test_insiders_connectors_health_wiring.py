@@ -136,3 +136,88 @@ def test_form13dg_submissions_exito_cierra():
     items = form13dg.recent_form13dg_filings("320193", client=_client(handler))
     assert items == []
     assert registry.get_status("sec_edgar").consecutive_failures == 0
+
+
+def test_form13f_200_no_json_degrada():
+    """Un 200 con challenge HTML en submissions NO cierra el circuito."""
+
+    def handler(request):
+        return httpx.Response(200, text="<!DOCTYPE html><html><body>challenge</body></html>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form13f.recent_13f_filings("1067983", client=_client(handler))
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form13f_documento_200_html_degrada():
+    """Un 200 HTML donde iba el information table XML tampoco es éxito."""
+
+    def handler(request):
+        return httpx.Response(200, text="<html><head><title>Request Rejected</title></head></html>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(Exception):
+        form13f.fetch_information_table(
+            "https://www.sec.gov/Archives/edgar/data/1/x.xml", client=_client(handler)
+        )
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form4_documento_200_html_challenge_degrada():
+    def handler(request):
+        return httpx.Response(200, text="<!DOCTYPE html><html><body>challenge</body></html>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form4.fetch_filing_xml(
+            "https://www.sec.gov/Archives/edgar/data/320193/000032019326000123/doc4.xml",
+            client=_client(handler),
+        )
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form4_documento_xml_valido_cierra():
+    xml = '<?xml version="1.0"?><ownershipDocument><issuer></issuer></ownershipDocument>'
+
+    def handler(request):
+        return httpx.Response(200, text=xml)
+
+    registry = get_data_source_registry()
+    registry.record_failure("sec_edgar", "fallo previo")
+    text = form4.fetch_filing_xml(
+        "https://www.sec.gov/Archives/edgar/data/320193/000032019326000123/doc4.xml", client=_client(handler)
+    )
+    assert "ownershipDocument" in text
+    assert registry.get_status("sec_edgar").consecutive_failures == 0
+
+
+def test_form13dg_documento_200_html_challenge_degrada():
+    def handler(request):
+        return httpx.Response(200, text="<html><body>Access Denied</body></html>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form13dg.fetch_filing_document(
+            "https://www.sec.gov/Archives/edgar/data/320193/0000320193/sc13g.htm", client=_client(handler)
+        )
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form13dg_documento_sgml_legitimo_cierra():
+    sgml = "<SEC-DOCUMENT>0000320193-26-000123\nCONFORMED SUBMISSION TYPE: SC 13G\n<TEXT>\nresto\n"
+
+    def handler(request):
+        return httpx.Response(200, text=sgml)
+
+    registry = get_data_source_registry()
+    registry.record_failure("sec_edgar", "fallo previo")
+    text = form13dg.fetch_filing_document(
+        "https://www.sec.gov/Archives/edgar/data/320193/0000320193/sc13g.htm", client=_client(handler)
+    )
+    assert "SC 13G" in text
+    assert registry.get_status("sec_edgar").consecutive_failures == 0
