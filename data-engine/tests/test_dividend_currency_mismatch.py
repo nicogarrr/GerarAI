@@ -147,6 +147,24 @@ def test_portfolio_yield_never_sums_two_currencies(db: Session):
     assert result["coverage"]["positions_missing_base_value"] == ["USDB"]
 
 
+def test_position_without_dividend_data_does_not_dilute_the_aggregate(db: Session):
+    valued = _company(db, "PAYE")
+    _position(db, valued, price="100.00", currency="EUR", value_base="1000.00")
+    _dividend(db, valued, "10.00", "EUR")
+
+    # Misma cartera valorada, pero la segunda posicion no tiene registros de
+    # dividendo: su yield es desconocido (None), no 0 %. Si su valor entra en
+    # el denominador, el agregado se diluye como si no pagara nada.
+    silent = _company(db, "QUIET")
+    _position(db, silent, price="100.00", currency="EUR", value_base="1000.00")
+
+    result = _yields(db)
+    by_ticker = {row["ticker"]: row for row in result["positions"]}
+    assert by_ticker["QUIET"]["dividend_yield"] is None
+    # 10% sobre el valor CUBIERTO (1000), no 5% sobre el valor total (2000).
+    assert result["portfolio_yield"] == pytest.approx(0.10)
+
+
 def test_no_position_has_a_base_value_yields_none_not_zero(db: Session):
     company = _company(db, "NOFX")
     _position(db, company, price="100.00", currency="USD", value_base=None)

@@ -325,6 +325,10 @@ class DividendIngestionService(ProviderIngestionService):
         position without a base-currency value has no honest weight (its native
         value is in another currency and summing the two would mix EUR and USD
         into a meaningless total), so it is excluded and reported in coverage.
+        The denominator holds the same honesty as the per-position gate: a
+        position with a base value but NO usable dividend data has an unknown
+        yield (None, never 0.0 %), so its value must not dilute the aggregate
+        either - only positions that actually contributed a real yield count.
         """
         # Ventana TTM = (hoy - 1 año, hoy]: un dividendo ya declarado con
         # ex_date futuro todavia no forma parte de los ultimos 12 meses (antes
@@ -361,7 +365,9 @@ class DividendIngestionService(ProviderIngestionService):
         with_data = 0
         weighted_yield = 0.0
         weighted_positions = 0
-        total_value = 0.0
+        # Denominador del agregado: SOLO el valor de las posiciones que
+        # aportaron un yield real (una posicion sin datos no rinde 0 %).
+        covered_value = 0.0
         missing_base_value: list[str] = []
         for position, company in rows:
             records, uncertain = resolve_yahoo_events(records_by_company.get(company.id, []))
@@ -374,7 +380,6 @@ class DividendIngestionService(ProviderIngestionService):
                 value = None
             else:
                 value = float(position.market_value_base)
-                total_value += value
             # GBX (dividendo Yahoo en peniques) frente a GBp/GBP de la posicion:
             # misma moneda, se convierte sin FX; otra moneda no se mezcla.
             matching_currency = records_in_position_currency(records, position.currency)
@@ -391,6 +396,7 @@ class DividendIngestionService(ProviderIngestionService):
                 if dividend_yield is not None and value is not None and value > 0:
                     weighted_yield += dividend_yield * value
                     weighted_positions += 1
+                    covered_value += value
             positions.append(
                 {
                     "ticker": company.ticker,
@@ -421,8 +427,8 @@ class DividendIngestionService(ProviderIngestionService):
             # computed from an empty numerator is the same fabrication as the
             # per-position one, one level up.
             "portfolio_yield": (
-                (weighted_yield / total_value)
-                if weighted_positions and total_value > 0
+                (weighted_yield / covered_value)
+                if weighted_positions and covered_value > 0
                 else None
             ),
             "coverage": {
