@@ -62,7 +62,7 @@ export default async function FollowedEarningsPage() {
                         materialsSlot={
                             event.date <= today ? (
                                 <Suspense fallback={null}>
-                                    <EventMaterialsLine promise={materialsPromise} eventKey={`${event.ticker}|${event.date}`} />
+                                    <EventMaterialsLine ti={ti} promise={materialsPromise} eventKey={`${event.ticker}|${event.date}`} />
                                 </Suspense>
                             ) : null
                         }

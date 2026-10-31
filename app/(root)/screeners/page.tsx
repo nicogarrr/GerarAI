@@ -26,7 +26,8 @@ import { SubmitButton } from '@/components/screeners/SubmitButton';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getErrorMessage } from '@/lib/types/errors';
 import { formatDate, formatNumber, formatPercent, NA, NO_CORRIDO } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { formatScreenCriterionRight, formatScreenCriterionValue, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel } from '@/lib/screener-results';
 
 export const dynamic = 'force-dynamic';
@@ -43,7 +44,7 @@ const operators: ScreenCriterion['operator'][] = ['>', '>=', '<', '<=', '==', '!
 
 const RESULTS_PAGE_SIZE = 25;
 
-function Results({ result, page, pageHref }: { result: ScreenResult; page: number; pageHref: (target: number) => string }) {
+function Results({ result, page, pageHref, t }: { result: ScreenResult; page: number; pageHref: (target: number) => string; t: TranslateFn }) {
   const newMatches = new Set(result.new_match_company_ids ?? []);
   const matchedRows = result.results.filter(row => row.matched);
   // Paginación (preferencia del usuario) en vez de una tabla sin fin: el
@@ -85,6 +86,7 @@ async function ResultsSection({ query, operator, incompleteRun, requestedPage, r
   requestedPage: number;
   resultsPageHref: (target: number) => string;
 }) {
+  const t = await getT();
   // El screener ad-hoc con fórmula inválida debe mostrar el error en un
   // banner visible en español, nunca escalar al boundary global.
   let result: ScreenResult | null = null;
@@ -113,7 +115,7 @@ async function ResultsSection({ query, operator, incompleteRun, requestedPage, r
           <p className="mt-1">{screenError}</p>
         </div>
       ) : null}
-      {result ? <Results page={requestedPage} pageHref={resultsPageHref} result={result} /> : null}
+      {result ? <Results page={requestedPage} pageHref={resultsPageHref} result={result} t={t} /> : null}
     </>
   );
 }

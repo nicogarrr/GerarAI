@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { library } = vi.hoisted(() => ({ library: vi.fn() }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/components/forms/MutationForm', () => ({ MutationForm: ({ children, className }: { children: React.ReactNode; className?: string }) => <form className={className}>{children}</form> }));
 vi.mock('@/components/forms/FileUploadInput', () => ({ FileUploadInput: () => null }));
 vi.mock('@/components/knowledge/ExtractionRefresh', () => ({ ExtractionRefresh: () => null }));

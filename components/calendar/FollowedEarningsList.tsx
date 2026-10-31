@@ -96,9 +96,9 @@ export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: strin
 }
 
 /** Espera la promesa compartida de materiales (dentro de Suspense) y pinta solo la linea de esta fila. */
-export async function EventMaterialsLine({ promise, eventKey }: { promise: Promise<Record<string, EventMaterials>>; eventKey: string }) {
+export async function EventMaterialsLine({ promise, eventKey, ti = esT }: { promise: Promise<Record<string, EventMaterials>>; eventKey: string; ti?: TiFn }) {
     const all = await promise;
-    return <MaterialsLine materials={all[eventKey]} />;
+    return <MaterialsLine materials={all[eventKey]} ti={ti} />;
 }
 
 export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event: FollowedEarningsEvent; materialsSlot?: ReactNode; ti?: TiFn }) {

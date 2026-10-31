@@ -298,6 +298,30 @@ const staleOrphans = Object.keys(KNOWN_ORPHANS).filter((k) => !orphans.includes(
 
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ *
+ * 4. t() LEGACY (siempre español) fuera de lib/
+ * ------------------------------------------------------------------ */
+
+// `t` de lib/i18n/t está fijado al español: en una página o componente pinta
+// español aunque el usuario elija English en Ajustes. En app/, components/ y
+// hooks/ se usa getT() (server) o useT() (client). Los imports de solo tipos
+// (`import type { TranslationKey }`) siguen permitidos.
+const legacyImports = [];
+for (const file of [...files, ...walk(join(ROOT, "hooks"))]) {
+  const rel = file.slice(ROOT.length + 1);
+  if (rel.startsWith("lib/")) continue;
+  const source = readFileSync(file, "utf8");
+  for (const m of source.matchAll(/import\s+(type\s+)?\{([^}]*)\}\s*from\s*['"]@\/lib\/i18n\/t['"]/g)) {
+    if (m[1]) continue;
+    const values = m[2].split(",").map((s) => s.trim()).filter((s) => s && !s.startsWith("type "));
+    // Excepción: `const esT = t;` como valor por defecto de un parámetro `ti`
+    // (helpers que el llamador debe invocar con su t del idioma activo).
+    const onlyFallback = values.length === 1 && values[0] === "t" &&
+      /const esT(: \w+)? = t;/.test(source) && !/(?<![\w.])t\(/.test(source);
+    if (values.length && !onlyFallback) legacyImports.push(`${rel}: ${values.join(", ")}`);
+  }
+}
+
 const unique = [...new Set(englishHits)];
 
 if (missingKeys.length > 0) {
@@ -321,7 +345,12 @@ if (staleOrphans.length > 0) {
   for (const key of staleOrphans) console.error(`  - ${key}`);
 }
 
-if (missingKeys.length > 0 || unique.length > 0 || newOrphans.length > 0) {
+if (legacyImports.length > 0) {
+  console.error(`\ni18n: ${legacyImports.length} import(s) del t() LEGACY (siempre español) en app/, components/ o hooks/; usa getT() o useT():`);
+  for (const hit of legacyImports) console.error(`  - ${hit}`);
+}
+
+if (missingKeys.length > 0 || unique.length > 0 || newOrphans.length > 0 || legacyImports.length > 0) {
   console.error(
     "\nVer lib/i18n/README.md. Los anglicismos aceptados (Watchlist, Screeners, Sharpe, CAGR, PER (TTM)...) no deben aparecer aqui.\n",
   );

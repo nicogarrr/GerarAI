@@ -1,5 +1,7 @@
 {
   "follow": "Seguir",
   "followed": "Siguiendo",
-  "noResults": "Sin resultados con estos filtros"
+  "noResults": "Sin resultados con estos filtros",
+  "noPublished": "Sin selección publicada",
+  "noEligible": "Sin candidatos aptos"
 }

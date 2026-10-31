@@ -1,6 +1,5 @@
 'use client';
 
-import { t } from '@/lib/i18n/t';
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
@@ -50,8 +49,8 @@ function secLink(sourceUrl: unknown): string | null {
     return typeof sourceUrl === 'string' && sourceUrl.startsWith('https://') ? sourceUrl : null;
 }
 
-function formatFetchedAt(f: Formatters, value: unknown): string {
-    if (typeof value !== 'string' || !value) return t('signals.noDate');
+function formatFetchedAt(f: Formatters, value: unknown, ti: TFunction): string {
+    if (typeof value !== 'string' || !value) return ti('signals.noDate');
     return f.formatUserDateTime(value);
 }
 
@@ -177,7 +176,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     onValueChange={setTicker}
                     onSelect={(stock) => router.push(`/insider?ticker=${encodeURIComponent(stock.symbol.toUpperCase())}`)}
                     placeholder={ti('insider.search.placeholder')}
-                    ariaLabel={t('insider.searchPlaceholder')}
+                    ariaLabel={ti('insider.searchPlaceholder')}
                     className="h-11 w-full bg-gray-900"
                 />
                 <Button type="submit" className="h-11 shrink-0 gap-2">
@@ -273,7 +272,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                     ) : null}
                     {signals.length === 0 ? (
                         <p className="rounded-lg border border-dashed border-gray-800 p-6 text-sm text-gray-500">
-                            {initialTicker}: {t('insider.noSignals')} (
+                            {initialTicker}: {ti('insider.noSignals')} (
                             {analyzedCountCopy(initialResult.status, initialResult, (v) => countText(f, v))}).
                         </p>
                     ) : (
@@ -296,7 +295,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                         signals: f.formatCount(signals.length, ti('insider.signals.unit'), ti('insider.signals.unitPlural')),
                                         buys: countText(f, initialResult.buy_count),
                                         scanned: countText(f, initialResult.filings_scanned),
-                                        date: t('signals.asOf', { date: formatFetchedAt(f, (initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at) }),
+                                        date: ti('signals.asOf', { date: formatFetchedAt(f, (initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at, ti) }),
                                     })}
                                 </CardDescription>
                             </div>
@@ -312,11 +311,11 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             <TableCaption className="sr-only">{ti('insider.signals.tableCaption')}</TableCaption>
                             <TableHeader>
                                 <TableRow className="border-gray-700 hover:bg-transparent">
-                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.signal')}</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.insider')}</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.date')}</TableHead>
-                                    <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{t('insider.value')}</TableHead>
-                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.detail')}</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.signal')}</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.insider')}</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.date')}</TableHead>
+                                    <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{ti('insider.value')}</TableHead>
+                                    <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.detail')}</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>

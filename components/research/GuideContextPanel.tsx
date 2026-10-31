@@ -3,7 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Panel } from '@/components/ui/panel';
 import { safeAssistantSourceUrl, type GuideContext } from '@/lib/research/assistant-contract';
-import { t } from '@/lib/i18n/t';
+import { useT } from '@/lib/i18n/client';
 import { formatUserDateTime } from '@/lib/format';
 
 /**
@@ -13,6 +13,7 @@ import { formatUserDateTime } from '@/lib/format';
  * el lateral de /research/assistant; la página se unificó en el Cerebro.
  */
 export function GuideContextPanel({ ticker, context, hideReviews = false }: { ticker: string; context: GuideContext | null; hideReviews?: boolean }) {
+    const t = useT();
     function askWithReview(reviewId: number) {
         window.dispatchEvent(new CustomEvent('gerarai:open-brain', { detail: { ticker, review_id: reviewId } }));
     }

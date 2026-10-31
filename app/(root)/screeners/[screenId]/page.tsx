@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ScreenBreadcrumbName } from '@/components/screeners/ScreenBreadcrumbName';
 import { getScreenerWorkspace, runSavedScreen } from '@/lib/actions/research-tools.actions';
 import { formatNumber, formatPercent } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
 import { formatScreenCriterionRight, formatScreenRank, screenCriterionMetricLabel, screenMissingDataEntry, screenMissingFieldsLabel } from '@/lib/screener-results';
 
 // Sin metadata propia la pestaña heredaba el título genérico de la app y
@@ -22,6 +22,7 @@ export const revalidate = 0;
 
 export default async function SavedScreenResultsPage({ params }: { params: Promise<{ screenId: string }> }) {
   const { screenId } = await params;
+  const t = await getT();
   // Un id que no es un entero positivo (/screeners/abc) o un filtro que no
   // existe o no es tuyo (/screeners/999999) es un 404 honesto, no la página
   // genérica de error con «Reintentar» (reintentar nunca lo arregla).
