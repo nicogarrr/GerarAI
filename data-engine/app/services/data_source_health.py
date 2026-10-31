@@ -130,6 +130,26 @@ class DataSourceHealthRegistry:
                 is_primary=True,
                 fallback_source="cached_fx",
             ),
+            "stooq": DataSourceStatus(
+                name="Stooq",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "finnhub": DataSourceStatus(
+                name="Finnhub",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "fmp": DataSourceStatus(
+                name="Financial Modeling Prep",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "damodaran": DataSourceStatus(
+                name="Damodaran (NYU Stern)",
+                is_primary=False,
+                fallback_source="settings_erp",
+            ),
             "sec_edgar": DataSourceStatus(
                 name="SEC EDGAR",
                 is_primary=False,
