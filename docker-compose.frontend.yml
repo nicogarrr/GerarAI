@@ -1,0 +1,38 @@
+# Independent project. Do not recreate backend or storage during frontend deploy.
+services:
+  frontend-oracle:
+    image: cavaai-frontend:${FRONTEND_IMAGE_TAG:-oracle}
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?Set HTTPS frontend origin}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:?Set HTTPS frontend origin}
+        NEXT_PUBLIC_SUPPORT_EMAIL: ${NEXT_PUBLIC_SUPPORT_EMAIL:-}
+    restart: unless-stopped
+    env_file: ${FRONTEND_ENV_FILE:-.env.frontend.production}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      FMP_BACKEND_URL: http://backend:8000
+    ports:
+      - "127.0.0.1:3300:3000"
+    networks:
+      backend:
+        aliases: [gerarai-frontend]
+    cpus: "1.0"
+    mem_limit: 2g
+    memswap_limit: 2g
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/sign-in').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+networks:
+  backend:
+    external: true
+    name: ${BACKEND_DOCKER_NETWORK:-cavaai_default}

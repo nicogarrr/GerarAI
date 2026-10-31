@@ -1,9 +1,9 @@
 # ============================================================
 # Docker Compose - Produccion personal (Oracle Ampere Always Free)
 # ============================================================
-# Una sola VM ARM64 (4 OCPU / 24 GB RAM, Always Free sin upgrade), un solo usuario.
-# El frontend vive en Vercel Hobby; la auth en MongoDB Atlas (M0 gratis), asi
-# que aqui NO va ni frontend ni MongoDB.
+# VM ARM64 existente (4 OCPU / 24 GB RAM), un solo usuario.
+# Frontend Oracle aparte en docker-compose.frontend.yml; auth en Atlas.
+# Comprobar tarifa real OCI: una cuota o presupuesto no es un tope monetario.
 #
 # Presupuesto de memoria: la suma de `memory` de TODOS los servicios es
 # 13.568 MiB (13,25 GiB); worker default con 4 GiB tras OOM medido (3 GiB con

@@ -4,3 +4,9 @@
 	encode zstd gzip
 	reverse_proxy backend:8000
 }
+
+# Oracle frontend. Keep the backend block and Vercel deployment unchanged.
+gerarai.duckdns.org {
+	encode zstd gzip
+	reverse_proxy gerarai-frontend:3000
+}
