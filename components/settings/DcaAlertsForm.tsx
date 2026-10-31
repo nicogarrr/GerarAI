@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { getFriendlyErrorMessage } from '@/lib/types/errors';
+import { toast } from 'sonner';
 import { saveDcaAlertSettings, type DcaAlertSettings } from '@/lib/actions/dca-settings.actions';
+import { showErrorToast } from '@/lib/toast';
 
 /** Solo se menciona si hay alguno: «(0) se conservan» describía algo que no existe. */
 function legacyOverridesText(count: number): string {
@@ -16,18 +17,19 @@ export default function DcaAlertsForm({ initial }: { initial: DcaAlertSettings }
     const [down, setDown] = useState(initial.down_max_level);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(initial);
-    const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
     const save = async (event: React.FormEvent) => {
         event.preventDefault();
-        setSaving(true); setError(''); setMessage('');
+        setSaving(true);
         try {
             const result = await saveDcaAlertSettings(up, down);
             setSaved(result);
-            setMessage(result.legacy_override_count > 0
+            // Toast como el resto de formularios de Ajustes (divisa, fiscal):
+            // el aviso en linea bajo el boton quedaba lejos del foco en movil
+            // y era el unico formulario de la pagina sin confirmacion flotante.
+            toast.success(result.legacy_override_count > 0
                 ? 'Avisos DCA guardados para todas tus empresas. Los ajustes antiguos por empresa se conservan sin efecto.'
                 : 'Avisos DCA guardados para todas tus empresas.');
-        } catch (err) { setError(getFriendlyErrorMessage(err)); }
+        } catch (err) { showErrorToast(err); }
         finally { setSaving(false); }
     };
     const options = [0, 1, 2, 3, 4];
@@ -50,7 +52,5 @@ export default function DcaAlertsForm({ initial }: { initial: DcaAlertSettings }
         <p className="text-xs text-gray-400">Se usa el nivel nuevo: con 3X al subir y 1X al bajar, avisa en 2X → 3X y 2X → 1X. No avisa en 1X → 2X ni 3X → 2X. También avisa en 3X → 4X, pero no en 4X → 3X. Sin aviso en la primera evaluación ni si el nivel no cambia.</p>
         <p className="text-xs text-gray-400">Los recortes tienen su propio control en el servidor y no se modifican aquí.{saved.legacy_override_count > 0 ? ` ${legacyOverridesText(saved.legacy_override_count)}` : ''}</p>
         <button type="submit" disabled={saving} aria-busy={saving} className="min-h-11 rounded border border-teal-600 px-4 text-sm text-teal-300 disabled:opacity-50">{saving ? 'Guardando…' : 'Guardar avisos DCA'}</button>
-        {message ? <p role="status" className="text-sm text-teal-300">{message}</p> : null}
-        {error ? <p role="alert" className="text-sm text-red-300">{error}</p> : null}
     </form>;
 }
