@@ -326,6 +326,79 @@ def _currency_blocked_result(engine: ValuationEngine, context: ValuationContext,
 logger = logging.getLogger(__name__)
 
 
+def _relative_multiples_cross_check(
+    db: Session,
+    company: Company,
+    context: "ValuationContext",
+    *,
+    resolved_engine: str,
+    to_listing: float | None,
+) -> dict | None:
+    """Contraste aditivo por multiplos de comparables junto al DCF estandar.
+
+    Solo cuando el motor resuelto es ``standard_dcf``: en pre-revenue,
+    holdings o ciclicas un multiplo relativo engana (lo demostro la evaluacion
+    con datos reales: ASTS daba 3,05 frente a 40,97). El motor de multiplos se
+    auto-rechaza con ADR sin ratio, sin acciones, sin precio o sin peers; en
+    ese caso se adjunta solo el estado, nunca una cifra inventada. Nunca rompe
+    la valoracion principal: cualquier error interno se registra y se omite.
+    """
+    if resolved_engine != "standard_dcf":
+        return None
+    try:
+        from app.valuation.engines.relative_multiples import RelativeMultiplesEngine
+
+        relative_engine = RelativeMultiplesEngine()
+        relative_context = relative_engine.build_context(
+            db,
+            company,
+            context.current_price,
+            context.as_of,
+            price_as_of=context.price_as_of,
+        )
+        relative = apply_publication_blockers(relative_engine.value(relative_context))
+    except Exception as exc:  # noqa: BLE001 - el contraste es opcional
+        logger.warning(
+            "Relative cross-check failed company_id=%s error=%s",
+            getattr(company, "id", None),
+            redact_secrets(type(exc).__name__),
+        )
+        return None
+
+    scale = to_listing if to_listing is not None else 1.0
+
+    def _scaled(key: str) -> float | None:
+        value = relative.get(key)
+        return value * scale if isinstance(value, (int, float)) else None
+
+    trace = relative.get("trace") or {}
+    rel = relative.get("relative") or {}
+    cross = {
+        "engine": "relative",
+        "status": relative.get("status"),
+        "headline_multiple": rel.get("headline_multiple"),
+        "bear_value": _scaled("bear_value"),
+        "base_value": _scaled("base_value"),
+        "bull_value": _scaled("bull_value"),
+        "expected_value": _scaled("expected_value"),
+        "margin_of_safety": relative.get("margin_of_safety"),
+        "peer_set_size": rel.get("peer_set_size"),
+        "peer_median": rel.get("peer_median"),
+        "publication_blockers": relative.get("publication_blockers") or [],
+        "missing_inputs": relative.get("missing_inputs") or [],
+        # Fuente y fecha por cifra: mismos ids/periodos de hechos SEC que
+        # alimentan la cifra, mas la procedencia del peer set.
+        "provenance": {
+            "peer_set": trace.get("peer_set"),
+            "fact_ids": trace.get("fact_ids"),
+            "periods": trace.get("periods"),
+            "snapshot": trace.get("snapshot"),
+            "model_version": trace.get("model_version"),
+        },
+    }
+    return cross
+
+
 class ValuationService:
     def value_company(self, db: Session, company: Company, *, as_of: date | None = None) -> dict:
         price_error = None
@@ -404,6 +477,15 @@ class ValuationService:
                 # tasa, invertida): MOS y crecimientos son invariantes.
                 scale_per_share_outputs(result, to_listing)
                 result["current_price"] = current_price
+            cross = _relative_multiples_cross_check(
+                db,
+                company,
+                context,
+                resolved_engine=resolve_engine_key(company),
+                to_listing=to_listing if currency_gate["status"] != "blocked" else None,
+            )
+            if cross is not None:
+                result.setdefault("cross_checks", {})["relative_multiples"] = cross
         result["value_currency"] = price_currency if currency_gate["status"] != "blocked" else None
         result["currency"] = {
             key: value
