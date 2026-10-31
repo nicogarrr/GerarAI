@@ -68,10 +68,7 @@ jobs:
       # pero el SARIF subido solo lleva hallazgos activos; los suprimidos
       # desaparecen del upload y code scanning los cierra como fixed.
       - name: Quitar del SARIF los hallazgos suprimidos con nosemgrep
-        run: >-
-          jq 'del(.runs[].results[] | select(.suppressions))'
-          semgrep-registry.sarif > semgrep-registry.filtered.sarif
-          && mv semgrep-registry.filtered.sarif semgrep-registry.sarif
+        run: python scripts/filter_sarif_suppressions.py semgrep-registry.sarif
       - name: Bandit (severidad media o mayor)
         run: bandit -r data-engine/app -ll -f sarif -o bandit.sarif || true
       - name: Upload Semgrep SARIF
