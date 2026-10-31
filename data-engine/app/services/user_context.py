@@ -40,6 +40,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import (
     AlertRule,
     Company,
@@ -686,7 +687,9 @@ def build_user_context(
     tenant = _tenant(db)
     if tenant is None:
         return None
-    today = today or date.today()
+    # «Hoy» del usuario (Europe/Madrid): el 1 de enero a las 00:30 el día UTC
+    # aún es 31 de diciembre y el año fiscal por defecto salía uno antes.
+    today = today or local_today()
     now = now or datetime.now(UTC)
     wanted = [key for key in (sections or DEFAULT_SECTIONS) if key in SECTIONS]
     blocks: dict[str, ContextBlock] = {}

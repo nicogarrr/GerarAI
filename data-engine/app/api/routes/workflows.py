@@ -1,5 +1,3 @@
-from datetime import UTC, datetime
-
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
@@ -7,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.errors import safe_detail
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import Company
 from app.models.entities import WorkflowRun
@@ -45,7 +44,8 @@ class EarningsRunParams(BaseModel):
     antes de abrir el run y el envelope graba exactamente lo que corre.
     """
 
-    fiscal_year: int = Field(default_factory=lambda: datetime.now(UTC).year)
+    # Año del usuario (Europe/Madrid), no el del reloj UTC del servidor.
+    fiscal_year: int = Field(default_factory=lambda: local_today().year)
     fiscal_quarter: str = "FY"
     document_ids: list[int] = Field(default_factory=list)
     force_new_thesis: bool = False
