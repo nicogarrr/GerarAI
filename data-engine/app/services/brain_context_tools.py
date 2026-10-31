@@ -439,6 +439,129 @@ def engine_valuation_answer(db: Session, company: Company) -> ChatResponse:
                      "engine_valuation")
 
 
+# ------------------------------------------------------- propicks / radar / salud
+
+_PROPICKS_RE = re.compile(r"(?i)\bpropicks?\b")
+_RADAR_RE = re.compile(r"(?i)\bradar\b")
+_SOURCE_HEALTH_RE = re.compile(
+    r"(?i)salud\s+de\s+(?:las\s+)?fuentes|estado\s+de\s+(?:las\s+)?fuentes|"
+    r"fuentes\s+de\s+datos|c[oó]mo\s+(?:van|est[aá]n)\s+las\s+fuentes"
+)
+_LAYER_STATUS_ES = {"available": "al día", "stale": "desactualizada", "empty": "vacía", "error": "error de lectura"}
+
+
+def propicks_answer(db: Session, tenant: int) -> ChatResponse:
+    """Último run guardado del funnel ProPicks: ganadores con score y fecha."""
+    from app.models.entities import ProPickCandidate, ProPickRun
+
+    run = db.scalars(
+        select(ProPickRun)
+        .where(ProPickRun.tenant_id == tenant)
+        .order_by(ProPickRun.as_of.desc())
+        .limit(1)
+    ).first()
+    if run is None:
+        return _response(
+            ["Todavía no hay ningún run de ProPicks guardado; no invento candidatos."],
+            [], "propicks")
+    when = _day(run.as_of)
+    sources = [_source("propick_run", run.id, f"Run ProPicks {when}", "/propicks")]
+    rows = db.execute(
+        select(ProPickCandidate, Company)
+        .join(Company, Company.id == ProPickCandidate.company_id)
+        .where(ProPickCandidate.run_id == run.id, ProPickCandidate.passed.is_(True))
+        .order_by(ProPickCandidate.rank)
+        .limit(8)
+    ).all()
+    if not rows:
+        return _response([
+            f"Último run de ProPicks ({when}): {run.universe_size} valores analizados "
+            "y ninguno pasó todos los filtros.",
+        ], sources, "propicks")
+    lines = [
+        f"Último run de ProPicks ({when}): {run.passed_count} de {run.universe_size} "
+        "valores pasan el funnel. Mejor puntuados:",
+    ]
+    for cand, comp in rows:
+        score = f"{float(cand.score):.1f}".replace(".", ",") if cand.score is not None else "s/p"
+        lines.append(f"- {comp.ticker}: score {score}.")
+        sources.append(_source("propick_candidate", cand.id, f"ProPick {comp.ticker}", "/propicks"))
+    lines.append("Es la salida guardada de tu funnel determinista, no una recomendación de compra.")
+    return _response(lines, sources, "propicks")
+
+
+def radar_answer(db: Session) -> ChatResponse:
+    """Señales claras del radar de precio (snapshots guardados, fórmula nico-v1)."""
+    from zoneinfo import ZoneInfo
+
+    from app.services.propicks_radar_store import latest_public_signals
+
+    today = datetime.now(ZoneInfo("America/New_York")).date()
+    signals = latest_public_signals(db, as_of=today)
+    if not signals:
+        return _response([
+            "El radar no tiene snapshots guardados todavía (el escaneo no ha corrido "
+            "o no cubre ningún valor). No lo simulo en directo.",
+        ], [], "radar")
+    clear = [s for s in signals if (s["payload"] or {}).get("clear_price_signal")]
+    tickers = {
+        row.id: row.ticker
+        for row in db.scalars(select(Company).where(Company.id.in_({s["company_id"] for s in signals}))).all()
+    }
+    scan_day = max(s["scan_date"] for s in signals)
+    sources = [_source("radar_snapshot", "latest", f"Radar {scan_day}", "/propicks")]
+    if not clear:
+        return _response([
+            f"Radar de precio (escaneo guardado del {_day(scan_day)}, {len(signals)} valores): "
+            "ninguno tiene señal clara (nivel 4 confirmado y verificado) ahora mismo.",
+        ], sources, "radar")
+    lines = [
+        f"Radar de precio (escaneo guardado del {_day(scan_day)}): "
+        f"{len(clear)} valores con señal clara (nivel 4 confirmado):",
+    ]
+    for sig in clear[:8]:
+        payload = sig["payload"] or {}
+        ticker = tickers.get(sig["company_id"], str(sig["company_id"]))
+        dd = payload.get("daily_close_drawdown")
+        dd_txt = f", caída {float(dd) * 100:.1f} % desde el máximo".replace(".", ",") if dd is not None else ""
+        lines.append(f"- {ticker}{dd_txt}.")
+        sources.append(_source("radar_snapshot", sig["company_id"], f"Radar {ticker}", "/propicks"))
+    lines.append("Es la lectura guardada del radar, no una orden de compra.")
+    return _response(lines, sources, "radar")
+
+
+def source_health_answer(db: Session, tenant: int) -> ChatResponse:
+    """Salud de las fuentes: estado por capa y conectores con problemas."""
+    from app.services.data_health_service import read_inventory
+
+    try:
+        inv = read_inventory(db)
+    except Exception:  # noqa: BLE001 - la lectura rota se dice, no se inventa
+        db.rollback()
+        return _response(["No se pudo leer el inventario de fuentes ahora mismo."], [], "source_health")
+    by_layer: dict[str, list[dict]] = {}
+    for row in inv["sources"]:
+        by_layer.setdefault(row["layer"], []).append(row)
+    lines = ["Salud de las fuentes de datos (última escritura guardada en cada capa):"]
+    for layer, rows in by_layer.items():
+        counts: dict[str, int] = {}
+        for row in rows:
+            counts[row["status"]] = counts.get(row["status"], 0) + 1
+        detail = ", ".join(
+            f"{_LAYER_STATUS_ES.get(status, status)} {count}" for status, count in sorted(counts.items())
+        )
+        line = f"- {layer}: {detail}."
+        review = sorted({row["source"] or "sin fuente" for row in rows if row["status"] in ("stale", "empty", "error")})
+        if review:
+            line += f" Revisar: {', '.join(review[:4])}."
+        lines.append(line)
+    bad = [c for c in inv["connectors"] if c["status"] in ("degraded", "error")]
+    if bad:
+        lines.append("Conectores con problemas: " + ", ".join(c["source"] for c in bad[:5]) + ".")
+    lines.append("Mide la última escritura en la BD, no si el proveedor sigue disponible.")
+    return _response(lines, [], "source_health")
+
+
 # ---------------------------------------------------------------- router
 
 
@@ -469,6 +592,12 @@ def answer_context_question(
         return journal_answer(db, tenant, resolve_company())
     if _ALERTS_RE.search(question) and not _ALERT_ACTION_RE.search(question):
         return alerts_answer(db, tenant, resolve_company())
+    if _PROPICKS_RE.search(question):
+        return propicks_answer(db, tenant)
+    if _RADAR_RE.search(question):
+        return radar_answer(db)
+    if _SOURCE_HEALTH_RE.search(question):
+        return source_health_answer(db, tenant)
     return None
 
 
@@ -480,4 +609,7 @@ __all__ = [
     "journal_answer",
     "portfolio_risk_answer",
     "portfolio_risk_lines",
+    "propicks_answer",
+    "radar_answer",
+    "source_health_answer",
 ]
