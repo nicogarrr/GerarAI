@@ -181,6 +181,16 @@ def raw_document_url(document_url: str) -> str:
     return urlunparse(parsed._replace(path=raw_path))
 
 
+def _is_13dg_xml(text: str) -> bool:
+    """Parseo real: solo vale XML bien formado con raíz <edgarSubmission>
+    (esquema schedule13d/13g). `<div>AccessDenied</div>` no pasa."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return False
+    return root.tag.rsplit("}", 1)[-1] == "edgarSubmission"
+
+
 def _looks_like_xml(text: str) -> bool:
     """XML con o sin declaracion `<?xml`; la version renderizada XSLT es HTML
     (<!DOCTYPE html> / <html) y eso es lo unico que hay que descartar."""
@@ -252,7 +262,7 @@ def fetch_filing_document(
         # es ni XML ni lleva la marca de tipo SC 13D/G (un challenge HTML de
         # WAF no la lleva) no es un documento: deriva de formato, no éxito.
         if (
-            not _looks_like_xml(text)
+            not _is_13dg_xml(text)
             and _SGML_TYPE_RE.search(text) is None
             and _LEGACY_DOC_RE.search(text) is None
         ):
@@ -264,7 +274,11 @@ def fetch_filing_document(
     # humanos; el documento crudo vive en el directorio del filing.
     raw_url = raw_document_url(document_url)
     raw_text = _get_text(raw_url, client)
-    if raw_text.lstrip().lower().startswith(("<!doctype", "<html")):
+    if (
+        not _is_13dg_xml(raw_text)
+        and _SGML_TYPE_RE.search(raw_text) is None
+        and _LEGACY_DOC_RE.search(raw_text) is None
+    ):
         registry.record_failure(_REGISTRY_KEY, "200 sin documento 13D/G válido (parse failed)")
         raise ValueError("SC 13D/13G raw document is rendered HTML too")
     _record_sec_outcome(registry, started)

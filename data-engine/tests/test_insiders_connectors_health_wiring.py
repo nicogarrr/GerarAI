@@ -221,3 +221,77 @@ def test_form13dg_documento_sgml_legitimo_cierra():
     )
     assert "SC 13G" in text
     assert registry.get_status("sec_edgar").consecutive_failures == 0
+
+
+def test_form4_documento_xml_malformado_degrada():
+    def handler(request):
+        return httpx.Response(200, text='<?xml version="1.0"?><broken')
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form4.fetch_filing_xml(
+            "https://www.sec.gov/Archives/edgar/data/320193/000032019326000123/doc4.xml",
+            client=_client(handler),
+        )
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form4_documento_xml_bien_formado_raiz_ajena_degrada():
+    def handler(request):
+        return httpx.Response(200, text="<div>AccessDenied</div>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form4.fetch_filing_xml(
+            "https://www.sec.gov/Archives/edgar/data/320193/000032019326000123/doc4.xml",
+            client=_client(handler),
+        )
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form13dg_documento_xml_raiz_ajena_degrada():
+    def handler(request):
+        return httpx.Response(200, text="<div>AccessDenied</div>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form13dg.fetch_filing_document(
+            "https://www.sec.gov/Archives/edgar/data/320193/0000320193/sc13g.xml", client=_client(handler)
+        )
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form13f_submissions_json_lista_degrada():
+    def handler(request):
+        return httpx.Response(200, json=[1, 2, 3])
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form13f.recent_13f_filings("1067983", client=_client(handler))
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form13f_submissions_json_objeto_vacio_degrada():
+    def handler(request):
+        return httpx.Response(200, json={})
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form13f.recent_13f_filings("1067983", client=_client(handler))
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1
+
+
+def test_form13f_index_json_sin_directory_degrada():
+    def handler(request):
+        return httpx.Response(200, json={"otra": "cosa"})
+
+    registry = get_data_source_registry()
+    before = registry.get_status("sec_edgar").consecutive_failures
+    with pytest.raises(ValueError):
+        form13f.information_table_url("1067983", "0000950123-26-001234", None, client=_client(handler))
+    assert registry.get_status("sec_edgar").consecutive_failures == before + 1

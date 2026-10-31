@@ -93,6 +93,10 @@ def recent_13f_filings(
     except ValueError:
         registry.record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
         raise
+    if not isinstance(payload, dict) or "filings" not in payload:
+        # Un 200 con JSON lista o {} no es el submissions de la SEC.
+        registry.record_failure(_REGISTRY_KEY, "200 con JSON sin la clave 'filings' (parse failed)")
+        raise ValueError("13F submissions payload is not the SEC submissions object")
     _record_sec_outcome(registry, started)
     recent = (payload.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
@@ -137,6 +141,9 @@ def information_table_url(
     except ValueError:
         registry.record_failure(_REGISTRY_KEY, "200 sin JSON válido (parse failed)")
         raise
+    if not isinstance(payload, dict) or "directory" not in payload:
+        registry.record_failure(_REGISTRY_KEY, "200 con JSON sin la clave 'directory' (parse failed)")
+        raise ValueError("13F index payload is not the SEC directory object")
     _record_sec_outcome(registry, started)
     items = (payload.get("directory") or {}).get("item") or []
     candidates: list[str] = []

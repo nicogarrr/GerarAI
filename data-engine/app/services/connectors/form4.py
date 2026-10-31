@@ -211,6 +211,16 @@ def _looks_like_xml(text: str) -> bool:
     return head.startswith("<")
 
 
+def _is_form4_xml(text: str) -> bool:
+    """Parseo real: solo vale XML bien formado con raíz <ownershipDocument>
+    (esquema F345). `<div>AccessDenied</div>` o `<?xml><broken` no pasan."""
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError:
+        return False
+    return root.tag.rsplit("}", 1)[-1] == "ownershipDocument"
+
+
 RETRY_STATUSES = {403, 429, 500, 502, 503, 504}
 RETRY_BACKOFF_SECONDS = (2.0, 6.0)
 
@@ -271,7 +281,7 @@ def fetch_filing_xml(
     registry = get_data_source_registry()
     started = time.perf_counter()
     text = _get_text(document_url, client)
-    if _looks_like_xml(text):
+    if _is_form4_xml(text):
         _record_sec_outcome(registry, started)
         return text
     raw_url = raw_document_url(document_url)
@@ -279,7 +289,7 @@ def fetch_filing_xml(
         registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
         raise ValueError("Form 4 document is not XML and has no raw variant")
     raw_text = _get_text(raw_url, client)
-    if not _looks_like_xml(raw_text):
+    if not _is_form4_xml(raw_text):
         registry.record_failure(_REGISTRY_KEY, "200 sin XML válido (parse failed)")
         raise ValueError("Form 4 raw document is not XML either")
     _record_sec_outcome(registry, started)
