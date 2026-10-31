@@ -723,6 +723,14 @@ def positions(
         page_size = limit
         offset_val = offset or 0
         page = offset_val // limit + 1
+    elif offset:
+        # offset sin limit no significa nada en el contrato page/page_size:
+        # mejor un 422 explicito que ignorarlo en silencio (y un entero
+        # enorme no llega nunca a la BD; tests/test_huge_integer_params.py).
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset solo tiene efecto junto a limit.",
+        )
     else:
         offset_val = (page - 1) * page_size
     total = db.scalar(
@@ -878,8 +886,16 @@ def transactions(
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
     ticker: Annotated[str | None, Query(max_length=32)] = None,
     action: Annotated[Literal["buy", "sell"] | None, Query()] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
+    if offset:
+        # /transactions usa page/page_size (el listado limit/offset vive en
+        # /transactions/page): offset suelto se rechaza en vez de ignorarlo.
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="El parámetro offset no aplica aquí; usa /transactions/page o page/page_size.",
+        )
     offset = (page - 1) * page_size
     total = db.scalar(
         select(func.count()).select_from(Transaction)

@@ -68,6 +68,22 @@ def test_offset_no_multiplo_de_limit_dice_la_verdad_en_page_info():
     assert inicio["page_info"]["has_prev"] is False
 
 
+def test_offset_sin_limit_es_422_explicito():
+    client = _client()
+    _seed_positions(client, 2)
+    response = client.get("/api/portfolio/positions?offset=5")
+    assert response.status_code == 422
+
+
+def test_offset_enorme_con_limit_es_422_no_500():
+    # 2**63 desborda el bind de SQLite/Postgres; el guarda global de
+    # app.core.errors lo traduce a 422 (entrada invalida), nunca 500.
+    client = _client()
+    _seed_positions(client, 2)
+    response = client.get("/api/portfolio/positions?limit=10&offset=9223372036854775808")
+    assert response.status_code == 422
+
+
 def test_page_page_size_siguen_funcionando():
     client = _client()
     _seed_positions(client, POSITIONS)

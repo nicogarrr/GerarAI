@@ -6294,6 +6294,7 @@
       "IBKRCsvImportRequest": {
         "properties": {
           "csv": {
+            "maxLength": 15728640,
             "minLength": 10,
             "title": "Csv",
             "type": "string"
@@ -6308,6 +6309,7 @@
       "IBKRXmlImportRequest": {
         "properties": {
           "xml": {
+            "maxLength": 15728640,
             "minLength": 20,
             "title": "Xml",
             "type": "string"
@@ -11875,6 +11877,17 @@
       },
       "TransactionImportCommitRequest": {
         "properties": {
+          "source_filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Filename"
+          },
           "transactions": {
             "items": {
               "$ref": "#/components/schemas/ParsedTransaction"
@@ -11929,6 +11942,14 @@
           "valid_rows_count": {
             "title": "Valid Rows Count",
             "type": "integer"
+          },
+          "warnings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RowValidationError"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -56697,6 +56718,23 @@
                 }
               ],
               "title": "Action"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
             }
           },
           {
