@@ -330,7 +330,7 @@ export default async function ResearchPage({
                                         Anterior
                                     </Link>
                                 ) : null}
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs whitespace-nowrap text-gray-500">
                                     Página {formatNumber(slice.page)} de {formatNumber(slice.pages)}
                                 </span>
                                 {slice.page < slice.pages ? (

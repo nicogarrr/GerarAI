@@ -23,5 +23,5 @@ export function WatchlistEntry({ symbol, as: Tag, children, className }: { symbo
 export function WatchlistCount({ symbols, page, totalPages }: { symbols: string[]; page: number; totalPages: number }) {
     const { removed } = useContext(Membership);
     const count = symbols.filter((symbol) => !removed.has(normalize(symbol))).length;
-    return <span aria-live="polite">{count} {count === 1 ? 'empresa' : 'empresas'} · Página {page} de {totalPages}</span>;
+    return <span aria-live="polite">{count} {count === 1 ? 'empresa' : 'empresas'} · <span className="whitespace-nowrap">Página {page} de {totalPages}</span></span>;
 }

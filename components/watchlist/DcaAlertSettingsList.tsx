@@ -44,7 +44,7 @@ export default function DcaAlertSettingsList({ items }: { items: DcaSignalItem[]
             </ul>
             <nav aria-label="Paginación del histórico DCA" className="grid grid-cols-2 items-center gap-2 text-xs text-gray-300">
                 <button type="button" disabled={page === 0} onClick={() => setPage(page - 1)} className="min-h-11 justify-self-start rounded border border-gray-600 px-3 disabled:opacity-40">Anterior</button>
-                <p role="status" aria-live="polite" aria-atomic="true" className="col-span-2 row-start-1 text-center">{start + 1}-{Math.min(start + PAGE_SIZE, items.length)} de {items.length} · Página {page + 1} de {pages}</p>
+                <p role="status" aria-live="polite" aria-atomic="true" className="col-span-2 row-start-1 text-center">{start + 1}-{Math.min(start + PAGE_SIZE, items.length)} de {items.length} · <span className="whitespace-nowrap">Página {page + 1} de {pages}</span></p>
                 <button type="button" disabled={page === pages - 1} onClick={() => setPage(page + 1)} className="min-h-11 justify-self-end rounded border border-gray-600 px-3 disabled:opacity-40">Siguiente</button>
             </nav>
         </div>

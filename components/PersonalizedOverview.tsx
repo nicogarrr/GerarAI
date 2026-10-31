@@ -575,8 +575,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                 // salen de la cotización y se muestran con su divisa.
                                                 <span className="text-right font-mono text-gray-300">
                                                     {formatMoney(h.value, h.baseCurrency)}
+                                                    {/* NBSP alrededor del «·»: a 390px el peso se quedaba
+                                                        huerfano en la linea siguiente y el separador colgado. */}
                                                     {portfolioSummary && portfolioSummary.equityValue > 0
-                                                        ? ` · ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
+                                                        ? `\u00a0\u00b7\u00a0${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
                                                         : ''}
                                                 </span>
                                             ) : (

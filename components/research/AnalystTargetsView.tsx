@@ -49,7 +49,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     <>
                     {pages > 1 ? <nav aria-label="Paginación de analistas" className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-300">
                       <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current === 0} onClick={() => setPage(current - 1)}>Anterior</button>
-                      <span aria-live="polite">Página {current + 1} de {pages} · {count} firmas</span>
+                      <span aria-live="polite"><span className="whitespace-nowrap">Página {current + 1} de {pages}</span> · {count} firmas</span>
                       <button type="button" className="min-h-11 px-2 disabled:opacity-40" disabled={current + 1 >= pages} onClick={() => setPage(current + 1)}>Siguiente</button>
                     </nav> : null}
                     <ul aria-label="Precios objetivo por firma" className="mt-1 divide-y divide-gray-800 sm:hidden">
