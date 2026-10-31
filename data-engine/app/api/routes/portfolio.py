@@ -45,6 +45,7 @@ from app.schemas.api import (
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTearsheetOut,
+    PortfolioTransactionCreateOut,
     PortfolioTransactionOut,
     PortfolioTransactionPageOut,
 )
@@ -1014,7 +1015,7 @@ def add_portfolio_transaction(
     return create_transaction(payload, db)
 
 
-@router.post("/transactions", status_code=201)
+@router.post("/transactions", status_code=201, response_model=PortfolioTransactionCreateOut)
 def create_transaction(
     payload: PortfolioTransactionInput, db: Session = Depends(get_db)
 ) -> dict:

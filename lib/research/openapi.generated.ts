@@ -10940,6 +10940,42 @@ export interface components {
             /** Transactions */
             transactions: components["schemas"]["PortfolioTransactionInput"][];
         };
+        /**
+         * PortfolioTransactionCreateOut
+         * @description Respuesta de POST /api/portfolio/transactions (201).
+         *
+         *     Igual que PortfolioTransactionOut pero el POST acepta acciones de caja
+         *     (dividend/interest/fee/cash_misc), no solo buy/sell.
+         */
+        PortfolioTransactionCreateOut: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "buy" | "sell" | "dividend" | "interest" | "fee" | "cash_misc";
+            /** Created At */
+            created_at: string;
+            /** Currency */
+            currency: string;
+            /** Fees */
+            fees: number;
+            /** Id */
+            id: number;
+            /** Notes */
+            notes: string | null;
+            /** Price */
+            price: number;
+            /** Quantity */
+            quantity: number;
+            /** Review Flag */
+            review_flag: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Trade Date */
+            trade_date: string;
+            /** Updated At */
+            updated_at: string;
+        };
         /** PortfolioTransactionInput */
         PortfolioTransactionInput: {
             /**
@@ -23357,9 +23393,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTransactionCreateOut"];
                 };
             };
             /** @description Validation Error */

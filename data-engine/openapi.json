@@ -13874,6 +13874,97 @@
         "title": "PortfolioTransactionBatchInput",
         "type": "object"
       },
+      "PortfolioTransactionCreateOut": {
+        "description": "Respuesta de POST /api/portfolio/transactions (201).\n\nIgual que PortfolioTransactionOut pero el POST acepta acciones de caja\n(dividend/interest/fee/cash_misc), no solo buy/sell.",
+        "properties": {
+          "action": {
+            "enum": [
+              "buy",
+              "sell",
+              "dividend",
+              "interest",
+              "fee",
+              "cash_misc"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "fees": {
+            "title": "Fees",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "review_flag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Flag"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "trade_date": {
+            "title": "Trade Date",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ticker",
+          "action",
+          "quantity",
+          "price",
+          "fees",
+          "currency",
+          "trade_date",
+          "notes",
+          "review_flag",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "PortfolioTransactionCreateOut",
+        "type": "object"
+      },
       "PortfolioTransactionInput": {
         "properties": {
           "action": {
@@ -63850,9 +63941,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Create Transaction Api Portfolio Transactions Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTransactionCreateOut"
                 }
               }
             },
