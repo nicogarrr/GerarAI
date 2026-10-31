@@ -1437,16 +1437,18 @@ export async function submitThesisHumanInput(ticker: string, formData: FormData)
 /** Index relevance needs membership, not prices, FX totals or data quality. */
 export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: string; quantity: number }>> {
   await requireAuthenticatedUser();
-  return paginateAll(
-    async (offset) => {
-      const res = await researchRequest<Array<{ ticker: string; quantity: number }> | { items: Array<{ ticker: string; quantity: number }> }>(
-        `/api/portfolio/positions?limit=2000&offset=${offset}`, { fast: true },
-      );
-      return Array.isArray(res) ? res : (res as { items?: Array<{ ticker: string; quantity: number }> })?.items || [];
-    },
-    2000,
-    (position) => position.ticker,
-  );
+  // El backend pagina con page/page_size (max 200): limit/offset NO existen
+  // en este endpoint y los ignoraba, repitiendo siempre la pagina 1.
+  const PAGE_SIZE = 200;
+  const all: Array<{ ticker: string; quantity: number }> = [];
+  for (let page = 1; ; page += 1) {
+    const res = await researchRequest<{ items: Array<{ ticker: string; quantity: number }> }>(
+      `/api/portfolio/positions?page=${page}&page_size=${PAGE_SIZE}`, { fast: true },
+    );
+    const items = Array.isArray(res) ? res : res?.items || [];
+    all.push(...items);
+    if (items.length < PAGE_SIZE) return all;
+  }
 }
 
 /** Read only: opening a company never starts a 13D/G scan. */

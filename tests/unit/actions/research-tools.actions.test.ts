@@ -207,8 +207,11 @@ describe('búsqueda universal', () => {
         await searchResearchLibrary({ query: 'buffett', ticker: 'aapl', entityTypes: 'document, principle', collectionId: 0 });
         expect(lastBody()).toMatchObject({
             query: 'buffett', ticker: 'AAPL', entity_types: ['document', 'principle'],
-            collection_id: null, include_vector: true, limit: 50,
+            collection_id: null, include_vector: true, page_size: 50,
         });
+        // El backend (UniversalSearchRequest) no acepta `limit`: lo ignoraba y
+        // devolvía su page_size por defecto (20) en vez de los 50 pedidos.
+        expect(lastBody()).not.toHaveProperty('limit');
     });
 });
 

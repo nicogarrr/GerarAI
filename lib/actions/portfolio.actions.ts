@@ -33,9 +33,13 @@ function invalidatePortfolioReads(userId: string): void {
     }
 }
 
-type PaginatedOrArray<T> = T[] | { items: T[]; page_info?: unknown };
+// Contrato del backend (OpenAPI): /api/portfolio/positions|transactions|snapshots
+// devuelven SIEMPRE { items, page_info } (paginacion page/page_size). El
+// fallback a array de unwrapItems es solo defensa en runtime; el tipo que se
+// declara al pedir es el del contrato.
+type PaginatedBackendResponse<T> = { items: T[]; page_info?: unknown };
 
-function unwrapItems<T>(data: PaginatedOrArray<T> | null | undefined): T[] {
+function unwrapItems<T>(data: PaginatedBackendResponse<T> | T[] | null | undefined): T[] {
     if (!data) return [];
     if (Array.isArray(data)) return data;
     if (Array.isArray((data as { items?: T[] }).items)) {
@@ -246,7 +250,7 @@ export async function getPortfolioTransactions(userId: string) {
     const canonicalUserId = await resolveUserId(userId);
     const raw = await cachedFetch(
         `portfolio:${canonicalUserId}:transactions`,
-        () => researchRequest<PaginatedOrArray<ResearchPortfolioTransaction>>('/api/portfolio/transactions', { fast: true }),
+        () => researchRequest<PaginatedBackendResponse<ResearchPortfolioTransaction>>('/api/portfolio/transactions?page_size=200', { fast: true }),
         15,
     );
     const transactions = unwrapItems(raw);
@@ -317,7 +321,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     const [rawPositions, backendSummary, quality] = await Promise.all([
         cachedFetch(
             `portfolio:${canonicalUserId}:positions`,
-            () => researchRequest<PaginatedOrArray<ResearchPortfolioPosition>>('/api/portfolio/positions', { fast: true }),
+            () => researchRequest<PaginatedBackendResponse<ResearchPortfolioPosition>>('/api/portfolio/positions?page_size=200', { fast: true }),
             15,
         ),
         cachedFetch(
@@ -585,7 +589,7 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
         const sheet = await getPortfolioTearsheet(canonicalUserId);
         const rawSnapshots = await cachedFetch(
             `portfolio:${canonicalUserId}:snapshots`,
-            () => researchRequest<PaginatedOrArray<PortfolioSnapshotPoint>>('/api/portfolio/snapshots', { fast: true }),
+            () => researchRequest<PaginatedBackendResponse<PortfolioSnapshotPoint>>('/api/portfolio/snapshots?page_size=200', { fast: true }),
             15,
         ).catch(() => [] as PortfolioSnapshotPoint[]);
         const snapshots = unwrapItems(rawSnapshots);

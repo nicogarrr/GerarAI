@@ -694,7 +694,7 @@ export async function searchResearchLibrary(input: {
       collection_id: input.collectionId || null,
       date_from: input.dateFrom || null,
       date_to: input.dateTo || null,
-      limit: 50,
+      page_size: 50,
       include_vector: input.includeVector !== false,
     }),
   });

@@ -44,7 +44,8 @@ export async function getFlowHoldings(): Promise<{
 }> {
   try {
     const [rawPositions, rawWatchlist] = await Promise.all([
-      researchRequest<Array<{ ticker: string }> | { items: Array<{ ticker: string }> }>('/api/portfolio/positions', { fast: true }),
+      // Contrato: paginado { items, page_info }; page_size=200 (max del backend) para no truncar la pertenencia a 20.
+      researchRequest<{ items: Array<{ ticker: string }> }>('/api/portfolio/positions?page_size=200', { fast: true }),
       researchRequest<Array<{ symbol: string }> | { items: Array<{ symbol: string }> }>('/api/watchlist', { fast: true }),
     ]);
     const positions = Array.isArray(rawPositions) ? rawPositions : rawPositions?.items;

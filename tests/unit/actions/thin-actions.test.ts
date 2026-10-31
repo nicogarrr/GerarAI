@@ -174,6 +174,14 @@ describe('ticker-context: ningún badge es una afirmación falsa', () => {
         expect(ctx.watchlistTickers).toEqual(['META']);
     });
 
+    it('pide posiciones con page_size=200 (el backend pagina; sin parametro solo llegaban 20)', async () => {
+        researchRequest.mockResolvedValue({ items: [{ ticker: 'aapl', quantity: 10 }] });
+        getWatchlist.mockResolvedValue([]);
+        const ctx = await getTickerContext();
+        expect(ctx.portfolioTickers).toEqual(['AAPL']);
+        expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?page_size=200', { fast: true });
+    });
+
     it('lectura caída -> su conjunto vacío, nunca inventado', async () => {
         researchRequest.mockRejectedValue(new Error('500'));
         getWatchlist.mockRejectedValue(new Error('500'));

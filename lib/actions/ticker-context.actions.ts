@@ -22,7 +22,8 @@ export async function getTickerContext(): Promise<TickerContext> {
     const [rawPositions, watchlist] = await Promise.all([
         cachedFetch(
             `portfolio:${userId}:positions`,
-            () => researchRequest<Array<{ ticker: string; quantity: number | null }> | { items: Array<{ ticker: string; quantity: number | null }> }>('/api/portfolio/positions', { fast: true }),
+            // Contrato: paginado { items, page_info }; page_size=200 (max del backend) para no truncar badges a 20 posiciones.
+            () => researchRequest<{ items: Array<{ ticker: string; quantity: number | null }> }>('/api/portfolio/positions?page_size=200', { fast: true }),
             15,
         ).catch(() => [] as Array<{ ticker: string; quantity: number | null }>),
         getWatchlist().catch(() => [] as Array<{ symbol: string }>),
