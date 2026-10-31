@@ -73,7 +73,7 @@ export function PaperTradingContent({ data }: { data: PaperState }) {
             </div>
         )}
         {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} />)}
-        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. El neto descuenta costes modelados (supuesto: comisión fija + spread, persistido por operación) y suma dividendos declarados (fuente Yahoo/FMP; eventos inciertos excluidos; otra divisa nunca convertida). Splits: posiciones abiertas ajustadas con fuente; una cerrada con split no se reescribe y queda excluida del acierto. Sin financiación de cortos, FX, cash ledger ni capital. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
+        <details className="text-xs text-gray-400"><summary>Base de medición</summary><p className="mt-2">Acierto = resultado bruto positivo al cerrar. Divisas separadas. El neto descuenta costes modelados (supuesto: comisión fija + spread, persistido por operación) y suma dividendos declarados (fuente no oficial; eventos inciertos excluidos; otra divisa nunca convertida). Splits: posiciones abiertas ajustadas con fuente; una cerrada con split no se reescribe y queda excluida del acierto. Sin financiación de cortos, FX, cash ledger ni capital. Una salida anticipada no valida una tesis a 5 años. Cantidad simulada: supuesto.</p></details>
     </section>;
 }
 

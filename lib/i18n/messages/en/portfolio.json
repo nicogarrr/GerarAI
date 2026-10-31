@@ -473,10 +473,10 @@
   },
   "stress": {
     "reason_history_gaps": "History with gaps",
-    "reason_provider_error": "The provider (Yahoo) did not respond: try again later",
+    "reason_provider_error": "The provider did not respond: try again later",
     "reason_no_safe_symbol": "No safe symbol for this security (exchange or currency not mapped)",
-    "reason_currency_mismatch": "Yahoo returned a different currency than the stored one: discarded as it is not the same instrument",
-    "reason_currency_unverified": "Yahoo did not report the currency: the instrument cannot be verified",
+    "reason_currency_mismatch": "The provider returned a different currency than the stored one: discarded as it is not the same instrument",
+    "reason_currency_unverified": "The provider did not report the currency: the instrument cannot be verified",
     "reason_incomplete_portfolio": "Incomplete history or valuation",
     "noData": "No data",
     "noHistoryFor": "Not enough history: {tickers}",

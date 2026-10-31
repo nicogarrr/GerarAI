@@ -473,10 +473,10 @@
   },
   "stress": {
     "reason_history_gaps": "Histórico con huecos",
-    "reason_provider_error": "El proveedor (Yahoo) no respondió: reintenta más tarde",
+    "reason_provider_error": "El proveedor no respondió: reintenta más tarde",
     "reason_no_safe_symbol": "Sin símbolo seguro para este valor (bolsa o divisa no mapeadas)",
-    "reason_currency_mismatch": "Yahoo devolvió otra divisa distinta de la guardada: se descarta por no ser el mismo instrumento",
-    "reason_currency_unverified": "Yahoo no indicó la divisa: no se puede verificar el instrumento",
+    "reason_currency_mismatch": "El proveedor devolvió otra divisa distinta de la guardada: se descarta por no ser el mismo instrumento",
+    "reason_currency_unverified": "El proveedor no indicó la divisa: no se puede verificar el instrumento",
     "reason_incomplete_portfolio": "Histórico o valoración incompletos",
     "noData": "Sin datos",
     "noHistoryFor": "Sin histórico suficiente: {tickers}",

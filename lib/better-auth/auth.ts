@@ -22,6 +22,17 @@ import {
     SIGNUP_NOT_INVITED_CODE,
     SIGNUP_NOT_INVITED_MESSAGE,
 } from "@/lib/auth/signup-policy";
+import {
+    ACCOUNT_PENDING_CODE,
+    ACCOUNT_PENDING_MESSAGE,
+    ACCOUNT_REJECTED_CODE,
+    ACCOUNT_REJECTED_MESSAGE,
+    approvalTokenTtlMs,
+    normalizeAccountStatus,
+    signupAutoApprove,
+} from "@/lib/auth/account-approval";
+import { AccountApproval } from "@/database/models/account-approval.model";
+import { notifyPendingAccount } from "@/lib/auth/approval-notify";
 
 
 // Politica de alta compartida con las paginas de acceso (ver
@@ -32,6 +43,14 @@ import {
 const signupPolicy = resolveSignupPolicy(process.env);
 for (const warning of signupPolicy.warnings) {
     console.warn(`[auth] ${warning}`);
+}
+
+// Alta abierta con aprobación (ver lib/auth/account-approval.ts): las cuentas
+// nuevas nacen `pending` salvo SIGNUP_AUTO_APPROVE=true (solo e2e/desarrollo;
+// playwright.config.ts lo fija en el servidor de user-flows).
+const autoApprove = signupAutoApprove(process.env);
+if (!autoApprove && (process.env.SIGNUP_AUTO_APPROVE === 'true' || process.env.SIGNUP_AUTO_APPROVE === '1')) {
+    console.warn('[auth] SIGNUP_AUTO_APPROVE ignorado: en producción las cuentas nuevas siempre nacen pendientes de aprobación.');
 }
 
 const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => betterAuth({
@@ -50,7 +69,9 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
         requireEmailVerification: signupPolicy.requireEmailVerification,
         minPasswordLength: 8,
         maxPasswordLength: 128,
-        autoSignIn: signupPolicy.signUpEnabled && !signupPolicy.requireEmailVerification,
+        // Con aprobación pendiente el alta NO crea sesión: una cuenta pending
+        // nunca obtiene cookie (contrato con front: /cuenta-pendiente).
+        autoSignIn: autoApprove && !signupPolicy.requireEmailVerification,
         // Un reset invalida las sesiones existentes: si alguien habia robado
         // una cookie, deja de servir en cuanto se cambia la contrasena.
         revokeSessionsOnPasswordReset: true,
@@ -71,15 +92,82 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
     // decide es este filtro.
     hooks: {
         before: createAuthMiddleware(async (ctx) => {
-            if (ctx.path !== '/sign-up/email') return;
-            const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
-            if (!isEmailAllowedToSignUp(email, signupPolicy)) {
-                throw new APIError(403, {
-                    message: SIGNUP_NOT_INVITED_MESSAGE,
-                    code: SIGNUP_NOT_INVITED_CODE,
-                });
+            if (ctx.path === '/sign-up/email') {
+                const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
+                if (!isEmailAllowedToSignUp(email, signupPolicy)) {
+                    throw new APIError(403, {
+                        message: SIGNUP_NOT_INVITED_MESSAGE,
+                        code: SIGNUP_NOT_INVITED_CODE,
+                    });
+                }
+                return;
+            }
+            // Cuenta pendiente o rechazada: 403 con código estable, nunca
+            // "credenciales inválidas" (contrato con front). Se consulta el
+            // estado ANTES de verificar la contraseña: revela existencia de
+            // cuentas pendientes, tradeoff aceptado del contrato y cubierto
+            // por el rate limit compartido de /api/auth.
+            if (ctx.path === '/sign-in/email') {
+                const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
+                const normalized = typeof email === 'string' ? email.trim().toLowerCase() : '';
+                if (!normalized) return;
+                const mongoose = await connectToDatabase();
+                const db = mongoose?.connection?.db;
+                if (!db) return;
+                const existing = await db.collection('user').findOne(
+                    { email: normalized },
+                    { projection: { accountStatus: 1 } },
+                );
+                const status = normalizeAccountStatus(existing?.accountStatus);
+                if (status === 'pending') {
+                    throw new APIError(403, { message: ACCOUNT_PENDING_MESSAGE, code: ACCOUNT_PENDING_CODE });
+                }
+                if (status === 'rejected') {
+                    throw new APIError(403, { message: ACCOUNT_REJECTED_MESSAGE, code: ACCOUNT_REJECTED_CODE });
+                }
             }
         }),
+    },
+    // Tras crear la cuenta: registro de aprobación + correo a Nico con los
+    // enlaces firmados de un solo uso. Un fallo aquí NUNCA rompe el alta ni
+    // aprueba la cuenta: fail-closed, el respaldo es /api/admin/approvals.
+    databaseHooks: {
+        user: {
+            create: {
+                after: async (createdUser: { id: string; email?: string | null; name?: string | null }) => {
+                    if (autoApprove) return;
+                    try {
+                        const email = (createdUser.email ?? '').trim().toLowerCase();
+                        // getAuth ya exige BETTER_AUTH_SECRET al arrancar; si el
+                        // tipo dice opcional, aquí se confirma antes de firmar.
+                        const secret = env.BETTER_AUTH_SECRET;
+                        if (!createdUser.id || !email || !secret) return;
+                        const approval = await AccountApproval.create({
+                            userId: createdUser.id,
+                            email,
+                            name: createdUser.name ?? '',
+                            expiresAt: new Date(Date.now() + approvalTokenTtlMs(process.env)),
+                        });
+                        const sent = await notifyPendingAccount({
+                            approvalId: String(approval._id),
+                            email,
+                            name: createdUser.name,
+                            secret,
+                        });
+                        if (sent) {
+                            await AccountApproval.updateOne(
+                                { _id: approval._id },
+                                { $set: { notifiedAt: new Date() } },
+                            );
+                        } else {
+                            console.warn(`[auth] cuenta pendiente ${createdUser.id}: aviso a Nico NO enviado (SMTP sin configurar o caído); respaldo: /api/admin/approvals`);
+                        }
+                    } catch (error: unknown) {
+                        console.error('[auth] alta con aprobación: registro/aviso falló (la cuenta sigue pending):', toAppError(error).code);
+                    }
+                },
+            },
+        },
     },
     // Contadores compartidos entre instancias (ver lib/better-auth/rate-limit.ts).
     rateLimit: buildAuthRateLimit({
@@ -95,6 +183,15 @@ const createAuthInstance = (database?: ReturnType<typeof mongodbAdapter>) => bet
     // better-auth los persiste y los devuelve en sesion cuando se piden.
     user: {
         additionalFields: {
+            // Alta abierta con aprobación: input:false + defaultValue hacen que
+            // el alta fuerce este valor y el cliente no pueda fijarlo
+            // (verificado en la fuente de better-auth 1.7.7, db/schema.mjs).
+            accountStatus: {
+                type: 'string',
+                required: false,
+                input: false,
+                defaultValue: autoApprove ? 'approved' : 'pending',
+            },
             country: { type: 'string', required: false },
             investmentGoals: { type: 'string', required: false },
             riskTolerance: { type: 'string', required: false },

@@ -114,10 +114,10 @@ describe('helpers de valoración', () => {
     });
     it('quoteLabel: en vivo con hora de Madrid, cierre fechado, cierre por t y desconocido', () => {
         // 15:30 UTC el 28-oct-2026 = 16:30 en Madrid (CET tras el cambio del 25-oct).
-        expect(quoteLabel(q())).toBe('Finnhub · 16:30 (hora de Madrid) · en vivo');
-        expect(quoteLabel(q({ kind: 'close', closeDate: '2026-10-27' }))).toBe('Finnhub · cierre del 27 oct');
-        expect(quoteLabel(q({ kind: 'close', closeDate: null, t: Date.UTC(2026, 9, 27, 21, 0) / 1000 }))).toBe('Finnhub · último cierre, dato de 27 oct 22:00');
-        expect(quoteLabel({ c: 1, t: null, kind: 'close' })).toBe('Proveedor · cierre de fecha desconocida');
+        expect(quoteLabel(q())).toBe('16:30 (hora de Madrid) · en vivo');
+        expect(quoteLabel(q({ kind: 'close', closeDate: '2026-10-27' }))).toBe('cierre del 27 oct');
+        expect(quoteLabel(q({ kind: 'close', closeDate: null, t: Date.UTC(2026, 9, 27, 21, 0) / 1000 }))).toBe('último cierre, dato de 27 oct 22:00');
+        expect(quoteLabel({ c: 1, t: null, kind: 'close' })).toBe('cierre de fecha desconocida');
     });
     it('valuationMatches detecta valoración caducada (cantidad, coste, divisa o filas distintas)', () => {
         const positions = [pos()];

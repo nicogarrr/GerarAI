@@ -121,10 +121,10 @@ test('totales por divisa separados', () => {
 });
 
 test('etiquetas: en vivo con hora, cierre con fecha, sin fecha no inventa', () => {
-    assert.match(v.quoteLabel(live), /^Finnhub · 16:14 \(hora de Madrid\) · en vivo$/);
-    assert.match(v.quoteLabel(yahoo), /^Yahoo Finance · cierre del 20 oct$/);
-    assert.equal(v.quoteLabel({ source: 'Yahoo Finance', c: 5, t: null, closeDate: null, kind: 'close' }), 'Yahoo Finance · cierre de fecha desconocida');
-    assert.match(v.quoteLabel({ source: 'Finnhub', c: 5, t: Date.parse('2026-10-20T20:00:00Z') / 1000, kind: 'close' }), /^Finnhub · último cierre, dato de 20 oct 22:00$/);
+    assert.match(v.quoteLabel(live), /^16:14 \(hora de Madrid\) · en vivo$/);
+    assert.match(v.quoteLabel(yahoo), /^cierre del 20 oct$/);
+    assert.equal(v.quoteLabel({ source: 'Yahoo Finance', c: 5, t: null, closeDate: null, kind: 'close' }), 'cierre de fecha desconocida');
+    assert.match(v.quoteLabel({ source: 'Finnhub', c: 5, t: Date.parse('2026-10-20T20:00:00Z') / 1000, kind: 'close' }), /^último cierre, dato de 20 oct 22:00$/);
 });
 
 test('simbolo de la clave y parseo del listado de Finnhub', () => {

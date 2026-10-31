@@ -16,11 +16,12 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
         // El perfil inversor viaja en el propio sign-up (additionalFields de
         // better-auth, sin migraciones SQL) en vez de perderse en el destructuring.
-        await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
+        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
 
         // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
-        return { success: true };
+        // accountStatus ('pending' con el alta abierta) enruta a /cuenta-pendiente.
+        return { success: true, ...(response.accountStatus ? { accountStatus: response.accountStatus } : {}) };
     } catch (error: unknown) {
         const appError = toAppError(error);
         // The endpoint maps documented status/code pairs to safe Spanish copy.
@@ -74,9 +75,7 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         // The endpoint maps documented status/code pairs to safe Spanish copy.
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
-            // `code` llega al formulario: AUTH_ENDPOINT_ACCOUNT_PENDING /
-            // AUTH_ENDPOINT_ACCOUNT_REJECTED abren la pantalla de estado de la
-            // cuenta en lugar del toast generico.
+            // Preserve endpoint codes for the pending/rejected UI contract.
             return { success: false, error: getSafeErrorMessage(appError), code: appError.code };
         }
 

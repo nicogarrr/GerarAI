@@ -44,7 +44,7 @@ export default function RadarGlobalView() {
     return (
         <div className="space-y-4">
             <p className="text-xs text-gray-500">
-                Candidatos de fuente de mercado no oficial; conviene cotejo oficial antes de usarlos.
+                Candidatos sin verificar; conviene cotejo oficial antes de usarlos.
             </p>
             <div className="flex flex-wrap items-center gap-2">
                 {REGION_PRESETS.map((p) => (
@@ -65,7 +65,7 @@ export default function RadarGlobalView() {
                 </Button>
             </div>
             <p className="text-xs text-gray-500">
-                Consulta en vivo a la fuente de mercado al pulsar el botón; puede tardar unos segundos.
+                Consulta en vivo al pulsar el botón; puede tardar unos segundos.
             </p>
             {error && (
                 <Card className="border-amber-800 bg-amber-950/40 p-4">
@@ -79,7 +79,7 @@ export default function RadarGlobalView() {
                         {result.regiones.join(', ') || 'global'}
                     </p>
                     {result.candidatos.length === 0 ? (
-                        <p className="text-sm text-gray-400">La fuente de mercado no devolvió candidatos con estos filtros.</p>
+                        <p className="text-sm text-gray-400">La consulta no devolvió candidatos con estos filtros.</p>
                     ) : (
                         <div className="grid gap-3 sm:grid-cols-2">
                             {result.candidatos.map((c) => (

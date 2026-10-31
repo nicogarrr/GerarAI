@@ -8,9 +8,7 @@ from __future__ import annotations
 
 import pytest
 import sqlalchemy as sa
-from alembic.config import Config
 
-from alembic import command
 from tests.test_alembic_chain import VERSIONS_DIR, _url_postgres_ci
 
 _NOMBRE = "ix_research_alerts_home_feed"
@@ -49,10 +47,24 @@ def test_0121_reentrada_en_postgres() -> None:
     url = _url_postgres_ci()
     if not url:
         pytest.skip("Runs only on the CI Postgres migration service")
-    cfg = Config(str(VERSIONS_DIR.parent.parent / "alembic.ini"))
-    cfg.set_main_option("script_location", str(VERSIONS_DIR.parent))
-    cfg.set_main_option("sqlalchemy.url", url)
-    command.upgrade(cfg, "head")
+    # env.py fuerza sqlalchemy.url = get_settings().database_url (lee
+    # DATABASE_URL), asi que set_main_option("sqlalchemy.url", ...) no hace
+    # nada: hay que pasar la URL por entorno. En subproceso, como el test de
+    # sqlite de este archivo: env.py hace fileConfig y un upgrade en proceso
+    # tumba el logging del resto de la suite.
+    import os
+    import subprocess
+    import sys
+
+    env = {**os.environ, "CI": "true", "DATABASE_URL": url}
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=VERSIONS_DIR.parent.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr[-800:]
     engine = sa.create_engine(url)
     with engine.connect() as conn:
         oid_antes = conn.execute(
@@ -63,7 +75,14 @@ def test_0121_reentrada_en_postgres() -> None:
             {"n": _NOMBRE},
         ).scalar()
     assert oid_antes is not None
-    command.upgrade(cfg, "head")
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=VERSIONS_DIR.parent.parent,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr[-800:]
     with engine.connect() as conn:
         oid_despues = conn.execute(
             sa.text("select oid from pg_class where relname = :n"), {"n": _NOMBRE}

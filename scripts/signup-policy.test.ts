@@ -1,6 +1,7 @@
 /**
- * Politica de alta: lista de invitados (SIGNUP_ALLOWLIST) y arranque sin
- * verificacion de email cuando el registro se abre.
+ * Politica de alta: registro abierto con cuentas pendientes de aprobacion,
+ * escotilla de cierre (ALLOW_PUBLIC_SIGNUP=false + SIGNUP_ALLOWLIST) y
+ * arranque sin verificacion de email.
  * Ejecucion: node --experimental-strip-types --test scripts/signup-policy.test.ts
  */
 import { describe, it } from 'node:test';
@@ -28,15 +29,15 @@ describe('parseSignupAllowlist', () => {
 });
 
 describe('resolveSignupPolicy', () => {
-    it('produccion sin variables: alta cerrada, nadie entra', () => {
+    it('produccion sin variables: alta ABIERTA (las cuentas nacen pendientes de aprobacion)', () => {
         const p = resolveSignupPolicy(PROD);
-        assert.equal(p.publicOpen, false);
-        assert.equal(p.signUpEnabled, false);
-        assert.equal(isEmailAllowedToSignUp('qa@ejemplo.com', p), false);
+        assert.equal(p.publicOpen, true);
+        assert.equal(p.signUpEnabled, true);
+        assert.equal(isEmailAllowedToSignUp('qa@ejemplo.com', p), true);
     });
 
-    it('produccion con lista de invitados: solo esos emails, sin abrir el registro', () => {
-        const p = resolveSignupPolicy({ ...PROD, SIGNUP_ALLOWLIST: 'qa@ejemplo.com' });
+    it('ALLOW_PUBLIC_SIGNUP=false en produccion cierra el alta salvo invitados', () => {
+        const p = resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'false', SIGNUP_ALLOWLIST: 'qa@ejemplo.com' });
         assert.equal(p.publicOpen, false);
         assert.equal(p.signUpEnabled, true);
         assert.equal(isEmailAllowedToSignUp('  QA@Ejemplo.com ', p), true);
@@ -44,27 +45,27 @@ describe('resolveSignupPolicy', () => {
         assert.equal(isEmailAllowedToSignUp(undefined, p), false);
     });
 
-    it('ALLOW_PUBLIC_SIGNUP=true en produccion ya no exige verificacion (antes la app no arrancaba)', () => {
-        const p = resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'true' });
-        assert.equal(p.publicOpen, true);
-        assert.equal(p.requireEmailVerification, false);
-        assert.ok(p.warnings.some((w: string) => w.includes('ALLOW_PUBLIC_SIGNUP')));
+    it('ALLOW_PUBLIC_SIGNUP=false sin lista de invitados: cerrada del todo y avisa', () => {
+        const p = resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'false' });
+        assert.equal(p.publicOpen, false);
+        assert.equal(p.signUpEnabled, false);
+        assert.ok(p.warnings.some((w: string) => w.includes('ALLOW_PUBLIC_SIGNUP=false')));
     });
 
     it('REQUIRE_EMAIL_VERIFICATION=true sin envio se ignora con aviso, no bloquea el alta', () => {
-        const p = resolveSignupPolicy({ ...PROD, SIGNUP_ALLOWLIST: 'qa@ejemplo.com', REQUIRE_EMAIL_VERIFICATION: 'true' });
+        const p = resolveSignupPolicy({ ...PROD, REQUIRE_EMAIL_VERIFICATION: 'true' });
         assert.equal(p.requireEmailVerification, false);
         assert.ok(p.warnings.some((w: string) => w.includes('REQUIRE_EMAIL_VERIFICATION')));
     });
 
     it('los avisos nunca contienen los emails invitados', () => {
-        const p = resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'true', SIGNUP_ALLOWLIST: 'secreto@ejemplo.com', REQUIRE_EMAIL_VERIFICATION: 'true' });
+        const p = resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'false', SIGNUP_ALLOWLIST: 'secreto@ejemplo.com', REQUIRE_EMAIL_VERIFICATION: 'true' });
         assert.ok(p.warnings.every((w: string) => !w.includes('secreto@')));
     });
 
-    it('lista definida sin ningun email valido: avisa y sigue cerrada', () => {
+    it('lista definida sin ningun email valido: avisa (y con el alta abierta no cierra nada)', () => {
         const p = resolveSignupPolicy({ ...PROD, SIGNUP_ALLOWLIST: 'no-es-email' });
-        assert.equal(p.signUpEnabled, false);
+        assert.equal(p.signUpEnabled, true);
         assert.ok(p.warnings.some((w: string) => w.includes('SIGNUP_ALLOWLIST')));
     });
 
@@ -76,12 +77,12 @@ describe('resolveSignupPolicy', () => {
 });
 
 describe('signUpPageMode', () => {
-    it('cerrada, invitacion u abierta segun la politica y ?invitacion', () => {
-        assert.equal(signUpPageMode(resolveSignupPolicy(PROD), true), 'closed');
-        const invited = resolveSignupPolicy({ ...PROD, SIGNUP_ALLOWLIST: 'qa@ejemplo.com' });
-        assert.equal(signUpPageMode(invited, false), 'closed');
-        assert.equal(signUpPageMode(invited, true), 'invite');
-        assert.equal(signUpPageMode(resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'true' }), false), 'open');
+    it('abierta por defecto; cerrada o invitacion solo con la escotilla de cierre', () => {
+        assert.equal(signUpPageMode(resolveSignupPolicy(PROD), false), 'open');
+        const closedInvited = resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'false', SIGNUP_ALLOWLIST: 'qa@ejemplo.com' });
+        assert.equal(signUpPageMode(closedInvited, false), 'closed');
+        assert.equal(signUpPageMode(closedInvited, true), 'invite');
+        assert.equal(signUpPageMode(resolveSignupPolicy({ ...PROD, ALLOW_PUBLIC_SIGNUP: 'false' }), false), 'closed');
     });
 });
 

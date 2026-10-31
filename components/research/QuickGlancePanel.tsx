@@ -101,7 +101,6 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
 
   // Datos clave estilo Stock Analysis (REA, 31-oct-2026): solo con dato real
   // de una fuente gratuita; cada nota dice de dónde sale.
-  const yahooNote = t('research.glance.sourceYahoo');
   const earnings = keyStats?.next_earnings ?? null;
   if (earnings) {
     const status = earnings.confirmed === true ? t('research.glance.earningsConfirmed')
@@ -114,7 +113,7 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
       <Row
         key="exdividendo"
         label={exDividend.upcoming ? t('research.glance.exDividendNext') : t('research.glance.exDividendLast')}
-        note={yahooNote}
+        note={undefined}
         value={formatMarketDate(exDividend.date)}
       />,
     );
@@ -127,7 +126,7 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
       <Row
         key="rango52"
         label={t('research.glance.range52wLabel')}
-        note={range.source.startsWith('Yahoo') ? yahooNote : t('research.glance.sourceOwnCloses')}
+        note={range.source.startsWith('Yahoo') ? undefined : t('research.glance.sourceOwnCloses')}
         value={`${fmt(range.low)} – ${fmt(range.high)}`}
       />,
     );
