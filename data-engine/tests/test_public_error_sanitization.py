@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
-
 import main
 from app.api.routes import knowledge, sources
+from tests.auth_helpers import csrf_client
 
 _INTERNAL_DETAIL = (
     "provider=https://secret.example/path?token=abc "
@@ -32,7 +31,7 @@ def test_knowledge_upload_does_not_expose_internal_exception(monkeypatch):
         "KnowledgeLibraryService",
         FailingKnowledgeLibraryService,
     )
-    client = TestClient(main.app, raise_server_exceptions=False)
+    client = csrf_client(main.app, raise_server_exceptions=False)
 
     response = client.post(
         "/api/knowledge/documents/upload",
@@ -55,7 +54,7 @@ def test_sources_url_ingestion_does_not_expose_provider_url_or_exception(monkeyp
         "DocumentIngestionService",
         FailingDocumentIngestionService,
     )
-    client = TestClient(main.app, raise_server_exceptions=False)
+    client = csrf_client(main.app, raise_server_exceptions=False)
 
     response = client.post(
         "/api/sources/documents/ingest-url",
@@ -77,7 +76,7 @@ def test_sources_file_ingestion_does_not_expose_internal_exception(monkeypatch):
             raise RuntimeError(_INTERNAL_DETAIL)
 
     monkeypatch.setattr(sources, "DocumentIngestionService", FailingDocumentIngestionService)
-    client = TestClient(main.app, raise_server_exceptions=False)
+    client = csrf_client(main.app, raise_server_exceptions=False)
     response = client.post(
         "/api/sources/documents/ingest-file",
         data={"ticker": "MSFT", "title": "Private upload"},

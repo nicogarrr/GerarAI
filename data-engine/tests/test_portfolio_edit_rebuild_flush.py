@@ -14,13 +14,11 @@ posicion fantasma sin ninguna operacion detras.
 
 from uuid import uuid4
 
-from fastapi.testclient import TestClient
-
 import main
 from app.core import auth as auth_module
 from app.core.database import init_db
 from app.seed import seed
-from tests.auth_helpers import auth_settings, signed_request
+from tests.auth_helpers import auth_settings, csrf_client, signed_request
 
 SECRET = "research-edit-rebuild-secret-at-least-32-chars"
 
@@ -32,7 +30,7 @@ def _client(monkeypatch):
     init_db()
     seed()
     s = uuid4().hex[:8]
-    return TestClient(main.app), f"edit-{s}", f"user-{s}", s
+    return csrf_client(main.app), f"edit-{s}", f"user-{s}", s
 
 
 def _req(client, tenant, user, method, path, body=None):
@@ -51,7 +49,7 @@ def test_cambiar_ticker_mueve_la_posicion_sin_dejar_fantasma(monkeypatch):
     r = _req(client, tenant, user, "PUT", f"/api/portfolio/transactions/{tid}", {**base, "ticker": new})
     assert r.status_code == 200, r.text
 
-    positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()
+    positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()["items"]
     held = {p["ticker"]: p["quantity"] for p in positions}
     assert held == {new: 5.0}
 
@@ -72,7 +70,7 @@ def test_cambiar_ticker_de_una_compra_ya_vendida_se_rechaza(monkeypatch):
     # Vender mas de lo comprado: 409 como en POST (3f6ad58 alineo PUT con POST).
     assert r.status_code == 409, r.text
 
-    positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()
+    positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()["items"]
     assert {p["ticker"]: p["quantity"] for p in positions} == {old: 4.0}
 
 
@@ -92,7 +90,7 @@ def test_mover_la_compra_despues_de_su_venta_se_rechaza(monkeypatch):
              {**buy, "trade_date": "2025-07-10"})
     assert r.status_code == 409, r.text
 
-    transactions = _req(client, tenant, user, "GET", "/api/portfolio/transactions").json()
+    transactions = _req(client, tenant, user, "GET", "/api/portfolio/transactions").json()["items"]
     stored = next(t for t in transactions if t["id"] == tid)
     assert stored["trade_date"] == "2025-01-10"
 
@@ -111,7 +109,7 @@ def test_cambiar_fecha_valida_actualiza_la_primera_compra(monkeypatch):
     assert r.status_code == 200, r.text
 
     position = next(
-        p for p in _req(client, tenant, user, "GET", "/api/portfolio/positions").json()
+        p for p in _req(client, tenant, user, "GET", "/api/portfolio/positions").json()["items"]
         if p["ticker"] == ticker
     )
     assert position["first_buy_date"] == "2025-03-03"
@@ -128,5 +126,5 @@ def test_borrar_la_unica_operacion_borra_la_posicion(monkeypatch):
     r = _req(client, tenant, user, "DELETE", f"/api/portfolio/transactions/{r.json()['id']}")
     assert r.status_code == 204, r.text
 
-    positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()
+    positions = _req(client, tenant, user, "GET", "/api/portfolio/positions").json()["items"]
     assert ticker not in {p["ticker"] for p in positions}

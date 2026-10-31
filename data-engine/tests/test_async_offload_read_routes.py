@@ -7,13 +7,12 @@ event loop en su hilo va contra el hallazgo; sin loop, va por el pool.
 import asyncio
 from types import SimpleNamespace
 
-from fastapi.testclient import TestClient
-
 import main
 from app.core.database import init_db
 from app.schemas import ChatResponse
+from tests.auth_helpers import csrf_client
 
-client = TestClient(main.app)
+client = csrf_client(main.app)
 
 
 def _off_loop() -> bool:
