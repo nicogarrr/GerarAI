@@ -17,7 +17,6 @@
   },
   "footer": {
     "disclaimer": "Educational analysis tool: GerarAI does not provide investment advice and the decisions are yours.",
-    "chartsBy": "Interactive charts by",
     "navAria": "Footer links"
   },
   "hero": {
@@ -60,6 +59,7 @@
     "body": "The link expires and can only be used once. Saving it will sign out your open sessions."
   },
   "metodologia": {
+    "chartsAttribution": "Charts built with TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc. ·",
     "metaTitle": "Methodology",
     "metaDescription": "Data sources, valuation engines, limits and costs of GerarAI: where every figure comes from and what you should not expect from the platform.",
     "kicker": "Transparency",
