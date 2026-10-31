@@ -200,7 +200,9 @@ def refresh_from_edgartools(
         if live_cik:
             cik = live_cik
             facts_payload = client.read_companyfacts(live_cik, snapshot_root)
-            subs_payload = subs_payload if subs_payload is not None else client.read_submissions(live_cik, snapshot_root)
+            subs_payload = (
+                subs_payload if subs_payload is not None else client.read_submissions(live_cik, snapshot_root)
+            )
             if facts_payload is not None:
                 synced_at = client.manifest_synced_at(snapshot_root)
                 transport = "snapshot"
@@ -210,8 +212,11 @@ def refresh_from_edgartools(
                 if not cik:
                     cik = live_cik
                 client.default_breaker().record_success()
+                client.report_sec_success_to_health()
             except Exception as exc:  # noqa: BLE001 - degrada a snapshot, nunca reintenta
                 status = client.http_status_from_error(exc)
+                # Registry central de salud: 400/404 no degradan (dato por ticker)
+                client.report_sec_failure_to_health(status)
                 if status == 429:
                     client.default_breaker().record_429()
                     reason = f"429 rate-limited ({type(exc).__name__}); breaker cuenta la racha"
@@ -219,9 +224,7 @@ def refresh_from_edgartools(
                     reason = f"SEC bloqueada ({status}, caso OCI); snapshot sin reintento"
                 else:
                     reason = f"live no disponible ({type(exc).__name__}); snapshot"
-                cik, facts_payload, subs_payload, state = _degrade_to_snapshot(
-                    ticker, reason, snapshot_root
-                )
+                cik, facts_payload, subs_payload, state = _degrade_to_snapshot(ticker, reason, snapshot_root)
                 transport, synced_at = state.transport, state.synced_at
                 if facts_payload is None and used_entity_facts is None:
                     return {
@@ -338,9 +341,7 @@ def refresh_from_edgartools(
     }
 
 
-def _form4_filings_from_submissions(
-    submissions: dict, *, cik: str, limit: int
-) -> list[dict]:
+def _form4_filings_from_submissions(submissions: dict, *, cik: str, limit: int) -> list[dict]:
     recent = (submissions.get("filings") or {}).get("recent") or {}
     accessions = recent.get("accessionNumber", []) or []
     items: list[dict] = []
@@ -393,16 +394,24 @@ def refresh_form4_from_edgartools(
     resolved = _pad_cik(cik) or client.manifest_cik(wanted, snapshot_root)
     if not resolved and submissions is None:
         return {
-            "ticker": wanted, "status": "unavailable",
-            "reason": "not a US SEC filer", "signals": [], "transactions": [],
-            "transport": "snapshot", "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
+            "ticker": wanted,
+            "status": "unavailable",
+            "reason": "not a US SEC filer",
+            "signals": [],
+            "transactions": [],
+            "transport": "snapshot",
+            "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
         }
     subs = submissions if submissions is not None else client.read_submissions(resolved or "", snapshot_root)
     if subs is None:
         return {
-            "ticker": wanted, "cik": resolved, "status": "unavailable",
-            "reason": f"sin submissions (snapshot) para {wanted}", "transactions": [],
-            "transport": "snapshot", "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
+            "ticker": wanted,
+            "cik": resolved,
+            "status": "unavailable",
+            "reason": f"sin submissions (snapshot) para {wanted}",
+            "transactions": [],
+            "transport": "snapshot",
+            "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
         }
     filings = _form4_filings_from_submissions(subs, cik=resolved or "", limit=limit)
     transactions: list[dict] = []
@@ -411,7 +420,9 @@ def refresh_form4_from_edgartools(
         accession = str(filing["accession_number"])
         xml = (filing_xml or {}).get(accession)
         if xml is None:
-            xml = client.read_filing_xml(accession, str(filing.get("primary_document") or "form4.xml"), snapshot_root)
+            xml = client.read_filing_xml(
+                accession, str(filing.get("primary_document") or "form4.xml"), snapshot_root
+            )
         if xml is None:
             xml = client.read_filing_xml(accession, "form4.xml", snapshot_root)
         if xml is None:
@@ -419,7 +430,9 @@ def refresh_form4_from_edgartools(
             continue
         try:
             parsed = ownership_transactions(xml)
-            filing_tx = enrich_like_insider_service(list(parsed.get("transactions", [])), {**filing, "ticker": wanted})
+            filing_tx = enrich_like_insider_service(
+                list(parsed.get("transactions", [])), {**filing, "ticker": wanted}
+            )
             transactions.extend(filing_tx)
         except Exception as exc:  # noqa: BLE001 - best-effort por filing
             errors.append(f"{accession}: {type(exc).__name__}: {redact_secrets(str(exc))[:200]}")
@@ -435,7 +448,8 @@ def refresh_form4_from_edgartools(
         "snapshot_synced_at": synced_at,
         "fetched_at": datetime.now(UTC).isoformat(),
         "provenance": provenance(
-            SOURCE, SourceKind.OFFICIAL,
+            SOURCE,
+            SourceKind.OFFICIAL,
             source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={resolved}&type=4",
             coverage=Coverage.PARTIAL if errors else Coverage.OK,
             note="Form 4 via edgartools (snapshot); codigo P = mercado abierto o privado.",
@@ -495,16 +509,22 @@ def refresh_13f_from_edgartools(
     subs = submissions if submissions is not None else client.read_submissions(padded, snapshot_root)
     if subs is None:
         return {
-            "cik": padded, "status": "unavailable",
-            "reason": f"sin submissions (snapshot) para {padded}", "holdings": [],
-            "transport": "snapshot", "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
+            "cik": padded,
+            "status": "unavailable",
+            "reason": f"sin submissions (snapshot) para {padded}",
+            "holdings": [],
+            "transport": "snapshot",
+            "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
             "provenance": provenance(SOURCE, SourceKind.OFFICIAL, coverage=Coverage.UNAVAILABLE),
         }
     filings = _thirteenf_filings_from_submissions(subs, limit=limit)
     if not filings:
         return {
-            "cik": padded, "status": "unavailable", "reason": "no 13F-HR filings found",
-            "holdings": [], "transport": "snapshot",
+            "cik": padded,
+            "status": "unavailable",
+            "reason": "no 13F-HR filings found",
+            "holdings": [],
+            "transport": "snapshot",
             "snapshot_synced_at": client.manifest_synced_at(snapshot_root),
             "provenance": provenance(SOURCE, SourceKind.OFFICIAL, coverage=Coverage.UNAVAILABLE),
         }
@@ -539,7 +559,9 @@ def refresh_13f_from_edgartools(
         "transport": "snapshot",
         "snapshot_synced_at": synced_at,
         "provenance": provenance(
-            SOURCE, SourceKind.OFFICIAL, fetched_at=datetime.now(UTC),
+            SOURCE,
+            SourceKind.OFFICIAL,
+            fetched_at=datetime.now(UTC),
             coverage=Coverage.PARTIAL if errors else Coverage.OK,
         ),
     }

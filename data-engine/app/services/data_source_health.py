@@ -130,6 +130,16 @@ class DataSourceHealthRegistry:
                 is_primary=True,
                 fallback_source="cached_fx",
             ),
+            "sec_edgar": DataSourceStatus(
+                name="SEC EDGAR",
+                is_primary=False,
+                fallback_source="hf_snapshot",
+            ),
+            "cnmv": DataSourceStatus(
+                name="CNMV",
+                is_primary=False,
+                fallback_source=None,
+            ),
             "qdrant": DataSourceStatus(
                 name="Qdrant Vector Database",
                 is_primary=True,

@@ -75,10 +75,9 @@ def resolve_identity() -> str:
     from app.core.config import get_settings
 
     settings = get_settings()
-    candidate = (
-        (getattr(settings, "edgartools_identity", None) or "").strip()
-        or (settings.sec_user_agent or "").strip()
-    )
+    candidate = (getattr(settings, "edgartools_identity", None) or "").strip() or (
+        settings.sec_user_agent or ""
+    ).strip()
     match = _EMAIL_RE.search(candidate)
     contact = match.group(0) if match else DEFAULT_CONTACT
     if any(brand in candidate for brand in ("CavaAI", "GerarAI")):
@@ -233,6 +232,45 @@ def http_status_from_error(exc: BaseException) -> int | None:
 def is_sec_block(exc: BaseException) -> bool:
     """True si el fallo es 401/403 (IP baneada): degrada a snapshot, sin reintento."""
     return http_status_from_error(exc) in {401, 403}
+
+
+_SEC_REGISTRY_KEY = "sec_edgar"
+
+
+def report_sec_failure_to_health(status: int | None, *, registry: Any = None) -> bool:
+    """Registra un fallo live de SEC EDGAR en el registry central de fuentes.
+
+    Devuelve True si conto como fallo de FUENTE. 400/404 son dato por ticker
+    (companyfacts inexistente para ese CIK): la fuente respondio y el circuito
+    no se mueve. 429, 401/403 (IP baneada, caso OCI documentado), 5xx y fallo
+    de red sin status si degradan. El breaker propio (RateLimitBreaker) sigue
+    igual; esto solo hace visible la salud en /api/health/data-sources.
+    """
+    if status in (400, 404):
+        return False
+    if registry is None:
+        from app.services.data_source_health import get_data_source_registry
+
+        registry = get_data_source_registry()
+    if status == 429:
+        reason = "429 rate limit"
+    elif status in (401, 403):
+        reason = f"SEC bloqueada (HTTP {status}, IP baneada)"
+    elif status is None:
+        reason = "error de red o cliente sin status"
+    else:
+        reason = f"HTTP {status}"
+    registry.record_failure(_SEC_REGISTRY_KEY, reason)
+    return True
+
+
+def report_sec_success_to_health(*, registry: Any = None) -> None:
+    """Marca SEC EDGAR sana en el registry central tras una llamada live ok."""
+    if registry is None:
+        from app.services.data_source_health import get_data_source_registry
+
+        registry = get_data_source_registry()
+    registry.record_success(_SEC_REGISTRY_KEY)
 
 
 # ---------------- Snapshot en disco (offline-first) ----------------
