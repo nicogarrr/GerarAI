@@ -339,6 +339,15 @@ def get_db(
         db.close()
 
 
+def _quote_identifiers(names: list[str]) -> list[str]:
+    """Identificadores SQL entrecomillados con escape de comillas internas.
+
+    Los nombres salen de PRAGMA table_info (la propia DB), pero un nombre con
+    '"' no debe poder romper el literal: sqlite escapa la comilla como "".
+    """
+    return ['"{}"'.format(name.replace('"', '""')) for name in names]
+
+
 def init_db() -> None:
     import re
 
@@ -463,7 +472,7 @@ def init_db() -> None:
                                         "PRAGMA table_info(thesis_versions)"
                                     ).all()
                                 ]
-                                quoted = ", ".join(f'"{name}"' for name in names)
+                                quoted = ", ".join(_quote_identifiers(names))
                                 conn.exec_driver_sql(
                                     f"INSERT INTO thesis_versions__nullable ({quoted}) "
                                     f"SELECT {quoted} FROM thesis_versions"
