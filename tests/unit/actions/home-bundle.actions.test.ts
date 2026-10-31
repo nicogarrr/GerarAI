@@ -52,7 +52,9 @@ describe('getHomeOverviewBundle', () => {
 
         const result = await getHomeOverviewBundle('u1', params);
         expect(result.portfolio.data).toBeNull();
-        expect(result.portfolio.error).toBe('No se pudo conectar con el servicio. Reintenta en unos segundos.');
+        // La acción viaja solo la clave genérica por categoría (sin rutas ni
+        // detalles internos); el texto lo resuelve el cliente con t().
+        expect(result.portfolio.error).toBe('ui.sectionError.network');
         expect(result.watchlist.error).not.toBeNull();
         expect(result.alerts).toEqual({ data: { rules: [], triggered: [] }, error: null });
         expect(result.opportunities).toEqual({ data: [], error: null });
