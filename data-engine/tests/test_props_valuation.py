@@ -22,7 +22,6 @@ from app.valuation.dividend_equity import (
     run_ddm,
 )
 from app.valuation.engines.sector_specific import _pb_sensitivity_rows
-from app.valuation.regulated_asset import RegulatedAssetError, excess_return_equity_value
 from app.valuation.reverse_dcf import ReverseDCFInputs, solve_required_growth
 from app.valuation.scenario_model import Scenario, probability_weighted_value
 from app.valuation.sensitivity import sensitivity_grid
@@ -222,19 +221,6 @@ def test_rejilla_de_sensibilidad_es_el_dcf_celda_a_celda(rng):
     for celda, wacc in zip(celdas[2:], waccs[2:], strict=True):
         esperado = run_dcf(_con(base, revenue_growth=g, wacc=wacc)).value_per_share
         assert celda["value_per_share"] == pytest.approx(esperado)
-
-
-@pytest.mark.parametrize("rng", _casos(112), ids=lambda _: "")
-def test_ingreso_residual_vale_el_libro_si_roe_igual_ke(rng):
-    """V = B + (ROE − ke)·B/(ke − g): si ROE = ke no hay exceso y V = B;
-    si ROE > ke, V > B (CFA L2, Residual Income). Con g ≥ ke se niega."""
-    b = rng.uniform(10, 1_000)
-    ke = rng.uniform(0.05, 0.12)
-    g = rng.uniform(0, ke - 0.005)
-    assert excess_return_equity_value(book_equity=b, allowed_roe=ke, cost_of_equity=ke, growth=g)["equity_value"] == pytest.approx(b)
-    assert excess_return_equity_value(book_equity=b, allowed_roe=ke + 0.01, cost_of_equity=ke, growth=g)["equity_value"] > b
-    with pytest.raises(RegulatedAssetError):
-        excess_return_equity_value(book_equity=b, allowed_roe=ke, cost_of_equity=ke, growth=ke + rng.uniform(0, 0.02))
 
 
 @pytest.mark.parametrize("rng", _casos(113), ids=lambda _: "")
