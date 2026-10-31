@@ -81,9 +81,11 @@ describe('móvil: 44 px en inicio, índice research, watchlist y ProPicks (recor
     // Medido en prod con la cuenta de auditoría a 390x844: insignias de ticker
     // de 16 px de alto, chip DCA de 24 px, Filtrar 38 px y paginación 34 px.
     const HIT = "before:absolute before:-inset-2.5 before:content-['']";
+    const HIT14 = "before:absolute before:-inset-3.5 before:content-['']";
     it('insignia de ticker de las noticias de inicio: 44 px sin crecer lo visible', () => {
+        // 16 px de alto + 14 px por lado (::before -inset-3.5) = 44 px medidos en captura local.
         const src = readFileSync('components/NewsSection.tsx', 'utf8');
-        assert.ok(src.includes(`${HIT} text-xs text-teal-300`), 'insignia de ticker con área táctil invisible de 44 px');
+        assert.ok(src.includes(`${HIT14} text-xs text-teal-300`), 'insignia de ticker con área táctil invisible de 44 px');
     });
     it('chip de nivel DCA (watchlist/cartera): visible de 24 px, hit de 44 px', () => {
         const src = readFileSync('components/watchlist/DcaLevelBadge.tsx', 'utf8');
