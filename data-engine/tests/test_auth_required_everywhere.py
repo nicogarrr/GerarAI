@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 
 import main
 from app.core import auth as auth_module
+from app.core.csrf import generate_csrf_token
 from tests.auth_helpers import auth_settings, bound_headers
 
 SECRET = "auth-sweep-secret-with-at-least-32-characters!!"
@@ -26,6 +27,11 @@ PUBLIC = (
     re.compile(r"^/$"),
     re.compile(r"^/api/health"),
     re.compile(r"^/health"),
+    # Emite tokens CSRF: público por diseño (el frontend lo pide antes de mutar).
+    re.compile(r"^/api/csrf-token$"),
+    # Alias del mismo handler que /api/health/data-sources (health es público
+    # a propósito): expone idéntica lectura local de estado de fuentes.
+    re.compile(r"^/api/data-sources$"),
     re.compile(r"^/api/calendar/feed/\{filename\}$"),
     re.compile(r"^/api/telegram/"),
     re.compile(r"^/(openapi\.json|docs|redoc)"),
@@ -45,6 +51,20 @@ def _private_routes():
 
 def _concrete(path: str) -> str:
     return re.sub(r"\{[^}]+\}", "1", path)
+
+
+def _csrf(method: str) -> dict[str, str]:
+    """Token CSRF válido en métodos mutantes, como hace el frontend.
+
+    El middleware CSRF (VAL-SEC-001) corre antes del routing y responde 403 a
+    todo mutante sin token, así que sin él el barrido mediría el middleware y
+    no la auth: una ruta mutante que olvidara ``private_dependencies`` se
+    escondería detrás de ese 403. Con token válido la petición llega a la capa
+    de auth y debe responder 401.
+    """
+    if method in {"GET", "HEAD", "OPTIONS"}:
+        return {}
+    return {"X-CSRF-Token": generate_csrf_token()}
 
 
 ROUTES = sorted(set(_private_routes()))
@@ -82,25 +102,27 @@ def test_sweep_covers_the_app():
 def test_private_route_rejects_unsigned_and_misbound_requests(client, method, path):
     url = _concrete(path)
 
-    unsigned = client.request(method, url)
+    csrf = _csrf(method)
+
+    unsigned = client.request(method, url, headers=csrf)
     assert unsigned.status_code == 401, (method, url, unsigned.status_code, unsigned.text[:200])
 
     expired = bound_headers(
         SECRET, "sweep-tenant", "sweep-user", method=method, path=url,
         timestamp=str(int(time.time()) - 3600),
     )
-    response = client.request(method, url, headers=expired)
+    response = client.request(method, url, headers={**expired, **csrf})
     assert response.status_code == 401, ("expired", method, url, response.status_code)
 
     other_path = bound_headers(SECRET, "sweep-tenant", "sweep-user", method=method, path="/api/health")
-    response = client.request(method, url, headers=other_path)
+    response = client.request(method, url, headers={**other_path, **csrf})
     assert response.status_code == 401, ("other path", method, url, response.status_code)
 
     other_method = "POST" if method == "GET" else "GET"
     wrong_method = bound_headers(SECRET, "sweep-tenant", "sweep-user", method=other_method, path=url)
-    response = client.request(method, url, headers=wrong_method)
+    response = client.request(method, url, headers={**wrong_method, **csrf})
     assert response.status_code == 401, ("other method", method, url, response.status_code)
 
     forged = bound_headers("x" * 48, "sweep-tenant", "sweep-user", method=method, path=url)
-    response = client.request(method, url, headers=forged)
+    response = client.request(method, url, headers={**forged, **csrf})
     assert response.status_code == 401, ("forged secret", method, url, response.status_code)
