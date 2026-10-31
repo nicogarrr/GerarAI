@@ -1816,6 +1816,15 @@ class ResearchAlert(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "fingerprint", name="uq_research_alert_fingerprint"),
         Index("ix_research_alerts_company_status", "company_id", "status"),
+        # 0121: el feed del inicio ordena por ultimo disparo real
+        # (coalesce(last_triggered_at, created_at) DESC, id DESC) con scope
+        # de tenant; antes era Seq Scan + sort para devolver 3 filas.
+        Index(
+            "ix_research_alerts_home_feed",
+            "tenant_id",
+            text("coalesce(last_triggered_at, created_at) DESC"),
+            desc("id"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
