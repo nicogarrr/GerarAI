@@ -47,6 +47,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models import CalculatedMetric, Company, FinancialFact, MarketPrice
+from app.services.connectors.base import UpstreamRateLimited
 from app.services.price_units import close_in_company_currency, price_in_currency
 from app.services.propicks_price_service import yahoo_symbol
 from app.services.split_adjustment import (
@@ -119,17 +120,27 @@ def default_dividend_fetcher(symbol: str) -> list[dict[str, Any]] | None:
 
 
 def default_finnhub_yield_fetcher(ticker: str) -> Decimal | None:
-    """dividendYieldIndicatedAnnual de Finnhub en fraccion. None si no aplica."""
+    """dividendYieldIndicatedAnnual de Finnhub en fraccion. None si no aplica.
+
+    Un 429 sube TIPADO (UpstreamRateLimited): con cuota agotada el bucle de
+    universo no debe seguir martilleando ticker a ticker (medido en prod
+    31-oct-2026: 1.077 HTTP 429 en 10 min entre 2 corridas); el caller
+    suspende la corrida con cursor y la reanuda tras el Retry-After. Sin
+    reintento en caliente aqui (max_retries=0): el 429 lo gestiona la cola.
+    """
     _network_forbidden_in_tests()
     from app.core.config import get_settings
 
     if not get_settings().finnhub_api_key:
         return None
+    from app.services.connectors.base import UpstreamRateLimited
     from app.services.connectors.finnhub import FinnhubClient
     from app.services.thesis_evidence_service import _await_sync
 
     try:
-        metric = _await_sync(lambda: FinnhubClient().metric(ticker))
+        metric = _await_sync(lambda: FinnhubClient().metric(ticker, max_retries=0))
+    except UpstreamRateLimited:
+        raise
     except Exception:
         return None
     raw = metric.get("dividendYieldIndicatedAnnual")
@@ -340,6 +351,23 @@ def _upsert_metric(
     )
 
 
+class ValuationUniverseRateSuspended(RuntimeError):
+    """Finnhub agoto la cuota a mitad del universo: suspender y reanudar.
+
+    ``last_completed_ticker`` es el cursor (orden por ticker): la corrida
+    siguiente empieza DESPUES de el en vez de repetir el universo ya hecho
+    y quemar cuota otra vez. ``retry_after`` es la ventana del servidor.
+    """
+
+    def __init__(self, last_completed_ticker: str | None, retry_after: float | None) -> None:
+        self.last_completed_ticker = last_completed_ticker
+        self.retry_after = retry_after
+        super().__init__(
+            f"Finnhub 429 en el universo; completado hasta {last_completed_ticker!r}, "
+            f"reintentar tras {retry_after or 60:.0f}s"
+        )
+
+
 def compute_valuation_metrics(
     db: Session,
     companies: Sequence[Company],
@@ -347,6 +375,7 @@ def compute_valuation_metrics(
     as_of: date,
     dividend_fetcher: DividendFetcher | None = None,
     finnhub_yield_fetcher: FinnhubYieldFetcher | None = None,
+    commit_per_company: bool = False,
 ) -> dict[str, Any]:
     """Calcula y persiste price_to_book y dividend_yield_ttm por empresa.
 
@@ -373,6 +402,7 @@ def compute_valuation_metrics(
             "sin_unidad_cotizacion": 0,
         },
     }
+    last_completed_ticker: str | None = None
     for company in companies:
         price = _latest_price(db, company.id, as_of)
         if price is None:
@@ -464,7 +494,12 @@ def compute_valuation_metrics(
             continue
         ttm, used = ttm_dividend_per_share(events, as_of)
         yahoo_yield = ttm / yield_close
-        finnhub_yield = finnhub_yield_fetcher(company.ticker)
+        try:
+            finnhub_yield = finnhub_yield_fetcher(company.ticker)
+        except UpstreamRateLimited as exc:
+            # Cuota agotada: suspender la corrida CON cursor en vez de seguir
+            # martilleando el resto del universo (429 por ticker).
+            raise ValuationUniverseRateSuspended(last_completed_ticker, exc.retry_after) from exc
         disagree = (
             finnhub_yield is not None
             and _rel_disagree(yahoo_yield, finnhub_yield) > DISAGREE_REL_TOL
@@ -506,7 +541,14 @@ def compute_valuation_metrics(
             trace=trace,
         )
         stats[METRIC_YIELD] += 1
+        last_completed_ticker = company.ticker
+        if commit_per_company:
+            # Pagina atomica de 1 empresa: el progreso sobrevive al rollback
+            # que hace el actor al suspenderse por 429; el cursor en Redis
+            # solo puede avanzar sobre metricas ya comprometidas.
+            db.commit()
     db.flush()
+
     return stats
 
 
@@ -516,6 +558,7 @@ def refresh_valuation_metrics(
     as_of: date | None = None,
     dividend_fetcher: DividendFetcher | None = None,
     finnhub_yield_fetcher: FinnhubYieldFetcher | None = None,
+    start_after_ticker: str | None = None,
 ) -> dict[str, Any]:
     """Job diario: metricas de valoracion de TODO el universo del tenant.
 
@@ -526,11 +569,17 @@ def refresh_valuation_metrics(
     as_of = as_of or date.today()
     # Company es universo global (no TenantOwnedMixin), como en
     # sync_official_closes: el tenant acota las metricas escritas, no el universo.
-    companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
+    statement = select(Company).order_by(Company.ticker)
+    if start_after_ticker is not None:
+        # Reanudacion tras suspension por 429: empieza DESPUES del cursor,
+        # no repite el universo ya hecho (cada repetida quema cuota Finnhub).
+        statement = statement.where(Company.ticker > start_after_ticker)
+    companies = list(db.scalars(statement).all())
     stats = compute_valuation_metrics(
         db,
         companies,
         as_of=as_of,
+        commit_per_company=True,
         dividend_fetcher=dividend_fetcher,
         finnhub_yield_fetcher=finnhub_yield_fetcher,
     )

@@ -91,7 +91,16 @@ DEFAULT_RETRY_CAP_SECONDS = 120.0
 
 
 class UpstreamRateLimited(RuntimeError):
-    """El proveedor respondio 429 y se agotaron los reintentos con presupuesto."""
+    """El proveedor respondio 429 y se agotaron los reintentos con presupuesto.
+
+    ``retry_after`` conserva la ventana que pidio el servidor (si la mando)
+    para que el llamante marque un cooldown global en vez de seguir
+    martilleando (medido 31-oct-2026: 1.077 429 de Finnhub en 10 min).
+    """
+
+    def __init__(self, message: str, *, retry_after: float | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 def _raw_retry_after(response: Any) -> float | None:
@@ -124,12 +133,31 @@ def retry_after_seconds(response: Any, cap: float = DEFAULT_RETRY_CAP_SECONDS) -
     return min(raw, cap)
 
 
+def _backoff_seconds(
+    attempt: int, base_seconds: float, cap_seconds: float, *, jitter: bool
+) -> float:
+    """Exponencial acotado; con ``jitter`` la espera es uniforme en [0, expo].
+
+    El jitter decorrelaciona workers que reciben 429 a la vez: sin el, los
+    reintentos de N procesos salen en el mismo segundo y vuelven a chocar
+    (thundering herd medido en prod, 31-oct-2026). Retry-After se aplica
+    ENCIMA como suelo en el llamante: el jitter nunca lo recorta.
+    """
+    expo = min(base_seconds * (2**attempt), cap_seconds)
+    if not jitter:
+        return expo
+    import random
+
+    return random.uniform(0.0, expo)
+
+
 async def get_with_retry(
     fetch: Any,
     *,
     max_retries: int = DEFAULT_MAX_RETRIES,
     base_seconds: float = DEFAULT_RETRY_BASE_SECONDS,
     cap_seconds: float = DEFAULT_RETRY_CAP_SECONDS,
+    jitter: bool = False,
 ) -> Any:
     """Ejecuta ``fetch()`` reintentando 429 y 5xx con backoff y presupuesto.
 
@@ -169,21 +197,23 @@ dentro de la misma corrida.
                 # el proveedor no disponible para esta corrida.
                 raise UpstreamRateLimited(
                     f"upstream pidio Retry-After {raw_retry_after:.0f}s "
-                    f"(> cap {cap_seconds:.0f}s): pospuesto sin reintento inline"
+                    f"(> cap {cap_seconds:.0f}s): pospuesto sin reintento inline",
+                    retry_after=raw_retry_after,
                 )
             if attempt < max_retries:
                 await asyncio.sleep(
                     max(
                         retry_after_seconds(response, cap_seconds),
-                        base_seconds * (2**attempt),
+                        _backoff_seconds(attempt, base_seconds, cap_seconds, jitter=jitter),
                     )
                 )
                 continue
             raise UpstreamRateLimited(
-                f"upstream rate limited after {max_retries} retries"
+                f"upstream rate limited after {max_retries} retries",
+                retry_after=raw_retry_after,
             )
         if status >= 500 and attempt < max_retries:
-            await asyncio.sleep(min(base_seconds * (2**attempt), cap_seconds))
+            await asyncio.sleep(_backoff_seconds(attempt, base_seconds, cap_seconds, jitter=jitter))
             continue
         response.raise_for_status()
         return response
