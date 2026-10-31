@@ -295,29 +295,42 @@ class PortfolioRiskMatrixService:
                 continue
             candidates[company.id] = series
 
-        # Alineacion a fechas comunes. Una serie con calendario raro
-        # arrastraria la interseccion a casi vacio: se expulsa la que menos
-        # aporta a las fechas comunes hasta llegar al minimo o no mejorar.
+        # Alineacion a fechas comunes por interseccion LEAVE-ONE-OUT: se
+        # expulsa la serie cuya retirada MAS amplia la interseccion del
+        # resto (una serie con calendario disjunto arrastra la interseccion
+        # comun a casi vacio). Medir set(serie)&common no discrimina: como
+        # common ya es la interseccion de todas, toda serie empata y nadie
+        # saldria nunca (bug detectado en review del piloto).
         dropped_alignment: list[dict[str, Any]] = []
         ticker_of = {company.id: company.ticker for _, company in rows}
-        while len(candidates) > 1:
+
+        def _common_of(ids: list[int]) -> set[date]:
             common: set[date] | None = None
-            for series in candidates.values():
-                common = set(series) if common is None else (common & set(series))
-            common = common or set()
+            for cid in ids:
+                common = set(candidates[cid]) if common is None else (common & set(candidates[cid]))
+            return common or set()
+
+        while len(candidates) > 1:
+            current_ids = list(candidates)
+            common = _common_of(current_ids)
             if len(common) >= MIN_MATRIX_SESSIONS:
                 break
-            worst = min(candidates, key=lambda cid: len(set(candidates[cid]) & common))
-            if len(set(candidates[worst]) & common) == len(common):
+            best_cid: int | None = None
+            best_size = len(common)
+            for cid in current_ids:
+                size = len(_common_of([other for other in current_ids if other != cid]))
+                if size > best_size:
+                    best_cid, best_size = cid, size
+            if best_cid is None:
                 break
             dropped_alignment.append(
                 {
-                    "ticker": ticker_of[worst],
+                    "ticker": ticker_of[best_cid],
                     "reason": "calendar_misaligned",
-                    "sessions": len(candidates[worst]),
+                    "sessions": len(candidates[best_cid]),
                 }
             )
-            del candidates[worst]
+            del candidates[best_cid]
 
         common_dates: tuple[date, ...] = ()
         if candidates:

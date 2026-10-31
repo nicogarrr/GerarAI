@@ -270,3 +270,75 @@ def test_risk_matrix_pairwise_fallback_below_min_sessions(monkeypatch) -> None:
     # Todas las posiciones declaradas como excluidas de la matriz.
     assert all(not p["included"] for p in payload["positions"])
     assert all("risk_contribution" not in p for p in payload["positions"])
+
+
+def test_risk_matrix_calendar_misaligned_excluded(monkeypatch) -> None:
+    """Regresion (review piloto): 3 activos, dos con >=60 sesiones comunes y
+    uno con calendario TOTALMENTE disjunto. La seleccion leave-one-out debe
+    expulsar al disjunto con motivo declarado y conservar a los otros dos;
+    antes la interseccion vacia empataba a todos y nadie salia."""
+    client, tenant, user = _client(monkeypatch)
+    db = SessionLocal()
+    tenant_row = db.query(Tenant).filter(Tenant.external_id == tenant).one()
+    db.info["tenant_id"] = tenant_row.id
+    db.add(Portfolio(name="Main", base_currency="EUR", is_default=True))
+    import math
+
+    from app.models import MarketPrice
+
+    suffix = uuid4().hex[:4].upper()
+    today = date.today()
+    # A y B: dias 0..74. C: dias 200..274 (disjunto con A y B).
+    windows = {
+        "a": (today - timedelta(days=74), DAYS),
+        "b": (today - timedelta(days=74), DAYS),
+        "c": (today - timedelta(days=274), DAYS),
+    }
+    tickers = {}
+    for key, phase in (("a", 0.0), ("b", 1.3), ("c", 2.1)):
+        company = Company(
+            ticker=f"RG{key.upper()}{suffix}", name=f"RG {key}", exchange="X",
+            currency="EUR", sector="Tech", industry="I", company_type="holding",
+            valuation_model="unassigned", special_sources=[], special_risks=[],
+            factor_tags=[],
+        )
+        db.add(company)
+        db.commit()
+        db.refresh(company)
+        tickers[key] = company.ticker
+        start, days = windows[key]
+        for i in range(days):
+            day = start + timedelta(days=i)
+            value = round(100.0 * (1.001) ** i + 0.6 * math.sin(i / 2.7 + phase), 4)
+            db.add(MarketPrice(
+                company_id=company.id, date=day,
+                open=Decimal(str(value)), high=Decimal(str(value)),
+                low=Decimal(str(value)), close=Decimal(str(value)),
+                adj_close=Decimal(str(value)), source="probe",
+            ))
+        db.add(Position(
+            company_id=company.id, quantity=Decimal("10"), average_cost=Decimal("100"),
+            market_price=Decimal("100"), market_value=Decimal("1000"),
+            unrealized_pnl=Decimal("0"), realized_pnl=Decimal("0"), currency="EUR",
+            base_currency="EUR", market_value_native=Decimal("1000"),
+            cost_basis_native=Decimal("1000"), market_value_base=Decimal("1000"),
+            cost_basis_base=Decimal("1000"), as_of=today, source="probe",
+        ))
+    db.commit()
+    db.close()
+
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/portfolio/risk-matrix")
+
+    assert res.status_code == 200, res.text
+    payload = res.json()
+    PortfolioRiskMatrixOut.model_validate(payload)
+    assert payload["status"] == "ok"
+    included = {p["ticker"] for p in payload["positions"] if p["included"]}
+    assert included == {tickers["a"], tickers["b"]}
+    # El disjunto queda excluido con motivo declarado (nunca silenciado).
+    reasons = {item["ticker"]: item["reason"] for item in payload["excluded"]}
+    assert reasons == {tickers["c"]: "calendar_misaligned"}
+    entry = next(p for p in payload["positions"] if p["ticker"] == tickers["c"])
+    assert entry["included"] is False
+    assert entry["excluded_reason"] == "calendar_misaligned"
+    assert payload["window"]["sessions_common"] >= 60
