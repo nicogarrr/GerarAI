@@ -244,9 +244,9 @@ def test_portfolio_pdf_no_invented_rating_strategy_or_provenance(env):
 def test_portfolio_pdf_cost_fallback_is_labelled(env):
     """Sin cotización, el valor se marca como coste de adquisición; nunca como precio de mercado."""
     client, factory, port_id = env
-    from app.models.entities import Company as C, Position as P
-
+    from app.models.entities import Company as C
     from app.models.entities import Portfolio as Pf
+    from app.models.entities import Position as P
     with factory() as s:
         portfolio = s.query(Pf).filter(Pf.id == port_id).first()
         s.add(C(ticker="XYZ.MC", name="Sin Cotizar SA", exchange="BME", currency="EUR", sector="S", industry="I", company_type="operating", valuation_model="dcf"))
@@ -300,7 +300,9 @@ def test_thesis_pdf_single_section_not_duplicated():
 
 def test_thesis_pdf_citations_use_real_source_urls(env):
     """Las citas llevan la URL de la evidencia cuando existe, no un id interno."""
-    from app.models.entities import Claim, ClaimEvidence, FundamentalModelVersion as FMV, ThesisVersion as TV
+    from app.models.entities import Claim, ClaimEvidence
+    from app.models.entities import FundamentalModelVersion as FMV
+    from app.models.entities import ThesisVersion as TV
 
     client, factory, _ = env
     with factory() as s:
@@ -353,7 +355,9 @@ def test_thesis_pdf_citations_use_real_source_urls(env):
 def test_portfolio_pdf_usd_positions_not_labelled_eur(env):
     """Posiciones en USD sin valor base: el total se etiqueta USD, nunca EUR."""
     client, factory, port_id = env
-    from app.models.entities import Company as C, Portfolio as Pf, Position as P
+    from app.models.entities import Company as C
+    from app.models.entities import Portfolio as Pf
+    from app.models.entities import Position as P
 
     with factory() as s:
         portfolio = s.query(Pf).filter(Pf.id == port_id).first()
@@ -376,7 +380,9 @@ def test_portfolio_pdf_usd_positions_not_labelled_eur(env):
 def test_portfolio_pdf_mixed_currencies_no_fake_weights(env):
     """Divisas mezcladas sin valor base: pesos n/d y sin ranking de 'mayores posiciones'."""
     client, factory, port_id = env
-    from app.models.entities import Company as C, Portfolio as Pf, Position as P
+    from app.models.entities import Company as C
+    from app.models.entities import Portfolio as Pf
+    from app.models.entities import Position as P
 
     with factory() as s:
         portfolio = s.query(Pf).filter(Pf.id == port_id).first()
