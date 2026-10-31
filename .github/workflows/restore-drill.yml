@@ -336,11 +336,17 @@ jobs:
         run: uv run --frozen python -m pytest tests/test_backup_contracts.py -q
 
       - name: Lint the backup and restore scripts
-        # Los scripts viven dentro de data-engine/ para que este `ruff check .`
-        # los cubra; si alguien los mueve a scripts/ del repo, esto deja de
-        # revisar el codigo que produce los backups.
+        # Acotado a los scripts del drill a proposito: el lint de TODO
+        # data-engine ya corre en el job `backend-lint` de ci.yml
+        # (`uv run --frozen ruff check .` en cada PR y push a main). Cuando
+        # este paso era repo-wide, 12 errores de ruff en modulos ajenos
+        # (acumulados en main por merges sin esperar CI) dejaban el drill
+        # rojo sin que los scripts de backup hubieran cambiado: una alerta
+        # falsa sobre la pieza que este workflow existe para proteger.
+        # Aqui solo importa que el codigo que produce y verifica los backups
+        # pase lint; el resto es responsabilidad de ci.yml.
         working-directory: data-engine
-        run: uv run --frozen ruff check .
+        run: uv run --frozen ruff check scripts/backup scripts/restore
 
   drill-script:
     name: Drill reproducible local/VM (disaster_drill.py)
