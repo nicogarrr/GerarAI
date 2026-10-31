@@ -78,6 +78,82 @@ def _scenario_nd_note(name: str, raw_value: float | None, scenario_margin: float
     )
 
 
+def _normalized_fcf_margin(
+    context: "ValuationContext", snapshot
+) -> tuple[float | None, dict | None]:
+    """Margen FCF del DCF como mediana de los ultimos 3 ejercicios fiscales.
+
+    Motivacion: KO tenia un margen del ultimo FY de 10,1 % frente a 21,3 % y
+    22,2 % de los dos anteriores (caida puntual del flujo operativo con
+    beneficio estable, hechos SEC reales) y usar el ultimo ano en crudo
+    deprimia la base de forma severa. La magnitud exacta observada en prod
+    durante el analisis no es reproducible de forma aislada (depende de los
+    demas supuestos del motor: WACC, crecimiento, terminal); la auditoria
+    externa con supuestos propios obtuvo otra magnitud en la misma direccion.
+
+    Reglas: con >= 2 FY la mediana resiste un ano puntual; con 1 FY se
+    mantiene el comportamiento anterior. Guarda de tendencia: con caidas en
+    todos los pares consecutivos del historial (tendencia monotona a la
+    baja) la mediana sobrevalora, asi que se usa el ultimo FY
+    (equivale a min(mediana, ultimo) en ese caso). La traza publica la
+    normalizacion con los valores por periodo y la tendencia detectada.
+    Nunca se inventa un margen que no salga de hechos.
+
+    Limite conocido (preexistente): un margen negativo no tiene floor; esta
+    normalizacion no cambia ese comportamiento.
+    """
+    latest = snapshot.value("fcf_margin")
+    try:
+        from app.valuation.financial_snapshot import _available_at, _facts_for_metric
+
+        # Misma politica que el snapshot: elegibilidad/cuarentena, orden
+        # fiscal_year desc + created_at desc y corte point-in-time por
+        # ``filed`` cuando hay as_of (sin as_of no cambia el comportamiento).
+        # Un replay historico no puede consumir FY publicados despues del
+        # corte, y dos proveedores del mismo FY no ocupan dos plazas:
+        # setdefault deja UN hecho por ejercicio (el primero del orden, el
+        # mas reciente conocido en el corte).
+        facts = _facts_for_metric(context.db, context.company.id, "fcf_margin")
+        facts, _, _ = _available_at(facts, context.as_of)
+    except Exception:  # noqa: BLE001 - sin historial, comportamiento anterior
+        return latest, None
+    by_year: dict[int, object] = {}
+    for fact in facts:
+        if fact.fiscal_quarter != "FY" or fact.fiscal_year is None:
+            continue
+        by_year.setdefault(fact.fiscal_year, fact)
+    values = [
+        {"period": fact.period, "fiscal_year": year, "value": float(fact.value)}
+        for year, fact in sorted(by_year.items(), key=lambda kv: kv[0], reverse=True)[:3]
+    ]
+    if len(values) < 2:
+        return latest, None
+    ordered = sorted(item["value"] for item in values)
+    n = len(ordered)
+    median = ordered[n // 2] if n % 2 == 1 else (ordered[n // 2 - 1] + ordered[n // 2]) / 2
+    # Tendencia sobre el historial reciente (values viene del mas nuevo al
+    # mas viejo): caida monotona = todos los pares consecutivos caen.
+    pairs_declining = all(
+        values[i]["value"] < values[i + 1]["value"] for i in range(len(values) - 1)
+    )
+    pairs_rising = all(
+        values[i]["value"] > values[i + 1]["value"] for i in range(len(values) - 1)
+    )
+    trend = "declining" if pairs_declining else "rising" if pairs_rising else "mixed"
+    normalized = values[0]["value"] if trend == "declining" else median
+    normalization = {
+        "method": "median_last_n_fiscal_years",
+        "n": n,
+        "periods": values,
+        "latest_value": values[0]["value"],
+        "median_value": median,
+        "trend": trend,
+        "trend_guard_applied": trend == "declining",
+        "normalized_value": normalized,
+    }
+    return normalized, normalization
+
+
 class StandardDCFEngine(ValuationEngine):
     """DCF FCFF estándar sobre snapshot coherente.
 
@@ -135,7 +211,7 @@ class StandardDCFEngine(ValuationEngine):
             )
             return result
 
-        margin = snapshot.value("fcf_margin")
+        margin, margin_normalization = _normalized_fcf_margin(context, snapshot)
         if margin is None:
             fcf = snapshot.value("free_cash_flow")
             if fcf is None:
@@ -424,6 +500,7 @@ class StandardDCFEngine(ValuationEngine):
                 "growth_source": growth_source,
                 "growth_clamped_from": raw_growth if growth != raw_growth else None,
                 "fcf_margin_source": "financial_facts",
+                "fcf_margin_normalization": margin_normalization,
                 "fcf_margin_clamped_from": raw_margin if margin_clamped else None,
                 "wacc_source": wacc_source,
                 "terminal_source": terminal_source,
