@@ -9,8 +9,9 @@ from datetime import UTC, date, datetime
 from functools import wraps
 from threading import Lock
 from typing import Concatenate, ParamSpec, TypeVar
-from xml.etree import ElementTree
 
+# XML externo (servicio web de IBKR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedElementTree
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -174,7 +175,7 @@ def check_report(xml: str, account_id: str) -> date:
         raise ConnectionError("El extracto es demasiado grande. Reduce el período de la consulta Flex.")
     if validate_flex_xml(xml):
         raise ConnectionError("El extracto Flex está incompleto o IBKR aún prepara los costes. Revisa la consulta y vuelve a intentarlo más tarde.")
-    root = ElementTree.fromstring(xml)
+    root = DefusedElementTree.fromstring(xml)
     if _statement_identity_blockers(root, expected_account_id=account_id, max_age_days=5):
         raise ConnectionError("La cuenta o la fecha del extracto no coincide. Selecciona una sola cuenta y un extracto reciente en IBKR.")
     statement = next(e for e in root.iter() if e.tag.rsplit('}', 1)[-1] == "FlexStatement")
@@ -275,7 +276,7 @@ def import_report(db: Session, xml: str, account_id: str, revision: int, *, rece
     receipt = db.scalar(select(IBKRSyncReceipt).where(IBKRSyncReceipt.id == receipt_id))
     if not receipt or receipt.revision != revision or receipt.result != "running":
         raise ConnectionError("El intento de sincronización ya no es válido.")
-    statement = next(e for e in ElementTree.fromstring(xml).iter()
+    statement = next(e for e in DefusedElementTree.fromstring(xml).iter()
                      if e.tag.rsplit('}', 1)[-1] == "FlexStatement")
     raw_start = statement.attrib.get("fromDate", "").split(';', 1)[0]
     try:

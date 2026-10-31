@@ -10,6 +10,10 @@ from xml.etree import ElementTree
 
 import httpx
 
+# Feeds RSS/Atom externos: defusedxml solo para PARSEAR - entidades/DTD
+# rechazadas sin expandir; ParseError/Element siguen del stdlib.
+from defusedxml import ElementTree as DefusedElementTree
+
 from app.services.connectors.base import ConnectorItem, ConnectorResult
 from app.services.data_source_health import get_data_source_registry
 from app.services.public_fetch import fetch_public_url_async
@@ -105,7 +109,7 @@ class RSSConnector:
         metadata: dict[str, Any] = {"feed_url": url, "ticker": ticker}
         try:
             content = await self._fetch(url)
-            root = ElementTree.fromstring(content)
+            root = DefusedElementTree.fromstring(content)
             if _local_name(root.tag) not in _FEED_ROOTS:
                 # 200 bien formado que no es un feed (challenge HTML, sitemap,
                 # página de error): deriva de formato, no éxito.
