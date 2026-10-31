@@ -25,7 +25,9 @@ describe('modelo: la valoración de referencia es la vista Valoración', () => {
         assert.match(panel, /cálculo interno del modelo/);
         assert.match(panel, /compara versión y fecha antes de usarlo/);
     });
-    it('la ficha le pasa el ticker', () => {
-        assert.match(page, /<LongTermModelPanel model=\{model\?\.status === 'not_generated' \? null : model\} ticker=\{ticker\} \/>/);
+    it('la ficha le pasa el ticker y el traductor', () => {
+        // t llega del getT() de la pagina: las etiquetas del panel salen del
+        // diccionario (ratchet i18n), nunca de literales escritos a mano.
+        assert.match(page, /<LongTermModelPanel model=\{model\?\.status === 'not_generated' \? null : model\} ticker=\{ticker\} t=\{t\} \/>/);
     });
 });
