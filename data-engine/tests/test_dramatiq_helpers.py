@@ -71,9 +71,12 @@ def test_status_from_message_formas_conocidas():
 
 
 def test_status_from_message_rechaza_no_status():
-    assert da._status_from_message("en 2024 hubo 500 empresas") is None or True  # solo cuenta formato
+    # el parser no acepta cualquier numero de 3 cifras: solo formatos con
+    # parentesis, "status", comillas estilo httpx o HTTP/x.y
+    assert da._status_from_message("en 2024 hubo 500 empresas") is None
     assert da._status_from_message("sin numeros") is None
     assert da._status_from_message("(199) no es status") is None
+    assert da._status_from_message("(700) fuera de rango") is None
 
 
 def test_is_transient_clasificacion():
