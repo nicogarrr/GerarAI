@@ -52,7 +52,13 @@ def test_transaction_list_flags_zero_price_buy():
                   "currency": "EUR", "trade_date": "2025-03-03"},
         )
         assert response.status_code == 201, response.text
-    listed = client.get("/api/portfolio/transactions").json()
-    rows = listed if isinstance(listed, list) else listed.get("items", listed.get("transactions", []))
-    flags = {r["ticker"]: r.get("review_flag") for r in rows if r["ticker"] in {"ZEROGIFT", "PAIDBUY"}}
+    # GET /transactions pagina (20 por defecto): en la suite, con la BD
+    # compartida llena de operaciones de otros tests, las filas de 2025-03-03
+    # caian fuera de la pagina 1 y el assert veia {}. El endpoint ya ofrece
+    # filtro por ticker: deterministico con cualquier volumen acumulado.
+    flags = {}
+    for ticker in ("ZEROGIFT", "PAIDBUY"):
+        listed = client.get("/api/portfolio/transactions", params={"ticker": ticker}).json()
+        rows = listed if isinstance(listed, list) else listed.get("items", listed.get("transactions", []))
+        flags[ticker] = rows[0].get("review_flag") if rows else None
     assert flags == {"ZEROGIFT": ZERO_COST_REVIEW_LABEL, "PAIDBUY": None}
