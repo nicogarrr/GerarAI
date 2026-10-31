@@ -317,7 +317,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                         <Label htmlFor={`${uid}-expiry`}>{ti('paperTrading.ticket.expiry')}</Label>
                         <Input
                         style={{ minHeight: 44 }}
-                            className="w-full min-w-0 max-w-full px-3 text-sm placeholder:text-gray-500"
+                            className="w-full min-w-0 max-w-full px-3 placeholder:text-gray-500"
                             id={`${uid}-expiry`}
                             type="date"
                             value={expiry}
@@ -409,7 +409,7 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                 <div className="w-full overflow-hidden">
                     <Input
                         style={{ minHeight: 44 }}
-                        className="w-full min-w-0 max-w-full px-3 text-sm"
+                        className="w-full min-w-0 max-w-full px-3"
                         id={`${uid}-executed`}
                         type="datetime-local"
                         value={executedAtLocal}
