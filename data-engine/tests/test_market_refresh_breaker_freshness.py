@@ -20,7 +20,6 @@ from app.models.entities import Base, Company, MarketPrice, Portfolio, Position
 from app.services.market_refresh_service import (
     ECBRates,
     MarketRefreshService,
-    PriceObservation,
 )
 
 
