@@ -575,12 +575,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                 // salen de la cotización y se muestran con su divisa.
                                                 <span className="text-right font-mono text-gray-300">
                                                     {formatMoney(h.value, h.baseCurrency)}
-                                                    {/* NBSP antes del «·»: a 390px el separador se quedaba huerfano
-                                                        en la linea siguiente. El espacio tras «·» sigue rompible:
-                                                        pegar tambien el peso haria la cadena irrompible y en filas
-                                                        muy estrechas desbordaria la tarjeta (medido en captura). */}
                                                     {portfolioSummary && portfolioSummary.equityValue > 0
-                                                        ? `\u00a0\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
+                                                        ? ` · ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
                                                         : ''}
                                                 </span>
                                             ) : (

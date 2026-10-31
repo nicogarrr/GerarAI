@@ -4,18 +4,11 @@ import test from 'node:test';
 
 /**
  * Guard: wraps huérfanos a 390 px (recorrido móvil, 31-oct-2026).
- * - La fila de posición de inicio pintaba «12.211,79 € ·» y el peso suelto en
- *   la línea siguiente: NBSP antes del «·» (el espacio tras «·» sigue rompible
- *   para que la fila pueda partir sin desbordar la tarjeta).
- * - «Página x de y» se partía («de / 2»): va con whitespace-nowrap; el wrap,
- *   si hace falta, ocurre antes de la frase entera.
+ * «Página x de y» se partía («de / 2»): va con whitespace-nowrap; el wrap,
+ * si hace falta, ocurre antes de la frase entera.
+ * (La fila de posiciones de PersonalizedOverview va en su propio PR:
+ * necesita fix de layout, no solo NBSP.)
  */
-
-test('inicio: valor y peso de una posición no se separan del «·»', () => {
-    const src = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
-    assert.ok(src.includes('\\u00a0\\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue)'), 'separador con NBSP solo antes (rompible despues, sin desborde)');
-    assert.ok(!src.includes('\\u00a0\\u00b7\\u00a0${formatPercent'), 'NBSP en ambos lados haria la cadena irrompible y desbordaria filas estrechas');
-});
 
 test('«Página x de y» nunca se parte en dos líneas', () => {
     const NOWRAP = 'whitespace-nowrap';
