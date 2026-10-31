@@ -124,6 +124,13 @@ def _register(scheduler: BlockingScheduler, func, trigger: str, *, job_id: str, 
     )
 
 
+def _refresh_instrument_references() -> dict:
+    """Wrapper con import perezoso: scripts/ no es paquete de la app."""
+    from scripts.sync_instruments import refresh_weekly
+
+    return refresh_weekly()
+
+
 def enqueue_insider_scan(*, lookback: int, max_new_fetches: int) -> dict:
     """Fan-out del monitor insider con el alcance propio de cada cadencia."""
     queued = []
@@ -220,6 +227,11 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     _register(scheduler, refresh_macro_context.send, "cron", job_id="macro_context_refresh", hour=23, minute=10)
     # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)
+    # instrument_references (nombres 13F por CUSIP, gems smart-money, resolver
+    # de renombres por FIGI): semanal; sin el refresco la tabla queda congelada
+    # al seed manual y los consumidores degradan en silencio.
+    _register(scheduler, _refresh_instrument_references, "cron", job_id="instrument_references_refresh",
+              day_of_week="mon", hour=6, minute=15)
     # Cartera real desde IBKR Flex (solo lectura). El actor no hace nada si
     # faltan token, query id o IBKR_FLEX_TENANT_ID; corre una vez al dia, con el
     # extracto del ultimo dia habil ya generado por IBKR.
