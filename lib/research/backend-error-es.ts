@@ -40,6 +40,10 @@ const EXACT: Record<string, string> = {
   'rate limit exceeded': 'Demasiadas peticiones. Espera un momento y reintenta.',
   'quantity must be positive and price cannot be negative': 'La cantidad debe ser positiva y el precio no puede ser negativo.',
   'fees cannot be negative': 'Las comisiones no pueden ser negativas.',
+  'authentication backend unavailable': 'El servicio de autenticación no está disponible ahora mismo. Reintenta en unos segundos.',
+  'rate limit backend unavailable': 'El servicio de control de peticiones no está disponible ahora mismo. Reintenta en unos segundos.',
+  'research authentication is not configured': 'El motor de análisis no está configurado todavía. Inténtalo más tarde.',
+  'tenant access is not active': 'Tu cuenta no está activa. Cierra sesión y vuelve a entrar; si sigue fallando, contacta con soporte.',
 };
 
 /** Sujeto de «X not found» → español. */
@@ -60,6 +64,16 @@ const NOT_FOUND_SUBJECT: Record<string, string> = {
   'thesis version': 'No se encontró esa versión de la tesis.',
   job: 'No se encontró la tarea.',
   'processing job': 'No se encontró la tarea.',
+  claim: 'No se encontró la afirmación.',
+  'corporate action': 'No se encontró la acción corporativa.',
+  'decision lesson': 'No se encontró la lección de decisiones.',
+  'investment principle': 'No se encontró el principio de inversión.',
+  'kpi candidate': 'No se encontró el candidato de KPI.',
+  'management promise': 'No se encontró el compromiso de la directiva.',
+  'propick run': 'No se encontró la ejecución de ProPicks.',
+  'research session': 'No se encontró la sesión de investigación.',
+  review: 'No se encontró la revisión.',
+  source: 'No se encontró la fuente.',
 };
 
 const SPANISH_MARKS = /[áéíóúñü¿¡«»]/i;

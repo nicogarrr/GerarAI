@@ -35,6 +35,29 @@ describe('textos de error del motor en español', () => {
     expect(getFriendlyErrorMessage(new AppError('Tenant context required', 'RESEARCH_API_ERROR', 400))).not.toMatch(/tenant|context|required/i);
   });
 
+  it('traduce los rechazos de infraestructura y de acceso (auth, rate limit, tenant)', () => {
+    expect(spanishBackendMessage('Authentication backend unavailable')).toMatch(/autenticaci/i);
+    expect(spanishBackendMessage('Authentication backend unavailable')).not.toMatch(/backend|unavailable/i);
+    expect(spanishBackendMessage('Rate limit backend unavailable')).toMatch(/control de peticiones/i);
+    expect(spanishBackendMessage('Rate limit backend unavailable')).not.toMatch(/backend|unavailable/i);
+    expect(spanishBackendMessage('Research authentication is not configured')).not.toMatch(/research|authentication|configured/i);
+    expect(spanishBackendMessage('Tenant access is not active')).toMatch(/cuenta/i);
+    expect(spanishBackendMessage('Tenant access is not active')).not.toMatch(/tenant|access|active/i);
+  });
+
+  it('traduce los «X not found» de memoria, ProPicks y seguimiento', () => {
+    expect(spanishBackendMessage('Claim not found')).toBe('No se encontró la afirmación.');
+    expect(spanishBackendMessage('Corporate action not found')).toBe('No se encontró la acción corporativa.');
+    expect(spanishBackendMessage('Decision lesson not found')).toBe('No se encontró la lección de decisiones.');
+    expect(spanishBackendMessage('Investment principle not found')).toBe('No se encontró el principio de inversión.');
+    expect(spanishBackendMessage('KPI candidate not found')).toBe('No se encontró el candidato de KPI.');
+    expect(spanishBackendMessage('Management promise not found')).toBe('No se encontró el compromiso de la directiva.');
+    expect(spanishBackendMessage('propick run not found')).toBe('No se encontró la ejecución de ProPicks.');
+    expect(spanishBackendMessage('Research session not found')).toBe('No se encontró la sesión de investigación.');
+    expect(spanishBackendMessage('Review not found')).toBe('No se encontró la revisión.');
+    expect(spanishBackendMessage('Source not found')).toBe('No se encontró la fuente.');
+  });
+
   it('guard: ningún detail literal en inglés de las rutas del motor llega en inglés', () => {
     const dir = path.join(process.cwd(), 'data-engine/app/api/routes');
     const details = new Set<string>();
