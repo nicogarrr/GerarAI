@@ -205,6 +205,9 @@ class DataSourceHealthRegistry:
             ),
             "celestrak": DataSourceStatus(
                 name="CelesTrak",
+                is_primary=False,
+                fallback_source=None,
+            ),
             "fred": DataSourceStatus(
                 name="FRED (St. Louis Fed)",
                 is_primary=False,
