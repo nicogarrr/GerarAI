@@ -163,7 +163,10 @@ def exposure_from_snapshot(
         "total_value_base": _safe_float(snapshot.total_value_base),
         "equity_weight": _safe_float(equity_weight),
         "cash_weight": _safe_float(cash_value / total) if total > 0 else None,
-        "n_positions": len(weights),
+        # Recuento de posiciones en cartera: las filas del snapshot, no las
+        # que cupieron en el vector de pesos (con NAV <= 0 - margen por encima
+        # del valor - los pesos son None pero las posiciones SIGUEN ahi).
+        "n_positions": len(position_rows),
         "top_1_weight": _safe_float(weights[0]) if weights else None,
         "top_5_weight": _safe_float(sum(weights[:5])) if weights else None,
         # Auditoria A: caja/margen aparte con su signo, y el significado de
