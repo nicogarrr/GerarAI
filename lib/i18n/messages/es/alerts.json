@@ -7,5 +7,20 @@
     "priceChange": "Cambio de precio %",
     "news": "Nueva noticia",
     "earnings": "Informe de ganancias"
+  },
+  "card": {
+    "kindNews": "Noticia",
+    "kindMaterialNews": "Noticia material",
+    "kindAlert": "Alerta",
+    "dateDetected": "detectada {date}",
+    "summaryDailyDigest": "Resumen diario de tu cartera; abre el detalle para ver la cobertura de datos.",
+    "summaryMacroEvent": "Recordatorio del calendario macro oficial; el detalle indica la fuente y la hora.",
+    "summaryUnlinked": "Alerta sin empresa asociada.",
+    "formSummary": "Documento {form} asociado a {company}.",
+    "trackedNewsFallback": "Noticia sobre {company}.",
+    "newsNoHeadline": "Noticia sobre {company}; el aviso no trae titular verificable.",
+    "ruleMatched": "Se cumplió la regla «{title}» para {company}.",
+    "fallback": "Alerta de {company}: {title}.",
+    "fallbackNoDetail": "sin detalle disponible"
   }
 }

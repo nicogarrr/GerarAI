@@ -50,7 +50,10 @@ test('el panel restaura, guarda, sugiere y copia', () => {
     assert.ok(panel.includes('restoreConversation'));
     assert.ok(panel.includes('sessionStorage.setItem'));
     assert.ok(panel.includes('BRAIN_SUGGESTED_QUESTIONS'));
-    assert.ok(panel.includes('Copiar'));
+    assert.ok(panel.includes('brain.panel.copy'));
+    const dictBrain = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+    assert.equal(dictBrain.panel.copy, 'Copiar');
+    assert.equal(dictBrain.panel.copied, 'Copiado');
     // El saludo inicial no lleva botón de copiar: no hay nada del usuario que copiar.
     assert.ok(panel.includes("m.role === 'assistant' && i > 0"));
 });

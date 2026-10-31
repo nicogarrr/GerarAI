@@ -283,6 +283,8 @@ describe('ficha DCF del inicio: el precio con la divisa del listado', () => {
         assert.match(src, /currency: listing\.currency/, 'la divisa del precio viene del listado real (master)');
         assert.match(src, /getWatchlistEntryData\(sym\)/, 'precio y divisa salen de la MISMA fuente (nunca ticker desnudo)');
         assert.ok(!/getStockQuote\(/.test(src), 'getStockQuote no devuelve divisa: se cae en la línea US');
-        assert.match(src, /Valor justo \(divisa N\/D\)/, 'el valor justo declara la divisa que el modelo no propaga');
+        assert.match(src, /home\.opportunities\.fairUnknown/, 'el valor justo declara la divisa que el modelo no propaga');
+        const dictHome = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/home.json'), 'utf8'));
+        assert.ok(dictHome.opportunities.fairUnknown.startsWith('Valor justo (divisa'), dictHome.opportunities.fairUnknown);
     });
 });
