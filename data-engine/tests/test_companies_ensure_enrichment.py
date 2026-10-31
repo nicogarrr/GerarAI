@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Company
 from app.services.company_enrichment_service import CompanyEnrichmentService
@@ -49,7 +50,7 @@ def test_ensure_enriches_ticker_only_stub(monkeypatch):
             "currency": "USD",
         },
     )
-    response = TestClient(main.app).post("/api/companies/ensure", json={"ticker": TICKER})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json={"ticker": TICKER})
     assert response.status_code in (200, 201)
     payload = response.json()
     assert payload["name"] == "QA Ensure Corp"
@@ -71,7 +72,7 @@ def test_ensure_survives_enrichment_failure(monkeypatch):
     monkeypatch.setattr(
         CompanyEnrichmentService, "_finnhub_profile", lambda self, ticker: None
     )
-    response = TestClient(main.app).post("/api/companies/ensure", json={"ticker": TICKER})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json={"ticker": TICKER})
     assert response.status_code in (200, 201)
     payload = response.json()
     assert payload["ticker"] == TICKER
