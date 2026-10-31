@@ -21,6 +21,10 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import httpx
+
+from app.services.data_source_health import get_data_source_registry
+
+_REGISTRY_KEY = "cnmv"
 from lxml import html as lxml_html
 
 OIR_RESULTS_URL = "https://www.cnmv.es/portal/otra-informacion-relevante/resultado-oir"
@@ -53,7 +57,9 @@ def parse_oir_results(page_html: str) -> list[dict]:
     Structure (verified against the live page 2026-09-22): a repeater of
     first-level <li> blocks, each carrying date, time, entity link (with
     nif= in href), category, document link and registration number.
-    Raises CNMVParseError on any structural drift.
+    Returns an empty list on a valid no-filings day (weekend, holiday):
+    the results container renders empty. Raises CNMVParseError only when the
+    container itself is missing or a block is incomplete (structural drift).
     """
     try:
         tree = lxml_html.fromstring(page_html)
@@ -61,7 +67,14 @@ def parse_oir_results(page_html: str) -> list[dict]:
         raise CNMVParseError(f"unparseable document: {type(exc).__name__}") from exc
     blocks = tree.xpath('//li[contains(concat(" ", normalize-space(@class), " "), " blocks-single ")]')
     if not blocks:
-        raise CNMVParseError("no result blocks found (page structure changed or empty day)")
+        # Un dia sin hechos relevantes (fin de semana, festivo) NO es deriva:
+        # la lista de resultados (<ul id="listaElementosPrimernivel">, verificado
+        # contra la pagina viva el 2026-10-31) se renderiza igualmente, vacia.
+        # Solo si el contenedor falta la estructura ha cambiado de verdad.
+        container = tree.xpath('//ul[@id="listaElementosPrimernivel"]')
+        if container:
+            return []
+        raise CNMVParseError("results list container not found (page structure changed)")
     filings: list[dict] = []
     for block in blocks:
         date_nodes = block.xpath('.//li[contains(@class, "fecha-con-hora")]')
@@ -101,7 +114,13 @@ def parse_oir_results(page_html: str) -> list[dict]:
 
 
 async def fetch_oir_filings(*, days: int = 1, client: httpx.AsyncClient | None = None) -> list[dict]:
-    """Fetch OIR filings for the last N days (one GET; CNMV has no API)."""
+    """Fetch OIR filings for the last N days (one GET; CNMV has no API).
+
+    Registra el outcome en el registry de salud de fuentes: la CNMV es HTML
+    scrapeado sin API, justo el caso "el proveedor cambia el HTML" de la
+    auditoria — un CNMVParseError (estructura distinta) o un bloqueo deben
+    mover el circuito, no quedar invisibles.
+    """
     if not 1 <= days <= _MAX_DAYS:
         raise ValueError(f"days must be 1..{_MAX_DAYS}")
     _throttle()
@@ -109,10 +128,23 @@ async def fetch_oir_filings(*, days: int = 1, client: httpx.AsyncClient | None =
     client = client or httpx.AsyncClient(
         timeout=30, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
     )
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     try:
         response = await client.get(OIR_RESULTS_URL, params={"dias": days, "lang": "es"})
         response.raise_for_status()
-        return parse_oir_results(response.text)
+        filings = parse_oir_results(response.text)
+    except httpx.HTTPStatusError as exc:
+        registry.record_failure(_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    except CNMVParseError:
+        registry.record_failure(_REGISTRY_KEY, "estructura de la pagina cambio")
+        raise
     finally:
         if owns_client:
             await client.aclose()
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    return filings
