@@ -9,7 +9,12 @@ from app.core.database import Base
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # disable_existing_loggers=False es carga rota sin el: el default True
+    # deshabilita TODO logger ya creado. Cuando un test migra en proceso
+    # (patron test_0120), los modulos app ya estan importados en coleccion y
+    # sus loggers quedaban mudos para el resto del worker: las aserciones
+    # sobre caplog de toda la suite fallaban con capturas vacias.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 target_metadata = Base.metadata
 config.set_main_option("sqlalchemy.url", get_settings().database_url)
