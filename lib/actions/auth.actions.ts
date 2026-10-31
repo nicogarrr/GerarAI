@@ -6,7 +6,7 @@ import { callAuthEndpoint } from "@/lib/auth/endpoint";
 import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
 import { getT } from "@/lib/i18n/server";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string }> => {
+export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
     const t = await getT();
     try {
         const auth = await getAuth();
@@ -48,7 +48,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
-export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean }> => {
+export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean; code?: string }> => {
     const t = await getT();
     try {
         const auth = await getAuth();
@@ -74,7 +74,10 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         // The endpoint maps documented status/code pairs to safe Spanish copy.
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
-            return { success: false, error: getSafeErrorMessage(appError) };
+            // `code` llega al formulario: AUTH_ENDPOINT_ACCOUNT_PENDING /
+            // AUTH_ENDPOINT_ACCOUNT_REJECTED abren la pantalla de estado de la
+            // cuenta en lugar del toast generico.
+            return { success: false, error: getSafeErrorMessage(appError), code: appError.code };
         }
 
 
