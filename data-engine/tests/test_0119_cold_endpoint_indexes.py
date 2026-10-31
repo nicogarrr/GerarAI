@@ -100,4 +100,4 @@ def test_0119_indices_validos_parciales_y_reentrantes_en_ci_postgres():
     finally:
         engine.dispose()
         with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre uuid-hex generado por _scratch (test_0114), sin input externo; BD efimera de CI
