@@ -20,7 +20,6 @@ import app.api.routes.companies as companies_route
 from app.models.entities import (
     Base,
     Company,
-    DriverAssumptionVersion,
     FundamentalDriver,
     FundamentalModelVersion,
 )

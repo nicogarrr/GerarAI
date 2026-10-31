@@ -27,7 +27,6 @@ from app.services.connectors.edgartools_facts import (
     quarter_label,
 )
 
-
 # -- helpers puros ----------------------------------------------------------
 
 

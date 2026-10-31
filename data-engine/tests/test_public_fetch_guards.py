@@ -8,18 +8,16 @@ resolucion a una IP no publica se rechaza, y que el pinning exige el host y
 puerto validados.
 """
 
-import ipaddress
 import socket
 
 import pytest
 
-from app.services import public_fetch
 from app.services.public_fetch import (
-    _PinnedConnectionMixin,
-    _PublicTarget,
     _build_target,
     _parse_content_length,
     _parse_public_url,
+    _PinnedConnectionMixin,
+    _PublicTarget,
     _read_limited,
     _redirect_target,
     _resolve_public_url,

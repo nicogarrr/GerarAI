@@ -7,7 +7,6 @@ el real: sin clave no hay llamada, un profile2 sin datos cae a /search, y la
 divisa de reserva sale del sufijo del ticker sin pisar la declarada.
 """
 
-from datetime import UTC, datetime
 
 import httpx
 import pytest
