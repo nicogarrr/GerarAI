@@ -17,10 +17,14 @@ from sqlalchemy import select
 
 import main
 from app.api.routes import workflows as workflows_route
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Company, WorkflowRun
 
 client = TestClient(main.app)
+# Como el frontend: token CSRF por defecto; el middleware rechaza sin el (403)
+# antes de llegar al handler, y estas pruebas miden la capa de workflows.
+client.headers["X-CSRF-Token"] = generate_csrf_token()
 
 
 def _seed_company(ticker: str) -> None:
