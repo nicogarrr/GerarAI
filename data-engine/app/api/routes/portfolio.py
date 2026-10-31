@@ -36,6 +36,8 @@ from app.schemas.api import (
     PortfolioConfigurationOut,
     PortfolioConfigurationUpdateOut,
     PortfolioDataQualityOut,
+    PortfolioDividendProjectionOut,
+    PortfolioDividendYieldsOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
     PortfolioSnapshotOut,
@@ -746,7 +748,7 @@ async def sync_portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     )
 
 
-@router.get("/dividends")
+@router.get("/dividends", response_model=PortfolioDividendYieldsOut)
 def portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     """Trailing-12-month declared dividend yield per position and portfolio.
 
@@ -756,7 +758,7 @@ def portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     return DividendIngestionService().portfolio_yields(db)
 
 
-@router.get("/dividends/projection")
+@router.get("/dividends/projection", response_model=PortfolioDividendProjectionOut, response_model_exclude_unset=True)
 def portfolio_dividend_projection(
     months: Annotated[int, Query(ge=1, le=24)] = 12,
     db: Session = Depends(get_db),

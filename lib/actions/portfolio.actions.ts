@@ -544,21 +544,9 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
         // ya venía diluido sobre el valor total: fracción 1 es consistente.
         let dividendScore: number | null = null;
         try {
-            const dividends = await cachedFetch<{
-                portfolio_yield: number | null;
-                coverage: {
-                    positions_with_dividend_data: number;
-                    covered_value_fraction?: number | null;
-                };
-            }>(
+            const dividends = await cachedFetch<PortfolioDividendYields>(
                 `portfolio:${canonicalUserId}:dividends`,
-                () => researchRequest<{
-                    portfolio_yield: number | null;
-                    coverage: {
-                        positions_with_dividend_data: number;
-                        covered_value_fraction?: number | null;
-                    };
-                }>('/api/portfolio/dividends', { fast: true }),
+                () => researchRequest<PortfolioDividendYields>('/api/portfolio/dividends', { fast: true }),
                 30,
             );
             if (
@@ -985,94 +973,21 @@ export async function getPortfolioForecast(): Promise<PortfolioForecast> {
 // Proyección mecánica de dividendos (idea 5 del listado 0-31: mes a mes, con
 // retención de origen e IRPF). Toda cifra viene del endpoint determinista
 // /api/portfolio/dividends/projection; los null del backend se propagan como
-// null (N/D en pantalla), nunca como 0.
+// null (N/D en pantalla), nunca como 0. Tipos generados desde el OpenAPI del
+// backend (response_model en las dos rutas); regenerar con
+// `npx openapi-typescript data-engine/openapi.json`.
 
-export type DividendProjectionMonth = {
-  month: string;
-  gross_base: number;
-  source_withheld_base: number;
-  /** Bruto con FX conocido de posiciones sin retención verificada (nunca neto). */
-  gross_unverified_base?: number;
-  gross_total_base?: number;
-  covered_tickers: string[];
-  excluded_tickers: string[];
-  note: string | null;
-};
+export type DividendProjectionMonth = components['schemas']['DividendProjectionMonthOut'];
 
-export type DividendProjectionFiscalYear = {
-  gross_base: number | null;
-  irpf_scenario: number | null;
-  source_withheld_foreign: number | null;
-  retencion_a_cuenta_es: number | null;
-  double_tax_deduction: number | null;
-  cuota_pendiente_estimada: number | null;
-  net_scenario: number | null;
-  effective_avg_rate?: number;
-  per_position?: Record<
-    string,
-    {
-      gross_base: number;
-      source_withheld_foreign_base: number;
-      retencion_a_cuenta_base: number;
-      double_tax_deduction_base: number;
-    }
-  >;
-  covered_tickers: string[];
-  excluded_tickers: string[];
-  note: string;
-};
+export type DividendProjectionFiscalYear = components['schemas']['DividendProjectionFiscalYearOut'];
 
-export type DividendProjectionPosition = {
-  ticker: string;
-  currency: string;
-  quantity: number;
-  frequency_last_year: number;
-  gross_native: number;
-  gross_base: number | null;
-  domicile_country: string | null;
-  source_withholding_rate: number | null;
-  source_withheld_base: number | null;
-  withholding_basis?: 'emisor_verificado' | 'domicilio_bd';
-  withholding_kind?: 'techo_convenio' | 'escenario_convenio' | 'sin_impuesto_origen_escenario' | null;
-  unverified_reason?: string | null;
-  scenario_conditions?: string | null;
-  months: Record<string, number>;
-};
+export type DividendProjectionPosition = components['schemas']['DividendProjectionPositionOut'];
 
-export type DividendProjectionDeclaredFuture = {
-  ticker: string;
-  ex_date: string;
-  pay_date: string | null;
-  amount_per_share: number;
-  currency: string;
-  label: string;
-  source: string;
-  projection_as_of: string;
-  note: string;
-};
+export type DividendProjectionDeclaredFuture = components['schemas']['DividendProjectionDeclaredFutureOut'];
 
-export type PortfolioDividendProjection = {
-  as_of: string;
-  base_currency: string;
-  horizon_months: number;
-  label: string;
-  method: string;
-  fiscal_conditions: string[];
-  sources: Record<string, string>;
-  months: DividendProjectionMonth[];
-  fiscal_by_year: Record<string, DividendProjectionFiscalYear>;
-  positions: DividendProjectionPosition[];
-  gross_summary?: { label: string; gross_total_base: number; gross_unverified_base: number; net_irpf: string; excluded_no_fx?: string[]; excluded_no_dividends?: string[]; excluded_uncertain_dividends?: string[]; complete?: boolean };
-  declared_future: DividendProjectionDeclaredFuture[];
-  coverage: {
-    with_data: number;
-    sin_datos: string[];
-    uncertain_dividends?: string[];
-    fx_missing: string[];
-    unknown_source_withholding: string[];
-    unverified_reasons?: Record<string, string>;
-  };
-};
+export type PortfolioDividendYields = components['schemas']['PortfolioDividendYieldsOut'];
+
+export type PortfolioDividendProjection = components['schemas']['PortfolioDividendProjectionOut'];
 
 export async function getPortfolioDividendProjection(): Promise<PortfolioDividendProjection> {
   // Sin cache: la proyección depende de la última sincronización IBKR y de

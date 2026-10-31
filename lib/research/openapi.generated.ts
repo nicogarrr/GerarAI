@@ -8162,6 +8162,198 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** DividendProjectionCoverageOut */
+        DividendProjectionCoverageOut: {
+            /** Fx Missing */
+            fx_missing: string[];
+            /** Sin Datos */
+            sin_datos: string[];
+            /** Uncertain Dividends */
+            uncertain_dividends: string[];
+            /** Unknown Source Withholding */
+            unknown_source_withholding: string[];
+            /** Unverified Reasons */
+            unverified_reasons: {
+                [key: string]: string;
+            };
+            /** With Data */
+            with_data: number;
+        };
+        /** DividendProjectionDeclaredFutureOut */
+        DividendProjectionDeclaredFutureOut: {
+            /** Amount Per Share */
+            amount_per_share: number;
+            /** Currency */
+            currency: string;
+            /** Ex Date */
+            ex_date: string;
+            /** Label */
+            label: string;
+            /** Note */
+            note: string;
+            /** Pay Date */
+            pay_date: string | null;
+            /** Projection As Of */
+            projection_as_of: string;
+            /** Source */
+            source: string;
+            /** Ticker */
+            ticker: string;
+        };
+        /** DividendProjectionFiscalYearOut */
+        DividendProjectionFiscalYearOut: {
+            /** Covered Tickers */
+            covered_tickers: string[];
+            /** Cuota Pendiente Estimada */
+            cuota_pendiente_estimada: number | null;
+            /** Double Tax Deduction */
+            double_tax_deduction: number | null;
+            /** Effective Avg Rate */
+            effective_avg_rate?: number | null;
+            /** Excluded Tickers */
+            excluded_tickers: string[];
+            /** Gross Base */
+            gross_base: number | null;
+            /** Irpf Scenario */
+            irpf_scenario: number | null;
+            /** Net Scenario */
+            net_scenario: number | null;
+            /** Note */
+            note: string;
+            /** Per Position */
+            per_position?: {
+                [key: string]: components["schemas"]["DividendProjectionPositionFiscalOut"];
+            } | null;
+            /** Retencion A Cuenta Es */
+            retencion_a_cuenta_es: number | null;
+            /** Source Withheld Foreign */
+            source_withheld_foreign: number | null;
+        };
+        /** DividendProjectionGrossSummaryOut */
+        DividendProjectionGrossSummaryOut: {
+            /** Complete */
+            complete: boolean;
+            /** Excluded No Dividends */
+            excluded_no_dividends: string[];
+            /** Excluded No Fx */
+            excluded_no_fx: string[];
+            /** Excluded Uncertain Dividends */
+            excluded_uncertain_dividends: string[];
+            /** Gross Total Base */
+            gross_total_base: number;
+            /** Gross Unverified Base */
+            gross_unverified_base: number;
+            /** Label */
+            label: string;
+            /** Net Irpf */
+            net_irpf: string;
+        };
+        /** DividendProjectionMonthOut */
+        DividendProjectionMonthOut: {
+            /** Covered Tickers */
+            covered_tickers: string[];
+            /** Excluded Tickers */
+            excluded_tickers: string[];
+            /** Gross Base */
+            gross_base: number;
+            /** Gross Total Base */
+            gross_total_base: number;
+            /** Gross Unverified Base */
+            gross_unverified_base: number;
+            /** Month */
+            month: string;
+            /** Note */
+            note: string | null;
+            /** Source Withheld Base */
+            source_withheld_base: number;
+        };
+        /** DividendProjectionPositionFiscalOut */
+        DividendProjectionPositionFiscalOut: {
+            /** Double Tax Deduction Base */
+            double_tax_deduction_base: number;
+            /** Gross Base */
+            gross_base: number;
+            /** Retencion A Cuenta Base */
+            retencion_a_cuenta_base: number;
+            /** Source Withheld Foreign Base */
+            source_withheld_foreign_base: number;
+        };
+        /** DividendProjectionPositionOut */
+        DividendProjectionPositionOut: {
+            /** Currency */
+            currency: string;
+            /** Domicile Country */
+            domicile_country: string | null;
+            /** Frequency Last Year */
+            frequency_last_year: number;
+            /** Gross Base */
+            gross_base: number | null;
+            /** Gross Native */
+            gross_native: number;
+            /** Months */
+            months: {
+                [key: string]: number;
+            };
+            /** Quantity */
+            quantity: number;
+            /** Scenario Conditions */
+            scenario_conditions: string | null;
+            /** Source Withheld Base */
+            source_withheld_base: number | null;
+            /** Source Withholding Rate */
+            source_withholding_rate: number | null;
+            /** Ticker */
+            ticker: string;
+            /** Unverified Reason */
+            unverified_reason: string | null;
+            /** Withholding Basis */
+            withholding_basis: ("emisor_verificado" | "domicilio_bd") | null;
+            /** Withholding Kind */
+            withholding_kind: ("techo_convenio" | "escenario_convenio" | "sin_impuesto_origen_escenario") | null;
+        };
+        /** DividendUncertainEventOut */
+        DividendUncertainEventOut: {
+            /** Amounts */
+            amounts: string[];
+            /** Ex Date */
+            ex_date: string;
+        };
+        /** DividendYieldCoverageOut */
+        DividendYieldCoverageOut: {
+            /** Covered Value Fraction */
+            covered_value_fraction: number | null;
+            /** Percent */
+            percent: number;
+            /** Positions */
+            positions: number;
+            /** Positions Missing Base Value */
+            positions_missing_base_value: string[];
+            /** Positions With Dividend Data */
+            positions_with_dividend_data: number;
+        };
+        /** DividendYieldPositionOut */
+        DividendYieldPositionOut: {
+            /** Currency */
+            currency: string;
+            /** Dividend Yield */
+            dividend_yield: number | null;
+            /** Last Fetched At */
+            last_fetched_at: string | null;
+            /** Matching Currency Records 12M */
+            matching_currency_records_12m: number;
+            /** Price */
+            price: number | null;
+            /** Records 12M */
+            records_12m: number;
+            /** Skipped Currency Mismatch */
+            skipped_currency_mismatch: number;
+            /** Ticker */
+            ticker: string;
+            /** Ttm Dividend Per Share */
+            ttm_dividend_per_share: number | null;
+            /** Uncertain Dividend Events */
+            uncertain_dividend_events: components["schemas"]["DividendUncertainEventOut"][];
+        };
         /**
          * DocType
          * @enum {string}
@@ -10065,6 +10257,48 @@ export interface components {
              */
             status: "ok" | "incomplete" | "no_portfolio";
             twr_chain: components["schemas"]["PortfolioTwrChainOut"];
+        };
+        /** PortfolioDividendProjectionOut */
+        PortfolioDividendProjectionOut: {
+            /** As Of */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            coverage: components["schemas"]["DividendProjectionCoverageOut"];
+            /** Declared Future */
+            declared_future: components["schemas"]["DividendProjectionDeclaredFutureOut"][];
+            /** Fiscal By Year */
+            fiscal_by_year: {
+                [key: string]: components["schemas"]["DividendProjectionFiscalYearOut"];
+            };
+            /** Fiscal Conditions */
+            fiscal_conditions: string[];
+            gross_summary: components["schemas"]["DividendProjectionGrossSummaryOut"];
+            /** Horizon Months */
+            horizon_months: number;
+            /** Label */
+            label: string;
+            /** Method */
+            method: string;
+            /** Months */
+            months: components["schemas"]["DividendProjectionMonthOut"][];
+            /** Positions */
+            positions: components["schemas"]["DividendProjectionPositionOut"][];
+            /** Sources */
+            sources: {
+                [key: string]: string;
+            };
+        };
+        /** PortfolioDividendYieldsOut */
+        PortfolioDividendYieldsOut: {
+            /** As Of */
+            as_of: string;
+            coverage: components["schemas"]["DividendYieldCoverageOut"];
+            /** Portfolio Yield */
+            portfolio_yield: number | null;
+            /** Positions */
+            positions: components["schemas"]["DividendYieldPositionOut"][];
+            provenance: components["schemas"]["ProvenanceOut"];
         };
         /** PortfolioDrawdownPointOut */
         PortfolioDrawdownPointOut: {
@@ -21733,9 +21967,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDividendYieldsOut"];
                 };
             };
             /** @description Validation Error */
@@ -21775,9 +22007,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioDividendProjectionOut"];
                 };
             };
             /** @description Validation Error */

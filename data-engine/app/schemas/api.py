@@ -1739,3 +1739,149 @@ class PortfolioSnapshotOut(BaseModel):
     pricing_coverage: float
     source: str
     metadata: dict[str, Any]
+# --- GET /api/portfolio/dividends --------------------------------------------
+# Formas medidas contra DividendIngestionService.portfolio_yields (servicio
+# real): emite siempre todas las claves (los huecos llegan como null, nunca
+# como 0 fabricado).
+
+
+class DividendUncertainEventOut(BaseModel):
+    ex_date: str
+    amounts: list[str]
+
+
+class DividendYieldPositionOut(BaseModel):
+    ticker: str
+    ttm_dividend_per_share: float | None
+    uncertain_dividend_events: list[DividendUncertainEventOut]
+    currency: str
+    price: float | None
+    dividend_yield: float | None
+    records_12m: int
+    matching_currency_records_12m: int
+    skipped_currency_mismatch: int
+    last_fetched_at: str | None
+
+
+class DividendYieldCoverageOut(BaseModel):
+    positions: int
+    positions_with_dividend_data: int
+    percent: float
+    positions_missing_base_value: list[str]
+    covered_value_fraction: float | None
+
+
+class PortfolioDividendYieldsOut(BaseModel):
+    as_of: str
+    positions: list[DividendYieldPositionOut]
+    portfolio_yield: float | None
+    coverage: DividendYieldCoverageOut
+    provenance: ProvenanceOut
+
+
+# --- GET /api/portfolio/dividends/projection ---------------------------------
+# Formas medidas contra DividendProjectionService.project (servicio real).
+# fiscal_by_year: las ramas sin escenario completo (todo excluido o base no
+# EUR) OMITEN effective_avg_rate y per_position; la ruta usa
+# response_model_exclude_unset=True para conservar la omision.
+
+
+class DividendProjectionMonthOut(BaseModel):
+    month: str
+    gross_base: float
+    source_withheld_base: float
+    gross_unverified_base: float
+    gross_total_base: float
+    covered_tickers: list[str]
+    excluded_tickers: list[str]
+    note: str | None
+
+
+class DividendProjectionPositionFiscalOut(BaseModel):
+    gross_base: float
+    source_withheld_foreign_base: float
+    retencion_a_cuenta_base: float
+    double_tax_deduction_base: float
+
+
+class DividendProjectionFiscalYearOut(BaseModel):
+    gross_base: float | None
+    irpf_scenario: float | None
+    source_withheld_foreign: float | None
+    retencion_a_cuenta_es: float | None
+    double_tax_deduction: float | None
+    cuota_pendiente_estimada: float | None
+    net_scenario: float | None
+    # Solo presentes en la rama con escenario completo (base EUR y datos).
+    effective_avg_rate: float | None = None
+    per_position: dict[str, DividendProjectionPositionFiscalOut] | None = None
+    covered_tickers: list[str]
+    excluded_tickers: list[str]
+    note: str
+
+
+class DividendProjectionPositionOut(BaseModel):
+    ticker: str
+    currency: str
+    quantity: float
+    frequency_last_year: int
+    gross_native: float
+    gross_base: float | None
+    domicile_country: str | None
+    withholding_basis: Literal["emisor_verificado", "domicilio_bd"] | None
+    withholding_kind: (
+        Literal["techo_convenio", "escenario_convenio", "sin_impuesto_origen_escenario"] | None
+    )
+    unverified_reason: str | None
+    scenario_conditions: str | None
+    source_withholding_rate: float | None
+    source_withheld_base: float | None
+    months: dict[str, float]
+
+
+class DividendProjectionGrossSummaryOut(BaseModel):
+    label: str
+    gross_total_base: float
+    gross_unverified_base: float
+    net_irpf: str
+    excluded_no_fx: list[str]
+    excluded_no_dividends: list[str]
+    excluded_uncertain_dividends: list[str]
+    complete: bool
+
+
+class DividendProjectionDeclaredFutureOut(BaseModel):
+    ticker: str
+    ex_date: str
+    pay_date: str | None
+    amount_per_share: float
+    currency: str
+    label: str
+    source: str
+    projection_as_of: str
+    note: str
+
+
+class DividendProjectionCoverageOut(BaseModel):
+    with_data: int
+    sin_datos: list[str]
+    uncertain_dividends: list[str]
+    fx_missing: list[str]
+    unknown_source_withholding: list[str]
+    unverified_reasons: dict[str, str]
+
+
+class PortfolioDividendProjectionOut(BaseModel):
+    as_of: str
+    base_currency: str
+    horizon_months: int
+    label: str
+    method: str
+    fiscal_conditions: list[str]
+    sources: dict[str, str]
+    months: list[DividendProjectionMonthOut]
+    fiscal_by_year: dict[str, DividendProjectionFiscalYearOut]
+    positions: list[DividendProjectionPositionOut]
+    gross_summary: DividendProjectionGrossSummaryOut
+    declared_future: list[DividendProjectionDeclaredFutureOut]
+    coverage: DividendProjectionCoverageOut
