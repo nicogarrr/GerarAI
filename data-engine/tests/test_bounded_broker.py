@@ -166,7 +166,10 @@ def test_compose_dedicated_queues_and_fixed_connection_pool():
 
     root = Path(__file__).resolve().parents[2]
     services = yaml.load((root / "docker-compose.prod.yml").read_text(), Loader=_ComposeLoader)["services"]
-    expected = {"worker": ["default", "prices"], "worker-kpis": ["kpis"],
+    # Tras #3678/#3691 prices tiene worker dedicado: "worker" solo consume
+    # default y worker-prices consume prices. Guardia mantenida: cada servicio
+    # debe seguir consumiendo EXACTAMENTE sus colas, ni una mas ni una menos.
+    expected = {"worker": ["default"], "worker-prices": ["prices"], "worker-kpis": ["kpis"],
                 # #3028: el carril "computed" (ProPicks, calculos cortos) lo
                 # consume worker-alerts en vez de anadir un contenedor nuevo.
                 "worker-thesis": ["thesis"], "worker-alerts": ["alerts", "computed"],

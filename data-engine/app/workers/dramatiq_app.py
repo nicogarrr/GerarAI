@@ -1006,7 +1006,7 @@ def enqueue_document_kpis(db, document) -> dict[str, Any]:
     return {"status": "queued", "message_id": str(message.message_id)}
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("backfill_document_kpis", 4 * 60)
 def backfill_document_kpis() -> dict[str, Any]:
     """Re-encola extracciones KPI diferidas por backpressure, mas antiguas primero.
@@ -1316,7 +1316,7 @@ def evaluate_alert_rules(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("refresh_asts_catalog", 110 * 60)
 def refresh_asts_catalog() -> dict[str, Any]:
     """One global network fetch, explicit tenant-scoped persisted copies."""
@@ -1409,7 +1409,7 @@ def refresh_asts_catalog() -> dict[str, Any]:
     }
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("refresh_bottlenecks", 50 * 60, ("tenant_id",))
 def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Reconcile all local evidence, including historical letters, without AI."""
@@ -1427,7 +1427,7 @@ def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
 @_coalesce_on_success("ingest_sec_bottleneck_filings", 330 * 60, ("tenant_id",))
 def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Pasajes de escasez de filings SEC (EFTS full-text, gratis) como documentos.
@@ -1448,7 +1448,7 @@ def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | N
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
 @_coalesce_on_success("ingest_uk_pdmr_filings", 330 * 60, ("tenant_id",))
 def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Movimientos PDMR del Reino Unido (tracefour, gratis, CC BY 4.0): 1 GET por corrida."""
@@ -1465,7 +1465,7 @@ def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = N
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
 @_coalesce_on_success("ingest_ca_insider_yahoo", 330 * 60, ("tenant_id",))
 def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Insiders de Canada via Yahoo quoteSummary (FUENTE NO OFICIAL; SEDI es la verdad)."""
@@ -1485,7 +1485,7 @@ def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = 
 DISCOVERY_DEADLINE_SECONDS = 480  # margen de 2 min bajo el time_limit de 10 min
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
 def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Candidatos INFERIDOS por tema de cuello de botella (solo proveedor gratuito, sin dinero)."""
     from app.services.bottleneck_discovery_service import discover
@@ -1510,7 +1510,7 @@ def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = Non
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("refresh_macro_context", 20 * 3600)
 def refresh_macro_context() -> dict[str, Any]:
     """Fetch public FRED CSV once globally, then persist an honest snapshot."""
@@ -1534,7 +1534,7 @@ def refresh_macro_context() -> dict[str, Any]:
             return _handle_actor_error("refresh_macro_context", exc)
 
 
-@dramatiq.actor(max_retries=2, min_backoff=60_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=3_600_000)
 @_coalesce_on_success("sync_ibkr_flex", 20 * 3600, stale_after_seconds=None)
 def sync_ibkr_flex() -> dict[str, Any]:
     """Sincroniza la cartera real desde IBKR Flex Web Service (solo lectura).
@@ -1714,7 +1714,7 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
 @_coalesce_on_success("backfill_finnhub_profiles", 20 * 3600, ("tenant_id",))
 def backfill_finnhub_profiles(
     tenant_id: int | None = None,
@@ -1746,7 +1746,7 @@ def backfill_finnhub_profiles(
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
 @_coalesce_on_success("backfill_sec_fundamentals", 20 * 3600, ("tenant_id",))
 def backfill_sec_fundamentals(
     tenant_id: int | None = None,
@@ -1773,7 +1773,7 @@ def backfill_sec_fundamentals(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=600_000)
 def seed_company_fundamentals(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1819,7 +1819,7 @@ def seed_company_fundamentals(
 ESEF_REINGEST_CHUNK = 25
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=900_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=900_000)
 @_coalesce_on_success("ingest_class_shares_outstanding", 6 * 86400, ("tenant_id",))
 def ingest_class_shares_outstanding(
     tenant_id: int | None = None,
@@ -1865,7 +1865,7 @@ def ingest_class_shares_outstanding(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
 @_coalesce_on_success("refresh_esef_fundamentals", 6 * 86400, ("tenant_id", "phase", "cursor"))
 def refresh_esef_fundamentals(
     tenant_id: int | None = None,
@@ -2009,7 +2009,7 @@ def split_sync_tickers(
     return chunk_tickers, next_cursor
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("ingest_corporate_splits", 6 * 86400, ("tenant_id", "scope", "cursor"))
 def ingest_corporate_splits(
     tenant_id: int | None = None,
@@ -2054,7 +2054,7 @@ def ingest_corporate_splits(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("sync_portfolio_dividends", 20 * 3600, ("tenant_id",))
 def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingesta diaria de dividendos declarados de las posiciones abiertas (Yahoo, FMP de respaldo)."""
@@ -2078,7 +2078,7 @@ def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None =
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name="prices")
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name="prices")
 @_coalesce_on_success("refresh_portfolio_prices_intraday", 12 * 60, ("tenant_id",))
 def refresh_portfolio_prices_intraday(
     tenant_id: int | None = None,
@@ -2351,7 +2351,7 @@ def freeze_propicks_snapshot(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def ingest_spy_daily(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2379,7 +2379,7 @@ def _official_close_session_key() -> str:
     return last_completed_us_session(datetime.now(UTC)).isoformat()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000, queue_name="official-closes")
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=3_600_000, queue_name="official-closes")
 def sync_official_closes(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2520,7 +2520,7 @@ def evaluate_dca_signals(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
 @_coalesce_on_success("refresh_earnings_calendar", 11 * 3600, ("tenant_id",))
 def refresh_earnings_calendar(
     tenant_id: int | None = None,
@@ -2539,7 +2539,7 @@ def refresh_earnings_calendar(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
 def backfill_company_price_history(
     company_id: int,
     tenant_id: int | None = None,
@@ -3149,7 +3149,7 @@ def refresh_news(
         )
 
 
-@dramatiq.actor(max_retries=1, min_backoff=15_000, time_limit=2 * 3600 * 1000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000)
 @_coalesce_on_success(
     "refresh_ticker_news",
     lambda scope="tracked", **_: 20 * 60 if scope == "tracked" else 5 * 3600,
@@ -4044,7 +4044,7 @@ def sync_investor_holdings(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("ingest_letters_corpus", 6 * 60 * 60, ("tenant_id",))
 def ingest_letters_corpus(
     tenant_id: int | None = None,
@@ -4360,7 +4360,7 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("sync_paper_dividends", 20 * 3600, ("tenant_id",))
 def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingesta diaria de dividendos declarados de los tickers con paper trades vivos.
@@ -4406,7 +4406,7 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
 import app.workers.knowledge_rag_actors  # noqa: E402,F401
 
 
-@dramatiq.actor(max_retries=0, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
 @_coalesce_on_success("sync_tenant_ibkr_connections", 20 * 3600, stale_after_seconds=None)
 def sync_tenant_ibkr_connections() -> dict[str, Any]:
     """Bounded daily reporting sync, one independently scoped account per tenant."""
@@ -4415,30 +4415,36 @@ def sync_tenant_ibkr_connections() -> dict[str, Any]:
     from app.core.database import SessionLocal
     from app.models import IBKRConnection
 
-    with SessionLocal() as admin:
-        ids = set(
-            admin.scalars(
-                select(IBKRConnection.tenant_id)
-                .where(
-                    IBKRConnection.enabled.is_(True),
-                )
-                .execution_options(include_all_tenants=True)
-            ).all()
-        )
-    scheduled = 0
-    for tenant_id, user_id in tenant_contexts():
-        if tenant_id in ids:
-            actor = (
-                sync_one_tenant_ibkr_dedicated
-                if get_settings().ibkr_dedicated_sync_enabled
-                else sync_one_tenant_ibkr
+    try:
+        with SessionLocal() as admin:
+            ids = set(
+                admin.scalars(
+                    select(IBKRConnection.tenant_id)
+                    .where(
+                        IBKRConnection.enabled.is_(True),
+                    )
+                    .execution_options(include_all_tenants=True)
+                ).all()
             )
-            actor.send(tenant_id, user_id)
-            scheduled += 1
-    return {"scheduled": scheduled}
+        scheduled = 0
+        for tenant_id, user_id in tenant_contexts():
+            if tenant_id in ids:
+                actor = (
+                    sync_one_tenant_ibkr_dedicated
+                    if get_settings().ibkr_dedicated_sync_enabled
+                    else sync_one_tenant_ibkr
+                )
+                actor.send(tenant_id, user_id)
+                scheduled += 1
+        return {"scheduled": scheduled}
+    except Exception as exc:
+        # max_retries=2 con backoff solo es real si el transitorio RELANZA:
+        # un PG/Redis caido reintenta; el error permanente queda registrado
+        # como fallo estructurado sin quemar los reintentos.
+        return _handle_actor_error("sync_tenant_ibkr_connections", exc)
 
 
-@dramatiq.actor(max_retries=2, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=3_600_000, time_limit=1_800_000)
 def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
     from app.services import ibkr_connection_service as ibkr
 
@@ -4489,13 +4495,13 @@ def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -
         db.close()
 
 
-@dramatiq.actor(queue_name="ibkr-sync", max_retries=0, time_limit=600_000)
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, min_backoff=30_000, time_limit=600_000)
 def sync_tenant_ibkr_connections_dedicated() -> dict[str, Any]:
     """Dedicated dispatcher so default backlog cannot delay tenant Flex imports."""
     return sync_tenant_ibkr_connections.fn()
 
 
-@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, time_limit=300_000)
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, min_backoff=3_600_000, time_limit=1_800_000)
 def sync_one_tenant_ibkr_dedicated(tenant_id: int, user_id: str) -> dict[str, Any]:
     """Same revision/date validation, separate bounded read-only consumer."""
     return sync_one_tenant_ibkr.fn(tenant_id, user_id)
