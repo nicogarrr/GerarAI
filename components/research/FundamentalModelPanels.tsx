@@ -588,7 +588,9 @@ function ImpliedGrowthDetail({ reverse }: { reverse: Parameters<typeof impliedGr
         </div>
       ) : null}
       {view.grid ? (
-        <div className="overflow-x-auto">
+        // WCAG 2.1.1: el contenedor con scroll horizontal debe ser region
+        // enfocable (con teclado no hay barra de scroll), como el de arriba.
+        <div aria-label="Crecimiento exigido si cambian el WACC o el margen" className="overflow-x-auto" role="region" tabIndex={0}>
           <p className="text-xs text-gray-500">Crecimiento exigido si cambian el WACC o el margen</p>
           <table className="mt-1 w-full text-xs tabular-nums">
             <thead><tr><th className="text-left font-normal text-gray-500" scope="col"><span className="sr-only">WACC</span></th>{view.grid.columns.map((column) => <th key={column} scope="col" className="px-1 text-right font-normal text-gray-500">{column}</th>)}</tr></thead>
