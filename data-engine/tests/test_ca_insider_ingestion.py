@@ -1,6 +1,7 @@
 """Insiders Canada (Yahoo quoteSummary): mapping fail-closed e ingesta (grabado)."""
 
 import asyncio
+import json
 from datetime import date
 from pathlib import Path
 
@@ -179,12 +180,19 @@ def test_build_feed_final_contract_keeps_ca_out_of_usd_totals_and_signals(db, mo
 
 
 def test_desktop_and_mobile_preserve_source_and_missing_currency_labels():
-    source = (Path(__file__).resolve().parents[2] / "components/insider/InsiderFeed.tsx").read_text(encoding="utf-8")
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "components/insider/InsiderFeed.tsx").read_text(encoding="utf-8")
     desktop = source.split("<table", 1)[1].split("</table>", 1)[0]
     mobile = source.split("function OperationCard", 1)[1].split("export", 1)[0]
     for layout in (desktop, mobile):
         assert "tx.form === 'CA-INSIDER'" in layout
-        assert "fuente no oficial (Yahoo)" in layout
-        assert "Divisa no informada" in layout
+        assert "insider.feed.canadaBadge" in layout
         assert "tx.source_url" in layout
-    assert "Totales y señales: solo Form 4" in source
+        assert "Divisa no informada" in layout or "insider.feed.currencyMissing" in layout
+    assert "insider.feed.totalsNote" in source
+
+    # Las cadenas visibles viven en i18n: la semántica debe sobrevivir allí.
+    feed = json.loads((root / "lib/i18n/messages/es/insider.json").read_text(encoding="utf-8"))["feed"]
+    assert "fuente no oficial (Yahoo)" in feed["canadaBadge"]
+    assert feed["currencyMissing"] == "Divisa no informada"
+    assert "Totales y señales: solo Form 4" in feed["totalsNote"]
