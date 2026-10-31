@@ -566,6 +566,9 @@ function isSuggested(metadata: Record<string, unknown> | undefined): boolean {
   return (metadata?.auto_link as { status?: unknown } | undefined)?.status === 'suggested';
 }
 
+/** Rótulo visible y nombre accesible de la región con scroll (un solo texto). */
+const IMPLIED_GRID_LABEL = 'Crecimiento exigido si cambian el WACC o el margen';
+
 function ImpliedGrowthDetail({ reverse }: { reverse: Parameters<typeof impliedGrowthView>[0] }) {
   const view = impliedGrowthView(reverse);
   if (!view.perpetual && !view.split.length && !view.grid) return null;
@@ -590,8 +593,8 @@ function ImpliedGrowthDetail({ reverse }: { reverse: Parameters<typeof impliedGr
       {view.grid ? (
         // WCAG 2.1.1: el contenedor con scroll horizontal debe ser region
         // enfocable (con teclado no hay barra de scroll), como el de arriba.
-        <div aria-label="Crecimiento exigido si cambian el WACC o el margen" className="overflow-x-auto" role="region" tabIndex={0}>
-          <p className="text-xs text-gray-500">Crecimiento exigido si cambian el WACC o el margen</p>
+        <div aria-label={IMPLIED_GRID_LABEL} className="overflow-x-auto" role="region" tabIndex={0}>
+          <p className="text-xs text-gray-500">{IMPLIED_GRID_LABEL}</p>
           <table className="mt-1 w-full text-xs tabular-nums">
             <thead><tr><th className="text-left font-normal text-gray-500" scope="col"><span className="sr-only">WACC</span></th>{view.grid.columns.map((column) => <th key={column} scope="col" className="px-1 text-right font-normal text-gray-500">{column}</th>)}</tr></thead>
             <tbody>

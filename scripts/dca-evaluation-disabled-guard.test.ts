@@ -19,7 +19,15 @@ describe('panel DCA con la evaluación diaria apagada', () => {
         assert.match(panel, /data-testid="dca-evaluation-disabled"/);
     });
     it('explica el motivo y el siguiente paso en español', () => {
-        assert.match(panel, /evaluación diaria automática está desactivada en el servidor/);
-        assert.match(panel, /Pulsa «Ejecutar pendientes ahora»/);
+        // i18n: el texto vive en messages/<locale>/watchlist.json.
+        assert.ok(panel.includes("ti('watchlist.dca.panel.evalOffStale')"));
+        assert.ok(panel.includes("ti('watchlist.dca.panel.evalOffEmpty')"));
+        const esPanel = JSON.parse(readFileSync('lib/i18n/messages/es/watchlist.json', 'utf8')).dca.panel;
+        for (const text of [esPanel.evalOffStale, esPanel.evalOffEmpty]) {
+            assert.match(text, /evaluación diaria automática está desactivada en el servidor/);
+            assert.match(text, /Pulsa «Ejecutar pendientes ahora»/);
+        }
+        const enPanel = JSON.parse(readFileSync('lib/i18n/messages/en/watchlist.json', 'utf8')).dca.panel;
+        assert.match(enPanel.evalOffStale, /Run pending now/);
     });
 });

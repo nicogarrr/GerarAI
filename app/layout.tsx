@@ -2,32 +2,35 @@ import type { Metadata, Viewport } from "next";
 import { Toaster } from "@/components/ui/sonner";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
 import { LocaleProvider } from "@/lib/i18n/client";
-import { getLocale } from "@/lib/i18n/server";
+import { getLocale, getT } from "@/lib/i18n/server";
 import "./globals.css";
 
-export const metadata: Metadata = {
+export async function generateMetadata(): Promise<Metadata> {
+  // Título y descripciones en el idioma elegido (cookie); el español es el predeterminado.
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  return {
   applicationName: 'GerarAI',
   title: {
-    default: "GerarAI - Research OS de inversión fundamental",
+    default: t('shell.meta.title'),
     template: "%s | GerarAI"
   },
-  description: "GerarAI convierte evidencia, modelos específicos de cada empresa y memoria histórica en tesis fundamentales trazables.",
+  description: t('shell.meta.description'),
   metadataBase: new URL('https://gerarai.vercel.app'),
   openGraph: {
     siteName: 'GerarAI',
-    title: 'GerarAI - Research OS de inversión fundamental',
-    description: 'Evidencia, modelos y memoria histórica convertidos en tesis fundamentales trazables.',
-    locale: 'es_ES',
+    title: t('shell.meta.title'),
+    description: t('shell.meta.shareDescription'),
+    locale: locale === 'en' ? 'en_US' : 'es_ES',
     type: 'website',
     images: [{ url: '/assets/og/cover.png', width: 1200, height: 630, alt: 'GerarAI' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'GerarAI - Research OS de inversión fundamental',
-    description: 'Evidencia, modelos y memoria histórica convertidos en tesis fundamentales trazables.',
+    title: t('shell.meta.title'),
+    description: t('shell.meta.shareDescription'),
     images: ['/assets/og/cover.png'],
   },
-  keywords: ["fundamental analysis", "investment thesis", "financial modeling", "research OS", "análisis fundamental"],
+  keywords: ["fundamental analysis", "investment thesis", "financial modeling", "research OS", t('shell.meta.keywordFundamental')],
   authors: [{ name: "GerarAI Team" }],
   creator: "GerarAI",
   icons: {
@@ -54,7 +57,8 @@ export const metadata: Metadata = {
   // TODAS las rutas, y /metodologia y /help (indexables) pasaban a declarar
   // canonico '/' - se fusionaban con la landing en el indice. Cada pagina
   // publica declara el suyo (la landing ya tenia '/').
-};
+  };
+}
 
 export const viewport: Viewport = {
   width: 'device-width',

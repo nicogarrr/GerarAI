@@ -14,7 +14,7 @@ import test from 'node:test';
 test('pager DCA: estado en su propia pista, sin col-span bajo los botones', () => {
     const src = readFileSync('components/watchlist/DcaAlertSettingsList.tsx', 'utf8');
     assert.ok(src.includes('grid-cols-[auto_1fr_auto]'), 'nav con pista propia para el estado');
-    const nav = src.slice(src.indexOf('Paginación del histórico DCA'), src.indexOf('</nav>'));
+    const nav = src.slice(src.indexOf("t('watchlist.dca.list.pagination')"), src.indexOf('</nav>'));
     assert.ok(!nav.includes('col-span-2 row-start-1'), 'sin col-span-2 row-start-1 en el estado');
     assert.ok(nav.includes('min-w-0 text-center'), 'estado con min-w-0 para envolver');
 });

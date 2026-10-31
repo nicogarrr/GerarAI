@@ -1,1 +1,184 @@
-{}
+{
+  "page": {
+    "metaDescription": "Detailed tracking of the symbols you follow: price, session change, market cap and P/E for each one.",
+    "sort": {
+      "added": "Recent",
+      "symbol": "Symbol",
+      "price": "Price",
+      "change": "Session change",
+      "marketCap": "Market cap",
+      "pe": "P/E",
+      "earnings": "Next earnings"
+    },
+    "capGap": {
+      "timedOut": "the read took more than 3 s; reload to see it",
+      "notApplicable": "the source does not cover market cap for that market",
+      "unverifiable": "the source does not provide a verifiable market cap"
+    },
+    "capLegend": "* Market cap N/A for {who}: {reason}.",
+    "capLegendAll": "every company on this page",
+    "fairValue": {
+      "byThesis": "{count} with a published thesis",
+      "byEngine": "{count} from the valuation engine",
+      "summary": "By fair value ({source}): {under} undervalued · {over} overvalued"
+    },
+    "earningsUnavailable": "Earnings calendar unavailable right now.",
+    "earningsPartial": "Earnings calendar incomplete: some dates may be missing.",
+    "unavailable": "Couldn't load your watchlist (service unavailable). This doesn't mean it's empty: reload the page or try again later.",
+    "empty": {
+      "title": "Your watchlist is empty",
+      "body": "Tap “Add company” and search for it by name or symbol to follow it here.",
+      "shortcut": "You can also open search with Ctrl+K from any screen.",
+      "searchCta": "Go to stock search"
+    },
+    "pagesNav": "Watchlist pages",
+    "sortBy": "Sort",
+    "prev": "Previous",
+    "next": "Next",
+    "noData": "no data",
+    "noDataTimedOut": "no data: the read took more than 3 s, reload",
+    "closeOn": "Close {date}",
+    "closeUndated": "Close (no date from the source)",
+    "noMetricsTitle": "No data: listed outside the US and the source has no reliable market cap or P/E for that market",
+    "derived": "derived",
+    "peTtm": "P/E (TTM)",
+    "peFy": "P/E (FY)",
+    "readTimedOut": "The read took more than 3 s; reload to see it.",
+    "peNotCovered": "The source does not cover P/E for this market.",
+    "analystTitle": "Average analyst price target across firms. Unofficial source.",
+    "analystTarget": "Analyst target",
+    "viewAnalysisOf": "View analysis of {symbol}",
+    "viewAnalysis": "View analysis",
+    "tableRegion": "Watchlist: price, change, market cap and P/E",
+    "tableCaption": "Valuation and metrics for each symbol in your watchlist: price, session change, market cap and P/E",
+    "low52Title": "52-week low: {price} ({sessions} closes in our own series)",
+    "low52": "52-wk low",
+    "optionsOf": "Options for {symbol}",
+    "options": "Options",
+    "notFound": {
+      "label": "Not found",
+      "title": "None of our sources recognise this ticker: the symbol may be wrong. It stays in your watchlist until you remove it."
+    }
+  },
+  "dca": {
+    "run": {
+      "startFailed": "Couldn't start the evaluation",
+      "accepted": "Batch accepted. You can leave: it keeps running in the background.",
+      "background": "Still running in the background. Check the result in the watchlist.",
+      "interrupted": "Run interrupted. Check its status before running it again.",
+      "evaluatedOne": "evaluated",
+      "evaluatedOther": "evaluated",
+      "newAlertOne": "new alert",
+      "newAlertOther": "new alerts",
+      "skipped": "{count} without enough data",
+      "pending": "{count} left for another batch",
+      "errorsOne": "company with errors",
+      "errorsOther": "companies with errors",
+      "partial": "Partial DCA evaluation: {parts}",
+      "updated": "DCA signals updated: {parts}",
+      "failed": "Couldn't evaluate the DCA signals",
+      "evaluating": "Evaluating…",
+      "runNow": "Run pending now",
+      "help": "Only missing or outdated ones. Up to 10 companies per batch, 5 min between batches. No paid LLM; it sends no emails and makes no purchases.",
+      "planLink": "See my plan, DCA split and savings →"
+    },
+    "badge": {
+      "provisional": "(provisional)",
+      "status": "Status: month {status} ({period})",
+      "settledClose": "Settled close: {close} · {date}",
+      "monthlyRsi": "Monthly RSI: {rsi}",
+      "triggerClose": "Close that would trigger it: {prices}",
+      "forming": "The month hasn't closed: the verdict may change.",
+      "stale": "Outdated data: the level may not be current.",
+      "staleAge": "Outdated data (last close {age}): the level may not be current.",
+      "disclaimer": "Decision support, not financial advice."
+    },
+    "list": {
+      "empty": "Add companies to your watchlist or portfolio to see their DCA history.",
+      "label": "DCA history by company",
+      "inPortfolio": "in portfolio",
+      "notEvaluated": "No history evaluated",
+      "pagination": "DCA history pagination",
+      "prev": "Previous",
+      "next": "Next",
+      "range": "{from}-{to} of {total}",
+      "page": "Page {page} of {pages}"
+    },
+    "panel": {
+      "unavailable": "DCA signals unavailable right now (service unavailable).",
+      "channelEmail": "email",
+      "title": "DCA alerts and history",
+      "companyOne": "company",
+      "companyOther": "companies",
+      "settingsLink": "Set up DCA alerts in Settings →",
+      "noOrders": "It does not change the verdict or place orders.",
+      "upFrom": "from {level}X",
+      "downTo": "up to {level}X",
+      "off": "off",
+      "directional": "Up: {up} · down: {down}",
+      "globalMin": "Global minimum alert {level}X",
+      "trimsOn": "trims alerted",
+      "trimsOff": "trims not alerted",
+      "channels": "channels: {list}",
+      "emailMissing": " (email not set up)",
+      "alertsOff": " · alerts off",
+      "evalOffStale": "Automatic daily evaluation is turned off on the server: levels don’t update on their own. Tap “Run pending now” to recalculate them.",
+      "evalOffEmpty": "There are no levels yet because automatic daily evaluation is turned off on the server. Tap “Run pending now” to calculate them with today’s closes.",
+      "legend": "1X = base contribution; 2X-4X = multiples of your monthly contribution. Our own transparent formula, not DCA Optimizer’s. Decision support, not financial advice."
+    }
+  },
+  "add": {
+    "button": "Add company",
+    "added": "{symbol} added to the watchlist",
+    "failed": "Couldn't add it to the watchlist",
+    "title": "Add to watchlist",
+    "description": "Search by symbol or company and add it to the list you follow.",
+    "placeholder": "Search stocks (e.g. SAN or Santander)",
+    "searchLabel": "Search stocks to add to the watchlist",
+    "notListed": "Not in the list?",
+    "bySymbol": "Add “{symbol}” by its symbol",
+    "alreadyFollowed": "You already follow “{symbol}”: it is in your watchlist.",
+    "adding": "Adding {symbol}…"
+  },
+  "buy": {
+    "trigger": "Record purchase"
+  },
+  "remove": {
+    "removed": "{symbol} removed from the watchlist",
+    "failed": "Couldn't remove it from the watchlist",
+    "label": "Remove {symbol} from the watchlist"
+  },
+  "hitRates": {
+    "popoverLabel": "DCA signal history for {symbol}",
+    "trigger": "History",
+    "loading": "Loading history…",
+    "unavailable": "Signal history unavailable right now.",
+    "noHistory": "No signal history for this ticker yet.",
+    "title": "How often was it higher?",
+    "monthsCompleted": "{count} months completed",
+    "scopeRange": "selected range only",
+    "scopeFull": "full history",
+    "tableLabel": "Share of signal months whose close was higher N months later",
+    "signal": "Signal",
+    "months": "{count} mo",
+    "signalMonths": "{count} signal months",
+    "average": "avg {avg}",
+    "footer": "Confirmed months only; it measures price, not a portfolio’s return.",
+    "zone": {
+      "open": " · ongoing {months} mo (not counted)",
+      "excludedOne": " · {count} excluded for gaps in the history",
+      "excludedOther": " · {count} excluded for gaps in the history",
+      "none": "No completed visits to 2X-4X in the history{open}{excluded}",
+      "avgOne": "Average time in 2X-4X: {months} months · {count} completed visit{open}{excluded}",
+      "avgOther": "Average time in 2X-4X: {months} months · {count} completed visits{open}{excluded}"
+    },
+    "section": {
+      "notEvaluated": "This ticker has no evaluated DCA signal yet. The history shows up once it is in your watchlist or portfolio and has been evaluated.",
+      "unavailable": "History unavailable right now: the service couldn't be reached. Try again later.",
+      "label": "DCA signal history"
+    }
+  },
+  "lazy": {
+    "loading": "Loading the control"
+  }
+}

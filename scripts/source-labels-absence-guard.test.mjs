@@ -16,8 +16,10 @@ const read = (path) => readFileSync(path, 'utf8');
 
 test('watchlist: tooltip de consenso sin "fuente de mercado"', () => {
     const page = read('app/(root)/watchlist/page.tsx');
-    assert.doesNotMatch(page, /Fuente de mercado no oficial/);
-    assert.match(page, /Fuente no oficial\./, 'se conserva el aviso de calidad sin nombrar fuente');
+    const es = read('lib/i18n/messages/es/watchlist.json');
+    assert.doesNotMatch(page + es, /Fuente de mercado no oficial/);
+    assert.ok(page.includes("t('watchlist.page.analystTitle')"));
+    assert.match(JSON.parse(es).page.analystTitle, /Fuente no oficial\./, 'se conserva el aviso de calidad sin nombrar fuente');
 });
 
 test('radar global: candidatos sin etiqueta de fuente', () => {
