@@ -20,8 +20,8 @@ describe('IPOs: pie sin etiqueta de fuente', () => {
     }
   });
   it('la nota de cobertura se conserva en es y en', () => {
-    assert.match(es.ipos.footnote, /^Cobertura: solo salidas a bolsa en mercados de EE\. UU\./);
-    assert.match(en.ipos.footnote, /^Coverage: only listings on US markets/);
+    assert.match(es.ipos.footnote, /^Cobertura: solo algunas salidas a bolsa en mercados de EE\. UU\./);
+    assert.match(en.ipos.footnote, /^Coverage: only some listings on US markets/);
   });
   it('la pagina sigue pintando el pie', () => {
     assert.match(pagina, /ti\('calendar\.ipos\.footnote'\)/);
