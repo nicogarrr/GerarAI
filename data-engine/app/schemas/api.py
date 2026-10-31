@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CompanyOut(BaseModel):
@@ -792,6 +792,26 @@ class AlertRuleOut(BaseModel):
     metadata: dict = Field(validation_alias="metadata_")
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("condition", "target", "last_result", "metadata", mode="before")
+    @classmethod
+    def _coerce_legacy_dict(cls, value: object) -> dict:
+        # Filas legacy pueden tener campos JSON con formas antiguas (string,
+        # None) que PostgreSQL json/jsonb admite. Sin esta tolerancia, UNA sola
+        # fila malformada hace fallar la validacion del listado entero y el
+        # frontend muestra un error persistente para todas las alertas de la
+        # cuenta. Coaccion segura: el frontend ya trata estos campos como
+        # opcionales en la practica (p. ej. metadata.ticker ?? "").
+        return value if isinstance(value, dict) else {}
+
+    @field_validator("channels", mode="before")
+    @classmethod
+    def _coerce_legacy_channels(cls, value: object) -> list[str]:
+        if isinstance(value, str):
+            return [value]
+        if isinstance(value, list):
+            return value
+        return ["in_app"]
 
 
 class ResearchAlertAction(BaseModel):
