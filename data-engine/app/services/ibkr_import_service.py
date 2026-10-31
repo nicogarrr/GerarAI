@@ -2057,6 +2057,30 @@ class IBKRImportService:
                 raise IBKRImportError(f"Fecha no interpretable: {text!r}.")
             return parsed
         ledger = PortfolioLedgerService()
+        # Descarga historica del BCE ANTES de las filas: su escritura hace
+        # commit de la sesion y, dentro del ``begin_nested`` de una fila,
+        # mata el savepoint (InvalidRequestError) y tumba la importacion a
+        # mitad del fichero, dejando las filas ya procesadas comiteadas a
+        # medias por ese commit ajeno. Con los tipos ya descargados (o la
+        # divisa marcada como intentada), la fila no vuelve a descargar.
+        warm_currencies: set[str] = set()
+        warm_dates: list[date] = []
+        for raw in data_rows[1:]:
+            symbol_cell = raw[mapping["symbol"]].strip().upper() if mapping.get("symbol") is not None and mapping["symbol"] < len(raw) else ""
+            currency_cell = raw[mapping["currency"]].strip().upper() if mapping.get("currency") is not None and mapping["currency"] < len(raw) else ""
+            warm_currencies.add(currency_cell or _csv_default_currency(symbol_cell))
+            if mapping.get("date") is not None and mapping["date"] < len(raw):
+                warm_day = _csv_date_value(raw[mapping["date"]].strip(), bool(day_first))
+                if warm_day is not None:
+                    warm_dates.append(warm_day)
+        warm_currencies.discard("")
+        if warm_currencies and warm_dates:
+            ledger.ensure_historical_fx(
+                db,
+                currencies=warm_currencies,
+                base_currency=ledger.fx.ensure_portfolio(db).base_currency,
+                since=min(warm_dates),
+            )
         trades_imported = 0
         duplicate_trades = 0
         occurrences: Counter[str] = Counter()
