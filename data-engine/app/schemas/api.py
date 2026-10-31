@@ -810,7 +810,10 @@ class AlertRuleOut(BaseModel):
         if isinstance(value, str):
             return [value]
         if isinstance(value, list):
-            return value
+            # Listas legacy pueden mezclar tipos ([1, {}, null]): conservar
+            # solo strings; si no queda ninguno, canal por defecto.
+            strings = [item for item in value if isinstance(item, str)]
+            return strings or ["in_app"]
         return ["in_app"]
 
 

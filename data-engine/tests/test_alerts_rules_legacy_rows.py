@@ -88,6 +88,85 @@ def _seed_legacy_rule(call, suffix) -> int:
     return rule_id
 
 
+def test_channels_mixed_legacy_list_keeps_only_strings(world):
+    call, suffix = world
+    call("a", "GET", "/api/alerts/rules")
+    with SessionLocal() as db:
+        tenant = db.scalar(
+            select(Tenant).where(Tenant.external_id == f"a-{suffix}")
+        )
+        company = Company(
+            ticker=f"MX{suffix[:4].upper()}", name="Mixed Co", exchange="NASDAQ",
+            currency="USD", sector="Tech", industry="Software",
+            company_type="standard", valuation_model="standard_dcf",
+            special_sources=[], special_risks=[], factor_tags=[],
+        )
+        db.add(company)
+        db.flush()
+        rule = AlertRule(
+            tenant_id=tenant.id, company_id=company.id, name="mixed channels",
+            rule_type="price_above", condition={"value": 100}, target={},
+            severity="medium", channels=["in_app"], active=True,
+            cooldown_seconds=3600, trigger_count=0, last_result={},
+            metadata_={"ticker": company.ticker, "source": "user"},
+        )
+        db.add(rule)
+        db.commit()
+        rule_id = rule.id
+        # Lista legacy con tipos mezclados: json/jsonb la admite, list[str] no.
+        db.execute(
+            text(
+                "UPDATE alert_rules SET channels = :channels "
+                "WHERE id = :rule_id"
+            ),
+            {"rule_id": rule_id, "channels": '["email", 1, {}, null]'},
+        )
+        db.commit()
+    res = call("a", "GET", "/api/alerts/rules", params={"active": "true"})
+    assert res.status_code == 200, res.text
+    rule = next(r for r in res.json() if r["id"] == rule_id)
+    assert rule["channels"] == ["email"]
+
+
+def test_channels_legacy_list_without_strings_falls_back_to_in_app(world):
+    call, suffix = world
+    call("a", "GET", "/api/alerts/rules")
+    with SessionLocal() as db:
+        tenant = db.scalar(
+            select(Tenant).where(Tenant.external_id == f"a-{suffix}")
+        )
+        company = Company(
+            ticker=f"NS{suffix[:4].upper()}", name="NoStr Co", exchange="NASDAQ",
+            currency="USD", sector="Tech", industry="Software",
+            company_type="standard", valuation_model="standard_dcf",
+            special_sources=[], special_risks=[], factor_tags=[],
+        )
+        db.add(company)
+        db.flush()
+        rule = AlertRule(
+            tenant_id=tenant.id, company_id=company.id, name="no strings",
+            rule_type="price_above", condition={"value": 100}, target={},
+            severity="medium", channels=["in_app"], active=True,
+            cooldown_seconds=3600, trigger_count=0, last_result={},
+            metadata_={"ticker": company.ticker, "source": "user"},
+        )
+        db.add(rule)
+        db.commit()
+        rule_id = rule.id
+        db.execute(
+            text(
+                "UPDATE alert_rules SET channels = :channels "
+                "WHERE id = :rule_id"
+            ),
+            {"rule_id": rule_id, "channels": "[1, {}, null]"},
+        )
+        db.commit()
+    res = call("a", "GET", "/api/alerts/rules", params={"active": "true"})
+    assert res.status_code == 200, res.text
+    rule = next(r for r in res.json() if r["id"] == rule_id)
+    assert rule["channels"] == ["in_app"]
+
+
 def test_one_legacy_row_does_not_500_the_whole_rules_list(world):
     call, suffix = world
     rule_id = _seed_legacy_rule(call, suffix)
