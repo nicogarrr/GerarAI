@@ -792,9 +792,11 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                             )}
                         </div>
                         <div className="space-y-2">
-                            <Button asChild className="w-full min-h-11 md:min-h-9" size="sm" variant="outline">
+                            {/* whitespace-normal + h-auto: el texto largo del enlace
+                                (es/en) envuelve en vez de desbordar el panel a 390px. */}
+                            <Button asChild className="h-auto w-full min-h-11 whitespace-normal py-2 leading-snug md:min-h-9" size="sm" variant="outline">
                                 <Link href={`/knowledge-graph?node=${selectedNode.id}&depth=2`}>
-                                    <ExternalLink aria-hidden="true" className="h-4 w-4" />
+                                    <ExternalLink aria-hidden="true" className="h-4 w-4 shrink-0" />
                                     {t('knowledgeGraph.detail.scopeLink')}
                                 </Link>
                             </Button>
