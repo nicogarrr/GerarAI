@@ -12933,6 +12933,26 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** WatchlistAttentionThesisItemOut */
+        WatchlistAttentionThesisItemOut: {
+            /** Createdat */
+            createdAt: string;
+            /** Direction */
+            direction: string;
+            /** Id */
+            id: number;
+            /** Summary */
+            summary: string;
+            /** Symbol */
+            symbol: string;
+        };
+        /** WatchlistAttentionThesisOut */
+        WatchlistAttentionThesisOut: {
+            /** Items */
+            items: components["schemas"]["WatchlistAttentionThesisItemOut"][];
+            /** Truncated */
+            truncated: boolean;
+        };
         /** WorkProductRequest */
         WorkProductRequest: {
             /**
@@ -27770,9 +27790,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["WatchlistAttentionThesisOut"];
                 };
             };
             /** @description Validation Error */

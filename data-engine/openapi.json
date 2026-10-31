@@ -19855,6 +19855,60 @@
         "title": "WatchItemCreate",
         "type": "object"
       },
+      "WatchlistAttentionThesisItemOut": {
+        "properties": {
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "summary",
+          "direction",
+          "createdAt"
+        ],
+        "title": "WatchlistAttentionThesisItemOut",
+        "type": "object"
+      },
+      "WatchlistAttentionThesisOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistAttentionThesisItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "WatchlistAttentionThesisOut",
+        "type": "object"
+      },
       "WorkProductRequest": {
         "properties": {
           "product_type": {
@@ -82127,9 +82181,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Home Attention Thesis Api Watchlist Attention Thesis Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WatchlistAttentionThesisOut"
                 }
               }
             },

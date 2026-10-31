@@ -25,6 +25,7 @@ from app.models import (
     MarketPrice,
     WatchItem,
 )
+from app.schemas.api import WatchlistAttentionThesisOut
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
@@ -940,7 +941,7 @@ def dca_backtest(
     return out
 
 
-@router.get("/attention-thesis")
+@router.get("/attention-thesis", response_model=WatchlistAttentionThesisOut)
 def home_attention_thesis(db: Session = Depends(get_db)) -> dict:
     """Unresolved thesis changes for this tenant's watchlist and open holdings."""
     from app.services.home_attention_service import pending_thesis_changes
