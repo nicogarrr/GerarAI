@@ -279,10 +279,17 @@ def read_analysis(db: Session, alert_id: int) -> dict:
     rows = db.scalars(select(AlertAnalysis).where(
         AlertAnalysis.tenant_id == tenant_id, AlertAnalysis.alert_id == alert_id,
     ).order_by(AlertAnalysis.id)).all()
+    # Eventos en UNA pasada: antes una consulta por version (N+1 en la ruta).
+    events_by_id = {
+        event.id: event
+        for event in db.scalars(
+            select(NewsEvent).where(NewsEvent.id.in_({row.news_event_id for row in rows}))
+        )
+    } if rows else {}
     versions = []
     for row in rows:
         result = row.result or {}
-        event = db.scalar(select(NewsEvent).where(NewsEvent.id == row.news_event_id))
+        event = events_by_id.get(row.news_event_id)
         citations = result.get("citations", [])
         headline = (event.metadata_ or {}).get("source_headline") if event else None
         valid = (event is not None and

@@ -110,3 +110,44 @@ def test_attention_bridge_and_event_in_one_query():
         # puente en dos consultas secuenciales (3) es la regresión que se fija.
         assert counter.count == 2
     engine.dispose()
+
+
+def test_read_analysis_loads_events_in_one_pass():
+    """Las citas de todas las versiones se validan con UN IN por lote."""
+    from app.models.entities import AlertAnalysis
+    from app.services.alert_analysis_service import read_analysis
+
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.info["tenant_id"] = "t1"
+        now = datetime.now(UTC)
+        company = _company(db, "AAPL")
+        events = [
+            NewsEvent(tenant_id="t1", company_id=company.id, title=f"H{v}",
+                      url=f"https://example.com/{v}", date=now - timedelta(days=v),
+                      source="src", metadata_={"source_headline": f"Headline {v}"})
+            for v in range(3)
+        ]
+        db.add_all(events)
+        db.flush()
+        alert = ResearchAlert(tenant_id="t1", company_id=company.id, alert_type="tracked_news",
+                              severity="medium", title="t", message="m", fingerprint="fp-a",
+                              channels=["in_app"], status="open",
+                              metadata_={"news_event_id": events[0].id})
+        db.add(alert)
+        db.flush()
+        for v, event in enumerate(events):
+            db.add(AlertAnalysis(tenant_id="t1", alert_id=alert.id, news_event_id=event.id,
+                                 version=v + 1, status="ready", result={"citations": []}))
+        db.flush()
+        alert_id = alert.id  # antes del commit: leer .id de la entidad
+        # expirada lanzaria un refresh que no es de la ruta.
+        db.commit()
+        counter = _QueryCounter(engine)
+        out = read_analysis(db, alert_id)
+        assert len(out["versions"]) == 3
+        # alert + versions + events (IN por lote) = 3; una consulta por
+        # version (5 con 3 versiones) es la regresion que se fija.
+        assert counter.count == 3
+    engine.dispose()
