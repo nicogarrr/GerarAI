@@ -17,35 +17,43 @@ import {
     type LlmSettings,
     type LlmTestResult,
 } from '@/lib/actions/llm-settings.actions';
+import { useT } from '@/lib/i18n/client';
+import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { showErrorToast } from '@/lib/toast';
 
+/** Español por defecto (tests y llamadas sin hook). */
+const esT: TranslateFn = createTranslator('es');
+
 const REASONING_OPTIONS = [
-    { value: '__unset__', label: 'Sin especificar' },
-    { value: 'none', label: 'Ninguno' },
-    { value: 'minimal', label: 'Mínimo' },
-    { value: 'low', label: 'Bajo' },
-    { value: 'medium', label: 'Medio' },
-    { value: 'high', label: 'Alto' },
-    { value: 'max', label: 'Máximo' },
+    { value: '__unset__', label: 'settings.llm.reasoning.unset' },
+    { value: 'none', label: 'settings.llm.reasoning.none' },
+    { value: 'minimal', label: 'settings.llm.reasoning.minimal' },
+    { value: 'low', label: 'settings.llm.reasoning.low' },
+    { value: 'medium', label: 'settings.llm.reasoning.medium' },
+    { value: 'high', label: 'settings.llm.reasoning.high' },
+    { value: 'max', label: 'settings.llm.reasoning.max' },
 ] as const;
 
-export function statusLabel(settings: LlmSettings): string {
+export function statusLabel(settings: LlmSettings, t: TranslateFn = esT): string {
     if (!settings.encryption_available) {
-        return 'Cifrado no disponible';
+        return t('settings.llm.status.noEncryption');
     }
     if (settings.source === 'platform') {
-        return 'Usando proveedor de GerarAI';
+        return t('settings.llm.status.platform');
     }
     if (settings.status === 'tenant') {
-        return `Configurado con tu clave${settings.api_key_last4 ? ` (...${settings.api_key_last4})` : ''}`;
+        return settings.api_key_last4
+            ? t('settings.llm.status.tenantLast4', { last4: settings.api_key_last4 })
+            : t('settings.llm.status.tenant');
     }
     if (settings.status === 'missing_key') {
-        return 'Falta tu clave API';
+        return t('settings.llm.status.missingKey');
     }
-    return 'Configuración desactivada';
+    return t('settings.llm.status.disabled');
 }
 
 export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
+    const t = useT();
     const providerIds = useMemo(
         () => new Set(initial.providers.map((provider) => provider.id)),
         [initial.providers],
@@ -110,7 +118,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
             setApiKey('');
             setClearApiKey(false);
             setTestResult(null);
-            toast.success('Ajustes de IA guardados');
+            toast.success(t('settings.llm.saved'));
         } catch (cause) {
             showErrorToast(cause);
         } finally {
@@ -138,7 +146,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
         } catch {
             // Never reflect an upstream URL/key. Keep recovery in the form,
             // including production Server Action errors whose text is masked.
-            const message = 'No se pudo comprobar tu clave. Revisa proveedor y clave API; si sigue fallando, vuelve a intentarlo más tarde.';
+            const message = t('settings.llm.testFailed');
             setTestResult({ ok: false, status_code: null, provider, base_url: '', model, message });
             toast.error(message);
         } finally {
@@ -147,38 +155,33 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
     }
 
     return (
-        <form aria-label="Configuración del modelo de IA" className="space-y-4" onSubmit={submit}>
+        <form aria-label={t('settings.llm.formAria')} className="space-y-4" onSubmit={submit}>
             <div className="rounded-lg border border-gray-700/50 bg-gray-900/40 p-3 text-sm">
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-gray-100">{statusLabel(status)}</span>
+                    <span className="font-medium text-gray-100">{statusLabel(status, t)}</span>
                     <span className="rounded-full border border-gray-600 px-2 py-0.5 text-xs text-gray-400">
-                        {status.billing_scope === 'tenant' ? 'La clave y el coste son tuyos' : 'Coste de GerarAI'}
+                        {status.billing_scope === 'tenant' ? t('settings.llm.billingTenant') : t('settings.llm.billingPlatform')}
                     </span>
                 </div>
                 <p className="mt-1 text-gray-400">{status.message}</p>
                 {status.source !== 'tenant' ? (
                     <p className="mt-2 rounded-lg border border-teal-800/50 bg-teal-950/30 p-3 text-gray-300">
-                        Tu IA, tu clave: para no depender del límite semanal compartido de la
-                        plataforma, añade tu propia clave API. Elige proveedor (Claude vía
-                        OpenRouter, OpenAI, Gemini, Groq, OpenCode Go u otro compatible con
-                        OpenAI), escribe el modelo y pega la clave abajo. La clave y el coste
-                        son tuyos: GerarAI no asume tu consumo.
+                        {t('settings.llm.byokPitch')}
                     </p>
                 ) : null}
                 {!status.encryption_available ? (
                     <p className="mt-2 text-amber-300">
-                        El cifrado no está configurado en el servidor. Puedes elegir proveedor y modelo,
-                        pero no guardar una clave API propia.
+                        {t('settings.llm.noEncryptionBody')}
                     </p>
                 ) : null}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-provider">
-                    <span>Proveedor</span>
+                    <span>{t('settings.llm.provider')}</span>
                     <Select disabled={busy} onValueChange={changeProvider} value={provider}>
                         <SelectTrigger className="w-full data-[size=default]:h-11" id="llm-provider">
-                            <SelectValue placeholder="Elige proveedor" />
+                            <SelectValue placeholder={t('settings.llm.providerPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                             {status.providers.map((entry) => (
@@ -191,21 +194,21 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 </label>
 
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-model">
-                    <span>Modelo</span>
+                    <span>{t('settings.llm.model')}</span>
                     <Input
                         className="h-11"
                         autoComplete="off"
                         disabled={busy}
                         id="llm-model"
                         onChange={(event) => setModel(event.target.value)}
-                        placeholder="p. ej. gpt-4.1-mini"
+                        placeholder={t('settings.llm.modelPlaceholder')}
                         value={model}
                     />
                 </label>
 
                 {isCustom ? (
                     <label className="space-y-1 text-sm text-gray-300 md:col-span-2" htmlFor="llm-base-url">
-                        <span>URL base (HTTPS público compatible con OpenAI)</span>
+                        <span>{t('settings.llm.baseUrl')}</span>
                         <Input
                             className="h-11"
                             autoComplete="off"
@@ -213,46 +216,46 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                             id="llm-base-url"
                             inputMode="url"
                             onChange={(event) => setBaseUrl(event.target.value)}
-                            placeholder="https://tu-proveedor.example/v1"
+                            placeholder={t('settings.llm.baseUrlPlaceholder')}
                             value={baseUrl}
                         />
                         <span className="block text-xs text-gray-500">
-                            Solo HTTPS público. No se permiten IP privadas, loopback ni credenciales en la URL.
+                            {t('settings.llm.baseUrlHint')}
                         </span>
                     </label>
                 ) : (
                     <p className="text-sm text-gray-400 md:col-span-2">
-                        URL del proveedor: <span className="text-gray-300">{spec?.base_url}</span>
+                        {t('settings.llm.providerUrl')} <span className="text-gray-300">{spec?.base_url}</span>
                     </p>
                 )}
 
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-fallback">
-                    <span>Modelo de respaldo (opcional)</span>
+                    <span>{t('settings.llm.fallback')}</span>
                     <Input
                         className="h-11"
                         autoComplete="off"
                         disabled={busy}
                         id="llm-fallback"
                         onChange={(event) => setFallbackModel(event.target.value)}
-                        placeholder="Opcional"
+                        placeholder={t('settings.llm.optional')}
                         value={fallbackModel}
                     />
                 </label>
 
                 <label className="space-y-1 text-sm text-gray-300" htmlFor="llm-reasoning">
-                    <span>Razonamiento</span>
+                    <span>{t('settings.llm.reasoningLabel')}</span>
                     <Select
                         disabled={busy}
                         onValueChange={setReasoningEffort}
                         value={reasoningEffort}
                     >
                         <SelectTrigger className="w-full data-[size=default]:h-11" id="llm-reasoning">
-                            <SelectValue placeholder="Sin especificar" />
+                            <SelectValue placeholder={t('settings.llm.reasoning.unset')} />
                         </SelectTrigger>
                         <SelectContent>
                             {REASONING_OPTIONS.map((option) => (
                                 <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
+                                    {t(option.label)}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -260,7 +263,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                 </label>
 
                 <label className="space-y-1 text-sm text-gray-300 md:col-span-2" htmlFor="llm-api-key">
-                    <span>Clave API</span>
+                    <span>{t('settings.llm.apiKey')}</span>
                     <Input
                         className="h-11"
                         autoComplete="new-password"
@@ -272,14 +275,14 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                         }}
                         placeholder={
                             status.api_key_configured && status.api_key_last4
-                                ? `Guardada (...${status.api_key_last4}); escribe otra para cambiarla`
-                                : 'Pega tu clave API'
+                                ? t('settings.llm.apiKeySaved', { last4: status.api_key_last4 })
+                                : t('settings.llm.apiKeyPaste')
                         }
                         type="password"
                         value={apiKey}
                     />
                     <span className="block text-xs text-gray-500">
-                        Se guarda cifrada y no se vuelve a mostrar. La clave la paga tu proveedor.
+                        {t('settings.llm.apiKeyHint')}
                     </span>
                 </label>
             </div>
@@ -296,7 +299,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                         className="mt-0.5 size-5 shrink-0 accent-teal-500"
                         type="checkbox"
                     />
-                    Borrar la clave guardada y desactivar la IA propia
+                    {t('settings.llm.clearKey')}
                 </label>
             ) : null}
 
@@ -308,12 +311,12 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                     className="mt-0.5 size-5 shrink-0 accent-teal-500"
                     type="checkbox"
                 />
-                Usar esta configuración para la IA de mi cuenta
+                {t('settings.llm.useForAccount')}
             </label>
 
             <p className="text-xs text-gray-500">
-                Los proveedores de pago los paga el usuario; GerarAI no asume ese coste.
-                Consulta la <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href="/privacidad">política de privacidad</a>.
+                {t('settings.llm.paidNote')}{' '}
+                {t('settings.llm.privacyPrefix')} <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href="/privacidad">{t('settings.llm.privacyLink')}</a>.
             </p>
 
             {testResult ? (
@@ -327,12 +330,12 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
             ) : null}
 
             <p className="text-xs text-gray-400" id="llm-test-help">
-                Esta prueba comprueba tu clave API propia, no el proveedor de GerarAI.
-                {hasTestKey ? ' Consulta la conexión sin generar texto ni consumir tokens.' : ' Introduce una clave para habilitarla. No necesitas una clave propia para usar la IA de GerarAI.'}
+                {t('settings.llm.testHelp')}
+                {hasTestKey ? t('settings.llm.testHelpReady') : t('settings.llm.testHelpNoKey')}
             </p>
             <div className="flex flex-wrap gap-2">
                 <Button disabled={busy || !model.trim()} type="submit">
-                    {busy ? 'Guardando...' : 'Guardar'}
+                    {busy ? t('settings.llm.saving') : t('settings.common.save')}
                 </Button>
                 <Button
                     aria-describedby="llm-test-help"
@@ -341,7 +344,7 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                     type="button"
                     variant="outline"
                 >
-                    {testing ? 'Probando...' : 'Probar conexión'}
+                    {testing ? t('settings.llm.testing') : t('settings.llm.test')}
                 </Button>
             </div>
         </form>
