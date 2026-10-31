@@ -14,7 +14,7 @@ from app.services.company_resolver import resolve_company
 from app.services.materiality_service import MaterialityService, apply_recency_policy
 from app.services.review_alert_service import ReviewAlertService
 from app.services.source_hierarchy_service import classify_source
-from app.services.text_clip import clip_words
+from app.services.text_clip import clip_words, normalize_scraped_text
 
 # Boilerplate de movimiento de posición institucional reescrito por agregadores
 # (patrón 13F de MarketBeat: «X Shares Purchased by Y», «Stock: Z Raises
@@ -374,7 +374,7 @@ class NewsService:
                 requires_update = False
                 materiality_reasons.append("relevancia: la empresa solo se menciona de pasada")
 
-        summary = clip_words(" ".join(text.strip().split()), 320)
+        summary = clip_words(normalize_scraped_text(text), 320)
         # Tipo de noticia con Jev (earnings/filing/macro/opinion): 1 llamada
         # best-effort (~$0.042/MTok in) guardada en metadata. Sin
         # TYPESAFE_API_KEY o ante error, la noticia se ingiere sin `jev_doc_type`.
