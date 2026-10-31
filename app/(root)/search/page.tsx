@@ -85,13 +85,13 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
           <h1 className="mt-1 text-3xl font-bold text-gray-100">{t('search.title')}</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">{t('search.subtitle')}</p>
         </div>
-        <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/knowledge"><BookOpen aria-hidden="true" className="h-4 w-4" />{t('knowledge.library')}</Link></Button>
+        <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/knowledge"><BookOpen aria-hidden="true" className="h-4 w-4" />{t('search.libraryLink')}</Link></Button>
       </header>
 
       <form className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-4 sm:p-5" method="get">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <label className="grid min-w-0 content-start gap-1 text-sm text-gray-400 flex-1"><span>{t('search.queryLabel')}</span><Input autoFocus className="h-11 w-full text-base" defaultValue={query.q} name="q" placeholder={t('search.queryPlaceholder')} required /></label>
-          <Button className="h-11 w-full shrink-0 sm:w-auto" type="submit"><SearchIcon aria-hidden="true" className="h-4 w-4" />Buscar</Button>
+          <Button className="h-11 w-full shrink-0 sm:w-auto" type="submit"><SearchIcon aria-hidden="true" className="h-4 w-4" />{t('search.submitSearch')}</Button>
         </div>
         <details className="mt-4">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-gray-400"><Filter aria-hidden="true" className="h-4 w-4" />{t('search.advancedFilters')}</summary>
