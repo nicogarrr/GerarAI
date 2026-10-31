@@ -19,6 +19,7 @@ Reglas (comprobadas con 8-K reales de TSLA, META y ASTS el 21-oct-2026):
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -55,6 +56,31 @@ _MONTHS = ["january", "february", "march", "april", "may", "june", "july", "augu
            "september", "october", "november", "december"]
 _ORDINALS = ["first", "second", "third", "fourth"]
 _cache: dict[str, tuple[float, dict[str, Any]]] = {}
+
+# L2 Redis compartida entre workers y usuarios (misma frescura por estado que
+# la L1: ok 24 h / miss 10 min). Sin ella cada worker de gunicorn frio repetia
+# las llamadas a la SEC para los mismos eventos: /api/calendar/followed/materials
+# media 2.346 ms en el barrido del piloto (2026-10-31). Fail-open siempre:
+# Redis caido degrada a la L1 + SEC exactamente como antes.
+_MATERIALS_REDIS_PREFIX = "cavaai:earnings-materials:"
+
+
+def _materials_redis_key(key: str) -> str:
+    return f"{_MATERIALS_REDIS_PREFIX}{key}"
+
+
+def _materials_redis():
+    """Cliente Redis del cache layer (backoff interno); None si no disponible."""
+    try:
+        from app.core.cache import _redis_client
+
+        return _redis_client()
+    except Exception:  # noqa: BLE001 - cache best-effort
+        return None
+
+
+def _redis_ttl_for(value: dict[str, Any]) -> int:
+    return OK_TTL_S if value.get("status") == "ok" else MISS_TTL_S
 
 
 def reset_cache() -> None:
@@ -217,11 +243,37 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
     out: dict[str, dict[str, Any]] = {}
     pending: list[dict[str, Any]] = []
     now = time.monotonic()
+    redis_client = _materials_redis()
     for event in due:
         key = f"{event['ticker']}|{event['date']}"
         hit = _cache.get(key)
         if hit and now - hit[0] < (OK_TTL_S if hit[1]["status"] == "ok" else MISS_TTL_S):
             out[key] = hit[1]
+            continue
+        redis_hit = None
+        redis_age_s = 0.0
+        if redis_client is not None:
+            rkey = _materials_redis_key(key)
+            try:
+                raw = redis_client.get(rkey)
+                redis_hit = json.loads(raw) if raw else None
+            except Exception:  # noqa: BLE001 - fail-open a la resolucion
+                redis_hit = None
+            if redis_hit is not None:
+                # PTTL: la L1 hereda la EDAD de la entrada de Redis. Sin esto,
+                # rehidratar reinicia la frescura y un miss llega a 10+10 min.
+                try:
+                    pttl_ms = redis_client.pttl(rkey)
+                    if pttl_ms and pttl_ms > 0:
+                        redis_age_s = max(
+                            0.0, _redis_ttl_for(redis_hit) - pttl_ms / 1000.0
+                        )
+                except Exception:  # noqa: BLE001 - sin PTTL, frescura actual
+                    redis_age_s = 0.0
+        if redis_hit is not None:
+            out[key] = redis_hit
+            # Rehidrata la L1 del worker conservando el TTL restante de L2.
+            _cache[key] = (now - redis_age_s, redis_hit)
         else:
             pending.append(event)
 
@@ -235,6 +287,11 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
             return
         out[key] = value
         _cache[key] = (time.monotonic(), value)
+        if redis_client is not None:
+            try:
+                redis_client.setex(_materials_redis_key(key), _redis_ttl_for(value), json.dumps(value))
+            except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
+                pass
 
     if pending:
         tasks = [asyncio.create_task(one(e)) for e in pending]
