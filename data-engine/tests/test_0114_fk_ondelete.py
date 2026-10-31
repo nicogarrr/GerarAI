@@ -59,6 +59,13 @@ def _validar_url_admin_ci(url: str) -> None:
         raise ValueError(f"host admin fuera de loopback de CI: {parsed.host!r}")
     if parsed.database != _BD_ADMIN_CI:
         raise ValueError(f"BD admin no es la del job de migraciones: {parsed.database!r}")
+    # libpq honra ?host=, ?hostaddr= y ?service= POR ENCIMA de la autoridad de
+    # la URL: con query, el destino real puede no ser el host que se acaba de
+    # validar. El job de migraciones no usa query ninguna, asi que se bloquea
+    # entera. Solo se listan las claves, nunca los valores (podrian ser rutas
+    # o nombres internos).
+    if parsed.query:
+        raise ValueError(f"query no permitida en URL admin de CI: {sorted(parsed.query)}")
 
 
 def _scratch(url: str):
@@ -101,6 +108,9 @@ def _scratch(url: str):
         finally:
             if anterior:
                 os.environ["DATABASE_URL"] = anterior
+            else:
+                # Antes estaba ausente (o vacia): no dejar la scratch sembrada.
+                os.environ.pop("DATABASE_URL", None)
             get_settings.cache_clear()
     except BaseException:
         # Limpieza best-effort: si el DROP tambien falla no enmascara el
@@ -178,6 +188,9 @@ def test_0114_fks_coinciden_con_modelos_en_ci_postgres():
         finally:
             if anterior:
                 os.environ["DATABASE_URL"] = anterior
+            else:
+                # Antes estaba ausente (o vacia): no dejar la scratch sembrada.
+                os.environ.pop("DATABASE_URL", None)
             get_settings.cache_clear()
         fks_down = _fks(scratch_url)
         for tabla in _TABLAS_TENANT:
@@ -230,6 +243,9 @@ def test_0114_ondelete_rige_sin_validate_en_ci_postgres():
         finally:
             if anterior:
                 os.environ["DATABASE_URL"] = anterior
+            else:
+                # Antes estaba ausente (o vacia): no dejar la scratch sembrada.
+                os.environ.pop("DATABASE_URL", None)
             get_settings.cache_clear()
 
         engine = sa.create_engine(scratch_url)
@@ -362,3 +378,31 @@ def test_scratch_destruye_la_bd_si_la_migracion_falla(monkeypatch):
     assert f'"{nombre}"' in drops[0] and "WITH (FORCE)" in drops[0]
     assert engine.disposed
     assert os.environ["DATABASE_URL"] == "sqlite:///./previo.db"
+def test_validar_url_admin_ci_rechaza_query_bypass():
+    """libpq honra ?host=, ?hostaddr= y ?service= sobre la autoridad: fuera."""
+    for query in ("host=db.remoto.internal", "hostaddr=10.9.9.9", "service=pg_produccion"):
+        with pytest.raises(ValueError, match="query"):
+            _validar_url_admin_ci(f"postgresql+psycopg://u:p@127.0.0.1:5432/cavaai_research?{query}")
+
+
+def test_scratch_restaura_database_url_ausente_tras_fallo(monkeypatch):
+    """Si DATABASE_URL no existia antes, el fixture no la deja sembrada."""
+    import os
+
+    import sqlalchemy as sa
+
+    from alembic import command
+
+    engine = _EngineFalso([])
+    monkeypatch.setattr(sa, "create_engine", lambda *args, **kwargs: engine)
+
+    def _upgrade_que_falla(cfg, revision):
+        raise RuntimeError("migracion rota")
+
+    monkeypatch.setattr(command, "upgrade", _upgrade_que_falla)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    with pytest.raises(RuntimeError, match="migracion rota"):
+        _scratch("postgresql+psycopg://portfolio:portfolio@127.0.0.1:5432/cavaai_research")
+
+    assert "DATABASE_URL" not in os.environ
