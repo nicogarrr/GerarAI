@@ -1089,11 +1089,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // secciones seguidas con título claro («Una fila, no tres menús», 29-oct-2026).
   const buildOverviewContent = async (): Promise<React.ReactNode> => {
     // marketPromise ya se lanzó en paralelo al snapshot más arriba.
-    let market: Awaited<ReturnType<typeof getCompanyMarketSnapshot>>;
     try {
       // headerMarket ya guarda esta misma promesa resuelta (se esperó en la
-      // cabecera); aquí solo se distingue la caída del motor del resto.
-      market = await marketPromise;
+      // cabecera); aquí solo se espera para distinguir la caída del motor
+      // del resto de errores; el valor se lee en la cabecera.
+      await marketPromise;
     } catch (error) {
       if (isBackendUnavailableError(error)) {
         return <BackendOffline feature={`Datos de mercado de ${ticker}`} retryHref={`/research/${ticker}`} />;
