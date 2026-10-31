@@ -9791,10 +9791,211 @@ export interface components {
             /** Target Allocations */
             target_allocations?: components["schemas"]["PlanTarget"][];
         };
+        /** PortfolioAttributionOut */
+        PortfolioAttributionOut: {
+            /** Basis */
+            basis: string;
+            /** Excluded Partial Histories */
+            excluded_partial_histories: string[];
+            /** Incomplete Components */
+            incomplete_components: string[];
+            /** Period End */
+            period_end: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Portfolio Components */
+            portfolio_components: {
+                [key: string]: number | null;
+            };
+            /** Positions */
+            positions: components["schemas"]["PortfolioAttributionPositionOut"][];
+        };
+        /** PortfolioAttributionPositionOut */
+        PortfolioAttributionPositionOut: {
+            /** Components */
+            components: {
+                [key: string]: number | null;
+            };
+            /** Dividends Known */
+            dividends_known: boolean;
+            /** Fx Known */
+            fx_known: boolean;
+            /** Partial History */
+            partial_history: boolean;
+            /** Period Days */
+            period_days: number | null;
+            /** Period End */
+            period_end: string | null;
+            /** Period Start */
+            period_start: string | null;
+            /** Ticker */
+            ticker: string;
+            /** Total Return */
+            total_return: number | null;
+            /** Weight */
+            weight: number;
+        };
+        /** PortfolioBenchmarkOut */
+        PortfolioBenchmarkOut: {
+            /** Alpha Annualized */
+            alpha_annualized: number | null;
+            /** Benchmark Annualized */
+            benchmark_annualized: number | null;
+            /** Benchmark Twr */
+            benchmark_twr: number | null;
+            /** Information Ratio */
+            information_ratio: number | null;
+            /** Observations */
+            observations: number;
+            /** Portfolio Annualized */
+            portfolio_annualized: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "calculated" | "missing_benchmark" | "insufficient_overlap";
+            /** Symbol */
+            symbol: string;
+            /** Tracking Error */
+            tracking_error: number | null;
+        };
+        /** PortfolioConcentrationOut */
+        PortfolioConcentrationOut: {
+            /** Herfindahl */
+            herfindahl: number;
+            /** Top 1 */
+            top_1: number;
+            /** Top 5 */
+            top_5: number;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
         /** PortfolioConfigurationInput */
         PortfolioConfigurationInput: {
             /** Base Currency */
             base_currency: string;
+        };
+        /** PortfolioCoverageOut */
+        PortfolioCoverageOut: {
+            /** Limitations */
+            limitations: string[];
+            /** Partial Trading Day */
+            partial_trading_day: boolean;
+            /** Portfolio Snapshots */
+            portfolio_snapshots: number;
+            /** Positions */
+            positions: number;
+            /** Positions With Full Horizon */
+            positions_with_full_horizon: number;
+            /** Positions With Price History */
+            positions_with_price_history: number;
+            /** Price History Percent */
+            price_history_percent: number;
+            /** Price History Window Percent */
+            price_history_window_percent: number;
+            /** Snapshot Pricing Complete */
+            snapshot_pricing_complete: number;
+            /** Snapshot Returns */
+            snapshot_returns: number;
+            /** Spot Tail Positions */
+            spot_tail_positions: string[];
+        };
+        /** PortfolioDrawdownPointOut */
+        PortfolioDrawdownPointOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Drawdown */
+            drawdown: number;
+        };
+        /** PortfolioExposuresOut */
+        PortfolioExposuresOut: {
+            /** Countries */
+            countries: {
+                [key: string]: number;
+            };
+            /** Currencies */
+            currencies: {
+                [key: string]: number;
+            };
+            /** Factors */
+            factors: {
+                [key: string]: number;
+            };
+            /** Sectors */
+            sectors: {
+                [key: string]: number;
+            };
+        };
+        /** PortfolioIntelligenceOut */
+        PortfolioIntelligenceOut: {
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            attribution: components["schemas"]["PortfolioAttributionOut"];
+            /** Base Currency */
+            base_currency: string;
+            benchmark: components["schemas"]["PortfolioBenchmarkOut"];
+            concentration: components["schemas"]["PortfolioConcentrationOut"];
+            coverage: components["schemas"]["PortfolioCoverageOut"];
+            exposures: components["schemas"]["PortfolioExposuresOut"];
+            /** Horizon Years */
+            horizon_years: number;
+            ledger_contribution: components["schemas"]["PortfolioLedgerContributionOut"];
+            /** Missing Fx */
+            missing_fx: {
+                [key: string]: unknown;
+            }[];
+            performance: components["schemas"]["PortfolioPerformanceOut"];
+            risk: components["schemas"]["PortfolioRiskOut"];
+        };
+        /** PortfolioLedgerContributionOut */
+        PortfolioLedgerContributionOut: {
+            /** Base Currency */
+            base_currency?: string | null;
+            coverage: components["schemas"]["PortfolioLedgerCoverageOut"];
+            /** Methodology */
+            methodology: string;
+            /** Positions */
+            positions: components["schemas"]["PortfolioLedgerPositionOut"][];
+            /** Total Pnl */
+            total_pnl: number | null;
+        };
+        /** PortfolioLedgerCoverageOut */
+        PortfolioLedgerCoverageOut: {
+            /** Positions */
+            positions: number;
+            /** Reasons */
+            reasons: {
+                [key: string]: number;
+            };
+            /** With Contribution */
+            with_contribution: number;
+        };
+        /** PortfolioLedgerPositionOut */
+        PortfolioLedgerPositionOut: {
+            /** Contribution Pnl */
+            contribution_pnl: number | null;
+            /** Contribution Share */
+            contribution_share: number | null;
+            /** End Value */
+            end_value: number | null;
+            /** Income */
+            income: number | null;
+            /** Net Invested */
+            net_invested: number | null;
+            /** Reason */
+            reason: string | null;
+            /** Start Value */
+            start_value: number | null;
+            /** Ticker */
+            ticker: string;
         };
         /** PortfolioMovementOut */
         PortfolioMovementOut: {
@@ -9851,6 +10052,32 @@ export interface components {
             /** Unresolved Positions */
             unresolved_positions: number;
         };
+        /** PortfolioPerformanceOut */
+        PortfolioPerformanceOut: {
+            /** Annualized Return */
+            annualized_return: number | null;
+            reconstruction: components["schemas"]["PortfolioReconstructionOut"];
+            /** Trace */
+            trace: {
+                [key: string]: unknown;
+            };
+            /** Twr */
+            twr: number | null;
+            /** Twr Is Exact */
+            twr_is_exact: boolean;
+            /**
+             * Twr Method
+             * @enum {string}
+             */
+            twr_method: "daily_portfolio_snapshots" | "ledger_reconstruction_positions_only" | "static_current_weight_estimate";
+            twr_period: components["schemas"]["PortfolioTwrPeriodOut"] | null;
+            /** Valuation History */
+            valuation_history: {
+                [key: string]: unknown;
+            }[];
+            /** Xirr */
+            xirr: number | null;
+        };
         /** PortfolioPositionOut */
         PortfolioPositionOut: {
             /** Cusip */
@@ -9878,6 +10105,76 @@ export interface components {
             price: number | string;
             /** Ticker */
             ticker: string;
+        };
+        /** PortfolioReconstructionOut */
+        PortfolioReconstructionOut: {
+            /** Days Excluded */
+            days_excluded: number;
+            /** Days Valued */
+            days_valued: number;
+            /** Excluded Days */
+            excluded_days: {
+                [key: string]: unknown;
+            }[];
+            /** First Date */
+            first_date: string | null;
+            /** Last Date */
+            last_date: string | null;
+            /** Method */
+            method: string;
+            /** Price Check */
+            price_check: {
+                [key: string]: unknown;
+            };
+            /** Quantity Check */
+            quantity_check: {
+                [key: string]: unknown;
+            }[];
+            /** Scope */
+            scope: string;
+            /** Status */
+            status: string;
+            /** Twr */
+            twr: number | null;
+        };
+        /** PortfolioRiskOut */
+        PortfolioRiskOut: {
+            /** Beta */
+            beta: number | null;
+            /** Beta Trace */
+            beta_trace: {
+                [key: string]: unknown;
+            };
+            /** Calmar */
+            calmar: number | null;
+            /** Correlation Min Observations */
+            correlation_min_observations: number;
+            /** Correlation Observations */
+            correlation_observations: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+            /** Correlations */
+            correlations: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
+            /** Cvar 95 */
+            cvar_95: number | null;
+            /** Drawdown Series */
+            drawdown_series: components["schemas"]["PortfolioDrawdownPointOut"][];
+            /** Max Drawdown */
+            max_drawdown: number | null;
+            /** Sharpe */
+            sharpe: number | null;
+            /** Sortino */
+            sortino: number | null;
+            /** Var 95 */
+            var_95: number | null;
+            /** Volatility */
+            volatility: number | null;
         };
         /** PortfolioTransactionBatchInput */
         PortfolioTransactionBatchInput: {
@@ -9914,6 +10211,21 @@ export interface components {
              * Format: date
              */
             trade_date: string;
+        };
+        /** PortfolioTwrPeriodOut */
+        PortfolioTwrPeriodOut: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Sessions */
+            sessions: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
         };
         /** PrincipleAction */
         PrincipleAction: {
@@ -21730,9 +22042,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIntelligenceOut"];
                 };
             };
             /** @description Validation Error */

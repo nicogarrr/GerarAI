@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -1321,3 +1321,171 @@ class InvestorDetailOut(InvestorSummaryOut):
     provenance: ProvenanceOut
     changes: ManagerChangesOut | None = None
     videos: list[InvestorVideoOut] = []
+
+
+# --- GET /api/portfolio/intelligence ---------------------------------------
+# Formas medidas contra PortfolioIntelligenceService.build (servicio real).
+# La ruta devuelve siempre todas las claves (ramas None, no omision), asi que
+# no hace falta response_model_exclude_unset.
+
+
+class PortfolioTwrPeriodOut(BaseModel):
+    start: date
+    end: date
+    sessions: int
+
+
+class PortfolioReconstructionOut(BaseModel):
+    method: str
+    scope: str
+    status: str
+    days_valued: int
+    days_excluded: int
+    excluded_days: list[dict[str, Any]]
+    first_date: date | None
+    last_date: date | None
+    twr: float | None
+    quantity_check: list[dict[str, Any]]
+    price_check: dict[str, Any]
+
+
+class PortfolioPerformanceOut(BaseModel):
+    twr: float | None
+    xirr: float | None
+    annualized_return: float | None
+    trace: dict[str, Any]
+    twr_method: Literal[
+        "daily_portfolio_snapshots",
+        "ledger_reconstruction_positions_only",
+        "static_current_weight_estimate",
+    ]
+    twr_is_exact: bool
+    twr_period: PortfolioTwrPeriodOut | None
+    reconstruction: PortfolioReconstructionOut
+    valuation_history: list[dict[str, Any]]
+
+
+class PortfolioDrawdownPointOut(BaseModel):
+    date: date
+    drawdown: float
+
+
+class PortfolioRiskOut(BaseModel):
+    max_drawdown: float | None
+    drawdown_series: list[PortfolioDrawdownPointOut]
+    volatility: float | None
+    sharpe: float | None
+    sortino: float | None
+    var_95: float | None
+    cvar_95: float | None
+    calmar: float | None
+    beta: float | None
+    beta_trace: dict[str, Any]
+    correlations: dict[str, dict[str, float | None]]
+    correlation_observations: dict[str, dict[str, int]]
+    correlation_min_observations: int
+
+
+class PortfolioConcentrationOut(BaseModel):
+    top_1: float
+    top_5: float
+    herfindahl: float
+    weights: dict[str, float]
+
+
+class PortfolioExposuresOut(BaseModel):
+    sectors: dict[str, float]
+    countries: dict[str, float]
+    currencies: dict[str, float]
+    factors: dict[str, float]
+
+
+class PortfolioAttributionPositionOut(BaseModel):
+    ticker: str
+    weight: float
+    total_return: float | None
+    period_start: str | None
+    period_end: str | None
+    period_days: int | None
+    fx_known: bool
+    dividends_known: bool
+    partial_history: bool
+    components: dict[str, float | None]
+
+
+class PortfolioAttributionOut(BaseModel):
+    basis: str
+    period_start: str | None
+    period_end: str | None
+    portfolio_components: dict[str, float | None]
+    incomplete_components: list[str]
+    excluded_partial_histories: list[str]
+    positions: list[PortfolioAttributionPositionOut]
+
+
+class PortfolioLedgerPositionOut(BaseModel):
+    ticker: str
+    contribution_pnl: float | None
+    contribution_share: float | None
+    end_value: float | None
+    start_value: float | None
+    net_invested: float | None
+    income: float | None
+    reason: str | None
+
+
+class PortfolioLedgerCoverageOut(BaseModel):
+    positions: int
+    with_contribution: int
+    reasons: dict[str, int]
+
+
+class PortfolioLedgerContributionOut(BaseModel):
+    positions: list[PortfolioLedgerPositionOut]
+    total_pnl: float | None
+    coverage: PortfolioLedgerCoverageOut
+    methodology: str
+    # La rama sin posiciones del servicio OMITE la clave (no la emite null):
+    # se conserva la omision con response_model_exclude_unset=True.
+    base_currency: str | None = None
+
+
+class PortfolioBenchmarkOut(BaseModel):
+    symbol: str
+    status: Literal["calculated", "missing_benchmark", "insufficient_overlap"]
+    benchmark_twr: float | None
+    benchmark_annualized: float | None
+    portfolio_annualized: float | None
+    alpha_annualized: float | None
+    tracking_error: float | None
+    information_ratio: float | None
+    observations: int
+
+
+class PortfolioCoverageOut(BaseModel):
+    positions: int
+    positions_with_price_history: int
+    positions_with_full_horizon: int
+    price_history_window_percent: float
+    price_history_percent: float
+    portfolio_snapshots: int
+    partial_trading_day: bool
+    spot_tail_positions: list[str]
+    snapshot_returns: int
+    snapshot_pricing_complete: int
+    limitations: list[str]
+
+
+class PortfolioIntelligenceOut(BaseModel):
+    as_of: date
+    base_currency: str
+    missing_fx: list[dict[str, Any]]
+    horizon_years: int
+    performance: PortfolioPerformanceOut
+    risk: PortfolioRiskOut
+    concentration: PortfolioConcentrationOut
+    exposures: PortfolioExposuresOut
+    attribution: PortfolioAttributionOut
+    ledger_contribution: PortfolioLedgerContributionOut
+    benchmark: PortfolioBenchmarkOut
+    coverage: PortfolioCoverageOut

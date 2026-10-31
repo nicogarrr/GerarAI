@@ -9958,6 +9958,309 @@
         "title": "PlanUpsertInput",
         "type": "object"
       },
+      "PortfolioAttributionOut": {
+        "properties": {
+          "basis": {
+            "title": "Basis",
+            "type": "string"
+          },
+          "excluded_partial_histories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Partial Histories",
+            "type": "array"
+          },
+          "incomplete_components": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Incomplete Components",
+            "type": "array"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "portfolio_components": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Portfolio Components",
+            "type": "object"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioAttributionPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "basis",
+          "period_start",
+          "period_end",
+          "portfolio_components",
+          "incomplete_components",
+          "excluded_partial_histories",
+          "positions"
+        ],
+        "title": "PortfolioAttributionOut",
+        "type": "object"
+      },
+      "PortfolioAttributionPositionOut": {
+        "properties": {
+          "components": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Components",
+            "type": "object"
+          },
+          "dividends_known": {
+            "title": "Dividends Known",
+            "type": "boolean"
+          },
+          "fx_known": {
+            "title": "Fx Known",
+            "type": "boolean"
+          },
+          "partial_history": {
+            "title": "Partial History",
+            "type": "boolean"
+          },
+          "period_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Days"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "total_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Return"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "ticker",
+          "weight",
+          "total_return",
+          "period_start",
+          "period_end",
+          "period_days",
+          "fx_known",
+          "dividends_known",
+          "partial_history",
+          "components"
+        ],
+        "title": "PortfolioAttributionPositionOut",
+        "type": "object"
+      },
+      "PortfolioBenchmarkOut": {
+        "properties": {
+          "alpha_annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alpha Annualized"
+          },
+          "benchmark_annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Annualized"
+          },
+          "benchmark_twr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Twr"
+          },
+          "information_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Information Ratio"
+          },
+          "observations": {
+            "title": "Observations",
+            "type": "integer"
+          },
+          "portfolio_annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Annualized"
+          },
+          "status": {
+            "enum": [
+              "calculated",
+              "missing_benchmark",
+              "insufficient_overlap"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "tracking_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tracking Error"
+          }
+        },
+        "required": [
+          "symbol",
+          "status",
+          "benchmark_twr",
+          "benchmark_annualized",
+          "portfolio_annualized",
+          "alpha_annualized",
+          "tracking_error",
+          "information_ratio",
+          "observations"
+        ],
+        "title": "PortfolioBenchmarkOut",
+        "type": "object"
+      },
+      "PortfolioConcentrationOut": {
+        "properties": {
+          "herfindahl": {
+            "title": "Herfindahl",
+            "type": "number"
+          },
+          "top_1": {
+            "title": "Top 1",
+            "type": "number"
+          },
+          "top_5": {
+            "title": "Top 5",
+            "type": "number"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "top_1",
+          "top_5",
+          "herfindahl",
+          "weights"
+        ],
+        "title": "PortfolioConcentrationOut",
+        "type": "object"
+      },
       "PortfolioConfigurationInput": {
         "properties": {
           "base_currency": {
@@ -9972,6 +10275,370 @@
           "base_currency"
         ],
         "title": "PortfolioConfigurationInput",
+        "type": "object"
+      },
+      "PortfolioCoverageOut": {
+        "properties": {
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "partial_trading_day": {
+            "title": "Partial Trading Day",
+            "type": "boolean"
+          },
+          "portfolio_snapshots": {
+            "title": "Portfolio Snapshots",
+            "type": "integer"
+          },
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "positions_with_full_horizon": {
+            "title": "Positions With Full Horizon",
+            "type": "integer"
+          },
+          "positions_with_price_history": {
+            "title": "Positions With Price History",
+            "type": "integer"
+          },
+          "price_history_percent": {
+            "title": "Price History Percent",
+            "type": "number"
+          },
+          "price_history_window_percent": {
+            "title": "Price History Window Percent",
+            "type": "number"
+          },
+          "snapshot_pricing_complete": {
+            "title": "Snapshot Pricing Complete",
+            "type": "integer"
+          },
+          "snapshot_returns": {
+            "title": "Snapshot Returns",
+            "type": "integer"
+          },
+          "spot_tail_positions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Spot Tail Positions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "positions",
+          "positions_with_price_history",
+          "positions_with_full_horizon",
+          "price_history_window_percent",
+          "price_history_percent",
+          "portfolio_snapshots",
+          "partial_trading_day",
+          "spot_tail_positions",
+          "snapshot_returns",
+          "snapshot_pricing_complete",
+          "limitations"
+        ],
+        "title": "PortfolioCoverageOut",
+        "type": "object"
+      },
+      "PortfolioDrawdownPointOut": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "drawdown": {
+            "title": "Drawdown",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "drawdown"
+        ],
+        "title": "PortfolioDrawdownPointOut",
+        "type": "object"
+      },
+      "PortfolioExposuresOut": {
+        "properties": {
+          "countries": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Countries",
+            "type": "object"
+          },
+          "currencies": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Currencies",
+            "type": "object"
+          },
+          "factors": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Factors",
+            "type": "object"
+          },
+          "sectors": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Sectors",
+            "type": "object"
+          }
+        },
+        "required": [
+          "sectors",
+          "countries",
+          "currencies",
+          "factors"
+        ],
+        "title": "PortfolioExposuresOut",
+        "type": "object"
+      },
+      "PortfolioIntelligenceOut": {
+        "properties": {
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "attribution": {
+            "$ref": "#/components/schemas/PortfolioAttributionOut"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "benchmark": {
+            "$ref": "#/components/schemas/PortfolioBenchmarkOut"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/PortfolioConcentrationOut"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/PortfolioCoverageOut"
+          },
+          "exposures": {
+            "$ref": "#/components/schemas/PortfolioExposuresOut"
+          },
+          "horizon_years": {
+            "title": "Horizon Years",
+            "type": "integer"
+          },
+          "ledger_contribution": {
+            "$ref": "#/components/schemas/PortfolioLedgerContributionOut"
+          },
+          "missing_fx": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Missing Fx",
+            "type": "array"
+          },
+          "performance": {
+            "$ref": "#/components/schemas/PortfolioPerformanceOut"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/PortfolioRiskOut"
+          }
+        },
+        "required": [
+          "as_of",
+          "base_currency",
+          "missing_fx",
+          "horizon_years",
+          "performance",
+          "risk",
+          "concentration",
+          "exposures",
+          "attribution",
+          "ledger_contribution",
+          "benchmark",
+          "coverage"
+        ],
+        "title": "PortfolioIntelligenceOut",
+        "type": "object"
+      },
+      "PortfolioLedgerContributionOut": {
+        "properties": {
+          "base_currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Currency"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/PortfolioLedgerCoverageOut"
+          },
+          "methodology": {
+            "title": "Methodology",
+            "type": "string"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioLedgerPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "total_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Pnl"
+          }
+        },
+        "required": [
+          "positions",
+          "total_pnl",
+          "coverage",
+          "methodology"
+        ],
+        "title": "PortfolioLedgerContributionOut",
+        "type": "object"
+      },
+      "PortfolioLedgerCoverageOut": {
+        "properties": {
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Reasons",
+            "type": "object"
+          },
+          "with_contribution": {
+            "title": "With Contribution",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "positions",
+          "with_contribution",
+          "reasons"
+        ],
+        "title": "PortfolioLedgerCoverageOut",
+        "type": "object"
+      },
+      "PortfolioLedgerPositionOut": {
+        "properties": {
+          "contribution_pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Pnl"
+          },
+          "contribution_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contribution Share"
+          },
+          "end_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Value"
+          },
+          "income": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Income"
+          },
+          "net_invested": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Invested"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "start_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Value"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "contribution_pnl",
+          "contribution_share",
+          "end_value",
+          "start_value",
+          "net_invested",
+          "income",
+          "reason"
+        ],
+        "title": "PortfolioLedgerPositionOut",
         "type": "object"
       },
       "PortfolioMovementOut": {
@@ -10167,6 +10834,95 @@
         "title": "PortfolioOverlapOut",
         "type": "object"
       },
+      "PortfolioPerformanceOut": {
+        "properties": {
+          "annualized_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annualized Return"
+          },
+          "reconstruction": {
+            "$ref": "#/components/schemas/PortfolioReconstructionOut"
+          },
+          "trace": {
+            "additionalProperties": true,
+            "title": "Trace",
+            "type": "object"
+          },
+          "twr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twr"
+          },
+          "twr_is_exact": {
+            "title": "Twr Is Exact",
+            "type": "boolean"
+          },
+          "twr_method": {
+            "enum": [
+              "daily_portfolio_snapshots",
+              "ledger_reconstruction_positions_only",
+              "static_current_weight_estimate"
+            ],
+            "title": "Twr Method",
+            "type": "string"
+          },
+          "twr_period": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PortfolioTwrPeriodOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "valuation_history": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Valuation History",
+            "type": "array"
+          },
+          "xirr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Xirr"
+          }
+        },
+        "required": [
+          "twr",
+          "xirr",
+          "annualized_return",
+          "trace",
+          "twr_method",
+          "twr_is_exact",
+          "twr_period",
+          "reconstruction",
+          "valuation_history"
+        ],
+        "title": "PortfolioPerformanceOut",
+        "type": "object"
+      },
       "PortfolioPositionOut": {
         "properties": {
           "cusip": {
@@ -10277,6 +11033,253 @@
           "price"
         ],
         "title": "PortfolioPriceInput",
+        "type": "object"
+      },
+      "PortfolioReconstructionOut": {
+        "properties": {
+          "days_excluded": {
+            "title": "Days Excluded",
+            "type": "integer"
+          },
+          "days_valued": {
+            "title": "Days Valued",
+            "type": "integer"
+          },
+          "excluded_days": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Excluded Days",
+            "type": "array"
+          },
+          "first_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Date"
+          },
+          "last_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Date"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "price_check": {
+            "additionalProperties": true,
+            "title": "Price Check",
+            "type": "object"
+          },
+          "quantity_check": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Quantity Check",
+            "type": "array"
+          },
+          "scope": {
+            "title": "Scope",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "twr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Twr"
+          }
+        },
+        "required": [
+          "method",
+          "scope",
+          "status",
+          "days_valued",
+          "days_excluded",
+          "excluded_days",
+          "first_date",
+          "last_date",
+          "twr",
+          "quantity_check",
+          "price_check"
+        ],
+        "title": "PortfolioReconstructionOut",
+        "type": "object"
+      },
+      "PortfolioRiskOut": {
+        "properties": {
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "beta_trace": {
+            "additionalProperties": true,
+            "title": "Beta Trace",
+            "type": "object"
+          },
+          "calmar": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calmar"
+          },
+          "correlation_min_observations": {
+            "title": "Correlation Min Observations",
+            "type": "integer"
+          },
+          "correlation_observations": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Correlation Observations",
+            "type": "object"
+          },
+          "correlations": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "title": "Correlations",
+            "type": "object"
+          },
+          "cvar_95": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cvar 95"
+          },
+          "drawdown_series": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioDrawdownPointOut"
+            },
+            "title": "Drawdown Series",
+            "type": "array"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown"
+          },
+          "sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe"
+          },
+          "sortino": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino"
+          },
+          "var_95": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Var 95"
+          },
+          "volatility": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility"
+          }
+        },
+        "required": [
+          "max_drawdown",
+          "drawdown_series",
+          "volatility",
+          "sharpe",
+          "sortino",
+          "var_95",
+          "cvar_95",
+          "calmar",
+          "beta",
+          "beta_trace",
+          "correlations",
+          "correlation_observations",
+          "correlation_min_observations"
+        ],
+        "title": "PortfolioRiskOut",
         "type": "object"
       },
       "PortfolioTransactionBatchInput": {
@@ -10391,6 +11394,31 @@
           "trade_date"
         ],
         "title": "PortfolioTransactionInput",
+        "type": "object"
+      },
+      "PortfolioTwrPeriodOut": {
+        "properties": {
+          "end": {
+            "format": "date",
+            "title": "End",
+            "type": "string"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "start": {
+            "format": "date",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "sessions"
+        ],
+        "title": "PortfolioTwrPeriodOut",
         "type": "object"
       },
       "PrincipleAction": {
@@ -57804,9 +58832,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Intelligence Api Portfolio Intelligence Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioIntelligenceOut"
                 }
               }
             },

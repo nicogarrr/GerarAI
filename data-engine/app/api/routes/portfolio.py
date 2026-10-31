@@ -31,6 +31,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
+from app.schemas.api import PortfolioIntelligenceOut
 from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.audit_service import record_audit_event
@@ -410,7 +411,7 @@ def portfolio_summary(db: Session = Depends(get_db)) -> dict:
     }
 
 
-@router.get("/intelligence")
+@router.get("/intelligence", response_model=PortfolioIntelligenceOut, response_model_exclude_unset=True)
 def portfolio_intelligence(
     years: int = Query(default=5, ge=1, le=20),
     db: Session = Depends(get_db),
