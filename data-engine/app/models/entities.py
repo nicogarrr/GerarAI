@@ -23,6 +23,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     event,
+    text,
 )
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
@@ -937,6 +938,13 @@ class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
             name="uq_calculated_metric_definition_period",
         ),
         Index("ix_calculated_metrics_company_metric", "company_id", "metric"),
+        # metric-coverage (0119): distinct metric filtrado por status/value.
+        Index(
+            "ix_calc_metrics_tenant_metric_ok",
+            "tenant_id",
+            "metric",
+            postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1036,6 +1044,15 @@ class MarketPrice(Base, TimestampMixin):
     __tablename__ = "market_prices"
     __table_args__ = (
         UniqueConstraint("company_id", "date", name="uq_market_price_company_date"),
+        # data-health (0119): group by source con close > 0 era Seq Scan con
+        # spill; market_prices es global, sin ix_tenant_id de 0117.
+        Index(
+            "ix_market_prices_source_cov",
+            "source",
+            "company_id",
+            "updated_at",
+            postgresql_where=text("close > 0"),
+        ),
         CheckConstraint("close >= 0", name="ck_market_prices_close_non_negative"),
     )
 
