@@ -37,6 +37,8 @@ def ledger(monkeypatch):
     import app.services.sale_hypothetical as hypo
     monkeypatch.setattr(chat, "date", Clock)
     monkeypatch.setattr(hypo, "date", Clock)
+    monkeypatch.setattr(chat, "local_today", Clock.today)
+    monkeypatch.setattr(hypo, "local_today", Clock.today)
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:

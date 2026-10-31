@@ -235,6 +235,7 @@ def test_chat_con_posicion_vender_la_mitad_a_un_precio_usa_el_precio_del_usuario
             raise AssertionError("la estimación de venta no llama a ningún modelo")
 
     monkeypatch.setattr(chat, "date", Clock)
+    monkeypatch.setattr(chat, "local_today", Clock.today)
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
