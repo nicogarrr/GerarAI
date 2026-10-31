@@ -33,6 +33,12 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
+# Clave en el registry de salud de fuentes (filings.xbrl.org). 400/404 son
+# dato por filing/consulta y NO degradan; 5xx/red/no-JSON SI.
+REGISTRY_KEY = "esef"
+
 ESEF_BASE_URL = "https://filings.xbrl.org"
 FILINGS_API = "/api/filings"
 ENTITIES_API = "/api/entities"
@@ -55,7 +61,7 @@ class EsefFiling:
     lei: str
     country: str
     period_end: str | None
-    json_url: str | None       # relative path on ESEF_BASE_URL; None = unavailable
+    json_url: str | None  # relative path on ESEF_BASE_URL; None = unavailable
     package_url: str | None
     sha256: str | None
     error_count: int | None
@@ -224,13 +230,24 @@ class EsefClient:
         self, url: str, params: dict[str, Any] | None = None, accept: str | None = None
     ) -> dict[str, Any]:
         _throttle()
+        registry = get_data_source_registry()
+        started = time.monotonic()
         try:
             headers = {"Accept": accept} if accept else None
             resp = await self._client.get(url, params=params, headers=headers)
             resp.raise_for_status()
-            return resp.json()
-        except (httpx.HTTPError, ValueError) as exc:
+            payload = resp.json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response is not None and exc.response.status_code in (400, 404):
+                # Filing/entidad inexistente: dato por consulta, no fuente caida.
+                raise EsefError(f"GET {url} failed: {exc!r}") from exc
+            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
             raise EsefError(f"GET {url} failed: {exc!r}") from exc
+        except (httpx.HTTPError, ValueError) as exc:
+            registry.record_failure(REGISTRY_KEY, f"{type(exc).__name__}")
+            raise EsefError(f"GET {url} failed: {exc!r}") from exc
+        registry.record_success(REGISTRY_KEY, (time.monotonic() - started) * 1000)
+        return payload
 
     async def list_filings_page(
         self, country: str = "ES", page: int = 1, page_size: int = DEFAULT_PAGE_SIZE
@@ -241,7 +258,9 @@ class EsefClient:
         )
         return parse_filings_page(payload)
 
-    async def list_all_filings(self, country: str = "ES", page_size: int = DEFAULT_PAGE_SIZE) -> list[EsefFiling]:
+    async def list_all_filings(
+        self, country: str = "ES", page_size: int = DEFAULT_PAGE_SIZE
+    ) -> list[EsefFiling]:
         first, total = await self.list_filings_page(country, page=1, page_size=page_size)
         filings = list(first)
         pages = max(1, -(-total // page_size))
