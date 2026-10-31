@@ -1,4 +1,6 @@
-/** Formato de operaciones insider (puro, sin imports). */
+import type { TranslateFn } from '@/lib/i18n/translate';
+
+/** Formato de operaciones insider (puro; solo importa el tipo TranslateFn). */
 
 /** La SEC da «APELLIDO NOMBRE» en mayúsculas: se pasa a «Apellido Nombre». */
 export function insiderName(value: string | null | undefined): string {
@@ -100,7 +102,15 @@ export function insiderRole(role: string | null | undefined, officerTitle: strin
     return parts.length ? parts.join(' · ') : 'Insider';
 }
 
-export function sideLabel(side: string | null | undefined): string {
+export function sideLabel(side: string | null | undefined, t?: TranslateFn): string {
+    if (t) {
+        return side === 'compra'
+            ? t('insider.feed.sideBuyLabel')
+            : side === 'venta'
+              ? t('insider.feed.sideSellLabel')
+              : '—';
+    }
+    // Sin t: literales historicos es (scripts y llamadas legacy fuera de React).
     return side === 'compra' ? 'Compra' : side === 'venta' ? 'Venta' : '—';
 }
 
@@ -125,11 +135,11 @@ const CODE_LABELS: Record<string, string> = {
     X: 'Ejercicio de opción',
 };
 
-export function insiderCodeLabel(code: string | null | undefined): string {
+export function insiderCodeLabel(code: string | null | undefined, t?: TranslateFn): string {
     const clean = (code ?? '').trim().toUpperCase();
     if (!clean) return '—';
-    if (clean === 'P') return sideLabel('compra');
-    if (clean === 'S') return sideLabel('venta');
+    if (clean === 'P') return sideLabel('compra', t);
+    if (clean === 'S') return sideLabel('venta', t);
     return CODE_LABELS[clean] ?? `Código ${clean}`;
 }
 

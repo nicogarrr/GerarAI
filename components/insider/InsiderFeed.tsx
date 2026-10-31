@@ -94,7 +94,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
                 <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
                     {tx.ticker}
                 </Link>
-                <span className={`font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>{sideLabel(tx.side)}</span>
+                <span className={`font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>{sideLabel(tx.side, t)}</span>
                 {tx.rule_10b5_1 ? <span className="text-xs text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}
                 {tx.form === 'PDMR' ? <span className="text-xs text-gray-500">{t('insider.feed.pdmrBadge')}</span> : null}
                 {tx.form === 'CA-INSIDER' ? <span className="text-xs text-gray-500">{t('insider.feed.canadaBadge')}</span> : null}
@@ -264,7 +264,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                 <td className="px-3 py-2 text-gray-100">{insiderName(tx.insider)}</td>
                                                 <td className="px-3 py-2 text-gray-400">{insiderRole(tx.role, tx.officer_title)}</td>
                                                 <td className={`px-3 py-2 font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
-                                                    {sideLabel(tx.side)}
+                                                    {sideLabel(tx.side, t)}
                                                     {tx.rule_10b5_1 ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}
                                                 </td>
                                                 <td className="px-3 py-2 text-right tabular-nums">

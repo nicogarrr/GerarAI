@@ -449,7 +449,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                     <span className="font-semibold text-gray-100">{insiderName(tx.insider)}</span>
                                                     <span className="text-gray-400">{insiderRole(tx.role, tx.officer_title)}</span>
                                                     <span className={tx.code === 'P' ? 'text-teal-300' : tx.code === 'S' ? 'text-red-400' : 'text-gray-400'}>
-                                                        {insiderCodeLabel(tx.code)}
+                                                        {insiderCodeLabel(tx.code, ti)}
                                                         {tx.is_derivative ? ` · ${ti('insider.derivative')}` : ''}
                                                         {tx.security_title ? ` · ${tx.security_title}` : ''}
                                                         {tx.rule_10b5_1 ? ` · ${ti('insider.plan10b51')}` : ''}

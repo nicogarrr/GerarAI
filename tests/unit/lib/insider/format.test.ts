@@ -78,6 +78,15 @@ describe('sideLabel / insiderCodeLabel', () => {
         expect(sideLabel('venta')).toBe('Venta');
         expect(sideLabel('otro')).toBe('—');
     });
+    it('con traductor usa las claves i18n (EN: Buy/Sell)', () => {
+        const en = ((path: string) =>
+            path === 'insider.feed.sideBuyLabel' ? 'Buy' : path === 'insider.feed.sideSellLabel' ? 'Sell' : path) as never;
+        expect(sideLabel('compra', en)).toBe('Buy');
+        expect(sideLabel('venta', en)).toBe('Sell');
+        expect(sideLabel('otro', en)).toBe('—');
+        expect(insiderCodeLabel('P', en)).toBe('Buy');
+        expect(insiderCodeLabel('S', en)).toBe('Sell');
+    });
     it('P y S se tratan como compra/venta; el resto se traduce; desconocido se muestra crudo', () => {
         expect(insiderCodeLabel('P')).toBe('Compra');
         expect(insiderCodeLabel('S')).toBe('Venta');
