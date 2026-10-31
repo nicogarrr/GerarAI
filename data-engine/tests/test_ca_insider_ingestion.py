@@ -193,6 +193,6 @@ def test_desktop_and_mobile_preserve_source_and_missing_currency_labels():
 
     # Las cadenas visibles viven en i18n: la semántica debe sobrevivir allí.
     feed = json.loads((root / "lib/i18n/messages/es/insider.json").read_text(encoding="utf-8"))["feed"]
-    assert "fuente no oficial (Yahoo)" in feed["canadaBadge"]
+    assert feed["canadaBadge"] == "Canadá · fuente no oficial"  # f443af3f5: badge sin proveedor (guard TS lo fija)
     assert feed["currencyMissing"] == "Divisa no informada"
     assert "Totales y señales: solo Form 4" in feed["totalsNote"]
