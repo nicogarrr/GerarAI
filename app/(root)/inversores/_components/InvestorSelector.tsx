@@ -10,7 +10,7 @@ export function InvestorSelector({ investors, selected = '' }: { investors: Choi
     return (
         <select
             aria-label="Seleccionar inversor"
-            className="min-h-11 w-full min-w-0 rounded-lg border border-gray-800 bg-surface-1 px-3 text-sm text-gray-100"
+            className="min-h-11 w-full min-w-0 rounded-lg border border-gray-800 bg-surface-1 px-3 text-base text-gray-100 sm:text-sm"
             value={selected}
             onChange={(event) => {
                 const slug = event.target.value;

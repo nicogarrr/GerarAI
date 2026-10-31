@@ -137,7 +137,7 @@ export default function PlanContributionDialog({
                         <Label htmlFor="contribution-currency" className="text-gray-300">{t('plan.contribution.currencyLabel')}</Label>
                         <select
                             id="contribution-currency"
-                            className="h-11 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-gray-100"
+                            className="h-11 w-full rounded-md border border-gray-700 bg-gray-800 px-3 text-base text-gray-100 sm:text-sm"
                             value={currency}
                             onChange={(e) => setCurrency(e.target.value)}
                         >

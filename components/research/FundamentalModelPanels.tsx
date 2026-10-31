@@ -395,7 +395,7 @@ export function DecisionAndRealityPanel({
   /** Compras/ventas del ticker (IBKR o manuales) que se pueden enlazar. */
   trades?: JournalTrade[];
 }) {
-  const selectClass = 'h-10 rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-200';
+  const selectClass = 'h-11 rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 sm:h-10 sm:text-sm';
   return (
     <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="scroll-mt-24 rounded-lg border border-gray-800 bg-surface-1 p-5" id="diario-decisiones">
@@ -409,7 +409,7 @@ export function DecisionAndRealityPanel({
           resetOnSuccess
           successMessage="Decisión registrada contra la tesis vigente"
         >
-          <select aria-label="Decisión" className="h-10 rounded-md border border-gray-700 bg-gray-900 px-3 text-sm text-gray-200" defaultValue="hold" name="decision">
+          <select aria-label="Decisión" className="h-11 rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 sm:h-10 sm:text-sm" defaultValue="hold" name="decision">
             <option value="buy">Comprar</option>
             <option value="hold">Mantener</option>
             <option value="trim">Reducir</option>

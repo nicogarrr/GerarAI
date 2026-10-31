@@ -33,7 +33,7 @@ function EmptyCoverageNote() {
   return <p className="px-3 py-2 text-sm text-gray-400">No hay métricas disponibles. Puedes crear una fórmula.</p>;
 }
 
-const selectClasses = 'min-h-11 w-full min-w-0 rounded-md border border-gray-700 bg-black px-3 text-sm text-gray-200';
+const selectClasses = 'min-h-11 w-full min-w-0 rounded-md border border-gray-700 bg-black px-3 text-base text-gray-200 sm:text-sm';
 const fieldLabel = 'mb-1.5 block text-sm font-medium text-gray-200';
 
 function describe(expression: string): string {

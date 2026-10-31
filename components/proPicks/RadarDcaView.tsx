@@ -139,7 +139,7 @@ export default function RadarDcaView() {
             <div className="flex flex-wrap items-center gap-2">
                 <select
                     aria-label="Nivel"
-                    className="min-h-[44px] rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200"
+                    className="min-h-[44px] rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-200 sm:text-sm"
                     value={level == null ? '' : String(level)}
                     onChange={(e) => { setPage(1); setLevel(e.target.value === '' ? null : Number(e.target.value)); }}
                 >
@@ -151,7 +151,7 @@ export default function RadarDcaView() {
                 </select>
                 <select
                     aria-label="Sector"
-                    className="min-h-[44px] rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-200"
+                    className="min-h-[44px] rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-200 sm:text-sm"
                     value={sector}
                     onChange={(e) => { setPage(1); setSector(e.target.value); }}
                 >

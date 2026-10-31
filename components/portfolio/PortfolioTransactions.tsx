@@ -131,11 +131,11 @@ export default function PortfolioTransactions({ transactions, userId, page }: Pr
           <label className="grid gap-1 text-xs text-gray-400">
             {ti('common.labels.ticker')}
             <input name="ticker" defaultValue={filters?.ticker ?? ''} placeholder={ti('portfolio.transactions.filterAll')} autoCapitalize="characters" maxLength={32}
-              className="min-h-11 w-28 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100 md:min-h-9" />
+              className="min-h-11 w-28 rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:text-sm md:min-h-9" />
           </label>
           <label className="grid gap-1 text-xs text-gray-400">
             {ti('portfolio.transactions.filterType')}
-            <select name="type" defaultValue={filters?.type ?? ''} className="min-h-11 rounded-md border border-gray-700 bg-gray-800 px-2 text-sm text-gray-100 md:min-h-9">
+            <select name="type" defaultValue={filters?.type ?? ''} className="min-h-11 rounded-md border border-gray-700 bg-gray-800 px-2 text-base text-gray-100 sm:text-sm md:min-h-9">
               <option value="">{ti('portfolio.transactions.filterAll')}</option>
               <option value="buy">{ti('portfolio.transactions.typeBuys')}</option>
               <option value="sell">{ti('portfolio.transactions.typeSells')}</option>

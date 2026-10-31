@@ -113,7 +113,7 @@ export default function TaxDeclarantForm({ initial }: { initial: TaxDeclarant })
                 <label className="space-y-1 text-sm text-gray-300">
                     <span>Presentaste el 720 en ejercicios anteriores</span>
                     <select
-                        className="h-11 w-full rounded-lg border border-gray-600 bg-transparent px-3 text-sm"
+                        className="h-11 w-full rounded-lg border border-gray-600 bg-transparent px-3 text-base sm:text-sm"
                         disabled={busy}
                         onChange={(event) => setFiled(event.target.value)}
                         value={filed}
