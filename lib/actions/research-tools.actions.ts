@@ -10,6 +10,7 @@ import { AppError, ExternalAPIError, ValidationError, isNextRedirectError } from
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import { knowledgeTickerFormValue, libraryReadingsPath } from '@/lib/knowledge/document-ticker';
 import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import type { components } from '@/lib/research/openapi.generated';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
@@ -262,66 +263,7 @@ export type ManagementCredibility = {
   }>;
 };
 
-export type PortfolioIntelligence = {
-  as_of: string;
-  base_currency: string;
-  horizon_years: number;
-  performance: { twr: number | null; xirr: number | null; annualized_return: number | null; trace: Record<string, unknown>; twr_method: string; twr_is_exact: boolean };
-  risk: {
-    max_drawdown: number | null;
-    drawdown_series: Array<{ date: string; drawdown: number }>;
-    volatility: number | null;
-    sharpe: number | null;
-    sortino: number | null;
-    var_95: number | null;
-    cvar_95: number | null;
-    calmar: number | null;
-    beta: number | null;
-    beta_trace: Record<string, unknown>;
-    correlations: Record<string, Record<string, number | null>>;
-    correlation_observations: Record<string, Record<string, number>>;
-    correlation_min_observations: number;
-  };
-  concentration: { top_1: number; top_5: number; herfindahl: number; weights: Record<string, number> };
-  exposures: Record<'sectors' | 'countries' | 'currencies' | 'factors', Record<string, number>>;
-  attribution: {
-    basis?: 'adjusted_price_return';
-    period_start?: string | null;
-    period_end?: string | null;
-    portfolio_components: Record<string, number | null>;
-    incomplete_components?: string[];
-    excluded_partial_histories?: string[];
-    positions: Array<{ ticker: string; weight: number; total_return: number | null; period_start?: string | null; period_end?: string | null; period_days?: number | null; partial_history?: boolean; components: Record<string, number | null> }>;
-  };
-  ledger_contribution: {
-    positions: Array<{
-      ticker: string;
-      contribution_pnl: number | null;
-      contribution_share: number | null;
-      end_value: number | null;
-      start_value: number | null;
-      net_invested: number;
-      income: number;
-      reason: string | null;
-    }>;
-    total_pnl: number | null;
-    coverage: { positions: number; with_contribution: number; reasons: Record<string, number> };
-    methodology: string;
-    base_currency: string;
-  };
-  benchmark: {
-    symbol: string;
-    status: 'calculated' | 'missing_benchmark' | 'insufficient_overlap';
-    benchmark_twr: number | null;
-    benchmark_annualized: number | null;
-    portfolio_annualized: number | null;
-    alpha_annualized: number | null;
-    tracking_error: number | null;
-    information_ratio: number | null;
-    observations: number;
-  };
-  coverage: { positions: number; positions_with_price_history: number; positions_with_full_horizon: number; price_history_window_percent: number; price_history_percent: number; portfolio_snapshots: number; snapshot_returns: number; snapshot_pricing_complete: number; limitations: string[] };
-};
+export type PortfolioIntelligence = components['schemas']['PortfolioIntelligenceOut'];
 
 export type KnowledgeGraph = {
   node_count: number;
