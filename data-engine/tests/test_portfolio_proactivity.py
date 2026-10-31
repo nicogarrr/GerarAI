@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models import (
     CashBalance,
     Company,
@@ -28,7 +29,7 @@ def db():
 
 
 def setup_snapshot(db, *, targets=None, coverage='1', cash='0', dated=None):
-    dated = dated or date.today()
+    dated = dated or local_today()
     company = Company(valuation_model='dcf', company_type='public', ticker='ASTS', name='AST', exchange='NASDAQ', currency='USD')
     db.add(company); db.flush()
     plan = InvestmentPlan(tenant_id=1, portfolio_id=1, monthly_contribution=1000,
@@ -111,5 +112,5 @@ def test_cross_tenant_snapshot_not_used(db):
 
 
 def test_future_snapshot_not_used(db):
-    setup_snapshot(db,targets=[{'kind':'ticker','label':'ASTS','target_pct':20,'band_pct':5}],dated=date.today()+timedelta(days=1))
+    setup_snapshot(db,targets=[{'kind':'ticker','label':'ASTS','target_pct':20,'band_pct':5}],dated=local_today()+timedelta(days=1))
     assert review_portfolio_data(db)['new_in_app_alerts'] == 0

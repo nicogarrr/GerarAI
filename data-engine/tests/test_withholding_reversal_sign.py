@@ -86,14 +86,14 @@ def test_xirr_ibkr_withholding_reversal_is_an_inflow(db, monkeypatch):
     """
     today = date.today()
 
-    class _FixedDate(date):
-        @classmethod
-        def today(cls):
-            return today
-
     import app.services.portfolio_intelligence_service as pi_module
 
-    monkeypatch.setattr(pi_module, "date", _FixedDate)
+    # El servicio fecha el valor final con local_today() (hoy en Madrid):
+    # congelar ESA base. Parchear date.today ya no gobierna al servicio y en
+    # CI (TZ=UTC) entre las 23:00 y 00:00 el valor final quedaba un dia por
+    # delante de los flujos y el XIRR se movia lo suficiente para romper las
+    # tolerancias.
+    monkeypatch.setattr(pi_module, "local_today", lambda: today)
     company = _company(db)
     from app.services.portfolio_fx_service import PortfolioFXService
 
