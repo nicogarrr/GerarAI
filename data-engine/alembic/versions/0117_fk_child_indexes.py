@@ -50,20 +50,25 @@ _INDICES = [
     ("ix_transcripts_source_id", "transcripts", ["source_id"]),
 ]
 
-_NOMBRES = [n for n, _, _ in _INDICES]
+def _es_invalido(bind, nombre: str, tabla: str) -> bool:
+    """True si EXISTE un indice INVALID llamado ``nombre`` sobre ESA tabla.
 
-
-def _invalidos(bind) -> set[str]:
-    """Indices INVALID (intento CONCURRENTLY interrumpido) de nuestra lista."""
-    rows = bind.execute(
-        sa.text(
-            "select c.relname from pg_class c "
-            "join pg_index i on i.indexrelid = c.oid "
-            "where not i.indisvalid and c.relname = any(:nombres)"
-        ),
-        {"nombres": _NOMBRES},
-    ).all()
-    return {r[0] for r in rows}
+    Un intento CONCURRENTLY interrumpido deja el indice con indisvalid =
+    false. Se comprueba por tabla (indrelid resuelto via search_path, o sea
+    el schema efectivo) y no solo por nombre: un indice homonimo de otro
+    schema o de otra tabla no se toca.
+    """
+    return bool(
+        bind.execute(
+            sa.text(
+                "select 1 from pg_index i "
+                "join pg_class idx on idx.oid = i.indexrelid "
+                "where i.indrelid = cast(:tabla as regclass) "
+                "and idx.relname = :nombre and not i.indisvalid"
+            ),
+            {"tabla": tabla, "nombre": nombre},
+        ).first()
+    )
 
 
 def upgrade() -> None:
@@ -71,7 +76,7 @@ def upgrade() -> None:
     if bind.dialect.name == "postgresql":
         with op.get_context().autocommit_block():
             for nombre, tabla, columnas in _INDICES:
-                if nombre in _invalidos(bind):
+                if _es_invalido(bind, nombre, tabla):
                     op.drop_index(
                         nombre,
                         table_name=tabla,
