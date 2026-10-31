@@ -7,10 +7,12 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { deletePlanContribution } from '@/lib/actions/plan.actions';
+import { useT } from '@/lib/i18n/client';
 
 /** Borra una aportación registrada por error, con confirmación. */
 export default function DeleteContributionButton({ contributionId, label }: { contributionId: number; label: string }) {
     const router = useRouter();
+    const t = useT();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [state, setState] = useState<'idle' | 'deleting' | 'error'>('idle');
 
@@ -32,19 +34,19 @@ export default function DeleteContributionButton({ contributionId, label }: { co
                 variant="outline"
                 size="sm"
                 className="min-h-[44px]"
-                aria-label={`Eliminar aportación: ${label}`}
+                aria-label={t('plan.deleteContribution.aria', { label })}
                 disabled={state === 'deleting'}
                 onClick={() => setConfirmOpen(true)}
             >
                 <Trash2 className="h-4 w-4" aria-hidden="true" />
-                {state === 'deleting' ? 'Eliminando…' : 'Eliminar'}
+                {state === 'deleting' ? t('plan.deleteContribution.deleting') : t('plan.deleteContribution.delete')}
             </Button>
-            {state === 'error' ? <span role="alert" className="text-xs text-red-400">No se pudo eliminar. Inténtalo de nuevo.</span> : null}
+            {state === 'error' ? <span role="alert" className="text-xs text-red-400">{t('plan.deleteContribution.error')}</span> : null}
             <ConfirmDialog
                 open={confirmOpen}
                 onOpenChange={setConfirmOpen}
-                title={`¿Eliminar la aportación ${label}?`}
-                description="Se borra solo este registro del plan. No toca tu cartera ni tus movimientos."
+                title={t('plan.deleteContribution.confirmTitle', { label })}
+                description={t('plan.deleteContribution.confirmDescription')}
                 onConfirm={handleDelete}
             />
         </span>

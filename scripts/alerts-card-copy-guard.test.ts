@@ -56,7 +56,8 @@ test('source and detail controls exist on both surfaces', () => {
   for (const path of ['components/PersonalizedOverview.tsx', 'components/alerts/AlertsManager.tsx']) {
     const view = readFileSync(path, 'utf8');
     assert.match(view, /alertCardCopy\(item, \w+, \w+\)/);
-    assert.match(view, /originalNotice|Ver aviso original/, 'el detalle del aviso original existe en ambas superficies');
+    // i18n: AlertsManager usa alerts.triggered.viewOriginal y PersonalizedOverview home.alerts.originalNotice.
+    assert.match(view, /originalNotice|alerts\.triggered\.viewOriginal/, 'el detalle del aviso original existe en ambas superficies');
     assert.match(view, /item.sourceUrl/);
   }
 });

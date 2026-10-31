@@ -91,7 +91,9 @@ export default function Link({ href, children, ...rest }) { return createElement
             compile('components/portfolio/PortfolioForecast.tsx').replaceAll(
                 '@/components/ui/panel',
                 './panel.mjs',
-            ).replaceAll("'next/link'", "'./next-link.mjs'").replaceAll('@/lib/format', './format.mjs'),
+            ).replaceAll("'next/link'", "'./next-link.mjs'").replaceAll('@/lib/format', './format.mjs')
+                .replaceAll('@/lib/i18n/t', './i18n/t.mjs')
+                .replaceAll('@/lib/i18n/locale', './i18n/locale.mjs'),
         );
         const mod = await import(`${process.cwd()}/${dir}/forecast.mjs`);
         return renderToStaticMarkup(createElement(mod.default, { forecast: payload }));
@@ -117,7 +119,7 @@ describe('PortfolioForecast montado con react-dom/server', () => {
     it('los porcentajes se renderizan en formato es-ES con coma decimal', async () => {
         const { readFileSync } = await import('node:fs');
         const source = readFileSync('components/portfolio/PortfolioForecast.tsx', 'utf8');
-        assert.ok(source.includes("Intl.NumberFormat('es-ES'"), 'el formato usa es-ES');
+        assert.ok(/Intl\.NumberFormat\(intlLocale\(/.test(source), 'el formato se liga al locale (es-ES por defecto)');
         assert.ok(!source.includes('.toFixed('), 'toFixed rompe la coma decimal es-ES');
         assert.ok(source.includes('Number.isFinite'), 'Infinity/NaN se filtran a Sin datos');
     });

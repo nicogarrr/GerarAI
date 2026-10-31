@@ -3,18 +3,21 @@ import PlanView from '@/components/plan/PlanView';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getPlan, getPlanContributionSplit, getPlanContributions, getPlanDrift } from '@/lib/actions/plan.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Plan de inversión',
-    description:
-        'Objetivo a largo plazo, aportaciones registradas y desviación de la cartera frente a la asignación objetivo.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return {
+        title: t('plan.meta.title'),
+        description: t('plan.meta.description'),
+    };
+}
 
 export default async function PlanPage() {
+    const t = await getT();
     let plan: Awaited<ReturnType<typeof getPlan>>;
     let contributions: Awaited<ReturnType<typeof getPlanContributions>>;
     let drift: Awaited<ReturnType<typeof getPlanDrift>>;

@@ -4,6 +4,7 @@
  */
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { register } from 'node:module';
 
 register('./transaction-validation.loader.mjs', import.meta.url);
@@ -11,7 +12,18 @@ register('./transaction-validation.loader.mjs', import.meta.url);
 // Import dinámico: register() debe ejecutarse antes de resolver el alias @/
 // que usa transactionValidation.ts internamente.
 // @ts-expect-error entorno de test con node --experimental-strip-types (import con extensión solo en runtime)
-const { hasTransactionErrors, validateTransactionForm } = await import('../components/portfolio/transactionValidation.ts');
+const { hasTransactionErrors, validateTransactionForm, TRANSACTION_VALIDATION_ES } = await import('../components/portfolio/transactionValidation.ts');
+
+// Las copias ES por defecto del validador son las del diccionario i18n
+// (carril C): si una cambia, cambia la otra.
+const esPortfolio = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+describe('transactionValidation: copias ES == diccionario', () => {
+  it('cada mensaje por defecto coincide con messages/es/portfolio.json#transactionForm', () => {
+    for (const [key, value] of Object.entries(TRANSACTION_VALIDATION_ES)) {
+      assert.equal(esPortfolio.transactionForm[key], value, `transactionForm.${key}`);
+    }
+  });
+});
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
 const { parseLocalizedNumber } = await import('../lib/format.ts');
 

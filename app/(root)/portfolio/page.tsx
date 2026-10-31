@@ -18,13 +18,16 @@ export const revalidate = 0;
 // Server Actions on this page must outlive the 55s chat fetch budget.
 export const maxDuration = 60;
 
-export const metadata: Metadata = {
-  title: 'Tu cartera',
-  description:
-    'Posiciones, movimientos, factores de calidad y tearsheet de tu cartera, con base de coste y tipos de cambio por transacción.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const ti = await getT();
+  return {
+    title: ti('portfolio.page.metaTitle'),
+    description: ti('portfolio.page.metaDescription'),
+  };
+}
 
 export default async function PortfolioPage({ searchParams }: { searchParams: Promise<{ transactionOffset?: string; ticker?: string; type?: string }> }) {
+  const ti = await getT();
   const query = await searchParams;
   const transactionFilters = parseTransactionFilters(query);
   const offset = Number.isSafeInteger(Number(query.transactionOffset)) && Number(query.transactionOffset) >= 0 ? Number(query.transactionOffset) : 0;
@@ -50,18 +53,18 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     // oculte el resto de la cartera. Summary/positions son esenciales; scores,
     // transactions y tearsheet son lecturas tolerantes a falta de historial.
     const [summaryResult, transactionsResult, scoresResult, tearsheetResult, forecastResult, dividendsResult] = await Promise.all([
-      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar la cartera', cause: error as unknown })),
-      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudieron cargar los movimientos' })),
+      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadSummaryFailed'), cause: error as unknown })),
+      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadTransactionsFailed') })),
       // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
       // desconocidos, y la UI los pinta como "no disponible" en vez de
       // "0,00", que es lo que se veia cuando el backend no respondia.
-      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudieron cargar los factores' })),
-      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar el historial' })),
+      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadScoresFailed') })),
+      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadTearsheetFailed') })),
       // La previsión es lectura tolerante: un fallo deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar la previsión' })),
+      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadForecastFailed') })),
       // La proyección de dividendos también es lectura tolerante: un fallo
       // deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : 'No se pudo cargar la proyección de dividendos' })),
+      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? spanishBackendMessage(error.message) : ti('portfolio.page.loadDividendsFailed') })),
     ]);
     if (!summaryResult.value) {
       // Antes se reconstruia un Error plano desde el mensaje: perdia code y
@@ -75,8 +78,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       result = [summaryResult.value, transactionsResult.value, scoresResult.value, tearsheetResult.value, forecastResult.value, dividendsResult.value];
       const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
         .filter((error): error is string => Boolean(error));
-      const t = await getT();
-      partialMessage = secondaryErrors.length ? `Algunas secciones no respondieron: ${[...new Set(secondaryErrors.map((error) => t(sectionErrorKey(new Error(error)))))].join(' · ')}` : null;
+      partialMessage = secondaryErrors.length ? ti('portfolio.page.partialPrefix', { errors: [...new Set(secondaryErrors.map((error) => ti(sectionErrorKey(new Error(error)))))].join(' · ') }) : null;
     }
   } catch (error) {
     if (!isBackendUnavailableError(error)) throw error;
@@ -85,7 +87,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
   // sin resumen —backend caído o lectura esencial fallida— se pinta el aviso
   // con Reintentar.
   if (!result) {
-    return <BackendOffline feature="Tu cartera" retryHref="/portfolio" />;
+    return <BackendOffline feature={ti('portfolio.page.featureName')} retryHref="/portfolio" />;
   }
   const [summary, transactions, scores, tearsheet, forecast, dividends] = result;
 

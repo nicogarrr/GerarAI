@@ -49,7 +49,8 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
 
     it('el copy ya no afirma que no hay buscador y la ayuda explica el guiado', () => {
         assert.doesNotMatch(ticket, /no hay buscador en la fase manual/);
-        assert.match(ticket, /Busca por nombre o ticker y elige/);
+        // i18n: la pista vive en el diccionario (ticket.searchHint).
+        assert.match(ticket, /paperTrading\.ticket\.searchHint/);
     });
 
     it('la fecha lleva contención reforzada: fila propia + overflow-hidden (fallo real iPhone 21-oct-2026; verificación en dispositivo pendiente)', () => {
@@ -71,7 +72,10 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         // ni afirmación de operar gratis; el envío conserva el campo fee del
         // libro (contrato intacto).
         assert.match(ticket, /const parsedFee = 0;/);
-        assert.match(ticket, /Sin comisión en la demo \(0 simulado\): no reproduce la tarifa de ningún bróker/);
+        // i18n: el aviso vive en el diccionario (ticket.manualNote).
+        assert.match(ticket, /paperTrading\.ticket\.manualNote/);
+        const dict = JSON.parse(readFileSync('lib/i18n/messages/es/paperTrading.json', 'utf8'));
+        assert.match(dict.ticket.manualNote, /Sin comisión en la demo \(0 simulado\): no reproduce la tarifa de ningún bróker/);
         assert.match(ticket, /fee: parsedFee/);
         assert.doesNotMatch(ticket, /tarifa de IBKR|IBKR gratis|comisiones de Interactive Brokers/i);
     });
@@ -79,7 +83,7 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
     it('el label de cantidad no envuelve: unidad como sufijo del campo (QA píxeles 21-oct-2026)', () => {
         // «Cantidad (contratos)» envolvía a 2 líneas a 390px y se pegaba al
         // borde del input. Label corto + sufijo dentro del campo relativo.
-        assert.match(ticket, /<Label htmlFor=\{`\$\{uid\}-quantity`\}>Cantidad<\/Label>/);
+        assert.match(ticket, /<Label htmlFor=\{`\$\{uid\}-quantity`\}>\{ti\('paperTrading\.ticket\.quantity'\)\}<\/Label>/);
         assert.doesNotMatch(ticket, /Cantidad \(\{kindLabel\}\)<\/Label>/);
         assert.match(ticket, /pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-gray-500">\{kindLabel\}<\/span>/);
         // El sufijo queda asociado al input (auditor 21-oct-2026).
@@ -88,7 +92,7 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
     });
 
     it('placeholder del nombre neutro: no parece un valor relleno', () => {
-        assert.match(ticket, /placeholder="Nombre de la empresa"/);
+        assert.match(ticket, /placeholder=\{ti\('paperTrading\.ticket\.namePh'\)\}/);
         assert.doesNotMatch(ticket, /placeholder="p\. ej\. AST SpaceMobile"/);
     });
 
@@ -133,30 +137,34 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
     });
 
     it('la identidad del contrato de opción sigue manual y etiquetada (sin cadena fabricada)', () => {
-        assert.match(ticket, /Fecha del contrato; no implica que hoy sea negociable/);
+        // i18n: la nota vive en el diccionario (ticket.expiryHint).
+        assert.match(ticket, /paperTrading\.ticket\.expiryHint/);
         assert.doesNotMatch(ticket, /optionChain|cadena de contratos|strikesDisponibles/i);
     });
 
     it('mantiene la advertencia de fill manual (no ejecución de mercado)', () => {
-        assert.match(ticket, /no es una ejecución de\s+mercado/i);
+        // i18n: la advertencia vive en el diccionario (ticket.manualNote).
+        assert.match(ticket, /paperTrading\.ticket\.manualNote/);
     });
 
     it('resumen de coste previo visible, calculado solo con los datos del usuario', () => {
         // Bloque propio (no la frase enterrada en la nota pequeña).
-        assert.match(ticket, /Resumen antes de registrar/);
+        // i18n: el título vive en el diccionario (ticket.summaryTitle).
+        assert.match(ticket, /paperTrading\.ticket\.summaryTitle/);
         assert.doesNotMatch(ticket, /Importe estimado/);
         // Desglose: lado, cantidad, precio, multiplicador de opción y comisión con signo según lado.
-        assert.match(ticket, /\{sideLabel\} · \{formatNumber\(parsedQuantity\)\} \{kindLabel\}/);
-        assert.match(ticket, /× 100 \(multiplicador\)/);
+        assert.match(ticket, /\{sideLabel\} · \{f\.formatNumber\(parsedQuantity\)\} \{kindLabel\}/);
+        assert.match(ticket, /paperTrading\.ticket\.multiplierPart/);
         assert.match(ticket, /side === 'buy' \? '\+' : '−'/);
         // Etiqueta honesta según lado y sin presentarlo como cotización.
-        assert.match(ticket, /Coste total estimado: /);
-        assert.match(ticket, /Ingreso neto estimado: /);
-        assert.match(ticket, /no es una cotización ni una ejecución de mercado/);
+        // i18n: los rótulos viven en el diccionario (ticket.costBuy/costSell).
+        assert.match(ticket, /paperTrading\.ticket\.costBuy/);
+        assert.match(ticket, /paperTrading\.ticket\.costSell/);
+        assert.match(ticket, /paperTrading\.ticket\.summaryDisclaimer/);
         // La comisión ya no es input (0 simulada fija): el resumen no la
         // muestra (condición > 0) y el total la suma como 0. Cantidad y
         // precio inválidos siguen SIN resumen.
-        assert.match(ticket, /\{parsedFee > 0 \? ` \$\{side === 'buy' \? '\+' : '−'\}/);
+        assert.match(ticket, /\{parsedFee > 0 \? ti\('paperTrading\.ticket\.feePart', \{ sign: side === 'buy' \? '\+' : '−'/);
         assert.match(ticket, /total \+ parsedFee : total - parsedFee/);
         // Cantidad/precio ya tenían validación equivalente en el mismo useMemo.
         assert.match(ticket, /!Number\.isInteger\(parsedQuantity\) \|\| parsedQuantity <= 0\) return null/);

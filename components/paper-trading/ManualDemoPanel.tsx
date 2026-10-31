@@ -12,7 +12,8 @@ import { FxTicket } from './FxTicket';
 import { LedgerTable } from './LedgerTable';
 import { OrderTicket } from './OrderTicket';
 import { PositionsTable } from './PositionsTable';
-import { formatMoney, formatCountEs } from '@/lib/format';
+import { formatCountEs } from '@/lib/format';
+import { useT, useLocale, useFormat } from '@/lib/i18n/client';
 import { valuationMatches, type DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, HistoryPageResult, HistoryRow, SubmitFill, SubmitFx } from './submit';
 
@@ -42,7 +43,7 @@ export type RefreshResult =
     | { ok: true; valuation: DemoValuation; asOf: number; listingUnavailable: boolean; quoteFetchFailed: boolean; retryAfterSeconds: number | null }
     | { ok: false; error: string };
 
-const ASOF_FORMAT = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const ASOF_OPTIONS: Intl.DateTimeFormatOptions = { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' };
 
 /** Cadencia base del auto-refresco: 60 s, el patrón de sondeo ya usado por
  *  la app (LiveMarketsPanel). OJO: Mercados usa Yahoo y esta valoración usa
@@ -61,31 +62,36 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
     pending: boolean;
     error: string | null;
 }) {
+    const ti = useT();
+    const locale = useLocale();
+    const f = useFormat();
+    const asofFormat = new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'es-ES', ASOF_OPTIONS);
+    const countText = locale === 'en'
+        ? (valuation.coverage.total === 1 ? '1 position' : `${valuation.coverage.total} positions`)
+        : formatCountEs(valuation.coverage.total, 'posición', 'posiciones');
     return (
         <div className="mb-3 space-y-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-300">
             <p>
-                Valoradas {valuation.coverage.valued} de {formatCountEs(valuation.coverage.total, 'posición', 'posiciones')} con cotización del proveedor.
-                {valuation.totals.length > 0 ? ' Los totales suman solo las valoradas, por divisa:' : ' Sin totales: ninguna posición tiene cotización.'}
+                {ti('paperTrading.valuation.valuedCoverage', { valued: String(valuation.coverage.valued), count: countText })}
+                {valuation.totals.length > 0 ? ti('paperTrading.valuation.withTotals') : ti('paperTrading.valuation.noTotals')}
             </p>
             {valuation.totals.length > 0 ? (
                 <ul className="space-y-0.5">
                     {valuation.totals.map((total) => (
                         <li key={total.currency}>
-                            {total.currency}: valor {formatMoney(total.marketValue, total.currency)} · PyG no realizada{' '}
-                            {formatMoney(total.unrealizedPnl, total.currency)}
+                            {ti('paperTrading.valuation.totalLine', { currency: total.currency, marketValue: f.formatMoney(total.marketValue, total.currency), unrealized: f.formatMoney(total.unrealizedPnl, total.currency) })}
                         </li>
                     ))}
                 </ul>
             ) : null}
             <p className="text-xs text-gray-500">
-                Las opciones no se valoran (no hay cotización de su prima). Solo se valora con Finnhub y con la divisa verificada en su listado; el resto sale N/D.
-                Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito). También puedes solicitar una actualización con el botón
-                {asOf ? ` · consultado a las ${ASOF_FORMAT.format(new Date(asOf))} (hora de Madrid)` : ''}.
+                {ti('paperTrading.valuation.note')}
+                {asOf ? ti('paperTrading.valuation.asOf', { time: asofFormat.format(new Date(asOf)) }) : ''}.
             </p>
             {error ? <p role="alert" className="text-xs text-amber-300">{error}</p> : null}
             {onRefresh ? (
                 <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={pending}>
-                    {pending ? 'Consultando…' : 'Actualizar cotizaciones'}
+                    {pending ? ti('paperTrading.valuation.refreshing') : ti('paperTrading.valuation.refresh')}
                 </Button>
             ) : null}
         </div>
@@ -103,6 +109,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
  * con la pestaña visible), nunca el precio de los fills.
  */
 export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuation: initialValuation = null, valuationAsOf = null, refreshValuation, historyHasMore = false, historyNextBefore = null, loadMoreHistory }: ManualDemoPanelProps) {
+    const ti = useT();
     const wired = account !== null;
     const [valuation, setValuation] = useState<DemoValuation | null>(initialValuation);
     const [asOf, setAsOf] = useState<number | null>(valuationAsOf);
@@ -200,16 +207,16 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 setRefreshError(null);
             } else {
                 lock.failures += 1;
-                setRefreshError(`No se pudieron actualizar las cotizaciones: ${result.error}`);
+                setRefreshError(ti('paperTrading.valuation.refreshError', { error: result.error }));
             }
         } catch {
             lock.failures += 1;
-            setRefreshError('No se pudieron actualizar las cotizaciones: fallo de red o del servidor.');
+            setRefreshError(ti('paperTrading.valuation.refreshErrorNetwork'));
         } finally {
             lock.inFlight = false;
             setRefreshing(false);
         }
-    }, [refreshValuation]);
+    }, [refreshValuation, ti]);
     const onRefresh = () => {
         if (refreshValuation) startTransition(() => runRefresh());
     };
@@ -251,55 +258,52 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
     return (
         <div className="mt-6 space-y-6">
             <p className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">
-                Cuenta de práctica con saldo ficticio. Registras operaciones con el precio que introduces tú:
-                no es una ejecución de mercado ni hay conexión con un broker.
+                {ti('paperTrading.panel.intro')}
             </p>
 
             {account ? <AccountSummary account={account} /> : null}
 
             <Tabs defaultValue="operar">
                 <TabsList className="h-auto min-h-[50px] w-full flex-wrap">
-                    <TabsTrigger className="min-h-11" value="operar">Operar</TabsTrigger>
-                    <TabsTrigger className="min-h-11" value="divisas">Divisas</TabsTrigger>
-                    <TabsTrigger className="min-h-11" value="posiciones">Posiciones</TabsTrigger>
-                    <TabsTrigger className="min-h-11" value="historial">Historial</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="operar">{ti('paperTrading.panel.tabTrade')}</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="divisas">{ti('paperTrading.panel.tabFx')}</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="posiciones">{ti('paperTrading.panel.tabPositions')}</TabsTrigger>
+                    <TabsTrigger className="min-h-11" value="historial">{ti('paperTrading.panel.tabHistory')}</TabsTrigger>
                 </TabsList>
                 <TabsContent value="operar" className="mt-4">
-                    <Panel title="Registrar operación">
+                    <Panel title={ti('paperTrading.panel.tradePanel')}>
                         <OrderTicket submitFill={submitFill} disabled={!wired} />
                         {!wired ? (
                             <p className="mt-3 text-xs text-gray-500">
-                                El registro en servidor todavía no está conectado; el formulario se activará
-                                cuando lo esté.
+                                {ti('paperTrading.panel.notWired')}
                             </p>
                         ) : null}
                     </Panel>
                 </TabsContent>
                 <TabsContent value="divisas" className="mt-4">
-                    <Panel title="Conversión EUR ⇄ USD">
+                    <Panel title={ti('paperTrading.panel.fxPanel')}>
                         <FxTicket submitFx={submitFx} disabled={!wired} />
                         {!wired ? (
                             <p className="mt-3 text-xs text-gray-500">
-                                El registro en servidor todavía no está conectado; el formulario se activará
-                                cuando lo esté.
+                                {ti('paperTrading.panel.notWired')}
                             </p>
                         ) : null}
                     </Panel>
                 </TabsContent>
                 <TabsContent value="posiciones" className="mt-4">
-                    <Panel title="Posiciones abiertas">
+                    <Panel title={ti('paperTrading.panel.positionsPanel')}>
                         {activeValuation ? (
                             <ValuationSummary valuation={activeValuation} asOf={asOf} onRefresh={refreshValuation ? onRefresh : null} pending={refreshBusy} error={refreshError} />
                         ) : refreshValuation && positions.length > 0 ? (
                             <div className="mb-3 space-y-2">
                                 <p className="text-xs text-gray-500">
                                     {valuation
-                                        ? 'Sin actualizar: las posiciones han cambiado desde la última consulta de cotizaciones. Se reconsultan solas con la pestaña visible, o puedes pedirlo con el botón.'
-                                        : 'Valoración no disponible todavía: sin cotizaciones consultadas. Se consultan solas con la pestaña visible, o puedes pedirlo con el botón.'}
+                                        ? ti('paperTrading.valuation.stale')
+                                        : ti('paperTrading.valuation.unavailable')}
                                 </p>
                                 {refreshError ? <p role="alert" className="text-xs text-amber-300">{refreshError}</p> : null}
                                 <Button type="button" variant="outline" size="sm" onClick={onRefresh} disabled={refreshBusy}>
-                                    {refreshBusy ? 'Consultando…' : 'Consultar cotizaciones'}
+                                    {refreshBusy ? ti('paperTrading.valuation.refreshing') : ti('paperTrading.valuation.consult')}
                                 </Button>
                             </div>
                         ) : null}
@@ -307,20 +311,20 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                     </Panel>
                 </TabsContent>
                 <TabsContent value="historial" className="mt-4">
-                    <Panel title="Historial de operaciones">
+                    <Panel title={ti('paperTrading.panel.historyPanel')}>
                         <LedgerTable entries={historyView.items} />
                         <Pagination
                             busy={loadingMore}
                             className="mt-3"
                             hasMore={Boolean(loadMoreHistory && moreHistory)}
-                            label="Historial de operaciones"
+                            label={ti('paperTrading.panel.historyLabel')}
                             onPageChange={onHistoryPageChange}
                             page={historyView.page}
                             pages={historyView.pages}
                         />
                         {loadMoreError ? (
                             <p role="alert" className="mt-2 text-xs text-amber-300">
-                                No se pudo cargar más historial: {loadMoreError}
+                                {ti('paperTrading.panel.loadMoreError', { error: loadMoreError })}
                             </p>
                         ) : null}
                     </Panel>

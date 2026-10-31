@@ -6,18 +6,23 @@ import SubscriptionManager from '@/components/calendar/SubscriptionManager';
 import { getCalendarFeed, type CalendarFeedState } from '@/lib/actions/calendar-feed.actions';
 import { AppError } from '@/lib/types/errors';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Suscripción al calendario',
-    description: 'Recibe los resultados de tus empresas en Apple, Google u Outlook Calendar.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const ti = await getT();
+    return {
+        title: ti('calendar.meta.subscriptionTitle'),
+        description: ti('calendar.meta.subscriptionDescription'),
+    };
+}
 
 const EMPTY: CalendarFeedState = { active: false, scope: null, created_at: null, last_used_at: null };
 
 export default async function CalendarSubscriptionPage() {
+    const ti = await getT();
     let state: CalendarFeedState;
     try {
         state = await getCalendarFeed();
@@ -27,7 +32,7 @@ export default async function CalendarSubscriptionPage() {
             isBackendUnavailableError(error) ||
             (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404);
         if (unavailable) {
-            return <BackendOffline feature="Suscripción al calendario" retryHref="/calendar/suscripcion" />;
+            return <BackendOffline feature={ti('calendar.subscription.offlineFeature')} retryHref="/calendar/suscripcion" />;
         }
         throw error;
     }
@@ -51,7 +56,7 @@ export default async function CalendarSubscriptionPage() {
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-col gap-6">
             <header className="flex flex-col gap-1">
-                <h1 className="text-2xl font-bold text-gray-100">Suscripción al calendario</h1>
+                <h1 className="text-2xl font-bold text-gray-100">{ti('calendar.subscription.pageTitle')}</h1>
             </header>
             <SubscriptionManager initialState={state ?? EMPTY} origin={origin} />
         </main>

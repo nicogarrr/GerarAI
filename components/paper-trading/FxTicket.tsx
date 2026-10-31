@@ -5,10 +5,10 @@ import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatMoney } from '@/lib/format';
+import { useT, useFormat } from '@/lib/i18n/client';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
-import { clientOrderIdAfter, NUM_INPUT_HINT, parseEsNumber, type SubmitFx } from './submit';
+import { clientOrderIdAfter, parseEsNumber, type SubmitFx } from './submit';
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -21,6 +21,8 @@ function newClientOrderId(): string {
  * tipo de cambio que introduce el usuario. No consulta ningún mercado.
  */
 export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?: boolean }) {
+    const ti = useT();
+    const f = useFormat();
     const uid = useId();
     const router = useRouter();
     const clientOrderId = useRef<string>(newClientOrderId());
@@ -47,6 +49,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     const validationError = invalid !== null && invalid.key === fieldKey ? invalid.message : null;
 
     const to: Currency = from === 'EUR' ? 'USD' : 'EUR';
+    const numInputHint = ti('paperTrading.numInputHint');
     const parsedAmount = parseEsNumber(amount);
     const parsedRate = parseEsNumber(rate);
     const received =
@@ -59,28 +62,28 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
         setNotice(null);
         setDuplicate(null);
         if (!Number.isFinite(parsedAmount)) {
-            setInvalid({ key: fieldKey, message: `El importe no es un número válido (${NUM_INPUT_HINT}).` });
+            setInvalid({ key: fieldKey, message: ti('paperTrading.fx.amountInvalid', { hint: numInputHint }) });
             return;
         }
         if (parsedAmount <= 0) {
-            setInvalid({ key: fieldKey, message: 'Indica un importe mayor que cero.' });
+            setInvalid({ key: fieldKey, message: ti('paperTrading.fx.amountPositive') });
             return;
         }
         if (!Number.isFinite(parsedRate)) {
-            setInvalid({ key: fieldKey, message: `El tipo de cambio no es un número válido (${NUM_INPUT_HINT}).` });
+            setInvalid({ key: fieldKey, message: ti('paperTrading.fx.rateInvalid', { hint: numInputHint }) });
             return;
         }
         if (parsedRate <= 0) {
-            setInvalid({ key: fieldKey, message: 'Indica el tipo de cambio (simulado) mayor que cero.' });
+            setInvalid({ key: fieldKey, message: ti('paperTrading.fx.ratePositive') });
             return;
         }
         const executedAt = new Date(executedAtLocal).getTime();
         if (!Number.isFinite(executedAt)) {
-            setInvalid({ key: fieldKey, message: 'Indica la fecha de la conversión.' });
+            setInvalid({ key: fieldKey, message: ti('paperTrading.fx.dateRequired') });
             return;
         }
         if (executedAt > Date.now()) {
-            setInvalid({ key: fieldKey, message: 'La fecha de la conversión no puede ser futura.' });
+            setInvalid({ key: fieldKey, message: ti('paperTrading.fx.dateFuture') });
             return;
         }
         setInvalid(null);
@@ -97,18 +100,18 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             });
             if (result.ok) {
                 if (result.outcome === 'filled') {
-                    setNotice('Conversión registrada en la cuenta demo.');
+                    setNotice(ti('paperTrading.fx.filled'));
                     setAmount('');
                     setRate('');
                     router.refresh();
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate(
                         result.reason
-                            ? `Ya consta como rechazada con ese identificador: ${result.reason}. Corrige y reenvía: cuenta como operación nueva.`
-                            : 'Ya estaba registrada (mismo identificador): no se duplicó.',
+                            ? ti('paperTrading.fx.duplicateRejected', { reason: result.reason })
+                            : ti('paperTrading.fx.duplicateFill'),
                     );
                 } else {
-                    setSubmitError(`Conversión rechazada: ${result.reason ?? 'motivo no indicado'}.`);
+                    setSubmitError(ti('paperTrading.fx.rejected', { reason: result.reason ?? ti('paperTrading.ticket.reasonMissing') }));
                 }
                 clientOrderId.current = clientOrderIdAfter(result, clientOrderId.current, newClientOrderId);
             } else {
@@ -121,11 +124,11 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     }
 
     return (
-        <form onSubmit={onSubmit} aria-label="Conversión de divisa simulada" className="space-y-4">
+        <form onSubmit={onSubmit} aria-label={ti('paperTrading.fx.ariaLabel')} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-from`}>De</Label>
-                    <div className="flex gap-2" role="group" aria-label="Divisa de origen">
+                    <Label htmlFor={`${uid}-from`}>{ti('paperTrading.fx.fromLabel')}</Label>
+                    <div className="flex gap-2" role="group" aria-label={ti('paperTrading.fx.fromGroup')}>
                         {(['EUR', 'USD'] as const).map((value) => (
                             <Button
                                 key={value}
@@ -141,7 +144,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                     </div>
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-amount`}>Importe ({from})</Label>
+                    <Label htmlFor={`${uid}-amount`}>{ti('paperTrading.fx.amountLabel', { from })}</Label>
                     <Input
                         style={{ minHeight: 44 }}
                         className="placeholder:text-gray-500"
@@ -149,13 +152,13 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                         value={amount}
                         onChange={(event) => setAmount(event.target.value)}
                         inputMode="decimal"
-                        placeholder="p. ej. 1000"
+                        placeholder={ti('paperTrading.fx.amountPh')}
                         required
                     />
                 </div>
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-rate`}>
-                        Tipo: 1 {from} = … {to}
+                        {ti('paperTrading.fx.rateLabel', { from, to })}
                     </Label>
                     <Input
                         style={{ minHeight: 44 }}
@@ -164,12 +167,12 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                         value={rate}
                         onChange={(event) => setRate(event.target.value)}
                         inputMode="decimal"
-                        placeholder={from === 'EUR' ? 'p. ej. 1,12' : 'p. ej. 0,89'}
+                        placeholder={from === 'EUR' ? ti('paperTrading.fx.ratePhEur') : ti('paperTrading.fx.ratePhUsd')}
                         required
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${uid}-executed`}>Fecha</Label>
+                    <Label htmlFor={`${uid}-executed`}>{ti('paperTrading.fx.dateLabel')}</Label>
                     <Input
                         style={{ minHeight: 44 }}
                         id={`${uid}-executed`}
@@ -182,12 +185,11 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             </div>
 
             <p className="text-xs text-gray-500">
-                Decimales con coma o punto, sin separador de miles (1234,56).
-                Conversión simulada con el tipo que introduces tú; la demo no consulta el mercado.
+                {ti('paperTrading.fx.formatHint')} {ti('paperTrading.fx.note')}
                 {received !== null ? (
                     <>
                         {' '}
-                        Recibirías <span className="font-medium text-gray-300">{formatMoney(received, to)}</span>.
+                        {ti('paperTrading.fx.receivePart', { amount: f.formatMoney(received, to) })}
                     </>
                 ) : null}
             </p>
@@ -209,7 +211,7 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
             ) : null}
 
             <Button type="submit" variant="outline" disabled={disabled || pending}>
-                {pending ? 'Registrando…' : 'Registrar conversión simulada'}
+                {pending ? ti('paperTrading.fx.submitPending') : ti('paperTrading.fx.submit')}
             </Button>
         </form>
     );

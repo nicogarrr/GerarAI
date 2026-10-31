@@ -49,5 +49,9 @@ void test('ningún copy ni comentario remite a la pestaña Simulación retirada'
 void test('Exposiciones no niega medidas que Inteligencia sí ofrece (F130)', () => {
     const risk = readFileSync(join(root, 'app/(root)/risk/page.tsx'), 'utf8');
     assert.ok(!risk.includes('el motor aún no usa'), 'el motor SÍ usa historia de precios (Inteligencia)');
-    assert.ok(risk.includes('esas medidas están en Inteligencia'), 'la distinción honesta: esta página no las calcula');
+    // La distinción honesta vive en el diccionario i18n (carril C); la página
+    // la referencia por clave. El guard verifica ambos extremos.
+    const esRisk = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/risk.json'), 'utf8'));
+    assert.ok(risk.includes('risk.methodology.noRiskMeasures'), 'la página usa la clave de la distinción');
+    assert.ok(esRisk.methodology.noRiskMeasures.includes('esas medidas están en Inteligencia'), 'la distinción honesta: esta página no las calcula');
 });

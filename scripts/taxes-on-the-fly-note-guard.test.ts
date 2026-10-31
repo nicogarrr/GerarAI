@@ -26,8 +26,13 @@ void test('la nota solo aparece con persisted=false y sin generated_at', () => {
 
 void test('la vista pinta la nota en la fila «Generado»', () => {
     const view: string = readFileSync(new URL('../components/taxes/TaxesView.tsx', import.meta.url), 'utf8');
+    // Las etiquetas visibles viven en el diccionario i18n (carril C); la
+    // vista las referencia por clave. El guard verifica ambos extremos.
+    const esTaxes = JSON.parse(readFileSync(new URL('../lib/i18n/messages/es/taxes.json', import.meta.url), 'utf8'));
     assert.match(view, /onTheFlyReportNote\(raw\)/);
-    assert.match(view, /humanized\[TAX_LABELS\.generated_at\] = onTheFly/);
+    assert.match(view, /humanized\[i18n\.t\('taxes\.labels\.generatedAt'\)\] = onTheFly/);
+    assert.equal(esTaxes.values.onTheFlyNote, ON_THE_FLY_REPORT_NOTE);
+    assert.equal(esTaxes.labels.generatedAt, 'Generado');
 });
 
 console.log('taxes-on-the-fly-note-guard: ok');

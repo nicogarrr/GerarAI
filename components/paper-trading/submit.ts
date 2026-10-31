@@ -122,6 +122,10 @@ export type HistoryPageResult =
  * ("1.234,56", "1,2,3", "1.234.567") son ambiguas y se rechazan (NaN) para
  * pedir formato claro. El formateo es-ES con miles es solo de salida.
  */
+// i18n: la pista vive en messages/<locale>/paperTrading.json (numInputHint).
+// Este literal es queda por compatibilidad con importadores node directos
+// (guards); scripts/manual-demo-ui.guard.test.ts verifica que coincide con
+// el diccionario.
 export const NUM_INPUT_HINT = 'decimales con coma o punto, sin separador de miles (1234,56)';
 
 export function parseEsNumber(raw: string): number {

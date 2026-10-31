@@ -5,7 +5,7 @@ import {usePathname} from 'next/navigation';
 import {useEffect, useState} from 'react';
 import {flattenNavItems, sectionForRoute} from '@/lib/constants';
 import {OverflowScrollRegion} from '@/components/ui/overflow-scroll-region';
-import {useT} from '@/lib/i18n/client';
+import { useT } from '@/lib/i18n/client';
 
 const CALENDAR_ROUTES=['/calendar','/macro-calendar','/corporate-actions'];
 

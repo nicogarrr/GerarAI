@@ -230,12 +230,36 @@ const KNOWN_ORPHANS = {
   // guiones bajos y el detector de usos no cuenta segmentos con '_'.
   'auth.risk.very_aggressive': 'consumida via RISK_TOLERANCE_LABEL_KEYS (literal con guion bajo no detectado)',
   'auth.industries.real_estate': 'consumida via PREFERRED_INDUSTRY_LABEL_KEYS (literal con guion bajo no detectado)',
+  // Consumidas via REASON_LABEL_KEYS (HistoricalStressView), LEDGER_LABEL_KEYS y
+  // ATTRIBUTION_ND_LABEL_KEYS (portfolio/intelligence): las claves llevan
+  // guion bajo y el detector de usos no cuenta segmentos con '_' (misma
+  // limitacion documentada arriba).
+  'portfolio.stress.reason_history_gaps': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
+  'portfolio.stress.reason_provider_error': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
+  'portfolio.stress.reason_no_safe_symbol': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
+  'portfolio.stress.reason_currency_mismatch': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
+  'portfolio.stress.reason_currency_unverified': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
+  'portfolio.stress.reason_incomplete_portfolio': 'consumida via REASON_LABEL_KEYS en components/historical-stress/HistoricalStressView.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_missing_ledger': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_incomplete_ledger': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_missing_fx': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_missing_start_price': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_missing_start_fx': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_missing_end_value': 'consumida via LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.ledger_fallback': 'fallback de LEDGER_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_fundamental_growth': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_multiple': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_dividends': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_buybacks': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_dilution': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_fx': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_sizing': 'consumida via ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
+  'portfolio.intelligence.attrNd_fallback': 'fallback de ATTRIBUTION_ND_LABEL_KEYS en app/(root)/portfolio/intelligence/page.tsx (guion bajo no detectado)',
 
   // Vocabulario canonico del diseno (acciones, estados y etiquetas de tabla)
   // definido en el diccionario comun para que los componentes no reescriban
   // el copy uno a uno. Sin consumidor todavia: si acaba sin adoptarse, la
   // accion correcta es borrar la clave de lib/i18n/es.json.
-  'common.actions.cancel': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.save': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.close': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
   'common.actions.regenerate': 'verbo canonico de accion del diseno, sin boton que lo consuma hoy',
