@@ -37,6 +37,21 @@ def _tracked_symbols(db: Session) -> set[str]:
     return {str(s).upper() for s in (*watched, *held)}
 
 
+@router.post("/radar/scan", status_code=202)
+def enqueue_radar_scan(db: Session = Depends(get_db)) -> dict:
+    """Encola un lote del barrido (ops/sync manual; el diario lo da el scheduler).
+
+    El job es resumible por cursor: reintentar no duplica snapshots del día.
+    """
+    from app.workers.dramatiq_app import propicks_radar_scan
+
+    message = propicks_radar_scan.send(
+        tenant_id=db.info.get("tenant_id"),
+        user_id=db.info.get("user_id"),
+    )
+    return {"status": "queued", "broker_message_id": str(message.message_id)}
+
+
 @router.get("/radar/opportunities")
 def list_radar_opportunities(
     page: int = Query(default=1, ge=1),

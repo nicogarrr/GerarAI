@@ -1972,6 +1972,50 @@ def refresh_propicks_prices(
         db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000,
+              queue_name=COMPUTED_QUEUE_NAME)
+def propicks_radar_scan(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Radar ProPicks+DCA: barrido acotado y resumible del universo.
+
+    Escritor explicito de snapshots PUBLICOS de precio (nico-v1). Sin red,
+    sin LLM y SIN outbox de alertas: no comparte cola con el evaluador DCA
+    de watchlist. El lease es global (datos publicos, no de tenant) y el
+    cursor por dia hace seguro reanudar tras un fallo o un corte de
+    presupuesto: un lote incompleto nunca marca el dia como cubierto.
+    """
+    from app.services.propicks_radar_job import run_radar_scan
+
+    db = _session(tenant_id, user_id)
+    try:
+        lease = acquire_job_lease(
+            "propicks_radar_scan",
+            ttl_seconds=3600,
+            redis_url=_lease_redis_url(),
+        )
+    except Exception:
+        db.close()
+        raise
+    if lease is None:
+        db.close()
+        return {
+            "status": "skipped",
+            "actor": "propicks_radar_scan",
+            "reason": "lease_held",
+        }
+    try:
+        result = run_radar_scan(db)
+        return {"actor": "propicks_radar_scan", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("propicks_radar_scan", exc, tenant_id=tenant_id)
+    finally:
+        release_job_lease("propicks_radar_scan", lease, redis_url=_lease_redis_url())
+        db.close()
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000)
 def refresh_valuation_metrics(
     tenant_id: int | None = None,

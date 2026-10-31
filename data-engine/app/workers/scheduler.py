@@ -30,6 +30,7 @@ from app.workers.dramatiq_app import (
     ingest_spy_daily,
     ingest_uk_pdmr_filings,
     propose_paper_trades,
+    propicks_radar_scan,
     recompute_fundamental_metrics,
     reconcile_alert_analyses,
     reconcile_alert_deliveries,
@@ -522,6 +523,18 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         day=1,
         hour=22,
         minute=30,
+    )
+    # Radar ProPicks+DCA (universo 1.000): barrido acotado y resumible tras
+    # los precios del cierre US. El cursor por dia reanuda lo que el
+    # presupuesto deje sin completar en la siguiente corrida; el lease
+    # global evita solapes entre lotes.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, propicks_radar_scan),
+        "cron",
+        job_id="propicks_radar_scan_daily",
+        hour=23,
+        minute=0,
     )
     # Serie diaria SPY para el "vs SPY" del track record ProPicks.
     _register(

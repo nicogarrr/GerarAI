@@ -107,3 +107,32 @@ def test_outside_tracked_excludes_watchlist(client):
     assert res["total"] == 24
     assert "T01" not in {i["ticker"] for i in res["items"]}
     assert res["counts_by_level"]["4"] == 2
+
+
+def test_post_scan_enqueues_actor(client, monkeypatch):
+    from app.workers import dramatiq_app
+
+    sent = {}
+
+    class _Msg:
+        message_id = "msg-1"
+
+    def _send(**kwargs):
+        sent.update(kwargs)
+        return _Msg()
+
+    monkeypatch.setattr(dramatiq_app.propicks_radar_scan, "send", _send)
+    res = client.post("/api/propicks/radar/scan")
+    assert res.status_code == 202
+    assert res.json() == {"status": "queued", "broker_message_id": "msg-1"}
+
+
+def test_actor_is_registered_on_computed_queue():
+    import dramatiq
+
+    from app.workers.dramatiq_app import propicks_radar_scan
+
+    assert isinstance(propicks_radar_scan, dramatiq.Actor)
+    assert propicks_radar_scan.queue_name == "computed"
+    # Radar sin outbox: no comparte la cola de alertas del evaluador DCA.
+    assert propicks_radar_scan.queue_name != "alerts"
