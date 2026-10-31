@@ -590,6 +590,11 @@ services:
       <<: [*app-env, *worker-db-env]
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
       FMP_API_KEY: ${FMP_API_KEY:-}
+      # Trabajos pesados y largos (universo, backfills): sin prefetch extra,
+      # como worker-knowledge. Un mensaje prefetcheado espera en local
+      # invisible para HLEN y frena el drenaje compartido.
+      dramatiq_queue_prefetch: "1"
+      dramatiq_delay_queue_prefetch: "1"
     logging: *default-logging
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import os,sys,redis; sys.exit(0 if 'dramatiq' in open('/proc/1/cmdline','rb').read().decode(errors='ignore') and redis.from_url(os.environ['REDIS_URL'], socket_connect_timeout=3).ping() else 1)\""]
