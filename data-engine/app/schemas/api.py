@@ -1660,6 +1660,14 @@ class PortfolioTransactionCreateOut(BaseModel):
     updated_at: str
 
 
+class PortfolioTransactionBatchOut(BaseModel):
+    """Respuesta de POST /api/portfolio/transactions/batch (201, atomico)."""
+
+    created: int
+    transaction_ids: list[int]
+    transactions: list[PortfolioTransactionCreateOut]
+
+
 class PortfolioTransactionPageOut(BaseModel):
     """Respuesta de GET /api/portfolio/transactions/page (limit/offset)."""
 

@@ -45,6 +45,7 @@ from app.schemas.api import (
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTearsheetOut,
+    PortfolioTransactionBatchOut,
     PortfolioTransactionCreateOut,
     PortfolioTransactionOut,
     PortfolioTransactionPageOut,
@@ -1109,7 +1110,7 @@ class PortfolioTransactionBatchInput(BaseModel):
     transactions: list[PortfolioTransactionInput] = Field(min_length=1, max_length=1000)
 
 
-@router.post("/transactions/batch", status_code=201)
+@router.post("/transactions/batch", status_code=201, response_model=PortfolioTransactionBatchOut)
 def create_transaction_batch(
     payload: PortfolioTransactionBatchInput, db: Session = Depends(get_db)
 ) -> dict:
