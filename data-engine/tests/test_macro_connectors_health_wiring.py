@@ -207,3 +207,50 @@ def test_ecb_history_exito_agrega_en_ecb(monkeypatch):
     text = asyncio.run(ecb_history.fetch_ecb_csv(["USD"], start=date(2026, 1, 1), end=date(2026, 1, 2)))
     assert "TIME_PERIOD" in text
     assert registry.get_status("ecb").consecutive_failures == 0
+
+
+# ---------- Bloqueos del piloto (#3433) ----------
+
+
+def test_fred_series_429_agotado_degrada(monkeypatch):
+    """UpstreamRateLimited (get_with_retry) no es HTTPStatusError: sin captura
+    propia, un 429 agotado salia sin registrar fallo."""
+    from app.services.connectors.base import UpstreamRateLimited
+
+    monkeypatch.setenv("FRED_API_KEY", "test-key")
+
+    def handler(request):
+        return _json_response(429, "{}")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("fred").consecutive_failures
+    client = fred.FREDClient(client=_client(handler))
+    with pytest.raises(UpstreamRateLimited):
+        asyncio.run(client.series("CPIAUCSL"))
+    assert registry.get_status("fred").consecutive_failures == before + 1
+
+
+def test_fred_series_csv_200_html_no_es_exito(monkeypatch):
+    """Un 200 con HTML challenge debe registrar FALLO, no salud."""
+
+    def handler(request):
+        return httpx.Response(200, text="<html><body>challenge</body></html>")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("fred").consecutive_failures
+    client = fred.FREDClient(client=_client(handler))
+    with pytest.raises(RuntimeError, match="CSV"):
+        asyncio.run(client.series_csv("CPIAUCSL"))
+    assert registry.get_status("fred").consecutive_failures == before + 1
+
+
+def test_fred_series_csv_valido_es_exito(monkeypatch):
+    def handler(request):
+        return httpx.Response(200, text="DATE,VALUE\n2026-01-01,3.2\n")
+
+    registry = get_data_source_registry()
+    registry.record_failure("fred", "fallo previo")
+    client = fred.FREDClient(client=_client(handler))
+    data = asyncio.run(client.series_csv("CPIAUCSL"))
+    assert data["observations"][0]["value"] == "3.2"
+    assert registry.get_status("fred").consecutive_failures == 0

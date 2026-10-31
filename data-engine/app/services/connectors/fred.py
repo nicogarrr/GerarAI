@@ -17,7 +17,7 @@ from typing import Any
 import httpx
 
 from app.core.config import get_settings
-from app.services.connectors.base import get_with_retry
+from app.services.connectors.base import UpstreamRateLimited, get_with_retry
 from app.services.data_source_health import get_data_source_registry
 
 # Clave de este proveedor en el registry de salud de fuentes (ver yahoo.py:
@@ -67,6 +67,11 @@ class FREDClient:
                 async with httpx.AsyncClient(timeout=30, headers=self.headers) as client:
                     response = await get_with_retry(lambda: client.get(url, params=params))
             payload = response.json()
+        except UpstreamRateLimited:
+            # 429 agotado por get_with_retry: sin este except el fallo no se
+            # registraba nunca (UpstreamRateLimited no es HTTPStatusError).
+            registry.record_failure(REGISTRY_KEY, "HTTP 429: rate limit agotado")
+            raise
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in (400, 404):
                 # Serie inexistente o peticion mal formada: la fuente respondio.
@@ -108,9 +113,16 @@ class FREDClient:
         except httpx.TransportError as exc:
             registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
             raise
+        text = response.text
+        header = text.split("\n", 1)[0].strip().upper()
+        if text.lstrip().startswith("<") or not header.startswith("DATE"):
+            # Un 200 con HTML (challenge) o un CSV con cabecera distinta no es
+            # salud: validar el esquema ANTES de registrar el exito.
+            registry.record_failure(REGISTRY_KEY, "respuesta no CSV (challenge o cambio de formato)")
+            raise RuntimeError("FRED no devolvio un CSV con la cabecera esperada")
         registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         observations = []
-        for line in response.text.splitlines()[1:]:
+        for line in text.splitlines()[1:]:
             date, _, value = line.partition(",")
             if not date:
                 continue
