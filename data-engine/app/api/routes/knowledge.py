@@ -63,6 +63,12 @@ def validate_upload_metadata(
             validated_url = str(_source_url_adapter.validate_python(source_url.strip()))
         except ValidationError as exc:
             raise ValueError("Invalid knowledge source_url") from exc
+        # La cota se mide sobre la URL FINAL: la normalizacion ALARGA
+        # ('/' final, IDN -> punycode) y HttpUrl solo corta en 2083, asi que
+        # una entrada de <=1000 chars puede guardar >1000 y romper el INSERT
+        # de KnowledgeDocument.source_url (String(1000)) en Postgres.
+        if len(validated_url) > 1000:
+            raise ValueError("Invalid knowledge source_url")
     return document_type, normalized_language, validated_url
 
 

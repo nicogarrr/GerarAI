@@ -373,7 +373,9 @@ async def ingest_document_file(
     ticker: str = Form(..., min_length=1, max_length=20),
     title: str = Form(..., min_length=3, max_length=500),
     source_type: str = Form(default="manual_upload", min_length=2, max_length=80),
-    source_url: str | None = Form(default=None),
+    # Document.source_url es String(1000): sin tope, un valor mas largo
+    # rompia el INSERT en Postgres con un 500 en vez de un 422 de validacion.
+    source_url: str | None = Form(default=None, max_length=1000),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
 ) -> dict:
