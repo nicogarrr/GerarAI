@@ -229,4 +229,6 @@ def test_ingest_free_corpus_cuenta_ingestados_duplicados_fallos_y_saltados(monke
     ]
     # la coleccion del corpus queda creada para el tenant
     assert calls and all(c["collection_id"] for c in calls)
-    assert all(c["source_url"] == c["source_url"] for c in calls)
+    by_file = {c["filename"]: c for c in calls}
+    assert by_file["Berkshire2020.pdf"]["source_url"] == "https://www.berkshirehathaway.com/letters/2020ltr.pdf"
+    assert by_file["Berkshire1977.html"]["source_url"] == "https://www.berkshirehathaway.com/letters/1977.html"
