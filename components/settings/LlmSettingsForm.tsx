@@ -156,6 +156,15 @@ export default function LlmSettingsForm({ initial }: { initial: LlmSettings }) {
                     </span>
                 </div>
                 <p className="mt-1 text-gray-400">{status.message}</p>
+                {status.source !== 'tenant' ? (
+                    <p className="mt-2 rounded-lg border border-teal-800/50 bg-teal-950/30 p-3 text-gray-300">
+                        Tu IA, tu clave: para no depender del límite semanal compartido de la
+                        plataforma, añade tu propia clave API. Elige proveedor (Claude vía
+                        OpenRouter, OpenAI, Gemini, Groq, OpenCode Go u otro compatible con
+                        OpenAI), escribe el modelo y pega la clave abajo. La clave y el coste
+                        son tuyos: GerarAI no asume tu consumo.
+                    </p>
+                ) : null}
                 {!status.encryption_available ? (
                     <p className="mt-2 text-amber-300">
                         El cifrado no está configurado en el servidor. Puedes elegir proveedor y modelo,
