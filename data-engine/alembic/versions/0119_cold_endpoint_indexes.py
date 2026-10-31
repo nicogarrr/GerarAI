@@ -4,7 +4,7 @@ Revision ID: 0119_cold_endpoint_indexes
 Revises: 0118_thesis_attention_idx
 Create Date: 2026-10-31T14:40:00.000Z
 
-Orden de Nico (2026-10-31): solo se aplica lo que MIDA mejor. Laboratorio
+Criterio: solo se anade lo que MIDE mejor. Laboratorio
 EXPLAIN (ANALYZE, BUFFERS) en PG 16.2 sobre BD scratch migrada a head con
 volumenes sinteticos con forma de prod (5 tenants, ~2.132 empresas LEIDO del
 docstring de data_health, ~256k market_prices, ~256k financial_facts,
@@ -33,7 +33,7 @@ filtros de las consultas para que el planner pueda usarlos.
 Modelos alineados (Index con postgresql_where, mismos nombres): el rachet
 no crece.
 
-NO desplegar en produccion hasta que Nico lo decida.
+Pendiente de aplicar en produccion (sin despliegue en este commit).
 """
 
 import sqlalchemy as sa
