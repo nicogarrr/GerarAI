@@ -18,4 +18,10 @@ test('/api/logo acota la resolución completa con cancelación real', () => {
     assert.ok(!route.includes('AbortSignal.timeout(5000)'), 'Finnhub no puede seguir con 5s de timeout');
     const budget = readFileSync('lib/logos/logo-budget.ts', 'utf8');
     assert.ok(budget.includes('LOGO_TOTAL_BUDGET_MS = 4000'), 'el presupuesto vive en lib/logos/logo-budget.ts');
+    // Revisión del piloto (31-oct): el abort también tiene que cortar el DNS
+    // (dns.lookup no acepta AbortSignal) y el bucle de candidatos.
+    const site = readFileSync('lib/logos/site-icon.ts', 'utf8');
+    assert.ok(site.includes('raced(lookup(hostname), signal)'), 'el lookup DNS debe ir en carrera con la señal');
+    assert.ok(site.includes('signal?.aborted'), 'get() y el bucle deben salir si la señal está abortada');
+    assert.ok(route.includes('fetchSiteIcon(domain, boundedFetch, undefined, controller.signal)'), 'la ruta pasa su señal a fetchSiteIcon');
 });

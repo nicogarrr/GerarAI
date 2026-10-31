@@ -96,7 +96,7 @@ async function resolveLogo(ticker: string): Promise<SiteIcon | null> {
                         ? AbortSignal.any([init.signal, controller.signal])
                         : controller.signal,
             });
-        const icon = domain ? await fetchSiteIcon(domain, boundedFetch).catch(() => null) : null;
+        const icon = domain ? await fetchSiteIcon(domain, boundedFetch, undefined, controller.signal).catch(() => null) : null;
         remember(key, icon);
         return icon;
     } catch {
