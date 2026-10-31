@@ -5,7 +5,6 @@ every workflow that is not executable is retired with a reason and a real
 replacement instead of being advertised.
 """
 
-from fastapi.testclient import TestClient
 
 import main
 from app.workflows.catalog import (
@@ -14,8 +13,9 @@ from app.workflows.catalog import (
     WORKFLOW_CATALOG,
     find_workflow,
 )
+from tests.auth_helpers import csrf_client
 
-client = TestClient(main.app)
+client = csrf_client(main.app)
 
 
 def test_no_workflow_exposes_partial_or_descriptive():

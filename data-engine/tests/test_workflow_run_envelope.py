@@ -1,12 +1,12 @@
 """Stage 2: uniform workflow run envelope (workflow_runs + workflow_step_runs)."""
 
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
 from app.core.database import SessionLocal, init_db
 from app.models.entities import Company, WorkflowRun, WorkflowStepRun
 from app.services.workflow_run_service import begin_run
+from tests.auth_helpers import csrf_client
 
 
 def _db():
@@ -129,7 +129,7 @@ def test_generate_thesis_run_is_idempotent_over_http(monkeypatch):
         "app.services.thesis_service.ThesisService", FakeThesisService
     )
 
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     headers = {"Idempotency-Key": "http-key-1"}
     first = client.post(
         "/api/workflows/GenerateThesisWorkflow/run",

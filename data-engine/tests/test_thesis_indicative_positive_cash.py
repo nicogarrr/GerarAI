@@ -3,12 +3,12 @@
 import copy
 
 import pytest
-from fastapi.testclient import TestClient
 
 import main
 from app.core.database import init_db
 from app.seed import seed
 from tests import test_thesis_auto_ingest as base
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +51,7 @@ def test_positive_ocf_keeps_partial_indicative_range(monkeypatch):
         base.ThesisEvidenceService, "_fetch_company_facts", lambda self, cik: facts
     )
     base._seed_evidence_rows()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     response = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})
     assert response.status_code == 200

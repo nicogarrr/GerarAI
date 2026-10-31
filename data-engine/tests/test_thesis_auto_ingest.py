@@ -18,7 +18,6 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 import main
@@ -37,6 +36,7 @@ from app.seed import seed
 from app.services.connectors.base import ConnectorItem, ConnectorResult
 from app.services.red_team_service import RedTeamService
 from app.services.thesis_evidence_service import ThesisEvidenceService
+from tests.auth_helpers import csrf_client
 
 
 def _xbrl(val, end, filed, form="10-K", fy=None):
@@ -284,7 +284,7 @@ def test_generate_with_mocked_sources_persists_facts_and_blocks_range_on_cash_bu
     _clean_asts_evidence()
     _mock_all_sources(monkeypatch)
     _seed_evidence_rows()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     response = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})
     assert response.status_code == 200
@@ -345,7 +345,7 @@ def test_generate_without_network_degrades_to_honest_skeleton(monkeypatch):
     seed()
     _clean_asts_evidence()
     _mock_no_network(monkeypatch)
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     response = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})
     assert response.status_code == 200

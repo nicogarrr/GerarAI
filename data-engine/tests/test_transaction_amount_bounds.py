@@ -13,16 +13,16 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 
 import main
 from app.core.database import init_db
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture()
 def client():
     init_db()
-    return TestClient(main.app, raise_server_exceptions=False)
+    return csrf_client(main.app, raise_server_exceptions=False)
 
 
 def _tx(ticker: str, **overrides):
