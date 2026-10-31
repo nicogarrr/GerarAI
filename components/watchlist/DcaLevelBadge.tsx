@@ -59,7 +59,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}${staleText ? `, ${staleText}` : ''}`}
                 >
                     {state.label}
-                    {forming ? <span aria-hidden="true" className="opacity-70">·</span> : null}
+                    {forming ? <span className="font-normal opacity-80">(provisional)</span> : null}
                 </button>
             </TooltipTrigger>
             <TooltipContent

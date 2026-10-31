@@ -165,6 +165,22 @@ describe('PersonalizedOverview', () => {
         expect(screen.queryByRole('link', { name: /Ver qué ha cambiado en/i })).not.toBeInTheDocument();
     });
 
+    it('el precio queda en la fila del símbolo y nunca bajo la insignia DCA (solape)', async () => {
+        // Regresión: con la insignia «2X DCA (provisional)» en la segunda fila,
+        // el precio (centrado en vertical contra la columna de dos filas) se
+        // pintaba encima de la insignia en pantallas estrechas.
+        setup({
+            portfolio: summary([holding('ASTS', { cost: null, gain: null, gainPercent: null, firstBuyDate: null })]),
+            signals: { fairValues: {}, dca: { ASTS: { label: '2X DCA', forming: true } } },
+        });
+        await renderHome();
+        const asts = screen.getByRole('link', { name: /^ASTS/ });
+        const symbolRow = within(asts).getByText('ASTS').parentElement as HTMLElement;
+        expect(within(symbolRow).getByText(/1\.200/)).toBeInTheDocument();
+        expect(within(symbolRow).queryByText(/2X DCA/)).not.toBeInTheDocument();
+        await waitFor(() => expect(within(asts).getByText('2X DCA (provisional)')).toBeInTheDocument());
+    });
+
     it('valor justo en otra divisa: muestra el valor sin porcentaje y la fuente', async () => {
         setup({
             portfolio: summary([holding('ASTS')]),
