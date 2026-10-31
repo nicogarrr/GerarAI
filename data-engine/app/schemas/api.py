@@ -419,7 +419,7 @@ class ThesisOut(BaseModel):
 class ClaimEvidenceCreate(BaseModel):
     document_id: int | None = None
     document_chunk_id: int | None = None
-    source_url: str | None = None
+    source_url: str | None = Field(default=None, max_length=1000)
     evidence_type: str = Field(
         default="supports",
         pattern="^(supports|contradicts|supersedes|context|uncertain)$",
@@ -451,12 +451,14 @@ class ClaimCreate(BaseModel):
     company_id: int | None = None
     thesis_version_id: int | None = None
     statement: str = Field(min_length=5)
-    claim_type: str = "thesis"
-    status: str = "unverified"
+    # Cotas = ancho de columna: SQLite acepta cualquier largo en String(N),
+    # pero Postgres rompe con DataError; el 422 por campo sale del schema.
+    claim_type: str = Field(default="thesis", max_length=80)
+    status: str = Field(default="unverified", max_length=40)
     confidence: Decimal = Decimal("0.50")
     materiality_score: int = Field(default=5, ge=0, le=10)
-    source_quality: str = "unknown"
-    created_by: str = "user"
+    source_quality: str = Field(default="unknown", max_length=40)
+    created_by: str = Field(default="user", max_length=80)
 
 
 class ClaimOut(BaseModel):
@@ -481,7 +483,7 @@ class ThesisSectionCreate(BaseModel):
     section_key: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=200)
     body: str = ""
-    status: str = "draft"
+    status: str = Field(default="draft", max_length=40)
     order_index: int = 0
     confidence: Decimal = Decimal("0.70")
 
@@ -507,7 +509,7 @@ class ThesisChangeCreate(BaseModel):
     company_id: int | None = None
     from_version_id: int | None = None
     to_version_id: int | None = None
-    change_type: str = "manual"
+    change_type: str = Field(default="manual", max_length=80)
     impact_direction: str = Field(default="neutral", pattern="^(positive|negative|neutral|mixed)$")
     materiality_score: int = Field(default=5, ge=0, le=10)
     summary: str = Field(min_length=5)
