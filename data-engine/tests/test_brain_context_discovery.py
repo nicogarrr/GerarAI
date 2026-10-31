@@ -161,3 +161,89 @@ def test_unrelated_question_is_not_routed_to_discovery(db):
     from app.services.brain_data_tools import answer_data_question
 
     assert answer_data_question(db, "¿qué tiempo hace en Madrid?") is None
+
+
+def test_radar_stale_scan_is_not_announced_as_current_signal(db):
+    """4X confirmado y verificado escaneado hace 4 dias: NO es señal de hoy."""
+    from datetime import timedelta
+
+    comp = _company(db, "STAL")
+    from app.services.propicks_radar_store import save_snapshot
+
+    four_days_ago = datetime.now(UTC) - timedelta(days=4)
+    save_snapshot(
+        db,
+        comp.id,
+        {
+            "status": "ok",
+            "formula_version": "nico-v1",
+            "price_verified": True,
+            "price_date": four_days_ago.date().isoformat(),
+            "source": "test",
+            "current": {"level": 4},
+            "confirmed": [{"level": 4}],
+            "clear_price_signal": True,
+            "daily_close_drawdown": 0.35,
+            "drawdown_basis": "close",
+        },
+        now=four_days_ago,
+    )
+    db.commit()
+    from app.services.brain_data_tools import answer_data_question
+
+    resp = answer_data_question(db, "¿Qué dice el radar?")
+    assert resp is not None
+    assert "STAL" not in resp.answer
+    assert "valores con señal clara" not in resp.answer
+    assert "escaneo de más de 3 días" in resp.answer
+
+
+def test_propicks_running_run_does_not_claim_none_passed(db):
+    """Un run en curso no tiene ganadores todavia: no se dice 'ninguno paso'."""
+    aapl = _company(db, "AAPL")
+    _propick_run(db, [(aapl, 87.5)])
+    running = ProPickRun(
+        tenant_id=1,
+        as_of=datetime(2026, 10, 31, 22, 0, tzinfo=UTC),
+        status="running",
+        funnel_version="nico-v1",
+        universe_size=0,
+        passed_count=0,
+        top_n=20,
+        duration_ms=0,
+        params={},
+    )
+    db.add(running)
+    db.commit()
+    from app.services.brain_data_tools import answer_data_question
+
+    resp = answer_data_question(db, "¿Qué ProPicks tengo?")
+    assert resp is not None
+    # Muestra el ultimo COMPLETADO y avisa del run en curso.
+    assert "AAPL: score 87,5" in resp.answer
+    assert "running" in resp.answer
+
+
+def test_propicks_only_running_run_says_no_completed_run(db):
+    _company(db, "AAPL")
+    db.add(
+        ProPickRun(
+            tenant_id=1,
+            as_of=datetime(2026, 10, 31, 22, 0, tzinfo=UTC),
+            status="running",
+            funnel_version="nico-v1",
+            universe_size=0,
+            passed_count=0,
+            top_n=20,
+            duration_ms=0,
+            params={},
+        )
+    )
+    db.commit()
+    from app.services.brain_data_tools import answer_data_question
+
+    resp = answer_data_question(db, "¿Qué ProPicks tengo?")
+    assert resp is not None
+    assert "ningún run de ProPicks completado" in resp.answer
+    assert "running" in resp.answer
+    assert "ninguno pasó" not in resp.answer

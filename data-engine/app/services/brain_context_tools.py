@@ -454,16 +454,31 @@ def propicks_answer(db: Session, tenant: int) -> ChatResponse:
     """Último run guardado del funnel ProPicks: ganadores con score y fecha."""
     from app.models.entities import ProPickCandidate, ProPickRun
 
+    # Solo runs COMPLETADOS: uno en curso todavia no tiene ganadores y decir
+    # "ninguno paso" seria falso. Si el mas reciente esta en curso, se dice.
     run = db.scalars(
+        select(ProPickRun)
+        .where(ProPickRun.tenant_id == tenant, ProPickRun.status == "completed")
+        .order_by(ProPickRun.as_of.desc())
+        .limit(1)
+    ).first()
+    latest_any = db.scalars(
         select(ProPickRun)
         .where(ProPickRun.tenant_id == tenant)
         .order_by(ProPickRun.as_of.desc())
         .limit(1)
     ).first()
+    in_progress_note = None
+    if latest_any is not None and (run is None or latest_any.id != run.id):
+        in_progress_note = (
+            f"El run más reciente ({_day(latest_any.as_of)}) está en estado "
+            f"«{latest_any.status}» y aún no tiene resultado; muestro el último completado."
+        )
     if run is None:
-        return _response(
-            ["Todavía no hay ningún run de ProPicks guardado; no invento candidatos."],
-            [], "propicks")
+        lines = ["Todavía no hay ningún run de ProPicks completado; no invento candidatos."]
+        if in_progress_note:
+            lines.append(in_progress_note)
+        return _response(lines, [], "propicks")
     when = _day(run.as_of)
     sources = [_source("propick_run", run.id, f"Run ProPicks {when}", "/propicks")]
     rows = db.execute(
@@ -486,6 +501,8 @@ def propicks_answer(db: Session, tenant: int) -> ChatResponse:
         score = f"{float(cand.score):.1f}".replace(".", ",") if cand.score is not None else "s/p"
         lines.append(f"- {comp.ticker}: score {score}.")
         sources.append(_source("propick_candidate", cand.id, f"ProPick {comp.ticker}", "/propicks"))
+    if in_progress_note:
+        lines.append(in_progress_note)
     lines.append("Es la salida guardada de tu funnel determinista, no una recomendación de compra.")
     return _response(lines, sources, "propicks")
 
@@ -503,22 +520,65 @@ def radar_answer(db: Session) -> ChatResponse:
             "El radar no tiene snapshots guardados todavía (el escaneo no ha corrido "
             "o no cubre ningún valor). No lo simulo en directo.",
         ], [], "radar")
-    clear = [s for s in signals if (s["payload"] or {}).get("clear_price_signal")]
+    # Misma vigencia que GET /radar/opportunities: solo lecturas ok con
+    # escaneo de como mucho STALE_SCAN_DAYS dias; lo viejo o invalido se
+    # cuenta y se dice, nunca se anuncia como señal de hoy.
+    from app.api.routes.propicks_radar import STALE_SCAN_DAYS
+
+    valid: list[dict] = []
+    stale_count = 0
+    invalid_count = 0
+    for sig in signals:
+        payload = sig["payload"] or {}
+        if payload.get("status") != "ok":
+            invalid_count += 1
+            continue
+        try:
+            scan_date = date.fromisoformat(sig["scan_date"])
+        except ValueError:
+            invalid_count += 1
+            continue
+        if (today - scan_date).days > STALE_SCAN_DAYS:
+            stale_count += 1
+            continue
+        valid.append(sig)
+    exclusions = []
+    if stale_count:
+        exclusions.append(
+            f"{stale_count} con escaneo de más de {STALE_SCAN_DAYS} días (sin corrida nueva, no vigentes)"
+        )
+    if invalid_count:
+        exclusions.append(f"{invalid_count} con lectura inválida")
+    exclusion_line = "Descartados: " + "; ".join(exclusions) + "." if exclusions else None
+    if not valid:
+        lines = [
+            f"Radar de precio: ninguna lectura vigente a día de hoy "
+            f"({len(signals)} valores con snapshot guardado, todos descartados)."
+        ]
+        if exclusion_line:
+            lines.append(exclusion_line)
+        return _response(lines, [], "radar")
+    clear = [s for s in valid if (s["payload"] or {}).get("clear_price_signal")]
     tickers = {
         row.id: row.ticker
-        for row in db.scalars(select(Company).where(Company.id.in_({s["company_id"] for s in signals}))).all()
+        for row in db.scalars(select(Company).where(Company.id.in_({s["company_id"] for s in valid}))).all()
     }
-    scan_day = max(s["scan_date"] for s in signals)
+    scan_day = max(s["scan_date"] for s in valid)
     sources = [_source("radar_snapshot", "latest", f"Radar {scan_day}", "/propicks")]
     if not clear:
-        return _response([
-            f"Radar de precio (escaneo guardado del {_day(scan_day)}, {len(signals)} valores): "
+        lines = [
+            f"Radar de precio (escaneo guardado del {_day(scan_day)}, {len(valid)} valores vigentes): "
             "ninguno tiene señal clara (nivel 4 confirmado y verificado) ahora mismo.",
-        ], sources, "radar")
+        ]
+        if exclusion_line:
+            lines.append(exclusion_line)
+        return _response(lines, sources, "radar")
     lines = [
         f"Radar de precio (escaneo guardado del {_day(scan_day)}): "
         f"{len(clear)} valores con señal clara (nivel 4 confirmado):",
     ]
+    if exclusion_line:
+        lines.append(exclusion_line)
     for sig in clear[:8]:
         payload = sig["payload"] or {}
         ticker = tickers.get(sig["company_id"], str(sig["company_id"]))
