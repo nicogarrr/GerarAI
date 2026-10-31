@@ -2,8 +2,10 @@
  * Guard de velas (lightweight-charts v5, TradingView): la librería es
  * ESM-only y NO puede entrar en el bundle de servidor; el montaje es cliente
  * con `dynamic(ssr: false)`, la atribución a TradingView es obligatoria por
- * licencia y los mapeos de datos son honestos (sin OHLC no hay velas, sin
- * volumen no hay 0 fabricado).
+ * licencia: logo + enlace en el propio chart y aviso público en /metodologia
+ * (fuera del pie de la landing por decisión de producto, 1 nov 2026). Los
+ * mapeos de datos son honestos (sin OHLC no hay velas, sin volumen no hay 0
+ * fabricado).
  * Ejecución: node --experimental-strip-types --test scripts/charts-guard.test.ts
  */
 import { describe, it } from 'node:test';
@@ -19,7 +21,8 @@ const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const workspaceActions = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
 const finnhub = readFileSync('lib/actions/finnhub.actions.ts', 'utf8');
 const quoteRoute = existsSync('app/api/quote/route.ts') ? readFileSync('app/api/quote/route.ts', 'utf8') : '';  // /api/quote se borro: era codigo muerto con cuatro '|| 0' que inventaban variaciones
-const footer = readFileSync('app/(public)/layout.tsx', 'utf8');
+const metodologia = readFileSync('app/(public)/metodologia/page.tsx', 'utf8');
+const landingEs = readFileSync('lib/i18n/messages/es/landing.json', 'utf8');
 const candles = readFileSync('lib/market/candles.ts', 'utf8');
 
 const STATIC_LW_IMPORT = /^import\s+(?!type)[^;]*?from\s+['"]lightweight-charts['"]/m;
@@ -58,9 +61,13 @@ describe('charts: atribución obligatoria a TradingView', () => {
         assert.match(chart, /attributionLogo:\s*true/);
     });
 
-    it('el footer público incluye la línea de atribución con enlace', () => {
-        assert.match(footer, /TradingView/);
-        assert.match(footer, /https:\/\/www\.tradingview\.com\//);
+    it('la atribución pública vive en /metodologia: aviso de la NOTICE y enlace', () => {
+        // Decisión de producto (1 nov 2026): fuera del pie de la landing; en la
+        // página pública donde menos se ve. La doc de la licencia pide el aviso
+        // de la NOTICE y el enlace a tradingview.com en una página pública.
+        assert.match(metodologia, /landing\.metodologia\.chartsAttribution/);
+        assert.match(metodologia, /https:\/\/www\.tradingview\.com\//);
+        assert.match(landingEs, /TradingView Lightweight Charts™ · Copyright \(c\) 2025 TradingView, Inc\./);
     });
 });
 

@@ -638,17 +638,18 @@ export function formatUserDateTime(
  * navegador da el de hoy, así que el default del input difiere entre el HTML
  * del servidor y la hidratación.
  */
-export function todayLocal(): string {
+export function todayLocal(date: Date = new Date()): string {
   // "Hoy" en la zona del USUARIO, no en la del proceso: con el servidor en
   // UTC y el navegador en Europe/Madrid, getFullYear()/getDate() daban dias
   // distintos entre el HTML del servidor y la hidratacion. `en-CA` rinde
-  // YYYY-MM-DD directamente.
+  // YYYY-MM-DD directamente. Acepta el instante a evaluar para que el
+  // validador compare contra el MISMO "hoy" que siembra el dialogo.
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: USER_TZ,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date());
+  }).format(date);
 }
 
 /**

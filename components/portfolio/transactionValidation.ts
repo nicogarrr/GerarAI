@@ -7,6 +7,7 @@
  * o precio válidos no hay petición al backend.
  */
 
+import { todayLocal } from '@/lib/format';
 import { parseLocalizedNumberDetailed } from '@/lib/i18n/parse-number';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { TranslationKey } from '@/lib/i18n/t';
@@ -111,8 +112,11 @@ export function validateTransactionForm(values: TransactionFormValues, now: Date
       errors.date = msg('errDateInvalid');
     } else {
       // Comparación por día de calendario (no por hora): mañana ya es futuro.
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      // «Hoy» en USER_TZ, la misma base con la que el diálogo siembra la
+      // fecha (todayLocal): con los getters locales del proceso, un proceso
+      // una hora atrás (CI en UTC a las 23:xx, navegador al oeste de Madrid)
+      // veía «ayer» y rechazaba la fecha sembrada como futura.
+      const today = todayLocal(now);
       if (values.date > today) {
         errors.date = msg('errDateFuture');
       }
