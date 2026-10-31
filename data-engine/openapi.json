@@ -4845,6 +4845,702 @@
         "title": "DiscoveryOut",
         "type": "object"
       },
+      "DividendProjectionCoverageOut": {
+        "properties": {
+          "fx_missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fx Missing",
+            "type": "array"
+          },
+          "sin_datos": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sin Datos",
+            "type": "array"
+          },
+          "uncertain_dividends": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertain Dividends",
+            "type": "array"
+          },
+          "unknown_source_withholding": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unknown Source Withholding",
+            "type": "array"
+          },
+          "unverified_reasons": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Unverified Reasons",
+            "type": "object"
+          },
+          "with_data": {
+            "title": "With Data",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "with_data",
+          "sin_datos",
+          "uncertain_dividends",
+          "fx_missing",
+          "unknown_source_withholding",
+          "unverified_reasons"
+        ],
+        "title": "DividendProjectionCoverageOut",
+        "type": "object"
+      },
+      "DividendProjectionDeclaredFutureOut": {
+        "properties": {
+          "amount_per_share": {
+            "title": "Amount Per Share",
+            "type": "number"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "ex_date": {
+            "title": "Ex Date",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "pay_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pay Date"
+          },
+          "projection_as_of": {
+            "title": "Projection As Of",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "ex_date",
+          "pay_date",
+          "amount_per_share",
+          "currency",
+          "label",
+          "source",
+          "projection_as_of",
+          "note"
+        ],
+        "title": "DividendProjectionDeclaredFutureOut",
+        "type": "object"
+      },
+      "DividendProjectionFiscalYearOut": {
+        "properties": {
+          "covered_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Covered Tickers",
+            "type": "array"
+          },
+          "cuota_pendiente_estimada": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cuota Pendiente Estimada"
+          },
+          "double_tax_deduction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Double Tax Deduction"
+          },
+          "effective_avg_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Avg Rate"
+          },
+          "excluded_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Tickers",
+            "type": "array"
+          },
+          "gross_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Base"
+          },
+          "irpf_scenario": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Irpf Scenario"
+          },
+          "net_scenario": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Scenario"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "per_position": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/DividendProjectionPositionFiscalOut"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Position"
+          },
+          "retencion_a_cuenta_es": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retencion A Cuenta Es"
+          },
+          "source_withheld_foreign": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Withheld Foreign"
+          }
+        },
+        "required": [
+          "gross_base",
+          "irpf_scenario",
+          "source_withheld_foreign",
+          "retencion_a_cuenta_es",
+          "double_tax_deduction",
+          "cuota_pendiente_estimada",
+          "net_scenario",
+          "covered_tickers",
+          "excluded_tickers",
+          "note"
+        ],
+        "title": "DividendProjectionFiscalYearOut",
+        "type": "object"
+      },
+      "DividendProjectionGrossSummaryOut": {
+        "properties": {
+          "complete": {
+            "title": "Complete",
+            "type": "boolean"
+          },
+          "excluded_no_dividends": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded No Dividends",
+            "type": "array"
+          },
+          "excluded_no_fx": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded No Fx",
+            "type": "array"
+          },
+          "excluded_uncertain_dividends": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Uncertain Dividends",
+            "type": "array"
+          },
+          "gross_total_base": {
+            "title": "Gross Total Base",
+            "type": "number"
+          },
+          "gross_unverified_base": {
+            "title": "Gross Unverified Base",
+            "type": "number"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "net_irpf": {
+            "title": "Net Irpf",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "gross_total_base",
+          "gross_unverified_base",
+          "net_irpf",
+          "excluded_no_fx",
+          "excluded_no_dividends",
+          "excluded_uncertain_dividends",
+          "complete"
+        ],
+        "title": "DividendProjectionGrossSummaryOut",
+        "type": "object"
+      },
+      "DividendProjectionMonthOut": {
+        "properties": {
+          "covered_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Covered Tickers",
+            "type": "array"
+          },
+          "excluded_tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Excluded Tickers",
+            "type": "array"
+          },
+          "gross_base": {
+            "title": "Gross Base",
+            "type": "number"
+          },
+          "gross_total_base": {
+            "title": "Gross Total Base",
+            "type": "number"
+          },
+          "gross_unverified_base": {
+            "title": "Gross Unverified Base",
+            "type": "number"
+          },
+          "month": {
+            "title": "Month",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "source_withheld_base": {
+            "title": "Source Withheld Base",
+            "type": "number"
+          }
+        },
+        "required": [
+          "month",
+          "gross_base",
+          "source_withheld_base",
+          "gross_unverified_base",
+          "gross_total_base",
+          "covered_tickers",
+          "excluded_tickers",
+          "note"
+        ],
+        "title": "DividendProjectionMonthOut",
+        "type": "object"
+      },
+      "DividendProjectionPositionFiscalOut": {
+        "properties": {
+          "double_tax_deduction_base": {
+            "title": "Double Tax Deduction Base",
+            "type": "number"
+          },
+          "gross_base": {
+            "title": "Gross Base",
+            "type": "number"
+          },
+          "retencion_a_cuenta_base": {
+            "title": "Retencion A Cuenta Base",
+            "type": "number"
+          },
+          "source_withheld_foreign_base": {
+            "title": "Source Withheld Foreign Base",
+            "type": "number"
+          }
+        },
+        "required": [
+          "gross_base",
+          "source_withheld_foreign_base",
+          "retencion_a_cuenta_base",
+          "double_tax_deduction_base"
+        ],
+        "title": "DividendProjectionPositionFiscalOut",
+        "type": "object"
+      },
+      "DividendProjectionPositionOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "domicile_country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domicile Country"
+          },
+          "frequency_last_year": {
+            "title": "Frequency Last Year",
+            "type": "integer"
+          },
+          "gross_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Base"
+          },
+          "gross_native": {
+            "title": "Gross Native",
+            "type": "number"
+          },
+          "months": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Months",
+            "type": "object"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "number"
+          },
+          "scenario_conditions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scenario Conditions"
+          },
+          "source_withheld_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Withheld Base"
+          },
+          "source_withholding_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Withholding Rate"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "unverified_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unverified Reason"
+          },
+          "withholding_basis": {
+            "anyOf": [
+              {
+                "enum": [
+                  "emisor_verificado",
+                  "domicilio_bd"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withholding Basis"
+          },
+          "withholding_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "techo_convenio",
+                  "escenario_convenio",
+                  "sin_impuesto_origen_escenario"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withholding Kind"
+          }
+        },
+        "required": [
+          "ticker",
+          "currency",
+          "quantity",
+          "frequency_last_year",
+          "gross_native",
+          "gross_base",
+          "domicile_country",
+          "withholding_basis",
+          "withholding_kind",
+          "unverified_reason",
+          "scenario_conditions",
+          "source_withholding_rate",
+          "source_withheld_base",
+          "months"
+        ],
+        "title": "DividendProjectionPositionOut",
+        "type": "object"
+      },
+      "DividendUncertainEventOut": {
+        "properties": {
+          "amounts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Amounts",
+            "type": "array"
+          },
+          "ex_date": {
+            "title": "Ex Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ex_date",
+          "amounts"
+        ],
+        "title": "DividendUncertainEventOut",
+        "type": "object"
+      },
+      "DividendYieldCoverageOut": {
+        "properties": {
+          "covered_value_fraction": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Value Fraction"
+          },
+          "percent": {
+            "title": "Percent",
+            "type": "number"
+          },
+          "positions": {
+            "title": "Positions",
+            "type": "integer"
+          },
+          "positions_missing_base_value": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Positions Missing Base Value",
+            "type": "array"
+          },
+          "positions_with_dividend_data": {
+            "title": "Positions With Dividend Data",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "positions",
+          "positions_with_dividend_data",
+          "percent",
+          "positions_missing_base_value",
+          "covered_value_fraction"
+        ],
+        "title": "DividendYieldCoverageOut",
+        "type": "object"
+      },
+      "DividendYieldPositionOut": {
+        "properties": {
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "dividend_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividend Yield"
+          },
+          "last_fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Fetched At"
+          },
+          "matching_currency_records_12m": {
+            "title": "Matching Currency Records 12M",
+            "type": "integer"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "records_12m": {
+            "title": "Records 12M",
+            "type": "integer"
+          },
+          "skipped_currency_mismatch": {
+            "title": "Skipped Currency Mismatch",
+            "type": "integer"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "ttm_dividend_per_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ttm Dividend Per Share"
+          },
+          "uncertain_dividend_events": {
+            "items": {
+              "$ref": "#/components/schemas/DividendUncertainEventOut"
+            },
+            "title": "Uncertain Dividend Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ticker",
+          "ttm_dividend_per_share",
+          "uncertain_dividend_events",
+          "currency",
+          "price",
+          "dividend_yield",
+          "records_12m",
+          "matching_currency_records_12m",
+          "skipped_currency_mismatch",
+          "last_fetched_at"
+        ],
+        "title": "DividendYieldPositionOut",
+        "type": "object"
+      },
       "DocType": {
         "enum": [
           "letter",
@@ -10869,6 +11565,136 @@
           "reasons"
         ],
         "title": "PortfolioDataQualityOut",
+        "type": "object"
+      },
+      "PortfolioDividendProjectionOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/DividendProjectionCoverageOut"
+          },
+          "declared_future": {
+            "items": {
+              "$ref": "#/components/schemas/DividendProjectionDeclaredFutureOut"
+            },
+            "title": "Declared Future",
+            "type": "array"
+          },
+          "fiscal_by_year": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DividendProjectionFiscalYearOut"
+            },
+            "title": "Fiscal By Year",
+            "type": "object"
+          },
+          "fiscal_conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fiscal Conditions",
+            "type": "array"
+          },
+          "gross_summary": {
+            "$ref": "#/components/schemas/DividendProjectionGrossSummaryOut"
+          },
+          "horizon_months": {
+            "title": "Horizon Months",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "months": {
+            "items": {
+              "$ref": "#/components/schemas/DividendProjectionMonthOut"
+            },
+            "title": "Months",
+            "type": "array"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/DividendProjectionPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "object"
+          }
+        },
+        "required": [
+          "as_of",
+          "base_currency",
+          "horizon_months",
+          "label",
+          "method",
+          "fiscal_conditions",
+          "sources",
+          "months",
+          "fiscal_by_year",
+          "positions",
+          "gross_summary",
+          "declared_future",
+          "coverage"
+        ],
+        "title": "PortfolioDividendProjectionOut",
+        "type": "object"
+      },
+      "PortfolioDividendYieldsOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/DividendYieldCoverageOut"
+          },
+          "portfolio_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Yield"
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/DividendYieldPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          }
+        },
+        "required": [
+          "as_of",
+          "positions",
+          "portfolio_yield",
+          "coverage",
+          "provenance"
+        ],
+        "title": "PortfolioDividendYieldsOut",
         "type": "object"
       },
       "PortfolioDrawdownPointOut": {
@@ -57257,9 +58083,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Dividends Api Portfolio Dividends Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioDividendYieldsOut"
                 }
               }
             },
@@ -57433,9 +58257,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Dividend Projection Api Portfolio Dividends Projection Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioDividendProjectionOut"
                 }
               }
             },
