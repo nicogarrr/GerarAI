@@ -104,27 +104,28 @@ def _normalized_fcf_margin(
     """
     latest = snapshot.value("fcf_margin")
     try:
-        from app.models import FinancialFact
-        from sqlalchemy import select
+        from app.valuation.financial_snapshot import _available_at, _facts_for_metric
 
-        rows = context.db.execute(
-            select(FinancialFact.value, FinancialFact.fiscal_year, FinancialFact.period)
-            .where(
-                FinancialFact.company_id == context.company.id,
-                FinancialFact.metric == "fcf_margin",
-                FinancialFact.fiscal_quarter == "FY",
-            )
-            .order_by(FinancialFact.fiscal_year.desc())
-            .limit(3)
-        ).all()
+        # Misma politica que el snapshot: elegibilidad/cuarentena, orden
+        # fiscal_year desc + created_at desc y corte point-in-time por
+        # ``filed`` cuando hay as_of (sin as_of no cambia el comportamiento).
+        # Un replay historico no puede consumir FY publicados despues del
+        # corte, y dos proveedores del mismo FY no ocupan dos plazas:
+        # setdefault deja UN hecho por ejercicio (el primero del orden, el
+        # mas reciente conocido en el corte).
+        facts = _facts_for_metric(context.db, context.company.id, "fcf_margin")
+        facts, _, _ = _available_at(facts, context.as_of)
     except Exception:  # noqa: BLE001 - sin historial, comportamiento anterior
         return latest, None
-    values = []
-    for value, fiscal_year, period in rows:
-        if value is None:
+    by_year: dict[int, object] = {}
+    for fact in facts:
+        if fact.fiscal_quarter != "FY" or fact.fiscal_year is None:
             continue
-        v = float(value)
-        values.append({"period": period, "fiscal_year": fiscal_year, "value": v})
+        by_year.setdefault(fact.fiscal_year, fact)
+    values = [
+        {"period": fact.period, "fiscal_year": year, "value": float(fact.value)}
+        for year, fact in sorted(by_year.items(), key=lambda kv: kv[0], reverse=True)[:3]
+    ]
     if len(values) < 2:
         return latest, None
     ordered = sorted(item["value"] for item in values)

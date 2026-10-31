@@ -52,7 +52,8 @@ def _company(db):
     return row
 
 
-def _fact(db, company, metric, value, *, year, source_type="dcf_norm_test"):
+def _fact(db, company, metric, value, *, year, source_type="dcf_norm_test",
+          filed=None, created_at=None):
     db.add(
         FinancialFact(
             company_id=company.id,
@@ -65,6 +66,8 @@ def _fact(db, company, metric, value, *, year, source_type="dcf_norm_test"):
             source_type=source_type,
             is_reported=True,
             confidence=Decimal("0.90"),
+            filed=filed,
+            created_at=created_at,
         )
     )
 
@@ -176,3 +179,82 @@ def test_trend_guard_uses_latest_fy_on_monotonic_decline(db):
     assert normalization["trend"] == "declining"
     assert normalization["trend_guard_applied"] is True
     assert normalization["normalized_value"] == pytest.approx(0.202)
+
+
+def _fact_set(db, company, year, margin, *, filed=None):
+    _fact(db, company, "fcf_margin", margin, year=year, filed=filed)
+    _fact(db, company, "revenue", 47_000_000_000, year=year, filed=filed)
+    _fact(db, company, "net_debt", 35_000_000_000, year=year, filed=filed)
+    _fact(db, company, "revenue_growth", 0.03, year=year, filed=filed)
+    _fact(db, company, "shares_diluted", 4_320_000_000, year=year, filed=filed)
+
+
+def _price(db, company):
+    db.add(
+        MarketPrice(
+            company_id=company.id,
+            date=date(2026, 10, 30),
+            close=Decimal("94.08"),
+            adj_close=Decimal("94.08"),
+            source="dcf_norm_test",
+        )
+    )
+
+
+def test_duplicate_sources_same_fy_count_as_one_fact(db):
+    """Dos proveedores del mismo FY no ocupan dos plazas: 1 hecho por
+    ejercicio, el mas recientemente conocido (mismo orden que el snapshot:
+    fiscal_year desc, created_at desc)."""
+    from datetime import UTC, datetime
+
+    company = _company(db)
+    _fact_set(db, company, 2022, 0.1007)
+    _fact_set(db, company, 2023, 0.2217)
+    # Duplicado FY2024: el hecho VIEJO vale 0.05, el NUEVO 0.213.
+    _fact(db, company, "fcf_margin", 0.05, year=2024,
+          source_type="provider_a", created_at=datetime(2025, 3, 1, tzinfo=UTC))
+    _fact(db, company, "revenue", 47_000_000_000, year=2024)
+    _fact(db, company, "net_debt", 35_000_000_000, year=2024)
+    _fact(db, company, "revenue_growth", 0.03, year=2024)
+    _fact(db, company, "shares_diluted", 4_320_000_000, year=2024)
+    _fact(db, company, "fcf_margin", 0.213, year=2024,
+          source_type="provider_b", created_at=datetime(2025, 6, 1, tzinfo=UTC))
+    _price(db, company)
+    db.commit()
+    engine = StandardDCFEngine()
+    result = engine.value(engine.build_context(db, company, 94.08))
+    normalization = result["trace"]["fcf_margin_normalization"]
+    assert normalization is not None
+    assert normalization["n"] == 3
+    # Un hecho por FY: 2024 aparece una sola vez y con el valor mas reciente.
+    assert [p["fiscal_year"] for p in normalization["periods"]] == [2024, 2023, 2022]
+    assert normalization["periods"][0]["value"] == pytest.approx(0.213)
+    # La mediana se calcula sobre 3 ejercicios, no sobre 4 filas.
+    assert normalization["median_value"] == pytest.approx(0.213)
+    assert normalization["trend"] == "mixed"
+    assert normalization["trend_guard_applied"] is False
+
+
+def test_old_snapshot_replay_excludes_facts_filed_after_cutoff(db):
+    """Replay historico (as_of): un FY publicado despues del corte no puede
+    alimentar la mediana de una valoracion de aquella fecha (eje filed,
+    misma politica V1 que el snapshot)."""
+    company = _company(db)
+    _fact_set(db, company, 2022, 0.2217, filed=date(2023, 2, 1))
+    _fact_set(db, company, 2023, 0.2130, filed=date(2024, 2, 1))
+    _fact_set(db, company, 2024, 0.1007, filed=date(2025, 2, 1))
+    _price(db, company)
+    db.commit()
+    engine = StandardDCFEngine()
+
+    # Corte 2023-06-30: solo el FY2022 era conocible -> sin normalizacion.
+    past = engine.value(engine.build_context(db, company, 94.08, as_of=date(2023, 6, 30)))
+    assert past["trace"]["fcf_margin_normalization"] is None
+
+    # Corte 2024-06-30: FY2022 y FY2023 conocibles, FY2024 aun no publicado.
+    replay = engine.value(engine.build_context(db, company, 94.08, as_of=date(2024, 6, 30)))
+    normalization = replay["trace"]["fcf_margin_normalization"]
+    assert normalization is not None
+    assert normalization["n"] == 2
+    assert [p["fiscal_year"] for p in normalization["periods"]] == [2023, 2022]
+    assert normalization["median_value"] == pytest.approx((0.2217 + 0.2130) / 2)
