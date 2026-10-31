@@ -3,14 +3,14 @@ import { render, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/actions/analyst-targets.actions', () => ({
-    getListingAnalystTargets: vi.fn(),
+    getListingAnalystTargetsBatch: vi.fn(),
 }));
 
-import { getListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { getListingAnalystTargetsBatch } from '@/lib/actions/analyst-targets.actions';
 import { requestCache } from '@/lib/cache/requestCache';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 
-const mocked = vi.mocked(getListingAnalystTargets);
+const mocked = vi.mocked(getListingAnalystTargetsBatch);
 
 const TARGETS = {
     status: 'available', mean: 1000, currency: 'USD', firms: 20, fetchedAt: null, source: 'Yahoo Finance', note: null,
@@ -23,7 +23,7 @@ beforeEach(() => {
 
 describe('AnalystTargetLine: el title no pinta el proveedor', () => {
     it('declara el caracter no oficial y el detalle por firma, nunca data.source', async () => {
-        mocked.mockResolvedValue(TARGETS);
+        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, TARGETS])));
         const { container } = render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={800} />);
         await waitFor(() => {
             const span = container.querySelector('span[title]');

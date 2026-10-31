@@ -3,24 +3,24 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/actions/analyst-targets.actions', () => ({
-    getListingAnalystTargets: vi.fn(),
+    getListingAnalystTargetsBatch: vi.fn(),
 }));
 
-import { getListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { getListingAnalystTargetsBatch } from '@/lib/actions/analyst-targets.actions';
 import { requestCache } from '@/lib/cache/requestCache';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { convertWithPortfolioFx } from '@/lib/analyst-target-currency';
 
 // ASML comprada en EUR: Yahoo solo da el consenso del ADR en USD. Nunca un
 // objetivo en USD junto a un precio en EUR sin decirlo (Nico, 29-oct-2026).
-const mocked = vi.mocked(getListingAnalystTargets);
+const mocked = vi.mocked(getListingAnalystTargetsBatch);
 const USD_TARGET = {
     status: 'available', mean: 1000, currency: 'USD', firms: 20, fetchedAt: null, source: 'Yahoo Finance', note: null,
 } as never;
 
 beforeEach(() => {
     requestCache.clear();
-    mocked.mockResolvedValue(USD_TARGET);
+    mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, USD_TARGET])));
 });
 
 describe('objetivo de analistas en otra divisa', () => {

@@ -3,14 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/actions/watchlist.actions', () => ({
-    getExtendedQuote: vi.fn(),
+    getExtendedQuotes: vi.fn(),
 }));
 
-import { getExtendedQuote } from '@/lib/actions/watchlist.actions';
+import { getExtendedQuotes } from '@/lib/actions/watchlist.actions';
 import { requestCache } from '@/lib/cache/requestCache';
 import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 
-const mocked = vi.mocked(getExtendedQuote);
+const mocked = vi.mocked(getExtendedQuotes);
 
 const POST_QUOTE = {
     symbol: 'ASTS', price: 101.5, currency: 'USD', change_percent: 0.4,
@@ -24,7 +24,7 @@ beforeEach(() => {
 
 describe('ExtendedHoursLine: deduplicación de lecturas por símbolo', () => {
     it('dos instancias montadas a la vez (tarjetas + tabla) hacen UNA sola lectura', async () => {
-        mocked.mockResolvedValue(POST_QUOTE as never);
+        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, POST_QUOTE])) as never);
         render(
             <>
                 <ExtendedHoursLine symbol="ASTS" currency="USD" />
@@ -36,7 +36,7 @@ describe('ExtendedHoursLine: deduplicación de lecturas por símbolo', () => {
     });
 
     it('símbolos distintos sí leen por separado', async () => {
-        mocked.mockResolvedValue(null as never);
+        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, null])) as never);
         render(
             <>
                 <ExtendedHoursLine symbol="ASTS" currency="USD" />
@@ -47,7 +47,7 @@ describe('ExtendedHoursLine: deduplicación de lecturas por símbolo', () => {
     });
 
     it('un remontaje dentro del TTL no repite la lectura', async () => {
-        mocked.mockResolvedValue(POST_QUOTE as never);
+        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, POST_QUOTE])) as never);
         const first = render(<ExtendedHoursLine symbol="ASTS" currency="USD" />);
         await waitFor(() => expect(screen.getByText(/Post-cierre/)).toBeInTheDocument());
         first.unmount();
@@ -61,7 +61,7 @@ describe('ExtendedHoursLine: deduplicación de lecturas por símbolo', () => {
         const first = render(<ExtendedHoursLine symbol="ASTS" currency="USD" />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
         first.unmount();
-        mocked.mockResolvedValue(POST_QUOTE as never);
+        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, POST_QUOTE])) as never);
         render(<ExtendedHoursLine symbol="ASTS" currency="USD" />);
         await waitFor(() => expect(screen.getByText(/Post-cierre/)).toBeInTheDocument());
         expect(mocked).toHaveBeenCalledTimes(2);
