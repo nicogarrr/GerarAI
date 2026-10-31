@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.api.routes import calendar as calendar_routes
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Company, EarningsDate, Position, Tenant, WatchItem
 from app.services import calendar_feed_service as svc
@@ -146,6 +147,7 @@ def test_public_feed_http_without_identity_and_authenticated_routes_stay_401(mon
     # Auth exigida como en produccion (conftest la desactiva por defecto).
     monkeypatch.setattr(get_settings(), "research_auth_required", True)
     client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
     ok = client.get(f"/api/calendar/feed/{token}.ics")
     assert ok.status_code == 200
     assert ok.headers["content-type"].startswith("text/calendar")

@@ -13,9 +13,11 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 
 import main
+from app.core.csrf import generate_csrf_token
 from app.core.database import init_db
 
 client = TestClient(main.app)
+client.headers["X-CSRF-Token"] = generate_csrf_token()  # token CSRF como el frontend (VAL-SEC-001)
 
 
 class _OffLoopProbe:
