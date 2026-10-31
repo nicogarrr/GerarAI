@@ -473,6 +473,15 @@ class Settings(BaseSettings):
     # X-GerarAI-Language (es/en) fija el idioma de generación de la petición.
     # Env: I18N_GENERATION_ENABLED.
     i18n_generation_enabled: bool = False
+
+    # Invalidación GLOBAL de la caché de mercado (compartida entre tenants).
+    # Las rutas POST /api/cache/invalidate/market-data e /invalidate/all la
+    # vacían para TODOS los tenants; sin gate, cualquier identidad firmada
+    # podía dejar fría la caché de los demás (re-fetch masivo a yfinance/SEC).
+    # Omiso: activo fuera de producción (dev/test), apagado en producción,
+    # donde la acción queda como script de ops
+    # (scripts/invalidate_market_cache.py). Env: CACHE_GLOBAL_INVALIDATION_ENABLED.
+    cache_global_invalidation_enabled: bool | None = None
     langfuse_public_key: str | None = Field(default=None, repr=False)
     langfuse_secret_key: str | None = Field(default=None, repr=False)
     langfuse_host: str = "https://cloud.langfuse.com"
@@ -677,6 +686,17 @@ class Settings(BaseSettings):
     # Lower defaults: the catalog refreshes a few times a day at most.
     asts_llm_calls_per_minute: int = Field(default=2, ge=0, le=100)
     asts_llm_calls_per_day: int = Field(default=30, ge=0, le=10000)
+
+    @property
+    def cache_global_invalidation_allowed(self) -> bool:
+        """Resuelve el gate de invalidación global de caché.
+
+        La variable explícita manda; omisa, solo se permite fuera de
+        producción.
+        """
+        if self.cache_global_invalidation_enabled is not None:
+            return self.cache_global_invalidation_enabled
+        return not self.is_production
 
     @property
     def is_production(self) -> bool:

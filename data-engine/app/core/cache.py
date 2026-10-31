@@ -219,25 +219,34 @@ def invalidate_portfolio_cache(tenant_id: int | None = None, db=None) -> None:
         _redis_down()
 
 
-def invalidate_market_data_cache() -> None:
-    """Invalida toda la cache de datos de mercado."""
+def invalidate_market_data_cache() -> int | None:
+    """Invalida toda la cache de datos de mercado.
+
+    Devuelve el numero de claves borradas (0 si no habia ninguna), o None
+    si Redis no esta disponible o el borrado falla. Los llamadores que
+    ignoran el retorno conservan el comportamiento de siempre; el script
+    de ops lo usa para salir != 0 cuando nada se ha borrado de verdad.
+    """
     client = _redis_client()
     if client is None:
-        return
-    
+        return None
+
     try:
         pattern = f"{MARKET_DATA_PREFIX}:*"
+        deleted = 0
         cursor = 0
         while True:
             cursor, keys = client.scan(cursor, match=pattern, count=100)
             if keys:
-                client.delete(*keys)
+                deleted += client.delete(*keys)
             if cursor == 0:
                 break
-        logger.info("Invalidated market data cache")
+        logger.info(f"Invalidated market data cache ({deleted} keys)")
+        return deleted
     except Exception as exc:
         logger.warning(f"Failed to invalidate market data cache: {exc}")
         _redis_down()
+        return None
 
 
 def invalidate_dca_cache(tenant_id: int | None = None, db=None) -> None:
