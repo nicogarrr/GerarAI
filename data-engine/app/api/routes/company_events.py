@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.ui_errors import ui_error
 from app.services.async_bridge import run_from_any_context
 from app.services.company_events_service import CompanyEventsService, stored_holding, stored_timeline_events
@@ -123,7 +124,7 @@ def get_company_timeline_events(
     company = resolve_company(db, ticker)
     if company is None:
         raise HTTPException(status_code=404, detail=ui_error(404, "company_not_found_ticker", ticker=ticker).detail)
-    end = hasta or date.today()
+    end = hasta or local_today()  # día de Madrid, no el UTC del servidor
     start = desde or end - timedelta(days=183)
     if start > end:
         raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
