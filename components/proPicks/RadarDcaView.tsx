@@ -16,14 +16,25 @@ const LEVEL_STYLES: Record<number, string> = {
     3: 'border-teal-500/40 bg-teal-500/15 text-teal-300',
     2: 'border-amber-500/40 bg-amber-500/15 text-amber-300',
     1: 'border-gray-500/40 bg-gray-600/30 text-gray-300',
+    [-1]: 'border-orange-500/40 bg-orange-500/15 text-orange-300',
+    [-2]: 'border-red-500/40 bg-red-500/15 text-red-300',
 };
 
 function LevelBadge({ item }: { item: RadarDcaOpportunity }) {
     if (item.level == null) return null;
     const style = LEVEL_STYLES[item.level] ?? LEVEL_STYLES[1];
+    // Sin línea "Fuente X · barrido · versión" por tarjeta (petición de Nico:
+    // la fuente ya se conoce y no aporta en cada fila; los avisos de calidad
+    // —precio sin verificación, stale, inválida— se mantienen en StatusLine).
+    // Etiqueta única (petición de Nico): para 1-4 el label del motor ya es
+    // "N X DCA" — el doble "2X · 2X DCA" repetía el mismo dato. En recortes
+    // (-1/-2) el label es "RECORTE LIGERO/FUERTE" y el prefijo "-1X" era un
+    // artefacto. Sin label del backend: fallback derivado del nivel.
+    const label =
+        item.level_label ?? (item.level > 0 ? `${item.level}X DCA` : 'RECORTE');
     return (
         <span className={`rounded-full border px-2 py-0.5 text-xs font-semibold ${style}`}>
-            {item.level}X{item.level_label ? ` · ${item.level_label}` : ''}
+            {label}
         </span>
     );
 }
@@ -88,10 +99,6 @@ function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
                         </span>
                     )}
                     {item.signal_date && <span className="text-gray-500"> · señal {item.signal_date}</span>}
-                </div>
-                <div className="text-xs text-gray-500">
-                    Fuente {item.source ?? 'desconocida'} · barrido del {item.scan_date}
-                    {item.formula_version ? ` · ${item.formula_version}` : ''}
                 </div>
             </Card>
         </li>
