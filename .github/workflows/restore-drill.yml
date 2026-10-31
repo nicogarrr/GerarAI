@@ -369,15 +369,23 @@ jobs:
       - name: Install data-engine dependencies
         working-directory: data-engine
         run: uv sync --frozen --extra test --extra dev --no-install-project
-      - name: Drill reproducible (contenedores propios cavaai-drill-*)
-        # En el runner no existe la imagen local cavaai-minio (se compila desde
-        # docker/minio/Dockerfile, p. ej. en la VM); el script acepta override
-        # de registro y se le pasa el mismo bitnamilegacy fijado que usan los
-        # services del job restore-drill.
+      - name: Construir la imagen MinIO fijada (la de produccion)
+        # El drill levanta el pin de _kit.MINIO_IMAGE, que es una imagen LOCAL
+        # compilada desde docker/minio/Dockerfile (la de produccion y la VM):
+        # en el runner hay que construirla antes. El tag sale de _kit, no de
+        # una copia a mano, para que el dia que se suba la release este paso
+        # siga construyendo la correcta. Un sustituto de registro NO vale: la
+        # familia bitnamilegacy no acepta el comando `server ...` de la imagen
+        # oficial (medido 2026-10-31, job 124386414236) y el drill esperaria
+        # 300 s a un contenedor muerto.
         working-directory: data-engine
-        run: >-
-          uv run --frozen python -m scripts.backup.disaster_drill
-          --minio-image bitnamilegacy/minio:2025.7.23-debian-12-r5
+        run: |
+          IMAGE="$(uv run --frozen python -c 'from scripts.backup._kit import MINIO_IMAGE; print(MINIO_IMAGE)')"
+          echo "Construyendo $IMAGE desde docker/minio/Dockerfile"
+          docker build -t "$IMAGE" ../docker/minio
+      - name: Drill reproducible (contenedores propios cavaai-drill-*)
+        working-directory: data-engine
+        run: uv run --frozen python -m scripts.backup.disaster_drill
 
   block-on-main:
     name: Require the drill in main
