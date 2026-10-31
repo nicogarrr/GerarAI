@@ -167,6 +167,8 @@ export type WatchlistEntryData = {
     peKind: 'ttm' | 'fy' | null;
     /** Procedencia del PER visible: Finnhub (TTM, línea US) o la cadena del backend («PER: cierre … / eps_diluido FY…»). Null sin PER. */
     peSource: string | null;
+    /** Etiqueta corta de la fuente del PER para mostrar junto al número («Finnhub» o la fuente del cálculo propio). Null sin PER. */
+    peSourceLabel: string | null;
     // F358: frescura del precio: 'live' = sesión en curso; 'close' = último
     // cierre fechado (con fecha en priceAsOf si se conoce). Un cierre NUNCA
     // se pinta como cotización actual.
@@ -214,6 +216,7 @@ export async function getWatchlistEntryData(
         peRatio: null,
         peKind: null,
         peSource: null,
+        peSourceLabel: null,
         priceKind: null,
         priceAsOf: null,
         metricsNotApplicable: false,
@@ -274,6 +277,10 @@ export async function getWatchlistEntryData(
     const backendPer = backendAll && typeof backendAll.per === 'number' && Number.isFinite(backendAll.per) ? backendAll.per : null;
     const backendDerived = (backendAll?.sources ?? []).some((src) => src.toLowerCase().includes('derivada'));
     const backendPerSource = (backendAll?.sources ?? []).find((src) => src.startsWith('PER:')) ?? null;
+    // Etiqueta corta de la fuente del PER de respaldo: la cadena «PER: …»
+    // termina con la fuente entre paréntesis («(SEC)», «(ESEF)»…); sin ella,
+    // sin etiqueta (nunca se inventa la procedencia).
+    const backendPerLabel = backendPerSource?.match(/\(([^)]+)\)\s*$/)?.[1] ?? null;
 
     return {
         ...base,
@@ -311,6 +318,10 @@ export async function getWatchlistEntryData(
         // Trazabilidad del número: sin fuente visible un PER erróneo (QA
         // 2026-10-19: AENA 2,0x por EPS FY mal cargado) parece dato oficial.
         peSource: peRatio !== null ? 'PER TTM (Finnhub)' : backendPerSource,
+        // Fuente visible a primera vista: el PER del proveedor y el EPS TTM
+        // propio (SEC) son series distintas y sin etiqueta parecen una sola
+        // (QA 31-oct-2026: GOOGL PER 14,5x Finnhub vs EPS TTM SEC 19,91).
+        peSourceLabel: peRatio !== null ? 'Finnhub' : backendPerLabel,
         priceKind,
         priceAsOf,
         metricsNotApplicable: !usListing,
