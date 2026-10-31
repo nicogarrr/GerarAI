@@ -10,16 +10,19 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
+const fichaEs = JSON.parse(source('lib/i18n/messages/es/research.json')).ficha;
 
 void test('la vista de valoración separa notPublishable antes de pintar números', () => {
   const page = source('app/(root)/research/[ticker]/page.tsx');
   const view = page.slice(page.indexOf('function ValuationView'), page.indexOf('function MarketOpportunityView'));
   assert.ok(view.includes("valuation.status !== 'ok' || valuation.publishable === false"), 'debe detectar estado no publicable');
   assert.ok(view.includes('publication_blockers'), 'debe leer los bloqueos del trace');
-  const warnAt = view.indexOf('no precio objetivo');
+  const warnAt = view.indexOf("t('research.ficha.engineGuidanceTitle')");
+  assert.ok(fichaEs.engineGuidanceTitle.includes('no precio objetivo'), 'ES conserva el literal');
   const guardAt = view.indexOf('notPublishable');
   assert.ok(guardAt !== -1 && warnAt !== -1, 'aviso visible en la rama no publicable');
-  assert.ok(view.includes('(orientación)'), 'los números se etiquetan como orientación');
+  assert.ok(view.includes("t('research.ficha.bearGuidance')") && view.includes("t('research.ficha.bullGuidance')"), 'los números se etiquetan como orientación');
+  assert.ok(fichaEs.bearGuidance.includes('(orientación)') && fichaEs.bullGuidance.includes('(orientación)'), 'ES conserva el literal');
 });
 
 void test('sin blockers el panel NO afirma una causa por defecto', () => {
@@ -29,7 +32,8 @@ void test('sin blockers el panel NO afirma una causa por defecto', () => {
   // puede aparecer condicionada a que existan blockers/missing/notice.
   assert.ok(!view.includes('le faltan entradas trazables a una fuente fechada'), 'causa por defecto prohibida');
   assert.ok(!view.includes('salida cruda del modelo con supuestos por defecto'), 'causa por defecto prohibida');
-  assert.ok(view.includes('Motivos registrados:'), 'los motivos se muestran cuando existen');
+  assert.ok(view.includes("t('research.ficha.blockers'"), 'los motivos se muestran cuando existen');
+  assert.ok(fichaEs.blockers.startsWith('Motivos registrados:'), 'ES conserva el literal');
   assert.ok(view.includes('engineNotice'), 'la nota del motor se muestra cuando existe');
 });
 
