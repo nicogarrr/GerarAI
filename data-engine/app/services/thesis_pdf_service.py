@@ -417,12 +417,16 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
                 lines.append(f"{name}: {share}")
             composition_body = "Mayores posiciones por peso estimado: " + ", ".join(lines) + "."
         else:
-            # Divisas mezcladas sin valor consolidado: no se ordenan por peso.
             names = [p.company.ticker if p.company else f"ACT-{p.company_id}" for p, *_r in rows]
-            composition_body = (
-                "Posiciones: " + ", ".join(names) + ". "
-                "Pesos no calculables: hay posiciones en divisas distintas sin valor consolidado en divisa base."
-            )
+            if not valued_rows:
+                reason = "todas las posiciones tienen la valoración en suspenso (sin precio verificado)"
+            elif not same_ccy:
+                # Divisas mezcladas sin valor consolidado: no se ordenan por peso.
+                reason = "hay posiciones en divisas distintas sin valor consolidado en divisa base"
+            else:
+                reason = "ninguna posición tiene valor consolidado distinto de cero"
+            composition_body = "Posiciones: " + ", ".join(names) + ". Pesos no calculables: " + reason + "."
+
 
     limitations: list[str] = []
     if cost_rows:

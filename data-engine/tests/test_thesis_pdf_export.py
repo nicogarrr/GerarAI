@@ -394,6 +394,8 @@ def test_portfolio_pdf_mixed_currencies_no_fake_weights(env):
     full = page1 + page2
     assert "n/d" in page1
     assert "Pesos no calculables" in full
+    assert "divisas distintas" in full
+    assert "valoración en suspenso" not in full
     assert "Mayores posiciones por peso estimado" not in full
 
 
@@ -443,10 +445,13 @@ def test_portfolio_pdf_valuation_hold_shows_nd(env):
 
     res = client.get(f"/api/portfolio/{port_id}/pdf")
     assert res.status_code == 200
-    reader = PdfReader(io.BytesIO(res.content))
-    page1 = reader.pages[0].extract_text()
+    page1, page2 = _page_text(res.content)
+    full = page1 + page2
     assert "n/d" in page1
     assert "4.50" not in page1.replace("0,00", "")
+    # Razon honesta: la suspension, no una mezcla de divisas que no existe
+    assert "valoración en suspenso" in full
+    assert "divisas distintas" not in full
 
     # Sin suspensión no debe aparecer N/D en la tabla de cartera
     with factory() as s:
