@@ -145,6 +145,8 @@ def test_portfolio_yield_never_sums_two_currencies(db: Session):
     assert result["portfolio_yield"] == pytest.approx(0.10)
     assert result["coverage"]["positions"] == 2
     assert result["coverage"]["positions_missing_base_value"] == ["USDB"]
+    # Todo el valor valorado esta cubierto: el agregado SI es de cartera.
+    assert result["coverage"]["covered_value_fraction"] == pytest.approx(1.0)
 
 
 def test_position_without_dividend_data_does_not_dilute_the_aggregate(db: Session):
@@ -163,6 +165,8 @@ def test_position_without_dividend_data_does_not_dilute_the_aggregate(db: Sessio
     assert by_ticker["QUIET"]["dividend_yield"] is None
     # 10% sobre el valor CUBIERTO (1000), no 5% sobre el valor total (2000).
     assert result["portfolio_yield"] == pytest.approx(0.10)
+    # ...pero es el yield de las cubiertas, no de cartera: la fraccion lo dice.
+    assert result["coverage"]["covered_value_fraction"] == pytest.approx(0.5)
 
 
 def test_no_position_has_a_base_value_yields_none_not_zero(db: Session):
@@ -176,6 +180,7 @@ def test_no_position_has_a_base_value_yields_none_not_zero(db: Session):
     assert result["positions"][0]["dividend_yield"] == pytest.approx(0.05)
     assert result["portfolio_yield"] is None
     assert result["coverage"]["positions_missing_base_value"] == ["NOFX"]
+    assert result["coverage"]["covered_value_fraction"] is None
 
 
 def test_existing_records_without_prices_stay_unknown(db: Session):

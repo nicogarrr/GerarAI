@@ -368,6 +368,9 @@ class DividendIngestionService(ProviderIngestionService):
         # Denominador del agregado: SOLO el valor de las posiciones que
         # aportaron un yield real (una posicion sin datos no rinde 0 %).
         covered_value = 0.0
+        # Valor base de TODAS las posiciones valoradas: solo para declarar la
+        # fraccion cubierta (un yield de cubiertas al 50 % NO es de cartera).
+        valued_value = 0.0
         missing_base_value: list[str] = []
         for position, company in rows:
             records, uncertain = resolve_yahoo_events(records_by_company.get(company.id, []))
@@ -380,6 +383,7 @@ class DividendIngestionService(ProviderIngestionService):
                 value = None
             else:
                 value = float(position.market_value_base)
+                valued_value += value
             # GBX (dividendo Yahoo en peniques) frente a GBp/GBP de la posicion:
             # misma moneda, se convierte sin FX; otra moneda no se mezcla.
             matching_currency = records_in_position_currency(records, position.currency)
@@ -436,6 +440,12 @@ class DividendIngestionService(ProviderIngestionService):
                 "positions_with_dividend_data": with_data,
                 "percent": round(100 * coverage_ratio, 1),
                 "positions_missing_base_value": sorted(missing_base_value),
+                # Fraccion del VALOR valorado con yield real: 1.0 = el
+                # agregado representa toda la cartera valorada; None = no hay
+                # denominador posible. El yield de arriba es de las cubiertas.
+                "covered_value_fraction": (
+                    covered_value / valued_value if valued_value > 0 else None
+                ),
             },
             "provenance": provenance(
                 "Yahoo Finance/FMP dividends via la base de datos de GerarAI",
