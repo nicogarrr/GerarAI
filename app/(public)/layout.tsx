@@ -115,20 +115,14 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
 
             <footer className="public-footer">
                 <div className="container public-footer-inner">
-                    <div className="max-w-sm">
-                        <p className="font-medium text-gray-300">GerarAI</p>
-                        <p className="mt-1">
+                    <div className="max-w-sm text-center sm:text-left">
+                        <p>
+                            <span className="font-medium text-gray-400">GerarAI</span>
+                            {' · '}
                             {t('landing.footer.disclaimer')}
                         </p>
-                        <p className="mt-1 text-xs">
-                            {t('landing.footer.chartsBy')}{' '}
-                            <a className="inline-flex min-h-11 items-center public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
-                                TradingView
-                            </a>
-                            .
-                        </p>
                     </div>
-                    <nav aria-label={t('landing.footer.navAria')} className="flex flex-col items-start gap-2 sm:items-end">
+                    <nav aria-label={t('landing.footer.navAria')} className="flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 sm:justify-end">
                         {legalLinks.map((link) => (
                             <Link key={link.href} href={link.href} className="inline-flex min-h-11 items-center public-footer-link">
                                 {link.label}

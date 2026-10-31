@@ -17,7 +17,6 @@
   },
   "footer": {
     "disclaimer": "Herramienta educativa de análisis: GerarAI no da asesoramiento de inversión y las decisiones son tuyas.",
-    "chartsBy": "Gráficos interactivos por",
     "navAria": "Enlaces del pie"
   },
   "hero": {
@@ -36,7 +35,11 @@
     "shotDesktopAlt": "Ficha de empresa de GerarAI: precio con su fuente, variación y gráfico de evolución",
     "shotTabletAlt": "GerarAI en tablet: la misma ficha adaptada a pantalla mediana",
     "shotMobileAlt": "GerarAI en móvil: precio y gráfico de la ficha de empresa",
-    "caption": "Capturas reales de la aplicación con datos de ejemplo. La interfaz declara de dónde sale cada cifra que muestra, o que no hay fuente disponible."
+    "caption": "Capturas reales de la aplicación con datos de ejemplo. La interfaz declara de dónde sale cada cifra que muestra, o que no hay fuente disponible.",
+    "deviceAria": "Elige el dispositivo de la vista previa",
+    "devicePc": "Ver en ordenador",
+    "deviceTablet": "Ver en tablet",
+    "deviceMobile": "Ver en móvil"
   },
   "help": {
     "metaTitle": "Centro de ayuda",
@@ -56,6 +59,7 @@
     "body": "El enlace caduca y solo se puede usar una vez. Al guardarla se cerrarán las sesiones abiertas."
   },
   "metodologia": {
+    "chartsAttribution": "Gráficos construidos con TradingView Lightweight Charts™ · Copyright (c) 2025 TradingView, Inc. ·",
     "metaTitle": "Metodología",
     "metaDescription": "Fuentes de datos, motores de valoración, límites y costes de GerarAI: de dónde sale cada dato y qué no debes esperar de la plataforma.",
     "kicker": "Transparencia",

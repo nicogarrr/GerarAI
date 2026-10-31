@@ -197,6 +197,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/knowledge/DeleteCollectionButton.tsx': 'useState, jsx-onClick, jsx-onOpenChange, importa cliente: components/ui/confirm-dialog.tsx',
   'components/knowledge/DeleteDocumentButton.tsx': 'useState, jsx-onClick, jsx-onOpenChange, importa cliente: components/ui/confirm-dialog.tsx',
   'components/knowledge/ExtractionRefresh.tsx': 'useRouter, useEffect, browser:window, browser:document',
+  'components/landing/LandingMockup.tsx': 'useState, jsx-onClick',
   'components/layout/BottomNav.tsx': 'usePathname, jsx-onClick, browser:window',
   'components/layout/ScrollPreserver.tsx': 'usePathname, useSearchParams, useEffect+useRef, browser:document/window',
   'components/layout/Breadcrumbs.tsx': 'usePathname',
