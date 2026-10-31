@@ -4,6 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 let pathname = '/calendar';
 vi.mock('next/navigation', () => ({ usePathname: () => pathname }));
 
+// EarningsDayStrip es un server component traducido con getT(): lib/i18n/server
+// lee la cookie de locale vía next/headers; sin cookie el locale es «es».
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+
 const getFollowedEarnings = vi.fn();
 vi.mock('@/lib/actions/catalysts.actions', () => ({ getFollowedEarnings: (...a: unknown[]) => getFollowedEarnings(...a) }));
 const createCalendarFeed = vi.fn();
