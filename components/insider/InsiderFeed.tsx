@@ -102,7 +102,7 @@ function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
             </div>
             <div className="mt-1.5 text-sm font-medium text-gray-100">{insiderName(tx.insider)}</div>
             <div className="text-xs text-gray-500">{insiderRole(tx.role, tx.officer_title)}</div>
-            <dl className="mt-2 grid grid-cols-3 gap-2 text-sm">
+            <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                 <div>
                     <dt className="text-xs text-gray-500">{t('insider.feed.colShares')}</dt>
                     <dd className="tabular-nums text-gray-200">{f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })}</dd>
