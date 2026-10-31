@@ -26,6 +26,7 @@ from app.models import (
     FXRate,
     MarketPrice,
     Portfolio,
+    PortfolioDailySnapshot,
     Position,
     ThesisVersion,
     Transaction,
@@ -423,6 +424,24 @@ def portfolio_data_quality(db: Session = Depends(get_db)) -> dict:
     return portfolio_quality(db)
 
 
+def _snapshot_payload(snapshot: PortfolioDailySnapshot) -> dict:
+    return {
+        "id": snapshot.id,
+        "portfolio_id": snapshot.portfolio_id,
+        "snapshot_date": snapshot.snapshot_date,
+        "base_currency": snapshot.base_currency,
+        "positions_value_base": snapshot.positions_value_base,
+        "cash_value_base": snapshot.cash_value_base,
+        "total_value_base": snapshot.total_value_base,
+        "net_external_flow_base": snapshot.net_external_flow_base,
+        "daily_return": snapshot.daily_return,
+        "cumulative_twr": snapshot.cumulative_twr,
+        "pricing_coverage": snapshot.pricing_coverage,
+        "source": snapshot.source,
+        "metadata": snapshot.metadata_,
+    }
+
+
 @router.get("/snapshots")
 def portfolio_snapshots(
     start: date | None = None,
@@ -433,33 +452,32 @@ def portfolio_snapshots(
     db: Session = Depends(get_db),
 ) -> dict:
     # Contrato dual aditivo como en /positions (ver list_fx_rates).
+    service = PortfolioSnapshotService()
+    total = service.count_history(db, start=start)
     if limit is not None:
-        page_size = limit
-        page = (offset or 0) // limit + 1
-    elif offset:
+        exact_offset = offset or 0
+        items = [
+            _snapshot_payload(snapshot)
+            for snapshot in service.history(db, start=start, page_size=limit, offset=exact_offset)
+        ]
+        # page_info de la ventana real (has_next/has_prev del offset exacto,
+        # no de la division entera), como en /positions.
+        page_info = PageInfo(
+            page=exact_offset // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=exact_offset + len(items) < total,
+            has_prev=exact_offset > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
+    if offset:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="El parámetro offset solo tiene efecto junto a limit.",
         )
-    service = PortfolioSnapshotService()
-    # Get total count with the same filter
-    total = service.count_history(db, start=start)
     items = [
-        {
-            "id": snapshot.id,
-            "portfolio_id": snapshot.portfolio_id,
-            "snapshot_date": snapshot.snapshot_date,
-            "base_currency": snapshot.base_currency,
-            "positions_value_base": snapshot.positions_value_base,
-            "cash_value_base": snapshot.cash_value_base,
-            "total_value_base": snapshot.total_value_base,
-            "net_external_flow_base": snapshot.net_external_flow_base,
-            "daily_return": snapshot.daily_return,
-            "cumulative_twr": snapshot.cumulative_twr,
-            "pricing_coverage": snapshot.pricing_coverage,
-            "source": snapshot.source,
-            "metadata": snapshot.metadata_,
-        }
+        _snapshot_payload(snapshot)
         for snapshot in service.history(db, start=start, page=page, page_size=page_size)
     ]
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
@@ -621,7 +639,8 @@ def list_fx_rates(
 ) -> dict:
     # Contrato dual aditivo como en /positions: limit/offset (paginateAll del
     # indice de /research) tiene precedencia; antes se descartaba en silencio.
-    if limit is not None:
+    use_window = limit is not None
+    if use_window:
         page_size = limit
         offset = offset or 0
     elif offset:
@@ -650,6 +669,18 @@ def list_fx_rates(
             .offset(offset)
         ).all()
     ]
+    if use_window:
+        # page_info de la ventana real: con offset>0 la pagina derivada
+        # mentia (siempre page=1) y has_next salia de la division entera.
+        page_info = PageInfo(
+            page=offset // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=offset + len(items) < total,
+            has_prev=offset > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 

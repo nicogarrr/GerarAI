@@ -488,11 +488,15 @@ class PortfolioSnapshotService:
         start: date | None = None,
         page: int = 1,
         page_size: int = 20,
+        offset: int | None = None,
     ) -> list[PortfolioDailySnapshot]:
         portfolio = self.fx.portfolio(db)
         if portfolio is None:
             return []
-        offset = (page - 1) * page_size
+        # offset explicito (contrato limit/offset) gana a la pagina derivada:
+        # la division entera pierde desplazamientos no multiplos de limit.
+        if offset is None:
+            offset = (page - 1) * page_size
         statement = select(PortfolioDailySnapshot).where(
             PortfolioDailySnapshot.portfolio_id == portfolio.id
         )
