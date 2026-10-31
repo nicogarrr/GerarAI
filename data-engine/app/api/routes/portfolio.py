@@ -28,7 +28,7 @@ from app.models import (
     ThesisVersion,
     Transaction,
 )
-from app.schemas.pagination import PaginatedResponse
+from app.schemas.pagination import PageInfo, PaginatedResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.audit_service import record_audit_event
 from app.services.company_resolver import resolve_company
@@ -709,9 +709,22 @@ def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
 def positions(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=200)] = 20,
+    limit: Annotated[int | None, Query(ge=1, le=2000)] = None,
+    offset: Annotated[int | None, Query(ge=0)] = None,
     db: Session = Depends(get_db),
 ) -> dict:
-    offset = (page - 1) * page_size
+    # Contrato dual (aditivo): page/page_size es el estilo documentado y
+    # limit/offset el que usa el indice de /research via paginateAll
+    # (?limit=2000&offset=N). Antes solo existian page/page_size y FastAPI
+    # descartaba limit/offset en silencio: cualquier tenant con mas de 20
+    # posiciones recibia solo la primera pagina rotulada como completa.
+    # limit/offset tiene precedencia cuando se pasa `limit`.
+    if limit is not None:
+        page_size = limit
+        offset_val = offset or 0
+        page = offset_val // limit + 1
+    else:
+        offset_val = (page - 1) * page_size
     total = db.scalar(
         select(func.count())
         .select_from(Position)
@@ -723,7 +736,7 @@ def positions(
         .join(Company, Position.company_id == Company.id)
         .order_by(Company.ticker)
         .limit(page_size)
-        .offset(offset)
+        .offset(offset_val)
     ).all()
     fiscal = _fiscal_info_batch(db, _holding_as_of(db, rows))
     analysis_states = tracked_statuses(db, [company.ticker for _, company in rows])
@@ -821,6 +834,20 @@ def positions(
             payloads[-1].update(dict.fromkeys(_QUOTE_MISSING_PNL_KEYS))
     items = [mask_cost_under_review(payload, cost_checks.get(position.id))
             for payload, (position, _) in zip(payloads, rows, strict=True)]
+    if limit is not None:
+        # Con limit/offset la ventana no tiene por que alinearse con paginas
+        # enteras: has_next/has_prev se derivan de la ventana real, no de la
+        # division entera (offset 19 con limit 10 y total 25 -> 6 items y
+        # has_next False; la pagina derivada daria True).
+        page_info = PageInfo(
+            page=offset_val // limit + 1,
+            page_size=limit,
+            total_items=total,
+            total_pages=(total + limit - 1) // limit if limit > 0 else 0,
+            has_next=offset_val + len(items) < total,
+            has_prev=offset_val > 0,
+        )
+        return PaginatedResponse(items=items, page_info=page_info).model_dump()
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
