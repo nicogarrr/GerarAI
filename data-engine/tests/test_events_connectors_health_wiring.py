@@ -108,6 +108,43 @@ def test_finra_429_degrada():
     assert registry.get_status("finra").consecutive_failures == before + 1
 
 
+def test_finra_200_html_challenge_no_es_exito():
+    html = "<html><head><title>Request Rejected</title></head><body>challenge</body></html>"
+
+    def handler(request):
+        return httpx.Response(200, text=html, headers={"content-type": "text/html"})
+
+    registry = get_data_source_registry()
+    before = registry.get_status("finra").consecutive_failures
+    result = asyncio.run(
+        short_interest.fetch_short_volume(
+            "AAPL", date(2026, 1, 5), client=_mock_client(handler), lookback_days=2
+        )
+    )
+    assert result is None
+    assert registry.get_status("finra").consecutive_failures == before + 1
+
+
+def test_finra_ticker_ausente_en_fichero_valido_es_exito_neutral():
+    # Cabecera oficial real verificada el 2026-10-31 contra CNMSshvol20261030.txt
+    body = (
+        "Date|Symbol|ShortVolume|ShortExemptVolume|TotalVolume|Market \n20260105|A|574482|0|1331315|B,Q,N \n"
+    )
+
+    def handler(request):
+        return httpx.Response(200, text=body)
+
+    registry = get_data_source_registry()
+    registry.record_failure("finra", "fallo previo")
+    result = asyncio.run(
+        short_interest.fetch_short_volume(
+            "ZZZNOEXISTE", date(2026, 1, 5), client=_mock_client(handler), lookback_days=0
+        )
+    )
+    assert result is None
+    assert registry.get_status("finra").consecutive_failures == 0
+
+
 def test_finra_quincenal_no_json_degrada():
     def handler(request):
         return httpx.Response(200, text="<html>no json</html>")

@@ -60,6 +60,21 @@ def _to_float(value: Any) -> float | None:
 # ---------------- FINRA: volumen corto diario (RegSHO) ----------------
 
 
+# Cabecera oficial del RegSHO diario, verificada en vivo el 2026-10-31 contra
+# https://cdn.finra.org/equity/regsho/daily/CNMSshvol20261030.txt (la linea
+# real termina en espacio: "Date|Symbol|...|Market ").
+REGSHO_DAILY_HEADER = ("Date", "Symbol", "ShortVolume", "ShortExemptVolume", "TotalVolume", "Market")
+
+
+def has_regsho_daily_header(text: str) -> bool:
+    """True si la primera linea es la cabecera oficial del RegSHO diario."""
+    lines = text.splitlines()
+    if not lines:
+        return False
+    parts = [part.strip() for part in lines[0].split("|")]
+    return parts[:6] == list(REGSHO_DAILY_HEADER)
+
+
 def parse_regsho_daily(text: str, symbol: str) -> dict | None:
     """Extrae la fila de `symbol` del fichero RegSHO diario (texto con `|`).
 
@@ -151,6 +166,12 @@ async def fetch_short_volume(
             if response.status_code not in (400, 404):
                 registry.record_failure(REGISTRY_KEY, f"HTTP {response.status_code}")
             continue
+        if not has_regsho_daily_header(response.text):
+            # 200 sin la cabecera oficial (challenge HTML, captive proxy o
+            # cambio de formato): deriva de formato, no exito. No seguir con
+            # el lookback: los demas dias responderan igual.
+            registry.record_failure(REGISTRY_KEY, "200 sin la cabecera oficial RegSHO")
+            return None
         registry.record_success(REGISTRY_KEY)
         row = parse_regsho_daily(response.text, symbol)
         if row is not None:
