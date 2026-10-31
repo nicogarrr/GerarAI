@@ -10405,6 +10405,38 @@
         "title": "PortfolioExposuresOut",
         "type": "object"
       },
+      "PortfolioFxRateOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "rate": {
+            "title": "Rate",
+            "type": "number"
+          },
+          "scope": {
+            "enum": [
+              "cash",
+              "positions"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "currency",
+          "rate",
+          "as_of"
+        ],
+        "title": "PortfolioFxRateOut",
+        "type": "object"
+      },
       "PortfolioIntelligenceOut": {
         "properties": {
           "as_of": {
@@ -11282,6 +11314,185 @@
         "title": "PortfolioRiskOut",
         "type": "object"
       },
+      "PortfolioSummaryAlertOut": {
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "metric_value": {
+            "title": "Metric Value",
+            "type": "number"
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          }
+        },
+        "required": [
+          "severity",
+          "ticker",
+          "message",
+          "metric_value",
+          "threshold"
+        ],
+        "title": "PortfolioSummaryAlertOut",
+        "type": "object"
+      },
+      "PortfolioSummaryOut": {
+        "properties": {
+          "alerts": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioSummaryAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "cash": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Cash",
+            "type": "object"
+          },
+          "cash_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash As Of"
+          },
+          "cash_assets_base": {
+            "title": "Cash Assets Base",
+            "type": "number"
+          },
+          "cash_native": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Cash Native",
+            "type": "object"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "equity_value": {
+            "title": "Equity Value",
+            "type": "number"
+          },
+          "fx_rates": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioFxRateOut"
+            },
+            "title": "Fx Rates",
+            "type": "array"
+          },
+          "margin_debt_base": {
+            "title": "Margin Debt Base",
+            "type": "number"
+          },
+          "missing_fx": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Missing Fx",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "incomplete_fx",
+              "incomplete_valuation"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "top_1_weight": {
+            "title": "Top 1 Weight",
+            "type": "number"
+          },
+          "top_5_weight": {
+            "title": "Top 5 Weight",
+            "type": "number"
+          },
+          "total_value": {
+            "title": "Total Value",
+            "type": "number"
+          },
+          "valuation_dates_differ": {
+            "title": "Valuation Dates Differ",
+            "type": "boolean"
+          },
+          "valuation_hold": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioValuationHoldOut"
+            },
+            "title": "Valuation Hold",
+            "type": "array"
+          }
+        },
+        "required": [
+          "total_value",
+          "equity_value",
+          "cash_assets_base",
+          "margin_debt_base",
+          "cash",
+          "top_1_weight",
+          "top_5_weight",
+          "alerts",
+          "status",
+          "base_currency",
+          "cash_native",
+          "missing_fx",
+          "data_as_of",
+          "cash_as_of",
+          "fx_rates",
+          "valuation_dates_differ",
+          "valuation_hold",
+          "provenance"
+        ],
+        "title": "PortfolioSummaryOut",
+        "type": "object"
+      },
       "PortfolioTransactionBatchInput": {
         "properties": {
           "transactions": {
@@ -11419,6 +11630,36 @@
           "sessions"
         ],
         "title": "PortfolioTwrPeriodOut",
+        "type": "object"
+      },
+      "PortfolioValuationHoldOut": {
+        "properties": {
+          "effective_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Date"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "reason",
+          "effective_date"
+        ],
+        "title": "PortfolioValuationHoldOut",
         "type": "object"
       },
       "PrincipleAction": {
@@ -60148,9 +60389,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Summary Api Portfolio Summary Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioSummaryOut"
                 }
               }
             },

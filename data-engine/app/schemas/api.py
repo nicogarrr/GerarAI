@@ -1490,3 +1490,50 @@ class PortfolioIntelligenceOut(BaseModel):
     ledger_contribution: PortfolioLedgerContributionOut
     benchmark: PortfolioBenchmarkOut
     coverage: PortfolioCoverageOut
+
+
+# --- GET /api/portfolio/summary --------------------------------------------
+# Formas medidas contra RiskService.dashboard (servicio real): la ruta
+# devuelve siempre todas las claves (ramas None/[]; no omite ninguna).
+
+
+class PortfolioSummaryAlertOut(BaseModel):
+    severity: Literal["high", "medium"]
+    ticker: str | None
+    message: str
+    metric_value: float
+    threshold: float
+
+
+class PortfolioValuationHoldOut(BaseModel):
+    ticker: str
+    reason: str
+    effective_date: str | None
+
+
+class PortfolioFxRateOut(BaseModel):
+    scope: Literal["cash", "positions"]
+    currency: str
+    rate: float
+    as_of: str
+
+
+class PortfolioSummaryOut(BaseModel):
+    total_value: float
+    equity_value: float
+    cash_assets_base: float
+    margin_debt_base: float
+    cash: dict[str, float]
+    top_1_weight: float
+    top_5_weight: float
+    alerts: list[PortfolioSummaryAlertOut]
+    status: Literal["ok", "incomplete_fx", "incomplete_valuation"]
+    base_currency: str
+    cash_native: dict[str, float]
+    missing_fx: list[dict[str, Any]]
+    data_as_of: str | None
+    cash_as_of: str | None
+    fx_rates: list[PortfolioFxRateOut]
+    valuation_dates_differ: bool
+    valuation_hold: list[PortfolioValuationHoldOut]
+    provenance: ProvenanceOut

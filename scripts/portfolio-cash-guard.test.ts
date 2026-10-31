@@ -42,9 +42,15 @@ describe('sumCashByCurrency: respuesta real del backend { EUR: 100 }', () => {
 describe('contrato y mapeo del resumen', () => {
     it('el contrato declara cash como diccionario por moneda, no como número', () => {
         const actions = source('lib/actions/portfolio.actions.ts');
-        const block = actions.slice(actions.indexOf('type ResearchPortfolioSummaryResponse'), actions.indexOf('};', actions.indexOf('type ResearchPortfolioSummaryResponse')));
-        assert.ok(block.includes('cash: Record<string, number>'), 'cash tipado como diccionario por moneda');
-        assert.ok(!block.includes('cash: number'), 'cash no puede tiparse como número: con el payload real la línea no se mostraría');
+        // El contrato del resumen es el schema generado desde el OpenAPI del
+        // backend (response_model en la ruta), no un tipo manuscrito.
+        assert.ok(actions.includes("components['schemas']['PortfolioSummaryOut']"), 'el resumen usa el tipo generado desde el OpenAPI');
+        const generated = source('lib/research/openapi.generated.ts');
+        const start = generated.indexOf('PortfolioSummaryOut: {');
+        const block = generated.slice(start, start + 2000);
+        const cashField = /cash: \{\s*\[key: string\]: number;\s*\}/;
+        assert.ok(cashField.test(block), 'cash tipado como diccionario por moneda');
+        assert.ok(!/cash: number/.test(block), 'cash no puede tiparse como número: con el payload real la línea no se mostraría');
     });
 
     it('getPortfolioSummary deriva el importe con sumCashByCurrency', () => {

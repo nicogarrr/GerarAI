@@ -1,6 +1,7 @@
 'use server';
 
 import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
+import type { components } from '@/lib/research/openapi.generated';
 import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 
 import { qualifiedHistoricalMetrics, verifiedPortfolioHistory, type PortfolioSnapshotPoint } from '@/lib/portfolio-history';
@@ -124,7 +125,7 @@ export type PortfolioSummary = {
     quality?: PortfolioDataQuality | null;
 };
 
-export type PortfolioFxRate = { scope: 'cash' | 'positions'; currency: string; rate: number; as_of: string };
+export type PortfolioFxRate = components['schemas']['PortfolioFxRateOut'];
 
 type ResearchPortfolioTransaction = {
     id: number;
@@ -174,22 +175,7 @@ type ResearchPortfolioPosition = {
     quote_missing?: boolean;
 };
 
-type ResearchPortfolioSummaryResponse = {
-    total_value: number;
-    equity_value: number;
-    cash_assets_base?: number;
-    margin_debt_base?: number;
-    /** Diccionario por moneda ya en divisa base: { EUR: 1234.56 }. */
-    cash: Record<string, number>;
-    status: 'ok' | 'incomplete_fx' | 'incomplete_valuation';
-    base_currency: string;
-    missing_fx: Array<Record<string, unknown>>;
-    valuation_hold?: Array<{ ticker: string; reason: string; effective_date: string | null }>;
-    fx_rates?: PortfolioFxRate[];
-    cash_as_of?: string | null;
-    data_as_of?: string | null;
-    valuation_dates_differ?: boolean;
-};
+type ResearchPortfolioSummaryResponse = components['schemas']['PortfolioSummaryOut'];
 
 export async function addTransaction(
     userId: string,
