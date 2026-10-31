@@ -108,9 +108,12 @@ describe('ficha en una fila de seis pestañas: mapeo de vistas', () => {
             assert.ok(inline || optional, `sección ${anchor} presente`);
         }
         // Sumario local de la pestaña: nunca otra barra global.
-        assert.match(page, /aria-label="En esta página"/);
+        const esResearch = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8'));
+        assert.ok(page.includes("aria-label={t('research.fichaOnThisPage')}"), 'sumario local via i18n');
+        assert.equal(esResearch['fichaOnThisPage'], 'En esta página', 'el literal ES visible no cambia');
         // Las secciones no principales degradan a aviso inline, nunca a vacío.
-        assert.match(page, /optionalSection\('terminal', 'Terminal financiero'/);
+        assert.ok(page.includes("optionalSection('terminal', t('research.fichaSecTerminal')"), 'terminal con título i18n');
+        assert.equal(esResearch['fichaSecTerminal'], 'Terminal financiero', 'el literal ES visible no cambia');
         assert.match(page, /<SectionLoadError retryHref=/);
     });
 

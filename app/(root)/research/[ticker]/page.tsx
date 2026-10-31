@@ -1771,14 +1771,14 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // Secciones que eran subrutas propias hasta el 29-oct-2026.
   const buildTerminalSection = async (): Promise<React.ReactNode> => {
     const terminal = await viewData('terminal');
-    if (!terminal) return <EmptyState title="Sin datos del terminal financiero todavía: se cargan con los financieros de la empresa." />;
+    if (!terminal) return <EmptyState title={t('research.fichaTerminalEmpty')} />;
     return <FinancialTerminalSection metrics={terminalQuery.metrics} periodicity={terminalQuery.periodicity} terminal={terminal} years={terminalQuery.years} />;
   };
   const buildCapitalSection = async (): Promise<React.ReactNode> => <ShareCapitalSection data={await viewData('capital')} ticker={ticker} />;
   const buildSupuestosSection = async (): Promise<React.ReactNode> => <DriverAssumptionsSection assumptions={await viewData('supuestos')} ticker={ticker} />;
   const buildDirectivaSection = async (): Promise<React.ReactNode> => {
     const dashboard = await viewData('directiva');
-    if (!dashboard) return <EmptyState title="Sin compromisos de la directiva registrados todavía." />;
+    if (!dashboard) return <EmptyState title={t('research.fichaDirectivaEmpty')} />;
     return <ManagementCredibilitySection dashboard={dashboard} ticker={ticker} />;
   };
   const buildLeccionesSection = async (): Promise<React.ReactNode> => <DecisionLessonsSection data={await viewData('lecciones')} ticker={ticker} />;
@@ -1802,38 +1802,38 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   if (activeView === 'overview') {
     sections = [
       { node: await buildOverviewContent() },
-      await optionalSection('noticias', 'Noticias', buildNoticiasSection),
+      await optionalSection('noticias', t('research.fichaSecNoticias'), buildNoticiasSection),
     ];
   } else if (activeView === 'thesis') {
     sections = [{ node: await buildThesisContent() }];
   } else if (activeView === 'financials') {
     sections = [
-      { id: 'financieros', title: 'Financieros', node: await buildFinancialsContent() },
-      await optionalSection('terminal', 'Terminal financiero', buildTerminalSection),
-      await optionalSection('dilucion', 'Dilución y recompras', buildCapitalSection),
+      { id: 'financieros', title: t('research.fichaSecFinancieros'), node: await buildFinancialsContent() },
+      await optionalSection('terminal', t('research.fichaSecTerminal'), buildTerminalSection),
+      await optionalSection('dilucion', t('research.fichaSecDilucion'), buildCapitalSection),
     ];
   } else if (activeView === 'valuation') {
     sections = [
-      { id: 'valoracion', title: 'Valoración', node: await buildValuationContent() },
-      await optionalSection('modelo', 'Modelo a largo plazo', buildModelSection),
-      await optionalSection('supuestos', 'Supuestos de drivers', buildSupuestosSection),
-      await optionalSection('oportunidad', 'Oportunidad de mercado', buildMarketOpportunitySection),
-      await optionalSection('comparables', 'Comparables', buildPeersSection),
-      await optionalSection('foso', 'Foso', buildMoatSection),
+      { id: 'valoracion', title: t('research.fichaSecValoracion'), node: await buildValuationContent() },
+      await optionalSection('modelo', t('research.fichaSecModelo'), buildModelSection),
+      await optionalSection('supuestos', t('research.fichaSecSupuestos'), buildSupuestosSection),
+      await optionalSection('oportunidad', t('research.fichaSecOportunidad'), buildMarketOpportunitySection),
+      await optionalSection('comparables', t('research.fichaSecComparables'), buildPeersSection),
+      await optionalSection('foso', t('research.fichaSecFoso'), buildMoatSection),
     ];
   } else if (activeView === 'changes') {
     sections = [
-      { id: 'cambios', title: 'Cambios y revisiones', node: await buildChangesContent() },
-      await optionalSection('superinversores', 'Superinversores', buildHoldersSection),
-      await optionalSection('directiva', 'Credibilidad de la directiva', buildDirectivaSection),
-      await optionalSection('lecciones', 'Lecciones de decisiones', buildLeccionesSection),
-      ...(ticker === 'ASTS' ? [await optionalSection('satellites', 'Satélites AST', buildSatellitesSection)] : []),
+      { id: 'cambios', title: t('research.fichaSecCambios'), node: await buildChangesContent() },
+      await optionalSection('superinversores', t('research.fichaSecSuperinversores'), buildHoldersSection),
+      await optionalSection('directiva', t('research.fichaSecDirectiva'), buildDirectivaSection),
+      await optionalSection('lecciones', t('research.fichaSecLecciones'), buildLeccionesSection),
+      ...(ticker === 'ASTS' ? [await optionalSection('satellites', t('research.fichaSecSatelites'), buildSatellitesSection)] : []),
     ];
   } else {
     sections = [
-      { id: 'documentos', title: 'Documentos', node: await buildDocumentsContent() },
-      await optionalSection('fuentes', 'Fuentes', buildSourcesSection),
-      { id: 'chat', title: 'Chat con fuentes', node: await buildChatSection() },
+      { id: 'documentos', title: t('research.fichaSecDocumentos'), node: await buildDocumentsContent() },
+      await optionalSection('fuentes', t('research.fichaSecFuentes'), buildSourcesSection),
+      { id: 'chat', title: t('research.fichaSecChat'), node: await buildChatSection() },
     ];
   }
 
@@ -1846,7 +1846,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // el fallback de label()). Un company_type portfolio_holding sin
   // posicion viva se muestra como candidato de analisis.
   const holdingBadge = snapshot.in_portfolio
-    ? 'en cartera'
+    ? t('research.fichaInPortfolio')
     : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
 
   return (
@@ -1857,7 +1857,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
       <Suspense fallback={null}><ResearchHashScroll /></Suspense>
       <div className="mx-auto max-w-[1600px]">
         {/* Desde md las migas ya llevan a Research: la flecha solo queda en movil. */}
-        <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />Research</Link>
+        <Link className="mb-3 inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 md:hidden" href="/research"><ArrowLeft className="mr-2 h-4 w-4" />{t('research.fichaBackResearch')}</Link>
         <header className="mb-6 flex flex-col gap-4 border-b border-gray-800 pb-6">
           <div className="flex items-start gap-3 sm:gap-4">
             <CompanyLogo ticker={ticker} name={company.name || ticker} className="size-12 shrink-0 rounded-xl sm:size-14" />
@@ -1883,13 +1883,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
-          <div className="scroll-mt-6" id="analistas"><MobileCollapse title="Precios objetivo de analistas"><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
-          <MobileCollapse title="Señales DCA: histórico"><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
+          <div className="scroll-mt-6" id="analistas"><MobileCollapse title={t('research.fichaAnalystTargetsTitle')}><Suspense fallback={null}><AnalystTargetsSection symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></Suspense></MobileCollapse></div>
+          <MobileCollapse title={t('research.fichaDcaSignalsTitle')}><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
         </header>
         {sections.filter((section) => section.id && section.title).length > 1 ? (
           // Sumario local de la pestaña (anclas dentro de la página): nunca
           // otra barra global de menús.
-          <nav aria-label="En esta página" className="mb-6 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <nav aria-label={t('research.fichaOnThisPage')} className="mb-6 flex flex-wrap gap-x-4 gap-y-1 text-sm">
             {sections.filter((section) => section.id && section.title).map((section) => (
               <a className="inline-flex min-h-[44px] items-center text-gray-500 hover:text-teal-300 sm:min-h-0" href={`#${section.id}`} key={section.id}>
                 {section.title}
