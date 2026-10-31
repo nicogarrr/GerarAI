@@ -31,7 +31,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models.entities import Company, EarningsDate, Position, WatchItem
+from app.models.entities import Company, DividendRecord, EarningsDate, Position, WatchItem
 from app.services.async_bridge import run_from_any_context
 from app.services.connectors.earnings_calendar import BROWSER_HEADERS, EARNINGS_URL
 from app.services.market_refresh_service import _us_listed
@@ -413,3 +413,59 @@ def followed_calendar(
         # Subconjunto de lo anterior: tenia fecha futura, pero el dato no se renueva desde hace mas de STALE_AFTER.
         "stale_date_in_range": sorted((set(followed) - covered) & stale_future),
     }
+
+
+
+def portfolio_dividend_dates(db: Session, desde: date, hasta: date) -> list[dict[str, Any]]:
+    """Ex-dividendo y pago de las posiciones abiertas (tabla ``dividend_records``, sin proveedores).
+
+    Son fechas publicadas por la fuente que ya se guardó: «oficial». Sin fila no hay fecha.
+    """
+    held = {t: v for t, v in followed_companies(db).items() if v["origin"] == "cartera"}
+    if not held:
+        return []
+    by_id = {v["company"].id: (t, v["company"]) for t, v in held.items()}
+    rows = db.scalars(select(DividendRecord).where(DividendRecord.company_id.in_(list(by_id)))).all()
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        ticker, company = by_id[row.company_id]
+        amount = float(row.amount) if row.amount is not None else None
+        detail = f"{amount:g} {row.currency} por acción" if amount else None
+        for kind, day in (("ex_dividend", row.ex_date), ("dividend_payment", row.pay_date)):
+            if day is None or not (desde <= day <= hasta):
+                continue
+            items.append({
+                "date": day.isoformat(), "ticker": ticker, "company": company.name, "kind": kind,
+                "status": "oficial", "detail": detail, "source": row.source, "source_url": None,
+            })
+    return items
+
+
+UPCOMING_LIMITATIONS = [
+    "Juntas de accionistas: no hay una fuente gratuita guardada; no se muestran fechas inventadas.",
+]
+
+
+def portfolio_upcoming(db: Session, desde: date, hasta: date, *, now: datetime | None = None) -> dict[str, Any]:
+    """«Próximas fechas» de toda la cartera: resultados (oficial o estimada), ex-dividendo y pago.
+
+    Reutiliza el calendario de seguidas (``earnings_dates``) y los dividendos guardados; cada
+    fecha lleva su recordatorio (el día antes), el mismo que pone el calendario suscrito.
+    """
+    items: list[dict[str, Any]] = []
+    calendar = followed_calendar(db, desde, hasta, now=now)
+    for day in calendar["days"]:
+        for event in day["events"]:
+            if event["origin"] != "cartera" or event["date"] < desde.isoformat():
+                continue
+            items.append({
+                "date": event["date"], "ticker": event["ticker"], "company": event["company"], "kind": "results",
+                "status": "oficial" if event["confirmed"] is True else "estimada",
+                "detail": event.get("fiscal_label"), "source": event["source"], "source_url": event["source_url"],
+            })
+    items += portfolio_dividend_dates(db, desde, hasta)
+    for item in items:
+        item["reminder"] = (date.fromisoformat(item["date"]) - timedelta(days=1)).isoformat()
+    items.sort(key=lambda i: (i["date"], i["ticker"], i["kind"]))
+    return {"desde": desde.isoformat(), "hasta": hasta.isoformat(), "count": len(items), "items": items,
+            "limitations": UPCOMING_LIMITATIONS}
