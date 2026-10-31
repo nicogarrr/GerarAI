@@ -33,3 +33,11 @@ export function resolveVisitBaseline(
     local.setItem(`cavaai:last-visit:${key}`, now.toISOString());
     return baseline;
 }
+
+/** «Marcar como leído»: la referencia pasa a ahora en este navegador (sin tocar el servidor). */
+export function markVisitRead(local: StorageLike, session: StorageLike, ticker: string, now: Date): void {
+    const key = keyFor(ticker);
+    const iso = now.toISOString();
+    session.setItem(`cavaai:visit-baseline:${key}`, iso);
+    local.setItem(`cavaai:last-visit:${key}`, iso);
+}
