@@ -91,6 +91,10 @@ class YahooFinanceClient:
                 payload = response.json()
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
+            if status in (400, 404):
+                # Ticker inexistente o clase con notacion distinta: la FUENTE
+                # respondio; no se degrada el circuito por un simbolo.
+                raise
             # 429 y 999 son las senales tipicas de rate limit / CAPTCHA de Yahoo
             reason = (
                 f"HTTP {status}: rate limit o CAPTCHA probable" if status in (429, 999) else f"HTTP {status}"

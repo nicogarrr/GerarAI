@@ -155,3 +155,46 @@ async def test_ecb_error_http_registra_fallo(registry_limpio):
             await ECBClient().conversion_rates(base_currency="EUR", quote_currencies={"USD"})
 
     assert status.consecutive_failures == before + 1
+
+
+@pytest.mark.anyio
+async def test_yahoo_404_ticker_inexistente_no_degrada(registry_limpio):
+    """404 de la chart API = símbolo inexistente o delistado: la fuente
+    respondió; el circuito no debe moverse por un ticker."""
+    registry = registry_limpio
+    status = registry.get_status("yahoo_finance")
+    before = status.consecutive_failures
+
+    async def fake_get(self, url, params=None, headers=None):
+        raise _http_error(404)
+
+    with patch("httpx.AsyncClient.get", new=fake_get):
+        with pytest.raises(httpx.HTTPStatusError):
+            await YahooFinanceClient().quote("TICKERQUENOEXISTE")
+
+    assert status.consecutive_failures == before
+
+
+@pytest.mark.anyio
+async def test_historical_stress_registra_captcha_como_fallo(registry_limpio):
+    """historical_stress_service llama a Yahoo por HTTP propio: sin este
+    cableado su CAPTCHA/bloqueo era invisible en el registry."""
+    from app.services.historical_stress_service import _CACHE, load_history
+
+    _CACHE.clear()
+    registry = registry_limpio
+    status = registry.get_status("yahoo_finance")
+    before = status.consecutive_failures
+
+    async def fake_get(self, url, params=None, headers=None):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.raise_for_status = lambda: None
+        resp.json = MagicMock(side_effect=ValueError("Expecting value"))
+        return resp
+
+    with patch("httpx.AsyncClient.get", new=fake_get):
+        with pytest.raises(ValueError):
+            await load_history("AAPL")
+
+    assert status.consecutive_failures == before + 1
