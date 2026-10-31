@@ -6,6 +6,7 @@ Expected Behavior:
 - Patrón Circuit Breaker para fuentes con fallos consecutivos
 - Conmutación automática por error (failover) a fuentes secundarias
 - Registro y trazabilidad de fallos en fuentes de datos
+- Una fuente nunca sondeada se reporta como "unknown", nunca como "healthy"
 """
 
 from __future__ import annotations
@@ -36,48 +37,58 @@ class DataSourceStatus:
     failure_threshold: int = 3
     cooldown_seconds: float = 60.0
     last_failure_time: float = 0.0
-    last_checked_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    # None hasta la primera comprobación real: la fuente nunca se ha sondeado.
+    last_checked_at: str | None = None
     fallback_source: str | None = None
     response_time_ms: float = 0.0
+    _transition_lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
 
     def record_success(self, elapsed_ms: float = 0.0) -> None:
-        self.consecutive_failures = 0
-        self.state = CircuitState.CLOSED
-        self.last_checked_at = datetime.now(UTC).isoformat()
-        self.response_time_ms = elapsed_ms
+        with self._transition_lock:
+            self.consecutive_failures = 0
+            self.state = CircuitState.CLOSED
+            self.last_checked_at = datetime.now(UTC).isoformat()
+            self.response_time_ms = elapsed_ms
 
     def record_failure(self, error: str) -> None:
-        self.consecutive_failures += 1
-        self.last_failure_time = time.perf_counter()
-        self.last_checked_at = datetime.now(UTC).isoformat()
-        if self.consecutive_failures >= self.failure_threshold:
-            self.state = CircuitState.OPEN
-            logger.warning(
-                "Circuit breaker abierto para fuente '%s' tras %d fallos consecutivos. Error: %s",
-                self.name,
-                self.consecutive_failures,
-                error,
-            )
-        else:
-            logger.info("Fallo registrado en fuente '%s' (%d/%d): %s", self.name, self.consecutive_failures, self.failure_threshold, error)
+        with self._transition_lock:
+            self.consecutive_failures += 1
+            self.last_failure_time = time.perf_counter()
+            self.last_checked_at = datetime.now(UTC).isoformat()
+            if self.consecutive_failures >= self.failure_threshold:
+                self.state = CircuitState.OPEN
+                logger.warning(
+                    "Circuit breaker abierto para fuente '%s' tras %d fallos consecutivos. Error: %s",
+                    self.name,
+                    self.consecutive_failures,
+                    error,
+                )
+            else:
+                logger.info("Fallo registrado en fuente '%s' (%d/%d): %s", self.name, self.consecutive_failures, error)
 
     def can_attempt(self) -> bool:
-        if self.state == CircuitState.CLOSED:
+        with self._transition_lock:
+            if self.state == CircuitState.OPEN:
+                if time.perf_counter() - self.last_failure_time > self.cooldown_seconds:
+                    self.state = CircuitState.HALF_OPEN
+                    return True
+                return False
             return True
-        if self.state == CircuitState.OPEN:
-            # Comprobar si ha pasado el periodo de enfriamiento
-            if time.perf_counter() - self.last_failure_time > self.cooldown_seconds:
-                self.state = CircuitState.HALF_OPEN
-                return True
-            return False
-        # HALF_OPEN permite un intento
-        return True
 
     def as_dict(self) -> dict[str, Any]:
+        if self.last_checked_at is None:
+            # Nunca sondeada: no se afirma salud que no se ha comprobado.
+            status = "unknown"
+        elif self.state == CircuitState.CLOSED:
+            status = "healthy"
+        elif self.state == CircuitState.HALF_OPEN:
+            status = "degraded"
+        else:
+            status = "failing"
         return {
             "name": self.name,
             "is_primary": self.is_primary,
-            "status": "healthy" if self.state == CircuitState.CLOSED else "degraded" if self.state == CircuitState.HALF_OPEN else "failing",
+            "status": status,
             "circuit_state": self.state.value,
             "consecutive_failures": self.consecutive_failures,
             "last_checked_at": self.last_checked_at,
@@ -153,7 +164,13 @@ class DataSourceHealthRegistry:
         all_sources = [s.as_dict() for s in self.sources.values()]
         any_failing = any(s["circuit_state"] == CircuitState.OPEN.value for s in all_sources)
         any_degraded = any(s["circuit_state"] == CircuitState.HALF_OPEN.value for s in all_sources)
-        overall = "degraded" if (any_failing or any_degraded) else "healthy"
+        if any_failing or any_degraded:
+            overall = "degraded"
+        elif all(s["status"] == "unknown" for s in all_sources):
+            # Ninguna fuente se ha sondeado aún: no se afirma salud.
+            overall = "unknown"
+        else:
+            overall = "healthy"
 
         return {
             "overall_status": overall,
