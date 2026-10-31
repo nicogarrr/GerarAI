@@ -44,6 +44,7 @@ from app.schemas.api import (
     PortfolioPositionItemOut,
     PortfolioPriceUpdateOut,
     PortfolioRefreshMarketOut,
+    PortfolioSnapshotCaptureOut,
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTearsheetOut,
@@ -504,7 +505,7 @@ def portfolio_snapshots(
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.post("/snapshots/capture")
+@router.post("/snapshots/capture", response_model=PortfolioSnapshotCaptureOut)
 def capture_portfolio_snapshot(
     as_of: date | None = None,
     db: Session = Depends(get_db),

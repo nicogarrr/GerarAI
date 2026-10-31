@@ -13626,6 +13626,65 @@
         "title": "PortfolioRiskOut",
         "type": "object"
       },
+      "PortfolioSnapshotCaptureOut": {
+        "properties": {
+          "cumulative_twr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Twr"
+          },
+          "daily_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Return"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "pricing_coverage": {
+            "title": "Pricing Coverage",
+            "type": "number"
+          },
+          "snapshot_date": {
+            "format": "date",
+            "title": "Snapshot Date",
+            "type": "string"
+          },
+          "total_value_base": {
+            "title": "Total Value Base",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "snapshot_date",
+          "total_value_base",
+          "pricing_coverage",
+          "daily_return",
+          "cumulative_twr",
+          "metadata"
+        ],
+        "title": "PortfolioSnapshotCaptureOut",
+        "type": "object"
+      },
       "PortfolioSnapshotOut": {
         "properties": {
           "base_currency": {
@@ -63445,9 +63504,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Capture Portfolio Snapshot Api Portfolio Snapshots Capture Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioSnapshotCaptureOut"
                 }
               }
             },

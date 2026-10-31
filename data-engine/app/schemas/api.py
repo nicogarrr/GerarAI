@@ -1768,6 +1768,24 @@ class PortfolioSnapshotOut(BaseModel):
     pricing_coverage: float
     source: str
     metadata: dict[str, Any]
+
+
+# --- POST /api/portfolio/snapshots/capture -----------------------------------
+# Forma medida contra la ruta (dict literal de 7 claves, todas siempre
+# presentes): subconjunto del payload del historial, sin portfolio_id,
+# base_currency, desglose de valor, net_external_flow_base ni source.
+# daily_return/cumulative_twr son null en la primera foto de la serie
+# (sin foto previa no hay retorno que enlazar).
+
+
+class PortfolioSnapshotCaptureOut(BaseModel):
+    id: int
+    snapshot_date: date
+    total_value_base: float
+    pricing_coverage: float
+    daily_return: float | None
+    cumulative_twr: float | None
+    metadata: dict[str, Any]
 # --- GET /api/portfolio/dividends --------------------------------------------
 # Formas medidas contra DividendIngestionService.portfolio_yields (servicio
 # real): emite siempre todas las claves (los huecos llegan como null, nunca
