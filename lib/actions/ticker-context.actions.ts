@@ -1,6 +1,7 @@
 'use server';
 
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 import { researchRequest } from '@/lib/research/client';
 import { cachedFetch } from '@/lib/cache/memoryTTL';
 import { getWatchlist } from '@/lib/actions/watchlist.actions';
@@ -22,13 +23,13 @@ export async function getTickerContext(): Promise<TickerContext> {
     const [rawPositions, watchlist] = await Promise.all([
         cachedFetch(
             `portfolio:${userId}:positions`,
-            // Contrato: paginado { items, page_info }; page_size=200 (max del backend) para no truncar badges a 20 posiciones.
-            () => researchRequest<{ items: Array<{ ticker: string; quantity: number | null }> }>('/api/portfolio/positions?page_size=200', { fast: true }),
+            // Lectura completa: paginado page/page_size hasta agotar (fetchAllBackendPages lanza si no avanza).
+            () => fetchAllBackendPages((page) => researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number | null }>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true })),
             15,
         ).catch(() => [] as Array<{ ticker: string; quantity: number | null }>),
         getWatchlist().catch(() => [] as Array<{ symbol: string }>),
     ]);
-    const positions = Array.isArray(rawPositions) ? rawPositions : (rawPositions as { items?: Array<{ ticker: string; quantity: number | null }> })?.items || [];
+    const positions = rawPositions;
     return {
         portfolioTickers: openPositionTickers(positions),
         watchlistTickers: watchlist.map((item) => item.symbol.toUpperCase()),

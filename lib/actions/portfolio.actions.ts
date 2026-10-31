@@ -1,6 +1,7 @@
 'use server';
 
 import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 
 import { qualifiedHistoricalMetrics, verifiedPortfolioHistory, type PortfolioSnapshotPoint } from '@/lib/portfolio-history';
 
@@ -31,21 +32,6 @@ function invalidatePortfolioReads(userId: string): void {
     for (const suffix of ['positions', 'summary', 'transactions', 'scores', 'tearsheet', 'dividends']) {
         requestCache.invalidate(`portfolio:${userId}:${suffix}`);
     }
-}
-
-// Contrato del backend (OpenAPI): /api/portfolio/positions|transactions|snapshots
-// devuelven SIEMPRE { items, page_info } (paginacion page/page_size). El
-// fallback a array de unwrapItems es solo defensa en runtime; el tipo que se
-// declara al pedir es el del contrato.
-type PaginatedBackendResponse<T> = { items: T[]; page_info?: unknown };
-
-function unwrapItems<T>(data: PaginatedBackendResponse<T> | T[] | null | undefined): T[] {
-    if (!data) return [];
-    if (Array.isArray(data)) return data;
-    if (Array.isArray((data as { items?: T[] }).items)) {
-        return (data as { items: T[] }).items;
-    }
-    return [];
 }
 
 async function getQuote(symbol: string): Promise<{ c: number } | null> {
@@ -250,10 +236,12 @@ export async function getPortfolioTransactions(userId: string) {
     const canonicalUserId = await resolveUserId(userId);
     const raw = await cachedFetch(
         `portfolio:${canonicalUserId}:transactions`,
-        () => researchRequest<PaginatedBackendResponse<ResearchPortfolioTransaction>>('/api/portfolio/transactions?page_size=200', { fast: true }),
+        () => fetchAllBackendPages(
+            (page) => researchRequest<PaginatedBackendResponse<ResearchPortfolioTransaction>>(`/api/portfolio/transactions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+        ),
         15,
     );
-    const transactions = unwrapItems(raw);
+    const transactions = raw;
     return transactions.map((transaction) => ({
         _id: String(transaction.id),
         symbol: transaction.ticker,
@@ -321,7 +309,9 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
     const [rawPositions, backendSummary, quality] = await Promise.all([
         cachedFetch(
             `portfolio:${canonicalUserId}:positions`,
-            () => researchRequest<PaginatedBackendResponse<ResearchPortfolioPosition>>('/api/portfolio/positions?page_size=200', { fast: true }),
+            () => fetchAllBackendPages(
+                (page) => researchRequest<PaginatedBackendResponse<ResearchPortfolioPosition>>(`/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+            ),
             15,
         ),
         cachedFetch(
@@ -331,7 +321,7 @@ export async function getPortfolioSummary(userId: string): Promise<PortfolioSumm
         ),
         getPortfolioDataQuality(canonicalUserId),
     ]);
-    const positions = unwrapItems(rawPositions);
+    const positions = rawPositions;
     const holdings = positions.map((position): PortfolioHolding => {
         const held = Boolean(position.valuation_hold);
         const currentPrice = held ? null : position.market_price;
@@ -589,10 +579,12 @@ export async function getPortfolioScores(userId: string): Promise<PortfolioScore
         const sheet = await getPortfolioTearsheet(canonicalUserId);
         const rawSnapshots = await cachedFetch(
             `portfolio:${canonicalUserId}:snapshots`,
-            () => researchRequest<PaginatedBackendResponse<PortfolioSnapshotPoint>>('/api/portfolio/snapshots?page_size=200', { fast: true }),
+            () => fetchAllBackendPages(
+                (page) => researchRequest<PaginatedBackendResponse<PortfolioSnapshotPoint>>(`/api/portfolio/snapshots?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true }),
+            ),
             15,
         ).catch(() => [] as PortfolioSnapshotPoint[]);
-        const snapshots = unwrapItems(rawSnapshots);
+        const snapshots = rawSnapshots;
         const history = verifiedPortfolioHistory(snapshots, summary.baseCurrency);
         // Real dividend score: trailing-12M declared-dividend yield from
         // GET /api/portfolio/dividends (FMP-ingested records, provenance

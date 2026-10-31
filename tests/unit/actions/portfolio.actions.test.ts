@@ -55,7 +55,7 @@ const backendSummary = (over: object = {}) => ({
 
 const seedSummary = (positions: object[], summary: object = {}) => {
     researchRequest.mockImplementation(async (path: string) => {
-        if (path === '/api/portfolio/positions?page_size=200') return positions;
+        if (path === '/api/portfolio/positions?page=1&page_size=200') return positions;
         if (path === '/api/portfolio/summary') return backendSummary(summary);
         if (path === '/api/portfolio/data-quality') throw new Error('sin calidad');
         throw new AppError('404', 'RESEARCH_API_ERROR', 404);
@@ -252,17 +252,17 @@ describe('getPortfolioScores: null es ausencia, no un cero', () => {
     it('dividendo: banda 0-6 % con cobertura; endpoint caído -> null', async () => {
         seedSummary([position()]);
         researchRequest.mockImplementation(async (path: string) => {
-            if (path === '/api/portfolio/positions?page_size=200') return [position()];
+            if (path === '/api/portfolio/positions?page=1&page_size=200') return [position()];
             if (path === '/api/portfolio/summary') return backendSummary();
             if (path === '/api/portfolio/data-quality') throw new Error('x');
-            if (path === '/api/portfolio/snapshots?page_size=200') return [];
+            if (path === '/api/portfolio/snapshots?page=1&page_size=200') return [];
             if (path === '/api/portfolio/tearsheet') return { status: 'ok', metrics: null, exposure: null };
             if (path === '/api/portfolio/dividends') return { portfolio_yield: 0.03, coverage: { positions_with_dividend_data: 2 } };
             throw new AppError('404', 'RESEARCH_API_ERROR', 404);
         });
         expect((await getPortfolioScores('tenant-one')).dividend).toBe(50);
         researchRequest.mockImplementation(async (path: string) => {
-            if (path === '/api/portfolio/positions?page_size=200') return [position()];
+            if (path === '/api/portfolio/positions?page=1&page_size=200') return [position()];
             if (path === '/api/portfolio/summary') return backendSummary();
             if (path === '/api/portfolio/data-quality') throw new Error('x');
             if (path === '/api/portfolio/dividends') throw new Error('caído');
@@ -311,7 +311,7 @@ describe('refreshPortfolioHoldings: declara lo que SE ESCRIBIÓ', () => {
         }));
         researchRequest.mockImplementation(async (path: string, opts?: { method?: string }) => {
             if (opts?.method === 'PATCH') return {};
-            if (path === '/api/portfolio/positions?page_size=200') return [position()];
+            if (path === '/api/portfolio/positions?page=1&page_size=200') return [position()];
             if (path === '/api/portfolio/summary') return backendSummary();
             if (path === '/api/portfolio/data-quality') throw new Error('x');
             throw new AppError('404', 'RESEARCH_API_ERROR', 404);

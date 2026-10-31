@@ -179,7 +179,7 @@ describe('ticker-context: ningún badge es una afirmación falsa', () => {
         getWatchlist.mockResolvedValue([]);
         const ctx = await getTickerContext();
         expect(ctx.portfolioTickers).toEqual(['AAPL']);
-        expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?page_size=200', { fast: true });
+        expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?page=1&page_size=200', { fast: true });
     });
 
     it('lectura caída -> su conjunto vacío, nunca inventado', async () => {

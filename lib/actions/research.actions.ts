@@ -1,6 +1,7 @@
 'use server';
 
 import { isQuoteLandingEvent } from '@/lib/news-landing';
+import { BACKEND_PAGE_SIZE, fetchAllBackendPages, type PaginatedBackendResponse } from '@/lib/paginated-backend';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { revalidatePath } from 'next/cache';
 import { AppError, ExternalAPIError, ValidationError, getSafeErrorMessage } from '@/lib/types/errors';
@@ -1439,16 +1440,11 @@ export async function getResearchPortfolioPositions(): Promise<Array<{ ticker: s
   await requireAuthenticatedUser();
   // El backend pagina con page/page_size (max 200): limit/offset NO existen
   // en este endpoint y los ignoraba, repitiendo siempre la pagina 1.
-  const PAGE_SIZE = 200;
-  const all: Array<{ ticker: string; quantity: number }> = [];
-  for (let page = 1; ; page += 1) {
-    const res = await researchRequest<{ items: Array<{ ticker: string; quantity: number }> }>(
-      `/api/portfolio/positions?page=${page}&page_size=${PAGE_SIZE}`, { fast: true },
-    );
-    const items = Array.isArray(res) ? res : res?.items || [];
-    all.push(...items);
-    if (items.length < PAGE_SIZE) return all;
-  }
+  return fetchAllBackendPages((page) =>
+    researchRequest<PaginatedBackendResponse<{ ticker: string; quantity: number }>>(
+      `/api/portfolio/positions?page=${page}&page_size=${BACKEND_PAGE_SIZE}`, { fast: true },
+    ),
+  );
 }
 
 /** Read only: opening a company never starts a 13D/G scan. */

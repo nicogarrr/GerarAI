@@ -60,7 +60,7 @@ describe('getFlowHoldings: solape con cartera y seguimiento', () => {
         const result = await getFlowHoldings();
         expect(result.unavailable).toBe(false);
         expect([...result.portfolio]).toEqual(['ASTS']);
-        expect(researchRequest).toHaveBeenNthCalledWith(1, '/api/portfolio/positions?page_size=200', { fast: true });
+        expect(researchRequest).toHaveBeenNthCalledWith(1, '/api/portfolio/positions?page=1&page_size=200', { fast: true });
     });
 
     it('cualquier fallo o forma rara -> no disponible, nunca un "no tienes nada" inventado', async () => {
