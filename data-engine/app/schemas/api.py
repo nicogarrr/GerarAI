@@ -1807,6 +1807,40 @@ class PortfolioIbkrCsvImportOut(BaseModel):
     identity_warning: str | None
     rows_skipped: int
     row_errors: list[str]
+# --- POST /api/portfolio/import/ibkr/xml -------------------------------------
+# Forma medida contra IBKRImportService.import_flex_xml (rama confirmada,
+# return L1915): las 23 claves siempre. dry_run y reconcile destructivo
+# nunca llegan al wire desde la ruta (solo pasa expected_account_id y
+# max_statement_age_days). Errores -> IBKRImportError -> 400, no wire.
+
+
+class PortfolioIbkrXmlImportOut(BaseModel):
+    # Re-medido tras #3664: la rama "imported" emite 23 claves (status fijo
+    # "imported"; dry_run no es alcanzable desde la ruta: default False y la
+    # ruta no lo pasa). Sin estas 4, response_model las borraba del wire.
+    status: Literal["imported"]
+    trades_imported: int
+    rows_skipped: int
+    row_errors: list[str]
+    price_backfills_enqueued: int
+    positions_imported: int
+    valuation_hold_kept: list[str]
+    cost_review_required: list[str]
+    cash_imported: int
+    raw_rows_stored: int
+    raw_rows_already_present: int
+    raw_rows_pruned: int
+    fx_conversions_imported: int
+    fx_conversions_skipped: int
+    trades_cancelled: int
+    dividends_imported: int
+    fees_imported: int
+    cash_transactions_imported: int
+    unattributed_cash_rows: int
+    positions_closed: list[str]
+    cash_removed: list[str]
+    reconcile_blocked: list[str]
+    portfolio_snapshot_id: int
 
 
 # --- GET /api/portfolio/snapshots --------------------------------------------
