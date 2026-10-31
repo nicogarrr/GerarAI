@@ -32,7 +32,8 @@ test('aviso de entradas de valoración en inglés se traduce', () => {
 test('documentos: tier en castellano y ausencia de fecha explícita', () => {
   const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
   assert.ok(page.includes('etiquetaTierFuente(document.source_tier)'));
-  assert.ok(page.includes("'fecha desconocida'"));
+  assert.ok(page.includes("t('research.fichaUnknownDate')"));
+  assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).fichaUnknownDate, 'fecha desconocida');
 });
 
 test('auditFixLabel: lista de entradas faltantes sin claves crudas ni comodines', () => {
