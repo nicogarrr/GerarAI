@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.concurrency import run_in_threadpool
 
+from app.core.cache import invalidate_market_data_cache, invalidate_portfolio_cache
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import safe_detail
@@ -47,7 +48,6 @@ from app.services.portfolio_ledger_service import (
     ValuationHeldError,
 )
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
-from app.services.risk_service import RiskService
 from app.services.tax_report_service import (
     CASH_UNIT_QUANTITIES,
     ZERO_COST_REVIEW_LABEL,
@@ -377,7 +377,12 @@ def portfolio_pdf_export(portfolio_id: int, db: Session = Depends(get_db)) -> Re
 
 @router.get("/summary")
 def portfolio_summary(db: Session = Depends(get_db)) -> dict:
-    risk = RiskService().dashboard(db)
+    # Cache Redis de 10 min por tenant (categoria portfolio_valuation): se
+    # invalida por eventos ORM al escribir posiciones/transacciones/caja/FX y
+    # de forma explicita tras PATCH /prices y POST /refresh-market.
+    from app.services.cached_portfolio_valuation import risk_dashboard
+
+    risk = risk_dashboard(db)
     return {
         "total_value": risk["total_value"],
         "equity_value": risk["equity_value"],
@@ -1299,6 +1304,9 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
             db, company_id=company.id, price=payload.price, as_of=payload.as_of
         )
         db.commit()
+        # Precio manual: limpia valoraciones y lectores de mercado cacheados.
+        invalidate_portfolio_cache(db=db)
+        invalidate_market_data_cache()
         return {"ticker": company.ticker, "market_price": float(position.market_price)}
     except ValuationHeldError as exc:
         db.rollback()

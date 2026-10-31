@@ -6,6 +6,13 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.cache import (
+    DCA_SCHEDULE_PREFIX,
+    DCA_SCHEDULE_TTL,
+    cached,
+    invalidate_dca_cache,
+    tenant_from_first_db_arg,
+)
 from app.core.database import get_db
 from app.core.tenancy import tenant_filters
 from app.core.ui_errors import ui_error
@@ -101,6 +108,8 @@ def upsert_watch_item(
         # Los hechos son por tenant: siembra automatica para que la ficha no
         # salga vacia hasta pulsar «Refrescar SEC» (hallazgo del tester).
         enqueue_fundamentals_seed(db, symbol)
+    # Alta o cambio de ticker: el listado DCA cacheado incluye la watchlist.
+    invalidate_dca_cache(db=db)
     return _payload(item)
 
 
@@ -111,6 +120,7 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail=ui_error(404, "ticker_not_in_watchlist").detail)
     db.delete(item)
     db.commit()
+    invalidate_dca_cache(db=db)
 
 @router.get("/monitor")
 async def watchlist_monitor(
@@ -624,9 +634,18 @@ def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> d
     }
 
 
-@router.get("/dca-signals", response_model=DcaSignalsOut)
-def list_dca_signals(db: Session = Depends(get_db)) -> dict:
-    """Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso."""
+@cached(
+    prefix=f"{DCA_SCHEDULE_PREFIX}:signals_payload",
+    ttl=DCA_SCHEDULE_TTL,
+    category="dca_schedule",
+    extract_tenant=tenant_from_first_db_arg,
+)
+def _dca_signals_payload(db: Session) -> dict:
+    """Payload de GET /watchlist/dca-signals con cache Redis de 5 min por tenant.
+
+    Se invalida por eventos ORM al tocar watchlist, posiciones, overrides,
+    politica o estados DCA, y de forma explicita al terminar cada evaluacion.
+    """
     from app.core.config import get_settings
     from app.services import dca_signal_service as dca
     from app.services.dca_signal_engine import DEFAULT_PARAMS, ZONES
@@ -679,6 +698,12 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
     }
 
 
+@router.get("/dca-signals", response_model=DcaSignalsOut)
+def list_dca_signals(db: Session = Depends(get_db)) -> dict:
+    """Nivel DCA actual de cada ticker de watchlist + cartera y su minimo de aviso."""
+    return _dca_signals_payload(db)
+
+
 @router.put("/{symbol}/dca-alert-min-level", response_model=DcaMinLevelOut)
 def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = Depends(get_db)) -> dict:
     """Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado)."""
@@ -700,6 +725,7 @@ def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = D
     else:
         row.min_level = payload.min_level
     db.commit()
+    invalidate_dca_cache(db=db)
     return {
         "symbol": key,
         "min_level_override": payload.min_level,

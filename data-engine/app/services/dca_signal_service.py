@@ -633,4 +633,9 @@ def evaluate_watchlist(
         if symbol not in tracked:
             db.delete(state)
     db.commit()
+    # Tras el commit final: el listado /watchlist/dca-signals cacheado por
+    # tenant ya no refleja los estados recien escritos.
+    from app.core.cache import invalidate_dca_cache
+
+    invalidate_dca_cache(db=db)
     return summary

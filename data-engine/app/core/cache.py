@@ -19,6 +19,8 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, ParamSpec, TypeVar, cast
 
 logger = logging.getLogger(__name__)
@@ -90,6 +92,44 @@ def _tenant_from_db(db) -> int | None:
     if hasattr(db, 'info'):
         return db.info.get("tenant_id")
     return None
+
+
+def tenant_from_first_db_arg(args: Any, kwargs: Any) -> int | None:
+    """extract_tenant para funciones de modulo cuya Session es el primer argumento.
+
+    El decorador asume metodos (self, db, ...); las funciones cacheadas de
+    modulo reciben (db, ...) y necesitan este extractor para que la clave
+    quede aislada por tenant.
+    """
+    db = kwargs.get("db") if isinstance(kwargs, dict) else None
+    if db is None and args:
+        db = args[0]
+    return _tenant_from_db(db) if db is not None else None
+
+
+def _json_default(value: Any) -> Any:
+    """Serializa tipos no-JSON de forma estable entre miss y hit.
+
+    Decimal -> float, date/datetime -> ISO 8601, set -> lista ordenada. Sin
+    esto el primer request (miss) devolvia Decimals/objetos date y el segundo
+    (hit) strings planos: misma ruta, dos shapes distintos.
+    """
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, (set, frozenset)):
+        return sorted(value)
+    return str(value)
+
+
+def _restore_serialized(value: Any) -> Any:
+    """Recupera claves int que JSON convirtio a str (p. ej. {company_id: precio})."""
+    if isinstance(value, dict) and value and all(
+        isinstance(k, str) and k.isdigit() for k in value
+    ):
+        return {int(k): v for k, v in value.items()}
+    return value
 
 
 def _make_cache_key(prefix: str, tenant_id: int | None, *args: Any, **kwargs: Any) -> str:
@@ -289,9 +329,7 @@ def cached(
                     cached_value = client.get(cache_key)
                     if cached_value is not None:
                         _record_hit(category)
-                        result = json.loads(cached_value)
-                        if isinstance(result, dict) and result and all(isinstance(k, str) and k.isdigit() for k in result):
-                            result = {int(k): v for k, v in result.items()}
+                        result = _restore_serialized(json.loads(cached_value))
                         logger.debug(f"Cache hit: {cache_key}")
                         return cast(T, result)
                 except Exception as exc:
@@ -301,18 +339,28 @@ def cached(
             # Cache miss: ejecutar funcion
             _record_miss(category)
             result = func(*args, **kwargs)
-            
+
+            # Misma forma en miss y en hit: la respuesta recien calculada pasa
+            # por el mismo ciclo JSON que una leida de cache. Si no se puede
+            # serializar (p. ej. referencias circulares), se devuelve tal cual
+            # y no se cachea: la cache nunca rompe una respuesta.
+            try:
+                serialized = json.dumps(result, default=_json_default)
+                result = cast(T, _restore_serialized(json.loads(serialized)))
+            except (TypeError, ValueError) as exc:
+                logger.debug(f"Result not cacheable for {func.__name__}: {exc}")
+                return result
+
             # Guardar en cache
             if client is not None:
                 try:
-                    serialized = json.dumps(result, default=str)
                     # redis-py depreco setex (DeprecationWarning desde 2.6.12): set con ex=ttl
                     client.set(cache_key, serialized, ex=ttl)
                     logger.debug(f"Cached result: {cache_key} (TTL={ttl}s)")
                 except Exception as exc:
                     logger.debug(f"Cache write failed for {cache_key}: {exc}")
                     _redis_down()
-            
+
             return result
         
         return wrapper

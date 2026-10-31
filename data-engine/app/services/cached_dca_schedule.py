@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sqlalchemy import event, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.cache import (
@@ -222,16 +222,6 @@ class CachedDcaScheduleService:
         """Invalida cache de DCA para el tenant actual."""
         invalidate_dca_cache(db=db)
 
-
-# Event listener para invalidacion automatica
-@event.listens_for(DcaSignalState, "after_insert")
-@event.listens_for(DcaSignalState, "after_update")
-@event.listens_for(DcaSignalState, "after_delete")
-def invalidate_on_dca_change(mapper, connection, target):
-    """Invalida cache cuando cambian senales DCA."""
-    try:
-        tenant_id = getattr(target, 'tenant_id', None)
-        invalidate_dca_cache(tenant_id)
-        logger.debug(f"Invalidated DCA cache after signal change (tenant={tenant_id})")
-    except Exception as exc:
-        logger.warning(f"Failed to invalidate cache on DCA change: {exc}")
+# La invalidacion automatica por eventos ORM vive en
+# app.core.cache_invalidation (instalada desde app.models); los listeners que
+# habia aqui nunca llegaban a instalarse porque nadie importaba este modulo.

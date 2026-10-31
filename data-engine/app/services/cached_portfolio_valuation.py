@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import event, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.cache import (
@@ -19,9 +19,10 @@ from app.core.cache import (
     PORTFOLIO_VALUATION_TTL,
     cached,
     invalidate_portfolio_cache,
+    tenant_from_first_db_arg,
 )
 from app.core.tenancy import tenant_cache_scope
-from app.models import Position, Transaction
+from app.models import Position
 
 logger = logging.getLogger(__name__)
 
@@ -139,35 +140,24 @@ class CachedPortfolioValuationService:
         """Invalida cache de valoracion de cartera para el tenant actual."""
         invalidate_portfolio_cache(db=db)
 
-
-# Event listeners para invalidacion automatica
-def _setup_invalidation_listeners():
-    """Configura listeners de SQLAlchemy para invalidar cache al modificar datos."""
-    
-    @event.listens_for(Position, "after_insert")
-    @event.listens_for(Position, "after_update")
-    @event.listens_for(Position, "after_delete")
-    def invalidate_on_position_change(mapper, connection, target):
-        """Invalida cache cuando cambian posiciones."""
-        try:
-            tenant_id = getattr(target, 'tenant_id', None)
-            invalidate_portfolio_cache(tenant_id)
-            logger.debug(f"Invalidated portfolio cache after position change (tenant={tenant_id})")
-        except Exception as exc:
-            logger.warning(f"Failed to invalidate cache on position change: {exc}")
-    
-    @event.listens_for(Transaction, "after_insert")
-    @event.listens_for(Transaction, "after_update")
-    @event.listens_for(Transaction, "after_delete")
-    def invalidate_on_transaction_change(mapper, connection, target):
-        """Invalida cache cuando cambian transacciones."""
-        try:
-            tenant_id = getattr(target, 'tenant_id', None)
-            invalidate_portfolio_cache(tenant_id)
-            logger.debug(f"Invalidated portfolio cache after transaction change (tenant={tenant_id})")
-        except Exception as exc:
-            logger.warning(f"Failed to invalidate cache on transaction change: {exc}")
+# La invalidacion automatica por eventos ORM vive ahora en
+# app.core.cache_invalidation (instalada desde app.models): este modulo se
+# importaba solo en tests y sus listeners nunca se instalaban en produccion.
 
 
-# Instalar listeners al importar el modulo
-_setup_invalidation_listeners()
+@cached(
+    prefix=f"{PORTFOLIO_VALUATION_PREFIX}:risk_dashboard",
+    ttl=PORTFOLIO_VALUATION_TTL,
+    category="portfolio_valuation",
+    extract_tenant=tenant_from_first_db_arg,
+)
+def risk_dashboard(db: Session) -> dict[str, Any]:
+    '''Dashboard de valoracion/riesgo de cartera con cache de 10 min por tenant.
+
+    Lo usa GET /portfolio/summary. Se invalida por eventos ORM al escribir
+    posiciones, transacciones, caja, cartera o conversiones FX, y de forma
+    explicita tras un market refresh o un PATCH de precios.
+    '''
+    from app.services.risk_service import RiskService
+
+    return RiskService().dashboard(db)
