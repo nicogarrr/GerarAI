@@ -23,7 +23,9 @@ beforeEach(() => {
 
 describe('AnalystTargetLine: el title no pinta el proveedor', () => {
     it('declara el caracter no oficial y el detalle por firma, nunca data.source', async () => {
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, TARGETS])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         const { container } = render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={800} />);
         await waitFor(() => {
             const span = container.querySelector('span[title]');

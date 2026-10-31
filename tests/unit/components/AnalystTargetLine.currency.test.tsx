@@ -20,7 +20,9 @@ const USD_TARGET = {
 
 beforeEach(() => {
     requestCache.clear();
-    mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, USD_TARGET])));
+    mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, USD_TARGET])),
+        );
 });
 
 describe('objetivo de analistas en otra divisa', () => {

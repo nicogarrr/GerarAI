@@ -35,7 +35,10 @@ describe('ExtendedHoursLine: deduplicación de lecturas por símbolo', () => {
         expect(mocked).toHaveBeenCalledTimes(1);
     });
 
-    it('símbolos distintos sí leen por separado', async () => {
+    it('símbolos distintos viajan en la MISMA llamada batch como claves separadas', async () => {
+        // 31-oct-2026: antes cada símbolo era una invocación serverless (12
+        // filas = 12 POSTs medidos en prod). Ahora una ventana = UNA llamada
+        // con todas las claves; la protección es que cada fila pide su clave.
         mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, null])) as never);
         render(
             <>
@@ -43,7 +46,8 @@ describe('ExtendedHoursLine: deduplicación de lecturas por símbolo', () => {
                 <ExtendedHoursLine symbol="AAPL" currency="USD" />
             </>,
         );
-        await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
+        expect(mocked).toHaveBeenCalledWith(['ASTS', 'AAPL']);
     });
 
     it('un remontaje dentro del TTL no repite la lectura', async () => {

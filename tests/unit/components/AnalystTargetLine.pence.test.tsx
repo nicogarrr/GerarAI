@@ -25,7 +25,9 @@ beforeEach(() => {
 
 describe('objetivo de analistas en peniques', () => {
     it('watchlist (fila en GBP): objetivo en GBX convertido exacto a libras, con recorrido', async () => {
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, target(300, 'GBX')])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, target(300, 'GBX')])),
+        );
         render(<AnalystTargetLine symbol="CGEO.L" currency="GBP" referencePrice={2.5} />);
         expect(await screen.findByText(/\+20,0/)).toBeInTheDocument();
         expect(screen.getByText(/3,00/)).toBeInTheDocument();
@@ -33,13 +35,17 @@ describe('objetivo de analistas en peniques', () => {
     });
 
     it('cartera (fila en GBp): objetivo en GBX es la misma unidad', async () => {
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, target(300, 'GBX')])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, target(300, 'GBX')])),
+        );
         render(<AnalystTargetLine symbol="CGEO.L" currency="GBp" referencePrice={250} />);
         expect(await screen.findByText(/\+20,0/)).toBeInTheDocument();
     });
 
     it('cartera (fila en GBp): un objetivo en libras no se lee como peniques (×100)', async () => {
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, target(3, 'GBP')])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, target(3, 'GBP')])),
+        );
         render(<AnalystTargetLine symbol="CGEO.L" currency="GBp" referencePrice={250} />);
         expect(await screen.findByText(/\+20,0/)).toBeInTheDocument();
         expect(screen.queryByText(/98,8/)).toBeNull();

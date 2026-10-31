@@ -23,7 +23,9 @@ beforeEach(() => {
 
 describe('AnalystTargetLine: deduplicación de lecturas por símbolo', () => {
     it('dos instancias montadas a la vez (tarjetas + tabla) hacen UNA sola lectura', async () => {
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, TARGETS])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         render(
             <>
                 <AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />
@@ -34,7 +36,9 @@ describe('AnalystTargetLine: deduplicación de lecturas por símbolo', () => {
     });
 
     it('un remontaje dentro del TTL no repite la lectura', async () => {
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, TARGETS])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         const first = render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
         first.unmount();
@@ -48,7 +52,9 @@ describe('AnalystTargetLine: deduplicación de lecturas por símbolo', () => {
         const first = render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(1));
         first.unmount();
-        mocked.mockImplementation(async (keys: string[]) => Object.fromEntries(keys.map((k) => [k, TARGETS])));
+        mocked.mockImplementation(async (items: { symbol: string; quoteSymbol?: string | null }[]) =>
+            Object.fromEntries(items.map((it) => [`${it.symbol.toUpperCase()}:${(it.quoteSymbol ?? '').toUpperCase()}`, TARGETS])),
+        );
         render(<AnalystTargetLine symbol="ASTS" quoteSymbol="ASTS" currency="USD" referencePrice={100} />);
         await waitFor(() => expect(mocked).toHaveBeenCalledTimes(2));
     });
