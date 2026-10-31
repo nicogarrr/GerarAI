@@ -318,6 +318,7 @@ npm run lint
 npm run typecheck
 npm run test:unit                         # Vitest + Testing Library
 npm run test:e2e                          # Playwright (starts the servers it needs)
+npm run test:e2e:flows                   # Browser user flows (docs: docs/FRONTEND_TESTS.md)
 ```
 
 The OpenAPI client must not drift from the backend:
