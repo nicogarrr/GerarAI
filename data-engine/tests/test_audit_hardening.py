@@ -352,6 +352,17 @@ def test_knowledge_upload_whitelist():
     assert validated.startswith("https://")
 
 
+def test_knowledge_upload_source_url_capped_at_column_length():
+    """KnowledgeDocument.source_url es String(1000): una URL valida pero mas
+    larga debe rechazarse en la whitelist (400), no romper el INSERT en
+    Postgres. HttpUrl solo corta en 2083, asi que hace falta tope propio."""
+    from app.api.routes.knowledge import validate_upload_metadata
+
+    long_url = "https://example.com/" + "a" * 1200  # 1220 chars: HttpUrl la acepta
+    with pytest.raises(ValueError, match="Invalid knowledge source_url"):
+        validate_upload_metadata(document_type="book", language="en", source_url=long_url)
+
+
 # ---------------------------------------------------------------------------
 # memory.py enums cerrados
 # ---------------------------------------------------------------------------

@@ -59,8 +59,14 @@ def validate_upload_metadata(
         raise ValueError("Unsupported knowledge language")
     validated_url: str | None = None
     if source_url:
+        stripped = source_url.strip()
+        # HttpUrl corta en 2083 pero KnowledgeDocument.source_url es
+        # String(1000): sin este tope una URL valida de 1001-2083 chars
+        # pasaba la whitelist y rompia el INSERT en Postgres (500, no 400).
+        if len(stripped) > 1000:
+            raise ValueError("Invalid knowledge source_url")
         try:
-            validated_url = str(_source_url_adapter.validate_python(source_url.strip()))
+            validated_url = str(_source_url_adapter.validate_python(stripped))
         except ValidationError as exc:
             raise ValueError("Invalid knowledge source_url") from exc
     return document_type, normalized_language, validated_url

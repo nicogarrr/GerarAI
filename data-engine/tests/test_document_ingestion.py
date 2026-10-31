@@ -47,6 +47,26 @@ def test_pdf_parser_uses_the_maintained_pypdf_package():
     assert parsed.blocks == []
 
 
+def test_ingest_file_rejects_source_url_beyond_document_column():
+    """Document.source_url es String(1000): un source_url mas largo debe ser
+    422 de validacion, no un 500 al insertar en Postgres."""
+    cleanup_test_uploads()
+    seed()
+    client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
+    response = client.post(
+        "/api/sources/documents/ingest-file",
+        data={
+            "ticker": "MSFT",
+            "title": f"oversized source_url {uuid4().hex}",
+            "source_type": "test_upload",
+            "source_url": "https://example.com/" + "a" * 1200,  # 1220 > 1000
+        },
+        files={"file": ("note.txt", b"short note body for source_url bound test", "text/plain")},
+    )
+    assert response.status_code == 422
+
+
 def test_file_ingestion_creates_traceable_chunks_and_dedupes():
     cleanup_test_uploads()
     seed()
