@@ -1,6 +1,6 @@
 """Indice aditivo de thesis_changes para /api/attention-thesis.
 
-Revision ID: 0118_thesis_changes_attention_thesis
+Revision ID: 0118_thesis_attention_idx
 Revises: 0117_fk_child_indexes
 Create Date: 2026-10-31T12:24:00.000Z
 
@@ -29,7 +29,7 @@ import sqlalchemy as sa
 
 from alembic import op
 
-revision = "0118_thesis_changes_attention_thesis"
+revision = "0118_thesis_attention_idx"
 down_revision = "0117_fk_child_indexes"
 branch_labels = None
 depends_on = None
