@@ -13,6 +13,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -207,6 +208,59 @@ def _dump_row(row: Any) -> dict[str, Any]:
     return data
 
 
+def _tenant_scoped_tables(connection) -> list[sa.Table]:
+    """Tablas a purgar cuando un tenant borra su cuenta, hijos primero.
+
+    Incluye las tablas de los modelos y, ademas, cualquier tabla REAL de la
+    base con ``tenant_id`` que los modelos ya no conocen: migraciones viejas
+    crearon tablas (p. ej. ``thesis_backtest_runs``) cuyo modelo desaparecio,
+    y enumerar solo ``Base.metadata`` dejaba sus filas fuera del borrado de
+    cuenta. MEDIDO: 7 tablas asi en la cadena 0001->0115.
+
+    Las tablas sin modelo se borran primero y en orden hijos-primero segun
+    sus propias FKs (reflejadas por nombre, sin resolver a tablas de modelo):
+    pueden tener FKs NO ACTION hacia tablas de modelo, y ningun modelo las
+    referencia a ellas.
+    """
+    model_tables = [
+        table
+        for table in reversed(Base.metadata.sorted_tables)
+        if "tenant_id" in table.columns and table.name != "tenants"
+    ]
+    known = {table.name for table in Base.metadata.sorted_tables}
+    inspector = sa.inspect(connection)
+    dead_names = {
+        name
+        for name in inspector.get_table_names()
+        if name not in known
+        and any(col["name"] == "tenant_id" for col in inspector.get_columns(name))
+    }
+    if not dead_names:
+        return model_tables
+    deps = {
+        name: {
+            fk["referred_table"]
+            for fk in inspector.get_foreign_keys(name)
+            if fk["referred_table"] in dead_names
+        }
+        for name in dead_names
+    }
+    ordered_names: list[str] = []
+    pending = dict(deps)
+    while pending:
+        ready = sorted(n for n, d in pending.items() if not (d - set(ordered_names)))
+        if not ready:  # ciclo entre tablas muertas: orden alfabetico estable
+            ready = [sorted(pending)[0]]
+        ordered_names.extend(ready)
+        for n in ready:
+            pending.pop(n)
+    md = sa.MetaData()
+    dead_tables = [
+        sa.Table(name, md, autoload_with=connection) for name in reversed(ordered_names)
+    ]
+    return dead_tables + model_tables
+
+
 class PrivacyService:
     def export_account(self, db: Session) -> dict[str, Any]:
         """Exporta los datos del tenant de la sesion, nunca de otro."""
@@ -389,11 +443,9 @@ class PrivacyService:
         # dependencias: hijos antes que padres. La fila ``tenants`` no se
         # borra: se convierte en tombstone sin nombre ni metadata.
         counts: dict[str, int] = {}
-        tenant_tables = [
-            table
-            for table in reversed(Base.metadata.sorted_tables)
-            if "tenant_id" in table.columns and table.name != "tenants"
-        ]
+        tenant_tables: list[sa.Table] = []
+        with engine.connect() as probe:
+            tenant_tables = _tenant_scoped_tables(probe)
         with engine.begin() as connection:
             previous = connection.execute(
                 select(func.count())
