@@ -811,11 +811,11 @@ export async function importFromIBKR(userId: string): Promise<IBKRImportResult> 
 /**
  * Importa un Flex XML crudo (por si el usuario lo descarga a mano).
  */
-export async function importIBKRXml(userId: string, xml: string): Promise<IBKRImportResult> {
+export async function importIBKRXml(userId: string, xml: string): Promise<IBKRXmlImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRXmlImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/xml', {
+        result = await researchRequest<IBKRXmlImportResult>('/api/portfolio/import/ibkr/xml', {
             method: 'POST',
             body: jsonBody({ xml }),
         });
@@ -853,6 +853,7 @@ export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRCs
 // El CSV de IBKR tiene su propio contrato en el backend (no devuelve
 // positions_imported ni portfolio_snapshot_id: esos son del Flex XML).
 export type IBKRCsvImportResult = components['schemas']['PortfolioIbkrCsvImportOut'];
+export type IBKRXmlImportResult = components['schemas']['PortfolioIbkrXmlImportOut'];
 
 export type PortfolioTearsheetMetrics = components['schemas']['TearsheetMetricsOut'];
 

@@ -12549,6 +12549,148 @@
         "title": "PortfolioIbkrCsvImportOut",
         "type": "object"
       },
+      "PortfolioIbkrXmlImportOut": {
+        "properties": {
+          "cash_imported": {
+            "title": "Cash Imported",
+            "type": "integer"
+          },
+          "cash_removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cash Removed",
+            "type": "array"
+          },
+          "cash_transactions_imported": {
+            "title": "Cash Transactions Imported",
+            "type": "integer"
+          },
+          "cost_review_required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cost Review Required",
+            "type": "array"
+          },
+          "dividends_imported": {
+            "title": "Dividends Imported",
+            "type": "integer"
+          },
+          "fees_imported": {
+            "title": "Fees Imported",
+            "type": "integer"
+          },
+          "fx_conversions_imported": {
+            "title": "Fx Conversions Imported",
+            "type": "integer"
+          },
+          "fx_conversions_skipped": {
+            "title": "Fx Conversions Skipped",
+            "type": "integer"
+          },
+          "portfolio_snapshot_id": {
+            "title": "Portfolio Snapshot Id",
+            "type": "integer"
+          },
+          "positions_closed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Positions Closed",
+            "type": "array"
+          },
+          "positions_imported": {
+            "title": "Positions Imported",
+            "type": "integer"
+          },
+          "price_backfills_enqueued": {
+            "title": "Price Backfills Enqueued",
+            "type": "integer"
+          },
+          "raw_rows_already_present": {
+            "title": "Raw Rows Already Present",
+            "type": "integer"
+          },
+          "raw_rows_pruned": {
+            "title": "Raw Rows Pruned",
+            "type": "integer"
+          },
+          "raw_rows_stored": {
+            "title": "Raw Rows Stored",
+            "type": "integer"
+          },
+          "reconcile_blocked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reconcile Blocked",
+            "type": "array"
+          },
+          "row_errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Row Errors",
+            "type": "array"
+          },
+          "rows_skipped": {
+            "title": "Rows Skipped",
+            "type": "integer"
+          },
+          "status": {
+            "const": "imported",
+            "title": "Status",
+            "type": "string"
+          },
+          "trades_cancelled": {
+            "title": "Trades Cancelled",
+            "type": "integer"
+          },
+          "trades_imported": {
+            "title": "Trades Imported",
+            "type": "integer"
+          },
+          "unattributed_cash_rows": {
+            "title": "Unattributed Cash Rows",
+            "type": "integer"
+          },
+          "valuation_hold_kept": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Valuation Hold Kept",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "trades_imported",
+          "rows_skipped",
+          "row_errors",
+          "price_backfills_enqueued",
+          "positions_imported",
+          "valuation_hold_kept",
+          "cost_review_required",
+          "cash_imported",
+          "raw_rows_stored",
+          "raw_rows_already_present",
+          "raw_rows_pruned",
+          "fx_conversions_imported",
+          "fx_conversions_skipped",
+          "trades_cancelled",
+          "dividends_imported",
+          "fees_imported",
+          "cash_transactions_imported",
+          "unattributed_cash_rows",
+          "positions_closed",
+          "cash_removed",
+          "reconcile_blocked",
+          "portfolio_snapshot_id"
+        ],
+        "title": "PortfolioIbkrXmlImportOut",
+        "type": "object"
+      },
       "PortfolioImportCommitOut": {
         "properties": {
           "duplicates_skipped": {
@@ -62246,9 +62388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Ibkr Xml Api Portfolio Import Ibkr Xml Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioIbkrXmlImportOut"
                 }
               }
             },

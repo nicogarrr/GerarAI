@@ -10581,6 +10581,58 @@ export interface components {
             /** Trades Imported */
             trades_imported: number;
         };
+        /** PortfolioIbkrXmlImportOut */
+        PortfolioIbkrXmlImportOut: {
+            /** Cash Imported */
+            cash_imported: number;
+            /** Cash Removed */
+            cash_removed: string[];
+            /** Cash Transactions Imported */
+            cash_transactions_imported: number;
+            /** Cost Review Required */
+            cost_review_required: string[];
+            /** Dividends Imported */
+            dividends_imported: number;
+            /** Fees Imported */
+            fees_imported: number;
+            /** Fx Conversions Imported */
+            fx_conversions_imported: number;
+            /** Fx Conversions Skipped */
+            fx_conversions_skipped: number;
+            /** Portfolio Snapshot Id */
+            portfolio_snapshot_id: number;
+            /** Positions Closed */
+            positions_closed: string[];
+            /** Positions Imported */
+            positions_imported: number;
+            /** Price Backfills Enqueued */
+            price_backfills_enqueued: number;
+            /** Raw Rows Already Present */
+            raw_rows_already_present: number;
+            /** Raw Rows Pruned */
+            raw_rows_pruned: number;
+            /** Raw Rows Stored */
+            raw_rows_stored: number;
+            /** Reconcile Blocked */
+            reconcile_blocked: string[];
+            /** Row Errors */
+            row_errors: string[];
+            /** Rows Skipped */
+            rows_skipped: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "imported";
+            /** Trades Cancelled */
+            trades_cancelled: number;
+            /** Trades Imported */
+            trades_imported: number;
+            /** Unattributed Cash Rows */
+            unattributed_cash_rows: number;
+            /** Valuation Hold Kept */
+            valuation_hold_kept: string[];
+        };
         /** PortfolioImportCommitOut */
         PortfolioImportCommitOut: {
             /** Duplicates Skipped */
@@ -23068,9 +23120,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIbkrXmlImportOut"];
                 };
             };
             /** @description Validation Error */

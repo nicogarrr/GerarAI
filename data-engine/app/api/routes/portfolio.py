@@ -42,6 +42,7 @@ from app.schemas.api import (
     PortfolioDividendYieldsOut,
     PortfolioForecastOut,
     PortfolioIbkrCsvImportOut,
+    PortfolioIbkrXmlImportOut,
     PortfolioImportCommitOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
@@ -1494,7 +1495,7 @@ async def import_ibkr(db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/ibkr/xml")
+@router.post("/import/ibkr/xml", response_model=PortfolioIbkrXmlImportOut)
 def import_ibkr_xml(payload: IBKRXmlImportRequest, db: Session = Depends(get_db)) -> dict:
     settings = _require_ibkr_owner(db)
     try:
