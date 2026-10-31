@@ -15,6 +15,7 @@ from app.models import AlertDelivery, AlertRule, Company, NewsEvent, ResearchAle
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.schemas import (
     AlertRuleOut,
+    AlertsTelegramStatusOut,
     ResearchAlertAction,
     ResearchAlertChannels,
     ResearchAlertOut,
@@ -109,7 +110,7 @@ def list_alert_rules(
     )
 
 
-@router.get("/telegram-status")
+@router.get("/telegram-status", response_model=AlertsTelegramStatusOut)
 def telegram_status() -> dict:
     """Presencia de la configuracion Telegram para la guia de /alerts.
 

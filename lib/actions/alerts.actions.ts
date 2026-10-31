@@ -7,6 +7,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { AppError, isNextRedirectError, ValidationError } from '@/lib/types/errors';
 import { paginateAll } from '@/lib/paginate-all';
 import { spanishBackendMessage } from '@/lib/research/backend-error-es';
+import type { components } from '@/lib/research/openapi.generated';
 
 export type AlertType = 'price_above' | 'price_below' | 'price_change' | 'news' | 'earnings';
 
@@ -230,12 +231,7 @@ export async function deleteAlert(alertId: string): Promise<void> {
     requestCache.invalidate(keys.recent(20));
 }
 
-export interface TelegramStatus {
-    enabled: boolean;
-    has_bot_token: boolean;
-    has_chat_id: boolean;
-    configured: boolean;
-}
+export type TelegramStatus = components['schemas']['AlertsTelegramStatusOut'];
 
 /** GET /api/alerts/telegram-status — presencia de config Telegram (sin secretos). */
 // Telegram configuration changes rarely; cache 30s to avoid a request on every render.
