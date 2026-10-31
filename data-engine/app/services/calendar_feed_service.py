@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.entities import CalendarFeedToken, Tenant
-from app.services.earnings_dates_service import followed_calendar
+from app.services.earnings_dates_service import followed_calendar, portfolio_dividend_dates
 
 SCOPES = ("followed", "watchlist")
 TOKEN_PREFIX = "gfc_"
@@ -105,8 +105,21 @@ CALNAME_BY_SCOPE = {
 }
 
 
+def _alarm(title: str) -> list[str]:
+    """Un único recordatorio el día antes (lo muestra el calendario donde se suscribe el feed)."""
+    return ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{_escape('Mañana: ' + title)}", "TRIGGER:-P1D", "END:VALARM"]
+
+
+_DIVIDEND_TITLE = {"ex_dividend": "ex-dividendo", "dividend_payment": "pago de dividendo"}
+
+
 def build_ics(
-    calendar: dict, *, now: datetime | None = None, scope: str = "followed", min_date: date | None = None
+    calendar: dict,
+    *,
+    now: datetime | None = None,
+    scope: str = "followed",
+    min_date: date | None = None,
+    dividends: list[dict] | None = None,
 ) -> str:
     calname = CALNAME_BY_SCOPE.get(scope, CALNAME_BY_SCOPE["followed"])
     lines = [
@@ -143,7 +156,27 @@ def build_ics(
             ]
             if event["source_url"]:
                 lines.append(f"URL:{event['source_url']}")
+            lines += _alarm(title)
             lines.append("END:VEVENT")
+    for item in dividends or []:
+        start = date.fromisoformat(item["date"])
+        if min_date is not None and start < min_date:
+            continue
+        title = f"{item['company']} ({item['ticker']}): {_DIVIDEND_TITLE[item['kind']]}"
+        details = [item["detail"]] if item.get("detail") else []
+        details.append(f"Fuente: {item['source']}")
+        lines += [
+            "BEGIN:VEVENT",
+            f"UID:{item['kind']}-{item['ticker']}-{item['date']}@gerarai",
+            f"DTSTAMP:{stamp}",
+            f"DTSTART;VALUE=DATE:{start.strftime('%Y%m%d')}",
+            f"DTEND;VALUE=DATE:{(start + timedelta(days=1)).strftime('%Y%m%d')}",
+            f"SUMMARY:{_escape(title)}",
+            f"DESCRIPTION:{_escape(chr(10).join(details))}",
+            "TRANSP:TRANSPARENT",
+            *_alarm(title),
+            "END:VEVENT",
+        ]
     lines.append("END:VCALENDAR")
     return "\r\n".join(part for line in lines for part in _fold(line)) + "\r\n"
 
@@ -168,4 +201,10 @@ def feed_for_token(db: Session, token: str, *, today: date | None = None) -> str
     calendar = followed_calendar(
         db, today - timedelta(days=PAST_DAYS), today + timedelta(days=FUTURE_DAYS), scope=scope
     )
-    return build_ics(calendar, scope=scope, min_date=today - timedelta(days=PAST_DAYS))
+    # Cartera: también ex-dividendo y pago guardados (el feed de solo watchlist no los lleva).
+    dividends = (
+        portfolio_dividend_dates(db, today - timedelta(days=PAST_DAYS), today + timedelta(days=FUTURE_DAYS))
+        if scope != "watchlist"
+        else []
+    )
+    return build_ics(calendar, scope=scope, min_date=today - timedelta(days=PAST_DAYS), dividends=dividends)
