@@ -7,7 +7,6 @@ import { formatUserDateTime } from '@/lib/format';
 import { metricLabel } from '@/lib/research/metric-labels';
 import { changeHeadlineCopy, changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 import { groupReviews } from '@/lib/research/review-groups';
-import { safeAssistantSourceUrl } from '@/lib/research/assistant-contract';
 import { buildChangeEvents, isOpenReview, paginate, type ChangeDirection, type ChangeEvent, type EventAlert, type EventReview } from '@/lib/research/change-events';
 import type { ResearchThesisChange } from '@/lib/actions/research.actions';
 import { Pager } from './Pager';
@@ -28,15 +27,11 @@ const DIRECTION_CLASS: Record<ChangeDirection, string> = {
   none: 'bg-gray-800 text-gray-300',
 };
 
-function hostOf(url: string): string {
-  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
-}
 
 function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; ticker: string; open?: boolean; onToggle?: (open: boolean) => void }) {
   const lead = event.changes[0];
   const openReview = event.reviews.find((r) => isOpenReview(r.status));
   const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? 'Registro sin resumen');
-  const sources = event.sourceUrls.map((u) => ({ url: safeAssistantSourceUrl(u), host: hostOf(u) })).filter((s): s is { url: string; host: string } => !!s.url);
   const records = event.changes.length + event.reviews.length + event.alerts.length;
   const touches = [
     ...event.metrics.map((metric) => metricLabel(metric)),
@@ -54,14 +49,6 @@ function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; tick
       {title.note ? <p className="mt-2 text-xs text-amber-300">{title.note}</p> : null}
       <p className="mt-2 text-xs text-gray-500">{event.latest ? `${formatUserDateTime(event.latest)} (Madrid)` : 'Fecha desconocida'}</p>
       {touches.length ? <p className="mt-1 text-xs text-gray-500">Supuesto afectado: {touches.join(' · ')}</p> : null}
-      {sources.length ? (
-        <p className="mt-1 break-words text-xs text-gray-500">
-          Fuentes:{' '}
-          {sources.map((s, i) => (
-            <span key={s.url}>{i ? ' · ' : ''}<a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={s.url} rel="noopener noreferrer" target="_blank">{s.host}</a></span>
-          ))}
-        </p>
-      ) : null}
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {openReview ? (
           <button

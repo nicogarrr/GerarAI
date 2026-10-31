@@ -96,9 +96,7 @@ export function AnalystTargetsView({data,currency}:{data:AnalystTargets|null;cur
                     </>
                     ) : null}
                     <p className="mt-2 text-xs text-gray-500">
-                        Fuente: {data.source}
-                        {data.source_url ? <> · <a className="text-teal-300 underline underline-offset-4 hover:text-teal-200" href={data.source_url} rel="noreferrer noopener" target="_blank">ver en Yahoo Finance</a></> : null}
-                        {' '}· obtenido el {formatUserDateTime(data.fetched_at * 1000)}
+                        Obtenido el {formatUserDateTime(data.fetched_at * 1000)}
                         {cur && data.reference_price ? ` · potencial frente a ${fmtTarget(data.reference_price)} (${data.reference_price_source ?? 'precio de referencia'})` : ' · sin precio de referencia con unidad verificada: potencial N/D'}
                         . Terceros, no verificado por GerarAI.
                     </p>

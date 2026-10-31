@@ -12,10 +12,7 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
                 <p className="text-sm text-gray-400">{vehicle.type}</p>
                 <p className="text-sm text-gray-500">
                     {vehicle.regulator_id}
-                    {vehicle.start_date ? ` · Inicio ${vehicle.start_date}` : ''} ·{' '}
-                    <a className={LINK} href={vehicle.source_url} rel="noreferrer" target="_blank">
-                        Fuente
-                    </a>
+                    {vehicle.start_date ? ` · Inicio ${vehicle.start_date}` : ''}
                 </p>
             </section>
 
@@ -27,10 +24,7 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
                             <span className="text-sm text-gray-300">{fact.label}</span>
                             <span className="text-sm font-medium text-gray-100">{fact.value}</span>
                             <span className="w-full text-xs text-gray-500">
-                                {fact.kind === 'oficial' ? 'Oficial' : fact.kind === 'prensa' ? 'Prensa' : 'Inferido'} · {fact.as_of} ·{' '}
-                                <a className={LINK} href={fact.source_url} rel="noreferrer" target="_blank">
-                                    Fuente
-                                </a>
+                                {fact.kind === 'oficial' ? 'Oficial' : fact.kind === 'prensa' ? 'Prensa' : 'Inferido'} · {fact.as_of}
                             </span>
                         </li>
                     ))}

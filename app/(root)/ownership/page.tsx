@@ -228,8 +228,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         </OverflowScrollRegion>
                         {holdings.provenance ? (
                             <p className="mt-3 text-xs text-gray-500">
-                                Fuente: {holdings.provenance.source} ({holdings.provenance.source_kind}),
-                                obtenido {formatUserDateTime(holdings.provenance.fetched_at)}.
+                                Datos obtenidos el {formatUserDateTime(holdings.provenance.fetched_at)}.
                             </p>
                         ) : null}
                     </section>

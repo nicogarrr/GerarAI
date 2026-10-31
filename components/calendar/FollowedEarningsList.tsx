@@ -131,8 +131,7 @@ export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event:
                     href={event.source_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    aria-label={ti('calendar.earnings.sourceAria', { ticker: event.ticker, source: event.source })}
-                    title={ti('calendar.earnings.sourceTitle', { source: event.source })}
+                    aria-label={ti('calendar.earnings.docAria', { ticker: event.ticker })}
                     className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-800 hover:text-gray-200 sm:h-9 sm:w-9"
                 >
                     <ExternalLink aria-hidden="true" className="h-4 w-4" />
@@ -141,42 +140,10 @@ export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event:
             <Link
                 href={`/research/${encodeURIComponent(event.ticker)}`}
                 aria-label={ti('calendar.earnings.openAria', { name: event.company || event.ticker })}
-                title={ti('calendar.earnings.sourceTitle', { source: event.source })}
                 className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-800 hover:text-gray-100 sm:h-9 sm:w-9"
             >
                 <ChevronRight aria-hidden="true" className="h-5 w-5" />
             </Link>
         </li>
-    );
-}
-
-/** Fuentes del día, visibles (no solo en hover): texto pequeño bajo la tarjeta. */
-export function FollowedDaySources({ events, ti = esT }: { events: FollowedEarningsEvent[]; ti?: TiFn }) {
-    const sources = new Map<string, string | null>();
-    for (const event of events) {
-        if (!sources.has(event.source)) sources.set(event.source, event.source_url);
-    }
-    if (sources.size === 0) return null;
-    return (
-        <p className="mt-2 text-xs text-gray-500">
-            {sources.size > 1 ? ti('calendar.earnings.sourcesPrePlural') : ti('calendar.earnings.sourcesPre')}
-            {[...sources.entries()].map(([label, url], index) => (
-                <span key={label}>
-                    {index > 0 ? ' · ' : ''}
-                    {url ? (
-                        <a
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="underline decoration-gray-600 underline-offset-2 hover:text-gray-300"
-                        >
-                            {label}
-                        </a>
-                    ) : (
-                        label
-                    )}
-                </span>
-            ))}
-        </p>
     );
 }

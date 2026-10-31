@@ -1,6 +1,6 @@
 import { getParticipationFilings } from '@/lib/actions/research.actions';
 import { ParticipationFilingsPanel } from '@/components/research/ParticipationFilingsPanel';
-import { FactCalculatedLabel } from '@/components/research/FactCalculatedLabel';
+import { FactTable } from '@/components/research/FactsPanels';
 import BlockedValuation from '@/components/research/BlockedValuation';
 import { ThesisSummary } from '@/components/research/ThesisSummary';
 import { CompanyNavigation } from '@/components/research/CompanyNavigation';
@@ -17,7 +17,6 @@ import CompanyActionsMenu from '@/components/research/CompanyActionsMenu';
 import { collapseVersionHistory, versionHistoryBadges } from '@/lib/research/version-history';
 import { ListingStaleBanner } from '@/components/research/ListingStaleBanner';
 import { formatPeerValue, peerMedianText } from '@/lib/research/peer-format';
-import { factDisplayAudit, factStalenessNotice } from '@/lib/research/fact-display-audit';
 import { groupClaimsByVersion } from '@/lib/research/claim-groups';
 import { asView, tabHref, tabOfView, type View } from '@/lib/research/research-views';
 import { FinancialTerminalSection } from '@/components/research/sections/FinancialTerminalSection';
@@ -333,130 +332,9 @@ function metricValue(value: number | string | null | undefined, unit: string) {
   return formatResearchMetric(parsed, unit);
 }
 
-/** Fuente de una cifra: enlace real al documento de origen (filing SEC/ESEF o pagina del proveedor) con su fecha, o texto plano cuando no hay documento. Nunca un enlace inventado. */
-function FactSource({ fact }: { fact: ResearchFact }) {
-  const text = label(fact.source_type);
-  if (!fact.source_url) return <>{text}<FactCalculatedLabel fact={fact} /></>;
-  const date = fact.source_published_at ? formatUserDate(fact.source_published_at) : null;
-  return (
-    <>
-    <a
-      className="text-teal-300 underline-offset-2 transition hover:text-teal-200 hover:underline"
-      href={fact.source_url}
-      rel="noopener noreferrer"
-      target="_blank"
-      title={fact.source_title ?? fact.source_url}
-    >
-      {text}{date ? ` · ${date}` : ''}
-    </a>
-    <FactCalculatedLabel fact={fact} />
-    </>
-  );
-}
-
-/** La cifra enlaza a su fuente cuando el backend trae URL real del documento. */
-function FactValueLink({ fact, children }: { fact: ResearchFact; children: React.ReactNode }) {
-  if (!fact.source_url) return <>{children}</>;
-  return (
-    <a
-      className="underline-offset-2 transition hover:text-teal-200 hover:underline"
-      href={fact.source_url}
-      rel="noopener noreferrer"
-      target="_blank"
-      title={fact.source_title ?? 'Fuente del dato'}
-    >
-      {children}
-    </a>
-  );
-}
-
-function FactCard({ fact, ticker, staleness }: { fact: ResearchFact; ticker: string; staleness: string | null }) {
-  const audit = factDisplayAudit(ticker, fact);
-  return (
-    <div className="rounded-lg border border-gray-800 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-gray-200">{metricLabel(fact.metric)}</span>
-        <span className={`text-sm font-semibold ${audit ? 'text-gray-400' : 'text-teal-300'}`}>{audit ? 'N/D' : <FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>}</span>
-      </div>
-      {audit ? <p className="mt-2 text-xs text-amber-300">{audit}</p> : null}
-      {!audit && staleness ? <p className="mt-2 text-xs text-amber-300">{staleness}</p> : null}
-      <div className="mt-1.5 flex flex-wrap gap-2 text-xs text-gray-500">
-        <span>{financialPeriod(fact.period)}</span>
-        <span>·</span>
-        <span><FactSource fact={fact} /></span>
-      </div>
-    </div>
-  );
-}
-
-/** Hechos visibles en móvil antes del «ver más» */
-const FACTS_MOBILE_PAGE = 10;
-
 /** Un borrador o una tesis en revisión no enseña veredicto ni cifras (regla vigente, igual que el memo y el PDF). */
 function thesisIsPublic(status: string | null | undefined): boolean {
   return status === 'published' || status === 'approved';
-}
-
-function FactTable({ facts, refreshLabel, ticker }: { facts: ResearchFact[]; refreshLabel: string; ticker: string }) {
-  if (!facts.length) {
-    return (
-      <EmptyState
-        description={`Pulsa «${refreshLabel}» arriba para traerlos del proveedor indicado. Si sigue vacío, no hay datos persistidos: comprueba el resultado del refresh y la fuente.`}
-        title="Todavía no hay hechos financieros persistidos."
-      />
-    );
-  }
-  // El último hecho de cada métrica (la lista viene ordenada por año fiscal
-  // descendente) es el que un lector toma por «estado actual».
-  const latestFiscalYear = facts.reduce((acc, fact) => Math.max(acc, fact.fiscal_year ?? 0), 0) || null;
-  const latestIdByMetric = new Map<string, number>();
-  for (const fact of facts) {
-    if (!latestIdByMetric.has(fact.metric)) latestIdByMetric.set(fact.metric, fact.id);
-  }
-  const stalenessOf = (fact: ResearchFact) =>
-    factStalenessNotice(fact, { isLatestForMetric: latestIdByMetric.get(fact.metric) === fact.id, latestFiscalYear });
-  const hasUnofficial = facts.some((fact) => String(fact.source_type ?? '').toUpperCase() === 'YAHOO_FUNDAMENTALS');
-  return (
-    <>
-      {hasUnofficial ? (
-        <p className="mb-3 text-xs text-amber-300" role="note">
-          Incluye cifras de una fuente no oficial (Yahoo Finance), sin auditar ni contrastar con el emisor; la fuente de cada fila aparece a la derecha.
-        </p>
-      ) : null}
-      {/* Móvil: cards paginadas (Anterior/Siguiente), sin «ver más» ni corte silencioso */}
-      <div className="space-y-3 md:hidden">
-        <PagedList
-          items={facts.map((fact) => ({ key: `fact-${fact.id}`, node: <FactCard fact={fact} staleness={stalenessOf(fact)} ticker={ticker} /> }))}
-          label="Hechos financieros"
-          pageSize={FACTS_MOBILE_PAGE}
-        />
-      </div>
-      {/* Escritorio: tabla completa */}
-      <div aria-label="Hechos financieros" className="hidden overflow-x-auto md:block" role="region" tabIndex={0}>
-      <table className="w-full text-left text-sm">
-        <caption className="sr-only">Hechos financieros de la empresa (oficiales y, si se indica, no oficiales): métrica, periodo, valor y fuente</caption>
-        <thead className="text-xs uppercase text-gray-500">
-          <tr>
-            <th className="border-b border-gray-800 py-2" scope="col">Métrica</th>
-            <th className="border-b border-gray-800 py-2" scope="col">Periodo</th>
-            <th className="border-b border-gray-800 py-2 text-right" scope="col">Valor</th>
-            <th className="border-b border-gray-800 py-2 text-right" scope="col">Fuente</th>
-          </tr>
-        </thead>
-        <tbody>
-          {facts.map((fact) => (
-            <tr key={fact.id} className="text-gray-300">
-              <th className="border-b border-gray-900 py-2 text-left text-sm font-medium" scope="row">{metricLabel(fact.metric)}</th>
-              <td className="border-b border-gray-900 py-2">{financialPeriod(fact.period)}</td>
-              <td className="border-b border-gray-900 py-2 text-right">{factDisplayAudit(ticker, fact) ? <span className="text-gray-400">N/D<span className="mt-1 block text-xs text-amber-300">{factDisplayAudit(ticker, fact)}</span></span> : <><FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>{stalenessOf(fact) ? <span className="mt-1 block text-xs text-amber-300">{stalenessOf(fact)}</span> : null}</>}</td>
-              <td className="border-b border-gray-900 py-2 text-right text-xs text-gray-500"><FactSource fact={fact} /></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </>
-  );
 }
 
 function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
@@ -502,7 +380,6 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   }
   const engine = typeof valuation.trace?.engine === 'string' ? valuation.trace.engine : null;
   const method = typeof valuation.trace?.method === 'string' ? valuation.trace.method : null;
-  const inputSource = typeof valuation.trace?.input_source === 'string' ? valuation.trace.input_source : null;
   const periods = Object.entries(valuation.trace?.periods ?? {})
     .filter(([, value]) => value)
     .map(([metric, period]) => `${termLabel(metric)}: ${period}`)
@@ -568,7 +445,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         <p className="text-xs leading-5 text-gray-500">
           Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
           El «valor por acción» del Modelo a largo plazo es otro cálculo (otra versión/fecha/motor).
-          Fuente de datos: {inputSource ?? NA}{periods ? ` · periodos ${periods}` : ` · periodos ${NA}`}.
+          Periodos de los inputs: {periods ? periods : NA}.
         </p>
       </div>
     );
@@ -592,7 +469,7 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
         No es comparable 1:1 con el «valor por acción» del Modelo a largo plazo: ese es un cálculo interno
         del escenario (otra versión/fecha/motor). Antes de fiarte, comprueba versión y fecha en ambas vistas.
-        Fuente de datos: {inputSource ?? NA}{periods ? ` · periodos ${periods}` : ` · periodos ${NA}`}.
+        Periodos de los inputs: {periods ? periods : NA}.
       </p>
     </div>
   );
@@ -1268,25 +1145,6 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     </span>
                   </div>
                   <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary)}</p>
-                  {/* Procedencia: fuente del evento y URLs absorbidas al agrupar
-                      la misma noticia en dos idiomas (identidad atribuida). */}
-                  {change.fuente_url && /^https:\/\//.test(change.fuente_url) ? (
-                    <p className="mt-1 text-xs text-gray-500">
-                      <a href={change.fuente_url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-                        {change.fuente_nombre || 'Fuente'}
-                      </a>
-                      {(change.tambien_en ?? []).map((entry, entryIndex) => {
-                        const url = typeof entry?.url === 'string' ? entry.url : null;
-                        const nombre = typeof entry?.fuente === 'string' ? entry.fuente : 'otra fuente';
-                        return url && /^https:\/\//.test(url) ? (
-                          <span key={`${url}-${entryIndex}`}>
-                            {' · también en '}
-                            <a href={url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">{nombre}</a>
-                          </span>
-                        ) : null;
-                      })}
-                    </p>
-                  ) : null}
                 </li>
               ))}
             </ul>

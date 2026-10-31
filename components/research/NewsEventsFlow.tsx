@@ -159,29 +159,6 @@ function CoverageChip({ event }: { event: ResearchNewsEvent }) {
   );
 }
 
-/** Fuentes absorbidas por la agrupación de historia, dentro del detalle. */
-function CoverageDetail({ event }: { event: ResearchNewsEvent }) {
-  if (!event.coverage?.length) return null;
-  return (
-    <div className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
-      <div className="font-medium">También lo cubrieron:</div>
-      <div className="space-y-0.5">
-        {event.coverage.map((item, idx) => (
-          <div key={`${item.url ?? item.source}-${idx}`}>
-            {item.url ? (
-              <a className="text-teal-300 hover:text-teal-200" href={item.url} rel="noreferrer" target="_blank">
-                {item.source || 'Fuente sin nombre'}
-              </a>
-            ) : (
-              <span>{item.source || 'Fuente sin nombre'}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function MacroChip({ event }: { event: ResearchNewsEvent }) {
   if (event.news_lane !== 'macro') return null;
   return (
@@ -220,7 +197,6 @@ function DateNotes({ event, inline = false }: { event: ResearchNewsEvent; inline
 function ContextDetail({ event }: { event: ResearchNewsEvent }) {
   return (
     <dl className="mt-1 max-w-xs space-y-1 break-words rounded-md border border-gray-800 p-2">
-      <div><dt className="inline font-medium">Fuente: </dt><dd className="inline">{event.source || NA}</dd></div>
       <div><dt className="inline font-medium">Tipo: </dt><dd className="inline">{etiquetaTipoEvento(event.event_type)}</dd></div>
       {/* Datos decisionales reubicados (SERIE 1, auditoria): nunca crudos, nulos etiquetados "sin datos". */}
       <div><dt className="inline font-medium">Tier de fuente: </dt><dd className="inline">{event.source_tier ? etiquetaTierFuente(event.source_tier) : NA}</dd></div>
@@ -235,7 +211,6 @@ function ContextAndCoverage({ event }: { event: ResearchNewsEvent }) {
   return (
     <>
       <ContextDetail event={event} />
-      <CoverageDetail event={event} />
     </>
   );
 }

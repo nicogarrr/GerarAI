@@ -38,7 +38,6 @@
     "addWatchlist": "Add to watchlist",
     "addInvestment": "Add investment",
     "emptyRange": "No events in this range. Live earnings and ex-dividends only cover the US (USD); payment dates and ex-dividends from other markets come from your imported dividend history, which only shows what its source has declared.",
-    "sourcePre": "Source: {source}",
     "typeEarnings": "Earnings",
     "typeDividendEx": "Ex-dividend",
     "typeDividendPayment": "Dividend payment",
@@ -75,11 +74,8 @@
     "assetWebcast": "Webcast",
     "assetGrabacion": "Recording",
     "assetTranscripcion": "Transcript",
-    "sourceAria": "Source of the {ticker} date: {source}",
-    "sourceTitle": "Source: {source}",
-    "openAria": "Open {name}",
-    "sourcesPre": "Source: ",
-    "sourcesPrePlural": "Sources: "
+    "docAria": "Open the {ticker} date document (external link)",
+    "openAria": "Open {name}"
   },
   "strip": {
     "ariaLabel": "Earnings calendar",

@@ -97,7 +97,7 @@ describe('RiskDashboardView', () => {
         expect(screen.getByText(/No hay alertas en los datos disponibles/)).toBeInTheDocument();
     });
 
-    it('humaniza campos de FX, caja, procedencia y fechas', () => {
+    it('humaniza campos de FX, caja y fechas', () => {
         render(
             <RiskDashboardView
                 initialDashboard={{
@@ -141,16 +141,19 @@ describe('RiskDashboardView', () => {
         expect(screen.getByText(/Caja: 1 USD = 0,9000 EUR/)).toBeInTheDocument();
         expect(screen.getByText(/Posiciones: 1 GBP = 1,1000 EUR/)).toBeInTheDocument();
         expect(screen.getByText(/Posiciones y caja a fechas distintas/)).toBeInTheDocument();
-        expect(screen.getByText(/Base de datos de GerarAI/)).toBeInTheDocument();
+        // La procedencia ya no se pinta como etiqueta de fuente (2026-10-31).
+        expect(screen.queryByText(/Base de datos de GerarAI/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Procedencia/)).not.toBeInTheDocument();
         expect(screen.getByText('Sí')).toBeInTheDocument();
         expect(screen.getByText('No')).toBeInTheDocument();
         expect(screen.getByText('Some key')).toBeInTheDocument();
         expect(screen.queryByText('oculto')).not.toBeInTheDocument();
     });
 
-    it('provenance sin fuente o no-objeto', () => {
-        render(<RiskDashboardView initialDashboard={{ provenance: {}, data_as_of: null, cash_as_of: '' }} />);
-        expect(screen.getByText('Fuente interna')).toBeInTheDocument();
+    it('provenance no se pinta como etiqueta de fuente (decisión de producto 2026-10-31)', () => {
+        render(<RiskDashboardView initialDashboard={{ provenance: { source: 'CavaAI Postgres', fetched_at: '2026-10-30T10:00:00Z' }, data_as_of: null, cash_as_of: '' }} />);
+        expect(screen.queryByText(/Fuente/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/provenance/)).not.toBeInTheDocument();
         const r = render(<RiskDashboardView initialDashboard={{ provenance: 'x', status: 'zzz' }} />);
         expect(r.container.textContent).toContain('zzz');
     });

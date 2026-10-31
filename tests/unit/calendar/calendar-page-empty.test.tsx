@@ -1,3 +1,6 @@
+// La página es un server component traducido con getT(): lib/i18n/server lee
+// la cookie de locale vía next/headers; sin cookie el locale es «es».
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
