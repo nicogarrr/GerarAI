@@ -42,4 +42,8 @@ describe('Analistas: tooltips sin etiqueta de fuente', () => {
     assert.equal(enInsider.feed.canadaSourcePre, 'Unofficial source; the official record is ');
     assert.doesNotMatch(esInsider.feed.canadaSourcePre + enInsider.feed.canadaSourcePre, /Yahoo/i);
   });
+  it('el badge de Canada (movil y escritorio) tampoco nombra al proveedor', () => {
+    assert.equal(esInsider.feed.canadaBadge, 'Canadá · fuente no oficial');
+    assert.equal(enInsider.feed.canadaBadge, 'Canada · unofficial source');
+  });
 });
