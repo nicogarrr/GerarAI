@@ -19,6 +19,7 @@ export type OwnershipProvenance = {
   source_url: string | null;
   fetched_at: string;
   coverage: string;
+  note?: string | null;
 };
 
 // La via snapshot (sin sync en vivo) deja en null lo que el snapshot no tiene:
@@ -44,14 +45,17 @@ export type ManagerHoldingsStatus = 'ok' | 'mismatch' | 'unverified' | 'partial'
 
 export type ManagerHoldings = {
   cik: string;
-  manager?: string;
+  manager?: string | null;
   status: ManagerHoldingsStatus;
-  verification?: 'verified' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | null;
-  report_date?: string;
-  coverage?: string;
+  verification?: 'verified' | 'mismatch' | 'unverified' | 'partial' | 'unavailable' | 'snapshot_unverified' | null;
+  report_date?: string | null;
+  coverage?: string | null;
   holdings: ManagerHoldingRow[];
-  limitations?: string[];
-  provenance?: OwnershipProvenance;
+  errors?: unknown[] | null;
+  limitations?: string[] | null;
+  transport?: string | null;
+  snapshot_synced_at?: string | null;
+  provenance?: OwnershipProvenance | null;
 };
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -106,15 +110,15 @@ export type ManagerChangeRow = {
 
 export type ManagerChanges = {
   cik: string;
-  manager?: string;
+  manager?: string | null;
   status: 'ok' | 'insufficient_history' | 'unavailable';
-  detail?: string;
-  latest_report?: string;
-  previous_report?: string;
-  compared_accessions?: { latest: string; previous: string; rule: string };
+  detail?: string | null;
+  latest_report?: string | null;
+  previous_report?: string | null;
+  compared_accessions?: { latest: string; previous: string; rule: string } | null;
   changes: ManagerChangeRow[];
-  limitations?: string[];
-  provenance?: OwnershipProvenance;
+  limitations?: string[] | null;
+  provenance?: OwnershipProvenance | null;
 };
 
 export async function getManagerChanges(cik: string): Promise<ManagerChanges> {
