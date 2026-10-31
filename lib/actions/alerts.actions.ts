@@ -5,6 +5,7 @@ import { cachedFetch } from '@/lib/cache/memoryTTL';
 import { requestCache } from '@/lib/cache/requestCache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { AppError, isNextRedirectError, ValidationError } from '@/lib/types/errors';
+import { paginateAll } from '@/lib/paginate-all';
 import { spanishBackendMessage } from '@/lib/research/backend-error-es';
 
 export type AlertType = 'price_above' | 'price_below' | 'price_change' | 'news' | 'earnings';
@@ -159,9 +160,26 @@ async function alertCacheKeys(): Promise<{ user: string; active: string; recent:
 }
 
 // User alerts are a short-lived read: mutations explicitly invalidate the keys.
+// El endpoint pagina con limit/offset (defecto 100, max 500): sin paginar, un
+// usuario con mas de 100 reglas activas veria una lista CORTADA como completa.
+// paginateAll pide todas las paginas y lanza si el backend no avanza: nunca se
+// entrega una parcial.
+const ALERT_RULES_PAGE = 500;
 export async function getUserAlerts(): Promise<Alert[]> {
     const keys = await alertCacheKeys();
-    const alerts = await cachedFetch(keys.active, () => researchRequest<ResearchAlertRule[]>('/api/alerts/rules?active=true'), 15);
+    const alerts = await cachedFetch(
+        keys.active,
+        () =>
+            paginateAll(
+                (offset) =>
+                    researchRequest<ResearchAlertRule[]>(
+                        `/api/alerts/rules?active=true&limit=${ALERT_RULES_PAGE}&offset=${offset}`,
+                    ),
+                ALERT_RULES_PAGE,
+                (rule) => String(rule.id),
+            ),
+        15,
+    );
     return alerts.map(toAlert);
 }
 
