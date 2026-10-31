@@ -1,11 +1,24 @@
-"""Explicit tenant predicates for reads that bypass ORM entity loading.
+"""Predicados explicitos de tenant: segunda capa sobre el loader criteria.
 
-`with_loader_criteria` in app/core/database.py scopes ORM entity loads. A
-`select(Model.column)` or an aggregate (`func.count`, `func.max`, a window
-function) is a column query and can be compiled without that criteria
-(SQLAlchemy 2.0), so every read of a ``TenantOwnedMixin`` model must add its
-own tenant predicate. Use :func:`tenant_filters` as ``*tenant_filters(db,
-Model)`` in the ``where``/subquery of those reads.
+`with_loader_criteria` en app/core/database.py acota TODOS los selects ORM
+con contexto de tenant: entity loads y tambien column selects de entidad
+(`select(Model.column)`), agregados (`func.count`/`func.max`), GROUP BY,
+joins, subqueries IN y window functions. Medido en SQLAlchemy 2.1.6 (rango
+fijado >=2.0.32,<2.2) y fijado por
+tests/test_tenant_column_isolation.py::test_loader_criteria_scopes_column_and_aggregate_selects_too,
+que rompe CI si un bump de SQLAlchemy cambia ese comportamiento.
+
+Aun asi, toda lectura de un modelo ``TenantOwnedMixin`` debe seguir usando
+:func:`tenant_filters` (``*tenant_filters(db, Model)`` en el where/subquery):
+
+1. Defensa en profundidad: si el criteria se pierde (un refactor del hook,
+   un ``include_all_tenants`` mal puesto, un bump de SQLAlchemy), la
+   consulta sigue acotada.
+2. Fail-closed: sin contexto de tenant y con auth obligatoria o en
+   produccion, :func:`tenant_filters` levanta en vez de leer todos los
+   tenants; el criteria simplemente no se activa sin tenant en la sesion.
+3. Ejecuciones no-ORM (``db.connection().execute(...)``, ``text()``) nunca
+   pasan por el criteria: ahi el predicado explicito es la UNICA capa.
 """
 
 from __future__ import annotations

@@ -297,11 +297,13 @@ class CompanySnapshotService:
     def _counts_many(db: Session, company_ids: list[int]) -> dict[int, dict[str, int]]:
         """Los 8 conteos por empresa: una query GROUP BY por tabla, no por empresa."""
 
-        # F315: with_loader_criteria no alcanza a los agregados
-        # (func.count() select_from): TODAS las entidades tenant-owned se
-        # filtran explicitamente, no solo documents. Company es global y
-        # compartida entre tenants; sin este filtro un snapshot sumaba los
-        # facts/metrics/claims/versions/reviews/alerts de otros tenants.
+        # F315: medido en SQLAlchemy 2.1.6, with_loader_criteria SI alcanza
+        # a los agregados (func.count() select_from); aun asi TODAS las
+        # entidades tenant-owned se filtran explicitamente, no solo
+        # documents, como segunda capa y fail-closed. Company es global y
+        # compartida entre tenants; sin ninguna de las dos capas un snapshot
+        # sumaba los facts/metrics/claims/versions/reviews/alerts de otros
+        # tenants.
         tenant_id = db.info.get("tenant_id")
 
         def grouped(entity: type, *extra_where) -> dict[int, int]:
@@ -327,8 +329,9 @@ class CompanySnapshotService:
             .where(Document.company_id.in_(company_ids))
             .group_by(Document.company_id)
         )
-        # with_loader_criteria no alcanza a los agregados (func.count()
-        # select_from): sin filtro explícito una empresa compartida entre
+        # El filtro explícito es segunda capa sobre with_loader_criteria
+        # (que medido en SQLAlchemy 2.1.6 SI alcanza a los agregados):
+        # sin ninguna de las dos capas una empresa compartida entre
         # tenants sumaría los documentos de todos. Mismo patrón que
         # /documents/count.
         if tenant_id is not None:
@@ -505,9 +508,9 @@ class CompanySnapshotService:
     @staticmethod
     def _counts(db: Session, company_id: int) -> dict[str, int]:
         """Los 8 conteos en UNA sola query (anti 8 round-trips por snapshot)."""
-        # Filtro de tenant explicito: los criterios de carga
-        # (with_loader_criteria) no alcanzan a los agregados
-        # func.count().select_from(...) — ver _counts_many.
+        # Filtro de tenant explicito: segunda capa y fail-closed; medido
+        # en SQLAlchemy 2.1.6, with_loader_criteria SI alcanza a los
+        # agregados func.count().select_from(...) — ver _counts_many.
         tenant_id = db.info.get("tenant_id")
         documents_subquery = without_archive_duplicates(
             select(func.count()).select_from(Document).where(Document.company_id == company_id)
@@ -516,8 +519,9 @@ class CompanySnapshotService:
             documents_subquery = documents_subquery.where(Document.tenant_id == tenant_id)
 
         # F315: las 7 entidades tenant-owned se cuentan con filtro de
-        # tenant explícito (los agregados no heredan with_loader_criteria);
-        # Company es global y compartida entre tenants.
+        # tenant explícito como segunda capa (medido en SQLAlchemy 2.1.6,
+        # los agregados SI heredan with_loader_criteria); Company es global
+        # y compartida entre tenants.
         def scoped_count(entity: type, *extra_where):
             stmt = (
                 select(func.count())

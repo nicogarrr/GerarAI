@@ -44,12 +44,13 @@ class BudgetController:
 
     def current_usage(self, db: Session, *, admin: bool = False) -> dict:
         today = date.today()
-        # BudgetUsage es TenantOwnedMixin, asi que el agregado tiene que
-        # filtrar por tenant. Sin el predicado, `db.scalar(select(sum(...)))`
-        # con una sola columna no dispara el with_loader_criteria de
-        # app/core/database.py y el total era GLOBAL: un solo tenant podia
-        # agotar el tope diario de todos los demas, y ningun tenant podia
-        # ver su propio consumo. La columna existia precisely para esto.
+        # BudgetUsage es TenantOwnedMixin, asi que el agregado filtra por
+        # tenant. Medido en SQLAlchemy 2.1.6: `db.scalar(select(sum(...)))`
+        # de una sola columna SI dispara el with_loader_criteria de
+        # app/core/database.py; el predicado explicito queda como segunda
+        # capa y fail-closed. Sin ninguna de las dos capas el total era
+        # GLOBAL: un solo tenant podia agotar el tope diario de todos los
+        # demas, y ningun tenant podia ver su propio consumo.
         tenant_id = db.info.get("tenant_id")
         if tenant_id is None and not admin:
             # Falla cerrado: sin tenant el agregado seria GLOBAL y can_spend

@@ -5,7 +5,10 @@ import {readFileSync} from 'node:fs';
 import {etiquetaComponenteAtribucion} from '../lib/labels.ts';
 test('missing stress tickers keep their contextual label and dates are localized',()=>{
  const s=readFileSync('components/historical-stress/HistoricalStressView.tsx','utf8');
- assert.ok(s.includes("Sin histórico suficiente: {window.missing_tickers.join(', ')}"));
+ assert.ok(s.includes('portfolio.stress.noHistoryFor'), 'aviso de histórico vía i18n');
+ const dict=JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json','utf8'));
+ assert.ok(dict.stress.noHistoryFor.startsWith('Sin histórico suficiente: '), 'valor es del aviso de histórico');
+ assert.ok(s.includes("tickers: window.missing_tickers.join(', ')"), 'los tickers se interpolan en el aviso');
  assert.ok(s.includes('formatMarketDate(value)'));
 });
 test('sizing contribution is not labeled as position size',()=>{

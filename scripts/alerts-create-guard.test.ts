@@ -1,5 +1,6 @@
 /**
  * Guard: el botón «Crear alerta» no admite doble click.
+ * (i18n: el literal del umbral positivo vive en messages/<locale>/alerts.json; se busca la clave.)
  *
  * handleCreateAlert no tenía guard de vuelo y el Button no tenía disabled:
  * dos clicks lanzaban dos createAlert (el borrado ya tenía su patrón
@@ -34,7 +35,7 @@ describe('alta de alerta: sin doble click', () => {
 
 describe('alta de alerta: umbral de precio positivo', () => {
     it('el formulario rechaza precios <= 0 antes de llamar a createAlert', () => {
-        const at = alerts.indexOf('El precio debe ser mayor que 0');
+        const at = alerts.indexOf("ti('alerts.errors.pricePositive')");
         assert.ok(at !== -1 && at < alerts.indexOf('setCreating(true);'));
     });
     it('la server action también lo rechaza', () => {

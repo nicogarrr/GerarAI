@@ -2062,6 +2062,12 @@ class FundamentalValuationSnapshot(TenantOwnedMixin, Base, TimestampMixin):
             "market_snapshot_fingerprint",
             name="uq_fundamental_valuation_market_snapshot",
         ),
+        # MEDIDO: el nombre autogenerado (ix_<tabla>_<columna>, 65 chars) supera
+        # el limite de identificadores de PostgreSQL (63); nombre explicito.
+        Index(
+            "ix_fundamental_valuation_snapshots_valuation_fp",
+            "valuation_snapshot_fingerprint",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -2071,7 +2077,7 @@ class FundamentalValuationSnapshot(TenantOwnedMixin, Base, TimestampMixin):
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
     current_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
     market_snapshot_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
-    valuation_snapshot_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    valuation_snapshot_fingerprint: Mapped[str] = mapped_column(String(64))
     snapshot: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
@@ -2373,13 +2379,19 @@ class InvestmentCaseStudy(TenantOwnedMixin, Base, TimestampMixin):
 
 class DecisionLesson(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "decision_lessons"
+    # MEDIDO: la migracion creo un CONSTRAINT unique (no indice) con este
+    # nombre; el modelo lo declara igual para que la deriva sea cero. La
+    # unicidad (y su indice de soporte en PG) es identica.
+    __table_args__ = (
+        UniqueConstraint("expectation_review_id", name="uq_decision_lesson_expectation_review"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     decision_journal_entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("decision_journal_entries.id"), nullable=True, index=True
     )
     expectation_review_id: Mapped[int | None] = mapped_column(
-        ForeignKey("expectation_reviews.id"), nullable=True, unique=True, index=True
+        ForeignKey("expectation_reviews.id"), nullable=True
     )
     company_id: Mapped[int | None] = mapped_column(
         ForeignKey("companies.id"), nullable=True, index=True
@@ -2552,6 +2564,11 @@ class KnowledgeGraphEdge(TenantOwnedMixin, Base, TimestampMixin):
 
 class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "management_promises"
+    # MEDIDO: la BD tiene el unique como constraint con nombre automatico de
+    # PG (columna UNIQUE en el CREATE TABLE); el modelo lo declara igual.
+    __table_args__ = (
+        UniqueConstraint("call_claim_id", name="management_promises_call_claim_id_key"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     company_id: Mapped[int] = mapped_column(ForeignKey("companies.id"), index=True)
@@ -2559,7 +2576,7 @@ class ManagementPromise(TenantOwnedMixin, Base, TimestampMixin):
         ForeignKey("documents.id", ondelete="SET NULL"), nullable=True, index=True
     )
     call_claim_id: Mapped[int | None] = mapped_column(
-        ForeignKey("call_claims.id", ondelete="SET NULL"), nullable=True, unique=True, index=True
+        ForeignKey("call_claims.id", ondelete="SET NULL"), nullable=True
     )
     promise: Mapped[str] = mapped_column(Text)
     promise_date: Mapped[date] = mapped_column(Date, index=True)

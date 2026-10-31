@@ -19,7 +19,7 @@ import { fairValueGapPercent } from '@/lib/portfolio/holding-signals';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
 import { getHomeWatchlistPreview, getHomeOpportunities } from '@/lib/actions/home-overview.actions';
 import { getHomeOverviewBundle, type HomeOverviewBundle } from '@/lib/actions/home-bundle.actions';
-import { sectionError } from '@/lib/section-error';
+import { sectionErrorKey } from '@/lib/section-error';
 import {
     getRecentTriggeredAlerts,
     getUserAlerts,
@@ -30,7 +30,8 @@ import { holdingDisplayMode } from '@/lib/portfolio/holding-display';
 import { alertCardDestination, alertThesisHref } from '@/lib/alerts/card-destination';
 import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
-import { t } from '@/lib/i18n/t';
+import { useLocale, useT } from '@/lib/i18n/client';
+import { t as legacyT } from '@/lib/i18n/t';
 import { buildPortfolioInsight } from '@/lib/portfolio-insight';
 import HomeAttention from '@/components/HomeAttention';
 
@@ -70,14 +71,15 @@ interface UndervaluedStock {
 
 /** Valor justo único de una posición en el inicio: margen frente al precio y su fuente. */
 function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; signals: ReturnType<typeof useHoldingSignals> }) {
+    const t = useT();
     if (signals === null) return null;
     const fair = signals.fairValues[holding.symbol.toUpperCase()];
-    if (!fair) return <span className="text-[11px] text-gray-500">Sin valor justo</span>;
+    if (!fair) return <span className="text-[11px] text-gray-500">{t('home.fair.none')}</span>;
     const gap = fairValueGapPercent(holding.currentPrice, holding.nativeCurrency, fair);
     return (
-        <span className="text-[11px] text-gray-400" title={`Valor justo · ${fair.label}`}>
+        <span className="text-[11px] text-gray-400" title={t('home.fair.title', { label: fair.label })}>
             VJ {gap !== null ? formatPercent(gap, { fromRatio: false, digits: 0, signDisplay: 'always' }) : formatNumber(fair.value)}
-            <span className="text-gray-500"> · {fair.source === 'tesis' ? 'tesis' : fair.source === 'motor' ? 'motor' : 'motor orient.'}</span>
+            <span className="text-gray-500"> · {fair.source === 'tesis' ? t('home.fair.source.tesis') : fair.source === 'motor' ? t('home.fair.source.motor') : t('home.fair.source.orient')}</span>
         </span>
     );
 }
@@ -128,52 +130,53 @@ const EMPTY_RETRY_TOKENS: Record<SectionKey, number> = {
  * maquetación) y marca como hecho lo que ya ha hecho.
  */
 function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
+    const t = useT();
     const watchlistDone = (watchlistCount ?? 0) > 0;
     const stepClass = 'flex min-h-[44px] items-start gap-3 rounded-lg border border-gray-700/40 bg-gray-900/30 p-3';
     return (
         <div>
-            <h3 className="text-base font-semibold text-white">Primeros pasos</h3>
-            <p className="mt-1 text-sm text-gray-400">Tres pasos para que el inicio te diga qué ha cambiado en tus empresas.</p>
+            <h3 className="text-base font-semibold text-white">{t('home.steps.title')}</h3>
+            <p className="mt-1 text-sm text-gray-400">{t('home.steps.subtitle')}</p>
             <ol className="mt-4 space-y-2">
                 <li className={stepClass}>
                     {watchlistDone
                         ? <CheckCircle2 aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-teal-400" />
                         : <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />}
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-100">Sigue tus empresas</p>
+                        <p className="text-sm font-medium text-gray-100">{t('home.steps.followTitle')}</p>
                         <p className="text-xs text-gray-400">
                             {watchlistDone
-                                ? `Hecho: sigues ${watchlistCount} ${watchlistCount === 1 ? 'empresa' : 'empresas'}.`
-                                : 'Añádelas a la watchlist para ver precio, valoración y avisos.'}
+                                ? t('home.steps.followDone', { count: watchlistCount ?? 0, unit: watchlistCount === 1 ? t('home.steps.company') : t('home.steps.companies') })
+                                : t('home.steps.followTodo')}
                         </p>
                     </div>
                     <Link href={watchlistDone ? '/watchlist' : '/watchlist?anadir=1'} className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
-                        {watchlistDone ? 'Ver' : 'Añadir'}
-                        <span className="sr-only"> empresas a la watchlist</span>
+                        {watchlistDone ? t('home.steps.view') : t('home.steps.add')}
+                        <span className="sr-only">{t('home.steps.watchlistSr')}</span>
                     </Link>
                 </li>
                 <li className={stepClass}>
                     <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-100">Registra tu primera compra</p>
-                        <p className="text-xs text-gray-400">Con tus posiciones verás el valor de la cartera y dónde poner la aportación del mes.</p>
+                        <p className="text-sm font-medium text-gray-100">{t('home.steps.buyTitle')}</p>
+                        <p className="text-xs text-gray-400">{t('home.steps.buyBody')}</p>
                     </div>
                     <Link href="/portfolio?anadir=1" className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200">
-                        Añadir<span className="sr-only"> inversión</span>
+                        {t('home.steps.add')}<span className="sr-only">{t('home.steps.investmentSr')}</span>
                     </Link>
                 </li>
                 <li className={stepClass}>
                     <Circle aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0 text-gray-500" />
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-100">Pregunta al Cerebro</p>
-                        <p className="text-xs text-gray-400">Por ejemplo: «¿Qué está barato de mi watchlist?»</p>
+                        <p className="text-sm font-medium text-gray-100">{t('home.steps.brainTitle')}</p>
+                        <p className="text-xs text-gray-400">{t('home.steps.brainBody')}</p>
                     </div>
                     <button
                         type="button"
                         onClick={() => window.dispatchEvent(new Event('gerarai:open-brain'))}
                         className="inline-flex min-h-[44px] shrink-0 items-center text-sm text-teal-300 hover:text-teal-200"
                     >
-                        Abrir<span className="sr-only"> el Cerebro</span>
+                        {t('home.steps.open')}<span className="sr-only">{t('home.steps.brainSr')}</span>
                     </button>
                 </li>
             </ol>
@@ -182,9 +185,10 @@ function FirstSteps({ watchlistCount }: { watchlistCount: number | null }) {
 }
 
 function SectionSkeleton({ rows = 3, className }: { rows?: number; className?: string }) {
+    const t = useT();
     return (
         <div className={className}>
-            <span className="sr-only" role="status">Cargando…</span>
+            <span className="sr-only" role="status">{t('common.states.loading')}</span>
             <div aria-hidden="true" className="space-y-3">
                 {Array.from({ length: rows }).map((_, index) => (
                     <Skeleton className="h-12 w-full" key={index} />
@@ -205,9 +209,10 @@ function SectionSkeleton({ rows = 3, className }: { rows?: number; className?: s
  * CLS 0,16 en móvil (barrido del 29-oct-2026).
  */
 function PortfolioCardSkeleton() {
+    const t = useT();
     return (
         <div data-testid="portfolio-skeleton">
-            <span className="sr-only" role="status">Cargando…</span>
+            <span className="sr-only" role="status">{t('common.states.loading')}</span>
             <div aria-hidden="true" className="space-y-5">
                 <div className="rounded-xl border border-gray-700/50 bg-gray-900/60 p-4">
                     <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2">
@@ -233,44 +238,46 @@ function PortfolioCardSkeleton() {
 }
 
 function InlineSectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
+    const t = useT();
+    const text = message.startsWith('ui.sectionError.') ? t(message as Parameters<typeof t>[0]) : message;
     return (
         <div className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-            <span>{message}</span>
-            <button type="button" onClick={onRetry} className="underline hover:text-amber-100">Reintentar</button>
+            <span>{text}</span>
+            <button type="button" onClick={onRetry} className="underline hover:text-amber-100">{t('common.actions.retry')}</button>
         </div>
     );
 }
 
 /** El backend devuelve la severidad en inglés ("high", "critical"): sin
  *  traducirla se colaba copy en inglés en la UI. */
-const SEVERITY_LABELS: Record<string, string> = {
-    critical: 'crítica',
-    high: 'alta',
-    medium: 'media',
-    low: 'baja',
-    info: 'informativa',
-};
+const SEVERITY_KEYS = {
+    critical: 'home.severity.critical',
+    high: 'home.severity.high',
+    medium: 'home.severity.medium',
+    low: 'home.severity.low',
+    info: 'home.severity.info',
+} as const;
 
 /** La cabecera de la alerta lleva la fecha del hecho; si es el mismo día que
- *  la hora de entrega que se ve justo al lado, se omite para no repetirla. */
-const ALERT_HEADING_DATE = /( · (?:detectada )?)(\d{1,2} [^\s·]+ \d{4})$/;
-function alertHeading(heading: string, createdAt: string): string {
-    const match = ALERT_HEADING_DATE.exec(heading);
-    if (!match) return heading;
+ *  la hora de entrega que se ve justo al lado, se omite para no repetirla. El
+ *  sufijo exacto lo devuelve card-copy (ya traducido y con el formato del
+ *  idioma activo): nada de parsear meses en español con regex. */
+function alertHeading(heading: string, dateSuffix: string | null, createdAt: string, locale: string): string {
+    if (!dateSuffix || !heading.endsWith(dateSuffix)) return heading;
     const created = new Date(createdAt);
     if (Number.isNaN(created.getTime())) return heading;
-    const sameDay = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' }).format(created);
-    return sameDay === match[2] ? heading.replace(ALERT_HEADING_DATE, '') : heading;
+    const sameDay = new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'es-ES', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid' }).format(created);
+    return dateSuffix.endsWith(sameDay) ? heading.slice(0, -dateSuffix.length) : heading;
 }
 
 /** Una regla de alerta en una línea legible: "AAPL: precio por encima de 200". */
 function alertRuleLabel(alert: Alert): string {
     const labels: Record<Alert['type'], string> = {
-        price_above: t('alerts.types.priceAbove'),
-        price_below: t('alerts.types.priceBelow'),
-        price_change: t('alerts.types.priceChange'),
-        news: t('alerts.types.news'),
-        earnings: t('alerts.types.earnings'),
+        price_above: legacyT('alerts.types.priceAbove'),
+        price_below: legacyT('alerts.types.priceBelow'),
+        price_change: legacyT('alerts.types.priceChange'),
+        news: legacyT('alerts.types.news'),
+        earnings: legacyT('alerts.types.earnings'),
     };
     if (alert.type === 'news' || alert.type === 'earnings') return `${alert.symbol}: ${labels[alert.type]}`;
     const value = typeof alert.condition.value === 'number'
@@ -284,10 +291,12 @@ function alertRuleLabel(alert: Alert): string {
 function settle<T>(promise: Promise<T>, fallback: T): Promise<{ data: T; error: string | null }> {
     return promise
         .then((data) => ({ data, error: null as string | null }))
-        .catch((error) => ({ data: fallback, error: sectionError(error) }));
+        .catch((error) => ({ data: fallback, error: sectionErrorKey(error) }));
 }
 
 export default function PersonalizedOverview({ userId, afterAlerts }: PersonalizedOverviewProps) {
+    const t = useT();
+    const locale = useLocale();
     const [retryTokens, setRetryTokens] = useState<Record<SectionKey, number>>(EMPTY_RETRY_TOKENS);
     const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
     const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -329,7 +338,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         }
         return bundleRef.current.promise
             .then((bundle) => bundle[key])
-            .catch((error) => ({ data: fallback, error: sectionError(error) }));
+            .catch((error) => ({ data: fallback, error: sectionErrorKey(error) }));
     }, [userId]);
 
     // Una sección, un disparador: cada «Reintentar» vuelve a pedir solo su
@@ -497,8 +506,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         <div className="space-y-6">
             {/* Encabezado: el h1 es el dato accionable del día, no un saludo. */}
             <div>
-                <p className="text-sm font-semibold uppercase text-teal-300">Tu research hoy</p>
-                <h1 className="mt-1 text-2xl font-bold break-words text-gray-100 sm:text-3xl">Qué ha cambiado</h1>
+                <p className="text-sm font-semibold uppercase text-teal-300">{t('home.overview.kicker')}</p>
+                <h1 className="mt-1 text-2xl font-bold break-words text-gray-100 sm:text-3xl">{t('home.overview.title')}</h1>
             </div>
 
             {/* 1 · Cartera hoy. La frase «tu cartera en una línea» vive DENTRO de
@@ -510,10 +519,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Wallet aria-hidden="true" className="h-5 w-5 text-blue-400" />
-                        Tu cartera hoy
+                        {t('home.portfolio.title')}
                     </CardTitle>
                     <Link href="/portfolio" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-blue-400 hover:text-blue-300 text-sm transition-colors">
-                        <span className="whitespace-nowrap">Ver detalles</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{t('home.portfolio.details')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -527,20 +536,20 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <div className="space-y-5">
                             <PortfolioValueBreakdown summary={portfolioSummary} />
                             <div className="flex items-center justify-between gap-3 text-sm">
-                                <span className="text-gray-400">Ganancia/Pérdida desde la compra</span>
+                                <span className="text-gray-400">{t('home.portfolio.gainLoss')}</span>
                                 <span className={`font-semibold ${insight.kind !== 'movement' ? 'text-gray-500' : portfolioSummary.totalGainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                     {insight.kind !== 'movement' ? 'N/D' : formatPercent(portfolioSummary.totalGainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                 </span>
                             </div>
-                            <p className="text-xs text-gray-400">Pesos sobre el valor bruto de las posiciones.</p>
+                            <p className="text-xs text-gray-400">{t('home.portfolio.weightsNote')}</p>
                             {insight.kind === 'empty' && (
-                                <p className="text-xs text-gray-400">Todavía no tienes posiciones. Añade tu primera inversión para ver aquí qué ha cambiado desde la compra.</p>
+                                <p className="text-xs text-gray-400">{t('home.portfolio.empty')}</p>
                             )}
                             {insight.kind === 'no-cost-basis' && (
-                                <p className="text-xs text-gray-400">Todavía no tenemos la base de coste de tus posiciones. Cuando esté cargada, aquí verás cómo va tu cartera desde la compra.</p>
+                                <p className="text-xs text-gray-400">{t('home.portfolio.noCostBasis')}</p>
                             )}
                             {insight.kind === 'movement' && insight.partial && (
-                                <p className="text-xs text-gray-400">Entre las posiciones con base de coste: la ganancia/pérdida no incluye las demás.</p>
+                                <p className="text-xs text-gray-400">{t('home.portfolio.partial')}</p>
                             )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 {sortedHoldings
@@ -581,7 +590,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 className="inline-flex min-h-[44px] items-center gap-1 text-sm text-teal-300 hover:text-teal-200"
                             >
                                 <span className="min-w-0">
-                                    {topMover ? `Revisar ${topMover.symbol} (mayor variación desde la compra)` : 'Revisar tu cartera'}
+                                    {topMover ? t('home.portfolio.reviewMover', { symbol: topMover.symbol }) : t('home.portfolio.reviewAll')}
                                 </span>
                                 <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                             </Link>
@@ -599,10 +608,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <BellRing aria-hidden="true" className="h-5 w-5 text-amber-400" />
-                        Alertas
+                        {t('home.alerts.title')}
                     </CardTitle>
                     <Link href="/alerts" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-amber-400 hover:text-amber-300 text-sm transition-colors">
-                        <span className="whitespace-nowrap">Gestionar</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{t('home.alerts.manage')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -620,17 +629,17 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 // relative z-10 y conserva su destino. Sin enlaces
                                 // anidados ni roles duplicados.
                                 const destination = alertCardDestination(item);
-                                const copy = alertCardCopy(item);
+                                const copy = alertCardCopy(item, t, locale);
                                 return (
                                 <article
                                     className={`min-w-0 rounded-lg border p-3 ${destination ? 'relative border-gray-700/50 bg-gray-900/50 transition-colors hover:border-teal-700/60 hover:bg-gray-900' : 'border-gray-700/50 bg-gray-900/50'}`}
                                     key={item.id}
                                 >
                                     <div className="flex flex-wrap items-center gap-2">
-                                        {(item.severity === 'critical' || item.severity === 'high') && <Badge variant="outline">{SEVERITY_LABELS[item.severity] ?? item.severity}</Badge>}
+                                        {(item.severity === 'critical' || item.severity === 'high') && <Badge variant="outline">{t(SEVERITY_KEYS[item.severity as keyof typeof SEVERITY_KEYS] ?? 'home.severity.info')}</Badge>}
                                         <span className="text-xs text-gray-500">{formatUserDateTime(item.createdAt)}</span>
                                     </div>
-                                    <p className="mt-2 text-sm break-words font-semibold text-gray-100">{alertHeading(copy.heading, item.createdAt)}</p>
+                                    <p className="mt-2 text-sm break-words font-semibold text-gray-100">{alertHeading(copy.heading, copy.dateSuffix, item.createdAt, locale)}</p>
                                     {/* tracked_news lleva el titular crudo de la fuente: misma
                                         traducción bajo demanda que en /alerts (#1493). */}
                                     {alertSummaryIsSourceHeadline(item) ? (
@@ -638,7 +647,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     ) : (
                                         <p className="mt-1 text-sm break-words text-gray-300">{copy.summary}</p>
                                     )}
-                                    {!item.alert_type.includes('news') && <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>}
+                                    {!item.alert_type.includes('news') && <details className="relative z-10 mt-2 break-words text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">{t('home.alerts.originalNotice')}</summary><p className="whitespace-pre-wrap">{copy.technical}</p></details>}
                                     {(item.ticker || item.sourceUrl) && (
                                         <span className="mt-2 inline-flex flex-wrap gap-3">
                                             {item.ticker && (
@@ -646,7 +655,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                     className="inline-flex min-h-[44px] items-center text-xs text-teal-400 after:absolute after:inset-0 after:rounded-lg after:content-[''] hover:text-teal-300 hover:underline"
                                                     href={alertThesisHref(item.ticker)}
                                                 >
-                                                    Revisar tesis de {item.ticker}
+                                                    {t('home.alerts.reviewThesis', { symbol: item.ticker })}
                                                 </Link>
                                             )}
                                             {item.sourceUrl && (
@@ -656,7 +665,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                     rel="noopener noreferrer"
                                                     target="_blank"
                                                 >
-                                                    Abrir documento
+                                                    {t('home.alerts.openDocument')}
                                                 </a>
                                             )}
                                         </span>
@@ -665,7 +674,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 );
                             })}
                             <p className="text-xs text-gray-500">
-                                {alerts.length === 1 ? '1 regla activa' : `${alerts.length} reglas activas`} · el motor las evalúa cada 5 min.
+                                {`${alerts.length === 1 ? t('home.alerts.rulesActiveOne') : t('home.alerts.rulesActiveOther', { n: alerts.length })} · ${t('home.alerts.evaluated')}`}
                             </p>
                         </div>
                     ) : alerts.length > 0 ? (
@@ -680,7 +689,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 </Link>
                             ))}
                             <p className="text-xs text-gray-500">
-                                {alerts.length === 1 ? '1 regla activa' : `${alerts.length} reglas activas`} · ninguna se ha disparado todavía.
+                                {`${alerts.length === 1 ? t('home.alerts.rulesActiveOne') : t('home.alerts.rulesActiveOther', { n: alerts.length })} · ${t('home.alerts.noneTriggered')}`}
                             </p>
                         </div>
                     ) : (
@@ -702,10 +711,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Eye aria-hidden="true" className="h-5 w-5 text-yellow-400" />
-                        Últimas añadidas
+                        {t('home.watchlist.recent')}
                     </CardTitle>
                     <Link href="/watchlist" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-yellow-400 hover:text-yellow-300 text-sm transition-colors">
-                        <span className="whitespace-nowrap">Ver todo</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{t('home.watchlist.viewAll')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -733,7 +742,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                 <>
                                                     <div className="text-white font-mono">{isValidCurrencyCode(stock.currency) ? formatPrice(stock.price, stock.currency) : formatNumber(stock.price)}</div>
                                                     {stock.priceKind === 'close' && (
-                                                        <div className="text-[10px] text-gray-500">{stock.priceAsOf ? `Cierre ${formatMarketDate(stock.priceAsOf)}` : 'Cierre sin fecha de la fuente'}</div>
+                                                        <div className="text-[10px] text-gray-500">{stock.priceAsOf ? t('home.watchlist.close', { date: formatMarketDate(stock.priceAsOf) }) : t('home.watchlist.closeNoDate')}</div>
                                                     )}
                                                     {stock.changePercent != null && (
                                                         <div className={`text-xs ${stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
@@ -743,8 +752,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                 </>
                                             ) : (
                                                 <>
-                                                    <div className="font-mono text-gray-500" title="No hay cotización disponible">&mdash;</div>
-                                                    <div className="text-[10px] uppercase tracking-wide text-gray-500">sin datos</div>
+                                                    <div className="font-mono text-gray-500" title={t('home.watchlist.noQuote')}>&mdash;</div>
+                                                    <div className="text-[10px] uppercase tracking-wide text-gray-500">{t('home.watchlist.noData')}</div>
                                                 </>
                                             )}
                                         </div>
@@ -752,7 +761,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                 ))}
                             </div>
                             <p className="text-xs text-gray-500">
-                                {watchlistTotal > watchlist.length ? `Las ${watchlist.length} últimas añadidas de ${watchlistTotal}` : `${watchlistTotal} en total`} ·{' '}
+                                {watchlistTotal > watchlist.length ? t('home.watchlist.lastNOfTotal', { n: watchlist.length, total: watchlistTotal }) : t('home.watchlist.totalCount', { total: watchlistTotal })} ·{' '}
                                 <Link href="/watchlist" className="inline-flex min-h-[44px] items-center text-yellow-400 hover:underline">
                                     ver la lista completa
                                 </Link>
@@ -760,7 +769,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         </div>
                     ) : (
                         <div className="text-center py-8">
-                            <p className="text-gray-400 text-sm">Aún no sigues ninguna empresa.</p>
+                            <p className="text-gray-400 text-sm">{t('home.watchlist.empty')}</p>
                             {/* /watchlist tiene su propio «Añadir empresa» (con alta por
                                 símbolo): es el destino directo, sin pasar por /search. */}
                             <Link href="/watchlist" className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-lg border border-yellow-400/30 px-4 text-sm text-yellow-400 hover:bg-yellow-950/30">
@@ -777,10 +786,10 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-2 pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Gem aria-hidden="true" className="h-5 w-5 text-purple-400" />
-                        Oportunidades por valor intrínseco (DCF)
+                        {t('home.opportunities.title')}
                     </CardTitle>
                     <Link href="/screener" className="inline-flex min-h-[44px] items-center gap-1 px-2 -mr-2 text-purple-400 hover:text-purple-300 text-sm transition-colors">
-                        <span className="whitespace-nowrap">Afinar con el Screener</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{t('home.opportunities.refine')}</span> <ArrowRight aria-hidden="true" className="w-4 h-4 shrink-0" />
                     </Link>
                 </CardHeader>
                 <CardContent className="pt-4">
@@ -792,6 +801,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                         <>
                             <p className="mb-4 text-xs text-gray-500">
                                 {dcfScopeNote(
+                                    t,
                                     dcfScope ?? { probed: DCF_CANDIDATE_LIMIT, evaluated: DCF_CANDIDATE_LIMIT, failed: 0 },
                                     formatCompact(MIN_MARKET_CAP, { maximumFractionDigits: 0 }),
                                 )}
@@ -803,7 +813,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                     // (valor justo único, /api/valuation/{ticker}/fair-value)
                                     // no garantiza la divisa del listado, así que se declara N/D
                                     // en la etiqueta en vez de suponer dólares.
-                                    const priceLabel = isValidCurrencyCode(op.currency) ? 'Precio' : 'Precio (divisa N/D)';
+                                    const priceLabel = isValidCurrencyCode(op.currency) ? t('home.opportunities.price') : t('home.opportunities.priceUnknownCurrency', { na: NA });
                                     return (
                                         <Link key={op.symbol} href={`/research/${op.symbol}?view=valuation`}>
                                             <div className="p-4 bg-gray-900/40 rounded-xl border border-gray-700/30 hover:border-purple-500/50 hover:bg-gray-800 transition-all group">
@@ -815,7 +825,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                         </p>
                                                     </div>
                                                     <Badge className="border-good/30 bg-good/10 text-good">
-                                                        {formatPercent(op.upside, { fromRatio: false, digits: 1, signDisplay: 'always' })} potencial
+                                                        {t('home.opportunities.potential', { value: formatPercent(op.upside, { fromRatio: false, digits: 1, signDisplay: 'always' }) })}
                                                     </Badge>
                                                 </div>
                                                 <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
@@ -824,14 +834,14 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                                         style={{ width: `${Math.min(op.upside, 100)}%` }}
                                                     />
                                                 </div>
-                                                <p className="text-xs text-gray-500 mt-2 text-right">Valor justo (divisa N/D): {formatNumber(op.fairValue)}</p>
+                                                <p className="text-xs text-gray-500 mt-2 text-right">{t('home.opportunities.fairUnknown', { na: NA, value: formatNumber(op.fairValue) })}</p>
                                                 {op.fairValueLabel ? (
                                                     <p className="text-[11px] text-gray-500 mt-0.5 text-right">
-                                                        Fuente: {op.fairValueLabel}{op.fairValueAsOf ? ` · ${formatMarketDate(op.fairValueAsOf)}` : ''}
+                                                        {t('home.opportunities.source', { label: op.fairValueLabel })}{op.fairValueAsOf ? ` · ${formatMarketDate(op.fairValueAsOf)}` : ''}
                                                     </p>
                                                 ) : null}
                                                 {op.orientation ? (
-                                                    <p className="text-xs text-amber-500/90 mt-1 text-right">Orientación del motor, no valoración final</p>
+                                                    <p className="text-xs text-amber-500/90 mt-1 text-right">{t('home.opportunities.orientation')}</p>
                                                 ) : null}
                                             </div>
                                         </Link>
@@ -841,7 +851,7 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                             {/* Recortar la parrilla no puede callar lo que queda fuera. */}
                             {opportunities.length > OPPORTUNITY_TILE_LIMIT && (
                                 <p className="mt-4 text-xs text-gray-500">
-                                    Las {OPPORTUNITY_TILE_LIMIT} con más potencial de {opportunities.length}; las demás se afinan en «Afinar con el Screener».
+                                    {t('home.opportunities.topN', { limit: OPPORTUNITY_TILE_LIMIT, total: opportunities.length })}
                                 </p>
                             )}
                         </>

@@ -157,8 +157,9 @@ class PortfolioFXService:
         # Columnas, no entidades: con años de historico son miles de filas y
         # construir un objeto ORM por fila era la mayor parte del coste de
         # /api/portfolio/intelligence (que llama aqui varias veces). Una
-        # consulta de columnas no recibe el with_loader_criteria del tenant,
-        # asi que el predicado va explicito (mismo filtro, mismas filas).
+        # consulta de columnas SI recibe el with_loader_criteria del tenant
+        # (medido en SQLAlchemy 2.1.6); el predicado explicito queda como
+        # segunda capa y fail-closed (mismo filtro, mismas filas).
         rows = db.execute(
             select(
                 FXRate.base_currency,

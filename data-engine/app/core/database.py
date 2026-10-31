@@ -131,10 +131,13 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expi
 
 @event.listens_for(Session, "do_orm_execute")
 def _scope_tenant_queries(execute_state) -> None:
-    # Entity loads get the criteria below. Column/aggregate selects
-    # (`select(Model.columna)`, func.count/max, window functions) must add
-    # explicit predicates with app.core.tenancy.tenant_filters: on SQLAlchemy
-    # 2.0 the loader criteria does not reach those compiled column queries.
+    # El criteria acota todos los selects ORM con contexto de tenant:
+    # entity loads y tambien column selects, agregados, GROUP BY, joins,
+    # subqueries IN y window functions (medido en SQLAlchemy 2.1.6, rango
+    # fijado >=2.0.32,<2.2). Los predicados explicitos de
+    # app/core/tenancy.py siguen siendo obligatorios como segunda capa:
+    # defensa en profundidad, fail-closed sin contexto y ejecuciones
+    # no-ORM (Core/text()), que nunca pasan por aqui.
     if execute_state.execution_options.get("include_all_tenants"):
         return
     tenant_id = execute_state.session.info.get("tenant_id")

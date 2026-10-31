@@ -18,8 +18,12 @@ test('la rama sin datos nombra el factor de la columna', () => {
 });
 
 test('«sin datos» se mantiene (una puntuación sin datos no es un 0)', () => {
-    assert.match(noDataBranch, /sin datos/);
-    assert.match(component, /Una puntuación sin datos no es un 0\./);
+    // i18n: los textos viven en messages/<locale>/portfolio.json.
+    assert.match(noDataBranch, /portfolio\.scoresExtra\.noData/);
+    assert.match(component, /portfolio\.scoresExtra\.missingFor/);
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+    assert.equal(dict.scoresExtra.noData, 'sin datos');
+    assert.match(dict.scoresExtra.missingFor, /Una puntuación sin datos no es un 0\./);
 });
 
 test('la rama con datos sigue nombrando el factor', () => {

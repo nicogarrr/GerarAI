@@ -23,6 +23,7 @@ from app.valuation.engines.base import (
     is_adr_without_ratio,
     margin_of_safety,
 )
+from app.valuation.fact_reference import usable_fact
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.scenario_definitions import evidence_weighted_probabilities
 from app.valuation.scenario_model import Scenario, probability_weighted_value
@@ -63,11 +64,19 @@ class CommodityCycleEngine(ValuationEngine):
             return result
 
         def latest(metric: str) -> FinancialFact | None:
-            return context.db.scalar(
-                select(FinancialFact)
-                .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
-                .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
-                .limit(1)
+            # Sin LIMIT 1 + filtro de cuarentena: la fila mas reciente puede
+            # estar envenenada (cuarentena ESEF); la usable es la anterior.
+            return next(
+                (
+                    candidate
+                    for candidate in context.db.scalars(
+                        select(FinancialFact)
+                        .where(FinancialFact.company_id == company.id, FinancialFact.metric == metric)
+                        .order_by(FinancialFact.fiscal_year.desc().nullslast(), desc(FinancialFact.created_at))
+                    ).all()
+                    if usable_fact(candidate)
+                ),
+                None,
             )
 
         volume_fact = latest("production_volume") or latest("sales_volume")

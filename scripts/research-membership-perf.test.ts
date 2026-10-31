@@ -17,7 +17,10 @@ test('research index does not await unused valuation/FX/data-quality summary', (
     assert.match(page, /portfolioMembership\(portfolioPositions\)/);
     const action = readFileSync('lib/actions/research.actions.ts', 'utf8').split('export async function getResearchPortfolioPositions')[1];
     assert.match(action, /requireAuthenticatedUser\(\)/);
-    assert.match(action, /paginateAll\(/);
-    assert.match(action, /\/api\/portfolio\/positions\?limit=2000&offset=/);
+    // Paginacion completa por page_info.has_next (fetchAllBackendPages, #3413):
+    // la firma anterior (paginateAll + limit=2000&offset=) ignoraba la paginacion
+    // real del backend (page/page_size, max 200) y repetia la pagina 1.
+    assert.match(action, /fetchAllBackendPages\(/);
+    assert.match(action, /\/api\/portfolio\/positions\?page=\$\{page\}&page_size=/);
     assert.doesNotMatch(action, /\/summary|\/data-quality/);
 });

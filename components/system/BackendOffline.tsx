@@ -3,6 +3,7 @@ import { RefreshCcw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { BackendOfflineAutoRetry } from '@/components/system/BackendOfflineAutoRetry';
+import { getT } from '@/lib/i18n/server';
 
 type Props = {
   /** Nombre de la pantalla afectada, p. ej. "Tu cartera". */
@@ -22,7 +23,8 @@ type Props = {
  * consulta falla. Sustituye al crash de Server Components (error #441) por una
  * explicación accionable. Mismo patrón que el empty state de /screener.
  */
-export default function BackendOffline({ feature, retryHref, as = 'main' }: Props) {
+export default async function BackendOffline({ feature, retryHref, as = 'main' }: Props) {
+  const t = await getT();
   const Tag = as;
   return (
     <Tag
@@ -30,23 +32,23 @@ export default function BackendOffline({ feature, retryHref, as = 'main' }: Prop
       className="mx-auto flex w-full max-w-2xl flex-col items-center gap-5 px-4 py-24 text-center"
     >
       <span className="rounded-full border border-amber-900/60 bg-amber-950/40 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-300">
-        Motor de análisis desconectado
+        {t('ui.system.badge')}
       </span>
       <h1 className="text-2xl font-bold text-gray-100">
-        {feature} no está disponible ahora mismo
+        {t('ui.system.unavailable', { feature })}
       </h1>
       <p className="max-w-md text-sm leading-6 text-gray-400">
-        Esta pantalla necesita el servidor de GerarAI.
+        {t('ui.system.needsServer')}
       </p>
       <Button asChild className="min-h-[44px] px-6">
         <Link href={retryHref}>
           <RefreshCcw aria-hidden="true" className="h-4 w-4" />
-          Reintentar
+          {t('common.actions.retry')}
         </Link>
       </Button>
       <BackendOfflineAutoRetry />
       <p className="text-xs text-gray-500">
-        El servidor de GerarAI no ha podido completar la consulta. Reintenta en unos segundos.
+        {t('ui.system.failedDetail')}
       </p>
     </Tag>
   );

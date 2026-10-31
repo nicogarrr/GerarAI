@@ -15,6 +15,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const page = readFileSync('app/(root)/macro-calendar/page.tsx', 'utf8');
+// Las cadenas visibles viven en el diccionario i18n (carril C); la página
+// las referencia por clave. El guard verifica ambos extremos.
+const esMacro = JSON.parse(readFileSync('lib/i18n/messages/es/calendar.json', 'utf8')).macro;
 
 describe('Calendario macro: el pie de 8-K refleja si hay extractos', () => {
   it('el pie se condiciona a que existan extractos', () => {
@@ -27,11 +30,14 @@ describe('Calendario macro: el pie de 8-K refleja si hay extractos', () => {
 
   it('el texto íntegro solo sale cuando TODAS las tarjetas tienen extractos', () => {
     assert.match(page, /digest\.items\.every\(\(entry\) => entry\.items\.length > 0\)/);
-    assert.ok(page.includes('Extractos literales del 8-K, en inglés. Sin cifras recalculadas.'));
-    assert.ok(page.includes('cuando el texto completo está disponible'));
+    assert.ok(page.includes('calendar.macro.excerptsAll'));
+    assert.equal(esMacro.excerptsAll, 'Extractos literales del 8-K, en inglés. Sin cifras recalculadas.');
+    assert.ok(page.includes('calendar.macro.excerptsSome'));
+    assert.match(esMacro.excerptsSome, /cuando el texto completo está disponible/);
   });
 
   it('sin extractos el pie lo dice y remite al documento oficial', () => {
-    assert.ok(page.includes('Sin extractos: el texto completo de estos 8-K no estaba disponible'));
+    assert.ok(page.includes('calendar.macro.excerptsNone'));
+    assert.match(esMacro.excerptsNone, /^Sin extractos: el texto completo de estos 8-K no estaba disponible/);
   });
 });

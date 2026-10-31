@@ -11,7 +11,7 @@ import { Bell, History, Plus, RefreshCcw, Send, Trash2 } from 'lucide-react';
 const ALERT_SYMBOL_PATTERN = /^[A-Z0-9.\-]{1,20}$/;
 
 import { createAlertResult, getRecentTriggeredAlerts, getTelegramStatus, getUserAlertsResult, deleteAlert, type Alert, type AlertsLoadCause, type CreateAlertInput, type AlertType, type TelegramStatus, type TriggeredAlertDelivery } from '@/lib/actions/alerts.actions';
-import { parseLocalizedNumberDetailed } from '@/lib/format';
+import { parseLocalizedNumberDetailed } from '@/lib/i18n/parse-number';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     Dialog,
@@ -35,27 +35,31 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import SectionLoadError from '@/components/system/SectionLoadError';
 import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/lib/types/errors';
-import { formatDate, formatNumber, formatUserDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n/t';
+import { useT, useLocale, useFormat } from '@/lib/i18n/client';
 import { reviewResearchExpectations } from '@/lib/actions/research.actions';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
 import { alertCardCopy, alertSummaryIsSourceHeadline } from '@/lib/alerts/card-copy';
 import { etiquetaCanal, etiquetaEstadoEntrega } from '@/lib/alerts/delivery-labels';
 import { alertSkipNote } from '@/lib/alerts/skip-note';
 
-const ALERT_TYPE_LABELS: Record<AlertType, string> = {
-    price_above: t('alerts.types.priceAbove'),
-    price_below: t('alerts.types.priceBelow'),
-    price_change: t('alerts.types.priceChange'),
-    news: t('alerts.types.news'),
-    earnings: t('alerts.types.earnings'),
-};
-
 const isAlertType = (value: string | null | undefined): value is AlertType =>
     value === 'price_above' || value === 'price_below' || value === 'price_change' || value === 'news' || value === 'earnings';
 
 function AlertsManager() {
+    const cardT = useT();
+    const cardLocale = useLocale();
     const searchParams = useSearchParams();
+    const ti = useT();
+    const locale = useLocale();
+    const f = useFormat();
+    const alertTypeLabels: Record<AlertType, string> = {
+        price_above: ti('alerts.types.priceAbove'),
+        price_below: ti('alerts.types.priceBelow'),
+        price_change: ti('alerts.types.priceChange'),
+        news: ti('alerts.types.news'),
+        earnings: ti('alerts.types.earnings'),
+    };
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<{ message: string; cause: AlertsLoadCause } | null>(null);
@@ -151,23 +155,23 @@ function AlertsManager() {
             // que lanza ValidationError: POST /alerts 500 y, en producción, un
             // error genérico en inglés en vez de este aviso (agent-qa 28/10).
             if (!ALERT_SYMBOL_PATTERN.test(formData.symbol.trim().toUpperCase())) {
-                toast.error('Introduce un símbolo válido (letras, números, punto o guion; máximo 20)');
+                toast.error(ti('alerts.errors.invalidSymbol'));
                 return;
             }
             const isValueless = formData.type === 'news' || formData.type === 'earnings';
-            const parsed = parseLocalizedNumberDetailed(String(formData.condition.value));
+            const parsed = parseLocalizedNumberDetailed(String(formData.condition.value), locale);
             if (!isValueless && !parsed.ok) {
                 // El umbral ambiguo («1,234») se rechaza enseñando el formato,
                 // como en transacciones/tesis/screener: el mensaje genérico no
                 // le dice al usuario qué corregir.
                 toast.error(parsed.error === 'ambiguous'
-                    ? 'Formato de número ambiguo: usa la coma para los decimales y el punto para los miles (ej. 1.234,56).'
-                    : 'Introduce un valor numérico válido');
+                    ? ti('alerts.errors.ambiguousNumber')
+                    : ti('alerts.errors.invalidNumber'));
                 return;
             }
             const parsedValue = parsed.ok ? parsed.value : null;
             if ((formData.type === 'price_above' || formData.type === 'price_below') && (parsedValue === null || parsedValue <= 0)) {
-                toast.error('El precio debe ser mayor que 0');
+                toast.error(ti('alerts.errors.pricePositive'));
                 return;
             }
             const numericValue: string | number = isValueless
@@ -199,7 +203,7 @@ function AlertsManager() {
                 else toast.error(result.message);
                 return;
             }
-            toast.success('Alerta creada');
+            toast.success(ti('alerts.toast.created'));
 
             setOpen(false);
             setFormData({
@@ -219,7 +223,7 @@ function AlertsManager() {
                 setCreateError(getFriendlyErrorMessage(error));
             } else {
                 showErrorToast(error, {
-                    duplicateMessage: 'Ya tienes esta alerta configurada.',
+                    duplicateMessage: ti('alerts.errors.duplicate'),
                 });
             }
         } finally {
@@ -234,7 +238,7 @@ function AlertsManager() {
         try {
             await deleteAlert(alertId);
             await loadAlerts();
-            toast.success('Alerta eliminada');
+            toast.success(ti('alerts.toast.deleted'));
         } catch (error) {
             if (isNextRedirectError(error)) throw error;
             showErrorToast(error, {
@@ -255,7 +259,7 @@ function AlertsManager() {
         setReviewing(alert._id);
         try {
             await reviewResearchExpectations(alert.symbol);
-            toast.success(`Revisión de expectativas lanzada para ${alert.symbol}`);
+            toast.success(ti('alerts.toast.reviewLaunched', { symbol: alert.symbol }));
         } catch (error) {
             if (isNextRedirectError(error)) throw error;
             showErrorToast(error, {
@@ -275,24 +279,19 @@ function AlertsManager() {
         // con el último cierre del valor en la divisa de su bolsa. Se pinta el
         // número sin símbolo (y la nota de debajo lo declara) en vez de anteponer
         // un «$» que solo es cierto para las líneas en dólares.
-        const threshold = formatNumber(value, { maximumFractionDigits: 4 });
+        const threshold = f.formatNumber(value, { maximumFractionDigits: 4 });
 
-        if (type === 'price_above') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.price_above} ${threshold}`;
-        }
-        if (type === 'price_below') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.price_below} ${threshold}`;
+        if (type === 'price_above' || type === 'price_below') {
+            return ti('alerts.labels.price', { symbol, type: alertTypeLabels[type], threshold });
         }
         if (type === 'price_change') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.price_change} ${operator === '>' ? 'mayor' : 'menor'} a ${threshold}%`;
+            const direction = operator === '>' ? ti('alerts.labels.changeUp') : ti('alerts.labels.changeDown');
+            return ti('alerts.labels.priceChange', { symbol, type: alertTypeLabels.price_change, direction, threshold });
         }
-        if (type === 'news') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.news}`;
+        if (type === 'news' || type === 'earnings') {
+            return ti('alerts.labels.simple', { symbol, type: alertTypeLabels[type] });
         }
-        if (type === 'earnings') {
-            return `${symbol}: ${ALERT_TYPE_LABELS.earnings}`;
-        }
-        return `${symbol}: Alerta`;
+        return ti('alerts.labels.simple', { symbol, type: ti('alerts.labels.fallback') });
     };
 
     return (
@@ -300,7 +299,7 @@ function AlertsManager() {
             <div className="flex items-center justify-between gap-2 mb-4">
                 <div className="flex items-center gap-3">
                     <Bell aria-hidden="true" className="h-5 w-5 shrink-0 text-teal-400" />
-                    <h2 className="text-sm font-semibold text-gray-200">Mis alertas</h2>
+                    <h2 className="text-sm font-semibold text-gray-200">{ti('alerts.manager.title')}</h2>
                 </div>
                 <Dialog open={open} onOpenChange={(next) => {
                         setOpen(next);
@@ -309,31 +308,31 @@ function AlertsManager() {
                     <DialogTrigger asChild>
                         <Button size="sm" className="gap-2 min-h-[44px] px-4 text-sm sm:min-h-0 sm:text-xs">
                             <Plus aria-hidden="true" className="h-4 w-4" />
-                            {t('alerts.new')}
+                            {ti('alerts.new')}
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="bg-gray-800 border-gray-700 max-h-[90dvh] overflow-y-auto w-[calc(100vw-2rem)] sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle className="text-gray-100">{t('alerts.create')}</DialogTitle>
+                            <DialogTitle className="text-gray-100">{ti('alerts.create')}</DialogTitle>
                             <DialogDescription className="text-gray-400">
-                                Configura alertas para recibir notificaciones en tiempo real sobre cambios en tus acciones.
+                                {ti('alerts.dialog.description')}
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 mt-4">
                             <div>
-                                <Label htmlFor="symbol" className="text-gray-300">Símbolo</Label>
+                                <Label htmlFor="symbol" className="text-gray-300">{ti('alerts.form.symbol')}</Label>
                                 <TickerSearchInput
                                     id="symbol"
                                     value={formData.symbol}
                                     onValueChange={(value) => setFormData({ ...formData, symbol: value.toUpperCase() })}
                                     onSelect={(stock) => setFormData({ ...formData, symbol: stock.symbol.toUpperCase() })}
                                     placeholder="AAPL"
-                                    ariaLabel="Símbolo"
+                                    ariaLabel={ti('alerts.form.symbol')}
                                     className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm w-full"
                                 />
                             </div>
                             <div>
-                                <Label htmlFor="type" className="text-gray-300">Tipo de alerta</Label>
+                                <Label htmlFor="type" className="text-gray-300">{ti('alerts.form.type')}</Label>
                                 <Select
                                     value={formData.type}
                                     onValueChange={(value: AlertType) =>
@@ -361,7 +360,7 @@ function AlertsManager() {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="bg-gray-900 border-gray-600">
-                                        {Object.entries(ALERT_TYPE_LABELS).map(([value, label]) => (
+                                        {Object.entries(alertTypeLabels).map(([value, label]) => (
                                             <SelectItem key={value} value={value}>{label}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -371,7 +370,7 @@ function AlertsManager() {
                                 <>
                                     {formData.type === 'price_change' && (
                                     <div>
-                                        <Label htmlFor="operator" className="text-gray-300">Operador</Label>
+                                        <Label htmlFor="operator" className="text-gray-300">{ti('alerts.form.operator')}</Label>
                                         <Select
                                             value={formData.condition.operator === '<' ? '<' : '>'}
                                             onValueChange={(value: CreateAlertInput['condition']['operator']) =>
@@ -388,15 +387,15 @@ function AlertsManager() {
                                                 {/* Solo las dos direcciones que la etiqueta sabe pintar
                                                     («mayor/menor a X%»): '>=', '<=' y '==' se disparaban
                                                     bien pero se anunciaban como «menor». */}
-                                                <SelectItem value=">">Mayor que (&gt;)</SelectItem>
-                                                <SelectItem value="<">Menor que (&lt;)</SelectItem>
+                                                <SelectItem value=">">{ti('alerts.form.operatorGt')}</SelectItem>
+                                                <SelectItem value="<">{ti('alerts.form.operatorLt')}</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                     )}
                                     <div>
                                         <Label htmlFor="value" className="text-gray-300">
-                                            {formData.type === 'price_change' ? 'Porcentaje (%)' : 'Precio (divisa de la cotización)'}
+                                            {formData.type === 'price_change' ? ti('alerts.form.valuePercent') : ti('alerts.form.valuePrice')}
                                         </Label>
                                         <Input
                                             id="value"
@@ -414,13 +413,12 @@ function AlertsManager() {
                                                     condition: { ...formData.condition, value: e.target.value }
                                                 })
                                             }
-                                            placeholder={formData.type === 'price_change' ? "5" : "100,00"}
+                                            placeholder={formData.type === 'price_change' ? ti('alerts.form.percentPlaceholder') : ti('alerts.form.pricePlaceholder')}
                                             className="bg-gray-900 border-gray-600 text-gray-100 h-11 text-base sm:h-9 sm:text-sm"
                                         />
                                         {formData.type !== 'price_change' ? (
                                             <p className="mt-1 text-xs text-gray-500">
-                                                La alerta guarda el umbral sin divisa: el motor lo compara con el
-                                                último cierre del valor en la divisa de su bolsa.
+                                                {ti('alerts.form.thresholdNote')}
                                             </p>
                                         ) : null}
                                     </div>
@@ -448,7 +446,7 @@ function AlertsManager() {
                                 </div>
                             ) : null}
                             <Button onClick={handleCreateAlert} disabled={creating} aria-busy={creating} className="w-full min-h-[44px] text-sm sm:text-xs">
-                                {t('alerts.create')}
+                                {ti('alerts.create')}
                             </Button>
                         </div>
                     </DialogContent>
@@ -459,7 +457,7 @@ function AlertsManager() {
                 <div className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3" role="note">
                     <p className="flex items-center gap-2 text-sm text-amber-200">
                         <Send aria-hidden="true" className="h-4 w-4" />
-                        {telegram.configured ? 'Canal Telegram configurado en el servidor' : 'Telegram sin configurar: las alertas solo llegan en la app'}
+                        {telegram.configured ? ti('alerts.telegram.configured') : ti('alerts.telegram.notConfigured')}
                     </p>
                 </div>
             ) : null}
@@ -477,7 +475,7 @@ function AlertsManager() {
                     retryLabel={t('common.actions.retry')}
                     extra={loadError.cause === 'session' ? (
                         <Link href="/sign-in" className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 hover:underline">
-                            Iniciar sesión
+                            {ti('alerts.session.signIn')}
                         </Link>
                     ) : undefined}
                 />
@@ -493,7 +491,7 @@ function AlertsManager() {
                         onClick={() => setOpen(true)}
                     >
                         <Plus aria-hidden="true" className="h-4 w-4" />
-                        Crear la primera alerta
+                        {ti('alerts.empty.createFirst')}
                     </Button>
                 </div>
             ) : (
@@ -509,19 +507,19 @@ function AlertsManager() {
                                 </p>
                                 <div className="mt-1.5 flex flex-wrap items-center gap-2">
                                     <p className="text-xs text-gray-500">
-                                        Creada: {formatDate(alert.createdAt)}
+                                        {ti('alerts.list.createdAt', { date: f.formatDate(alert.createdAt) })}
                                     </p>
                                     <p className={`inline-flex items-center gap-1 text-xs ${alert.lastTriggered ? 'text-amber-300' : 'text-gray-500'}`}>
                                         <History aria-hidden="true" className="h-3.5 w-3.5" />
                                         {alert.lastTriggered
-                                            ? `Disparada por última vez: ${formatUserDateTime(alert.lastTriggered)}`
+                                            ? ti('alerts.list.lastTriggered', { date: f.formatUserDateTime(alert.lastTriggered) })
                                             : t('common.states.neverTriggered')}
                                     </p>
-                                    <p className="inline-flex items-center gap-1 text-xs text-gray-500" title={`Canales: ${(alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app'))} · disparos: ${alert.triggerCount}`}>
+                                    <p className="inline-flex items-center gap-1 text-xs text-gray-500" title={ti('alerts.list.channelsTitle', { channels: (alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app')), count: String(alert.triggerCount) })}>
                                         <Send aria-hidden="true" className="h-3.5 w-3.5" />
                                         {alert.lastEvaluatedAt
-                                            ? `Motor: evaluada ${formatUserDateTime(alert.lastEvaluatedAt)} · ${alert.triggerCount} disparos · ${(alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app'))}`
-                                            : 'Motor: pendiente de primera evaluación (cada 5 min)'}
+                                            ? ti('alerts.list.motorEvaluated', { date: f.formatUserDateTime(alert.lastEvaluatedAt), count: String(alert.triggerCount), channels: (alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app')) })
+                                            : ti('alerts.list.motorPending')}
                                         {alertSkipNote(alert.lastResultStatus) ? ` · ${alertSkipNote(alert.lastResultStatus)}` : null}
                                     </p>
                                     {alert.symbol ? (
@@ -529,7 +527,7 @@ function AlertsManager() {
                                             href={`/research/${encodeURIComponent(alert.symbol)}`}
                                             className="inline-flex min-h-[44px] items-center px-2 py-2 text-xs text-teal-400 hover:text-teal-300 sm:min-h-0 sm:p-0"
                                         >
-                                            Ver research →
+                                            {ti('alerts.list.viewResearch')}
                                         </Link>
                                     ) : null}
                                 </div>
@@ -542,11 +540,11 @@ function AlertsManager() {
                                         onClick={() => handleReview(alert)}
                                         disabled={reviewing === alert._id}
                                         aria-busy={reviewing === alert._id}
-                                        aria-label={`Ejecutar revisión de expectativas de ${alert.symbol}`}
+                                        aria-label={ti('alerts.list.reviewAria', { symbol: alert.symbol })}
                                         className="min-h-[44px] gap-1.5 px-3 text-xs sm:min-h-0"
                                     >
                                         <RefreshCcw aria-hidden="true" className={`h-3.5 w-3.5 ${reviewing === alert._id ? 'animate-spin' : ''}`} />
-                                        Ejecutar revisión
+                                        {ti('alerts.list.review')}
                                     </Button>
                                 ) : null}
                                 <Button
@@ -555,7 +553,7 @@ function AlertsManager() {
                                     onClick={() => setConfirmAlert(alert)}
                                     disabled={deleting === alert._id}
                                     aria-busy={deleting === alert._id}
-                                    aria-label={`Eliminar alerta: ${getAlertLabel(alert)}`}
+                                    aria-label={ti('alerts.list.deleteAria', { label: getAlertLabel(alert) })}
                                     className="min-h-[44px] min-w-[44px] text-gray-400 hover:text-red-400"
                                 >
                                     <Trash2 aria-hidden="true" className="h-4 w-4" />
@@ -564,7 +562,7 @@ function AlertsManager() {
                         </div>
                     ))}
                     <p className="text-xs text-gray-500">
-                        Cada umbral de precio se compara con el último cierre guardado del valor, sin convertir divisas; la regla no guarda la divisa, por eso se muestra sin símbolo.
+                        {ti('alerts.list.thresholdNote')}
                     </p>
                 </div>
             )}
@@ -572,7 +570,7 @@ function AlertsManager() {
             {!loading && triggered.length > 0 ? (
                 <div className="mt-6">
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-400">
-                        Últimos disparos y entregas
+                        {ti('alerts.triggered.title')}
                     </h3>
                     <div className="mt-2 space-y-2">
                         {triggered.map((item) => (
@@ -581,19 +579,19 @@ function AlertsManager() {
                                 className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3"
                             >
                                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                    <p className="text-sm font-medium text-gray-200">{alertCardCopy(item).heading}</p>
+                                    <p className="text-sm font-medium text-gray-200">{alertCardCopy(item, cardT, cardLocale).heading}</p>
                                     <time
                                         className="text-xs text-gray-500"
                                         dateTime={item.triggeredAt ?? item.createdAt}
                                         suppressHydrationWarning
                                     >
                                         {item.triggeredAt
-                                            ? `Último disparo ${formatUserDateTime(item.triggeredAt)}`
-                                            : `Creada ${formatUserDateTime(item.createdAt)}`}
+                                            ? ti('alerts.triggered.lastShot', { date: f.formatUserDateTime(item.triggeredAt) })
+                                            : ti('alerts.triggered.created', { date: f.formatUserDateTime(item.createdAt) })}
                                     </time>
                                 </div>
-                                {alertSummaryIsSourceHeadline(item) ? <ExternalNewsHeadline headline={alertCardCopy(item).summary} url={item.sourceUrl} className="mt-1 text-sm text-gray-300" /> : <p className="mt-1 text-sm text-gray-300">{alertCardCopy(item).summary}</p>}
-                                <details className="mt-2 text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">Ver aviso original</summary><p className="whitespace-pre-wrap break-words">{alertCardCopy(item).technical}</p></details>
+                                {alertSummaryIsSourceHeadline(item) ? <ExternalNewsHeadline headline={alertCardCopy(item, cardT, cardLocale).summary} url={item.sourceUrl} className="mt-1 text-sm text-gray-300" /> : <p className="mt-1 text-sm text-gray-300">{alertCardCopy(item, cardT, cardLocale).summary}</p>}
+                                <details className="mt-2 text-xs text-gray-400"><summary className="min-h-10 cursor-pointer py-2 text-teal-300">{ti('alerts.triggered.viewOriginal')}</summary><p className="whitespace-pre-wrap break-words">{alertCardCopy(item, cardT, cardLocale).technical}</p></details>
                                 {(item.ticker || item.sourceUrl) && (
                                     <span className="mt-1 inline-flex flex-wrap gap-x-3">
                                         {item.ticker && (
@@ -601,7 +599,7 @@ function AlertsManager() {
                                                 className="inline-flex min-h-[44px] items-center text-xs text-teal-400 hover:text-teal-300 hover:underline"
                                                 href={alertThesisHref(item.ticker)}
                                             >
-                                                Revisar tesis de {item.ticker}
+                                                {ti('alerts.triggered.reviewThesis', { ticker: item.ticker })}
                                             </Link>
                                         )}
                                         {item.sourceUrl && (
@@ -611,20 +609,20 @@ function AlertsManager() {
                                                 rel="noopener noreferrer"
                                                 target="_blank"
                                             >
-                                                Abrir documento
+                                                {ti('alerts.triggered.openDocument')}
                                             </a>
                                         )}
                                     </span>
                                 )}
                                 <div className="mt-2 flex flex-wrap gap-1.5">
                                     {item.channels.length === 0 ? (
-                                        <span className="text-xs text-gray-500">sin canales</span>
+                                        <span className="text-xs text-gray-500">{ti('alerts.triggered.noChannels')}</span>
                                     ) : (
                                         item.channels.map((channel) => {
                                             const delivery = item.deliveries[channel];
                                             // Sin registro de entrega no hay estado «pendiente»:
                                             // mostrar pendiente sería inventar un envío en curso.
-                                            const status = delivery?.status ?? 'sin registro';
+                                            const status = delivery?.status ?? ti('alerts.triggered.noDeliveryRecord');
                                             const statusText = etiquetaEstadoEntrega(status);
                                             const channelText = etiquetaCanal(channel);
                                             const tone =
@@ -636,7 +634,7 @@ function AlertsManager() {
                                             return (
                                                 <span
                                                     key={channel}
-                                                    title={delivery?.error ?? `canal ${channelText}: ${statusText}`}
+                                                    title={delivery?.error ?? ti('alerts.triggered.channelTitle', { channel: channelText, status: statusText })}
                                                     className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${tone}`}
                                                 >
                                                     {channelText}: {statusText}
@@ -653,8 +651,8 @@ function AlertsManager() {
             <ConfirmDialog
                 open={confirmAlert !== null}
                 onOpenChange={(next) => { if (!next) setConfirmAlert(null); }}
-                title="Eliminar alerta"
-                description={confirmAlert ? `¿Eliminar ${getAlertLabel(confirmAlert)}? Esta acción no se puede deshacer.` : ''}
+                title={ti('alerts.confirm.title')}
+                description={confirmAlert ? ti('alerts.confirm.description', { label: getAlertLabel(confirmAlert) }) : ''}
                 onConfirm={() => { if (confirmAlert) handleDeleteAlert(confirmAlert._id); }}
             />
         </Card>

@@ -4,16 +4,20 @@ import test from 'node:test';
 
 const taxes = readFileSync('components/taxes/TaxesView.tsx', 'utf8');
 const recordViews = readFileSync('components/data/RecordViews.tsx', 'utf8');
+// Las etiquetas visibles viven en el diccionario i18n (carril C); el
+// componente las referencia por clave. El guard verifica ambos extremos.
+const esTaxes = JSON.parse(readFileSync('lib/i18n/messages/es/taxes.json', 'utf8'));
 
 test('F284: /taxes etiqueta las cinco columnas fiscales visibles en español', () => {
-    for (const [key, label] of Object.entries({
-        ticker: 'Ticker',
-        quantity: 'Cantidad',
-        cost_basis: 'Base de coste',
-        market_value: 'Valor de mercado',
-        unrealized_pnl: 'Plusvalía latente',
-    })) {
-        assert.match(taxes, new RegExp(`${key}: '${label}'`), `falta etiqueta ${key}`);
+    for (const [key, dictKey, label] of [
+        ['ticker', 'ticker', 'Ticker'],
+        ['quantity', 'quantity', 'Cantidad'],
+        ['cost_basis', 'costBasis', 'Base de coste'],
+        ['market_value', 'marketValue', 'Valor de mercado'],
+        ['unrealized_pnl', 'unrealizedPnl', 'Plusvalía latente'],
+    ] as const) {
+        assert.match(taxes, new RegExp(`${key}: ti\\('taxes\\.holdings\\.${dictKey}'\\)`), `falta referencia ${key}`);
+        assert.equal(esTaxes.holdings[dictKey], label, `etiqueta es de ${key}`);
     }
 });
 

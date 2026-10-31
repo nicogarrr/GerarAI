@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { BookDown } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useT } from '@/lib/i18n/client';
 
 /**
  * Descarga del vault Obsidian del tenant (cartera + watchlist) vía la ruta
@@ -13,6 +14,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 const VAULT_URL = '/api/obsidian/vault.zip';
 
 export default function ObsidianVaultCard() {
+    const t = useT();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export default function ObsidianVaultCard() {
             // descarga en Safari/iOS antes de que empiece.
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         } catch {
-            setError('No se pudo descargar el vault. Inténtalo de nuevo en unos segundos.');
+            setError(t('export.obsidian.error'));
         } finally {
             setDownloading(false);
         }
@@ -48,9 +50,9 @@ export default function ObsidianVaultCard() {
                 <div className="flex items-center gap-3">
                     <BookDown className="h-5 w-5 text-teal-400" />
                     <div>
-                        <CardTitle className="text-lg font-semibold text-gray-100">Tesis para Obsidian</CardTitle>
+                        <CardTitle className="text-lg font-semibold text-gray-100">{t('export.obsidian.title')}</CardTitle>
                         <CardDescription className="mt-0.5 text-sm text-gray-500">
-                            Descarga tus tesis de cartera y watchlist en Markdown enlazado (.zip) para Obsidian.
+                            {t('export.obsidian.description')}
                         </CardDescription>
                     </div>
                 </div>
@@ -67,7 +69,7 @@ export default function ObsidianVaultCard() {
                     download
                 >
                     <BookDown className="h-4 w-4" />
-                    {downloading ? 'Descargando…' : 'Descargar para Obsidian (.zip)'}
+                    {downloading ? t('export.obsidian.downloading') : t('export.obsidian.cta')}
                 </a>
                 {error ? (
                     <p className="mt-2 text-sm text-red-400" role="alert">{error}</p>
@@ -75,9 +77,9 @@ export default function ObsidianVaultCard() {
                 <ConfirmDialog
                     open={confirmOpen}
                     onOpenChange={setConfirmOpen}
-                    title="Descargar para Obsidian"
-                    description="¿Descargar tus tesis y datos de cartera en un archivo ZIP en este dispositivo?"
-                    confirmLabel="Descargar"
+                    title={t('export.obsidian.confirmTitle')}
+                    description={t('export.obsidian.confirmDescription')}
+                    confirmLabel={t('export.obsidian.confirmLabel')}
                     tone="default"
                     onConfirm={handleDownload}
                 />

@@ -7,7 +7,6 @@ from datetime import date
 from decimal import Decimal
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
@@ -16,6 +15,7 @@ from app.core.database import get_db
 from app.models.entities import Base
 from app.services.investment_plan_service import InvestmentPlanService
 from main import app
+from tests.auth_helpers import csrf_client
 from tests.test_investment_plan_service import _plan
 
 
@@ -42,7 +42,7 @@ def test_api_rejects_non_iso_currency(db, bad):
     _plan(InvestmentPlanService(), db)
     app.dependency_overrides[get_db] = lambda: db
     try:
-        response = TestClient(app).post(
+        response = csrf_client(app).post(
             "/api/plan/contributions", json={"date": "2026-03-01", "amount": 100, "currency": bad}
         )
     finally:

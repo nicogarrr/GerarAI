@@ -17,7 +17,6 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -38,6 +37,7 @@ from app.services.document_ingestion_service import (
 )
 from app.services.news_service import NewsService
 from app.services.portfolio_ledger_service import PortfolioLedgerService
+from tests.auth_helpers import csrf_client
 
 
 @pytest.fixture
@@ -162,7 +162,7 @@ def test_oversize_upload_rejected_honestly_by_route():
     con su error de validacion, no un 413 generico del middleware.
     """
     init_db()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.post(
         "/api/sources/documents/ingest-file",
         data={
@@ -207,7 +207,7 @@ def test_ingest_url_route_maps_timeout_to_502(monkeypatch):
         raise TimeoutError("upstream silencioso (simulado)")
 
     monkeypatch.setattr(doc_module, "fetch_public_url", _boom)
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
     response = client.post(
         "/api/sources/documents/ingest-url",
         json={

@@ -6,6 +6,7 @@ import { useOpenFromQuery } from '@/hooks/useOpenFromQuery';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { Plus } from 'lucide-react';
+import { useT } from '@/lib/i18n/client';
 
 // El formulario de alta (buscador de ticker con autocompletado, selects,
 // validación y la server action) solo hace falta al abrir el diálogo:
@@ -20,6 +21,7 @@ type Props = {
 };
 
 export default function AddTransactionButton({ userId }: Props) {
+  const ti = useT();
   const [open, setOpen] = useState(false);
   // Una vez abierto por primera vez, el diálogo se queda montado (oculto por
   // Radix al cerrar) para conservar lo escrito si se cierra sin enviar,
@@ -50,7 +52,7 @@ export default function AddTransactionButton({ userId }: Props) {
           className="flex h-auto min-h-[44px] items-center gap-2 whitespace-normal py-1.5 text-center leading-tight sm:h-9 sm:min-h-0 sm:whitespace-nowrap"
         >
           <Plus className="h-4 w-4" />
-          Añadir inversión
+          {ti('portfolio.addButton.label')}
         </Button>
       </DialogTrigger>
       {openedOnce && <AddTransactionDialog userId={userId} initialSymbol={initialSymbol} onClose={() => setOpen(false)} />}

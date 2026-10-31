@@ -16,5 +16,6 @@ const source = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
 void test('sin registro de entrega la etiqueta honesta es «sin registro», nunca «pendiente»', () => {
     const manager = source('components/alerts/AlertsManager.tsx');
     assert.ok(!manager.includes("?? 'pendiente'"), 'el fallback no puede inventar un envío pendiente');
-    assert.ok(manager.includes("?? 'sin registro'"), 'ausencia de entrega declarada como ausencia');
+    // i18n: la etiqueta «sin registro» vive en messages/<locale>/alerts.json (triggered.noDeliveryRecord).
+    assert.ok(manager.includes("?? ti('alerts.triggered.noDeliveryRecord')"), 'ausencia de entrega declarada como ausencia');
 });

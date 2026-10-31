@@ -8,13 +8,12 @@ que devuelve la corutina: la llamada al servicio tambien queda medida.
 
 import asyncio
 
-from fastapi.testclient import TestClient
-
 import main
 from app.core.database import SessionLocal, init_db
 from app.models import Document
+from tests.auth_helpers import csrf_client
 
-client = TestClient(main.app)
+client = csrf_client(main.app)
 
 
 def _off_loop() -> bool:

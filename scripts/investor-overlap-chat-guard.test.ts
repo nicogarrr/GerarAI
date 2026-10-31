@@ -15,7 +15,9 @@ test('chat sends only signed server requests and renders quotes as plain text', 
   assert.ok(!action.includes('fetch('));
   assert.ok(action.includes("method: 'POST'"));
   const component = read('components/brain/BrainLibraryAnswer.tsx');
-  assert.ok((read('components/brain/GlobalBrain.tsx') + read('components/brain/GlobalBrainPanel.tsx')).includes('Doctrina, no datos actuales'));
+  assert.ok((read('components/brain/GlobalBrain.tsx') + read('components/brain/GlobalBrainPanel.tsx')).includes('brain.panel.doctrineNote'));
+  const dictBrain = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+  assert.ok(dictBrain.panel.doctrineNote.startsWith('Doctrina, no datos actuales'), dictBrain.panel.doctrineNote);
   assert.ok(component.includes('{point.citation.quote}') && component.includes('{answer.citation.quote}'));
   // B4: sin «Página/Fecha no registrada»: el dato que falta se omite, nunca se inventa.
   assert.ok(!component.includes('Página no registrada') && !component.includes('Fecha no registrada'));

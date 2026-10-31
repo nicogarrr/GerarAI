@@ -1,28 +1,42 @@
+'use client';
+
 import { Coins } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    BASIS_LABELS,
-    formatSplitAmount,
-    levelTone,
-    splitEmptyMessage,
-    type ContributionSplit,
-} from '@/lib/plan/contribution-split';
+
+import { levelTone, type ContributionSplit } from '@/lib/plan/contribution-split';
+import { useFormat, useT } from '@/lib/i18n/client';
 
 /** «Este mes X € a POOL, Y € a UBER»: la cuota del plan repartida por nivel DCA. */
 export default function ContributionSplitCard({ split }: { split: ContributionSplit | null }) {
-    const empty = splitEmptyMessage(split);
+    const t = useT();
+    const f = useFormat();
+    // Mismo formato que formatSplitAmount de lib/plan/contribution-split,
+    // pero ligado al locale activo.
+    const formatSplitAmount = (value: number, currencyCode: string | null | undefined): string => {
+        const text = f.formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return currencyCode ? `${text} ${currencyCode}` : text;
+    };
+    const empty = !split || !split.plan_exists
+        ? t('plan.split.emptyNoPlan')
+        : split.status === 'no_candidates'
+            ? t('plan.split.emptyNoCandidates')
+            : null;
     const allocations = split?.allocations ?? [];
     const currency = split?.currency ?? null;
+    const basisLabel = (basis: string): string =>
+        basis === 'objetivos_ticker' ? t('plan.split.basisObjetivosTicker')
+        : basis === 'posiciones_iguales' ? t('plan.split.basisPosicionesIguales')
+        : basis;
     return (
         <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
             <CardHeader className="border-b border-gray-700/50 pb-4">
                 <div className="flex items-center gap-3">
                     <Coins className="h-5 w-5 text-teal-400" />
                     <div>
-                        <CardTitle as="h2" className="text-lg font-semibold text-gray-100">Aportación de este mes</CardTitle>
+                        <CardTitle as="h2" className="text-lg font-semibold text-gray-100">{t('plan.split.title')}</CardTitle>
                         <CardDescription className="mt-0.5 text-sm text-gray-500">
-                            {split?.basis ? BASIS_LABELS[split.basis] ?? split.basis : 'Reparto de la cuota mensual por nivel DCA'}
+                            {split?.basis ? basisLabel(split.basis) : t('plan.split.fallbackDescription')}
                         </CardDescription>
                     </div>
                 </div>
@@ -38,9 +52,9 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                                 <thead>
                                     <tr className="text-left text-xs uppercase tracking-wide text-gray-500">
                                         <th className="py-2 pr-4 font-medium">Ticker</th>
-                                        <th className="py-2 pr-4 text-right font-medium">Importe</th>
-                                        <th className="py-2 pr-4 text-right font-medium">Peso</th>
-                                        <th className="py-2 font-medium">Nivel DCA</th>
+                                        <th className="py-2 pr-4 text-right font-medium">{t('plan.split.amountColumn')}</th>
+                                        <th className="py-2 pr-4 text-right font-medium">{t('plan.split.weightColumn')}</th>
+                                        <th className="py-2 font-medium">{t('plan.split.levelColumn')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-800">
@@ -52,8 +66,8 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                                                 </Link>
                                             </td>
                                             <td className="py-2 pr-4 text-right tabular-nums text-gray-100">{formatSplitAmount(row.amount, currency)}</td>
-                                            <td className="py-2 pr-4 text-right tabular-nums text-gray-400">{row.share_pct.toLocaleString('es-ES', { maximumFractionDigits: 1 })} %</td>
-                                            <td className={`py-2 ${levelTone(row.dca_level)}`} title={row.dca_period ? `Mes ${row.dca_period} (${row.dca_status ?? 's/d'})` : undefined}>
+                                            <td className="py-2 pr-4 text-right tabular-nums text-gray-400">{f.formatNumber(row.share_pct, { maximumFractionDigits: 1 })} %</td>
+                                            <td className={`py-2 ${levelTone(row.dca_level)}`} title={row.dca_period ? t('plan.split.periodTitle', { period: row.dca_period, status: row.dca_status ?? t('plan.split.noData') }) : undefined}>
                                                 {row.reason}
                                             </td>
                                         </tr>
@@ -62,7 +76,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                             </table>
                         </div>
                         {split?.unallocated ? (
-                            <p className="text-xs text-amber-300">Sin asignar (liquidez): {formatSplitAmount(split.unallocated, currency)}</p>
+                            <p className="text-xs text-amber-300">{t('plan.split.unallocated', { amount: formatSplitAmount(split.unallocated ?? 0, currency) })}</p>
                         ) : null}
                     </>
                 )}
@@ -71,7 +85,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                         {split.notes.map((note) => <li key={note}>{note}</li>)}
                     </ul>
                 ) : null}
-                <p className="text-xs text-gray-500">4X pesa 4, 3X 3, 2X 2, 1X 1; las zonas de recorte no reciben dinero nuevo y sin nivel DCA se pesa como 1X.</p>
+                <p className="text-xs text-gray-500">{t('plan.split.weightNote')}</p>
             </CardContent>
         </Card>
     );

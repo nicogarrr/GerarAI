@@ -185,7 +185,7 @@ async def test_llm_settings(
     if not key:
         raise HTTPException(
             status_code=422,
-            detail="Introduce una API key para probar la conexion.",
+            detail="Introduce una API key para probar la conexión.",
         )
     try:
         return await probe_connection(

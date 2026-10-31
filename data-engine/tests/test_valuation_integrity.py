@@ -3,7 +3,6 @@
 from decimal import Decimal
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 import main
@@ -24,12 +23,13 @@ from app.services.thesis_service import ThesisService
 from app.services.valuation_service import ValuationService
 from app.valuation.engines import resolve_engine_key
 from app.valuation.financial_snapshot import FinancialSnapshotBuilder
+from tests.auth_helpers import csrf_client
 
 
 def test_asts_without_facts_returns_insufficient_data_not_bootstrap_fair_value():
     init_db()
     seed()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     valuation = client.get("/api/valuation/ASTS")
     assert valuation.status_code == 200
@@ -150,7 +150,7 @@ def test_snapshot_builder_rejects_mixed_fiscal_years():
 def test_thesis_version_appears_in_markdown_title():
     init_db()
     seed()
-    client = TestClient(main.app)
+    client = csrf_client(main.app)
 
     # Force two versions
     first = client.post("/api/thesis/generate", json={"ticker": "ASTS", "force_new_version": True})

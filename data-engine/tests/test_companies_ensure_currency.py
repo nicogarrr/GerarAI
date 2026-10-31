@@ -12,6 +12,7 @@ from sqlalchemy import select
 
 import main
 from app.api.routes import companies as companies_routes
+from app.core.csrf import generate_csrf_token
 from app.core.database import SessionLocal, init_db
 from app.models import Company
 from app.services.company_enrichment_service import CompanyEnrichmentService, ensure_company_stub
@@ -55,7 +56,7 @@ def _profile(currency):
 def test_new_dkk_company_ends_up_dkk_after_enrichment(monkeypatch, trusted):
     monkeypatch.setattr(companies_routes, "_trust_client_identity", lambda: trusted)
     monkeypatch.setattr(CompanyEnrichmentService, "_finnhub_profile", _profile("DKK"))
-    response = TestClient(main.app).post("/api/companies/ensure", json={"ticker": "ZZQACUR.CO"})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json={"ticker": "ZZQACUR.CO"})
     assert response.status_code in (200, 201)
     assert _currency("ZZQACUR.CO") == "DKK"
 
@@ -65,6 +66,7 @@ def test_provider_without_currency_falls_back_to_ticker_suffix(monkeypatch, trus
     monkeypatch.setattr(companies_routes, "_trust_client_identity", lambda: trusted)
     monkeypatch.setattr(CompanyEnrichmentService, "_finnhub_profile", lambda self, ticker: None)
     client = TestClient(main.app)
+    client.headers["X-CSRF-Token"] = generate_csrf_token()
     assert client.post("/api/companies/ensure", json={"ticker": "ZZQACUR.CO"}).status_code in (200, 201)
     assert client.post("/api/companies/ensure", json={"ticker": "ZZQACUR"}).status_code in (200, 201)
     assert _currency("ZZQACUR.CO") == "DKK"
@@ -74,7 +76,7 @@ def test_provider_without_currency_falls_back_to_ticker_suffix(monkeypatch, trus
 def test_trusted_client_currency_still_wins(monkeypatch):
     monkeypatch.setattr(companies_routes, "_trust_client_identity", lambda: True)
     monkeypatch.setattr(CompanyEnrichmentService, "_finnhub_profile", _profile("DKK"))
-    response = TestClient(main.app).post("/api/companies/ensure", json={"ticker": "ZZQACUR.CO", "currency": "eur"})
+    response = TestClient(main.app, headers={"X-CSRF-Token": generate_csrf_token()}).post("/api/companies/ensure", json={"ticker": "ZZQACUR.CO", "currency": "eur"})
     assert response.status_code in (200, 201)
     assert _currency("ZZQACUR.CO") == "EUR"
 

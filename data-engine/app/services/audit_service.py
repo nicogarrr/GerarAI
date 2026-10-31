@@ -78,6 +78,8 @@ def list_audit_logs(
     if resource_type is not None:
         query = query.where(AuditLog.resource_type == resource_type)
 
-    query = query.order_by(AuditLog.created_at.desc()).offset(offset).limit(limit)
+    # Desempate por id: created_at empatado (inserciones en rafaga) dejaba
+    # el orden entre paginas al plan del motor (duplicados/saltos en Postgres).
+    query = query.order_by(AuditLog.created_at.desc(), AuditLog.id.desc()).offset(offset).limit(limit)
     return list(db.scalars(query).all())
 

@@ -23,8 +23,12 @@ test('fuentes solo enlazables si son http(s) seguros', () => {
 test('la interfaz usa el nuevo endpoint y no ofrece aceptar tickets', () => {
   assert.match(client, /researchRequest<AssistantResponse>\('\/api\/research\/assistant'/);
   assert.doesNotMatch(client, /['"]\/api\/chat['"]/);
-  assert.match(ui, /Noticia atribuida/);
-  assert.match(ui, /Datos insuficientes/);
-  assert.match(ui, /Sin escritura/);
+  const dictBrain = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+  assert.match(ui, /brain\.guide\.citations\.newsEvent/);
+  assert.equal(dictBrain.guide.citations.newsEvent, 'Noticia atribuida');
+  assert.match(ui, /brain\.guide\.insufficientTitle/);
+  assert.equal(dictBrain.guide.insufficientTitle, 'Datos insuficientes');
+  assert.match(ui, /brain\.guide\.header/);
+  assert.ok(dictBrain.guide.header.includes('Sin escritura'), dictBrain.guide.header);
   assert.doesNotMatch(ui, /acceptReview|approveReview|aceptar conclusión/i);
 });

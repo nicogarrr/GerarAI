@@ -961,21 +961,33 @@ class ChatService:
             tenant_id = db.info.get("tenant_id")
             if type(tenant_id) is not int or tenant_id <= 0:
                 return []
+            # Hidratacion en lote (anti N+1): una consulta para todos los
+            # candidatos con los mismos filtros (tenant, empresa); el orden y
+            # el cap se siguen decidiendo al recorrer los hits.
+            candidate_ids = [
+                hit["entity_id"]
+                for hit in hits
+                if hit.get("entity_type") == "document_chunk" and type(hit.get("entity_id")) is int
+            ]
+            hydrated: dict[int, tuple[DocumentChunk, Document]] = {}
+            if candidate_ids:
+                statement = (
+                    select(DocumentChunk, Document)
+                    .join(Document, Document.id == DocumentChunk.document_id)
+                    .where(DocumentChunk.id.in_(candidate_ids), DocumentChunk.tenant_id == tenant_id,
+                           Document.tenant_id == tenant_id)
+                )
+                if company:
+                    statement = statement.where(Document.company_id == company.id)
+                for row in db.execute(statement).all():
+                    hydrated[row[0].id] = (row[0], row[1])
             rows = []
             seen = set()
             for hit in hits:
                 chunk_id = hit.get("entity_id")
                 if hit.get("entity_type") != "document_chunk" or type(chunk_id) is not int or chunk_id in seen:
                     continue
-                statement = (
-                    select(DocumentChunk, Document)
-                    .join(Document, Document.id == DocumentChunk.document_id)
-                    .where(DocumentChunk.id == chunk_id, DocumentChunk.tenant_id == tenant_id,
-                           Document.tenant_id == tenant_id)
-                )
-                if company:
-                    statement = statement.where(Document.company_id == company.id)
-                row = db.execute(statement).first()
+                row = hydrated.get(chunk_id)
                 if not row:
                     continue
                 chunk, document = row

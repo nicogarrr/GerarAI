@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import csv
 import io
+import time
 from collections.abc import Awaitable, Callable
 from datetime import date
 from decimal import Decimal, InvalidOperation
@@ -32,7 +33,12 @@ from decimal import Decimal, InvalidOperation
 import httpx
 from sqlalchemy.orm import Session
 
+from app.services.data_source_health import get_data_source_registry
 from app.services.portfolio_fx_service import PortfolioFXService
+
+# Misma fuente que connectors/ecb.py (data-api.ecb.europa.eu): comparten clave "ecb" en
+# el registry para que el circuito agregue todos los outcomes del proveedor.
+_ECB_REGISTRY_KEY = "ecb"
 from app.valuation.currency import normalize_currency
 
 ECB_DATA_URL = "https://data-api.ecb.europa.eu/service/data/EXR/D.{codes}.EUR.SP00.A"
@@ -86,17 +92,29 @@ def parse_ecb_csv(text: str) -> list[tuple[date, str, Decimal]]:
 async def fetch_ecb_csv(codes: list[str], start: date, end: date) -> str:
     """Descarga la serie diaria del BCE (una petición para todas las divisas)."""
     url = ECB_DATA_URL.format(codes="+".join(sorted(codes)))
-    async with httpx.AsyncClient(timeout=60) as client:
-        response = await client.get(
-            url,
-            params={
-                "startPeriod": start.isoformat(),
-                "endPeriod": end.isoformat(),
-                "format": "csvdata",
-            },
-        )
-        response.raise_for_status()
-        return response.text
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            response = await client.get(
+                url,
+                params={
+                    "startPeriod": start.isoformat(),
+                    "endPeriod": end.isoformat(),
+                    "format": "csvdata",
+                },
+            )
+            response.raise_for_status()
+            text = response.text
+    except httpx.HTTPStatusError as exc:
+        # URL fija por divisas conocidas: un error HTTP es de la fuente.
+        registry.record_failure(_ECB_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(_ECB_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    registry.record_success(_ECB_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    return text
 
 
 async def backfill_ecb_rates(
@@ -159,17 +177,28 @@ async def backfill_ecb_rates(
 def fetch_ecb_csv_sync(codes: list[str], start: date, end: date) -> str:
     """Igual que :func:`fetch_ecb_csv` pero sincrono (lo usa el ledger, que es sync)."""
     url = ECB_DATA_URL.format(codes="+".join(sorted(codes)))
-    with httpx.Client(timeout=30) as client:
-        response = client.get(
-            url,
-            params={
-                "startPeriod": start.isoformat(),
-                "endPeriod": end.isoformat(),
-                "format": "csvdata",
-            },
-        )
-        response.raise_for_status()
-        return response.text
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        with httpx.Client(timeout=30) as client:
+            response = client.get(
+                url,
+                params={
+                    "startPeriod": start.isoformat(),
+                    "endPeriod": end.isoformat(),
+                    "format": "csvdata",
+                },
+            )
+            response.raise_for_status()
+            text = response.text
+    except httpx.HTTPStatusError as exc:
+        registry.record_failure(_ECB_REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+        raise
+    except httpx.TransportError as exc:
+        registry.record_failure(_ECB_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    registry.record_success(_ECB_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    return text
 
 
 def backfill_ecb_rates_sync(

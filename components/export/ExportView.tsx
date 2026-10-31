@@ -15,10 +15,12 @@ import {
 import { exportJournal, type ExportFormat } from '@/lib/actions/export.actions';
 import { showErrorToast } from '@/lib/toast';
 import { toast } from 'sonner';
+import { useT } from '@/lib/i18n/client';
 
 const YEAR_RANGE = 10;
 
 export default function ExportView() {
+    const t = useT();
     // El año civil depende del reloj del navegador: leerlo en el render hace
     // que el HTML del servidor y la hidratación difieran en la frontera de
     // año. Se arranca con un estado fijo (0 = todavía sin montar) y se fija
@@ -54,7 +56,7 @@ export default function ExportView() {
             URL.revokeObjectURL(url);
 
             setPreview(result.content.slice(0, 2000));
-            toast.success(`Exportación completada: ${result.filename}`);
+            toast.success(t('export.journal.success', { filename: result.filename }));
         } catch (error) {
             showErrorToast(error);
         } finally {
@@ -68,9 +70,9 @@ export default function ExportView() {
                 <div className="flex items-center gap-3">
                     <FileDown className="h-5 w-5 text-teal-400" />
                     <div>
-                        <CardTitle as="h2" className="text-lg font-semibold text-gray-100">Diario de decisiones</CardTitle>
+                        <CardTitle as="h2" className="text-lg font-semibold text-gray-100">{t('export.journal.title')}</CardTitle>
                         <CardDescription className="mt-0.5 text-sm text-gray-500">
-                            Decisiones de un año en CSV o JSON.
+                            {t('export.journal.description')}
                         </CardDescription>
                     </div>
                 </div>
@@ -78,7 +80,7 @@ export default function ExportView() {
             <CardContent className="pt-4">
                 <div className="grid gap-4 sm:grid-cols-2 lg:max-w-2xl">
                     <div className="space-y-2">
-                        <Label htmlFor="export-year" className="text-gray-300">Año</Label>
+                        <Label htmlFor="export-year" className="text-gray-300">{t('export.journal.yearLabel')}</Label>
                         <Select value={String(selectedYear)} onValueChange={(value) => setYear(Number(value))}>
                             <SelectTrigger id="export-year" className="bg-gray-900 border-gray-600 text-gray-100">
                                 <SelectValue />
@@ -94,14 +96,14 @@ export default function ExportView() {
                     </div>
 
                     <div className="space-y-2">
-                        <Label htmlFor="export-format" className="text-gray-300">Formato</Label>
+                        <Label htmlFor="export-format" className="text-gray-300">{t('export.journal.formatLabel')}</Label>
                         <Select value={format} onValueChange={(value) => setFormat(value as ExportFormat)}>
                             <SelectTrigger id="export-format" className="bg-gray-900 border-gray-600 text-gray-100">
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="bg-gray-900 border-gray-600">
-                                <SelectItem value="csv" className="text-gray-200">CSV (hoja de cálculo)</SelectItem>
-                                <SelectItem value="json" className="text-gray-200">JSON (datos crudos)</SelectItem>
+                                <SelectItem value="csv" className="text-gray-200">{t('export.journal.formatCsv')}</SelectItem>
+                                <SelectItem value="json" className="text-gray-200">{t('export.journal.formatJson')}</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -117,12 +119,12 @@ export default function ExportView() {
                     ) : (
                         <Download className="h-4 w-4" />
                     )}
-                    {loading ? 'Exportando...' : 'Exportar diario'}
+                    {loading ? t('export.journal.exporting') : t('export.journal.exportCta')}
                 </Button>
 
                 {preview !== null && (
                     <div className="mt-6">
-                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Vista previa</p>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{t('export.journal.preview')}</p>
                         <pre className="max-h-64 overflow-auto rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 text-xs text-gray-400">
                             {preview}
                             {preview.length >= 2000 ? '\n…' : ''}

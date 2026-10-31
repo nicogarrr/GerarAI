@@ -43,7 +43,9 @@ describe('cerebro: panel diferido fuera del bundle inicial', () => {
 
     it('el fallback de carga no desplaza el layout (posición fija del panel)', () => {
         assert.match(shell, /role="status"/);
-        assert.match(shell, /aria-label="Cargando el cerebro"/);
+        assert.match(shell, /aria-label=\{t\('brain\.loading'\)\}/);
+        const dict = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+        assert.equal(dict.loading, 'Cargando el cerebro');
         assert.match(shell, /fixed z-50/);
     });
 

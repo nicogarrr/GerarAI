@@ -120,3 +120,31 @@ def test_periodo_es_52_53_week_year_closing_in_january_is_previous_fy():
     assert _periodo_es("2026-01-02:FY") == "FY2025"
     assert _periodo_es("2025-12-31:FY") == "FY2025"
     assert _periodo_es("2025-03-31:Q1") == "Q12025"
+
+
+def test_find_gems_no_mezcla_fcf_y_acciones_de_ejercicios_distintos():
+    """Misma doctrina que el P/B: FCF de un FY con acciones de OTRO FY no es
+    un fcf_yield verificable (recompras/dilucion entre ejercicios). N/D."""
+    from datetime import date, timedelta
+    from decimal import Decimal
+
+    from app.models import MarketPrice
+    from app.services.propicks_funnel_service import run_funnel
+    from app.services.propicks_gems_service import find_gems
+    from tests.test_propicks_funnel import _company, _db, _fact, _five_good_years, _full_metrics
+
+    today = date(2026, 10, 19)
+    with _db() as db:
+        for ticker, fcf_fy, sh_fy in (("MIX1", 2025, 2024), ("MIX2", 2024, 2025)):
+            c = _company(ticker)
+            db.add(c)
+            db.flush()
+            _full_metrics(db, c)
+            _five_good_years(db, c)
+            _fact(db, c, "free_cash_flow", "150000000", fcf_fy)
+            _fact(db, c, "shares_diluted", "100000000", sh_fy)
+            db.add(MarketPrice(company_id=c.id, date=today - timedelta(days=1),
+                               close=Decimal("10"), volume=1000))
+        db.commit()
+        results, _ = run_funnel(db)
+        assert find_gems(db, results, today=today) == []

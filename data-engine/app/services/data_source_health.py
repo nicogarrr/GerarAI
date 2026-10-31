@@ -173,6 +173,16 @@ class DataSourceHealthRegistry:
                 is_primary=False,
                 fallback_source=None,
             ),
+            "nasdaq": DataSourceStatus(
+                name="Nasdaq (calendario API)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "finra": DataSourceStatus(
+                name="FINRA",
+                is_primary=False,
+                fallback_source=None,
+            ),
             "qdrant": DataSourceStatus(
                 name="Qdrant Vector Database",
                 is_primary=True,
@@ -195,6 +205,23 @@ class DataSourceHealthRegistry:
             ),
             "celestrak": DataSourceStatus(
                 name="CelesTrak",
+            "fred": DataSourceStatus(
+                name="FRED (St. Louis Fed)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "gdelt": DataSourceStatus(
+                name="GDELT Project",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "fomc_calendar": DataSourceStatus(
+                name="Federal Reserve (calendario FOMC)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "bls_calendar": DataSourceStatus(
+                name="BLS (calendario de publicaciones)",
                 is_primary=False,
                 fallback_source=None,
             ),

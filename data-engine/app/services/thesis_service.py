@@ -500,10 +500,11 @@ class ThesisService:
         from app.models import Document, FinancialFact, MarketPrice, NewsEvent
 
         latest_seen: datetime | None = None
-        # F317: los agregados MAX no heredan with_loader_criteria; las
-        # fuentes tenant-owned se filtran explícitamente o una actualización
-        # de otro tenant marcaría obsoleta esta tesis sin cambiar su
-        # información. MarketPrice es global por diseño y sigue global.
+        # F317: las fuentes tenant-owned se filtran explícitamente o una
+        # actualización de otro tenant marcaría obsoleta esta tesis sin
+        # cambiar su información. Medido en SQLAlchemy 2.1.6: los agregados
+        # MAX SI heredan with_loader_criteria; el filtro queda como segunda
+        # capa y fail-closed. MarketPrice es global por diseño y sigue global.
         tenant_id = db.info.get("tenant_id")
         for model in (FinancialFact, NewsEvent, Document):
             stmt = select(func.max(model.updated_at)).where(model.company_id == company_id)
