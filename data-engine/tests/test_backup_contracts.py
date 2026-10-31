@@ -20,6 +20,7 @@ en cada push, `.github/workflows/restore-drill.yml`.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -700,6 +701,41 @@ def test_workflow_instala_congelado_desde_uv_lock_y_lo_cachea():
     assert "uv sync --frozen" in text
     # el drill no resuelve versiones por su cuenta: nada de pip install -r
     assert "pip install" not in text
+
+
+def test_workflow_ejecuta_el_drill_reproducible():
+    """El script del drill (local/VM) se verifica en CI: un drill que nadie
+    ejecuta se rompe en silencio (auditoria 2026-10-31)."""
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "scripts.backup.disaster_drill" in text
+
+
+def test_block_on_main_exige_los_dos_drills():
+    try:
+        import yaml
+    except ImportError:
+        pytest.skip("PyYAML no instalado en este entorno")
+    data = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    block = data["jobs"]["block-on-main"]
+    necesita = block["needs"]
+    if isinstance(necesita, str):
+        necesita = [necesita]
+    assert "restore-drill" in necesita and "drill-script" in necesita
+    pasos = json.dumps(block["steps"])
+    assert "needs.restore-drill.result" in pasos
+    assert "needs.drill-script.result" in pasos
+
+
+def test_el_drill_reproducible_acepta_override_de_registro_minio():
+    """Contrato con el workflow: CI no tiene la imagen local cavaai-minio (se
+    compila en la VM) y pasa --minio-image bitnamilegacy. Si el parser pierde
+    la opcion, el job drill-script se rompe."""
+    parser = DRILL  # disaster_drill.py
+    source = parser.read_text(encoding="utf-8")
+    assert '"--minio-image"' in source
+    mod = __import__("scripts.backup.disaster_drill", fromlist=["build_parser"])
+    args = mod.build_parser().parse_args(["--minio-image", "bitnamilegacy/minio:2025.7.23-debian-12-r5"])
+    assert args.minio_image == "bitnamilegacy/minio:2025.7.23-debian-12-r5"
 
 
 def test_workflow_es_yaml_valido():
