@@ -10581,6 +10581,60 @@ export interface components {
             /** Trades Imported */
             trades_imported: number;
         };
+        /** PortfolioIbkrImportOut */
+        PortfolioIbkrImportOut: {
+            /** Cash Imported */
+            cash_imported?: number | null;
+            /** Cash Removed */
+            cash_removed?: string[] | null;
+            /** Cash Transactions Imported */
+            cash_transactions_imported?: number | null;
+            /** Cost Review Required */
+            cost_review_required?: string[] | null;
+            /** Dividends Imported */
+            dividends_imported?: number | null;
+            /** Fees Imported */
+            fees_imported?: number | null;
+            /** Fx Conversions Imported */
+            fx_conversions_imported?: number | null;
+            /** Fx Conversions Skipped */
+            fx_conversions_skipped?: number | null;
+            /** Message */
+            message?: string | null;
+            /** Portfolio Snapshot Id */
+            portfolio_snapshot_id?: number | null;
+            /** Positions Closed */
+            positions_closed?: string[] | null;
+            /** Positions Imported */
+            positions_imported?: number | null;
+            /** Price Backfills Enqueued */
+            price_backfills_enqueued?: number | null;
+            /** Raw Rows Already Present */
+            raw_rows_already_present?: number | null;
+            /** Raw Rows Pruned */
+            raw_rows_pruned?: number | null;
+            /** Raw Rows Stored */
+            raw_rows_stored?: number | null;
+            /** Reconcile Blocked */
+            reconcile_blocked?: string[] | null;
+            /** Row Errors */
+            row_errors?: string[] | null;
+            /** Rows Skipped */
+            rows_skipped?: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "imported" | "not_configured";
+            /** Trades Cancelled */
+            trades_cancelled?: number | null;
+            /** Trades Imported */
+            trades_imported?: number | null;
+            /** Unattributed Cash Rows */
+            unattributed_cash_rows?: number | null;
+            /** Valuation Hold Kept */
+            valuation_hold_kept?: string[] | null;
+        };
         /** PortfolioIbkrXmlImportOut */
         PortfolioIbkrXmlImportOut: {
             /** Cash Imported */
@@ -23034,9 +23088,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioIbkrImportOut"];
                 };
             };
             /** @description Validation Error */

@@ -1814,6 +1814,42 @@ class PortfolioIbkrCsvImportOut(BaseModel):
 # max_statement_age_days). Errores -> IBKRImportError -> 400, no wire.
 
 
+# --- POST /api/portfolio/import/ibkr -----------------------------------------
+# Dos variantes medidas en la ruta: sin credenciales Flex devuelve
+# {status: not_configured, message} y con credenciales delega en
+# import_flex_xml (misma rama confirmada de 23 claves que /import/ibkr/xml).
+# Un solo modelo con todo opcional + exclude_unset (el guard de drift no
+# resuelve unions anyOf; precedente refresh-market); los tests fijan el
+# conjunto exacto de claves de cada variante. Errores -> 400/403/409/503.
+
+
+class PortfolioIbkrImportOut(BaseModel):
+    status: Literal["imported", "not_configured"]
+    message: str | None = None
+    price_backfills_enqueued: int | None = None
+    positions_imported: int | None = None
+    valuation_hold_kept: list[str] | None = None
+    cost_review_required: list[str] | None = None
+    cash_imported: int | None = None
+    trades_imported: int | None = None
+    raw_rows_stored: int | None = None
+    raw_rows_already_present: int | None = None
+    raw_rows_pruned: int | None = None
+    fx_conversions_imported: int | None = None
+    fx_conversions_skipped: int | None = None
+    trades_cancelled: int | None = None
+    dividends_imported: int | None = None
+    fees_imported: int | None = None
+    cash_transactions_imported: int | None = None
+    rows_skipped: int | None = None
+    unattributed_cash_rows: int | None = None
+    row_errors: list[str] | None = None
+    positions_closed: list[str] | None = None
+    cash_removed: list[str] | None = None
+    reconcile_blocked: list[str] | None = None
+    portfolio_snapshot_id: int | None = None
+
+
 class PortfolioIbkrXmlImportOut(BaseModel):
     # Re-medido tras #3664: la rama "imported" emite 23 claves (status fijo
     # "imported"; dry_run no es alcanzable desde la ruta: default False y la
