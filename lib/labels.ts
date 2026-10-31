@@ -136,12 +136,32 @@ const DIRECCIONES_IMPACTO: Record<string, string> = {
   mixed: 'Mixto',
 };
 
-export function etiquetaDireccionImpacto(value: string): string {
-  return DIRECCIONES_IMPACTO[value] ?? value;
+/** Catálogos EN de las mismas claves (locale «en»). Clave desconocida: cruda, como en ES. */
+const DIRECCIONES_IMPACTO_EN: Record<string, string> = {
+  positive: 'Positive',
+  negative: 'Negative',
+  neutral: 'Neutral',
+  mixed: 'Mixed',
+};
+
+export function etiquetaDireccionImpacto(value: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? DIRECCIONES_IMPACTO_EN : DIRECCIONES_IMPACTO)[value] ?? value;
 }
 
-export function etiquetaTierFuente(value: string): string {
-  return TIERS_FUENTE[value] ?? value;
+const TIERS_FUENTE_EN: Record<string, string> = {
+  tier_1_regulatory: 'Regulatory · T1',
+  tier_2_company: 'Company · T2',
+  tier_3_transcript: 'Transcript · T3',
+  tier_4_reputable_media: 'Media · T4',
+  tier_5_data_provider: 'Data provider · T5',
+  tier_6_bootstrap: 'Seed data · T6',
+  tier_7_user_input: 'User-provided · T7',
+  tier_8_social: 'Social media · unverified',
+  tier_unknown: 'Unclassified source',
+};
+
+export function etiquetaTierFuente(value: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? TIERS_FUENTE_EN : TIERS_FUENTE)[value] ?? value;
 }
 
 /**
@@ -198,8 +218,21 @@ export function etiquetaComponenteAtribucion(value: string): string {
   return COMPONENTES_ATRIBUCION[value] ?? value;
 }
 
-export function etiquetaTipoEvento(value: string): string {
-  return TIPOS_EVENTO[value] ?? value;
+const TIPOS_EVENTO_EN: Record<string, string> = {
+  regulatory: 'Regulatory',
+  earnings: 'Earnings',
+  dilution: 'Dilution',
+  contract: 'Contract',
+  capital_allocation: 'Capital allocation',
+  general_news: 'General news',
+  legal_solicitation: 'Noise: legal solicitation',
+  macro: 'Macro',
+  opinion: 'Opinion',
+  unknown: 'Unclassified',
+};
+
+export function etiquetaTipoEvento(value: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? TIPOS_EVENTO_EN : TIPOS_EVENTO)[value] ?? value;
 }
 
 /** Etiqueta ES del tipo de instrumento del buscador (F174): Finnhub devuelve
@@ -247,8 +280,23 @@ const TEMAS_MACRO: Record<string, string> = {
   us_trade_policy: 'Política comercial de EE. UU.',
 };
 
-export function etiquetaTemaMacro(value: string): string {
-  return TEMAS_MACRO[value] ?? value;
+const TEMAS_MACRO_EN: Record<string, string> = {
+  gold_central_banks: 'Gold and central banks',
+  interest_rates: 'Interest rates',
+  commodities: 'Commodities',
+  trucking_freight: 'Trucking and freight',
+  ai_investment: 'AI investment',
+  hormuz_oil: 'Oil and Hormuz',
+  energy: 'Energy',
+  semiconductors: 'Semiconductors',
+  dollar_fx: 'Dollar and currencies',
+  inflation: 'Inflation',
+  china_supply_chains: 'China supply chains',
+  us_trade_policy: 'US trade policy',
+};
+
+export function etiquetaTemaMacro(value: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? TEMAS_MACRO_EN : TEMAS_MACRO)[value] ?? value;
 }
 
 /** F106: el master guarda la cadena 'Unknown' en sector/industry cuando no

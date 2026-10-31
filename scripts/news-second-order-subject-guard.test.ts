@@ -17,7 +17,9 @@ const source = (rel: string) => readFileSync(join(here, '..', rel), 'utf8');
 void test('el estado sin_datos explica la exclusión de la empresa protagonista', () => {
     const panel = source('components/research/NewsSecondOrder.tsx');
     assert.ok(panel.includes('subjectTicker'), 'recibe el ticker protagonista');
-    assert.ok(panel.includes('excluye a propósito a la propia'), 'declara la exclusión');
+    assert.ok(panel.includes("t('research.flow.second.noneWithSubject', { ticker: subjectTicker })"), 'declara la exclusión');
+    const es = JSON.parse(source('lib/i18n/messages/es/research.json')).flow.second;
+    assert.ok(es.noneWithSubject.includes('excluye a propósito a la propia {ticker}'), 'ES conserva el literal');
 });
 
 void test('ambos call sites pasan el ticker del evento', () => {
