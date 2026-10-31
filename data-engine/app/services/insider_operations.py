@@ -31,7 +31,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models.entities import InsiderFiling, InsiderTransaction
@@ -113,6 +113,24 @@ def _without_data_reason(ticker: str, company: Any, has_filings: bool) -> dict[s
     return {"ticker": ticker, "reason": reason, "label": label}
 
 
+def _matched_raw_tickers(db: Session, followed: set[str]) -> list[str]:
+    """Crudos de issuer_ticker cuyo primary_ticker esta en las seguidas.
+
+    El primary_ticker es el PRIMER simbolo de una lista ("LEN, LEN.B" ->
+    "LEN"), imposible de expresar en SQL: se leen los DISTINCT (baratos,
+    cubiertos por ix_insider_transactions_ticker_date) y se normaliza en
+    Python. Lista vacia = ninguna seguida con filings: el IN () es falso y
+    la consulta principal no carga nada, mismo resultado que el filtro Python.
+    """
+    matched: set[str] = set()
+    for column in (InsiderTransaction.issuer_ticker, InsiderFiling.issuer_ticker):
+        for (raw,) in db.execute(select(column).distinct()):
+            primary = primary_ticker(raw)
+            if primary and primary.upper() in followed:
+                matched.add(raw)
+    return sorted(matched)
+
+
 def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
     """Agregado por empresa (cartera + watchlist) e insider, ultimos `days` dias."""
     followed = followed_companies(db)
@@ -122,10 +140,22 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
     # Solo Form 4 (SEC, USD): los movimientos PDMR (UK) vienen en GBP y esta
     # vista SUMA valores entre insiders; mezclar divisas en una suma seria un
     # dato falso. Los PDMR se ven en el feed y en la ficha, con su divisa.
+    # Prefiltro SQL por ticker (SUPERCONJUNTO, medido 2026-10-31: 986 ms
+    # cargando TODO el universo Form 4 para quedarse con las seguidas). Los
+    # crudos que normalizan a una seguida salen de los DISTINCT de ambas
+    # columnas; el filtro exacto sigue siendo el de Python de abajo, asi el
+    # resultado es identico y los descartes se siguen declarando igual.
+    matched_raw = _matched_raw_tickers(db, followed)
     rows = db.execute(
         select(InsiderTransaction, InsiderFiling)
         .join(InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id)
         .where(InsiderTransaction.form.in_(("4", "4/A")))
+        .where(
+            or_(
+                InsiderTransaction.issuer_ticker.in_(matched_raw),
+                InsiderFiling.issuer_ticker.in_(matched_raw),
+            )
+        )
     ).all()
 
     by_ticker: dict[str, list[tuple[InsiderTransaction, InsiderFiling]]] = {}
