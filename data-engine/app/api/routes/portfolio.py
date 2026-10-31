@@ -32,6 +32,7 @@ from app.models import (
     Transaction,
 )
 from app.schemas.api import (
+    CashBalanceOut,
     FXRateOut,
     PortfolioConfigurationOut,
     PortfolioConfigurationUpdateOut,
@@ -1430,7 +1431,7 @@ def refresh_portfolio_market_data(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.get("/cash")
+@router.get("/cash", response_model=list[CashBalanceOut])
 def cash(db: Session = Depends(get_db)) -> list[dict]:
     return [
         {
