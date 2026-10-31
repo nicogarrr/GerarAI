@@ -616,8 +616,11 @@ services:
   # Carriles de ingesta por proveedor (31-oct): una racha de 429 o una
   # corrida larga de UN proveedor ya no frena a los demas. Los hilos solo
   # solapan latencia: la tasa la fijan los pacers/frenos en Redis (Finnhub
-  # ~60/min compartido; Yahoo/Google noticias 1 req/1,5 s), asi que 2 hilos
-  # por carril bastan y NO se suben a ciegas. GDELT ya tenia worker propio.
+  # ~60/min compartido; Yahoo/Google 1 req/1,5 s), asi que 2 hilos por
+  # carril bastan y NO se suben a ciegas. GDELT ya tenia worker propio.
+  # El carril yahoo agrupa TODA la ingesta ligada a Yahoo/yfinance
+  # (noticias, insiders CA, splits, dividendos, calendario de resultados);
+  # los precios Yahoo ya tenian su carril "prices".
   # Comentarios ANTES del servicio: los guards localizan command en 200 chars.
   worker-finnhub:
     image: cavaai-backend:prod
@@ -648,11 +651,11 @@ services:
           cpus: "0.50"
           memory: 384M
 
-  worker-yahoo-news:
+  worker-yahoo:
     image: cavaai-backend:prod
-    container_name: cavaai-worker-yahoo-news
+    container_name: cavaai-worker-yahoo
     restart: unless-stopped
-    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_NEWS_THREADS:-2}", "-Q", "yahoo-news"]
+    command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "${YAHOO_THREADS:-2}", "-Q", "yahoo"]
     environment:
       <<: [*app-env, *worker-db-env]
     logging: *default-logging

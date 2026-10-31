@@ -6,9 +6,9 @@ los pacers/frenos en Redis (Finnhub ~60/min compartido, GDELT 1/5s por IP,
 Yahoo/Google 1 req/1,5 s): los hilos solo solapan latencia, asi que cada
 carril va con 2 hilos y NO se suben a ciegas.
 
-La prueba A/B es un MODELO de eventos discretos (no prod): mide el efecto de
-aislamiento con la forma del incidente real; las cifras de prod las mide el
-piloto con su A/B tras el despliegue.
+La prueba A/B de aislamiento del final es el MODELO de eventos discretos; el
+A/B REAL con workers Dramatiq y Redis aislado (5 pares, 4,8x) vive en
+scripts/perf_ab/ (README con comando exacto y tabla de tiempos).
 """
 from __future__ import annotations
 
@@ -33,15 +33,38 @@ _ComposeLoader.add_multi_constructor(
 )
 
 
+# Toda la ingesta ligada a Yahoo/yfinance va al carril "yahoo" (31-oct, el
+# carril de tests rojos encontro 4 actores Yahoo sueltos en default).
+ACTORES_YAHOO = [
+    "refresh_ticker_news",        # Yahoo + Google RSS
+    "ingest_ca_insider_yahoo",    # Yahoo quoteSummary
+    "ingest_corporate_splits",    # Yahoo (FMP de respaldo)
+    "sync_portfolio_dividends",   # Yahoo (FMP de respaldo)
+    "sync_paper_dividends",       # Yahoo
+    "refresh_earnings_calendar",  # Yahoo calendarEvents (+NASDAQ)
+]
+
+# Actores que llaman a Yahoo/yfinance y NO van al carril "yahoo", con motivo
+# INTENCIONADO fijado aqui (no descuido):
+YAHOO_FUERA_INTENCIONADO = {
+    # Mixto yfinance + contraste Finnhub: carril externo mixto.
+    "refresh_valuation_metrics": "externa",
+    # Precios Yahoo: ya tenian carril propio "prices" (worker-prices, pacer 1,5 s).
+    "refresh_portfolio_prices_intraday": "prices",
+    # Pipeline propicks co-localizado en computed: si Yahoo frena, el pipeline
+    # que necesita esos precios tambien se frena; separarlos no aislava nada.
+    "refresh_propicks_prices": "computed",
+    "ingest_spy_daily": "computed",
+}
+
+
 def test_routing_por_proveedor():
     from app.workers.dramatiq_app import broker
 
     esperado = {
+        **dict.fromkeys(ACTORES_YAHOO, "yahoo"),
+        **YAHOO_FUERA_INTENCIONADO,
         "backfill_finnhub_profiles": "finnhub",
-        "refresh_ticker_news": "yahoo-news",
-        "ingest_ca_insider_yahoo": "yahoo-news",
-        # Mixto (yfinance + contraste Finnhub): se queda en externa.
-        "refresh_valuation_metrics": "externa",
         "backfill_sec_fundamentals": "externa",
         "backfill_company_price_history": "externa",
         # GDELT ya tenia carril propio.
@@ -52,18 +75,49 @@ def test_routing_por_proveedor():
         assert broker.get_actor(nombre).queue_name == cola, nombre
 
 
+def test_enumeracion_completa_actores_yahoo():
+    """Barrido estatico (mismo criterio que el carril de tests rojos): TODO
+    actor cuyo codigo mencione yahoo/yfinance esta en el carril "yahoo" o
+    fijado como intencionado en otro carril con su motivo. Un actor nuevo
+    que llame a Yahoo rompe este test hasta que se ubique a proposito."""
+    import re
+    from pathlib import Path
+
+    from app.workers.dramatiq_app import broker
+
+    fuente = (Path(__file__).resolve().parents[1]
+              / "app" / "workers" / "dramatiq_app.py").read_text()
+    encontrados = set()
+    for parte in fuente.split("@dramatiq.actor(")[1:]:
+        m = re.search(r"\ndef (\w+)\(", parte)
+        if not m:
+            continue
+        nombre = m.group(1)
+        segmento = parte[:parte.find(f"def {nombre}(") + 4000]
+        if re.search(r"yahoo|yfinance", segmento, re.I):
+            encontrados.add(nombre)
+    esperados = set(ACTORES_YAHOO) | set(YAHOO_FUERA_INTENCIONADO)
+    assert encontrados == esperados, (
+        f"sin clasificar: {encontrados - esperados}; "
+        f"ya no usan Yahoo: {esperados - encontrados}")
+    for nombre in encontrados:
+        destino = ("yahoo" if nombre in ACTORES_YAHOO
+                   else YAHOO_FUERA_INTENCIONADO[nombre])
+        assert broker.get_actor(nombre).queue_name == destino, nombre
+
+
 def test_workers_de_proveedor_en_compose():
     compose = yaml.load(COMPOSE_PATH.read_text(), Loader=_ComposeLoader)
     fin = compose["services"]["worker-finnhub"]
     assert fin["command"][fin["command"].index("-Q") + 1] == "finnhub"
     assert "FINNHUB_API_KEY" in fin["environment"]
     assert fin["environment"]["dramatiq_queue_prefetch"] == "1"
-    yahoo = compose["services"]["worker-yahoo-news"]
-    assert yahoo["command"][yahoo["command"].index("-Q") + 1] == "yahoo-news"
+    yahoo = compose["services"]["worker-yahoo"]
+    assert yahoo["command"][yahoo["command"].index("-Q") + 1] == "yahoo"
     # Nadie mas consume los carriles nuevos: el aislamiento es real.
     for nombre in ("worker", "worker-externa", "worker-gdelt"):
         comando = compose["services"][nombre]["command"]
-        assert "finnhub" not in comando and "yahoo-news" not in comando, nombre
+        assert "finnhub" not in comando and '"yahoo"' not in comando, nombre
     # Presupuesto de memoria intacto (techo 16 GiB, host 24 GB).
     total = 0
     for svc in compose["services"].values():
