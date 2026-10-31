@@ -3,12 +3,18 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const read = (p: string) => readFileSync(p, 'utf8');
+const flowEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).flow;
 
 test('news table keeps five decision columns and a contextual disclosure', () => {
   const src = (read('app/(root)/research/news/page.tsx') + read('components/research/NewsEventsFlow.tsx'));
-  for (const column of ['Ticker', 'Fecha', 'Titular', 'Materialidad', 'Estado y detalle']) assert.match(src, new RegExp(`scope="col">${column}`));
+  const columns: Array<[string, string]> = [['colTicker', 'Ticker'], ['colDate', 'Fecha'], ['colHeadline', 'Titular'], ['colMateriality', 'Materialidad'], ['colStatus', 'Estado y detalle']];
+  for (const [key, literal] of columns) {
+    assert.match(src, new RegExp(`scope="col">\\{t\\('research\\.flow\\.${key}'\\)\\}</th>`));
+    assert.equal(flowEs[key], literal, `ES ${key} == literal histórico`);
+  }
   assert.doesNotMatch(src, /scope="col">Peso al evaluar|scope="col">Impacto|scope="col">¿Actualizar\?/);
-  assert.match(src, /Ver contexto/);
+  assert.match(src, /summary=\{t\('research\.flow\.viewContext'\)\}/);
+  assert.equal(flowEs.viewContext, 'Ver contexto');
 });
 
 test('desktop portfolio and watchlist keep destructive action within symbol menu', () => {
@@ -38,7 +44,10 @@ test('volume belongs to most-active movers only and screener has units', () => {
 test('decisional fields removed from columns stay reachable in row detail (auditoria SERIE 1)', () => {
   const news = (read('app/(root)/research/news/page.tsx') + read('components/research/NewsEventsFlow.tsx'));
   // El expander "Ver contexto" conserva tier, impacto y peso con etiqueta; nunca desaparecen.
-  for (const row of ['Tier de fuente', 'Impacto', 'Peso en cartera']) assert.match(news, new RegExp(`<dt className="inline font-medium">${row}: `));
+  for (const [key, literal] of [['ctxTier', 'Tier de fuente: '], ['ctxImpact', 'Impacto: '], ['ctxWeight', 'Peso en cartera: ']]) {
+    assert.match(news, new RegExp(`<dt className="inline font-medium">\\{t\\('research\\.flow\\.${key}'\\)\\}</dt>`));
+    assert.equal(flowEs[key], literal, `ES ${key} == literal histórico`);
+  }
   assert.match(news, /etiquetaTierFuente\(event\.source_tier\)/);
   assert.match(news, /etiquetaDireccionImpacto\(event\.impact_direction\)/);
   assert.match(news, /formatPercent\(event\.portfolio_weight/);
@@ -57,6 +66,7 @@ test('decisional fields removed from columns stay reachable in row detail (audit
 
 test('noticias conserva columna Materialidad sin leyenda explicativa', () => {
   const source = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
-  assert.match(source, /scope="col">Materialidad/);
+  assert.match(source, /scope="col">\{t\('research\.flow\.colMateriality'\)\}<\/th>/);
+  assert.equal(flowEs.colMateriality, 'Materialidad');
   assert.doesNotMatch(source, /Materialidad: puntuación del evento/);
 });
