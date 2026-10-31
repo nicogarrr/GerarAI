@@ -35,7 +35,6 @@ import { toast } from 'sonner';
 import { showErrorToast } from '@/lib/toast';
 import SectionLoadError from '@/components/system/SectionLoadError';
 import { classifyError, getFriendlyErrorMessage, isNextRedirectError } from '@/lib/types/errors';
-import { t } from '@/lib/i18n/t';
 import { useT, useLocale, useFormat } from '@/lib/i18n/client';
 import { reviewResearchExpectations } from '@/lib/actions/research.actions';
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
@@ -112,12 +111,12 @@ function AlertsManager() {
             ]);
             if (!result.ok) {
                 const message = result.cause === 'session'
-                    ? t('common.states.alertsLoadErrorSession')
+                    ? cardT('common.states.alertsLoadErrorSession')
                     : result.cause === 'forbidden'
-                        ? t('common.states.alertsLoadErrorForbidden')
+                        ? cardT('common.states.alertsLoadErrorForbidden')
                         : result.cause === 'rate'
-                            ? t('common.states.alertsLoadErrorRate')
-                            : t('common.states.alertsLoadError');
+                            ? cardT('common.states.alertsLoadErrorRate')
+                            : cardT('common.states.alertsLoadError');
                 setLoadError({ message, cause: result.cause });
                 return;
             }
@@ -130,7 +129,7 @@ function AlertsManager() {
             // un segundo toast con el mismo fallo era ruido duplicado.
             // Los errores de MUTACIÓN (crear/borrar/revisar) sí conservan
             // su toast: no tienen otro feedback visible.
-            setLoadError({ message: t('common.states.alertsLoadError'), cause: 'unknown' });
+            setLoadError({ message: cardT('common.states.alertsLoadError'), cause: 'unknown' });
         } finally {
             setLoading(false);
         }
@@ -441,7 +440,7 @@ function AlertsManager() {
                                         className="mt-2 gap-2 border-amber-500/50 text-amber-200 hover:text-amber-100"
                                     >
                                         <RefreshCcw aria-hidden="true" className="h-4 w-4" />
-                                        {t('common.actions.retry')}
+                                        {cardT('common.actions.retry')}
                                     </Button>
                                 </div>
                             ) : null}
@@ -466,13 +465,13 @@ function AlertsManager() {
                 <div className="space-y-3 py-8">
                     {/* Un único texto de carga accesible; el spinner es decorativo. */}
                     <div aria-hidden="true" className="mx-auto h-5 w-5 animate-spin rounded-full border-2 border-gray-700 border-t-teal-300" />
-                    <div className="text-center text-sm text-gray-500">{t('common.states.loadingAlerts')}</div>
+                    <div className="text-center text-sm text-gray-500">{cardT('common.states.loadingAlerts')}</div>
                 </div>
             ) : loadError ? (
                 <SectionLoadError
                     message={loadError.message}
                     onRetry={() => void loadAlerts()}
-                    retryLabel={t('common.actions.retry')}
+                    retryLabel={cardT('common.actions.retry')}
                     extra={loadError.cause === 'session' ? (
                         <Link href="/sign-in" className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-300 hover:underline">
                             {ti('alerts.session.signIn')}
@@ -482,8 +481,8 @@ function AlertsManager() {
             ) : alerts.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                     <Bell aria-hidden="true" className="h-12 w-12 mx-auto mb-3 text-gray-500" />
-                    <p>{t('common.states.noAlerts')}</p>
-                    <p className="text-sm mt-2">{t('common.states.noAlertsHint')}</p>
+                    <p>{cardT('common.states.noAlerts')}</p>
+                    <p className="text-sm mt-2">{cardT('common.states.noAlertsHint')}</p>
                     <Button
                         size="sm"
                         variant="outline"
@@ -513,7 +512,7 @@ function AlertsManager() {
                                         <History aria-hidden="true" className="h-3.5 w-3.5" />
                                         {alert.lastTriggered
                                             ? ti('alerts.list.lastTriggered', { date: f.formatUserDateTime(alert.lastTriggered) })
-                                            : t('common.states.neverTriggered')}
+                                            : cardT('common.states.neverTriggered')}
                                     </p>
                                     <p className="inline-flex items-center gap-1 text-xs text-gray-500" title={ti('alerts.list.channelsTitle', { channels: (alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app')), count: String(alert.triggerCount) })}>
                                         <Send aria-hidden="true" className="h-3.5 w-3.5" />
@@ -664,6 +663,7 @@ function AlertsManager() {
  * vive en AlertsManager y aquí se envuelve para cumplir el contrato de Next.
  */
 export default function AlertsManagerWithSuspense() {
+    const t = useT();
     return (
         <Suspense fallback={<div className="py-8 text-center text-gray-500">{t('common.states.loadingAlerts')}</div>}>
             <AlertsManager />

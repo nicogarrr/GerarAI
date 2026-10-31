@@ -1,1 +1,9 @@
-{}
+{
+  "match": "match",
+  "noMatch": "no match",
+  "newMatch": "new",
+  "missing": "Missing",
+  "rank": "Rank",
+  "coverage": "Coverage",
+  "confidence": "Confidence"
+}

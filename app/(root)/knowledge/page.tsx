@@ -36,7 +36,7 @@ import { DeleteDocumentButton } from '@/components/knowledge/DeleteDocumentButto
 import { LibrarySearchForm } from '@/components/knowledge/LibrarySearchForm';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatDate, formatNumber, formatPercent, NA } from '@/lib/format';
-import { t } from '@/lib/i18n/t';
+import { getT } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -157,6 +157,7 @@ function statusTone(status: string) {
 }
 
 export default async function KnowledgeLibraryPage({ searchParams }: PageProps) {
+  const t = await getT();
   const query = await searchParams;
   const activeTab = asTab(query.tab);
   const documentId = Number(query.document);

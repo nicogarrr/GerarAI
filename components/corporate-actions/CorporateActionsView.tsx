@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { RecordList, researchHrefFor, type DataRecord, type ReplaceRecord } from '@/components/data/RecordViews';
 import { applyCorporateAction, getCorporateActions } from '@/lib/actions/corporate-actions.actions';
 import { showErrorToast } from '@/lib/toast';
-import { t } from '@/lib/i18n/t';
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
@@ -22,7 +21,7 @@ interface CorporateActionsViewProps {
  *  `ticker · action_type · description · effective_date · ratio` en crudo. */
 function corporateActionLabels(ti: TFunction): Record<string, string> {
     return {
-        ticker: t('common.labels.ticker'),
+        ticker: ti('common.labels.ticker'),
         action_type: ti('corporateActions.labels.actionType'),
         description: ti('corporateActions.labels.description'),
         effective_date: ti('corporateActions.labels.effectiveDate'),
@@ -175,7 +174,7 @@ export default function CorporateActionsView({ initialActions, emptyMessage, tic
                         ) : (
                             <CheckCircle2 className="h-3.5 w-3.5" />
                         )}
-                        {t('common.actions.apply')}
+                        {ti('common.actions.apply')}
                     </Button>
                 );
             }}

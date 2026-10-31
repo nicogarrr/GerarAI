@@ -14,7 +14,7 @@ import { CATEGORY_KEYS, categoryNeutralNote } from './category-display';
 import { addToWatchlist } from '@/lib/actions/watchlist.actions';
 import { formatCompanyName, formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime, formatCountEs } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
-import { t } from '@/lib/i18n/t';
+import { useT } from '@/lib/i18n/client';
 import { toast } from 'sonner';
 
 interface EnhancedProPicksContentProps {
@@ -28,6 +28,7 @@ interface EnhancedProPicksContentProps {
 }
 
 export default function EnhancedProPicksContent({ initialPicks, generatedAt, initialPassedCount = null, onRunUpdated }: EnhancedProPicksContentProps) {
+    const t = useT();
     const [picks, setPicks] = useState<ProPick[]>(initialPicks);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -270,7 +271,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                     <Card className="p-8 rounded-lg border border-gray-700 bg-gray-800/50 text-center">
                         <Sparkles aria-hidden="true" className="h-12 w-12 mx-auto mb-4 text-gray-500" />
                         <p className="text-gray-300 font-medium">
-                            {!lastGenerated ? 'Sin selección publicada' : passedCount === 0 ? 'Sin candidatos aptos' : t('propicks.noResults')}
+                            {!lastGenerated ? t('propicks.noPublished') : passedCount === 0 ? t('propicks.noEligible') : t('propicks.noResults')}
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
                             {!lastGenerated &&

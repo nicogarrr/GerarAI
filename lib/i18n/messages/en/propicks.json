@@ -1,5 +1,7 @@
 {
   "follow": "Follow",
   "followed": "Following",
-  "noResults": "No results with these filters"
+  "noResults": "No results with these filters",
+  "noPublished": "No published selection",
+  "noEligible": "No eligible candidates"
 }

@@ -51,8 +51,9 @@ describe('asistente: respuesta vacía explicada, no tapada con «Sin datos»', (
   });
 
   it('un as_of ausente usa el token canónico de fecha, no un «Sin datos»', () => {
-    assert.match(src, /citation\.as_of \|\| legacyT\('signals\.noDate'\)/);
-    assert.match(src, /legacyT/);
+    // Con el idioma activo (useT), no con el t() antiguo fijado al español.
+    assert.match(src, /citation\.as_of \|\| t\('signals\.noDate'\)/);
+    assert.doesNotMatch(src, /legacyT/);
     assert.ok(src.includes('lib/i18n'));
   });
 });

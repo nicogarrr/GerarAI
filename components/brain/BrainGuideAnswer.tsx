@@ -4,7 +4,6 @@ import { useId } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { safeAssistantSourceUrl, type AssistantCitationKind, type AssistantResponse, type AssistantSectionKey } from '@/lib/research/assistant-contract';
-import { t as legacyT } from '@/lib/i18n/t';
 import { useT } from '@/lib/i18n/client';
 
 const SECTION_KEYS = {
@@ -47,7 +46,7 @@ function GuideCitation({ citation, index, id }: { citation: AssistantResponse['c
                     ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex min-w-0 items-center gap-1 text-indigo-300 underline underline-offset-2 hover:text-indigo-200"><span className="min-w-0 break-words">{citation.source || t('brain.guide.unnamedSource')}</span><ExternalLink aria-hidden className="h-3 w-3 shrink-0" /></a>
                     : <span className="min-w-0 break-all text-slate-200">{citation.source || t('brain.guide.unnamedSource')}</span>}
             </div>
-            <div className="mt-1 break-all">{t('brain.guide.referenceDate', { date: citation.as_of || legacyT('signals.noDate') })}</div>
+            <div className="mt-1 break-all">{t('brain.guide.referenceDate', { date: citation.as_of || t('signals.noDate') })}</div>
             {citation.excerpt
                 ? <details className="mt-1"><summary className="cursor-pointer text-slate-400 hover:text-slate-200">{t('brain.guide.originalExcerpt')}</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
                 : null}
