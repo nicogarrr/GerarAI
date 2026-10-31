@@ -86,9 +86,9 @@ describe('QuickGlancePanel', () => {
         expect(screen.getByText('72/100')).toBeVisible();
     });
 
-    it('etiqueta el consenso como agregado Yahoo no oficial con su recorrido', async () => {
+    it('etiqueta el consenso como agregado no oficial (sin proveedor en el titulo) con su recorrido', async () => {
         render(await view());
-        expect(screen.getByRole('link', { name: /Analistas \(agregado Yahoo, no oficial\)/ }))
+        expect(screen.getByRole('link', { name: /Analistas \(agregado, no oficial\)/ }))
             .toHaveAttribute('href', '#analistas');
         expect(screen.getByText('Mediana 150,00 US$')).toBeVisible();
         // Recorrido de la mediana contra el precio en vivo: (150-100)/100 = +50 %.

@@ -89,7 +89,7 @@
     "title": "Vistazo rápido",
     "modelValue": "Valor del modelo",
     "modelValueWithPeriod": "Valor del modelo (datos a {period})",
-    "analystsLabel": "Analistas (agregado Yahoo, no oficial)",
+    "analystsLabel": "Analistas (agregado, no oficial)",
     "medianUpside": "Recorrido a la mediana: {pct}",
     "medianValue": "Mediana {price}",
     "buybacksLabel": "Recompras (registros SEC)",
