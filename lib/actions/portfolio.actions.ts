@@ -771,23 +771,6 @@ export async function updateAllPortfolioPrices(userId: string): Promise<{
     return { summary, scores };
 }
 
-export type IBKRImportResult = {
-    status: string;
-    positions_imported: number;
-    cash_imported: number;
-    trades_imported: number;
-    dividends_imported: number;
-    fees_imported: number;
-    cash_transactions_imported: number;
-    rows_skipped?: number;
-    row_errors?: string[];
-    duplicate_trades?: number;
-    identity_warning?: string | null;
-    /** Motivo del rechazo (status 'rejected'), en español. */
-    message?: string;
-    portfolio_snapshot_id: number | null;
-};
-
 /**
  * Dispara la descarga del Flex statement de IBKR (via IBKR_FLEX_TOKEN /
  * IBKR_FLEX_QUERY_ID) y la importación en el research backend.
