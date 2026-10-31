@@ -52,6 +52,11 @@ function StatusLine({ item }: { item: RadarDcaOpportunity }) {
                     Precio sin verificación independiente
                 </span>
             )}
+            {item.quality?.passed === true && (
+                <span className="rounded-full bg-teal-500/25 px-2 py-0.5 font-semibold text-teal-200">
+                    Calidad clara
+                </span>
+            )}
             {item.change?.status === 'compared' && item.change.changed === true && (
                 <span className="rounded-full bg-violet-500/15 px-2 py-0.5 text-violet-300">
                     Cambio {item.change.from_level}X → {item.change.to_level}X
@@ -98,6 +103,7 @@ export default function RadarDcaView() {
     const [level, setLevel] = useState<number | null>(null);
     const [sector, setSector] = useState('');
     const [outsideTracked, setOutsideTracked] = useState(false);
+    const [qualityClear, setQualityClear] = useState(false);
     const [result, setResult] = useState<RadarDcaResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -106,7 +112,7 @@ export default function RadarDcaView() {
         let cancelled = false;
         setLoading(true);
         setError(null);
-        getRadarDcaOpportunities({ page, level, sector: sector || null, outsideTracked })
+        getRadarDcaOpportunities({ page, level, sector: sector || null, outsideTracked, qualityClear })
             .then((data) => { if (!cancelled) setResult(data); })
             .catch(() => {
                 // Sin oportunidades inventadas ni cacheadas: error honesto.
@@ -114,7 +120,7 @@ export default function RadarDcaView() {
             })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
-    }, [page, level, sector, outsideTracked]);
+    }, [page, level, sector, outsideTracked, qualityClear]);
 
     return (
         <section aria-label="Oportunidades DCA" className="space-y-4">
@@ -155,6 +161,15 @@ export default function RadarDcaView() {
                         onChange={(e) => { setPage(1); setOutsideTracked(e.target.checked); }}
                     />
                     Fuera de cartera y watchlist
+                </label>
+                <label className="flex min-h-[44px] items-center gap-2 text-sm text-gray-300">
+                    <input
+                        type="checkbox"
+                        className="h-4 w-4 accent-teal-500"
+                        checked={qualityClear}
+                        onChange={(e) => { setPage(1); setQualityClear(e.target.checked); }}
+                    />
+                    Solo calidad clara
                 </label>
             </div>
 

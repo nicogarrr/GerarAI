@@ -25,6 +25,7 @@ const RESULT: RadarDcaResult = {
             confirmed_level: 1, confirmed_period: '2026-09', clear_price_signal: true,
             change: { status: 'compared', changed: true, from_level: 3, to_level: 4, since_price_date: '2026-10-15' },
             formula_version: 'nico-v1', scan_date: '2026-10-30',
+            quality: { passed: true, reasons: [], policy: 'quality-v1', market_cap_usd: 2_000_000_000 },
         },
         {
             ticker: 'T01', name: 'Co 1', sector: 'Technology', currency: 'USD',
@@ -33,6 +34,7 @@ const RESULT: RadarDcaResult = {
             confirmed_level: 1, confirmed_period: '2026-10', clear_price_signal: false,
             change: { status: 'history_pending', changed: null },
             formula_version: 'nico-v1', scan_date: '2026-10-30',
+            quality: { passed: false, reasons: ['quality_funnel_not_passed'], policy: 'quality-v1', market_cap_usd: null },
         },
     ],
 };
@@ -51,6 +53,7 @@ describe('RadarDcaView', () => {
         expect(screen.getByText('Confirmado')).toBeInTheDocument();
         expect(screen.getByText(/Cambio 3X → 4X/)).toBeInTheDocument();
         expect(screen.getByText('Precio sin verificación independiente')).toBeInTheDocument();
+        expect(screen.getByText('Calidad clara')).toBeInTheDocument();
         expect(screen.getByText(/25 vigentes · 26 evaluadas de 27/)).toBeInTheDocument();
         expect(screen.getAllByText(/barrido del 2026-10-30/)).toHaveLength(2);
     });
@@ -61,7 +64,7 @@ describe('RadarDcaView', () => {
         await waitFor(() => expect(screen.getByText('T04')).toBeInTheDocument());
         fireEvent.click(screen.getByRole('button', { name: /Siguiente/ }));
         await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(
-            { page: 2, level: null, sector: null, outsideTracked: false },
+            { page: 2, level: null, sector: null, outsideTracked: false, qualityClear: false },
         ));
     });
 
@@ -70,7 +73,16 @@ describe('RadarDcaView', () => {
         await waitFor(() => expect(screen.getByText('T04')).toBeInTheDocument());
         fireEvent.change(screen.getByRole('combobox', { name: 'Nivel' }), { target: { value: '4' } });
         await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(
-            { page: 1, level: 4, sector: null, outsideTracked: false },
+            { page: 1, level: 4, sector: null, outsideTracked: false, qualityClear: false },
+        ));
+    });
+
+    it('activa el filtro de calidad clara y vuelve a la página 1', async () => {
+        render(<RadarDcaView />);
+        await waitFor(() => expect(screen.getByText('T04')).toBeInTheDocument());
+        fireEvent.click(screen.getByRole('checkbox', { name: 'Solo calidad clara' }));
+        await waitFor(() => expect(mockGet).toHaveBeenLastCalledWith(
+            { page: 1, level: null, sector: null, outsideTracked: false, qualityClear: true },
         ));
     });
 

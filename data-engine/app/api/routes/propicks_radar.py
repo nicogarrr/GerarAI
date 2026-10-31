@@ -25,6 +25,7 @@ from app.core.tenancy import tenant_filters
 from app.models import Company, Position, WatchItem
 from app.services.propicks_dca_radar import PAGE_SIZE, page_candidates
 from app.services.propicks_radar_job import universe_company_ids
+from app.services.propicks_radar_quality import quality_for_companies
 from app.services.propicks_radar_store import latest_public_signals
 
 router = APIRouter()
@@ -71,6 +72,7 @@ def list_radar_opportunities(
     level: int | None = Query(default=None),
     sector: str | None = Query(default=None),
     outside_tracked: bool = Query(default=False),
+    quality: str | None = Query(default=None, pattern="^(clear)$"),
     db: Session = Depends(get_db),
 ) -> dict:
     as_of = date.today()
@@ -80,6 +82,10 @@ def list_radar_opportunities(
         c.id: c
         for c in db.scalars(select(Company).where(Company.id.in_(company_ids))).all()
     } if company_ids else {}
+
+    # Overlay de calidad (datos de tenant, solo en lectura; NUNCA entra en
+    # los snapshots públicos): veredicto quality-v1 por fila.
+    verdicts = quality_for_companies(db, [s["company_id"] for s in signals], as_of=as_of)
 
     rows: list[dict] = []
     invalid = 0
@@ -119,6 +125,7 @@ def list_radar_opportunities(
             "change": signal["change"],
             "formula_version": payload.get("formula_version"),
             "scan_date": signal["scan_date"],
+            "quality": verdicts.get(signal["company_id"]),
         })
 
     # Cobertura GLOBAL del universo: se calcula antes de los filtros y no
@@ -133,6 +140,8 @@ def list_radar_opportunities(
 
     if sector:
         rows = [r for r in rows if r["sector"] == sector]
+    if quality == "clear":
+        rows = [r for r in rows if (r["quality"] or {}).get("passed")]
     tracked = _tracked_symbols(db) if outside_tracked else None
     counts_by_level: dict[str, int] = {}
     eligible_rows = [r for r in rows if tracked is None or r["ticker"].upper() not in tracked]

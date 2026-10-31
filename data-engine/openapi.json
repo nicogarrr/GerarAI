@@ -59179,6 +59179,23 @@
             }
           },
           {
+            "in": "query",
+            "name": "quality",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^(clear)$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Quality"
+            }
+          },
+          {
             "in": "header",
             "name": "x-cavaai-user",
             "required": false,

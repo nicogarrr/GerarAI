@@ -10,6 +10,13 @@ export interface RadarDcaChange {
     since_price_date?: string;
 }
 
+export interface RadarDcaQuality {
+    passed: boolean;
+    reasons: string[];
+    policy: string;
+    market_cap_usd: number | null;
+}
+
 export interface RadarDcaOpportunity {
     ticker: string;
     name: string | null;
@@ -32,6 +39,8 @@ export interface RadarDcaOpportunity {
     formula_version: string | null;
     /** Fecha del barrido que produjo la fila: la vigencia se muestra, no se adivina. */
     scan_date: string;
+    /** Overlay quality-v1 (datos del tenant, calculado en lectura). */
+    quality: RadarDcaQuality | null;
 }
 
 export interface RadarDcaCoverage {
@@ -59,6 +68,8 @@ export interface RadarDcaQuery {
     level?: number | null;
     sector?: string | null;
     outsideTracked?: boolean;
+    /** Solo oportunidades con calidad clara (quality-v1). */
+    qualityClear?: boolean;
 }
 
 /** Radar ProPicks+DCA (nico-v1): oportunidades del barrido acotado. Solo lectura. */
@@ -68,5 +79,6 @@ export async function getRadarDcaOpportunities(query: RadarDcaQuery = {}): Promi
     if (query.level != null) params.set('level', String(query.level));
     if (query.sector) params.set('sector', query.sector);
     if (query.outsideTracked) params.set('outside_tracked', 'true');
+    if (query.qualityClear) params.set('quality', 'clear');
     return researchRequest<RadarDcaResult>(`/api/propicks/radar/opportunities?${params.toString()}`);
 }

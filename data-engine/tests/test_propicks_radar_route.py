@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi import FastAPI
@@ -13,7 +13,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.routes import propicks_radar as radar_module
 from app.core.database import Base, get_db
-from app.models import Company, Tenant, WatchItem
+from app.models import (CalculatedMetric, Company, FinancialFact, MarketPrice,
+                        ProPickCandidate, ProPickRun, Tenant, WatchItem)
 from app.services.propicks_radar_store import save_snapshot
 
 NOW = datetime(2026, 10, 30, 22, 0, tzinfo=UTC)
@@ -54,7 +55,6 @@ def db_session(monkeypatch):
                    currency="USD", sector="Technology", industry="Test",
                    company_type="large_cap", valuation_model="dcf"))
     # El universo = empresas con al menos un precio persistido (27 aquí).
-    from app.models import MarketPrice
     for cid in list(range(1, 27)) + [99]:
         db.add(MarketPrice(company_id=cid, date=NOW.date(), open=1, high=1, low=1,
                            close=1, adj_close=1, volume=1, quote_currency="USD", source="test"))
@@ -185,3 +185,46 @@ def test_snapshot_at_three_days_is_still_fresh(client, db_session):
     res = client.get("/api/propicks/radar/opportunities").json()
     assert "NOSNAP" in {i["ticker"] for i in res["items"]}
     assert res["coverage"]["stale"] == 0
+
+
+def test_quality_clear_filter(client, db_session):
+    # QUAL tiene todos los inputs quality-v1; el resto no (nunca pasan por defecto).
+    db_session.add(Company(id=50, ticker="QUAL", name="Quality Co", exchange="NASDAQ",
+                           currency="USD", sector="Technology", industry="Test",
+                           company_type="large_cap", valuation_model="dcf"))
+    day = date(2026, 10, 30)
+    for i in range(20):
+        db_session.add(MarketPrice(company_id=50, date=day - timedelta(days=i), open=100,
+                                   high=100, low=100, close=100, adj_close=100,
+                                   volume=200_000, quote_currency="USD", source="test"))
+    run = ProPickRun(tenant_id=1, as_of=datetime(2026, 10, 30, tzinfo=UTC),
+                     status="completed", funnel_version="v1")
+    db_session.add(run)
+    db_session.flush()
+    db_session.add(ProPickCandidate(tenant_id=1, run_id=run.id, company_id=50, passed=True))
+    db_session.add(CalculatedMetric(tenant_id=1, company_id=50, metric="net_debt_to_ebitda",
+                                    value=1.5, period="2025-FY", formula="test"))
+    db_session.add(CalculatedMetric(tenant_id=1, company_id=50, metric="market_cap",
+                                    value=2_000_000_000, period="2026-10-30", formula="test"))
+    db_session.add(FinancialFact(tenant_id=1, company_id=50, metric="free_cash_flow",
+                                 value=120, unit="USD", period="2025-FY", fiscal_year=2025,
+                                 filed=date(2026, 10, 15)))
+    db_session.add(FinancialFact(tenant_id=1, company_id=50, metric="free_cash_flow",
+                                 value=100, unit="USD", period="2024-FY", fiscal_year=2024,
+                                 filed=date(2025, 3, 1)))
+    db_session.commit()
+    save_snapshot(db_session, 50, _payload(4), now=NOW)
+    db_session.commit()
+
+    res = client.get("/api/propicks/radar/opportunities").json()
+    qual = next(i for i in res["items"] if i["ticker"] == "QUAL")
+    assert qual["quality"]["passed"] is True
+    other = next(i for i in res["items"] if i["ticker"] == "T02")
+    assert other["quality"]["passed"] is False
+
+    clear = client.get("/api/propicks/radar/opportunities", params={"quality": "clear"}).json()
+    assert {i["ticker"] for i in clear["items"]} == {"QUAL"}
+    assert clear["total"] == 1
+
+    assert client.get("/api/propicks/radar/opportunities",
+                      params={"quality": "bogus"}).status_code == 422

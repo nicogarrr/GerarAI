@@ -21906,6 +21906,7 @@ export interface operations {
                 level?: number | null;
                 sector?: string | null;
                 outside_tracked?: boolean;
+                quality?: string | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
