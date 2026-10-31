@@ -129,13 +129,29 @@ def build_identities(prefix: str) -> list[Identity]:
     ]
 
 
-def build_scenarios(*, include_chat: bool, portfolio_path: str) -> list[Scenario]:
+# Perfil ligero de solo lectura para los endpoints que usan Inicio y Watchlist,
+# incluidos los historicamente lentos (metric-coverage, data-health). Pensado
+# para el barrido de rendimiento: GETs idempotentes, sin escrituras ni LLM.
+INICIO_WATCHLIST_SCENARIOS = [
+    Scenario("watchlist_list", "GET", "/api/watchlist"),
+    Scenario("watchlist_monitor", "GET", "/api/watchlist/monitor?tickers=MSFT,NVDA,ASTS"),
+    Scenario("calendar_earnings", "GET", "/api/calendar/earnings"),
+    Scenario("metric_coverage", "GET", "/api/screeners/metric-coverage"),
+    Scenario("data_health", "GET", "/api/data-health"),
+]
+
+
+def build_scenarios(
+    *, include_chat: bool, portfolio_path: str, include_inicio_watchlist: bool = False
+) -> list[Scenario]:
     scenarios = [
         Scenario("health_live", "GET", "/health/live"),
         Scenario("thesis_tickers", "GET", "/api/companies/thesis-tickers"),
         Scenario("portfolio_summary", "GET", validate_endpoint_path(portfolio_path)),
         Scenario("screeners_real", "GET", "/api/screeners/real?limit=5"),
     ]
+    if include_inicio_watchlist:
+        scenarios.extend(INICIO_WATCHLIST_SCENARIOS)
     if include_chat:
         body = json.dumps(
             {"question": CHAT_PROMPT, "scope": "portfolio"},
@@ -156,6 +172,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--p95-ms", type=float, default=2000.0)
     parser.add_argument("--chat-p95-ms", type=float, default=30000.0)
     parser.add_argument("--skip-llm", action="store_true")
+    parser.add_argument(
+        "--inicio-watchlist",
+        action="store_true",
+        help="suma el perfil ligero de solo lectura de Inicio/Watchlist (watchlist, monitor, earnings, metric-coverage, data-health)",
+    )
     parser.add_argument("--allow-remote", action="store_true")
     parser.add_argument("--json-out", type=Path, default=None)
     parser.add_argument("--env-file", type=Path, default=None)
@@ -515,6 +536,7 @@ async def run_load(
     secret: str,
     identities: Sequence[Identity],
     portfolio_path: str = DEFAULT_PORTFOLIO_PATH,
+    include_inicio_watchlist: bool = False,
 ) -> dict[str, Any]:
     started_at = datetime.now(UTC)
     started = time.perf_counter()
@@ -536,7 +558,13 @@ async def run_load(
     else:
         include_chat = True
 
-    scenarios = build_scenarios(include_chat=include_chat, portfolio_path=portfolio_path)
+    scenarios = build_scenarios(
+        include_chat=include_chat,
+        portfolio_path=portfolio_path,
+        include_inicio_watchlist=include_inicio_watchlist,
+    )
+    if include_inicio_watchlist:
+        notes.append("perfil Inicio/Watchlist activo (--inicio-watchlist): 5 GETs de solo lectura")
     results = await run_rounds(
         client,
         secret=secret,
@@ -645,6 +673,7 @@ async def _execute(
     secret: str,
     identities: Sequence[Identity],
     portfolio_path: str,
+    include_inicio_watchlist: bool = False,
 ) -> dict[str, Any]:
     return await run_load(
         client,
@@ -652,11 +681,16 @@ async def _execute(
         secret=secret,
         identities=identities,
         portfolio_path=portfolio_path,
+        include_inicio_watchlist=include_inicio_watchlist,
     )
 
 
 def _run_async(
-    cfg: LoadConfig, secret: str, identities: Sequence[Identity], portfolio_path: str
+    cfg: LoadConfig,
+    secret: str,
+    identities: Sequence[Identity],
+    portfolio_path: str,
+    include_inicio_watchlist: bool = False,
 ) -> dict[str, Any]:
     limits = httpx.Limits(max_connections=32, max_keepalive_connections=16)
 
@@ -667,7 +701,14 @@ def _run_async(
             follow_redirects=False,
             limits=limits,
         ) as client:
-            return await _execute(client, cfg, secret, identities, portfolio_path)
+            return await _execute(
+                client,
+                cfg,
+                secret,
+                identities,
+                portfolio_path,
+                include_inicio_watchlist=include_inicio_watchlist,
+            )
 
     return asyncio.run(runner())
 
@@ -707,7 +748,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print_plan(
             base_url=base_url,
             identities=identities,
-            scenarios=build_scenarios(include_chat=include_chat, portfolio_path=portfolio_path),
+            scenarios=build_scenarios(
+                include_chat=include_chat,
+                portfolio_path=portfolio_path,
+                include_inicio_watchlist=args.inicio_watchlist,
+            ),
             cfg=cfg,
             json_out=args.json_out,
         )
@@ -720,7 +765,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     try:
-        report = _run_async(cfg, secret, identities, portfolio_path)
+        report = _run_async(
+            cfg,
+            secret,
+            identities,
+            portfolio_path,
+            include_inicio_watchlist=args.inicio_watchlist,
+        )
     except KeyboardInterrupt:
         print("interrumpido", file=sys.stderr)
         return 130
