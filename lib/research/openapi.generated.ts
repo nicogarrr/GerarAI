@@ -13219,6 +13219,17 @@ export interface components {
             /** Symbol */
             symbol: string;
         };
+        /** WatchlistAnalysisStateOut */
+        WatchlistAnalysisStateOut: {
+            /** As Of */
+            as_of: string;
+            /** Missing Inputs */
+            missing_inputs?: string[] | null;
+            /** Status */
+            status: string;
+            /** Thesis Status */
+            thesis_status: string | null;
+        };
         /** WatchlistAttentionThesisItemOut */
         WatchlistAttentionThesisItemOut: {
             /** Createdat */
@@ -13238,6 +13249,20 @@ export interface components {
             items: components["schemas"]["WatchlistAttentionThesisItemOut"][];
             /** Truncated */
             truncated: boolean;
+        };
+        /** WatchlistItemOut */
+        WatchlistItemOut: {
+            analysis: components["schemas"]["WatchlistAnalysisStateOut"] | null;
+            /** Company */
+            company: string | null;
+            /** Created At */
+            created_at: string | null;
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Updated At */
+            updated_at: string | null;
         };
         /** WorkProductRequest */
         WorkProductRequest: {
@@ -28022,9 +28047,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    }[];
+                    "application/json": components["schemas"]["WatchlistItemOut"][];
                 };
             };
             /** @description Validation Error */

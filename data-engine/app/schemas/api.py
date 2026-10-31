@@ -1989,6 +1989,30 @@ class ScreenerSavedScreenOut(BaseModel):
     created_at: datetime
 
 
+# --- GET /api/watchlist ---------------------------------------------------------
+# Forma medida contra la ruta y tracked_analysis.tracked_statuses: item con 6
+# claves siempre (id, symbol, company, created_at, updated_at, analysis).
+# analysis null sin workflow; cuando existe lleva status/as_of/thesis_status
+# siempre y missing_inputs SOLO si el ultimo estado es insufficient_data con
+# empresa conocida: exclude_unset + test de ausencia.
+
+
+class WatchlistAnalysisStateOut(BaseModel):
+    status: str
+    as_of: str
+    thesis_status: str | None
+    missing_inputs: list[str] | None = None
+
+
+class WatchlistItemOut(BaseModel):
+    id: int
+    symbol: str
+    company: str | None
+    created_at: str | None
+    updated_at: str | None
+    analysis: WatchlistAnalysisStateOut | None
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto

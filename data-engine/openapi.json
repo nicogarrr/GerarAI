@@ -20700,6 +20700,50 @@
         "title": "WatchItemCreate",
         "type": "object"
       },
+      "WatchlistAnalysisStateOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "missing_inputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Inputs"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "thesis_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Status"
+          }
+        },
+        "required": [
+          "status",
+          "as_of",
+          "thesis_status"
+        ],
+        "title": "WatchlistAnalysisStateOut",
+        "type": "object"
+      },
       "WatchlistAttentionThesisItemOut": {
         "properties": {
           "createdAt": {
@@ -20752,6 +20796,71 @@
           "truncated"
         ],
         "title": "WatchlistAttentionThesisOut",
+        "type": "object"
+      },
+      "WatchlistItemOut": {
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchlistAnalysisStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "company",
+          "created_at",
+          "updated_at",
+          "analysis"
+        ],
+        "title": "WatchlistItemOut",
         "type": "object"
       },
       "WorkProductRequest": {
@@ -82850,8 +82959,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/WatchlistItemOut"
                   },
                   "title": "Response List Watchlist Api Watchlist Get",
                   "type": "array"

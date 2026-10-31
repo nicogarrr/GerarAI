@@ -1,6 +1,7 @@
 'use server';
 
 import type { TrackedAnalysisStatus } from '@/lib/tracked-analysis-status';
+import type { components } from '@/lib/research/openapi.generated';
 import { revalidatePath } from 'next/cache';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest, jsonBody } from '@/lib/research/client';
@@ -36,13 +37,8 @@ function failure(error: unknown): WatchlistMutationResult {
     };
 }
 
-/** Entrada devuelta por GET /api/watchlist del backend research. */
-interface WatchlistEntry {
-    analysis?: TrackedAnalysisStatus | null;
-    symbol: string;
-    company?: string | null;
-    created_at?: string;
-}
+/** Entrada devuelta por GET /api/watchlist del backend research (tipo del OpenAPI generado). */
+type WatchlistEntry = components['schemas']['WatchlistItemOut'];
 
 // Obtener watchlist del usuario actual desde el backend research (/api/watchlist).
 // `unavailable` distingue un fallo del backend de una watchlist realmente vacía (F386).
