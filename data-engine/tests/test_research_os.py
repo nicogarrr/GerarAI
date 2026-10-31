@@ -183,8 +183,6 @@ def test_memory_api_tracks_claims_evidence_sections_and_sessions():
     client = TestClient(main.app)
     token = client.get("/api/csrf-token").json()["csrf_token"]
     client.headers.update({"x-csrf-token": token})
-    token = client.get("/api/csrf-token").json()["csrf_token"]
-    client.headers.update({"x-csrf-token": token})
 
     thesis = client.post("/api/thesis/generate", json={"ticker": "MSFT", "force_new_version": True})
     assert thesis.status_code == 200
@@ -624,8 +622,6 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     client = TestClient(main.app)
     token = client.get("/api/csrf-token").json()["csrf_token"]
     client.headers.update({"x-csrf-token": token})
-    token = client.get("/api/csrf-token").json()["csrf_token"]
-    client.headers.update({"x-csrf-token": token})
 
     refresh = client.post("/api/companies/MSFT/refresh/fmp")
     assert refresh.status_code == 200
@@ -693,8 +689,6 @@ def test_fmp_refresh_402_returns_actionable_message(monkeypatch):
     seed()
     monkeypatch.setattr(companies_route, "FMPClient", DeniedFMPClient)
     client = TestClient(main.app)
-    token = client.get("/api/csrf-token").json()["csrf_token"]
-    client.headers.update({"x-csrf-token": token})
     # El endpoint muta estado: exige token CSRF (VAL-SEC-001).
     token = client.get("/api/csrf-token").json()["csrf_token"]
     client.headers.update({"x-csrf-token": token})
