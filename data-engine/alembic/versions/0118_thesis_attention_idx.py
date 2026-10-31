@@ -22,7 +22,7 @@ inspector: idempotente. La migracion corre en una unica transaccion
 (env.py), asi que no se usa CONCURRENTLY; la tabla es pequena (una fila por
 cambio de tesis persistido).
 
-NO desplegar en produccion hasta que Nico lo decida.
+Desplegada en produccion el 2026-10-31 (confirmado por Nico via piloto).
 """
 
 import sqlalchemy as sa
