@@ -121,13 +121,6 @@ const Layout = async ({ children }: { children: React.ReactNode }) => {
                             {' · '}
                             {t('landing.footer.disclaimer')}
                         </p>
-                        <p className="mt-1">
-                            {t('landing.footer.chartsBy')}{' '}
-                            <a className="inline-flex min-h-11 items-center public-footer-link underline" href="https://www.tradingview.com/" rel="noreferrer" target="_blank">
-                                TradingView
-                            </a>
-                            .
-                        </p>
                     </div>
                     <nav aria-label={t('landing.footer.navAria')} className="flex flex-row flex-wrap items-center justify-center gap-x-4 gap-y-1 sm:justify-end">
                         {legalLinks.map((link) => (

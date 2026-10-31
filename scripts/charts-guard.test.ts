@@ -2,8 +2,10 @@
  * Guard de velas (lightweight-charts v5, TradingView): la librería es
  * ESM-only y NO puede entrar en el bundle de servidor; el montaje es cliente
  * con `dynamic(ssr: false)`, la atribución a TradingView es obligatoria por
- * licencia y los mapeos de datos son honestos (sin OHLC no hay velas, sin
- * volumen no hay 0 fabricado).
+ * licencia y vive en el propio chart (logo + enlace a tradingview.com); la
+ * línea del pie público se retiró por decisión de producto (1 nov 2026), así
+ * que este guard vigila la atribución del chart. Los mapeos de datos son
+ * honestos (sin OHLC no hay velas, sin volumen no hay 0 fabricado).
  * Ejecución: node --experimental-strip-types --test scripts/charts-guard.test.ts
  */
 import { describe, it } from 'node:test';
@@ -19,7 +21,6 @@ const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const workspaceActions = readFileSync('lib/actions/market-workspace.actions.ts', 'utf8');
 const finnhub = readFileSync('lib/actions/finnhub.actions.ts', 'utf8');
 const quoteRoute = existsSync('app/api/quote/route.ts') ? readFileSync('app/api/quote/route.ts', 'utf8') : '';  // /api/quote se borro: era codigo muerto con cuatro '|| 0' que inventaban variaciones
-const footer = readFileSync('app/(public)/layout.tsx', 'utf8');
 const candles = readFileSync('lib/market/candles.ts', 'utf8');
 
 const STATIC_LW_IMPORT = /^import\s+(?!type)[^;]*?from\s+['"]lightweight-charts['"]/m;
@@ -48,7 +49,7 @@ describe('charts: montaje solo-cliente (ESM-only, Next 16)', () => {
     });
 });
 
-describe('charts: atribución obligatoria a TradingView', () => {
+describe('charts: atribución obligatoria a TradingView en el chart', () => {
     it('el pie del chart nombra a TradingView y enlaza a tradingview.com', () => {
         assert.match(chart, /TradingView/);
         // La URL vive en la constante TRADINGVIEW_URL (lib/market/candles.ts,
@@ -56,11 +57,6 @@ describe('charts: atribución obligatoria a TradingView', () => {
         assert.match(chart, /href=\{TRADINGVIEW_URL\}/);
         assert.match(candles, /TRADINGVIEW_URL = 'https:\/\/www\.tradingview\.com\/'/);
         assert.match(chart, /attributionLogo:\s*true/);
-    });
-
-    it('el footer público incluye la línea de atribución con enlace', () => {
-        assert.match(footer, /TradingView/);
-        assert.match(footer, /https:\/\/www\.tradingview\.com\//);
     });
 });
 
