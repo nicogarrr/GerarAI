@@ -66,7 +66,7 @@ function SignalCard({ signal, minSources }: { signal: Awaited<ReturnType<typeof 
             {signal.evidence.map((item) => (
               <li key={item.id}>
                 {item.status === 'verificada' && item.url ? (
-                  <a className="inline-flex min-h-11 items-center break-words text-teal-300 underline" href={item.url} rel="noopener noreferrer" target="_blank">
+                  <a className="inline-flex min-h-11 min-w-0 items-center break-all text-teal-300 underline" href={item.url} rel="noopener noreferrer" target="_blank">
                     {item.title ?? item.url}
                   </a>
                 ) : <span className="text-gray-500">{item.title ?? 'Evidencia no disponible'} · sin enlace verificable</span>}
@@ -134,7 +134,7 @@ function DiscoveryCard({ item }: { item: DiscoveryView }) {
             <li className="flex items-center gap-1.5 text-xs" key={evidence.id}>
               {evidence.status === 'verificada' && evidence.url ? (
                 <a
-                  className="inline-flex min-h-11 items-center gap-1 text-teal-300 underline hover:text-teal-200"
+                  className="inline-flex min-h-11 min-w-0 items-center gap-1 break-all text-teal-300 underline hover:text-teal-200"
                   href={evidence.url}
                   rel="noopener noreferrer"
                   target="_blank"
