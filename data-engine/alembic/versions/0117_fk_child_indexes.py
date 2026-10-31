@@ -11,14 +11,20 @@ external_claims.source_id, financial_facts.source_id,
 financial_statements.source_id, source_audits.thesis_version_id,
 transcripts.source_id). 8 son ON DELETE SET NULL y 1 NO ACTION: al borrar
 un documents/companies/thesis_versions, Postgres recorre la tabla hija
-ENTERA para localizar las filas afectadas (Seq Scan por hija y por padre
-borrado). El borrado de cuenta (privacy delete_account) borra documents en
-lote: multiplica el coste.
+ENTERA por cada padre borrado. El borrado de cuenta (privacy
+delete_account) borra documents en lote: multiplica el coste.
 
-Aditivo: 9 CREATE INDEX con los mismos nombres que autogenera el modelo
-(index=True), guard por inspector, idempotente. Sin CONCURRENTLY: env.py
-migra en una unica transaccion. Modelos alineados para que el rachet de
-deriva no crezca.
+Los Dockerfiles ejecutan `alembic upgrade head` al arrancar: un CREATE
+INDEX normal bloquearia escrituras durante el arranque. Por eso en
+Postgres se usa CREATE INDEX CONCURRENTLY dentro de op.autocommit_block()
+(fuera de la transaccion de migracion), que no bloquea escrituras, con
+IF NOT EXISTS como guard. Un intento CONCURRENTLY interrumpido deja un
+indice INVALID (pg_index.indisvalid = false) que IF NOT EXISTS saltaria:
+se detecta y se recrea (DROP INDEX CONCURRENTLY + CREATE). En sqlite (no
+soporta CONCURRENTLY) se crea con CREATE INDEX normal + guard por
+inspector: mismo resultado, cadena de tests intacta.
+
+Modelos alineados (index=True, mismos nombres): el rachet no crece.
 
 NO desplegar en produccion hasta que Nico lo decida.
 """
@@ -44,9 +50,42 @@ _INDICES = [
     ("ix_transcripts_source_id", "transcripts", ["source_id"]),
 ]
 
+_NOMBRES = [n for n, _, _ in _INDICES]
+
+
+def _invalidos(bind) -> set[str]:
+    """Indices INVALID (intento CONCURRENTLY interrumpido) de nuestra lista."""
+    rows = bind.execute(
+        sa.text(
+            "select c.relname from pg_class c "
+            "join pg_index i on i.indexrelid = c.oid "
+            "where not i.indisvalid and c.relname = any(:nombres)"
+        ),
+        {"nombres": _NOMBRES},
+    ).all()
+    return {r[0] for r in rows}
+
 
 def upgrade() -> None:
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        with op.get_context().autocommit_block():
+            for nombre, tabla, columnas in _INDICES:
+                if nombre in _invalidos(bind):
+                    op.drop_index(
+                        nombre,
+                        table_name=tabla,
+                        postgresql_concurrently=True,
+                        if_exists=True,
+                    )
+                op.create_index(
+                    nombre,
+                    tabla,
+                    columnas,
+                    postgresql_concurrently=True,
+                    if_not_exists=True,
+                )
+        return
     inspector = sa.inspect(bind)
     existentes = {
         ix["name"]
@@ -54,13 +93,22 @@ def upgrade() -> None:
         for ix in inspector.get_indexes(tabla)
     }
     for nombre, tabla, columnas in _INDICES:
-        if nombre in existentes:
-            continue
-        op.create_index(nombre, tabla, columnas)
+        if nombre not in existentes:
+            op.create_index(nombre, tabla, columnas)
 
 
 def downgrade() -> None:
     bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
+        with op.get_context().autocommit_block():
+            for nombre, tabla, _ in _INDICES:
+                op.drop_index(
+                    nombre,
+                    table_name=tabla,
+                    postgresql_concurrently=True,
+                    if_exists=True,
+                )
+        return
     inspector = sa.inspect(bind)
     existentes = {
         ix["name"]
@@ -68,6 +116,5 @@ def downgrade() -> None:
         for ix in inspector.get_indexes(tabla)
     }
     for nombre, tabla, _ in _INDICES:
-        if nombre not in existentes:
-            continue
-        op.drop_index(nombre, table_name=tabla)
+        if nombre in existentes:
+            op.drop_index(nombre, table_name=tabla)
