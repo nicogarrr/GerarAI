@@ -1589,7 +1589,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return (
       <div className="space-y-5">
         <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelGenerated')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaGenerateModel')}</Button></MutationForm>
-        <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} />
+        <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} t={t} />
       </div>
     );
   };
