@@ -161,12 +161,22 @@ def enqueue_for_all_tenants(actor, **kwargs) -> dict:
 
 def enqueue_official_closes_once() -> dict:
     """Prices are global, unlike tenant portfolios: enqueue only one context."""
+    return enqueue_once(sync_official_closes)
+
+
+def enqueue_once(actor, **kwargs) -> dict:
+    """Un solo contexto para jobs de datos GLOBALES (precios/senales publicas).
+
+    Encolar por tenant generaria N-1 corridas skipped por el lease del actor:
+    un mensaje basta porque el resultado no es de tenant. Mismo patron que
+    los cierres oficiales.
+    """
     contexts = list(tenant_contexts())
     if not contexts:
-        return {"actor": "sync_official_closes", "queued": []}
+        return {"actor": actor.actor_name, "queued": []}
     tenant_id, user_id = contexts[0]
-    message = sync_official_closes.send(tenant_id, user_id)
-    return {"actor": "sync_official_closes", "queued": [str(message.message_id)]}
+    message = actor.send(tenant_id, user_id, **kwargs)
+    return {"actor": actor.actor_name, "queued": [str(message.message_id)]}
 
 
 def build_scheduler(*, background: bool = False) -> BlockingScheduler | BackgroundScheduler:
@@ -528,10 +538,12 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # resumible. Persiste snapshots SOLO con sesiones asentadas: la sesion
     # del dia en curso nunca entra, asi que esta corrida NO usa el cierre
     # de hoy aunque se encole despues de el. El cursor por dia reanuda lo
-    # que el presupuesto deje sin completar; el lease global evita solapes.
+    # que el presupuesto deje sin completar. Los snapshots son datos
+    # publicos globales: un solo encolado (enqueue_once); el lease global
+    # del actor sigue frenando solapes entre procesos.
     _register(
         scheduler,
-        partial(enqueue_for_all_tenants, propicks_radar_scan),
+        partial(enqueue_once, propicks_radar_scan),
         "cron",
         job_id="propicks_radar_scan_daily",
         hour=23,
