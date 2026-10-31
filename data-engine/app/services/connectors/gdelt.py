@@ -60,6 +60,10 @@ _gdelt_pacer = GlobalPacer(
     # proceso; el pacer aporta el ritmo ENTRE procesos via Redis. Un fallback
     # con reloj monotonic real colgaria los tests de reloj falso.
     fallback_local=False,
+    # Resuelto EN CADA LLAMADA desde el namespace del modulo: los tests
+    # sustituyen gdelt.asyncio (fake_clock) y cubren tambien la espera del
+    # pacer; con Redis real era una espera real no cubierta (cluster rojo CI).
+    sleep_async=lambda seconds: asyncio.sleep(seconds),
 )
 
 

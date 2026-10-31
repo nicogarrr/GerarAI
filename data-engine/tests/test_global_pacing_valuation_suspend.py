@@ -286,3 +286,48 @@ def test_actor_guarda_cursor_y_reencola_al_429_de_universo(monkeypatch):
         dramatiq_app.refresh_valuation_metrics(tenant_id=1)
     assert excinfo.value.delay >= 42_000
     assert fake.store.get("valuation_metrics:cursor:1") == "AAA"
+
+
+def test_sleep_async_inyectable_cubre_la_espera_del_hueco():
+    """Con Redis devolviendo una espera real, wait() usa el sleep ASYNC
+    inyectado y no el asyncio.sleep global (cluster gdelt rojo en CI con
+    Redis real: la espera del cooldown no la cubria el fake_clock)."""
+    fake = _FakeRedis()
+    dormidas: list[float] = []
+
+    async def _fake_sleep_async(seconds: float) -> None:
+        dormidas.append(seconds)
+
+    pacer = GlobalPacer(
+        "prov-async",
+        min_interval_seconds=5.0,
+        redis_client_factory=lambda: fake,
+        wall_clock=lambda: 1_000.0,
+        sleep_async=_fake_sleep_async,
+    )
+
+    async def main():
+        await pacer.wait()  # primer hueco: sin espera
+        await pacer.wait()  # segundo: espera de 5 s SOLO via sleep_async
+
+    t0 = time.monotonic()
+    asyncio.run(main())
+    assert time.monotonic() - t0 < 1.0, "la espera fue real: no uso el inyectable"
+    assert dormidas == [5.0]
+
+
+def test_sleep_async_por_defecto_es_asyncio_sleep():
+    """Sin inyeccion, wait() duerme de verdad (comportamiento de prod)."""
+    fake = _FakeRedis()
+    pacer = GlobalPacer(
+        "prov-real", min_interval_seconds=0.06, redis_client_factory=lambda: fake,
+        wall_clock=lambda: 2_000.0,
+    )
+
+    async def main():
+        await pacer.wait()
+        await pacer.wait()
+
+    t0 = time.monotonic()
+    asyncio.run(main())
+    assert time.monotonic() - t0 >= 0.05

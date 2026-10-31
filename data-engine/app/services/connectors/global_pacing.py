@@ -19,7 +19,7 @@ import asyncio
 import logging
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -69,6 +69,7 @@ class GlobalPacer:
         fallback_local: bool = True,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        sleep_async: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         if min_interval_seconds <= 0:
             raise ValueError(f"min_interval_seconds debe ser > 0, recibido {min_interval_seconds}")
@@ -82,6 +83,12 @@ class GlobalPacer:
         # caido SIN desactivar el fallback local (proteccion de prod).
         self._monotonic = monotonic
         self._sleep = sleep
+        # sleep ASYNC inyectable: el conector lo cablea resolviendo
+        # asyncio.sleep EN CADA LLAMADA desde SU modulo, para que un test
+        # que sustituye el reloj del conector cubra tambien esta espera
+        # (con Redis real la espera era real y el fake_clock no la veia:
+        # cluster gdelt rojo en CI, 31-oct).
+        self._sleep_async = sleep_async
         self._local_next = 0.0
         self._local_blocked_until = 0.0
         self._local_lock = threading.Lock()
@@ -115,7 +122,8 @@ class GlobalPacer:
                 )
                 wait = max(0.0, float(wait_ms) / 1000.0)
                 if wait > 0:
-                    await asyncio.sleep(wait)
+                    dormir = self._sleep_async if self._sleep_async is not None else asyncio.sleep
+                    await dormir(wait)
                 return
             except Exception as exc:  # noqa: BLE001 - Redis caido: pacing local
                 logger.warning("global pacer %s: Redis unavailable, fallback local: %s", self.key, exc)
