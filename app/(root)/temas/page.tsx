@@ -1,6 +1,8 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { TrendingDown, TrendingUp } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 import BackendOffline from '@/components/system/BackendOffline';
 import { ThemeBrainButton } from './_components/ThemeBrainButton';
@@ -224,20 +226,43 @@ function HoldingsLines({
   );
 }
 
-export default async function TemasPage({ searchParams }: PageProps) {
-  const query = await searchParams;
-  const order = parseThemeOrder(query.orden);
-  const requestedPage = parseThemePage(query.pagina);
+
+function TemasBodySkeleton() {
+  return (
+    <>
+      <ul aria-hidden="true" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <li className="rounded-xl border border-gray-800 bg-surface-1 p-5" key={i}>
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="mt-3 h-8 w-24" />
+            <Skeleton className="mt-3 h-4 w-full" />
+          </li>
+        ))}
+      </ul>
+      <Skeleton aria-hidden="true" className="h-4 w-2/3" />
+    </>
+  );
+}
+
+type TemasBodyProps = { order: ReturnType<typeof parseThemeOrder>; requestedPage: number };
+
+async function TemasBody({ order, requestedPage }: TemasBodyProps) {
+  // Todas las peticiones independientes se disparan a la vez (antes eran
+  // secuenciales: cada una esperaba a la anterior; LCP medido 7,3 s en prod).
+  const themesPromise = getMarketThemes();
+  const bottlenecksPromise = getBottlenecks().catch(() => null);
+  const flowIdsPromise = getMoneyFlowThemes();
+  const holdingsPromise = getFlowHoldings();
   let data;
   try {
-    data = await getMarketThemes();
+    data = await themesPromise;
   } catch (error) {
     if (isBackendUnavailableError(error)) return <BackendOffline feature="Temas" retryHref="/temas" />;
     throw error;
   }
 
   // Cruce con Cuellos de botella: si ese carril falla, la pagina sigue sin el enlace.
-  const bottlenecks = await getBottlenecks().catch(() => null);
+  const bottlenecks = await bottlenecksPromise;
   const detectedThemes = new Set(
     (bottlenecks?.signals ?? [])
       .filter((signal) => signal.status === 'detectado')
@@ -249,10 +274,10 @@ export default async function TemasPage({ searchParams }: PageProps) {
   // Flujos de dinero por tema: degradan en silencio (la página se pinta igual
   // si el endpoint no existe o el backend no responde); jamás un importe
   // inventado en su lugar.
-  const flowIds = await getMoneyFlowThemes();
+  const flowIds = await flowIdsPromise;
   const [flowPayloads, holdings] = await Promise.all([
     Promise.all(flowIds.map((item) => getMoneyFlow(item.id))),
-    getFlowHoldings(),
+    holdingsPromise,
   ]);
   const flowsById = new Map<string, MoneyFlow>();
   const failedFlowIds = new Set<string>();
@@ -267,14 +292,10 @@ export default async function TemasPage({ searchParams }: PageProps) {
     }
   });
 
-  return (
-    <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-bold text-gray-100">Temas</h1>
-        <ThemeOrderToggle order={order} />
-      </header>
 
-      {themes.length === 0 ? (
+  return (
+    <>
+    {themes.length === 0 ? (
         <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
           <h2 className="font-semibold text-gray-100">Sin datos de mercado ahora mismo</h2>
         </section>
@@ -339,6 +360,27 @@ export default async function TemasPage({ searchParams }: PageProps) {
           </ul>
         </details>
       </footer>
+    </>
+  );
+}
+export default async function TemasPage({ searchParams }: PageProps) {
+
+  const query = await searchParams;
+  const order = parseThemeOrder(query.orden);
+  const requestedPage = parseThemePage(query.pagina);
+
+  // La cabecera pinta en el primer chunk; los datos llegan por streaming
+  // (antes el primer byte útil esperaba a temas + cuellos + flujos: LCP
+  // medido 7,3 s en prod a 390px, 31-oct-2026).
+  return (
+    <main id="content" tabIndex={-1} className="mx-auto flex max-w-6xl flex-col gap-5">
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-bold text-gray-100">Temas</h1>
+        <ThemeOrderToggle order={order} />
+      </header>
+      <Suspense fallback={<TemasBodySkeleton />}>
+        <TemasBody order={order} requestedPage={requestedPage} />
+      </Suspense>
     </main>
   );
 }
