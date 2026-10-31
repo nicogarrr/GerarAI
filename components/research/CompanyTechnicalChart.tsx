@@ -11,7 +11,7 @@ import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges'
 import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
 import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
-import { availableIndicators, barsSince, eventsInRange, indicatorSeries, INDICATOR_LABELS, markersByDay, volumeSpikeFlags, type IndicatorKind, type PriceEventKind } from '@/lib/market/price-events';
+import { availableIndicators, barsSince, detectMovements, eventsInRange, movementEvents, indicatorSeries, INDICATOR_LABELS, markersByDay, volumeSpikeFlags, type IndicatorKind, type PriceEventKind } from '@/lib/market/price-events';
 import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
 
 function price(value: number, currency: string | null) {
@@ -64,7 +64,9 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     const spikes = useMemo(() => volumeSpikeFlags(visible), [visible]);
     const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<PriceEventKind>>(() => new Set());
     const [focusDate, setFocusDate] = useState<string | null>(null);
-    const rangeEvents = useMemo(() => eventsInRange(eventData?.events ?? [], firstDay, lastDay), [eventData, firstDay, lastDay]);
+    const storedEvents = useMemo(() => eventsInRange(eventData?.events ?? [], firstDay, lastDay), [eventData, firstDay, lastDay]);
+    // «¿Por qué se movió?»: los días de movimiento fuerte se listan con lo que pasó alrededor.
+    const rangeEvents = useMemo(() => hourly ? storedEvents : eventsInRange([...storedEvents, ...movementEvents(detectMovements(visible), storedEvents)], firstDay, lastDay), [storedEvents, visible, hourly, firstDay, lastDay]);
     const markers = useMemo(() => hourly ? [] : markersByDay(rangeEvents, hiddenKinds), [rangeEvents, hiddenKinds, hourly]);
     const priceLines = useMemo(() => [
         ...(target != null ? [{ label: 'Objetivo analistas', price: target, color: '#a78bfa' }] : []),
