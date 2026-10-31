@@ -2083,3 +2083,39 @@ class PortfolioForecastOut(BaseModel):
 class PortfolioPriceUpdateOut(BaseModel):
     ticker: str
     market_price: float
+
+
+# --- POST /api/portfolio/refresh-market --------------------------------------
+# Forma medida contra MarketRefreshService.refresh (servicio real): sobre un
+# envelope fijo, los stages varian sus claves por paso (solo step/name/status
+# son comunes) -> todo lo demas opcional y response_model_exclude_unset en la
+# ruta. Los tres bloques operativos internos (risk, alert_results,
+# screen_results) quedan free-form a proposito: son salidas de otros
+# servicios con sus propias ramas, y tiparlos parcialmente borraria claves
+# del wire (response_model filtra lo no declarado).
+
+
+class RefreshMarketStageOut(BaseModel):
+    step: int
+    name: str
+    status: str
+    updated: int | None = None
+    errors: list[dict[str, Any]] | None = None
+    stale_prices: list[dict[str, Any]] | None = None
+    portfolio_snapshot_id: int | None = None
+    snapshot_pricing_coverage: float | None = None
+    market_data_status: str | None = None
+    alert_rules: int | None = None
+    saved_screens: int | None = None
+
+
+class PortfolioRefreshMarketOut(BaseModel):
+    status: Literal["ok", "partial"]
+    as_of: date
+    started_at: datetime
+    completed_at: datetime
+    order: list[str]
+    stages: list[RefreshMarketStageOut]
+    risk: dict[str, Any]
+    alert_results: list[dict[str, Any]]
+    screen_results: list[dict[str, Any]]

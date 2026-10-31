@@ -10794,6 +10794,45 @@ export interface components {
             /** Twr */
             twr: number | null;
         };
+        /** PortfolioRefreshMarketOut */
+        PortfolioRefreshMarketOut: {
+            /** Alert Results */
+            alert_results: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * As Of
+             * Format: date
+             */
+            as_of: string;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+            /** Order */
+            order: string[];
+            /** Risk */
+            risk: {
+                [key: string]: unknown;
+            };
+            /** Screen Results */
+            screen_results: {
+                [key: string]: unknown;
+            }[];
+            /** Stages */
+            stages: components["schemas"]["RefreshMarketStageOut"][];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial";
+        };
         /** PortfolioRiskOut */
         PortfolioRiskOut: {
             /** Beta */
@@ -11479,6 +11518,35 @@ export interface components {
             regiones: string[];
             /** Rotulo */
             rotulo: string;
+        };
+        /** RefreshMarketStageOut */
+        RefreshMarketStageOut: {
+            /** Alert Rules */
+            alert_rules?: number | null;
+            /** Errors */
+            errors?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Market Data Status */
+            market_data_status?: string | null;
+            /** Name */
+            name: string;
+            /** Portfolio Snapshot Id */
+            portfolio_snapshot_id?: number | null;
+            /** Saved Screens */
+            saved_screens?: number | null;
+            /** Snapshot Pricing Coverage */
+            snapshot_pricing_coverage?: number | null;
+            /** Stale Prices */
+            stale_prices?: {
+                [key: string]: unknown;
+            }[] | null;
+            /** Status */
+            status: string;
+            /** Step */
+            step: number;
+            /** Updated */
+            updated?: number | null;
         };
         /** ResearchAlertAction */
         ResearchAlertAction: {
@@ -23160,9 +23228,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioRefreshMarketOut"];
                 };
             };
             /** @description Validation Error */
