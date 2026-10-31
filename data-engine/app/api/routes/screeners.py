@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models import CustomMetricDefinition, SavedScreen
+from app.schemas.api import ScreenerCustomMetricOut, ScreenerSavedScreenOut
 from app.services.screener_service import (
     DUPLICATE_SCREEN_NAME,
     CustomMetricService,
@@ -83,7 +84,7 @@ def _screen_payload(row: SavedScreen) -> dict[str, Any]:
     }
 
 
-@router.get("/custom-metrics")
+@router.get("/custom-metrics", response_model=list[ScreenerCustomMetricOut])
 def list_custom_metrics(db: Session = Depends(get_db)) -> list[dict]:
     return [_metric_payload(row) for row in CustomMetricService.active(db)]
 
@@ -99,7 +100,7 @@ def create_custom_metric(
     return _metric_payload(row)
 
 
-@router.get("/screens")
+@router.get("/screens", response_model=list[ScreenerSavedScreenOut])
 def list_screens(db: Session = Depends(get_db)) -> list[dict]:
     return [
         _screen_payload(row)

@@ -17816,6 +17816,174 @@
         "title": "ScreenCreate",
         "type": "object"
       },
+      "ScreenerCriterionOut": {
+        "properties": {
+          "left": {
+            "title": "Left",
+            "type": "string"
+          },
+          "operator": {
+            "enum": [
+              ">",
+              ">=",
+              "<",
+              "<=",
+              "==",
+              "!="
+            ],
+            "title": "Operator",
+            "type": "string"
+          },
+          "right": {
+            "title": "Right",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "operator",
+          "right"
+        ],
+        "title": "ScreenerCriterionOut",
+        "type": "object"
+      },
+      "ScreenerCustomMetricOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "metric_key": {
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "metric_key",
+          "name",
+          "formula",
+          "unit",
+          "description",
+          "version",
+          "active",
+          "metadata",
+          "created_at"
+        ],
+        "title": "ScreenerCustomMetricOut",
+        "type": "object"
+      },
+      "ScreenerSavedScreenOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "alerts_enabled": {
+            "title": "Alerts Enabled",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenerCriterionOut"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ranking_direction": {
+            "title": "Ranking Direction",
+            "type": "string"
+          },
+          "ranking_formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking Formula"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "criteria",
+          "ranking_formula",
+          "ranking_direction",
+          "alerts_enabled",
+          "active",
+          "last_run_at",
+          "created_at"
+        ],
+        "title": "ScreenerSavedScreenOut",
+        "type": "object"
+      },
       "SnapshotCountsOut": {
         "properties": {
           "calculated_metrics": {
@@ -70339,8 +70507,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ScreenerCustomMetricOut"
                   },
                   "title": "Response List Custom Metrics Api Screeners Custom Metrics Get",
                   "type": "array"
@@ -71219,8 +71386,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ScreenerSavedScreenOut"
                   },
                   "title": "Response List Screens Api Screeners Screens Get",
                   "type": "array"
