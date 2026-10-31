@@ -28,6 +28,9 @@
  *   node scripts/find-dead-code.mjs            # human table
  *   node scripts/find-dead-code.mjs --json     # machine readable
  *   node scripts/find-dead-code.mjs --fail     # non-zero exit if anything is dead
+ *   node scripts/find-dead-code.mjs --fail --baseline scripts/baselines/dead-code.txt
+ *       # non-zero exit only on dead code NOT in the baseline; a baseline entry
+ *       # that stops being a finding is fail-closed (shrink the baseline in that PR)
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
@@ -158,11 +161,6 @@ const ENTRY_POINTS = {
  * flag it: they are reached dynamically, or only from tests, or are vendored.
  */
 const KNOWN_ALIVE = [
-  // Imported by tests/test_portfolio_analytics.py, not by app/. The only reason
-  // it is alive at all is that a test exercises it.
-  'data-engine/modules/portfolio_analytics.py',
-  // Imported by tests/test_return_engine.py.
-  'data-engine/modules/return_engine.py',
   // Imported by tests/test_portfolio_risk_metrics.py as quantstats.montecarlo.
   'data-engine/quantstats/montecarlo/analytics.py',
   // FastAPI mounts every route module through app/api/router.py.
@@ -576,9 +574,29 @@ function human(bytes) {
 }
 
 function main() {
-  const args = new Set(process.argv.slice(2));
+  const argv = process.argv.slice(2);
+  const args = new Set(argv);
   const asJson = args.has('--json');
   const failOnDead = args.has('--fail');
+  // --baseline <fichero>: lista de inertes conocidos (uno por linea, # comenta).
+  // Con baseline, --fail solo rompe por muertos NUEVOS; una entrada de la
+  // baseline que ya no es hallazgo (borrada o revivida) es fallo cerrado:
+  // la baseline se encoge en el mismo PR que limpia, nunca se acumula.
+  const baselineIdx = argv.indexOf('--baseline');
+  const baselinePath = baselineIdx >= 0 ? argv[baselineIdx + 1] : null;
+  let baseline = null;
+  if (baselinePath) {
+    if (!baselinePath || baselinePath.startsWith('--') || !existsSync(resolve(REPO, baselinePath))) {
+      console.error(`--baseline: fichero no encontrado: ${baselinePath ?? '(sin valor)'}`);
+      process.exit(2);
+    }
+    baseline = new Set(
+      readFileSync(resolve(REPO, baselinePath), 'utf8')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => l && !l.startsWith('#')),
+    );
+  }
   const allFiles = trackedFiles();
   const { nodes, nodeSet, edges, importers } = buildGraph(allFiles);
   const files = new Map(nodes.map((n) => [n, statSync(join(REPO, n)).size]));
@@ -646,8 +664,25 @@ function main() {
   }
   findings.sort((a, b) => b.bytes - a.bytes);
 
+  // --- baseline de inertes conocidos
+  let newFindings = findings;
+  let staleBaseline = [];
+  if (baseline !== null) {
+    const found = new Set(findings.map((f) => f.file));
+    newFindings = findings.filter((f) => !baseline.has(f.file));
+    staleBaseline = [...baseline].filter((f) => !found.has(f));
+  }
+
   // --- fail-closed self checks
   const failures = [];
+  if (staleBaseline.length) {
+    failures.push({
+      check: 'baseline-stale',
+      detail:
+        'entradas de la baseline que ya no son hallazgo (borradas o revividas); ' +
+        `quitalas de la baseline en este PR: ${staleBaseline.join(', ')}`,
+    });
+  }
   if (staleWhitelist.length) {
     failures.push({
       check: 'whitelist-stale',
@@ -686,6 +721,8 @@ function main() {
     deadBytes: findings.reduce((a, f) => a + f.bytes, 0),
     reachableTests,
     findings,
+    newFindings,
+    baseline: baseline === null ? null : { path: baselinePath, known: baseline.size, stale: staleBaseline },
     selfCheckFailures: failures,
   };
 
@@ -713,7 +750,11 @@ function main() {
   }
 
   if (failures.length) process.exit(2);
-  if (failOnDead && findings.length) process.exit(1);
+  if (baseline !== null && newFindings.length) {
+    console.log(`\n  muertos NUEVOS (no en baseline ${baselinePath}):`);
+    for (const f of newFindings) console.log(`   - ${f.file}`);
+  }
+  if (failOnDead && newFindings.length) process.exit(1);
 }
 
 main();
