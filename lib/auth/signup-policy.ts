@@ -4,15 +4,17 @@
  * La comparten `lib/better-auth/auth.ts` (lo que el servidor acepta) y las
  * paginas de acceso (lo que se ensena), para que nunca digan cosas distintas.
  *
- * - Fuera de produccion el alta esta abierta (desarrollo y tests).
- * - En produccion esta cerrada salvo `ALLOW_PUBLIC_SIGNUP=true`.
- * - `SIGNUP_ALLOWLIST` (emails separados por comas) permite registrarse a esos
- *   emails aunque el alta publica siga cerrada: sirve para dar de alta una
- *   cuenta de prueba o a un invitado sin abrir el registro a todo el mundo.
+ * Modelo vigente (2026-10-31, decision de Nico): el registro esta ABIERTO a
+ * cualquiera, pero cada cuenta nueva nace `pending` y no entra hasta que
+ * Nico la aprueba desde el correo de aviso (ver lib/auth/account-approval.ts).
+ * Abrir ya no abre el acceso: abre la solicitud.
  *
- * Verificacion de email: GerarAI aun no tiene envio de verificacion. Antes,
- * produccion la exigia siempre, de modo que abrir el registro con
- * ALLOW_PUBLIC_SIGNUP=true hacia que la app fallara al arrancar. Ahora solo se
+ * - `ALLOW_PUBLIC_SIGNUP=false` en produccion es la escotilla de cierre:
+ *   vuelve al modelo anterior (alta cerrada salvo invitados de
+ *   `SIGNUP_ALLOWLIST`, emails separados por comas).
+ * - Fuera de produccion el alta siempre estuvo abierta; sigue igual.
+ *
+ * Verificacion de email: GerarAI aun no tiene envio de verificacion. Solo se
  * pide con REQUIRE_EMAIL_VERIFICATION=true y, mientras no exista el envio, se
  * ignora con un aviso en el log en lugar de tumbar el arranque o bloquear
  * el alta para siempre.
@@ -52,7 +54,10 @@ export function parseSignupAllowlist(raw: string | undefined): Set<string> {
 
 export function resolveSignupPolicy(env: Env): SignupPolicy {
     const isProduction = env.NODE_ENV === 'production';
-    const publicOpen = !isProduction || env.ALLOW_PUBLIC_SIGNUP === 'true';
+    // Alta abierta por defecto (las cuentas nacen pendientes de aprobación);
+    // ALLOW_PUBLIC_SIGNUP=false en producción restaura el alta cerrada.
+    const explicitlyClosed = isProduction && env.ALLOW_PUBLIC_SIGNUP === 'false';
+    const publicOpen = !explicitlyClosed;
     const allowlist = parseSignupAllowlist(env.SIGNUP_ALLOWLIST);
     const signUpEnabled = publicOpen || allowlist.size > 0;
     const warnings: string[] = [];
@@ -63,10 +68,10 @@ export function resolveSignupPolicy(env: Env): SignupPolicy {
             'y el alta quedaría bloqueada para siempre. Las cuentas nuevas se crean sin verificar el email.',
         );
     }
-    if (isProduction && env.ALLOW_PUBLIC_SIGNUP === 'true') {
+    if (explicitlyClosed && allowlist.size === 0) {
         warnings.push(
-            'Registro público abierto en producción (ALLOW_PUBLIC_SIGNUP=true) y sin verificación de email: ' +
-            'cualquiera puede crear una cuenta. Para dar acceso solo a algunas personas usa SIGNUP_ALLOWLIST.',
+            'Registro cerrado en producción (ALLOW_PUBLIC_SIGNUP=false) y SIGNUP_ALLOWLIST vacía: ' +
+            'nadie puede crear una cuenta. Es la escotilla de cierre; quita la variable para volver al alta abierta con aprobación.',
         );
     }
     const rawAllowlist = (env.SIGNUP_ALLOWLIST ?? '').trim();

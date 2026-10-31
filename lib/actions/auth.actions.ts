@@ -6,7 +6,7 @@ import { callAuthEndpoint } from "@/lib/auth/endpoint";
 import { AuthenticationError, toAppError, getSafeErrorMessage } from "@/lib/types/errors";
 import { getT } from "@/lib/i18n/server";
 
-export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string }> => {
+export const signUpWithEmail = async ({ email, password, fullName, country, investmentGoals, riskTolerance, preferredIndustry }: SignUpFormData): Promise<{ success: boolean; error?: string; accountStatus?: string }> => {
     const t = await getT();
     try {
         const auth = await getAuth();
@@ -16,11 +16,12 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
 
         // El perfil inversor viaja en el propio sign-up (additionalFields de
         // better-auth, sin migraciones SQL) en vez de perderse en el destructuring.
-        await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
+        const response = await callAuthEndpoint('/sign-up/email', { email, password, name: fullName, country, investmentGoals, riskTolerance, preferredIndustry });
 
         // The auth endpoint delivers the session in HttpOnly cookies. Never serialize
         // Better Auth's response: it also contains the raw bearer session token.
-        return { success: true };
+        // accountStatus ('pending' con el alta abierta) enruta a /cuenta-pendiente.
+        return { success: true, ...(response.accountStatus ? { accountStatus: response.accountStatus } : {}) };
     } catch (error: unknown) {
         const appError = toAppError(error);
         // The endpoint maps documented status/code pairs to safe Spanish copy.
@@ -48,7 +49,7 @@ export const signUpWithEmail = async ({ email, password, fullName, country, inve
     }
 }
 
-export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean }> => {
+export const signInWithEmail = async ({ email, password }: SignInFormData): Promise<{ success: boolean; error?: string; twoFactorRequired?: boolean; code?: string }> => {
     const t = await getT();
     try {
         const auth = await getAuth();
@@ -74,7 +75,19 @@ export const signInWithEmail = async ({ email, password }: SignInFormData): Prom
         // The endpoint maps documented status/code pairs to safe Spanish copy.
         // Do not reinterpret that structured result by English substrings.
         if (appError.code.startsWith('AUTH_ENDPOINT_') || appError.code === 'AUTH_UNAVAILABLE') {
-            return { success: false, error: getSafeErrorMessage(appError) };
+            // Código estable para el front solo donde el contrato lo pide
+            // (ACCOUNT_PENDING / ACCOUNT_REJECTED enrutan a /cuenta-pendiente);
+            // el resto mantiene la forma exacta de siempre.
+            const stableCode = appError.code === 'AUTH_ENDPOINT_ACCOUNT_PENDING'
+                ? 'ACCOUNT_PENDING'
+                : appError.code === 'AUTH_ENDPOINT_ACCOUNT_REJECTED'
+                    ? 'ACCOUNT_REJECTED'
+                    : undefined;
+            return {
+                success: false,
+                error: getSafeErrorMessage(appError),
+                ...(stableCode ? { code: stableCode } : {}),
+            };
         }
 
 
