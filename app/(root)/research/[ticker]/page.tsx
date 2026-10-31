@@ -1547,6 +1547,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildFinancialsContent = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const data = await viewData('financials');
     return (
       <div className="space-y-6">
@@ -1556,33 +1557,34 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               La decision usa el perfil (mercado declarado), no solo el
               sufijo del ticker: los europeos canonicos no lo llevan (AENA). */}
           {fmpCovers(ticker, company.exchange) ? (
-            <MutationForm action={refreshCompanyFinancials.bind(null, ticker)} successMessage="Financieros actualizados (FMP)"><Button type="submit" variant="outline">Refrescar financieros (FMP)</Button></MutationForm>
+            <MutationForm action={refreshCompanyFinancials.bind(null, ticker)} successMessage={t('research.fichaFinancialsUpdatedFmp')}><Button type="submit" variant="outline">{t('research.fichaRefreshFinancialsFmp')}</Button></MutationForm>
           ) : null}
           {isEsefIssuerProfile(ticker, company.exchange) ? (
-            <MutationForm action={refreshCompanyFinancialsESEF.bind(null, ticker)} successMessage="Financieros ESEF refrescados"><Button type="submit" variant="outline">Refrescar ESEF</Button></MutationForm>
+            <MutationForm action={refreshCompanyFinancialsESEF.bind(null, ticker)} successMessage={t('research.fichaFinancialsUpdatedEsef')}><Button type="submit" variant="outline">{t('research.fichaRefreshEsef')}</Button></MutationForm>
           ) : (
-            <MutationForm action={refreshCompanyFinancialsSEC.bind(null, ticker)} successMessage="Financieros SEC refrescados"><Button type="submit" variant="outline">Refrescar SEC</Button></MutationForm>
+            <MutationForm action={refreshCompanyFinancialsSEC.bind(null, ticker)} successMessage={t('research.fichaFinancialsUpdatedSec')}><Button type="submit" variant="outline">{t('research.fichaRefreshSec')}</Button></MutationForm>
           )}
-          <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Métricas y modelo de research refrescados"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Recalcular</Button></MutationForm>
+          <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelMetricsRefreshed')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaRecalculate')}</Button></MutationForm>
         </div>
-        <Panel title="Fundamentales actuales · TTM (últimos 4 trimestres)"><TtmPanel ttm={data.ttm} /></Panel>
-        <Panel title="Métricas calculadas trazables"><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
-        <Panel title="Hechos financieros canónicos"><FactTable ticker={ticker} facts={data.facts} refreshLabel={
+        <Panel title={t('research.fichaCurrentFundamentals')}><TtmPanel ttm={data.ttm} /></Panel>
+        <Panel title={t('research.fichaTraceableMetrics')}><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
+        <Panel title={t('research.fichaCanonicalFacts')}><FactTable ticker={ticker} facts={data.facts} refreshLabel={
             fmpCovers(ticker, company.exchange)
-              ? 'Refrescar financieros (FMP)'
+              ? t('research.fichaRefreshFinancialsFmp')
               : isEsefIssuerProfile(ticker, company.exchange)
-                ? 'Refrescar ESEF'
-                : 'Refrescar SEC'
+                ? t('research.fichaRefreshEsef')
+                : t('research.fichaRefreshSec')
           } /></Panel>
       </div>
     );
   };
 
   const buildModelSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const model = await viewData('model');
     return (
       <div className="space-y-5">
-        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Modelo a largo plazo generado"><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />Generar modelo</Button></MutationForm>
+        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelGenerated')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaGenerateModel')}</Button></MutationForm>
         <LongTermModelPanel model={model?.status === 'not_generated' ? null : model} ticker={ticker} />
       </div>
     );
@@ -1593,10 +1595,11 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildMoatSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const moat = await viewData('moat');
     return (
       <div className="space-y-5">
-        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage="Evaluación del foso refrescada"><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />Reevaluar evidencia</Button></MutationForm>
+        <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaMoatRefreshed')}><Button type="submit" variant="outline"><ShieldCheck className="mr-2 h-4 w-4" />{t('research.fichaReevaluateEvidence')}</Button></MutationForm>
         <MoatClassificationPanel moat={moat} />
         <MoatChecklistPanel moat={moat} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -1605,15 +1608,15 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             return (
               <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={item.type}>
                 <div className="flex justify-between gap-3"><MoatTerm type={item.type} /><Badge>{item.strength}/100</Badge></div>
-                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · persistencia {label(item.persistence)}</p>
+                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · {t('research.fichaPersistence')} {label(item.persistence)}</p>
                 {definition ? <p className="mt-2 text-xs leading-5 text-gray-500">{definition}</p> : null}
-                <p className="mt-2 text-xs text-gray-500">{item.supporting_claim_ids.length} afirmaciones a favor · {item.contradicting_claim_ids.length} en contra</p>
+                <p className="mt-2 text-xs text-gray-500">{t('research.fichaMoatClaims', { forCount: item.supporting_claim_ids.length, againstCount: item.contradicting_claim_ids.length })}</p>
               </div>
             );
           }) : (
             <EmptyState
-              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Genera el modelo y reevalúa el foso</EmptyLink>}
-              title="Sin evaluación de foso persistida."
+              action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{t('research.fichaGenerateModelReevaluate')}</EmptyLink>}
+              title={t('research.fichaNoMoatEval')}
             />
           )}
         </div>
@@ -1622,19 +1625,21 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   };
 
   const buildSatellitesSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     // El panel ya degrada solo cuando no hay datos; aquí la lectura llega del
     // lote en paralelo (null si degradó, igual que antes).
     const satellites = ticker === 'ASTS' ? await viewData('satellites') : null;
-    return ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title="Esta vista orbital solo está disponible para ASTS." />;
+    return ticker === 'ASTS' ? <AstOrbitPanel data={satellites?.orbits ?? null} analysis={satellites?.analysis ?? null} /> : <EmptyState title={t('research.fichaOrbitalOnlyAsts')} />;
   };
 
   const buildPeersSection = async (): Promise<React.ReactNode> => {
+    const t = await getT();
     const peers = await viewData('peers');
     return (
       <div className="space-y-6">
-        <Panel title="Conjunto de comparables"><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_LABELS[peers.comparison.basis] ?? peers.comparison.basis) : 'Sin conjunto de comparables'} · {peers.comparison?.peer_count ?? 0} comparables con datos{(peers.comparison?.peers_without_data ?? []).length > 0 ? ` · sin datos: ${(peers.comparison?.peers_without_data ?? []).join(', ')}` : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
-        <Panel title="Métricas comparables"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Object.entries(peers.comparison?.benchmarks ?? {}).map(([metric, value]) => <div className="rounded-lg border border-gray-800 p-3" key={metric}><div className="text-sm text-gray-200">{metric}</div><div className="mt-2 text-xs text-gray-500">Objetivo {formatPeerValue(value.target_value, metric)}{value.target_atypical ? ' (atípico: posible ganancia no operativa)' : ''} · mediana {peerMedianText(value, metric)} · n={value.peer_sample_size}</div>{(value.excluded_atypical ?? []).length > 0 ? <div className="mt-1 text-xs text-amber-300/80">Fuera de la mediana: {(value.excluded_atypical ?? []).map((ex) => `${ex.ticker} ${ex.value ?? 's/d'}`).join(', ')} - lectura atípica verificable, no benchmark</div> : null}</div>)}</div></Panel>
-        <Panel title="Ventajas y desventajas"><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_ES[peers.analysis.methodology] ?? peers.analysis.methodology) : 'Sin análisis de comparables persistido.'}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
+        <Panel title={t('research.fichaPeerSet')}><p className="text-sm text-gray-300">{peers.comparison?.basis ? (PEERS_BASIS_LABELS[peers.comparison.basis] ?? peers.comparison.basis) : t('research.fichaNoPeerSet')} · {t('research.fichaPeersWithData', { count: peers.comparison?.peer_count ?? 0 })}{(peers.comparison?.peers_without_data ?? []).length > 0 ? t('research.fichaPeersWithoutDataSuffix', { list: (peers.comparison?.peers_without_data ?? []).join(', ') }) : ''}</p><div className="mt-4 flex flex-wrap gap-2">{peers.comparison?.companies.map((peer) => <Badge variant={peer.is_target ? 'default' : 'outline'} key={peer.ticker}>{peer.ticker}</Badge>)}</div></Panel>
+        <Panel title={t('research.fichaPeerMetrics')}><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{Object.entries(peers.comparison?.benchmarks ?? {}).map(([metric, value]) => <div className="rounded-lg border border-gray-800 p-3" key={metric}><div className="text-sm text-gray-200">{metric}</div><div className="mt-2 text-xs text-gray-500">{t('research.fichaPeerTarget', { value: formatPeerValue(value.target_value, metric) })}{value.target_atypical ? t('research.fichaAtypicalSuffix') : ''}{t('research.fichaMedianSuffix', { value: peerMedianText(value, metric) })}{t('research.fichaSampleSuffix', { count: value.peer_sample_size })}</div>{(value.excluded_atypical ?? []).length > 0 ? <div className="mt-1 text-xs text-amber-300/80">{t('research.fichaOutsideMedian', { list: (value.excluded_atypical ?? []).map((ex) => `${ex.ticker} ${ex.value ?? t('research.fichaNoDataShort')}`).join(', ') })}</div> : null}</div>)}</div></Panel>
+        <Panel title={t('research.fichaAdvantages')}><p className="text-sm text-gray-400">{peers.analysis?.methodology ? (PEERS_METHODOLOGY_ES[peers.analysis.methodology] ?? peers.analysis.methodology) : t('research.fichaNoPeerAnalysis')}</p><p className="mt-3 text-xs text-amber-300">{peers.analysis?.insufficient_data.join(', ')}</p></Panel>
       </div>
     );
   };
