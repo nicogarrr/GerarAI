@@ -331,8 +331,8 @@ def test_preview_isin_column_warns_and_validates():
     assert result.success is True
     assert any("ISIN" in w.message for w in result.warnings)
 
-    bad = service.preview_import(("isin;date;action;quantity;price\n"
-                                  "NOTANISIN;2024-01-15;compra;100;3.50\n").encode(), "isin.csv")
+    bad = service.preview_import((b"isin;date;action;quantity;price\n"
+                                  b"NOTANISIN;2024-01-15;compra;100;3.50\n"), "isin.csv")
     assert bad.success is False
     assert any("ISIN" in e.message for e in bad.errors)
 
@@ -396,8 +396,9 @@ def test_commit_inserts_in_chronological_order(env):
 def test_dedupe_is_per_portfolio_not_tenant_wide(env):
     """Una compra idéntica en OTRA cartera del mismo tenant es legítima: no se omite."""
     _, factory, _, _ = env
-    from app.models.entities import Company, Portfolio, Transaction
     from datetime import UTC, datetime
+
+    from app.models.entities import Portfolio, Transaction
 
     service = TransactionImportService()
     with factory() as s:

@@ -19,7 +19,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.valuation.financial_snapshot import _period_type
 from app.models import (
     CalculatedMetric,
     Company,
@@ -30,6 +29,7 @@ from app.models import (
 )
 from app.services.propicks_dca_radar import quality_checks
 from app.services.propicks_funnel_service import LEVERAGE_METRIC
+from app.valuation.financial_snapshot import _period_type
 
 FCF_METRIC = "free_cash_flow"
 MARKET_CAP_METRIC = "market_cap"

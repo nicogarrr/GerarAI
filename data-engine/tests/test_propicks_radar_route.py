@@ -13,8 +13,16 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.routes import propicks_radar as radar_module
 from app.core.database import Base, get_db
-from app.models import (CalculatedMetric, Company, FinancialFact, MarketPrice,
-                        ProPickCandidate, ProPickRun, Tenant, WatchItem)
+from app.models import (
+    CalculatedMetric,
+    Company,
+    FinancialFact,
+    MarketPrice,
+    ProPickCandidate,
+    ProPickRun,
+    Tenant,
+    WatchItem,
+)
 from app.services.propicks_radar_store import save_snapshot
 
 NOW = datetime(2026, 10, 30, 22, 0, tzinfo=UTC)

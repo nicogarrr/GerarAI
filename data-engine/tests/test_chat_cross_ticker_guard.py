@@ -1,14 +1,13 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.api.routes.research_assistant import AssistantRequest, AssistantResponse
 from app.models.entities import Base, Company, Document, FinancialFact, NewsEvent, Tenant
 from app.services.research_assistant_service import answer
-
-import pytest
 
 
 @pytest.fixture

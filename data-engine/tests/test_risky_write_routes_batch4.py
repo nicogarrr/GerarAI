@@ -81,8 +81,9 @@ def test_propicks_freeze_empty_month_is_honest_409(monkeypatch):
 
 
 def test_propicks_freeze_with_passers_returns_201(monkeypatch):
-    import app.services.propicks_snapshot_service as snap
     from types import SimpleNamespace
+
+    import app.services.propicks_snapshot_service as snap
 
     row = SimpleNamespace(month="2026-10", as_of="2026-10-31", passed_count=3)
     monkeypatch.setattr(snap, "freeze_monthly_snapshot", lambda db: row)

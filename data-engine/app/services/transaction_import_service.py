@@ -20,7 +20,6 @@ import unicodedata
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
