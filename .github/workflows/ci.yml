@@ -213,6 +213,9 @@ jobs:
         working-directory: data-engine
     env:
       APP_ENV: test
+      # El redis-server del job es desechable: sin este opt-in el conftest no
+      # limpia claves ni reasigna DB (un REDIS_URL heredado no se toca).
+      TEST_REDIS_EPHEMERAL: "1"
       DATABASE_URL: sqlite:///./cavaai_ci.db
       CAVAAI_ENABLE_VECTOR_INGEST: "0"
       CAVAAI_ENABLE_VECTOR_CHAT: "0"
