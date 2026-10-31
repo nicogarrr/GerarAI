@@ -53,6 +53,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.models.entities import Company, DividendRecord, Position
 from app.services.dividend_records import (
     records_in_position_currency,
@@ -172,7 +173,9 @@ def _month_key(d: date) -> str:
 
 class DividendProjectionService:
     def project(self, db: Session, months: int = 12) -> dict[str, Any]:
-        today = date.today()
+        # «Hoy» del usuario (Europe/Madrid): con el reloj UTC, entre las 00:00
+        # y las 01:00/02:00 la proyección seguía empezando en el día (y el mes) anterior.
+        today = local_today()
         cutoff = _shift_year(today, -1)
         # Horizonte exacto por fechas: [today, today + months meses], ambos
         # inclusive. Los buckets mensuales cubren desde el mes actual hasta

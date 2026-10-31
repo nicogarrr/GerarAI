@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.ui_errors import ui_error
 from app.services import macro_calendar_service
 from app.services.eight_k_digest import eight_k_digest
@@ -27,7 +28,7 @@ async def macro_events(
     Una fuente caída marca ``status="partial"``/``"unavailable"``; nunca 5xx
     por fallo del proveedor y nunca fechas inventadas.
     """
-    start = desde or date.today()
+    start = desde or local_today()  # día de Madrid, como /calendar
     end = hasta or (start + timedelta(days=60))
     try:
         result = await macro_calendar_service.get_macro_events(start, end)
