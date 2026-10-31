@@ -111,7 +111,28 @@ def _startup_fire_time(trigger_args: dict, now: datetime | None = None) -> datet
     return base + timedelta(seconds=random.uniform(low, high))
 
 
+def _default_jitter(trigger: str, trigger_args: dict) -> int:
+    """Escalonado anti-manada para el job que no declara jitter propio.
+
+    Sin jitter, todos los jobs de la misma cadencia disparan en el mismo
+    segundo (los de 6 h a las :00, los de 1 h a las :00...): la rafaga
+    sincronizada satura worker, Redis y proveedores a la vez. MEDIDO
+    2026-10-31: 44 de 65 jobs no declaraban jitter. Politica: intervalo/6
+    acotado a [1, 600] s para triggers interval (nunca alcanza la mitad de
+    la cadencia, asi no solapa el tick vecino) y 300 s para cron (mismo
+    orden que los crons diarios que ya lo declaraban). Un job con jitter
+    explicito conserva el suyo.
+    """
+    if trigger == "interval":
+        interval = _interval_seconds(trigger_args)
+        if interval <= 0:
+            return 300
+        return max(1, min(600, int(interval // 6)))
+    return 300
+
+
 def _register(scheduler: BlockingScheduler, func, trigger: str, *, job_id: str, **trigger_args) -> None:
+    trigger_args.setdefault("jitter", _default_jitter(trigger, trigger_args))
     if trigger == "interval" and "next_run_time" not in trigger_args:
         first = _startup_fire_time(trigger_args)
         if first is not None:

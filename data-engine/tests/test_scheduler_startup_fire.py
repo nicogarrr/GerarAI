@@ -71,9 +71,10 @@ def test_real_apscheduler_first_fire_explicit_time_and_interval(monkeypatch):
         job = scheduler.get_job("one_min")
         assert job.next_run_time is not None
         assert job.next_run_time <= before + timedelta(seconds=61)
-        # El siguiente disparo mantiene el intervalo de 1 min desde el primero.
+        # El siguiente disparo mantiene el intervalo de 1 min desde el primero,
+        # mas el jitter anti-manada por defecto (intervalo/6 -> 10 s en 1 min).
         nxt = job.trigger.get_next_fire_time(job.next_run_time, job.next_run_time)
-        assert nxt - job.next_run_time == timedelta(minutes=1)
+        assert timedelta(minutes=1) <= nxt - job.next_run_time <= timedelta(minutes=1, seconds=10)
 
         explicit = datetime.now(UTC) + timedelta(hours=3)
         sched._register(
