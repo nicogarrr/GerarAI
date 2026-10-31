@@ -1,1 +1,8 @@
-{}
+{
+  "refresh": "Refresh",
+  "emptyDefault": "No data available yet",
+  "records": "records",
+  "actions": "Actions",
+  "yes": "Yes",
+  "no": "No"
+}
