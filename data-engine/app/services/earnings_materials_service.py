@@ -291,7 +291,7 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
             try:
                 redis_client.setex(_materials_redis_key(key), _redis_ttl_for(value), json.dumps(value))
             except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
-                pass
+                logger.warning("materials cache: escritura Redis fallo; se sirve sin cache", exc_info=True)
 
     if pending:
         tasks = [asyncio.create_task(one(e)) for e in pending]

@@ -148,7 +148,7 @@ class GlobalPacer:
             until_ms = int((self._wall() + seconds) * 1000)
             client.eval(_EXTEND_COOLDOWN_LUA, 1, self._cooldown_key, until_ms, int(seconds * 1000) + 5000)
         except Exception:  # noqa: BLE001 - best-effort, el cooldown local ya quedo
-            pass
+            logger.warning("global_pacing: no se pudo extender el cooldown en Redis; el local ya quedo", exc_info=True)
 
     def blocked_for_remote(self) -> float:
         """Segundos de cooldown leidos SOLO de Redis (0 si no hay o no responde).
@@ -181,7 +181,7 @@ class GlobalPacer:
                 if raw is not None:
                     remaining = max(remaining, float(raw) / 1000.0 - self._wall())
             except Exception:  # noqa: BLE001 - sonda best-effort
-                pass
+                logger.warning("global_pacing: sonda Redis de cooldown fallo; se usa el valor local", exc_info=True)
         return max(0.0, remaining)
 
     def reset(self) -> None:

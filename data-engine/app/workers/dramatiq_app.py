@@ -242,7 +242,7 @@ def _gdelt_circuit_trip(client) -> None:
             client.set(_GDELT_CIRCUIT_KEY, "1", ex=GDELT_CIRCUIT_TTL_SECONDS)
             client.delete(_GDELT_CIRCUIT_STREAK_KEY)
     except Exception:  # noqa: BLE001 - expira por TTL solo
-        pass
+        logger.warning("GDELT circuit: no se pudo abrir el disyuntor en Redis; expira por TTL", exc_info=True)
 
 
 def _gdelt_429_recorded(client) -> bool:
@@ -266,7 +266,7 @@ def _gdelt_success_recorded(client) -> None:
         if client is not None:
             client.delete(_GDELT_CIRCUIT_STREAK_KEY)
     except Exception:  # noqa: BLE001 - best-effort
-        pass
+        logger.warning("GDELT circuit: no se pudo romper la racha en Redis", exc_info=True)
 
 
 def _raise_gdelt_retry(exc: Exception) -> None:
@@ -458,7 +458,7 @@ def _coalesce_on_success(job, window_seconds, key_parts=(), stale_after_seconds=
                     try:
                         client.delete(_enqueue_mark_key(job, parts))
                     except Exception:  # noqa: BLE001 - best-effort
-                        pass
+                        logger.warning("enqueue mark: delete Redis fallo", exc_info=True)
                     claimed = bool(client.set(key, token, nx=True, ex=max(window, 1)))
             except Exception:  # noqa: BLE001 - sonda best-effort, fail-open
                 client, claimed = None, True
@@ -569,7 +569,7 @@ def coalesced_send(actor, *args, **kwargs):
                 token,
             )
         except Exception:  # noqa: BLE001 - expira por TTL solo
-            pass
+            logger.warning("enqueue token: no se pudo liberar la marca en Redis; expira por TTL", exc_info=True)
         raise
 
 # Ventana de la marca "analisis ya encolado" del carril de alertas. El
@@ -2338,7 +2338,7 @@ def refresh_valuation_metrics(
             try:
                 client.delete(cursor_key)
             except Exception:  # noqa: BLE001 - expira por TTL solo
-                pass
+                logger.warning("valuation cursor: delete Redis fallo; expira por TTL", exc_info=True)
         return {"actor": "refresh_valuation_metrics", **result}
     except ValuationUniverseRateSuspended as exc:
         # Suspender con cursor: la corrida siguiente reanuda DESPUES del
@@ -2348,7 +2348,7 @@ def refresh_valuation_metrics(
             try:
                 client.set(cursor_key, exc.last_completed_ticker, ex=20 * 3600)
             except Exception:  # noqa: BLE001 - expira por TTL solo
-                pass
+                logger.warning("valuation cursor: no se pudo guardar el cursor en Redis; expira por TTL", exc_info=True)
         delay_seconds = exc.retry_after or finnhub_blocked_for() or 60.0
         delay_ms = int(delay_seconds * 1000) + _retry_jitter_ms()
         raise dramatiq.Retry(
