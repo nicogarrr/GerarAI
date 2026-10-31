@@ -147,3 +147,69 @@ def test_data_sources_health_endpoint(client):
     assert "Yahoo Finance" in source_names
     assert "Alpha Vantage" in source_names
     assert "European Central Bank (ECB)" in source_names
+
+
+def test_health_reports_unknown_until_first_real_check():
+    """Veracidad: una fuente nunca sondeada no se reporta 'healthy' ni con fecha de chequeo inventada."""
+    from app.services.data_source_health import DataSourceHealthRegistry, DataSourceStatus
+
+    DataSourceHealthRegistry._instance = None
+    registry = DataSourceHealthRegistry()
+    summary = registry.summary()
+    assert summary["overall_status"] == "unknown"
+    for source in summary["sources"]:
+        assert source["status"] == "unknown"
+        assert source["last_checked_at"] is None
+
+    # Tras un éxito real sí se reporta healthy
+    registry.record_success("yahoo_finance", 12.0)
+    summary = registry.summary()
+    assert summary["overall_status"] == "healthy"
+    yahoo = next(s for s in summary["sources"] if s["name"] == "Yahoo Finance")
+    assert yahoo["status"] == "healthy"
+    assert yahoo["last_checked_at"] is not None
+    # Las demás siguen en unknown
+    ecb = next(s for s in summary["sources"] if s["name"] == "European Central Bank (ECB)")
+    assert ecb["status"] == "unknown"
+
+    DataSourceHealthRegistry._instance = None
+
+
+def test_circuit_breaker_half_open_transition_is_locked():
+    """La transición OPEN -> HALF_OPEN es atómica (un solo intento pasa a la vez)."""
+    import threading as th
+
+    from app.services.data_source_health import DataSourceStatus
+
+    status = DataSourceStatus(name="test", is_primary=True, cooldown_seconds=0.0)
+    for _ in range(3):
+        status.record_failure("boom")
+    assert status.state == CircuitState.OPEN
+
+    allowed = []
+    def try_attempt():
+        if status.can_attempt():
+            allowed.append(1)
+
+    threads = [th.Thread(target=try_attempt) for _ in range(10)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    # Solo la transición a HALF_OPEN permite intentos; el resto espera
+    assert status.state == CircuitState.HALF_OPEN
+    assert len(allowed) >= 1
+
+
+def test_record_failure_log_incluye_umbral(caplog):
+    """El logger.info de fallo tiene 4 placeholders y 4 argumentos (regresión del piloto)."""
+    import logging
+
+    status = get_data_source_registry().get_status("ecb_fx")
+    status.consecutive_failures = 0
+    status.state = CircuitState.CLOSED
+    with caplog.at_level(logging.INFO, logger="app.services.data_source_health"):
+        status.record_failure("Timeout")
+    msgs = [r.getMessage() for r in caplog.records if "Fallo registrado" in r.getMessage()]
+    assert len(msgs) == 1
+    assert "(1/3): Timeout" in msgs[0]
