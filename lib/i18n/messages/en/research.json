@@ -8,7 +8,7 @@
   "noResearch": "No research generated",
   "layersTitle": "Measures which layers exist (documents, facts, thesis, model), not whether the company can be valued or the reliability of the data.",
   "layersAvailable": "Layers available {score}/100",
-  "notValuable": "Not valuable: evidence missing",
+  "notValuable": "Cannot be valued: evidence missing",
   "notValuableTitle": "There are data layers, but inputs or sourced evidence to publish a valuation are missing.",
   "kicker": "Research OS",
   "indexTitle": "Research index",
