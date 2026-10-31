@@ -10885,6 +10885,28 @@ export interface components {
             /** Volatility */
             volatility: number | null;
         };
+        /** PortfolioSnapshotCaptureOut */
+        PortfolioSnapshotCaptureOut: {
+            /** Cumulative Twr */
+            cumulative_twr: number | null;
+            /** Daily Return */
+            daily_return: number | null;
+            /** Id */
+            id: number;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Pricing Coverage */
+            pricing_coverage: number;
+            /**
+             * Snapshot Date
+             * Format: date
+             */
+            snapshot_date: string;
+            /** Total Value Base */
+            total_value_base: number;
+        };
         /** PortfolioSnapshotOut */
         PortfolioSnapshotOut: {
             /** Base Currency */
@@ -23319,9 +23341,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioSnapshotCaptureOut"];
                 };
             };
             /** @description Validation Error */
