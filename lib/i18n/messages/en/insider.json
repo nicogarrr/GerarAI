@@ -107,7 +107,7 @@
     "statSells": "Sales",
     "statClusters": "Clusters",
     "statCsuite": "CEO/CFO buys",
-    "totalsNote": "Totals and signals: Form 4 only (SEC, amounts declared in USD). Canada (Yahoo, unofficial source) and UK PDMR are listed in the table with their declared currency, without counting here.",
+    "totalsNote": "Totals and signals: Form 4 only (SEC, amounts declared in USD). Canada (unofficial source) and UK PDMR are listed in the table with their declared currency, without counting here.",
     "clustersTitle": "Buy clusters",
     "insiders": "{n} insiders",
     "bigBuysTitle": "Large buys",
@@ -128,10 +128,10 @@
     "trancheNote": "{n} tranches · average price",
     "plan10b51Badge": "10b5-1 plan",
     "pdmrBadge": "PDMR (United Kingdom)",
-    "canadaBadge": "Canada · unofficial source (Yahoo)",
+    "canadaBadge": "Canada · unofficial source",
     "currencyMissing": "Currency not reported",
     "pdmrSource": "Source: tracefour (CC BY 4.0) · original document in FCA NSM",
-    "canadaSourcePre": "Unofficial source (Yahoo); the official record is ",
+    "canadaSourcePre": "Unofficial source; the official record is ",
     "canadaSourcePost": " (manual check)"
   }
 }

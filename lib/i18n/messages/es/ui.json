@@ -56,7 +56,8 @@
     "firmsOne": "{n} firma con objetivo en 12 meses",
     "firmsOther": "{n} firmas con objetivo en 12 meses",
     "firmsNone": "solo consenso agregado, sin detalle por firma",
-    "convertedFrom": "(convertido de {currency})"
+    "convertedFrom": "(convertido de {currency})",
+    "notOfficial": "Fuente no oficial"
   },
   "system": {
     "badge": "Motor de análisis desconectado",

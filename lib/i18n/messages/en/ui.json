@@ -56,7 +56,8 @@
     "firmsOne": "{n} firm with a 12-month target",
     "firmsOther": "{n} firms with 12-month targets",
     "firmsNone": "aggregate consensus only, no per-firm detail",
-    "convertedFrom": "(converted from {currency})"
+    "convertedFrom": "(converted from {currency})",
+    "notOfficial": "Unofficial source"
   },
   "system": {
     "badge": "Analysis engine disconnected",

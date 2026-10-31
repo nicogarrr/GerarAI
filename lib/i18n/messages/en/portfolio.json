@@ -63,7 +63,7 @@
     "colFairValue": "Fair value",
     "colAnalyst": "Analyst target",
     "colDcaFair": "DCA · Fair value",
-    "analystTitle": "Average analyst price target consensus by firm. Source: Yahoo Finance (not official).",
+    "analystTitle": "Average analyst price target consensus by firm. Unofficial source.",
     "dcaFairTitle": "Your DCA formula level and single fair value (published thesis or valuation engine)",
     "fiscalLong": "Long term",
     "fiscalShort": "Short term",
