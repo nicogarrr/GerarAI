@@ -24,7 +24,7 @@ _XML_ENTITIES_MSG = (
     "Descarga el fichero de nuevo desde IBKR sin editarlo."
 )
 
-from sqlalchemy import select, union_all
+from sqlalchemy import func, select, union_all
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -2057,6 +2057,70 @@ class IBKRImportService:
                 raise IBKRImportError(f"Fecha no interpretable: {text!r}.")
             return parsed
         ledger = PortfolioLedgerService()
+        # Descarga historica del BCE ANTES de las filas y fuera de cualquier
+        # savepoint (el ``begin_nested`` de cada fila): aunque el backfill ya
+        # escribe con una sesion propia que nunca confirma la del importador,
+        # calentar aqui el rango completo evita descargas dentro del bucle.
+        # Los pares (divisa, desde) son EXACTAMENTE los que el bucle pedira:
+        #  - la divisa EFECTIVA de cada fila: la del listado verificado por
+        #    ISIN si lo hay (no la adivinada solo por simbolo) y su fecha;
+        #  - la divisa y fecha de las patas buy/sell YA guardadas de esas
+        #    companias, que ``rebuild_position`` reproduce al asentar la fila
+        #    nueva (sin esto, una pata vieja sin tipo provocaba una descarga
+        #    dentro del savepoint).
+        warm: dict[str, date] = {}
+
+        def _warm_add(currency: str | None, day: date | None) -> None:
+            if not currency or day is None:
+                return
+            code = currency.strip().upper()
+            if not code or code == "EUR":
+                return
+            previous = warm.get(code)
+            if previous is None or day < previous:
+                warm[code] = day
+
+        warm_tickers: set[str] = set()
+        for raw in data_rows[1:]:
+            def _raw(name: str) -> str:
+                position = mapping.get(name)
+                if position is None or position >= len(raw):
+                    return ""
+                return raw[position].strip()
+
+            warm_symbol = _raw("symbol").upper()
+            warm_listing = reviewed_listing(_raw("isin"))
+            warm_tickers.add(warm_listing.ticker if warm_listing is not None else warm_symbol)
+            warm_text = _raw("date")
+            _warm_add(
+                _raw("currency").upper()
+                or _csv_default_currency(
+                    warm_symbol, warm_listing.currency if warm_listing is not None else None
+                ),
+                _csv_date_value(warm_text, bool(day_first)) if warm_text else None,
+            )
+        if warm_tickers:
+            prior_legs = db.execute(
+                select(Transaction.currency, func.min(Transaction.trade_date))
+                .join(Company, Transaction.company_id == Company.id)
+                .where(
+                    Company.ticker.in_(warm_tickers),
+                    Transaction.action.in_(["buy", "sell"]),
+                    *tenant_filters(db, Transaction),
+                )
+                .group_by(Transaction.currency)
+            ).all()
+            for prior_currency, prior_day in prior_legs:
+                _warm_add(prior_currency, prior_day)
+        if warm:
+            warm_base = ledger.fx.ensure_portfolio(db).base_currency
+            for warm_code, warm_since in warm.items():
+                ledger.ensure_historical_fx(
+                    db,
+                    currencies={warm_code},
+                    base_currency=warm_base,
+                    since=warm_since,
+                )
         trades_imported = 0
         duplicate_trades = 0
         occurrences: Counter[str] = Counter()
