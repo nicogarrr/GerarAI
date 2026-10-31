@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.schemas.api import (
+    InvestorDetailOut,
     InvestorPortfolioOut,
     InvestorsListOut,
     MostBoughtOut,
@@ -58,7 +59,7 @@ def investor_portfolio_route(slug: str, db: Session = Depends(get_db)) -> dict:
     return portfolio
 
 
-@router.get("/{slug}")
+@router.get("/{slug}", response_model=InvestorDetailOut, response_model_exclude_unset=True)
 def investor(slug: str, db: Session = Depends(get_db)) -> dict:
     """Ficha de un inversor: posiciones del ultimo 13F y cambios trimestrales."""
     detail = investor_detail(db, slug)

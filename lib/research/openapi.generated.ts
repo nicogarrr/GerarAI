@@ -8794,6 +8794,80 @@ export interface components {
             value?: number | null;
         };
         /**
+         * InvestorDetailOut
+         * @description Ficha de inversor: _entry + holdings + provenance; la ruta anade
+         *     changes solo si hay CIK (clave ausente si no) y videos siempre.
+         */
+        InvestorDetailOut: {
+            changes?: components["schemas"]["ManagerChangesOut"] | null;
+            /** Cik */
+            cik?: string | null;
+            /** Coverage */
+            coverage?: string | null;
+            /** Firm */
+            firm: string;
+            /** Has 13F */
+            has_13f: boolean;
+            /** Has Public Profile */
+            has_public_profile: boolean;
+            /** Holdings */
+            holdings: components["schemas"]["InvestorHoldingOut"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "person" | "firm" | "company";
+            /** Limitations */
+            limitations: string[];
+            /** Name */
+            name: string;
+            /** Note */
+            note?: string | null;
+            /** Official Name */
+            official_name?: string | null;
+            /** Positions */
+            positions?: number | null;
+            provenance: components["schemas"]["ProvenanceOut"];
+            public_profile?: components["schemas"]["PublicProfileOut"] | null;
+            /** Report Date */
+            report_date?: string | null;
+            /** Slug */
+            slug: string;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+            /** Verification */
+            verification?: string | null;
+            /**
+             * Videos
+             * @default []
+             */
+            videos: components["schemas"]["InvestorVideoOut"][];
+        };
+        /**
+         * InvestorHoldingOut
+         * @description Fila de cartera del detalle: ORM con defaults "" (filing_url nunca null).
+         */
+        InvestorHoldingOut: {
+            /** Cusip */
+            cusip: string;
+            /** Filing Url */
+            filing_url: string;
+            /** Name Of Issuer */
+            name_of_issuer: string;
+            /** Name Of Issuer Filed */
+            name_of_issuer_filed: string;
+            /** Put Call */
+            put_call?: string | null;
+            /** Shares */
+            shares?: number | null;
+            /** Title Of Class */
+            title_of_class: string;
+            /** Value Usd Thousands */
+            value_usd_thousands?: number | null;
+            /** Weight Pct */
+            weight_pct?: number | null;
+        };
+        /**
          * InvestorPortfolioOut
          * @description Respuesta de investor_portfolio(): ramas 13F y curated/Form4.
          */
@@ -8865,6 +8939,24 @@ export interface components {
             value_usd_thousands?: number | null;
             /** Verification */
             verification?: string | null;
+        };
+        /** InvestorVideoOut */
+        InvestorVideoOut: {
+            /**
+             * Channel Kind
+             * @enum {string}
+             */
+            channel_kind: "personal_confirmed" | "firm_confirmed" | "archive";
+            /** Channel Name */
+            channel_name: string;
+            /** Channel Url */
+            channel_url: string;
+            /** Published At */
+            published_at: string;
+            /** Title */
+            title: string;
+            /** Video Id */
+            video_id: string;
         };
         /** InvestorsListOut */
         InvestorsListOut: {
@@ -9987,6 +10079,83 @@ export interface components {
             source_kind: string;
             /** Source Url */
             source_url?: string | null;
+        };
+        /** PublicFactOut */
+        PublicFactOut: {
+            /** As Of */
+            as_of: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "oficial" | "inferido" | "prensa";
+            /** Label */
+            label: string;
+            /** Source Url */
+            source_url: string;
+            /** Value */
+            value: string;
+        };
+        /** PublicProfileLetterOut */
+        PublicProfileLetterOut: {
+            /** Date */
+            date: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /** PublicProfileLinkOut */
+        PublicProfileLinkOut: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
+        };
+        /** PublicProfileMeetingOut */
+        PublicProfileMeetingOut: {
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+            /** Year */
+            year: string;
+        };
+        /**
+         * PublicProfileOut
+         * @description Ficha pública curada (investor_profiles.PUBLIC_PROFILES) + provenance_note.
+         */
+        PublicProfileOut: {
+            /** Facts */
+            facts: components["schemas"]["PublicFactOut"][];
+            /** Holdings */
+            holdings?: unknown[] | null;
+            /** Holdings Note */
+            holdings_note: string;
+            /** Letters */
+            letters: components["schemas"]["PublicProfileLetterOut"][];
+            /** Links */
+            links: components["schemas"]["PublicProfileLinkOut"][];
+            /** Meetings */
+            meetings: components["schemas"]["PublicProfileMeetingOut"][];
+            /** Provenance Note */
+            provenance_note: string;
+            vehicle: components["schemas"]["PublicProfileVehicleOut"];
+        };
+        /** PublicProfileVehicleOut */
+        PublicProfileVehicleOut: {
+            /** Manager Company */
+            manager_company: string;
+            /** Name */
+            name: string;
+            /** Regulator Id */
+            regulator_id: string;
+            /** Source Url */
+            source_url: string;
+            /** Start Date */
+            start_date: string;
+            /** Type */
+            type: string;
         };
         /** PushConfigOut */
         PushConfigOut: {
@@ -16779,9 +16948,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["InvestorDetailOut"];
                 };
             };
             /** @description Validation Error */
