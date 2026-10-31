@@ -12,6 +12,7 @@ Run from data-engine/:
 from fastapi.testclient import TestClient
 
 import main
+from app.core.csrf import generate_csrf_token
 
 
 def test_legacy_fundamentals_routes_are_retired():
@@ -62,7 +63,8 @@ def test_legacy_market_routes_are_retired():
         response = client.get(path)
         assert response.status_code == 404, f"{path} debe estar retirado, obtuvo {response.status_code}"
 
-    assert client.post("/batch-quotes", json=["aapl"]).status_code == 404
+    headers = {"X-CSRF-Token": generate_csrf_token()}
+    assert client.post("/batch-quotes", json=["aapl"], headers=headers).status_code == 404
 
 
 def test_legacy_analytics_routes_are_retired():
@@ -76,8 +78,9 @@ def test_legacy_analytics_routes_are_retired():
         "/analytics/correlation",
         "/analytics/regime/AAPL",
     ]
+    csrf = {"X-CSRF-Token": generate_csrf_token(), "content-type": "application/json"}
     for path in retired:
-        response = client.post(path, json={"symbols": ["AAPL"]}, headers={"content-type": "application/json"})
+        response = client.post(path, json={"symbols": ["AAPL"]}, headers=csrf)
         assert response.status_code == 404, f"{path} debe estar retirado, obtuvo {response.status_code}"
 
 
@@ -85,6 +88,7 @@ def test_legacy_direct_vector_knowledge_routes_are_retired():
     response = TestClient(main.app).post(
         "/knowledge/upload",
         json={"collection": "analyses", "content": "must not bypass canonical ingestion"},
+        headers={"X-CSRF-Token": generate_csrf_token()},
     )
 
     assert response.status_code == 404
