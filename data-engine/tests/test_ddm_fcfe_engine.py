@@ -880,3 +880,63 @@ def test_fcfe_engine_negates_the_cash_flow_change_in_working_capital(db):
     assumptions = result["trace"]["assumptions"]
     assert assumptions["delta_working_capital"] == pytest.approx(8.0)
     assert assumptions["delta_working_capital_source"] == "negated_cash_flow_change_in_working_capital"
+
+
+def test_ddm_derives_dps_from_dividends_paid_over_shares_traceably(db):
+    """Sin hecho dividend_per_share: DPS = abs(dividends_paid)/shares_diluted.
+
+    Derivacion trazable: la fuente queda marcada como derivada, la traza
+    publica la formula y los dos componentes con su hecho, y la publicacion
+    queda bloqueada (derivado, no declarado), igual que el payout derivado.
+    dividends_paid = 180 USD y 100 acciones -> DPS 1,80, el mismo camino
+    feliz que el D0 declarado: base 30,90 (aritmetica del test happy-path).
+    """
+    facts = {k: v for k, v in DDM_FACTS.items() if k != "dividend_per_share"}
+    facts["dividends_paid"] = 180.0
+    company = _company(db, "DDMDERIVED")
+    _facts(db, company, facts)
+    _price(db, company, 30.0)
+    context = DividendDiscountEngine().build_context(db, company, 30.0)
+    result = DividendDiscountEngine().value(context)
+
+    # Con la derivacion la cifra sale igual, pero el estado ya no es "ok"
+    # limpio: hay bloqueo de publicacion (derivado, no declarado).
+    assert result["status"] == "partial"
+    assert result["base_value"] == pytest.approx(30.90, abs=1e-9)
+    assumptions = result["trace"]["assumptions"]
+    assert assumptions["dividend_per_share_d0"] == pytest.approx(1.80)
+    assert assumptions["dividend_source"] == "derived_dividends_paid_over_shares"
+    derivation = assumptions["dividend_per_share_derivation"]
+    assert derivation["formula"] == "abs(dividends_paid) / shares_diluted"
+    assert derivation["dividends_paid"] is not None
+    assert derivation["shares_diluted"] is not None
+    assert "dividend_per_share_source" in result["publication_blockers"]
+    assert result["publishable"] is False
+
+
+def test_ddm_derives_dps_from_negative_cashflow_dividends(db):
+    """El cash-flow SEC reporta dividendos pagados en negativo: abs()."""
+    facts = {k: v for k, v in DDM_FACTS.items() if k != "dividend_per_share"}
+    facts["dividends_paid"] = -180.0
+    company = _company(db, "DDMDERNEG")
+    _facts(db, company, facts)
+    _price(db, company, 30.0)
+    context = DividendDiscountEngine().build_context(db, company, 30.0)
+    result = DividendDiscountEngine().value(context)
+
+    assert result["status"] == "partial"
+    assert result["trace"]["assumptions"]["dividend_per_share_d0"] == pytest.approx(1.80)
+    assert result["trace"]["assumptions"]["dividend_source"] == "derived_dividends_paid_over_shares"
+
+
+def test_ddm_without_dividend_fact_nor_derivation_stays_insufficient(db):
+    """Ni dividend_per_share ni dividends_paid: el rechazo de siempre."""
+    facts = {k: v for k, v in DDM_FACTS.items() if k != "dividend_per_share"}
+    company = _company(db, "DDMNODIV")
+    _facts(db, company, facts)
+    _price(db, company, 30.0)
+    context = DividendDiscountEngine().build_context(db, company, 30.0)
+    result = DividendDiscountEngine().value(context)
+
+    assert result["status"] == "insufficient_data"
+    assert "dividend_per_share_or_payout_ratio" in result["missing_inputs"]
