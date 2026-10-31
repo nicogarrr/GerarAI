@@ -263,22 +263,7 @@ export type ResearchThesis = {
   created_at: string;
 };
 
-type ResearchThesisHistoryEntry = {
-  id: number;
-  version: number;
-  status: string;
-  rating: string;
-  red_team_score: number;
-  data_confidence_score: number;
-  created_at: string;
-  updated_at: string;
-  diff: {
-    change_summary: string;
-    affected_assumptions: string[];
-    rating_changed: boolean;
-    created_at: string;
-  } | null;
-};
+type ResearchThesisHistoryEntry = components['schemas']['ThesisHistoryItemOut'];
 
 type ResearchSourceDocument = {
   id: number;
