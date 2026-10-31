@@ -32,6 +32,9 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
+# XML externo (SEC EDGAR): defusedxml solo para PARSEAR.
+from defusedxml import ElementTree as DefusedET
+
 from app.core.errors import redact_secrets
 
 # Mismo throttle compartido de proceso que form4/form13f (ver base.py y la
@@ -185,7 +188,7 @@ def _is_13dg_xml(text: str) -> bool:
     """Parseo real: solo vale XML bien formado con raíz <edgarSubmission>
     (esquema schedule13d/13g). `<div>AccessDenied</div>` no pasa."""
     try:
-        root = ET.fromstring(text)
+        root = DefusedET.fromstring(text)
     except ET.ParseError:
         return False
     return root.tag.rsplit("}", 1)[-1] == "edgarSubmission"
@@ -398,7 +401,7 @@ def _empty_parse(form: str | None = None) -> dict:
 
 def _parse_xml(text: str) -> dict:
     """Portada del esquema schedule13d/schedule13g (namespaces tolerantes)."""
-    root = ET.fromstring(text)
+    root = DefusedET.fromstring(text)
     if _local(root.tag) != "edgarSubmission":
         raise ValueError("root element is not edgarSubmission")
 
