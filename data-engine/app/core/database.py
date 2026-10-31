@@ -474,7 +474,7 @@ def init_db() -> None:
                                 ]
                                 quoted = ", ".join(_quote_identifiers(names))
                                 conn.exec_driver_sql(
-                                    f"INSERT INTO thesis_versions__nullable ({quoted}) "
+                                    f"INSERT INTO thesis_versions__nullable ({quoted}) "  # nosec B608 -- identificadores de PRAGMA table_info (introspeccion) escapados con _quote_identifiers; sin input externo
                                     f"SELECT {quoted} FROM thesis_versions"
                                 )
                                 conn.exec_driver_sql("DROP TABLE thesis_versions")

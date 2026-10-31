@@ -115,7 +115,7 @@ def test_fallback_a_mirror_hf_en_403(monkeypatch):
                 return _Resp({
                     "tickers": {},
                     "synced_at": datetime.now(UTC).isoformat(),
-                    "files": {"submissions/CIK0000000001.json": hashlib.sha1(payload_bytes).hexdigest()},
+                    "files": {"submissions/CIK0000000001.json": hashlib.sha1(payload_bytes).hexdigest()},  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
                 })
             llamadas["url"] = url
             return _Resp(payload, content=payload_bytes)
@@ -171,7 +171,7 @@ def test_secclient_403_cae_al_mirror(monkeypatch):
                 return _Resp({
                     "tickers": {},
                     "synced_at": datetime.now(UTC).isoformat(),
-                    "files": {"companyfacts/CIK0000000001.json": hashlib.sha1(payload_bytes).hexdigest()},
+                    "files": {"companyfacts/CIK0000000001.json": hashlib.sha1(payload_bytes).hexdigest()},  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
                 })
             llamadas["url"] = url
             return _Resp(payload, content=payload_bytes)
@@ -357,7 +357,7 @@ def test_mirror_sha1_no_casa_fail_closed(monkeypatch):
 
     doc = "submissions/CIK0000000001.json"
     viejo = json.dumps({"filings": {"recent": {"old": True}}}).encode()
-    manifest = _manifest_fresco({doc: hashlib.sha1(b"contenido nuevo").hexdigest()})
+    manifest = _manifest_fresco({doc: hashlib.sha1(b"contenido nuevo").hexdigest()})  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
     _mirror_http(monkeypatch, sec_edgar, manifest, doc, viejo)
 
     try:
@@ -411,7 +411,7 @@ def test_mirror_sirve_solo_si_hash_casa(monkeypatch):
     doc = "submissions/CIK0000000001.json"
     payload = {"filings": {"recent": {"x": 1}}}
     contenido = json.dumps(payload).encode()
-    manifest = _manifest_fresco({doc: hashlib.sha1(contenido).hexdigest()})
+    manifest = _manifest_fresco({doc: hashlib.sha1(contenido).hexdigest()})  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
     _mirror_http(monkeypatch, sec_edgar, manifest, doc, contenido)
 
     data = asyncio.run(sec_edgar.mirror_get_json(
@@ -469,7 +469,7 @@ def test_mirror_metadata_no_sobrevive_a_corrida_directa(monkeypatch):
         "companyfacts/CIK0000000001.json": json.dumps(facts_payload).encode(),
         "submissions/CIK0000000001.json": json.dumps(subs_payload).encode(),
     }
-    files = {p: hashlib.sha1(c).hexdigest() for p, c in bodies.items()}
+    files = {p: hashlib.sha1(c).hexdigest() for p, c in bodies.items()}  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
 
     class _Resp:
         def __init__(self, data, content):

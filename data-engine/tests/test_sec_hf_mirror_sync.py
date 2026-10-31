@@ -130,7 +130,7 @@ def test_sync_sube_layout_oficial_y_manifest(tmp_path, monkeypatch, fake_hf):
     assert manifest["synced_at"].endswith("Z")
     # proveniencia por archivo: sha1 de cada contenido oficial servido
     import hashlib
-    assert manifest["files"]["companyfacts/CIK0000000123.json"] == hashlib.sha1(
+    assert manifest["files"]["companyfacts/CIK0000000123.json"] == hashlib.sha1(  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
         fake_hf.uploads["companyfacts/CIK0000000123.json"]).hexdigest()
 
 
@@ -144,7 +144,7 @@ def test_sync_no_resube_lo_que_no_cambio(tmp_path, monkeypatch, fake_hf):
     # Segunda corrida: el manifest remoto declara los sha1 ya publicados.
     import hashlib
     fake_hf.remote_manifest = {
-        path: hashlib.sha1(content).hexdigest()
+        path: hashlib.sha1(content).hexdigest()  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- fixture: replica el contrato de proveniencia sha1 del mirror HF (no criptografia; decision mia/main en scripts/sec_hf_mirror_sync.py)
         for path, content in fake_hf.uploads.items()
         if path != "manifest.json"
     }

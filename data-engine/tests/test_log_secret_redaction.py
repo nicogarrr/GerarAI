@@ -24,7 +24,7 @@ def _logger() -> tuple[logging.Logger, io.StringIO]:
 def test_query_param_keys_are_redacted_in_message() -> None:
     logger, out = _logger()
     logger.info('HTTP Request: GET https://x.test/q?symbol=AAPL&apikey=%s "HTTP/1.1 200"', FAKE)
-    logger.info("GET https://y.test/quote?symbol=BABA&token=%s", FAKE)
+    logger.info("GET https://y.test/quote?symbol=BABA&token=%s", FAKE)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure -- fixture deliberado: credencial sintetica FAKE para probar la redaccion de logs
     text = out.getvalue()
     assert FAKE not in text
     assert "symbol=AAPL" in text and "symbol=BABA" in text
@@ -34,7 +34,7 @@ def test_query_param_keys_are_redacted_in_message() -> None:
 def test_args_headers_and_bearer_are_redacted() -> None:
     logger, out = _logger()
     logger.warning("req %s", "https://z.test/a?api_key=" + FAKE)
-    logger.warning("headers Authorization: Bearer %s x-api-key: %s", FAKE, FAKE)
+    logger.warning("headers Authorization: Bearer %s x-api-key: %s", FAKE, FAKE)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure -- fixture deliberado: credencial sintetica FAKE para probar la redaccion de logs
     logger.warning("url https://user:%s@host.test/path", FAKE)
     assert FAKE not in out.getvalue()
 
@@ -84,9 +84,9 @@ def test_query_param_provider_variants_are_redacted() -> None:
     """
     logger, out = _logger()
     logger.info("GET https://m.test/v1/quotes?access_key=%s&symbols=AAPL", FAKE)
-    logger.info("GET https://e.test/api/fundamentals/AAPL?api_token=%s&fmt=json", FAKE)
-    logger.info("GET https://a.test/v2?auth_token=%s", FAKE)
-    logger.info("GET https://p.test/v3?private_token=%s", FAKE)
+    logger.info("GET https://e.test/api/fundamentals/AAPL?api_token=%s&fmt=json", FAKE)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure -- fixture deliberado: credencial sintetica FAKE para probar la redaccion de logs
+    logger.info("GET https://a.test/v2?auth_token=%s", FAKE)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure -- fixture deliberado: credencial sintetica FAKE para probar la redaccion de logs
+    logger.info("GET https://p.test/v3?private_token=%s", FAKE)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure -- fixture deliberado: credencial sintetica FAKE para probar la redaccion de logs
     logger.info("GET https://k.test/v4?app_key=%s", FAKE)
     text = out.getvalue()
     assert FAKE not in text

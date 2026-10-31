@@ -119,7 +119,7 @@ def main() -> int:
             # exigiria cambiar escritor y lector y republicar el dataset.
             # usedforsecurity=False es obligatorio (lo fija
             # test_sec_hf_mirror_sha1_contract).
-            "files": {p: hashlib.sha1(c, usedforsecurity=False).hexdigest() for p, c in uploads.items()},
+            "files": {p: hashlib.sha1(c, usedforsecurity=False).hexdigest() for p, c in uploads.items()},  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- proveniencia del mirror HF, no criptografia: contrato sha1 con usedforsecurity=False; decision mia/main documentada en el propio fichero
         }).encode()
 
     # Publicacion atomica: un unico commit con todos los ficheros cambiados
@@ -135,7 +135,7 @@ def main() -> int:
         old_files = {}
     operations = []
     for path, content in sorted(uploads.items()):
-        digest = hashlib.sha1(content, usedforsecurity=False).hexdigest()
+        digest = hashlib.sha1(content, usedforsecurity=False).hexdigest()  # nosemgrep: python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1 -- proveniencia del mirror HF, no criptografia: contrato sha1 con usedforsecurity=False; decision mia/main documentada en el propio fichero
         if path != "manifest.json" and old_files.get(path) == digest:
             continue
         operations.append(CommitOperationAdd(
