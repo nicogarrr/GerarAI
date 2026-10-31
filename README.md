@@ -9,10 +9,12 @@
 [![CodeQL](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/nicogarrr/GerarAI?include_prereleases&label=release&color=orange)](https://github.com/nicogarrr/GerarAI/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![Live app](https://img.shields.io/badge/live-gerarai.duckdns.org-green)](https://gerarai.duckdns.org)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](package.json)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](data-engine/pyproject.toml)
 
 > **Status:** v0.5.0 (pre-release), the production baseline of 30 October 2026. Hardening and review remain in progress.
+> Live at [gerarai.duckdns.org](https://gerarai.duckdns.org) (access by request).
 > The user interface is in Spanish (es-ES); code, APIs and this document are in English.
 > **Not financial advice.** See the [disclaimer](#disclaimer).
 
