@@ -14,6 +14,13 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
+# Clave de este proveedor en el registry de salud de fuentes: sin registrar
+# aqui los outcomes, el circuit breaker de "yahoo_finance" nunca transita y un
+# CAPTCHA o bloqueo de IP dejaria la fuente caida con el panel en "healthy".
+REGISTRY_KEY = "yahoo_finance"
+
 # Yahoo nombra las clases de acciones US con guion (BRK-B), no con punto
 # (BRK.B, convención de Finnhub y del master). Las bolsas no-US llevan
 # sufijo de DOS letras (.MC, .AS, .TO, .SW, .DE); la clase US es UNA letra
@@ -33,7 +40,6 @@ def yahoo_chart_symbol(symbol: str) -> str:
     return f"{match.group(1)}-{match.group(2)}" if match else normalized
 
 
-
 def _with_exchange_timezone(rows: list[Any], meta: Any) -> list[dict[str, Any]]:
     """Copia cada evento con la zona horaria de su bolsa.
 
@@ -43,6 +49,7 @@ def _with_exchange_timezone(rows: list[Any], meta: Any) -> list[dict[str, Any]]:
     tz = meta.get("exchangeTimezoneName") if isinstance(meta, dict) else None
     tz = tz if isinstance(tz, str) and tz.strip() else None
     return [{**row, "exchangeTimezoneName": tz} for row in rows if isinstance(row, dict)]
+
 
 class YahooFinanceClient:
     name = "yahoo"
@@ -58,7 +65,9 @@ class YahooFinanceClient:
         # La chart API de Yahoo no necesita key: siempre disponible.
         return True
 
-    async def _chart(self, ticker: str, *, events: bool = False, extended: bool = False, recent_daily: bool = False) -> dict[str, Any]:
+    async def _chart(
+        self, ticker: str, *, events: bool = False, extended: bool = False, recent_daily: bool = False
+    ) -> dict[str, Any]:
         params: dict[str, Any] = {"range": "max", "interval": "1d"}
         if recent_daily:
             params = {"interval": "1d", "range": "5d"}
@@ -71,14 +80,36 @@ class YahooFinanceClient:
                 "interval": "1d",
                 "events": "div|split",
             }
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await client.get(
-                f"{self.base_url}/{yahoo_chart_symbol(ticker)}", params=params, headers=self.headers
+        registry = get_data_source_registry()
+        started = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(
+                    f"{self.base_url}/{yahoo_chart_symbol(ticker)}", params=params, headers=self.headers
+                )
+                response.raise_for_status()
+                payload = response.json()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code
+            # 429 y 999 son las senales tipicas de rate limit / CAPTCHA de Yahoo
+            reason = (
+                f"HTTP {status}: rate limit o CAPTCHA probable" if status in (429, 999) else f"HTTP {status}"
             )
-            response.raise_for_status()
-            payload = response.json()
+            registry.record_failure(REGISTRY_KEY, reason)
+            raise
+        except httpx.TransportError as exc:
+            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+            raise
+        except ValueError as exc:
+            # JSONDecodeError: un 200 con HTML es la senal de CAPTCHA o de un
+            # cambio de pagina en Yahoo (la chart API ya no devuelve JSON).
+            registry.record_failure(REGISTRY_KEY, "respuesta no JSON (posible CAPTCHA o cambio de HTML)")
+            raise RuntimeError("Yahoo no devolvio JSON (posible CAPTCHA o cambio de HTML)") from exc
+        registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         result = payload.get("chart", {}).get("result") if isinstance(payload, dict) else None
         if not result:
+            # Ticker desconocido o respuesta sin serie: no es un fallo de la
+            # FUENTE (respondio JSON bien formado), no se degrada el breaker.
             raise RuntimeError("Yahoo returned an empty chart")
         return result[0]
 
