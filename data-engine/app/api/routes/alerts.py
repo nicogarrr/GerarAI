@@ -1,4 +1,7 @@
+import logging
+import os
 import re
+import time
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 from urllib.parse import urlparse
@@ -14,12 +17,16 @@ from app.core.ui_errors import ui_error
 from app.models import AlertDelivery, AlertRule, Company, NewsEvent, ResearchAlert
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.schemas import (
+    AlertAnalysisReadOut,
     AlertRuleOut,
+    AlertsTelegramStatusOut,
     ResearchAlertAction,
     ResearchAlertChannels,
     ResearchAlertOut,
 )
 from app.services.alert_rule_service import AlertRuleService
+
+logger = logging.getLogger(__name__)
 from app.services.company_resolver import resolve_company
 from app.services.notification_service import NotificationService
 from app.services.review_alert_service import ReviewAlertService
@@ -109,7 +116,7 @@ def list_alert_rules(
     )
 
 
-@router.get("/telegram-status")
+@router.get("/telegram-status", response_model=AlertsTelegramStatusOut)
 def telegram_status() -> dict:
     """Presencia de la configuracion Telegram para la guia de /alerts.
 
@@ -194,10 +201,21 @@ def list_alerts(
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> list[ResearchAlertOut]:
+    # Diagnostico (ALERTS_TIMING=1): desglose por tramos. Perfil local
+    # 2026-10-31 con volumen de prod (100 alertas): handler ~17,6 ms sin
+    # tramo dominante; prod p50 263 ms. Coste con flag apagado: 7
+    # time.monotonic() (~1 us). Los marcos no cambian ninguna consulta.
+    # El join de compania del 31-oct se revirtio el mismo dia: el A/B del
+    # piloto lo midio peor (~4-10 %). companies_ms vuelve a ser una consulta.
+    _t0 = time.monotonic()
     now = datetime.now(UTC)
     # Product feed is not an operations console. Filter BEFORE limit so an
     # operational alert cannot consume a user-visible slot. Keep stored rows.
     # Legacy TypeSafe incidents predate the explicit audience marker.
+    # La compañía va en una consulta IN aparte, NO en el join del listado:
+    # el A/B del 31-oct sobre restore PG midio el outerjoin 1:1 como
+    # regresion (p50 25,4 -> 27,9/26,3 ms, ~4-10 % peor) y la consulta IN
+    # separada como la forma rapida. Solo lo que mide mejor se queda.
     statement = select(ResearchAlert).where(
         ResearchAlert.alert_type != "typesafe_credit_exhausted",
         or_(
@@ -247,6 +265,7 @@ def list_alerts(
     # El estado derivado se refleja en DTOs, NUNCA en las entidades ORM:
     # mutarlas dejaba la sesion sucia y cualquier commit posterior del mismo
     # request podia flushear una escritura desde un GET.
+    _t1 = time.monotonic()
     company_ids = {alert.company_id for alert in alerts if alert.company_id is not None}
     companies = (
         {
@@ -259,6 +278,7 @@ def list_alerts(
     # F172: la URL de la fuente viene de metadata.source_url (alertas insider)
     # o del NewsEvent enlazado (alertas de filings/noticias). Sin URL no se
     # inventa enlace: source_url queda None y la UI solo ofrece la ficha.
+    _t2 = time.monotonic()
     news_ids = {
         alert.metadata_.get("news_event_id")
         for alert in alerts
@@ -271,6 +291,7 @@ def list_alerts(
     # Older insider alerts retain a transaction fingerprint even when the
     # issuer has no Company row. Read identity from that exact source row,
     # never from the alert title, and keep the tenant in the lookup key.
+    _t3 = time.monotonic()
     fingerprints = {
         alert.metadata_.get("tx_fingerprint")
         for alert in alerts
@@ -289,6 +310,7 @@ def list_alerts(
             for tx, filing in rows
             if tx.tenant_id == filing.tenant_id
         }
+    _t4 = time.monotonic()
     # Delivery rows are authoritative; metadata is only a legacy mirror and
     # may be absent (in-app creators) or stale (retries/backfill).
     delivery_rows = db.scalars(select(AlertDelivery).where(
@@ -301,6 +323,7 @@ def list_alerts(
             "attempted_at": row.updated_at.isoformat() if row.updated_at else None,
             "error": row.last_error,
         }
+    _t5 = time.monotonic()
     result: list[ResearchAlertOut] = []
     for alert in alerts:
         out = ResearchAlertOut.model_validate(alert)
@@ -349,10 +372,22 @@ def list_alerts(
             out.status = "open"
             out.snoozed_until = None
         result.append(out)
+    if os.environ.get("ALERTS_TIMING") == "1":
+        _t6 = time.monotonic()
+        logger.info(
+            "alerts_timing query_ms=%.1f companies_ms=%.1f news_ms=%.1f "
+            "insider_ms=%.1f deliveries_ms=%.1f dto_ms=%.1f total_ms=%.1f "
+            "alerts=%d companies=%d news=%d deliveries=%d",
+            (_t1 - _t0) * 1000, (_t2 - _t1) * 1000, (_t3 - _t2) * 1000,
+            (_t4 - _t3) * 1000, (_t5 - _t4) * 1000, (_t6 - _t5) * 1000,
+            (_t6 - _t0) * 1000,
+            len(alerts), len(companies), len(news_events), len(delivery_rows),
+        )
     return result
 
 
-@router.get("/{alert_id}/analysis")
+@router.get("/{alert_id}/analysis", response_model=AlertAnalysisReadOut,
+                    response_model_exclude_unset=True)
 def get_alert_analysis(alert_id: int, db: Session = Depends(get_db)) -> dict:
     from app.services.alert_analysis_service import read_analysis
 

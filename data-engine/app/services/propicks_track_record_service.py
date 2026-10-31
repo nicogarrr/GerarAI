@@ -150,6 +150,74 @@ def _latest_price(db: Session, company_id: int) -> MarketPrice | None:
     )
 
 
+class _PricePoint:
+    """Fila de market_prices precargada (close/adj_close/date), misma lectura
+    que el ORM para los consumidores de abajo."""
+
+    __slots__ = ("date", "close", "adj_close")
+
+    def __init__(self, day: date, close, adj_close) -> None:
+        self.date = day
+        self.close = close
+        self.adj_close = adj_close
+
+
+def _preload_prices(
+    db: Session, company_ids: list[int], min_target: date
+) -> dict[int, list[_PricePoint]]:
+    """Un SELECT para todos los cierres que el track record puede necesitar.
+
+    Sustituye los ~5 SELECTs por pick (entrada/salida/horizonte/actual).
+    Cota inferior: el candidato de ``_price_at`` mas viejo que aun pasa la
+    tolerancia (target - MATCH_TOLERANCE_DAYS). Lo mas antiguo fuera de la
+    ventana nunca era elegible (tolerancia) salvo en ``_latest_price``: esa
+    compañia sin filas en ventana cae en el fallback SQL de ``_series_latest``,
+    que conserva el comportamiento exacto.
+    """
+    lower = min_target - timedelta(days=MATCH_TOLERANCE_DAYS)
+    rows = db.execute(
+        select(
+            MarketPrice.company_id,
+            MarketPrice.date,
+            MarketPrice.close,
+            MarketPrice.adj_close,
+        )
+        .where(
+            MarketPrice.company_id.in_(company_ids),
+            MarketPrice.close.isnot(None),
+            MarketPrice.date >= lower,
+        )
+        .order_by(MarketPrice.company_id, MarketPrice.date)
+    ).all()
+    series: dict[int, list[_PricePoint]] = {}
+    for company_id, day, close, adj_close in rows:
+        series.setdefault(company_id, []).append(_PricePoint(day, close, adj_close))
+    return series
+
+
+def _series_price_at(points: list[_PricePoint], target: date) -> _PricePoint | None:
+    """``_price_at`` en memoria: max fecha <= target, tolerancia identica."""
+    idx = bisect_right([p.date for p in points], target) - 1
+    if idx < 0:
+        return None
+    point = points[idx]
+    if (target - point.date).days > MATCH_TOLERANCE_DAYS:
+        return None
+    return point
+
+
+def _series_latest(
+    db: Session, series: dict[int, list[_PricePoint]], company_id: int
+) -> _PricePoint | MarketPrice | None:
+    """``_latest_price`` en memoria; fallback SQL si la compañia no tiene
+    cierres dentro de la ventana precargada (su ultimo cierre es mas viejo:
+    mismo resultado que la consulta original, sin tolerancia)."""
+    points = series.get(company_id)
+    if points:
+        return points[-1]
+    return _latest_price(db, company_id)
+
+
 def _price_at(db: Session, company_id: int, target: date) -> MarketPrice | None:
     row = db.scalar(
         select(MarketPrice)
@@ -173,9 +241,8 @@ def _pct(end: Decimal | None, start: Decimal | None) -> float | None:
 
 
 def _pick_return(
-    db: Session,
-    company_id: int,
-    end_row: MarketPrice,
+    price_at,
+    end_row,
     entry_price: Decimal | None,
     entry_price_date: date | None,
 ) -> float | None:
@@ -197,7 +264,7 @@ def _pick_return(
         and end_row.adj_close is not None
         and end_row.adj_close > 0
     ):
-        entry_row = _price_at(db, company_id, entry_price_date)
+        entry_row = price_at(entry_price_date)
         if (
             entry_row is not None
             and entry_row.adj_close is not None
@@ -245,6 +312,30 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
     spy, spy_source = _spy_series(db, cutoff)
     spy_latest_date = spy[-1][0].isoformat() if spy else None
 
+    # Precarga por lotes de los cierres de todas las compañias del track
+    # record: antes eran ~5 SELECTs por pick (855 ms medidos en el barrido
+    # 2026-10-31); ahora 1 SELECT constante + lookups en memoria.
+    price_targets: list[date] = []
+    for idx, snapshot in enumerate(snapshots):
+        next_snapshot = snapshots[idx + 1] if idx + 1 < len(snapshots) else None
+        for ticker, pick in picks_by_month[idx].items():
+            epd = date.fromisoformat(pick["price_date"]) if pick.get("price_date") else None
+            if epd is not None:
+                price_targets.append(epd)
+                horizon_target = epd + timedelta(days=HORIZON_DAYS)
+                if horizon_target <= today:
+                    price_targets.append(horizon_target)
+            if (
+                next_snapshot is not None
+                and ticker not in picks_by_month[idx + 1]
+            ):
+                price_targets.append(next_snapshot.as_of.date())
+    series = _preload_prices(
+        db,
+        [c.id for c in companies.values()],
+        min(price_targets) if price_targets else today,
+    )
+
     rows: list[dict[str, Any]] = []
     for idx, snapshot in enumerate(snapshots):
         next_snapshot = snapshots[idx + 1] if idx + 1 < len(snapshots) else None
@@ -261,11 +352,18 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
                 exit_month = next_snapshot.month
                 exit_target = next_snapshot.as_of.date()
                 if company is not None:
-                    row = _price_at(db, company.id, exit_target)
+                    row = _series_price_at(series.get(company.id, []), exit_target)
                     if row is not None:
                         exit_price = float(row.close)
                         exit_price_date = row.date.isoformat()
-                        exit_pct = _pick_return(db, company.id, row, entry_price, entry_price_date)
+                        exit_pct = _pick_return(
+                            lambda target, cid=company.id: _series_price_at(
+                                series.get(cid, []), target
+                            ),
+                            row,
+                            entry_price,
+                            entry_price_date,
+                        )
                         spy_point = _price_at_or_before(spy, row.date)
                         spy_entry = _price_at_or_before(spy, entry_price_date) if entry_price_date else None
                         if spy_point and spy_entry:
@@ -277,14 +375,19 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
             # En un pick que ya salio, el retorno "desde entrada" es el de la
             # salida; comparar con el precio de hoy mezclaria dos periodos.
             if status == "activo" and company is not None:
-                latest = _latest_price(db, company.id)
+                latest = _series_latest(db, series, company.id)
                 if latest is not None:
                     current_stale = (today - latest.date).days > STALE_DAYS
                     if not current_stale:
                         current_price = float(latest.close)
                         current_price_date = latest.date.isoformat()
                         pct_since_entry = _pick_return(
-                            db, company.id, latest, entry_price, entry_price_date
+                            lambda target, cid=company.id: _series_price_at(
+                                series.get(cid, []), target
+                            ),
+                            latest,
+                            entry_price,
+                            entry_price_date,
                         )
                         spy_point = _price_at_or_before(spy, latest.date)
                         spy_entry = _price_at_or_before(spy, entry_price_date) if entry_price_date else None
@@ -299,9 +402,16 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
                 horizon_target = entry_price_date + timedelta(days=HORIZON_DAYS)
                 horizon_date = horizon_target.isoformat()
                 if horizon_target <= today and company is not None:
-                    row = _price_at(db, company.id, horizon_target)
+                    row = _series_price_at(series.get(company.id, []), horizon_target)
                     if row is not None:
-                        pct_90d = _pick_return(db, company.id, row, entry_price, entry_price_date)
+                        pct_90d = _pick_return(
+                            lambda target, cid=company.id: _series_price_at(
+                                series.get(cid, []), target
+                            ),
+                            row,
+                            entry_price,
+                            entry_price_date,
+                        )
                         spy_point = _price_at_or_before(spy, row.date)
                         spy_entry = _price_at_or_before(spy, entry_price_date)
                         if spy_point and spy_entry:

@@ -28,5 +28,9 @@ test('watchlist does not wait for the slowest extended quote', () => {
     assert.doesNotMatch(watchlist, /getExtendedQuote/);
     assert.doesNotMatch(watchlist, /EXTENDED_QUOTE_BUDGET_MS/);
     const client = readFileSync('components/common/ExtendedHoursLine.tsx', 'utf8');
-    assert.match(client, /getExtendedQuote\(symbol\)/);
+    // 31-oct-2026: la línea sigue pidiéndose en cliente tras el primer
+    // pintado, pero las filas de una página viajan en UNA acción batch
+    // (medido en prod: 12 POSTs de acción por carga -> 1 por ventana).
+    assert.match(client, /batchedSymbol\('extended-quote'/);
+    assert.match(client, /getExtendedQuotes\(symbols\)/);
 });

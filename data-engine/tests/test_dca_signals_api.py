@@ -188,7 +188,7 @@ def test_backtest_endpoint_any_ticker_plain_vs_levels(client):
     assert set(plans) == {"plain", "levels", "fixed_budget"}
     assert plans["plain"]["invested"] == 50 * body["months"]
     assert plans["fixed_budget"]["invested"] == plans["plain"]["invested"]
-    assert body["params_version"] == "nico-v1"
+    assert body["params_version"] == "nico-v2"
     assert body["disclaimer"].startswith("Histórico, hipotético")
     assert client.get("/api/watchlist/dca-signals/DCABT/backtest", params={"start": "2026-13"}).status_code == 422
 

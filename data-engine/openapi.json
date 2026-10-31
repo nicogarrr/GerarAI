@@ -40,6 +40,155 @@
         "title": "AdHocScreen",
         "type": "object"
       },
+      "AlertAnalysisCitationOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "source",
+          "url",
+          "as_of",
+          "excerpt"
+        ],
+        "title": "AlertAnalysisCitationOut",
+        "type": "object"
+      },
+      "AlertAnalysisReadOut": {
+        "properties": {
+          "alert_id": {
+            "title": "Alert Id",
+            "type": "integer"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/AlertAnalysisVersionOut"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "alert_id",
+          "versions"
+        ],
+        "title": "AlertAnalysisReadOut",
+        "type": "object"
+      },
+      "AlertAnalysisSectionOut": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "citation_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Citation Ids",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "body",
+          "citation_ids"
+        ],
+        "title": "AlertAnalysisSectionOut",
+        "type": "object"
+      },
+      "AlertAnalysisVersionOut": {
+        "properties": {
+          "citations": {
+            "items": {
+              "$ref": "#/components/schemas/AlertAnalysisCitationOut"
+            },
+            "title": "Citations",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "missing_data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Data",
+            "type": "array"
+          },
+          "second_order": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Second Order"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/AlertAnalysisSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "writeback": {
+            "title": "Writeback",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status",
+          "sections",
+          "citations",
+          "missing_data",
+          "writeback"
+        ],
+        "title": "AlertAnalysisVersionOut",
+        "type": "object"
+      },
       "AlertRuleOut": {
         "properties": {
           "active": {
@@ -168,6 +317,34 @@
           "updated_at"
         ],
         "title": "AlertRuleOut",
+        "type": "object"
+      },
+      "AlertsTelegramStatusOut": {
+        "properties": {
+          "configured": {
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "has_bot_token": {
+            "title": "Has Bot Token",
+            "type": "boolean"
+          },
+          "has_chat_id": {
+            "title": "Has Chat Id",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "has_bot_token",
+          "has_chat_id",
+          "configured"
+        ],
+        "title": "AlertsTelegramStatusOut",
         "type": "object"
       },
       "AnalystConsensus": {
@@ -654,6 +831,24 @@
           "body"
         ],
         "title": "AssistantSection",
+        "type": "object"
+      },
+      "Beta": {
+        "properties": {
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "value",
+          "source"
+        ],
+        "title": "Beta",
         "type": "object"
       },
       "Body_ingest_document_file_api_sources_documents_ingest_file_post": {
@@ -1362,6 +1557,7 @@
         "properties": {
           "claim_type": {
             "default": "thesis",
+            "maxLength": 80,
             "title": "Claim Type",
             "type": "string"
           },
@@ -1390,6 +1586,7 @@
           },
           "created_by": {
             "default": "user",
+            "maxLength": 80,
             "title": "Created By",
             "type": "string"
           },
@@ -1402,6 +1599,7 @@
           },
           "source_quality": {
             "default": "unknown",
+            "maxLength": 40,
             "title": "Source Quality",
             "type": "string"
           },
@@ -1412,6 +1610,7 @@
           },
           "status": {
             "default": "unverified",
+            "maxLength": 40,
             "title": "Status",
             "type": "string"
           },
@@ -1512,6 +1711,7 @@
           "source_url": {
             "anyOf": [
               {
+                "maxLength": 1000,
                 "type": "string"
               },
               {
@@ -2305,6 +2505,63 @@
           "snapshots"
         ],
         "title": "CompanySnapshotsBatchOut",
+        "type": "object"
+      },
+      "CompanyTimelineEventsOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "desde": {
+            "title": "Desde",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEventOut"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "hasta": {
+            "title": "Hasta",
+            "type": "string"
+          },
+          "holding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimelineHoldingOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "desde",
+          "hasta",
+          "events",
+          "source"
+        ],
+        "title": "CompanyTimelineEventsOut",
         "type": "object"
       },
       "CompanyTtmOut": {
@@ -5419,6 +5676,121 @@
           "months"
         ],
         "title": "DividendProjectionPositionOut",
+        "type": "object"
+      },
+      "DividendSyncResultOut": {
+        "properties": {
+          "currency_unknown_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency Unknown Rows"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "existing": {
+            "title": "Existing",
+            "type": "integer"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "inserted": {
+            "title": "Inserted",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "skipped": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skipped"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "split_readjustments_healed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Readjustments Healed"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "unavailable",
+              "unknown_company",
+              "no_safe_symbol",
+              "currency_unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "status",
+          "inserted",
+          "existing"
+        ],
+        "title": "DividendSyncResultOut",
         "type": "object"
       },
       "DividendUncertainEventOut": {
@@ -8752,6 +9124,120 @@
         "title": "KPIExtractionCandidateOut",
         "type": "object"
       },
+      "KeyDate": {
+        "properties": {
+          "confirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "upcoming": {
+            "title": "Upcoming",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "date",
+          "upcoming",
+          "source"
+        ],
+        "title": "KeyDate",
+        "type": "object"
+      },
+      "KeyStats": {
+        "properties": {
+          "beta": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Beta"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "ex_dividend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyDate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fetched_at": {
+            "title": "Fetched At",
+            "type": "integer"
+          },
+          "next_earnings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeyDate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "range_52w": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Range52w"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "fetched_at"
+        ],
+        "title": "KeyStats",
+        "type": "object"
+      },
       "LLMProposalRequest": {
         "additionalProperties": false,
         "properties": {
@@ -10134,6 +10620,22 @@
           "text"
         ],
         "title": "ManualTranscriptImportRequest",
+        "type": "object"
+      },
+      "MarketQuotesBatchIn": {
+        "properties": {
+          "symbols": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Symbols",
+            "type": "array"
+          }
+        },
+        "required": [
+          "symbols"
+        ],
+        "title": "MarketQuotesBatchIn",
         "type": "object"
       },
       "MemoryItemCreate": {
@@ -12104,6 +12606,46 @@
         "title": "PortfolioDividendProjectionOut",
         "type": "object"
       },
+      "PortfolioDividendSyncOut": {
+        "properties": {
+          "companies": {
+            "title": "Companies",
+            "type": "integer"
+          },
+          "currency_unknown": {
+            "title": "Currency Unknown",
+            "type": "integer"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/DividendSyncResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "synced": {
+            "title": "Synced",
+            "type": "integer"
+          },
+          "unavailable": {
+            "title": "Unavailable",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "companies",
+          "synced",
+          "unavailable",
+          "currency_unknown",
+          "results",
+          "provenance"
+        ],
+        "title": "PortfolioDividendSyncOut",
+        "type": "object"
+      },
       "PortfolioDividendYieldsOut": {
         "properties": {
           "as_of": {
@@ -12340,6 +12882,523 @@
         "title": "PortfolioFxSourceOut",
         "type": "object"
       },
+      "PortfolioIbkrCsvImportOut": {
+        "properties": {
+          "duplicate_trades": {
+            "title": "Duplicate Trades",
+            "type": "integer"
+          },
+          "identity_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity Warning"
+          },
+          "legacy_reimport_blocked": {
+            "title": "Legacy Reimport Blocked",
+            "type": "integer"
+          },
+          "row_errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Row Errors",
+            "type": "array"
+          },
+          "rows_skipped": {
+            "title": "Rows Skipped",
+            "type": "integer"
+          },
+          "status": {
+            "const": "imported",
+            "title": "Status",
+            "type": "string"
+          },
+          "trades_imported": {
+            "title": "Trades Imported",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "trades_imported",
+          "duplicate_trades",
+          "legacy_reimport_blocked",
+          "identity_warning",
+          "rows_skipped",
+          "row_errors"
+        ],
+        "title": "PortfolioIbkrCsvImportOut",
+        "type": "object"
+      },
+      "PortfolioIbkrImportOut": {
+        "properties": {
+          "cash_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Imported"
+          },
+          "cash_removed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Removed"
+          },
+          "cash_transactions_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Transactions Imported"
+          },
+          "cost_review_required": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Review Required"
+          },
+          "dividends_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dividends Imported"
+          },
+          "fees_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees Imported"
+          },
+          "fx_conversions_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Conversions Imported"
+          },
+          "fx_conversions_skipped": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Conversions Skipped"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "portfolio_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Snapshot Id"
+          },
+          "positions_closed": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions Closed"
+          },
+          "positions_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions Imported"
+          },
+          "price_backfills_enqueued": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Backfills Enqueued"
+          },
+          "raw_rows_already_present": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Rows Already Present"
+          },
+          "raw_rows_pruned": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Rows Pruned"
+          },
+          "raw_rows_stored": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Rows Stored"
+          },
+          "reconcile_blocked": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconcile Blocked"
+          },
+          "row_errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Row Errors"
+          },
+          "rows_skipped": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rows Skipped"
+          },
+          "status": {
+            "enum": [
+              "imported",
+              "not_configured"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "trades_cancelled": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trades Cancelled"
+          },
+          "trades_imported": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trades Imported"
+          },
+          "unattributed_cash_rows": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unattributed Cash Rows"
+          },
+          "valuation_hold_kept": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Hold Kept"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "PortfolioIbkrImportOut",
+        "type": "object"
+      },
+      "PortfolioIbkrXmlImportOut": {
+        "properties": {
+          "cash_imported": {
+            "title": "Cash Imported",
+            "type": "integer"
+          },
+          "cash_removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cash Removed",
+            "type": "array"
+          },
+          "cash_transactions_imported": {
+            "title": "Cash Transactions Imported",
+            "type": "integer"
+          },
+          "cost_review_required": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cost Review Required",
+            "type": "array"
+          },
+          "dividends_imported": {
+            "title": "Dividends Imported",
+            "type": "integer"
+          },
+          "fees_imported": {
+            "title": "Fees Imported",
+            "type": "integer"
+          },
+          "fx_conversions_imported": {
+            "title": "Fx Conversions Imported",
+            "type": "integer"
+          },
+          "fx_conversions_skipped": {
+            "title": "Fx Conversions Skipped",
+            "type": "integer"
+          },
+          "portfolio_snapshot_id": {
+            "title": "Portfolio Snapshot Id",
+            "type": "integer"
+          },
+          "positions_closed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Positions Closed",
+            "type": "array"
+          },
+          "positions_imported": {
+            "title": "Positions Imported",
+            "type": "integer"
+          },
+          "price_backfills_enqueued": {
+            "title": "Price Backfills Enqueued",
+            "type": "integer"
+          },
+          "raw_rows_already_present": {
+            "title": "Raw Rows Already Present",
+            "type": "integer"
+          },
+          "raw_rows_pruned": {
+            "title": "Raw Rows Pruned",
+            "type": "integer"
+          },
+          "raw_rows_stored": {
+            "title": "Raw Rows Stored",
+            "type": "integer"
+          },
+          "reconcile_blocked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reconcile Blocked",
+            "type": "array"
+          },
+          "row_errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Row Errors",
+            "type": "array"
+          },
+          "rows_skipped": {
+            "title": "Rows Skipped",
+            "type": "integer"
+          },
+          "status": {
+            "const": "imported",
+            "title": "Status",
+            "type": "string"
+          },
+          "trades_cancelled": {
+            "title": "Trades Cancelled",
+            "type": "integer"
+          },
+          "trades_imported": {
+            "title": "Trades Imported",
+            "type": "integer"
+          },
+          "unattributed_cash_rows": {
+            "title": "Unattributed Cash Rows",
+            "type": "integer"
+          },
+          "valuation_hold_kept": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Valuation Hold Kept",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "trades_imported",
+          "rows_skipped",
+          "row_errors",
+          "price_backfills_enqueued",
+          "positions_imported",
+          "valuation_hold_kept",
+          "cost_review_required",
+          "cash_imported",
+          "raw_rows_stored",
+          "raw_rows_already_present",
+          "raw_rows_pruned",
+          "fx_conversions_imported",
+          "fx_conversions_skipped",
+          "trades_cancelled",
+          "dividends_imported",
+          "fees_imported",
+          "cash_transactions_imported",
+          "unattributed_cash_rows",
+          "positions_closed",
+          "cash_removed",
+          "reconcile_blocked",
+          "portfolio_snapshot_id"
+        ],
+        "title": "PortfolioIbkrXmlImportOut",
+        "type": "object"
+      },
+      "PortfolioImportCommitOut": {
+        "properties": {
+          "duplicates_skipped": {
+            "title": "Duplicates Skipped",
+            "type": "integer"
+          },
+          "import_batch": {
+            "title": "Import Batch",
+            "type": "string"
+          },
+          "imported_count": {
+            "title": "Imported Count",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "success",
+          "message",
+          "imported_count",
+          "duplicates_skipped",
+          "import_batch"
+        ],
+        "title": "PortfolioImportCommitOut",
+        "type": "object"
+      },
       "PortfolioIntelligenceOut": {
         "properties": {
           "as_of": {
@@ -12386,6 +13445,14 @@
           },
           "risk": {
             "$ref": "#/components/schemas/PortfolioRiskOut"
+          },
+          "xray": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PortfolioXrayRuleOut"
+            },
+            "title": "Xray",
+            "type": "array"
           }
         },
         "required": [
@@ -13399,6 +14466,192 @@
         "title": "PortfolioReconstructionOut",
         "type": "object"
       },
+      "PortfolioRefreshMarketOut": {
+        "properties": {
+          "alert_results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Alert Results",
+            "type": "array"
+          },
+          "as_of": {
+            "format": "date",
+            "title": "As Of",
+            "type": "string"
+          },
+          "completed_at": {
+            "format": "date-time",
+            "title": "Completed At",
+            "type": "string"
+          },
+          "order": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Order",
+            "type": "array"
+          },
+          "risk": {
+            "additionalProperties": true,
+            "title": "Risk",
+            "type": "object"
+          },
+          "screen_results": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Screen Results",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/RefreshMarketStageOut"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "partial"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "as_of",
+          "started_at",
+          "completed_at",
+          "order",
+          "stages",
+          "risk",
+          "alert_results",
+          "screen_results"
+        ],
+        "title": "PortfolioRefreshMarketOut",
+        "type": "object"
+      },
+      "PortfolioRiskMatrixOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/RiskMatrixConcentrationOut"
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixCorrelationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "covariance_annualized": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixGridOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixEstimatorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/RiskMatrixExcludedOut"
+            },
+            "title": "Excluded",
+            "type": "array"
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixPortfolioOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/RiskMatrixPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trace": {
+            "additionalProperties": true,
+            "title": "Trace",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RiskMatrixWarningOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "window": {
+            "$ref": "#/components/schemas/RiskMatrixWindowOut"
+          }
+        },
+        "required": [
+          "as_of",
+          "base_currency",
+          "status",
+          "window",
+          "estimator",
+          "covariance_annualized",
+          "correlation",
+          "portfolio",
+          "positions",
+          "excluded",
+          "concentration",
+          "warnings",
+          "trace",
+          "provenance"
+        ],
+        "title": "PortfolioRiskMatrixOut",
+        "type": "object"
+      },
       "PortfolioRiskOut": {
         "properties": {
           "beta": {
@@ -13549,6 +14802,65 @@
           "correlation_min_observations"
         ],
         "title": "PortfolioRiskOut",
+        "type": "object"
+      },
+      "PortfolioSnapshotCaptureOut": {
+        "properties": {
+          "cumulative_twr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Twr"
+          },
+          "daily_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Return"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "pricing_coverage": {
+            "title": "Pricing Coverage",
+            "type": "number"
+          },
+          "snapshot_date": {
+            "format": "date",
+            "title": "Snapshot Date",
+            "type": "string"
+          },
+          "total_value_base": {
+            "title": "Total Value Base",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "snapshot_date",
+          "total_value_base",
+          "pricing_coverage",
+          "daily_return",
+          "cumulative_twr",
+          "metadata"
+        ],
+        "title": "PortfolioSnapshotCaptureOut",
         "type": "object"
       },
       "PortfolioSnapshotOut": {
@@ -14305,6 +15617,51 @@
           "effective_date"
         ],
         "title": "PortfolioValuationHoldOut",
+        "type": "object"
+      },
+      "PortfolioXrayRuleOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "threshold"
+        ],
+        "title": "PortfolioXrayRuleOut",
         "type": "object"
       },
       "PositionValuationHoldOut": {
@@ -15454,6 +16811,181 @@
         "title": "RadarResponse",
         "type": "object"
       },
+      "Range52w": {
+        "properties": {
+          "high": {
+            "title": "High",
+            "type": "number"
+          },
+          "high_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "High Date"
+          },
+          "low": {
+            "title": "Low",
+            "type": "number"
+          },
+          "low_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low Date"
+          },
+          "sessions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sessions"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "low",
+          "high",
+          "source"
+        ],
+        "title": "Range52w",
+        "type": "object"
+      },
+      "RefreshMarketStageOut": {
+        "properties": {
+          "alert_rules": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alert Rules"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errors"
+          },
+          "market_data_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Data Status"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "portfolio_snapshot_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Snapshot Id"
+          },
+          "saved_screens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Screens"
+          },
+          "snapshot_pricing_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot Pricing Coverage"
+          },
+          "stale_prices": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Prices"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "integer"
+          },
+          "updated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated"
+          }
+        },
+        "required": [
+          "step",
+          "name",
+          "status"
+        ],
+        "title": "RefreshMarketStageOut",
+        "type": "object"
+      },
       "ResearchAlertAction": {
         "properties": {
           "action": {
@@ -16138,6 +17670,355 @@
         "title": "ReviewInput",
         "type": "object"
       },
+      "RiskMatrixConcentrationOut": {
+        "properties": {
+          "effective_positions": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Positions"
+          },
+          "herfindahl": {
+            "title": "Herfindahl",
+            "type": "number"
+          },
+          "top_1": {
+            "title": "Top 1",
+            "type": "number"
+          },
+          "top_5": {
+            "title": "Top 5",
+            "type": "number"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "top_1",
+          "top_5",
+          "herfindahl",
+          "effective_positions",
+          "weights"
+        ],
+        "title": "RiskMatrixConcentrationOut",
+        "type": "object"
+      },
+      "RiskMatrixCorrelationOut": {
+        "properties": {
+          "matrix": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tickers",
+          "matrix",
+          "source"
+        ],
+        "title": "RiskMatrixCorrelationOut",
+        "type": "object"
+      },
+      "RiskMatrixEstimatorOut": {
+        "properties": {
+          "annualization": {
+            "title": "Annualization",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "shrinkage": {
+            "title": "Shrinkage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "shrinkage",
+          "annualization"
+        ],
+        "title": "RiskMatrixEstimatorOut",
+        "type": "object"
+      },
+      "RiskMatrixExcludedOut": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "reason",
+          "sessions"
+        ],
+        "title": "RiskMatrixExcludedOut",
+        "type": "object"
+      },
+      "RiskMatrixGridOut": {
+        "properties": {
+          "matrix": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tickers",
+          "matrix"
+        ],
+        "title": "RiskMatrixGridOut",
+        "type": "object"
+      },
+      "RiskMatrixPortfolioOut": {
+        "properties": {
+          "variance_annualized": {
+            "title": "Variance Annualized",
+            "type": "number"
+          },
+          "vol_annualized": {
+            "title": "Vol Annualized",
+            "type": "number"
+          }
+        },
+        "required": [
+          "vol_annualized",
+          "variance_annualized"
+        ],
+        "title": "RiskMatrixPortfolioOut",
+        "type": "object"
+      },
+      "RiskMatrixPositionOut": {
+        "properties": {
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason"
+          },
+          "fx_dropped_returns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Dropped Returns"
+          },
+          "fx_mode": {
+            "title": "Fx Mode",
+            "type": "string"
+          },
+          "included": {
+            "title": "Included",
+            "type": "boolean"
+          },
+          "marginal_contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginal Contribution"
+          },
+          "risk_contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Contribution"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "sessions_common": {
+            "title": "Sessions Common",
+            "type": "integer"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "vol_annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vol Annualized"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          },
+          "weight_included": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Included"
+          }
+        },
+        "required": [
+          "ticker",
+          "weight",
+          "included",
+          "sessions",
+          "sessions_common",
+          "fx_mode"
+        ],
+        "title": "RiskMatrixPositionOut",
+        "type": "object"
+      },
+      "RiskMatrixWarningOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "RiskMatrixWarningOut",
+        "type": "object"
+      },
+      "RiskMatrixWindowOut": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "min_sessions": {
+            "title": "Min Sessions",
+            "type": "integer"
+          },
+          "requested_days": {
+            "title": "Requested Days",
+            "type": "integer"
+          },
+          "sessions_common": {
+            "title": "Sessions Common",
+            "type": "integer"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          }
+        },
+        "required": [
+          "requested_days",
+          "sessions_common",
+          "min_sessions",
+          "start",
+          "end"
+        ],
+        "title": "RiskMatrixWindowOut",
+        "type": "object"
+      },
       "RowValidationError": {
         "properties": {
           "field": {
@@ -16712,6 +18593,429 @@
           "criteria"
         ],
         "title": "ScreenCreate",
+        "type": "object"
+      },
+      "ScreenerCriterionOut": {
+        "properties": {
+          "left": {
+            "title": "Left",
+            "type": "string"
+          },
+          "operator": {
+            "enum": [
+              ">",
+              ">=",
+              "<",
+              "<=",
+              "==",
+              "!="
+            ],
+            "title": "Operator",
+            "type": "string"
+          },
+          "right": {
+            "title": "Right",
+            "type": "string"
+          }
+        },
+        "required": [
+          "left",
+          "operator",
+          "right"
+        ],
+        "title": "ScreenerCriterionOut",
+        "type": "object"
+      },
+      "ScreenerCustomMetricOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "formula": {
+            "title": "Formula",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "metric_key": {
+            "title": "Metric Key",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "metric_key",
+          "name",
+          "formula",
+          "unit",
+          "description",
+          "version",
+          "active",
+          "metadata",
+          "created_at"
+        ],
+        "title": "ScreenerCustomMetricOut",
+        "type": "object"
+      },
+      "ScreenerMetricCoverageOut": {
+        "properties": {
+          "metrics_with_data": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Metrics With Data",
+            "type": "array"
+          }
+        },
+        "required": [
+          "metrics_with_data"
+        ],
+        "title": "ScreenerMetricCoverageOut",
+        "type": "object"
+      },
+      "ScreenerRealItemOut": {
+        "properties": {
+          "beta": {
+            "title": "Beta",
+            "type": "null"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "changePercent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changepercent"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "has_fundamentals": {
+            "title": "Has Fundamentals",
+            "type": "boolean"
+          },
+          "marketCap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marketcap"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "prevClose": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prevclose"
+          },
+          "price": {
+            "title": "Price",
+            "type": "number"
+          },
+          "priceAsOf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priceasof"
+          },
+          "priceDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pricedate"
+          },
+          "priceTimestampKind": {
+            "enum": [
+              "daily_candle_open",
+              "quote"
+            ],
+            "title": "Pricetimestampkind",
+            "type": "string"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "sector": {
+            "title": "Sector",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "ETF",
+              "Stock"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          }
+        },
+        "required": [
+          "symbol",
+          "name",
+          "price",
+          "priceAsOf",
+          "priceTimestampKind",
+          "priceDate",
+          "currency",
+          "change",
+          "changePercent",
+          "marketCap",
+          "volume",
+          "prevClose",
+          "sector",
+          "exchange",
+          "type",
+          "pe",
+          "pb",
+          "roe",
+          "has_fundamentals",
+          "beta"
+        ],
+        "title": "ScreenerRealItemOut",
+        "type": "object"
+      },
+      "ScreenerRealOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "number"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "refreshing": {
+            "title": "Refreshing",
+            "type": "boolean"
+          },
+          "screener": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenerRealItemOut"
+            },
+            "title": "Screener",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "unavailable": {
+            "title": "Unavailable",
+            "type": "boolean"
+          },
+          "universe_size": {
+            "title": "Universe Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source",
+          "as_of",
+          "count",
+          "screener",
+          "refreshing",
+          "unavailable",
+          "universe_size"
+        ],
+        "title": "ScreenerRealOut",
+        "type": "object"
+      },
+      "ScreenerSavedScreenOut": {
+        "properties": {
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "alerts_enabled": {
+            "title": "Alerts Enabled",
+            "type": "boolean"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenerCriterionOut"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ranking_direction": {
+            "title": "Ranking Direction",
+            "type": "string"
+          },
+          "ranking_formula": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranking Formula"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "criteria",
+          "ranking_formula",
+          "ranking_direction",
+          "alerts_enabled",
+          "active",
+          "last_run_at",
+          "created_at"
+        ],
+        "title": "ScreenerSavedScreenOut",
         "type": "object"
       },
       "SnapshotCountsOut": {
@@ -17884,6 +20188,42 @@
         "title": "ThesisApproveRequest",
         "type": "object"
       },
+      "ThesisAudioStatusOut": {
+        "properties": {
+          "generated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generated At"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "key"
+        ],
+        "title": "ThesisAudioStatusOut",
+        "type": "object"
+      },
       "ThesisChangeCreate": {
         "properties": {
           "affected_claim_ids": {
@@ -17902,6 +20242,7 @@
           },
           "change_type": {
             "default": "manual",
+            "maxLength": 80,
             "title": "Change Type",
             "type": "string"
           },
@@ -18182,6 +20523,149 @@
         "title": "ThesisGraphOut",
         "type": "object"
       },
+      "ThesisHistoryDiffOut": {
+        "properties": {
+          "affected_assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Affected Assumptions",
+            "type": "array"
+          },
+          "change_summary": {
+            "title": "Change Summary",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "derived": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derived"
+          },
+          "rating_changed": {
+            "title": "Rating Changed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "change_summary",
+          "affected_assumptions",
+          "rating_changed",
+          "created_at"
+        ],
+        "title": "ThesisHistoryDiffOut",
+        "type": "object"
+      },
+      "ThesisHistoryItemOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_confidence_score": {
+            "title": "Data Confidence Score",
+            "type": "integer"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisHistoryDiffOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "rating": {
+            "title": "Rating",
+            "type": "string"
+          },
+          "red_team_score": {
+            "title": "Red Team Score",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "status",
+          "rating",
+          "red_team_score",
+          "data_confidence_score",
+          "created_at",
+          "updated_at",
+          "diff"
+        ],
+        "title": "ThesisHistoryItemOut",
+        "type": "object"
+      },
+      "ThesisHistoryOut": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "data_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data As Of"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisHistoryItemOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "provenance": {
+            "$ref": "#/components/schemas/ProvenanceOut"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "count",
+          "history",
+          "data_as_of",
+          "provenance"
+        ],
+        "title": "ThesisHistoryOut",
+        "type": "object"
+      },
       "ThesisHumanInput": {
         "description": "Explicit human assumptions, never promoted to sourced financial facts.",
         "properties": {
@@ -18271,6 +20755,217 @@
           "inputs"
         ],
         "title": "ThesisInputsRequest",
+        "type": "object"
+      },
+      "ThesisJobPhaseOut": {
+        "properties": {
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "ThesisJobPhaseOut",
+        "type": "object"
+      },
+      "ThesisJobStatusOut": {
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "current_phase": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Phase"
+          },
+          "error_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Class"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "force": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Force"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "phases": {
+            "items": {
+              "$ref": "#/components/schemas/ThesisJobPhaseOut"
+            },
+            "title": "Phases",
+            "type": "array"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ticker"
+          },
+          "total_phases": {
+            "title": "Total Phases",
+            "type": "integer"
+          },
+          "workflow_name": {
+            "title": "Workflow Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workflow_name",
+          "status",
+          "ticker",
+          "force",
+          "phases",
+          "current_phase",
+          "total_phases",
+          "result",
+          "error_class",
+          "error_message",
+          "attempt",
+          "created_at",
+          "started_at",
+          "finished_at"
+        ],
+        "title": "ThesisJobStatusOut",
+        "type": "object"
+      },
+      "ThesisLatestJobOut": {
+        "properties": {
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ThesisJobStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "job"
+        ],
+        "title": "ThesisLatestJobOut",
         "type": "object"
       },
       "ThesisNodeOut": {
@@ -18700,6 +21395,7 @@
           },
           "status": {
             "default": "draft",
+            "maxLength": 40,
             "title": "Status",
             "type": "string"
           },
@@ -18797,6 +21493,89 @@
           "tickers"
         ],
         "title": "ThesisTickersOut",
+        "type": "object"
+      },
+      "TimelineEventOut": {
+        "properties": {
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "date",
+          "kind",
+          "title",
+          "source"
+        ],
+        "title": "TimelineEventOut",
+        "type": "object"
+      },
+      "TimelineHoldingOut": {
+        "properties": {
+          "average_cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Cost"
+          },
+          "first_buy_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Buy Date"
+          }
+        },
+        "title": "TimelineHoldingOut",
         "type": "object"
       },
       "TransactionImportCommitRequest": {
@@ -19412,6 +22191,442 @@
           "symbol"
         ],
         "title": "WatchItemCreate",
+        "type": "object"
+      },
+      "WatchlistAnalysisStateOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "missing_inputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Inputs"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "thesis_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thesis Status"
+          }
+        },
+        "required": [
+          "status",
+          "as_of",
+          "thesis_status"
+        ],
+        "title": "WatchlistAnalysisStateOut",
+        "type": "object"
+      },
+      "WatchlistAttentionThesisItemOut": {
+        "properties": {
+          "createdAt": {
+            "title": "Createdat",
+            "type": "string"
+          },
+          "direction": {
+            "title": "Direction",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "summary",
+          "direction",
+          "createdAt"
+        ],
+        "title": "WatchlistAttentionThesisItemOut",
+        "type": "object"
+      },
+      "WatchlistAttentionThesisOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistAttentionThesisItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "WatchlistAttentionThesisOut",
+        "type": "object"
+      },
+      "WatchlistItemOut": {
+        "properties": {
+          "analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchlistAnalysisStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "company",
+          "created_at",
+          "updated_at",
+          "analysis"
+        ],
+        "title": "WatchlistItemOut",
+        "type": "object"
+      },
+      "WatchlistMetricsOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "per": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per"
+          },
+          "sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "market_cap",
+          "per",
+          "currency",
+          "sources"
+        ],
+        "title": "WatchlistMetricsOut",
+        "type": "object"
+      },
+      "WatchlistMonitorItemOut": {
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "fair_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value"
+          },
+          "fair_value_as_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value As Of"
+          },
+          "fair_value_label": {
+            "title": "Fair Value Label",
+            "type": "string"
+          },
+          "fair_value_publishable": {
+            "title": "Fair Value Publishable",
+            "type": "boolean"
+          },
+          "fair_value_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Reason"
+          },
+          "fair_value_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "tesis",
+                  "motor",
+                  "motor_orientativo"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Source"
+          },
+          "fair_value_thesis_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Thesis Version"
+          },
+          "last_close": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close"
+          },
+          "last_close_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Close Date"
+          },
+          "low_52w": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low 52W"
+          },
+          "low_52w_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Low 52W Date"
+          },
+          "low_52w_sessions": {
+            "title": "Low 52W Sessions",
+            "type": "integer"
+          },
+          "next_earnings_confirmed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Confirmed"
+          },
+          "next_earnings_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Date"
+          },
+          "next_earnings_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Earnings Source"
+          },
+          "valuation_side": {
+            "anyOf": [
+              {
+                "enum": [
+                  "infravalorada",
+                  "sobrevalorada"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valuation Side"
+          }
+        },
+        "required": [
+          "low_52w",
+          "low_52w_date",
+          "low_52w_sessions",
+          "last_close",
+          "last_close_date",
+          "fair_value",
+          "fair_value_thesis_version",
+          "fair_value_source",
+          "fair_value_label",
+          "fair_value_as_of",
+          "fair_value_publishable",
+          "fair_value_reason",
+          "valuation_side",
+          "currency",
+          "next_earnings_date",
+          "next_earnings_source",
+          "next_earnings_confirmed"
+        ],
+        "title": "WatchlistMonitorItemOut",
+        "type": "object"
+      },
+      "WatchlistMonitorOut": {
+        "properties": {
+          "earnings_status": {
+            "title": "Earnings Status",
+            "type": "string"
+          },
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/WatchlistMonitorItemOut"
+            },
+            "title": "Items",
+            "type": "object"
+          }
+        },
+        "required": [
+          "items",
+          "earnings_status"
+        ],
+        "title": "WatchlistMonitorOut",
         "type": "object"
       },
       "WorkProductRequest": {
@@ -22145,9 +25360,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Telegram Status Api Alerts Telegram Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AlertsTelegramStatusOut"
                 }
               }
             },
@@ -22852,9 +26065,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Get Alert Analysis Api Alerts  Alert Id  Analysis Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/AlertAnalysisReadOut"
                 }
               }
             },
@@ -26603,6 +29814,204 @@
           }
         },
         "summary": "Ipo Calendar",
+        "tags": [
+          "calendar"
+        ]
+      }
+    },
+    "/api/calendar/portfolio-upcoming": {
+      "get": {
+        "description": "\u00abPr\u00f3ximas fechas\u00bb de la cartera: resultados (oficial/estimada), ex-dividendo y pago, con recordatorio.\n\nSolo tablas guardadas (``earnings_dates`` y ``dividend_records``): ninguna llamada a proveedores.",
+        "operationId": "portfolio_upcoming_dates_api_calendar_portfolio_upcoming_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Portfolio Upcoming Dates Api Calendar Portfolio Upcoming Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Portfolio Upcoming Dates",
         "tags": [
           "calendar"
         ]
@@ -30901,6 +34310,211 @@
         ]
       }
     },
+    "/api/companies/{ticker}/events/timeline": {
+      "get": {
+        "description": "Eventos guardados para el gr\u00e1fico de precio (resultados, ex-dividendo, filings, insiders, noticias).\n\nLee solo la base de datos: no llama a Finnhub, GDELT, la SEC ni Yahoo. Todo evento lleva fecha y fuente.",
+        "operationId": "get_company_timeline_events_api_companies__ticker__events_timeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "desde",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Desde"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hasta",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Hasta"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyTimelineEventsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Company Timeline Events",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
     "/api/companies/{ticker}/expectation-reality": {
       "get": {
         "operationId": "expectation_reality_api_companies__ticker__expectation_reality_get",
@@ -32738,6 +36352,177 @@
           }
         },
         "summary": "Create Inferred Input Llm",
+        "tags": [
+          "companies"
+        ]
+      }
+    },
+    "/api/companies/{ticker}/key-stats": {
+      "get": {
+        "description": "Datos clave de la ficha (rango 52 semanas, proximos resultados,\nex-dividendo, beta). Fuentes gratuitas ya presentes; cada dato lleva su\nfuente y un dato sin fuente queda vacio, nunca estimado.",
+        "operationId": "company_key_stats_api_companies__ticker__key_stats_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticker",
+            "required": true,
+            "schema": {
+              "title": "Ticker",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyStats"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Company Key Stats",
         "tags": [
           "companies"
         ]
@@ -49719,6 +53504,180 @@
         ]
       }
     },
+    "/api/market/quotes/batch": {
+      "post": {
+        "description": "Cotizaciones por lote (shape Finnhub via Yahoo), cache Redis 60s.\n\nRespuesta por simbolo: payload o null (sin dato NUNCA es error global).",
+        "operationId": "market_quotes_batch_api_market_quotes_batch_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarketQuotesBatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Market Quotes Batch Api Market Quotes Batch Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Market Quotes Batch",
+        "tags": [
+          "market"
+        ]
+      }
+    },
     "/api/market/regime": {
       "get": {
         "operationId": "regime_api_market_regime_get",
@@ -58339,9 +62298,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Add Portfolio Transaction Api Portfolio Add Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTransactionCreateOut"
                 }
               }
             },
@@ -59495,9 +63452,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Sync Portfolio Dividends Api Portfolio Dividends Sync Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioDividendSyncOut"
                 }
               }
             },
@@ -60047,9 +64002,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Upsert Fx Rate Api Portfolio Fx Rates Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/FXRateOut"
                 }
               }
             },
@@ -61080,9 +65033,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Commit Transaction Import Api Portfolio Import Commit Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioImportCommitOut"
                 }
               }
             },
@@ -61415,9 +65366,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Ibkr Api Portfolio Import Ibkr Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioIbkrImportOut"
                 }
               }
             },
@@ -61588,9 +65537,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Ibkr Csv Api Portfolio Import Ibkr Csv Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioIbkrCsvImportOut"
                 }
               }
             },
@@ -61761,9 +65708,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Import Ibkr Xml Api Portfolio Import Ibkr Xml Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioIbkrXmlImportOut"
                 }
               }
             },
@@ -62839,9 +66784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Refresh Portfolio Market Data Api Portfolio Refresh Market Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioRefreshMarketOut"
                 }
               }
             },
@@ -62859,6 +66802,167 @@
           }
         },
         "summary": "Refresh Portfolio Market Data",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/risk-matrix": {
+      "get": {
+        "operationId": "portfolio_risk_matrix_api_portfolio_risk_matrix_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRiskMatrixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Portfolio Risk Matrix",
         "tags": [
           "portfolio"
         ]
@@ -63255,9 +67359,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Capture Portfolio Snapshot Api Portfolio Snapshots Capture Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioSnapshotCaptureOut"
                 }
               }
             },
@@ -69205,8 +73307,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ScreenerCustomMetricOut"
                   },
                   "title": "Response List Custom Metrics Api Screeners Custom Metrics Get",
                   "type": "array"
@@ -69542,9 +73643,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Metric Coverage Api Screeners Metric Coverage Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ScreenerMetricCoverageOut"
                 }
               }
             },
@@ -69748,9 +73847,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Real Time Screener Api Screeners Real Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ScreenerRealOut"
                 }
               }
             },
@@ -70085,8 +74182,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/ScreenerSavedScreenOut"
                   },
                   "title": "Response List Screens Api Screeners Screens Get",
                   "type": "array"
@@ -77283,9 +81379,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Latest Thesis Job Api Thesis Jobs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisLatestJobOut"
                 }
               }
             },
@@ -77455,9 +81549,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thesis Job Status Api Thesis Jobs  Run Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisJobStatusOut"
                 }
               }
             },
@@ -78202,9 +82294,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thesis Audio Status Api Thesis  Ticker  Audio Status Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisAudioStatusOut"
                 }
               }
             },
@@ -79057,9 +83147,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Thesis History Api Thesis  Ticker  History Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ThesisHistoryOut"
                 }
               }
             },
@@ -80865,7 +84953,7 @@
     },
     "/api/valuation/{ticker}/fair-value": {
       "get": {
-        "description": "Valor justo \u00fanico de un ticker; recalcula el motor si la tesis no basta.",
+        "description": "Valor justo \u00fanico de un ticker; recalcula el motor si la tesis no basta.\n\nEl recalculo pasa por cache Redis (FAIR_VALUE_LIVE_CACHE_TTL_SECONDS):\nel sondeo de oportunidades de Inicio y la ficha piden el mismo ticker\nmuchas veces al dia y el motor no cambia hasta la proxima ingesta.",
         "operationId": "fair_value_api_valuation__ticker__fair_value_get",
         "parameters": [
           {
@@ -81360,8 +85448,7 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "additionalProperties": true,
-                    "type": "object"
+                    "$ref": "#/components/schemas/WatchlistItemOut"
                   },
                   "title": "Response List Watchlist Api Watchlist Get",
                   "type": "array"
@@ -81698,9 +85785,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Home Attention Thesis Api Watchlist Attention Thesis Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WatchlistAttentionThesisOut"
                 }
               }
             },
@@ -82758,9 +86843,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Watchlist Metrics Api Watchlist Metrics  Symbol  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WatchlistMetricsOut"
                 }
               }
             },
@@ -82933,9 +87016,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Watchlist Monitor Api Watchlist Monitor Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/WatchlistMonitorOut"
                 }
               }
             },

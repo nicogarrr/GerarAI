@@ -115,17 +115,7 @@ export type UniversalSearchResponse = {
   results: UniversalSearchResult[];
 };
 
-export type CustomMetric = {
-  id: number;
-  metric_key: string;
-  name: string;
-  formula: string;
-  unit: string;
-  description: string;
-  version: number;
-  active: boolean;
-  created_at: string;
-};
+export type CustomMetric = components['schemas']['ScreenerCustomMetricOut'];
 
 export type ScreenCriterion = {
   left: string;
@@ -133,18 +123,7 @@ export type ScreenCriterion = {
   right: string;
 };
 
-export type SavedScreen = {
-  id: number;
-  name: string;
-  description: string;
-  criteria: ScreenCriterion[];
-  ranking_formula: string | null;
-  ranking_direction: 'asc' | 'desc';
-  alerts_enabled: boolean;
-  active: boolean;
-  last_run_at: string | null;
-  created_at: string;
-};
+export type SavedScreen = components['schemas']['ScreenerSavedScreenOut'];
 
 export type ScreenResult = {
   criteria: ScreenCriterion[];
@@ -721,7 +700,7 @@ export async function getScreenerMetricCoverage(): Promise<string[] | null> {
   // answer, so the UI keeps its full static suggestion list instead of
   // offering nothing.
   try {
-    const payload = await requestJson<{ metrics_with_data: string[] }>('/api/screeners/metric-coverage');
+    const payload = await requestJson<components['schemas']['ScreenerMetricCoverageOut']>('/api/screeners/metric-coverage');
     return Array.isArray(payload.metrics_with_data) ? payload.metrics_with_data : null;
   } catch {
     return null;
@@ -863,6 +842,13 @@ export async function updateManagementExplanation(ticker: string, promiseId: num
 
 export async function getPortfolioIntelligence(years = 5): Promise<PortfolioIntelligence> {
   return requestJson(`/api/portfolio/intelligence?years=${Math.max(1, Math.min(20, years))}`);
+}
+
+export type PortfolioRiskMatrix = components['schemas']['PortfolioRiskMatrixOut'];
+
+/** GET /api/portfolio/risk-matrix — covarianza Ledoit-Wolf y contribución al riesgo por posición. */
+export async function getPortfolioRiskMatrix(): Promise<PortfolioRiskMatrix> {
+  return requestJson('/api/portfolio/risk-matrix');
 }
 
 export async function getKnowledgeGraph(input: { nodeTypes?: string; ticker?: string; limit?: number } = {}): Promise<KnowledgeGraph> {

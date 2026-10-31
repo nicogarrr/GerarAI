@@ -272,3 +272,65 @@ def test_us_exchange_or_empty_exchange_without_cik_is_unresolved_not_foreign(db)
     blank = _company(db, "FOO.X", "Foo")
     blank.exchange = ""
     assert _without_data_reason("FOO.X", blank, False)["reason"] == "cik_unresolved"
+
+
+def test_operations_prefilters_universe_in_sql(db):
+    """El agregado solo mira cartera + watchlist: el universo Form 4 no debe
+    cargarse entero (986 ms medidos en prod, barrido 2026-10-31). El prefiltro
+    SQL es un SUPERCONJUNTO (cualquier columna de ticker crudo que normalice a
+    una seguida); el filtro exacto sigue siendo el de Python."""
+    from sqlalchemy import event
+
+    _seed_portfolio_and_watchlist(db)
+    hoy = date.today().isoformat()
+    # 60 emisores NO seguidos con ventas: ruido que el prefiltro debe evitar.
+    for i in range(60):
+        noise = _filing(db, f"ZZ{i:02d}", f"9999-26-{i:06d}")
+        _tx(db, noise, fp_suffix="-n", insider="NOBODY", role="Director",
+            officer_title=None, code="S", shares=10.0, price=1.0, value=10.0, tx_date=hoy)
+    filing = _filing(db, "RKLB", "0001-26-000100")
+    _tx(db, filing, fp_suffix="-1", insider="BECK PETER", role="Officer",
+        officer_title="CEO", code="P", shares=50.0, price=60.0, value=3000.0, tx_date=hoy)
+
+    engine = db.get_bind()
+    statements: list[str] = []
+
+    def capture(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        result = insider_operations(db, days=365)
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    # Resultado intacto: solo la seguida agrega.
+    assert [c["ticker"] for c in result["companies"]] == ["RKLB"]
+    assert result["companies"][0]["totals"]["buy"]["value"] == 3000.0
+    # Y la consulta principal va prefiltrada por ticker (no carga el universo).
+    joined = [
+        s for s in statements
+        if "insider_transactions" in s and "JOIN" in s.upper() and "insider_filings" in s
+    ]
+    assert joined, "consulta principal no encontrada entre las emitidas"
+    assert any("issuer_ticker IN" in s for s in joined), (
+        "la consulta principal no lleva prefiltro SQL por issuer_ticker"
+    )
+
+
+def test_operations_prefilter_keeps_multiclass_raw_tickers(db):
+    """Emisor multiclase: crudo "LEN, LEN.B" con seguida LEN. El prefiltro SQL
+    debe aceptar el valor crudo aunque no sea literalmente la seguida."""
+    from app.models.entities import WatchItem
+
+    company = _company(db, "LEN", "Lennar Corp.")
+    db.add(WatchItem(symbol="LEN"))
+    db.commit()
+    hoy = date.today().isoformat()
+    filing = _filing(db, "LEN, LEN.B", "0001-26-000200")
+    _tx(db, filing, fp_suffix="-1", insider="MILLER STUART", role="Officer",
+        officer_title="CEO", code="P", shares=100.0, price=150.0, value=15000.0, tx_date=hoy)
+
+    result = insider_operations(db, days=365)
+    assert [c["ticker"] for c in result["companies"]] == ["LEN"]
+    assert result["companies"][0]["totals"]["buy"]["value"] == 15000.0

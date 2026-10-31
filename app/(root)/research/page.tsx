@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 import { NOT_VALUABLE, researchValuability, visibleThesisRating } from '@/lib/research/coverage-state';
 import type { Metadata } from 'next';
@@ -15,6 +16,7 @@ import { formatDate, formatNumber } from '@/lib/format';
 import { getT } from '@/lib/i18n/server';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
 import { Panel } from '@/components/ui/panel';
@@ -165,11 +167,7 @@ function CompanyCard({ row, t }: { row: CompanyRow; t: TranslateFn }) {
     );
 }
 
-export default async function ResearchPage({
-    searchParams,
-}: {
-    searchParams?: Promise<{ q?: string | string[]; page?: string | string[] }>;
-}) {
+async function ResearchIndexSection({ query, requestedPage }: { query: string; requestedPage: number }) {
     const t = await getT();
     // Las lecturas de contexto del usuario (cartera, watchlist) no dependen del
     // dashboard: se lanzan a la vez en vez de esperar a que termine el
@@ -217,11 +215,6 @@ export default async function ResearchPage({
         watchlistTickers,
     );
 
-    const params = (await searchParams) ?? {};
-    // Claves repetidas (?q=A&q=B) llegan como array: sin normalizar rompen la página.
-    const query = firstSearchParam(params.q).trim();
-    const requestedPage = parseIndexPage(firstSearchParam(params.page));
-
     // F308: filtro y paginación en servidor. Solo la página visible se
     // materializa en el HTML.
     const filtered = filterResearchIndex(ordered, query);
@@ -264,17 +257,7 @@ export default async function ResearchPage({
     });
 
     return (
-        <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
-            <PageHeader
-                actions={<WorkProductButton />}
-                kicker={t('research.kicker')}
-                title={t('research.indexTitle')}
-            />
-
-            <Panel
-                title={t('research.registryTitle')}
-            >
-                <p className="mb-4 text-sm text-gray-400">{t('research.coverageNote')}</p>
+        <>
                 {ordered.length ? (
                     <>
                         <form action="/research" className="mb-4 flex flex-wrap items-center gap-2" method="get">
@@ -362,11 +345,59 @@ export default async function ResearchPage({
                         title={t('research.emptyTitle')}
                     />
                 )}
+        </>
+    );
+}
+
+function ResearchIndexSkeleton() {
+    return (
+        <ol aria-hidden="true" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+                <li className="rounded-xl border border-gray-700/50 bg-surface-1 p-4" key={i}>
+                    <div className="flex items-center gap-3">
+                        <Skeleton className="size-10 shrink-0 rounded-lg" />
+                        <div className="min-w-0 flex-1 space-y-2">
+                            <Skeleton className="h-4 w-24 max-w-full" />
+                            <Skeleton className="h-3 w-40 max-w-full" />
+                        </div>
+                    </div>
+                    <Skeleton className="mt-3 h-4 w-32 max-w-full" />
+                </li>
+            ))}
+        </ol>
+    );
+}
+
+export default async function ResearchPage({
+    searchParams,
+}: {
+    searchParams?: Promise<{ q?: string | string[]; page?: string | string[] }>;
+}) {
+    const t = await getT();
+    const params = (await searchParams) ?? {};
+    // Claves repetidas (?q=A&q=B) llegan como array: sin normalizar rompen la página.
+    const query = firstSearchParam(params.q).trim();
+    const requestedPage = parseIndexPage(firstSearchParam(params.page));
+
+    // Una sola lectura del índice, detrás de Suspense: cabecera y Panel
+    // pintan sin esperar al dashboard (LCP 3,6 s medido en prod a 390px,
+    // 31-oct-2026).
+    return (
+        <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
+            <PageHeader
+                actions={<WorkProductButton />}
+                kicker={t('research.kicker')}
+                title={t('research.indexTitle')}
+            />
+
+            <Panel
+                title={t('research.registryTitle')}
+            >
+                <p className="mb-4 text-sm text-gray-400">{t('research.coverageNote')}</p>
+                <Suspense fallback={<ResearchIndexSkeleton />}>
+                    <ResearchIndexSection query={query} requestedPage={requestedPage} />
+                </Suspense>
             </Panel>
-
-
-
-
         </main>
     );
 }

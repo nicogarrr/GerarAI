@@ -79,6 +79,7 @@ from app.services.inferred_input_service import (
     InferredInputService,
 )
 from app.services.inferred_input_service import payload as inferred_input_payload
+from app.services.key_stats_service import KeyStats, key_stats_service
 from app.services.kpi_extraction_service import CompanyKPIRegistryService
 from app.services.long_term_model_service import LongTermModelService
 from app.services.management_credibility_service import ManagementCredibilityService
@@ -129,6 +130,14 @@ async def company_analyst_targets(ticker: str) -> AnalystTargets:
             ),
         }
     )
+
+
+@router.get("/{ticker}/key-stats", response_model=KeyStats)
+async def company_key_stats(ticker: str, db: Session = Depends(get_db)) -> KeyStats:
+    """Datos clave de la ficha (rango 52 semanas, proximos resultados,
+    ex-dividendo, beta). Fuentes gratuitas ya presentes; cada dato lleva su
+    fuente y un dato sin fuente queda vacio, nunca estimado."""
+    return await key_stats_service.get(db, ticker)
 
 
 @router.get("/{ticker}/extended-quote", response_model=ExtendedQuote)

@@ -37,7 +37,12 @@ def db():
 
 
 def _fuente(
-    status: str, *, name: str = "Yahoo Finance", failures: int = 3, fallback: str | None = "alpha_vantage"
+    status: str,
+    *,
+    name: str = "Yahoo Finance",
+    failures: int = 3,
+    fallback: str | None = "alpha_vantage",
+    fallback_automatic: bool = False,
 ) -> dict:
     """as_dict() de una fuente (la clave del registry la pone _collect_sources)."""
     circuit = {"healthy": "closed", "degraded": "half_open", "failing": "open", "unknown": "closed"}[status]
@@ -48,6 +53,7 @@ def _fuente(
         "consecutive_failures": failures,
         "last_checked_at": "2026-10-31T00:30:00+00:00",
         "fallback_source": fallback,
+        "fallback_automatic": fallback_automatic,
         "is_primary": True,
         "response_time_ms": 12.0,
     }
@@ -211,3 +217,57 @@ def test_rollback_no_consume_la_transicion(db, monkeypatch):
     assert retry["created"] + retry["existing"] == 1
     alert = db.scalar(select(ResearchAlert))
     assert alert is not None and alert.metadata_["source_key"] == "yahoo_finance"
+
+
+def test_mensaje_no_afirma_respaldo_configurado_sin_cablear(db):
+    """Veracidad: fallback_source es una DECLARACIÓN del registry; ningún
+    código ejecuta el respaldo (medido: AV sin consumidores fuera de /health,
+    "cached_fx" inexistente). El mensaje no puede decir "configurada"."""
+    last: dict[str, str] = {"yahoo_finance": "healthy"}
+
+    class _Status:
+        def as_dict(self):
+            return _fuente("failing", fallback="alpha_vantage")
+
+    class _Registry:
+        sources = {"yahoo_finance": _Status()}
+
+    wd.emit_source_health_alerts(db, registry=_Registry(), now=NOW, last_states=last)
+    alert = db.scalar(select(ResearchAlert))
+    assert "configurada" not in alert.message
+    assert "prevista" in alert.message
+    assert "sin degradación automática" in alert.message
+
+
+def test_respaldo_automatico_sec_hf_no_se_niega(db):
+    """SEC sí ejecuta el mirror HF automáticamente (sec.py: 401/403 ->
+    mirror_get_json, éxito registrado tras servir el dato). El mensaje NO
+    puede negar la conmutación automática para ese respaldo."""
+    last: dict[str, str] = {"sec_edgar": "healthy"}
+
+    class _Status:
+        def as_dict(self):
+            return _fuente(
+                "failing", name="SEC EDGAR", fallback="hf_snapshot", fallback_automatic=True
+            )
+
+    class _Registry:
+        sources = {"sec_edgar": _Status()}
+
+    wd.emit_source_health_alerts(db, registry=_Registry(), now=NOW, last_states=last)
+    alert = db.scalar(select(ResearchAlert))
+    assert "Fuente de respaldo automática: hf_snapshot" in alert.message
+    assert "sin degradación automática" not in alert.message
+    assert "prevista" not in alert.message
+
+
+def test_registry_marca_solo_los_respaldos_cableados():
+    """Pin del mapa medido 2026-10-31: automáticos sec_edgar/esef/qdrant/
+    damodaran; manuales yahoo_finance/ecb/redis."""
+    from app.services.data_source_health import get_data_source_registry
+
+    sources = get_data_source_registry().sources
+    automatic = {k for k, v in sources.items() if v.fallback_source and v.fallback_automatic}
+    manual = {k for k, v in sources.items() if v.fallback_source and not v.fallback_automatic}
+    assert automatic == {"sec_edgar", "esef", "qdrant", "damodaran"}
+    assert manual == {"yahoo_finance", "ecb", "redis"}

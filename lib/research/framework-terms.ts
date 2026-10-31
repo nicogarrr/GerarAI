@@ -4,6 +4,9 @@
  * Las claves van en minúsculas con guiones bajos; las fórmulas
  * («ARR × retention × expansion») se traducen término a término.
  */
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { FRAMEWORK_TERMS_EN } from './framework-terms-en.ts';
+
 export const FRAMEWORK_TERMS: Record<string, string> = {
     non_negative_fcf_margin: 'margen de flujo de caja libre no negativo',
     normalized_fcf_or_fcf_margin: 'flujo de caja libre normalizado o margen de flujo de caja libre',
@@ -100,7 +103,8 @@ function normalise(term: string): string {
 }
 
 /** Traduce un término simple o una fórmula con × / ÷; null si algún término no tiene etiqueta. */
-export function frameworkTerm(raw: string): string | null {
+export function frameworkTerm(raw: string, locale: 'es' | 'en' = 'es'): string | null {
+    if (locale === 'en') return frameworkTermEn(raw);
     const direct = (Object.hasOwn(FRAMEWORK_TERMS, normalise(raw)) ? FRAMEWORK_TERMS[normalise(raw)] : null);
     if (direct) return direct;
     if (!/[×÷]/.test(raw)) return null;
@@ -132,4 +136,25 @@ function translateWords(part: string): string | null {
 
 export function frameworkLabel(label: string): string {
     return Object.hasOwn(FRAMEWORK_LABELS, label) ? FRAMEWORK_LABELS[label] : label;
+}
+
+/** EN: excepciones del catálogo; el resto de claves (ya en inglés) se humaniza. Una clave sin forma de término devuelve null. */
+function frameworkTermEn(raw: string): string | null {
+    const one = (part: string): string | null => {
+        const key = normalise(part);
+        if (Object.hasOwn(FRAMEWORK_TERMS_EN, key)) return FRAMEWORK_TERMS_EN[key];
+        return Object.hasOwn(FRAMEWORK_TERMS, key) ? key.replaceAll('_', ' ') : null;
+    };
+    const direct = one(raw);
+    if (direct) return direct;
+    if (!/[×÷]/.test(raw)) return null;
+    const parts = raw.split(/\s*([×÷])\s*/);
+    const out: string[] = [];
+    for (const part of parts) {
+        if (part === '×' || part === '÷') { out.push(part); continue; }
+        const translated = one(part);
+        if (!translated) return null;
+        out.push(translated);
+    }
+    return out.join(' ');
 }

@@ -38,11 +38,19 @@ from app.schemas.api import (
     PortfolioConfigurationUpdateOut,
     PortfolioDataQualityOut,
     PortfolioDividendProjectionOut,
+    PortfolioDividendSyncOut,
     PortfolioDividendYieldsOut,
     PortfolioForecastOut,
+    PortfolioIbkrCsvImportOut,
+    PortfolioIbkrImportOut,
+    PortfolioIbkrXmlImportOut,
+    PortfolioImportCommitOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
     PortfolioPriceUpdateOut,
+    PortfolioRefreshMarketOut,
+    PortfolioRiskMatrixOut,
+    PortfolioSnapshotCaptureOut,
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTearsheetOut,
@@ -438,6 +446,13 @@ def portfolio_intelligence(
     return PortfolioIntelligenceService().build(db, years=years)
 
 
+@router.get("/risk-matrix", response_model=PortfolioRiskMatrixOut, response_model_exclude_unset=True)
+def portfolio_risk_matrix(db: Session = Depends(get_db)) -> dict:
+    from app.services.portfolio_risk_matrix_service import PortfolioRiskMatrixService
+
+    return PortfolioRiskMatrixService().build(db)
+
+
 @router.get("/data-quality", response_model=PortfolioDataQualityOut, response_model_exclude_unset=True)
 def portfolio_data_quality(db: Session = Depends(get_db)) -> dict:
     from app.services.portfolio_quality_service import portfolio_quality
@@ -503,7 +518,7 @@ def portfolio_snapshots(
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.post("/snapshots/capture")
+@router.post("/snapshots/capture", response_model=PortfolioSnapshotCaptureOut)
 def capture_portfolio_snapshot(
     as_of: date | None = None,
     db: Session = Depends(get_db),
@@ -704,7 +719,7 @@ def list_fx_rates(
     return PaginatedResponse.create(items=items, total=total, page=page, page_size=page_size).model_dump()
 
 
-@router.post("/fx-rates", status_code=201)
+@router.post("/fx-rates", status_code=201, response_model=FXRateOut)
 def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
     service = PortfolioFXService()
     ledger = PortfolioLedgerService()
@@ -739,7 +754,7 @@ def upsert_fx_rate(payload: FXRateInput, db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/dividends/sync")
+@router.post("/dividends/sync", response_model=PortfolioDividendSyncOut, response_model_exclude_unset=True)
 async def sync_portfolio_dividends(db: Session = Depends(get_db)) -> dict:
     """Ingest declared dividends for every held company from the data provider.
 
@@ -1009,7 +1024,7 @@ def transactions_page(
     }
 
 
-@router.post("/add", status_code=201)
+@router.post("/add", status_code=201, response_model=PortfolioTransactionCreateOut)
 def add_portfolio_transaction(
     payload: PortfolioTransactionInput, db: Session = Depends(get_db)
 ) -> dict:
@@ -1417,7 +1432,7 @@ def update_price(payload: PortfolioPriceInput, db: Session = Depends(get_db)) ->
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/refresh-market")
+@router.post("/refresh-market", response_model=PortfolioRefreshMarketOut, response_model_exclude_unset=True)
 def refresh_portfolio_market_data(
     as_of: date | None = None,
     db: Session = Depends(get_db),
@@ -1463,7 +1478,7 @@ def _require_ibkr_owner(db: Session):
     return settings
 
 
-@router.post("/import/ibkr")
+@router.post("/import/ibkr", response_model=PortfolioIbkrImportOut, response_model_exclude_unset=True)
 async def import_ibkr(db: Session = Depends(get_db)) -> dict:
     # _require_ibkr_owner y la importacion del XML son sqlalchemy/parseo
     # sincronos: hilo del pool. fetch_latest_xml es red async y se queda.
@@ -1489,7 +1504,7 @@ async def import_ibkr(db: Session = Depends(get_db)) -> dict:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/ibkr/xml")
+@router.post("/import/ibkr/xml", response_model=PortfolioIbkrXmlImportOut)
 def import_ibkr_xml(payload: IBKRXmlImportRequest, db: Session = Depends(get_db)) -> dict:
     settings = _require_ibkr_owner(db)
     try:
@@ -1500,7 +1515,7 @@ def import_ibkr_xml(payload: IBKRXmlImportRequest, db: Session = Depends(get_db)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/ibkr/csv")
+@router.post("/import/ibkr/csv", response_model=PortfolioIbkrCsvImportOut)
 def import_ibkr_csv(payload: IBKRCsvImportRequest, db: Session = Depends(get_db)) -> dict:
     try:
         return IBKRImportService().import_ibkr_csv(db, payload.csv)
@@ -1531,7 +1546,7 @@ def preview_transaction_import(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-@router.post("/import/commit")
+@router.post("/import/commit", response_model=PortfolioImportCommitOut)
 def commit_transaction_import(
     payload: TransactionImportCommitRequest,
     db: Session = Depends(get_db),

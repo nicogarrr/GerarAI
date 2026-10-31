@@ -11,6 +11,9 @@ import {
 describe('blockerLabel', () => {
   it('explica traceable_wacc como falta (no como presencia)', () => {
     expect(blockerLabel('traceable_wacc')).toBe('WACC sin cálculo trazable');
+    expect(blockerLabel('traceable_wacc', 'en')).toBe('WACC without a traceable calculation');
+    expect(blockerLabel('forecast_is_not_the_driver', 'en')).not.toBe(blockerLabel('forecast_is_not_the_driver'));
+    expect(blockerLabel('otro_motivo', 'en')).toBe('otro_motivo');
     expect(blockerLabel('traceable_wacc')).not.toContain('por defecto');
   });
   it('mantiene ids desconocidos tal cual', () => {

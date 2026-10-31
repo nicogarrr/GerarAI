@@ -1,3 +1,4 @@
+import { impliedGrowthView } from '@/lib/research/implied-growth';
 import Link from 'next/link';
 import { modelConditionState } from '@/lib/research/coverage-state';
 import { formatCompact, formatMarketDate, formatNumber, formatPercent, NA } from '@/lib/format';
@@ -120,8 +121,8 @@ export function ownerEarningsFormulaLabel(formula: string): string {
 }
 
 /** Driver, KPI, entrada o restricción del modelo en español (marco por tipo de empresa primero, luego métricas). */
-export function termLabel(raw: string): string {
-  return frameworkTerm(raw) ?? metricLabel(raw);
+export function termLabel(raw: string, locale: 'es' | 'en' = 'es'): string {
+  return frameworkTerm(raw, locale) ?? metricLabel(raw, locale);
 }
 
 function ModelStat({ label, value, positive = false, hint }: { label: string; value: string; positive?: boolean; hint?: string }) {
@@ -189,14 +190,14 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
 
       {model.missing_inputs.length ? (
         <div className="mb-4 rounded-md border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
-          Modelo no publicable: faltan {model.missing_inputs.map(termLabel).join(', ')}.
+          Modelo no publicable: faltan {model.missing_inputs.map((item) => termLabel(item)).join(', ')}.
         </div>
       ) : null}
 
       <div className="mb-4 rounded-md border border-gray-800 bg-black/10 p-3 text-xs leading-5 text-gray-400">
-        <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map(termLabel).join(' · ')}
+        <span className="font-semibold text-gray-300">Drivers:</span> {model.framework.revenue_drivers.map((item) => termLabel(item)).join(' · ')}
         <span aria-hidden="true" className="mx-2 text-gray-700">|</span>
-        <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map(termLabel).join(' · ')}
+        <span className="font-semibold text-gray-300">KPIs:</span> {model.framework.kpis.map((item) => termLabel(item)).join(' · ')}
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -287,11 +288,12 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
             <p className="mt-2 text-gray-300">
               {model.reverse_dcf.status === 'ok'
                 ? `El precio actual exige ${percentage(model.reverse_dcf.required_revenue_growth)} de crecimiento; la base asume ${percentage(model.reverse_dcf.base_revenue_growth)}${model.reverse_dcf.fcf_margin != null ? `, con margen FCF normalizado ${percentage(model.reverse_dcf.fcf_margin)}` : ''}.`
-                : `No disponible: ${(model.reverse_dcf.missing_inputs ?? []).map(termLabel).join(', ') || 'faltan inputs de mercado o financieros'}.`}
+                : `No disponible: ${(model.reverse_dcf.missing_inputs ?? []).map((item) => termLabel(item)).join(', ') || 'faltan inputs de mercado o financieros'}.`}
             </p>
             <p className="mt-2 text-xs leading-5 text-gray-500">
               El reverse DCF parte del precio de mercado y calcula qué crecimiento está descontando ya.
             </p>
+            <ImpliedGrowthDetail reverse={model.reverse_dcf} />
           </div>
         </div>
       </div>
@@ -306,7 +308,7 @@ export function LongTermModelPanel({ model, ticker }: { model: ResearchLongTermM
         <div className="rounded-md border border-gray-800 p-3 text-sm">
           <div className="text-xs font-semibold uppercase text-gray-500">Beneficio del propietario</div>
           <div className="mt-2 text-xl font-semibold text-gray-200">{compactNumber(model.owner_earnings.value)}</div>
-          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map(termLabel).join(', ')}.`}</p>
+          <p className="mt-2 text-xs leading-5 text-gray-500">{model.owner_earnings.status === 'ok' ? ownerEarningsFormulaLabel(model.owner_earnings.formula) : `Insuficiente: ${(model.owner_earnings.missing_inputs ?? []).map((item) => termLabel(item)).join(', ')}.`}</p>
         </div>
         <div className="rounded-md border border-gray-800 p-3 text-sm">
           <div className="text-xs font-semibold uppercase text-gray-500">Motor de oportunidad de mercado</div>
@@ -562,4 +564,45 @@ function isAutoLinked(metadata: Record<string, unknown> | undefined): boolean {
 
 function isSuggested(metadata: Record<string, unknown> | undefined): boolean {
   return (metadata?.auto_link as { status?: unknown } | undefined)?.status === 'suggested';
+}
+
+function ImpliedGrowthDetail({ reverse }: { reverse: Parameters<typeof impliedGrowthView>[0] }) {
+  const view = impliedGrowthView(reverse);
+  if (!view.perpetual && !view.split.length && !view.grid) return null;
+  return (
+    <div className="mt-3 space-y-3 border-t border-gray-800 pt-3" data-testid="implied-growth">
+      <div className="text-xs font-semibold uppercase text-gray-500">Crecimiento implícito</div>
+      {view.perpetual ? <p className="text-gray-300">A este precio, el mercado descuenta un crecimiento perpetuo del flujo de caja de {view.perpetual} (WACC − FCF / valor empresa).</p> : null}
+      {view.split.length ? (
+        <div>
+          <p className="text-xs text-gray-500">De dónde sale el valor que pagas hoy</p>
+          <ul className="mt-1 space-y-1">
+            {view.split.map((part) => (
+              <li key={part.label} className="flex items-center gap-2 text-xs">
+                <span className="w-32 shrink-0 text-gray-400">{part.label}</span>
+                <span className="h-2 flex-1 rounded bg-gray-800"><span className="block h-2 rounded bg-teal-400/60" style={{ width: `${part.width}%` }} /></span>
+                <span className="w-10 text-right tabular-nums text-gray-200">{part.share}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {view.grid ? (
+        <div className="overflow-x-auto">
+          <p className="text-xs text-gray-500">Crecimiento exigido si cambian el WACC o el margen</p>
+          <table className="mt-1 w-full text-xs tabular-nums">
+            <thead><tr><th className="text-left font-normal text-gray-500" scope="col"><span className="sr-only">WACC</span></th>{view.grid.columns.map((column) => <th key={column} scope="col" className="px-1 text-right font-normal text-gray-500">{column}</th>)}</tr></thead>
+            <tbody>
+              {view.grid.rows.map((row) => (
+                <tr key={row.label}>
+                  <th scope="row" className="text-left font-normal text-gray-400">{row.label}</th>
+                  {row.cells.map((cell, index) => <td key={index} className={`px-1 text-right ${cell.base ? 'font-semibold text-teal-300' : 'text-gray-300'}`}>{cell.text}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+    </div>
+  );
 }

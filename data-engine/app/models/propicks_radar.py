@@ -21,6 +21,12 @@ class ProPicksRadarSnapshot(Base):
 
 
 class ProPicksRadarCursor(Base):
+    """LEGADA, sin uso desde nico-v2: el cursor se deriva de los snapshots.
+
+    Sin formula_version, un cambio de formula a mitad de dia heredaba el
+    progreso de la formula anterior. La clase se conserva para no invalidar
+    las migraciones existentes; ningun codigo la lee ni la escribe.
+    """
     __tablename__ = 'propicks_radar_cursors'
     id: Mapped[int] = mapped_column(primary_key=True)
     scan_date: Mapped[date] = mapped_column(Date, unique=True)

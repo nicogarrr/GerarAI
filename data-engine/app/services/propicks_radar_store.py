@@ -4,10 +4,10 @@ from datetime import date, datetime
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Company, ProPicksRadarCursor, ProPicksRadarSnapshot
+from app.models import Company, ProPicksRadarSnapshot
 from app.services.propicks_dca_radar import signal_change
 
-FORMULA_VERSION = 'nico-v1'
+FORMULA_VERSION = 'nico-v2'
 _PUBLIC_KEYS = frozenset({'status', 'reason', 'formula_version', 'price_verified', 'price_date',
                           'source', 'current', 'confirmed', 'clear_price_signal',
                           'daily_close_drawdown', 'drawdown_basis'})
@@ -32,7 +32,6 @@ def save_snapshot(db: Session, company_id: int, payload: dict, *, now: datetime)
         ProPicksRadarSnapshot.company_id == company_id,
         ProPicksRadarSnapshot.scan_date == scan_date,
         ProPicksRadarSnapshot.formula_version == FORMULA_VERSION))
-    fresh = snapshot is None
     if snapshot is None:
         snapshot = ProPicksRadarSnapshot(company_id=company_id, scan_date=scan_date,
                                          formula_version=FORMULA_VERSION)
@@ -40,18 +39,30 @@ def save_snapshot(db: Session, company_id: int, payload: dict, *, now: datetime)
     snapshot.evaluated_at = now
     snapshot.status = payload['status']
     snapshot.payload = {**payload, 'formula_version': FORMULA_VERSION}
-    cursor = db.scalar(select(ProPicksRadarCursor).where(ProPicksRadarCursor.scan_date == scan_date))
-    if cursor is None:
-        cursor = ProPicksRadarCursor(scan_date=scan_date, after_company_id=0, saved_count=0)
-        db.add(cursor)
-    cursor.after_company_id = max(cursor.after_company_id, company_id)
-    cursor.saved_count += int(fresh)
     db.commit()
 
 
 def scan_cursor(db: Session, scan_date: date) -> tuple[int, int]:
-    row = db.scalar(select(ProPicksRadarCursor).where(ProPicksRadarCursor.scan_date == scan_date))
-    return (row.after_company_id, row.saved_count) if row else (0, 0)
+    """Punto de reanudacion del barrido: (ultima empresa guardada, guardadas).
+
+    Se DERIVA de los snapshots del dia filtrados por FORMULA_VERSION: la
+    tabla legada de cursores no tenia version de formula y un cambio de
+    formula a mitad de dia heredaba el progreso de la formula anterior
+    (bug de prod del 31-oct-2026: v2 se habria saltado 1000 empresas).
+    Derivandolo, el cursor no puede desviarse de lo guardado y cada formula
+    reanuda solo su propio barrido. ``saved_count`` no se infla en
+    reintentos del mismo dia porque el guardado reemplaza el snapshot.
+    """
+    after_id, saved = db.execute(
+        select(
+            func.coalesce(func.max(ProPicksRadarSnapshot.company_id), 0),
+            func.count(),
+        ).where(
+            ProPicksRadarSnapshot.scan_date == scan_date,
+            ProPicksRadarSnapshot.formula_version == FORMULA_VERSION,
+        )
+    ).one()
+    return (int(after_id), int(saved))
 
 
 def latest_public_signals(db: Session, *, as_of: date, company_limit: int = 1000) -> list[dict]:

@@ -4,6 +4,12 @@ import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies';
 import { getAuth } from '@/lib/better-auth/auth';
 import { AppError } from '@/lib/types/errors';
 import { SIGNUP_NOT_INVITED_CODE, SIGNUP_NOT_INVITED_MESSAGE } from '@/lib/auth/signup-policy';
+import {
+    ACCOUNT_PENDING_CODE,
+    ACCOUNT_PENDING_MESSAGE,
+    ACCOUNT_REJECTED_CODE,
+    ACCOUNT_REJECTED_MESSAGE,
+} from '@/lib/auth/account-approval';
 
 type AuthEndpoint =
     | '/sign-in/email'
@@ -25,7 +31,7 @@ export async function callAuthEndpoint(
     path: AuthEndpoint,
     body: unknown,
     extraHeaders: Record<string, string> = {},
-): Promise<{ twoFactorRedirect?: boolean }> {
+): Promise<{ twoFactorRedirect?: boolean; accountStatus?: string }> {
     const auth = await getAuth();
     const context = await auth.$context;
     const incoming = await headers();
@@ -74,6 +80,14 @@ export async function callAuthEndpoint(
         const signupMessage = path === '/sign-up/email' && (response.status === 400 || response.status === 422)
             ? signupMessages[code] : undefined;
         if (signupMessage) throw new AppError(signupMessage, `AUTH_ENDPOINT_${code}`, response.status);
+        // Cuenta pendiente o rechazada: código estable del contrato con front,
+        // con copy propia (nunca "credenciales inválidas").
+        if (path === '/sign-in/email' && response.status === 403
+            && (code === ACCOUNT_PENDING_CODE || code === ACCOUNT_REJECTED_CODE)) {
+            const statusMessage = code === ACCOUNT_PENDING_CODE
+                ? ACCOUNT_PENDING_MESSAGE : ACCOUNT_REJECTED_MESSAGE;
+            throw new AppError(statusMessage, `AUTH_ENDPOINT_${code}`, response.status);
+        }
         // Registro cerrado con lista de invitados: email fuera de SIGNUP_ALLOWLIST.
         if (path === '/sign-up/email' && response.status === 403 && code === SIGNUP_NOT_INVITED_CODE) {
             throw new AppError(SIGNUP_NOT_INVITED_MESSAGE, `AUTH_ENDPOINT_${code}`, response.status);
@@ -89,5 +103,15 @@ export async function callAuthEndpoint(
     }
     // Never let the router's raw session token escape to a Server Action.
     const result: unknown = await response.json();
-    return { twoFactorRedirect: Boolean(result && typeof result === 'object' && 'twoFactorRedirect' in result && result.twoFactorRedirect) };
+    // Alta con aprobación: la respuesta de sign-up trae user.accountStatus
+    // ('pending'); el server action lo propaga para enrutar a /cuenta-pendiente.
+    // Es el estado de la cuenta que se acaba de crear: nunca un token.
+    const user = result && typeof result === 'object' && 'user' in result
+        ? (result as { user?: { accountStatus?: unknown } }).user : undefined;
+    const accountStatus = path === '/sign-up/email' && typeof user?.accountStatus === 'string'
+        ? user.accountStatus : undefined;
+    return {
+        twoFactorRedirect: Boolean(result && typeof result === 'object' && 'twoFactorRedirect' in result && result.twoFactorRedirect),
+        ...(accountStatus ? { accountStatus } : {}),
+    };
 }

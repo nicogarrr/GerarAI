@@ -10,7 +10,7 @@ import hmac
 import logging
 import secrets
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
@@ -87,7 +87,7 @@ def validate_csrf_token(token: str | None) -> bool:
 class CSRFMiddleware(BaseHTTPMiddleware):
     """Middleware que exige un token CSRF valido en metodos mutantes (POST, PUT, DELETE, PATCH)."""
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Response]) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         if request.method in _SAFE_METHODS:
             return await call_next(request)
 

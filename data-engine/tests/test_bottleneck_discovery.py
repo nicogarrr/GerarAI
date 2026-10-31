@@ -440,7 +440,9 @@ class FakeDeadline:
 
 def test_actor_declares_explicit_time_limit():
     options = dramatiq_app.discover_bottlenecks.options
-    assert options["time_limit"] == 600_000 and options["max_retries"] == 1
+    # max_retries=2 desde la taxonomia de colas (b199a6ed0): reintento corto
+    # deliberado para el carril default.
+    assert options["time_limit"] == 600_000 and options["max_retries"] == 2
     assert options["time_limit"] > dramatiq_app.DISCOVERY_DEADLINE_SECONDS * 1000
 
 

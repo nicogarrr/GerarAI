@@ -51,7 +51,7 @@ describe('cableado en las páginas', () => {
   const actions = readFileSync('lib/actions/research-tools.actions.ts', 'utf8');
 
   it('la vista Documentos de la ficha lista las lecturas de la biblioteca', () => {
-    assert.match(research, /Lecturas de la biblioteca/);
+    assert.match(research, /research\.fichaLibraryReadings/);
     assert.match(research, /getKnowledgeDocumentsForTicker\(ticker\)/);
   });
 

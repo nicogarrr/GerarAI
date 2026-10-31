@@ -30,7 +30,7 @@
     "withTotals": " Los totales suman solo las valoradas, por divisa:",
     "noTotals": " Sin totales: ninguna posición tiene cotización.",
     "totalLine": "{currency}: valor {marketValue} · PyG no realizada {unrealized}",
-    "note": "Las opciones no se valoran (no hay cotización de su prima). Solo se valora con Finnhub y con la divisa verificada en su listado; el resto sale N/D. Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito). También puedes solicitar una actualización con el botón",
+    "note": "Las opciones no se valoran (no hay cotización de su prima). Solo se valora con la cotización en vivo y con la divisa verificada en su listado; el resto sale N/D. Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito). También puedes solicitar una actualización con el botón",
     "asOf": " · consultado a las {time} (hora de Madrid)",
     "refreshing": "Consultando…",
     "refresh": "Actualizar cotizaciones",

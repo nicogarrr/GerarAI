@@ -22,9 +22,13 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    desc,
     event,
+    text,
 )
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.sql.elements import TextClause
 
 from app.core.database import Base
 
@@ -925,6 +929,26 @@ class KPIExtractionCandidate(TenantOwnedMixin, Base, TimestampMixin):
     trace: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class _DescNullsLast(TextClause):
+    """'col DESC NULLS LAST' en Postgres; 'col DESC' en sqlite.
+
+    sqlite no acepta NULLS LAST dentro de CREATE INDEX ("unsupported use"),
+    asi que la variante sqlite lo omite: mismo orden de filas no nulas,
+    que es lo unico que recorren las consultas. El texto base es el DDL
+    fiel de Postgres para que el rachet de deriva (compare_metadata contra
+    la BD reflejada) coincida.
+    """
+
+    def __init__(self, columna: str) -> None:
+        super().__init__(f"{columna} DESC NULLS LAST")
+        self.columna = columna
+
+
+@compiles(_DescNullsLast, "sqlite")
+def _desc_nulls_last_sqlite(element, compiler, **kw):  # noqa: ANN001, ANN202, ARG001
+    return f"{element.columna} DESC"
+
+
 class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "calculated_metrics"
     __table_args__ = (
@@ -937,6 +961,28 @@ class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
             name="uq_calculated_metric_definition_period",
         ),
         Index("ix_calculated_metrics_company_metric", "company_id", "metric"),
+        # metric-coverage (0119): distinct metric filtrado por status/value.
+        Index(
+            "ix_calc_metrics_tenant_metric_ok",
+            "tenant_id",
+            "metric",
+            postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
+        ),
+        # 0120: la ventana row_number del screener (particion company+metric,
+        # orden fiscal_year DESC NULLS LAST, id DESC) la recorre sin sort.
+        # Variante por dialecto como la propia migracion 0120: el texto del
+        # modelo es el DDL fiel de PG (lo que compara el rachet de deriva
+        # contra la BD reflejada) y sqlite emite la misma columna sin NULLS
+        # LAST, que no acepta en CREATE INDEX.
+        Index(
+            "ix_calc_metrics_screener_window",
+            "tenant_id",
+            "company_id",
+            "metric",
+            _DescNullsLast("fiscal_year"),
+            text("id DESC"),
+            postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1036,6 +1082,15 @@ class MarketPrice(Base, TimestampMixin):
     __tablename__ = "market_prices"
     __table_args__ = (
         UniqueConstraint("company_id", "date", name="uq_market_price_company_date"),
+        # data-health (0119): group by source con close > 0 era Seq Scan con
+        # spill; market_prices es global, sin ix_tenant_id de 0117.
+        Index(
+            "ix_market_prices_source_cov",
+            "source",
+            "company_id",
+            "updated_at",
+            postgresql_where=text("close > 0"),
+        ),
         CheckConstraint("close >= 0", name="ck_market_prices_close_non_negative"),
     )
 
@@ -1245,6 +1300,16 @@ class NewsEvent(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "news_events"
     __table_args__ = (
         Index("ix_news_events_company_date", "company_id", "date"),
+        # 0120: portada del feed ordena por (date DESC, id DESC) y para al
+        # llenar la pagina; antes era Seq Scan + sort de toda la tabla.
+        Index("ix_news_events_date_id", desc("date"), desc("id")),
+        # 0120: carril macro (lane + frescura 72h) sondea este parcial.
+        Index(
+            "ix_news_events_macro_date_id",
+            desc("date"),
+            desc("id"),
+            postgresql_where=text("(metadata ->> 'news_lane') = 'macro'"),
+        ),
         UniqueConstraint("sec_filing_identity", name="uq_news_sec_filing_identity"),
     )
 
@@ -1522,6 +1587,9 @@ class ThesisChange(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "thesis_changes"
     __table_args__ = (
         Index("ix_thesis_changes_company_created", "company_id", "created_at"),
+        # /api/attention-thesis: sondas del nestloop por (tenant, company, id);
+        # sin el id en el indice cada sonda leia ~64 filas y descartaba 63.
+        Index("ix_thesis_changes_tenant_company_id", "tenant_id", "company_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1774,6 +1842,15 @@ class ResearchAlert(TenantOwnedMixin, Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("tenant_id", "fingerprint", name="uq_research_alert_fingerprint"),
         Index("ix_research_alerts_company_status", "company_id", "status"),
+        # 0121: el feed del inicio ordena por ultimo disparo real
+        # (coalesce(last_triggered_at, created_at) DESC, id DESC) con scope
+        # de tenant; antes era Seq Scan + sort para devolver 3 filas.
+        Index(
+            "ix_research_alerts_home_feed",
+            "tenant_id",
+            text("coalesce(last_triggered_at, created_at) DESC"),
+            desc("id"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

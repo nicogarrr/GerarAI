@@ -143,9 +143,31 @@ const MAX_REDIRECTS = 3;
  * públicas: con una mezcla pública/privada el round-robin podría conectar a
  * la interna.
  */
-async function resolvesPublic(hostname: string, lookup: LookupLike): Promise<boolean> {
+function abortError(): Error {
+    return new Error('La operación se canceló por el presupuesto de tiempo del logo');
+}
+
+/**
+ * Carrera contra la señal de presupuesto: dns.lookup NO acepta AbortSignal,
+ * así que sin esto un DNS colgado ignoraba el corte (revisión del piloto,
+ * 31-oct-2026: /api/logo podía seguir resolviendo DNS por candidato tras el
+ * abort).
+ */
+function raced<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (!signal) return promise;
+    if (signal.aborted) return Promise.reject(abortError());
+    return Promise.race([
+        promise,
+        new Promise<T>((_resolve, reject) => {
+            signal.addEventListener('abort', () => reject(abortError()), { once: true });
+        }),
+    ]);
+}
+
+async function resolvesPublic(hostname: string, lookup: LookupLike, signal?: AbortSignal): Promise<boolean> {
+    if (signal?.aborted) return false;
     try {
-        const addresses = await lookup(hostname);
+        const addresses = await raced(lookup(hostname), signal);
         return addresses.length > 0 && addresses.every((a) => isPublicIp(a.address));
     } catch {
         return false;
@@ -158,9 +180,10 @@ async function resolvesPublic(hostname: string, lookup: LookupLike): Promise<boo
  * conectaría con un host interno ANTES de que pudiéramos inspeccionar la URL
  * final (SSRF ciego), y un salto a http:// pasaría inadvertido hasta el final.
  */
-async function get(fetchImpl: FetchLike, url: string, accept: string, lookup: LookupLike): Promise<Response | null> {
+async function get(fetchImpl: FetchLike, url: string, accept: string, lookup: LookupLike, signal?: AbortSignal): Promise<Response | null> {
     let current = url;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        if (signal?.aborted) return null;
         if (!isSafeIconUrl(current)) return null;
         let hostname: string;
         try {
@@ -168,7 +191,7 @@ async function get(fetchImpl: FetchLike, url: string, accept: string, lookup: Lo
         } catch {
             return null;
         }
-        if (!(await resolvesPublic(hostname, lookup))) return null;
+        if (!(await resolvesPublic(hostname, lookup, signal))) return null;
         let res: Response;
         try {
             res = await fetchImpl(current, {
@@ -196,11 +219,11 @@ async function get(fetchImpl: FetchLike, url: string, accept: string, lookup: Lo
     return null;
 }
 
-export async function fetchSiteIcon(domain: string, fetchImpl: FetchLike = fetch, lookup: LookupLike = realLookup): Promise<SiteIcon | null> {
+export async function fetchSiteIcon(domain: string, fetchImpl: FetchLike = fetch, lookup: LookupLike = realLookup, signal?: AbortSignal): Promise<SiteIcon | null> {
     const home = `https://${domain}/`;
     if (!isSafeIconUrl(home)) return null;
     const candidates: Candidate[] = [];
-    const page = await get(fetchImpl, home, 'text/html,application/xhtml+xml', lookup);
+    const page = await get(fetchImpl, home, 'text/html,application/xhtml+xml', lookup, signal);
     if (page) {
         const html = await readCapped(page, MAX_HTML).catch(() => null);
         if (html) candidates.push(...iconCandidatesFromHtml(new TextDecoder().decode(html), page.url || home));
@@ -212,9 +235,10 @@ export async function fetchSiteIcon(domain: string, fetchImpl: FetchLike = fetch
     );
     const seen = new Set<string>();
     for (const c of candidates) {
+        if (signal?.aborted) return null;
         if (seen.has(c.href) || seen.size >= MAX_CANDIDATES) continue;
         seen.add(c.href);
-        const res = await get(fetchImpl, c.href, 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8', lookup);
+        const res = await get(fetchImpl, c.href, 'image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8', lookup, signal);
         if (!res) continue;
         const bytes = await readCapped(res, MAX_IMAGE).catch(() => null);
         if (!bytes || bytes.length < MIN_IMAGE) continue;

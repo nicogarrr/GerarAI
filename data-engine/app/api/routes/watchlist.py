@@ -25,6 +25,12 @@ from app.models import (
     MarketPrice,
     WatchItem,
 )
+from app.schemas.api import (
+    WatchlistAttentionThesisOut,
+    WatchlistItemOut,
+    WatchlistMetricsOut,
+    WatchlistMonitorOut,
+)
 from app.services.connectors.earnings_calendar import fetch_earnings_range
 from app.services.derived_market_cap_service import DERIVED_SOURCE
 from app.services.earnings_dates_service import is_fresh
@@ -55,7 +61,8 @@ def _find_watch_item(db: Session, symbol: str) -> WatchItem | None:
     return db.scalar(select(WatchItem).where(WatchItem.symbol == symbol))
 
 
-@router.get("")
+@router.get("", response_model=list[WatchlistItemOut],
+            response_model_exclude_unset=True)
 def list_watchlist(db: Session = Depends(get_db)) -> list[dict]:
     """Watch items of the active tenant, most recently added first.
 
@@ -122,7 +129,7 @@ def delete_watch_item(symbol: str, db: Session = Depends(get_db)) -> None:
     db.commit()
     invalidate_dca_cache(db=db)
 
-@router.get("/monitor")
+@router.get("/monitor", response_model=WatchlistMonitorOut)
 async def watchlist_monitor(
     tickers: str = Query(..., description="CSV de tickers, max 60"),
     db: Session = Depends(get_db),
@@ -238,7 +245,7 @@ async def watchlist_monitor(
     return {"items": items, "earnings_status": earnings_status}
 
 
-@router.get("/metrics/{symbol}")
+@router.get("/metrics/{symbol}", response_model=WatchlistMetricsOut)
 def watchlist_metrics(symbol: str, db: Session = Depends(get_db)) -> dict:
     """Market cap y PER de respaldo para emisoras sin cobertura del
     proveedor US (QA AENA/ASML): market_cap del proveedor o derivado
@@ -940,7 +947,7 @@ def dca_backtest(
     return out
 
 
-@router.get("/attention-thesis")
+@router.get("/attention-thesis", response_model=WatchlistAttentionThesisOut)
 def home_attention_thesis(db: Session = Depends(get_db)) -> dict:
     """Unresolved thesis changes for this tenant's watchlist and open holdings."""
     from app.services.home_attention_service import pending_thesis_changes

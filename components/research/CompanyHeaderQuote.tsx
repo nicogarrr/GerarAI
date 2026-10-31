@@ -169,7 +169,7 @@ export function CompanyHeaderQuote({
                         </div>
                     </div>
                 ) : null}
-                {useFallback ? <p className="mt-1 text-xs text-gray-500">Cotización en vivo no disponible ahora{snapshot.historySource ? ` · ${snapshot.historySource}` : ''}</p> : null}
+                {useFallback ? <p className="mt-1 text-xs text-gray-500">Cotización en vivo no disponible ahora</p> : null}
             </div>
             {compact ? null : <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">

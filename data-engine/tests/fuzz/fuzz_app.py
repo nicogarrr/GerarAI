@@ -139,6 +139,10 @@ def _disable_rate_limits() -> None:
 
 
 def _build_app():
+    import os
+
+    os.environ.setdefault("RAG_EMBEDDING_BACKEND", "sentence-transformers")
+
     import main
     from app.core import auth as auth_module
     from app.core.database import init_db
@@ -151,8 +155,26 @@ def _build_app():
     init_db()
     seed()
     app = SigningASGI(main.app)
+    _prewarm_rag_fallback()
     _seed_tenant_data(app)
     return app
+
+
+def _prewarm_rag_fallback() -> None:
+    """Resuelve una vez el embedder ST de fallback (exito o fallo cacheado).
+
+    Sin esto, el primer request que toca RAG paga el import perezoso de
+    sentence_transformers dentro del request (supera el read timeout de 10s
+    del transporte ASGI) y hypothesis lo reporta como flaky: primera llamada
+    lenta/fallida, siguientes rapidas. El coste de una sola vez no es lo que
+    mide el fuzz de endpoints.
+    """
+    try:
+        from app.services.rag import RAGIndex
+
+        RAGIndex.warm_fallback()
+    except Exception:
+        pass
 
 
 # Tickers del maestro sembrado. Sin ellos, cada {ticker}/{symbol} generado al

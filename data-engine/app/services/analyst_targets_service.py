@@ -260,7 +260,7 @@ class AnalystTargetsService:
             return AnalystTargets(
                 symbol=key,
                 fetched_at=fetched_at,
-                note="No se pudo consultar Yahoo Finance ahora; reintenta en unos minutos.",
+                note="No se pudo consultar el consenso ahora; reintenta en unos minutos.",
             )
         # Guard de identidad: si Yahoo dice que el ticker NO es una accion
         # (ETF, fondo, indice...), sus "objetivos de analistas" pertenecen a
@@ -275,7 +275,7 @@ class AnalystTargetsService:
                 fetched_at=fetched_at,
                 currency=data.get("currency"),
                 note=(
-                    f"Yahoo Finance identifica {key} como {label}, no como una "
+                    f"El valor {key} está identificado como {label}, no como una "
                     "acción, así que no hay precios objetivo de analistas que "
                     "mostrar para una empresa con este ticker."
                 ),
@@ -304,9 +304,9 @@ class AnalystTargetsService:
         if rows:
             note = None
         elif has_consensus:
-            note = "Yahoo Finance publica solo el consenso agregado, sin detalle por firma."
+            note = "Solo hay consenso agregado, sin detalle por firma."
         else:
-            note = "Yahoo Finance no publica precios objetivo por analista para este valor."
+            note = "No hay precios objetivo por analista para este valor."
         result = AnalystTargets(
             symbol=key,
             status="available" if rows or has_consensus else "empty",
@@ -314,7 +314,7 @@ class AnalystTargetsService:
             fetched_at=fetched_at,
             currency=data.get("currency"),
             reference_price=reference,
-            reference_price_source="Yahoo Finance, precio al obtener los datos" if reference else None,
+            reference_price_source="fuente de mercado, precio al obtener los datos" if reference else None,
             consensus=consensus if has_consensus else None,
             rows=rows,
             note=note,

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-import { getListingAnalystTargets, type ListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { getListingAnalystTargetsBatch, type ListingAnalystTargets } from '@/lib/actions/analyst-targets.actions';
+import { batchedSymbol } from '@/lib/cache/batch-symbols';
 import { requestCache } from '@/lib/cache/requestCache';
 import { formatNumber, formatPercent, formatPrice, NA } from '@/lib/format';
 import { convertWithPortfolioFx, sameTargetUnit, unconvertedTargetLabel, type TargetFxRate } from '@/lib/analyst-target-currency';
@@ -57,7 +58,17 @@ export default function AnalystTargetLine({
         let cancelled = false;
         requestCache.get(
             `analyst-targets:${symbol.toUpperCase()}:${(quoteSymbol ?? '').toUpperCase()}`,
-            () => getListingAnalystTargets(symbol, quoteSymbol),
+            () => batchedSymbol(
+                'analyst-targets',
+                `${symbol.toUpperCase()}:${(quoteSymbol ?? '').toUpperCase()}`,
+                (keys) =>
+                    getListingAnalystTargetsBatch(
+                        keys.map((key) => {
+                            const sep = key.indexOf(':');
+                            return { symbol: key.slice(0, sep), quoteSymbol: key.slice(sep + 1) === '' ? undefined : key.slice(sep + 1) };
+                        }),
+                    ),
+            ),
             ANALYST_TARGETS_TTL_S,
         )
             .then((value) => {

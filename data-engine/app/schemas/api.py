@@ -419,7 +419,7 @@ class ThesisOut(BaseModel):
 class ClaimEvidenceCreate(BaseModel):
     document_id: int | None = None
     document_chunk_id: int | None = None
-    source_url: str | None = None
+    source_url: str | None = Field(default=None, max_length=1000)
     evidence_type: str = Field(
         default="supports",
         pattern="^(supports|contradicts|supersedes|context|uncertain)$",
@@ -451,12 +451,14 @@ class ClaimCreate(BaseModel):
     company_id: int | None = None
     thesis_version_id: int | None = None
     statement: str = Field(min_length=5)
-    claim_type: str = "thesis"
-    status: str = "unverified"
+    # Cotas = ancho de columna: SQLite acepta cualquier largo en String(N),
+    # pero Postgres rompe con DataError; el 422 por campo sale del schema.
+    claim_type: str = Field(default="thesis", max_length=80)
+    status: str = Field(default="unverified", max_length=40)
     confidence: Decimal = Decimal("0.50")
     materiality_score: int = Field(default=5, ge=0, le=10)
-    source_quality: str = "unknown"
-    created_by: str = "user"
+    source_quality: str = Field(default="unknown", max_length=40)
+    created_by: str = Field(default="user", max_length=80)
 
 
 class ClaimOut(BaseModel):
@@ -481,7 +483,7 @@ class ThesisSectionCreate(BaseModel):
     section_key: str = Field(min_length=1, max_length=80)
     title: str = Field(min_length=1, max_length=200)
     body: str = ""
-    status: str = "draft"
+    status: str = Field(default="draft", max_length=40)
     order_index: int = 0
     confidence: Decimal = Decimal("0.70")
 
@@ -507,7 +509,7 @@ class ThesisChangeCreate(BaseModel):
     company_id: int | None = None
     from_version_id: int | None = None
     to_version_id: int | None = None
-    change_type: str = "manual"
+    change_type: str = Field(default="manual", max_length=80)
     impact_direction: str = Field(default="neutral", pattern="^(positive|negative|neutral|mixed)$")
     materiality_score: int = Field(default=5, ge=0, le=10)
     summary: str = Field(min_length=5)
@@ -1387,6 +1389,14 @@ class PortfolioRiskOut(BaseModel):
     correlation_min_observations: int
 
 
+class PortfolioXrayRuleOut(BaseModel):
+    id: str
+    status: str
+    subject: str | None = None
+    value: float | None = None
+    threshold: float
+
+
 class PortfolioConcentrationOut(BaseModel):
     top_1: float
     top_5: float
@@ -1486,10 +1496,99 @@ class PortfolioIntelligenceOut(BaseModel):
     risk: PortfolioRiskOut
     concentration: PortfolioConcentrationOut
     exposures: PortfolioExposuresOut
+    xray: list[PortfolioXrayRuleOut] = []
     attribution: PortfolioAttributionOut
     ledger_contribution: PortfolioLedgerContributionOut
     benchmark: PortfolioBenchmarkOut
     coverage: PortfolioCoverageOut
+
+
+# --- GET /api/portfolio/risk-matrix ----------------------------------------
+# Formas medidas contra PortfolioRiskMatrixService.build (servicio real):
+# claves siempre presentes en el sobre; estimator/covariance_annualized/
+# correlation/portfolio son None cuando no hay 60 sesiones comunes
+# (correlation cae a Pearson por pares si hay algo que emparejar). En cada
+# posicion, los numeros de riesgo SOLO existen cuando included=true
+# (exclude_unset + ausencia), y entonces excluded_reason no existe.
+
+
+class RiskMatrixWindowOut(BaseModel):
+    requested_days: int
+    sessions_common: int
+    min_sessions: int
+    start: str | None
+    end: str | None
+
+
+class RiskMatrixEstimatorOut(BaseModel):
+    name: str
+    shrinkage: float
+    annualization: int
+
+
+class RiskMatrixGridOut(BaseModel):
+    tickers: list[str]
+    matrix: list[list[float | None]]
+
+
+class RiskMatrixCorrelationOut(RiskMatrixGridOut):
+    source: str
+
+
+class RiskMatrixPortfolioOut(BaseModel):
+    vol_annualized: float
+    variance_annualized: float
+
+
+class RiskMatrixPositionOut(BaseModel):
+    ticker: str
+    weight: float
+    included: bool
+    sessions: int
+    sessions_common: int
+    fx_mode: str
+    weight_included: float | None = None
+    vol_annualized: float | None = None
+    risk_contribution: float | None = None
+    marginal_contribution: float | None = None
+    fx_dropped_returns: int | None = None
+    excluded_reason: str | None = None
+
+
+class RiskMatrixExcludedOut(BaseModel):
+    ticker: str
+    reason: str
+    sessions: int
+
+
+class RiskMatrixConcentrationOut(BaseModel):
+    top_1: float
+    top_5: float
+    herfindahl: float
+    effective_positions: float | None
+    weights: dict[str, float]
+
+
+class RiskMatrixWarningOut(BaseModel):
+    code: str
+    message: str
+
+
+class PortfolioRiskMatrixOut(BaseModel):
+    as_of: str
+    base_currency: str
+    status: str
+    window: RiskMatrixWindowOut
+    estimator: RiskMatrixEstimatorOut | None
+    covariance_annualized: RiskMatrixGridOut | None
+    correlation: RiskMatrixCorrelationOut | None
+    portfolio: RiskMatrixPortfolioOut | None
+    positions: list[RiskMatrixPositionOut]
+    excluded: list[RiskMatrixExcludedOut]
+    concentration: RiskMatrixConcentrationOut
+    warnings: list[RiskMatrixWarningOut]
+    trace: dict[str, Any]
+    provenance: dict[str, Any]
 
 
 # --- GET /api/portfolio/summary --------------------------------------------
@@ -1748,6 +1847,443 @@ class FXRateOut(BaseModel):
     source: str
 
 
+# --- POST /api/portfolio/import/commit ---------------------------------------
+# Forma medida contra TransactionImportService.commit_import: exito -> las 5
+# claves siempre; los errores salen como 400 (ValueError), no como wire.
+
+
+class PortfolioImportCommitOut(BaseModel):
+    success: bool
+    message: str
+    imported_count: int
+    duplicates_skipped: int
+    import_batch: str
+# --- POST /api/portfolio/dividends/sync --------------------------------------
+# Envelope medido contra DividendIngestionService.sync_portfolio (6 claves
+# siempre presentes). Los items de results varian por rama, medido contra
+# ProviderIngestionService.sync_company y el override de dividendos:
+# - ok: ticker/status/source/inserted/existing/skipped/fetched_at
+#   (+ split_readjustments_healed si hubo cura; + currency_unknown_rows y
+#   reason, con status currency_unknown, si el proveedor no informo divisa)
+# - unknown_company: ticker/status/inserted/existing
+# - no_safe_symbol / unavailable: + error
+# Por eso todo lo demas es opcional y la ruta usa exclude_unset.
+
+
+class DividendSyncResultOut(BaseModel):
+    ticker: str
+    status: Literal["ok", "unavailable", "unknown_company", "no_safe_symbol", "currency_unknown"]
+    inserted: int
+    existing: int
+    error: str | None = None
+    source: str | None = None
+    skipped: dict[str, int] | None = None
+    fetched_at: str | None = None
+    split_readjustments_healed: int | None = None
+    currency_unknown_rows: int | None = None
+    reason: str | None = None
+
+
+class PortfolioDividendSyncOut(BaseModel):
+    companies: int
+    synced: int
+    unavailable: int
+    currency_unknown: int
+    results: list[DividendSyncResultOut]
+    provenance: ProvenanceOut
+# --- POST /api/portfolio/import/ibkr/csv -------------------------------------
+# Forma medida contra IBKRImportService.import_ibkr_csv: exito -> las 8
+# claves siempre (identity_warning es null si todas las filas traen id;
+# CSV sin identificador -> aviso, medido en la rama has_rows_without_id).
+# Errores -> IBKRImportError -> 400, no wire.
+
+
+class PortfolioIbkrCsvImportOut(BaseModel):
+    status: Literal["imported"]
+    trades_imported: int
+    duplicate_trades: int
+    legacy_reimport_blocked: int
+    identity_warning: str | None
+    rows_skipped: int
+    row_errors: list[str]
+# --- POST /api/portfolio/import/ibkr/xml -------------------------------------
+# Forma medida contra IBKRImportService.import_flex_xml (rama confirmada,
+# return L1915): las 23 claves siempre. dry_run y reconcile destructivo
+# nunca llegan al wire desde la ruta (solo pasa expected_account_id y
+# max_statement_age_days). Errores -> IBKRImportError -> 400, no wire.
+
+
+# --- POST /api/portfolio/import/ibkr -----------------------------------------
+# Dos variantes medidas en la ruta: sin credenciales Flex devuelve
+# {status: not_configured, message} y con credenciales delega en
+# import_flex_xml (misma rama confirmada de 23 claves que /import/ibkr/xml).
+# Un solo modelo con todo opcional + exclude_unset (el guard de drift no
+# resuelve unions anyOf; precedente refresh-market); los tests fijan el
+# conjunto exacto de claves de cada variante. Errores -> 400/403/409/503.
+
+
+class PortfolioIbkrImportOut(BaseModel):
+    status: Literal["imported", "not_configured"]
+    message: str | None = None
+    price_backfills_enqueued: int | None = None
+    positions_imported: int | None = None
+    valuation_hold_kept: list[str] | None = None
+    cost_review_required: list[str] | None = None
+    cash_imported: int | None = None
+    trades_imported: int | None = None
+    raw_rows_stored: int | None = None
+    raw_rows_already_present: int | None = None
+    raw_rows_pruned: int | None = None
+    fx_conversions_imported: int | None = None
+    fx_conversions_skipped: int | None = None
+    trades_cancelled: int | None = None
+    dividends_imported: int | None = None
+    fees_imported: int | None = None
+    cash_transactions_imported: int | None = None
+    rows_skipped: int | None = None
+    unattributed_cash_rows: int | None = None
+    row_errors: list[str] | None = None
+    positions_closed: list[str] | None = None
+    cash_removed: list[str] | None = None
+    reconcile_blocked: list[str] | None = None
+    portfolio_snapshot_id: int | None = None
+
+
+class PortfolioIbkrXmlImportOut(BaseModel):
+    # Re-medido tras #3664: la rama "imported" emite 23 claves (status fijo
+    # "imported"; dry_run no es alcanzable desde la ruta: default False y la
+    # ruta no lo pasa). Sin estas 4, response_model las borraba del wire.
+    status: Literal["imported"]
+    trades_imported: int
+    rows_skipped: int
+    row_errors: list[str]
+    price_backfills_enqueued: int
+    positions_imported: int
+    valuation_hold_kept: list[str]
+    cost_review_required: list[str]
+    cash_imported: int
+    raw_rows_stored: int
+    raw_rows_already_present: int
+    raw_rows_pruned: int
+    fx_conversions_imported: int
+    fx_conversions_skipped: int
+    trades_cancelled: int
+    dividends_imported: int
+    fees_imported: int
+    cash_transactions_imported: int
+    unattributed_cash_rows: int
+    positions_closed: list[str]
+    cash_removed: list[str]
+    reconcile_blocked: list[str]
+    portfolio_snapshot_id: int
+
+
+# --- GET /api/watchlist/attention-thesis -------------------------------------
+# Forma medida contra la ruta + home_attention_service.pending_thesis_changes:
+# envelope fijo {items, truncated}; item de 5 claves siempre presentes.
+# direction es String(40) en el modelo con escritores que usan
+# neutral/negative/mixed (medido); no es un conjunto cerrado: str honesto.
+
+
+class WatchlistAttentionThesisItemOut(BaseModel):
+    id: int
+    symbol: str
+    summary: str
+    direction: str
+    createdAt: str
+
+
+class WatchlistAttentionThesisOut(BaseModel):
+    items: list[WatchlistAttentionThesisItemOut]
+    truncated: bool
+
+
+# --- GET /api/alerts/telegram-status -----------------------------------------
+# Forma medida contra la ruta: cuatro booleanos siempre (solo presencia de
+# config; ningun secreto sale por la API, ver docstring de la ruta).
+
+
+class AlertsTelegramStatusOut(BaseModel):
+    enabled: bool
+    has_bot_token: bool
+    has_chat_id: bool
+    configured: bool
+
+
+# --- GET /api/alerts/{alert_id}/analysis --------------------------------------
+# Forma medida contra alert_analysis_service.read_analysis: envelope fijo
+# {alert_id, versions}. Cada version tiene 7 claves siempre; la rama valida
+# (cita verificada) anade second_order (null si no se ejecuto el paso LLM) y
+# la rama invalida lo OMITE: response_model_exclude_unset + test de ausencia.
+# second_order es un bloque de hipotesis (temas/candidatos LLM) sin contrato
+# cerrado: se declara free-form dict, nunca se inventa su interior.
+
+
+class AlertAnalysisSectionOut(BaseModel):
+    key: str
+    body: str
+    citation_ids: list[str]
+
+
+class AlertAnalysisCitationOut(BaseModel):
+    id: str
+    kind: str
+    source: str
+    url: str
+    as_of: str
+    excerpt: str
+
+
+class AlertAnalysisVersionOut(BaseModel):
+    id: int
+    version: str
+    status: str
+    sections: list[AlertAnalysisSectionOut]
+    citations: list[AlertAnalysisCitationOut]
+    second_order: dict[str, Any] | None = None
+    missing_data: list[str]
+    writeback: bool
+
+
+class AlertAnalysisReadOut(BaseModel):
+    alert_id: int
+    versions: list[AlertAnalysisVersionOut]
+
+
+# --- GET /api/screeners/custom-metrics y /screens -------------------------------
+# Formas medidas contra _metric_payload y _screen_payload (serializan la fila
+# ORM tal cual). metadata es un dict libre del tenant y criteria la lista de
+# criterios tal como se guardaron: free-form declarado, nunca inventado.
+
+
+class ScreenerCustomMetricOut(BaseModel):
+    id: int
+    metric_key: str
+    name: str
+    formula: str
+    unit: str
+    description: str
+    version: int
+    active: bool
+    metadata: dict[str, Any]
+    created_at: datetime
+
+
+class ScreenerCriterionOut(BaseModel):
+    left: str
+    operator: Literal[">", ">=", "<", "<=", "==", "!="]
+    right: str
+
+
+class ScreenerSavedScreenOut(BaseModel):
+    id: int
+    name: str
+    description: str
+    criteria: list[ScreenerCriterionOut]
+    ranking_formula: str | None
+    ranking_direction: str
+    alerts_enabled: bool
+    active: bool
+    last_run_at: datetime | None
+    created_at: datetime
+
+
+# --- GET /api/watchlist ---------------------------------------------------------
+# Forma medida contra la ruta y tracked_analysis.tracked_statuses: item con 6
+# claves siempre (id, symbol, company, created_at, updated_at, analysis).
+# analysis null sin workflow; cuando existe lleva status/as_of/thesis_status
+# siempre y missing_inputs SOLO si el ultimo estado es insufficient_data con
+# empresa conocida: exclude_unset + test de ausencia.
+
+
+class WatchlistAnalysisStateOut(BaseModel):
+    status: str
+    as_of: str
+    thesis_status: str | None
+    missing_inputs: list[str] | None = None
+
+
+class WatchlistItemOut(BaseModel):
+    id: int
+    symbol: str
+    company: str | None
+    created_at: str | None
+    updated_at: str | None
+    analysis: WatchlistAnalysisStateOut | None
+# --- GET /api/watchlist/monitor -------------------------------------------------
+# Forma medida contra la ruta y fair_value_service.choose/_reading: item de 18
+# claves siempre (los huecos sin dato van a null, nunca se omiten).
+# valuation_side y fair_value_source son conjuntos cerrados medidos: Literal.
+# earnings_status: "skipped" o el estado del conector NASDAQ o "unavailable"
+# (no cerrado: str honesto).
+
+
+class WatchlistMonitorItemOut(BaseModel):
+    low_52w: float | None
+    low_52w_date: str | None
+    low_52w_sessions: int
+    last_close: float | None
+    last_close_date: str | None
+    fair_value: float | None
+    fair_value_thesis_version: int | None
+    fair_value_source: Literal["tesis", "motor", "motor_orientativo"] | None
+    fair_value_label: str
+    fair_value_as_of: str | None
+    fair_value_publishable: bool
+    fair_value_reason: str | None
+    valuation_side: Literal["infravalorada", "sobrevalorada"] | None
+    currency: str | None
+    next_earnings_date: str | None
+    next_earnings_source: str | None
+    next_earnings_confirmed: bool | None
+
+
+class WatchlistMonitorOut(BaseModel):
+    items: dict[str, WatchlistMonitorItemOut]
+    earnings_status: str
+# --- GET /api/watchlist/metrics/{symbol} ----------------------------------------
+# Forma medida contra la ruta: las cinco ramas de salida devuelven el mismo
+# envelope de 4 claves (market_cap, per, currency, sources); los huecos sin
+# base van a null, nunca se fabrica el numero (docstring de la ruta).
+
+
+class WatchlistMetricsOut(BaseModel):
+    market_cap: float | None
+    per: float | None
+    currency: str | None
+    sources: list[str]
+
+# --- GET /api/screeners/metric-coverage -----------------------------------------
+# Forma medida contra la ruta: envelope de 1 clave; la lista sale de
+# ScreenerService.metric_coverage (nombres de metrica con datos).
+
+
+class ScreenerMetricCoverageOut(BaseModel):
+    metrics_with_data: list[str]
+
+
+# --- GET /api/screeners/real ------------------------------------------------------
+# Envelope medido contra _real_response_payload: 7 claves siempre. Item medido
+# contra el builder de _refetch_real_items: 21 claves siempre; los huecos del
+# proveedor van a null ("Nulos honestos" de FinnhubScreenVendor.fetch_quote),
+# beta es siempre null en el codigo medido. priceTimestampKind y type son
+# conjuntos cerrados medidos: Literal.
+
+
+class ScreenerRealItemOut(BaseModel):
+    symbol: str
+    name: str
+    price: float
+    priceAsOf: float | None
+    priceTimestampKind: Literal["daily_candle_open", "quote"]
+    priceDate: str | None
+    currency: str | None
+    change: float | None
+    changePercent: float | None
+    marketCap: float | None
+    volume: float | None
+    prevClose: float | None
+    sector: str
+    exchange: str
+    type: Literal["ETF", "Stock"]
+    pe: float | None
+    pb: float | None
+    roe: float | None
+    has_fundamentals: bool
+    beta: None
+
+
+class ScreenerRealOut(BaseModel):
+    source: str
+    as_of: float
+    count: int
+    screener: list[ScreenerRealItemOut]
+    refreshing: bool
+    unavailable: bool
+    universe_size: int
+
+# --- GET /api/thesis/{ticker}/history -------------------------------------------
+# Forma medida contra la ruta: envelope de 5 claves; item de 9 claves con
+# diff null o bloque de 4 claves (change_summary, affected_assumptions,
+# rating_changed, created_at); la rama DERIVADA (derived_thesis_diff) anade
+# derived=true y la persistida lo OMITE: exclude_unset + test de ausencia.
+
+
+class ThesisHistoryDiffOut(BaseModel):
+    change_summary: str
+    affected_assumptions: list[str]
+    rating_changed: bool
+    created_at: str
+    derived: bool | None = None
+
+
+class ThesisHistoryItemOut(BaseModel):
+    id: int
+    version: int
+    status: str
+    rating: str
+    red_team_score: int
+    data_confidence_score: int
+    created_at: str
+    updated_at: str
+    diff: ThesisHistoryDiffOut | None
+
+
+class ThesisHistoryOut(BaseModel):
+    ticker: str
+    count: int
+    history: list[ThesisHistoryItemOut]
+    data_as_of: str | None
+    provenance: ProvenanceOut
+
+# --- GET /api/thesis/{ticker}/audio/status --------------------------------------
+# Forma medida contra la ruta y thesis_audio_service.status_info: state y key
+# siempre; generated_at SOLO cuando el mp3 esta listo (status_info lo OMITE
+# en cualquier otro estado): exclude_unset + test de ausencia. state sale del
+# servicio TTS externo (passthrough salvo prefijo error): no cerrado, str.
+
+
+class ThesisAudioStatusOut(BaseModel):
+    state: str
+    key: str | None
+    generated_at: str | None = None
+
+
+# --- GET /api/thesis/jobs y /jobs/{run_id} ---------------------------------------
+# Forma medida contra thesis_job_service.job_payload: 13 claves siempre; los
+# huecos (timestamps, errores, result) van a null. result es el result_payload
+# libre del workflow: free-form declarado. fase: 4 claves siempre.
+
+
+class ThesisJobPhaseOut(BaseModel):
+    name: str
+    status: str
+    started_at: str | None
+    finished_at: str | None
+
+
+class ThesisJobStatusOut(BaseModel):
+    id: int
+    workflow_name: str
+    status: str
+    ticker: str | None
+    force: bool | None
+    phases: list[ThesisJobPhaseOut]
+    current_phase: str | None
+    total_phases: int
+    result: dict[str, Any] | None
+    error_class: str | None
+    error_message: str | None
+    attempt: int
+    created_at: str | None
+    started_at: str | None
+    finished_at: str | None
+
+
+class ThesisLatestJobOut(BaseModel):
+    job: ThesisJobStatusOut | None
+
+
 # --- GET /api/portfolio/snapshots --------------------------------------------
 # Forma medida contra _snapshot_payload (servicio real): emite siempre todas
 # las claves; daily_return/cumulative_twr llegan como null (la primera foto
@@ -1767,6 +2303,24 @@ class PortfolioSnapshotOut(BaseModel):
     cumulative_twr: float | None
     pricing_coverage: float
     source: str
+    metadata: dict[str, Any]
+
+
+# --- POST /api/portfolio/snapshots/capture -----------------------------------
+# Forma medida contra la ruta (dict literal de 7 claves, todas siempre
+# presentes): subconjunto del payload del historial, sin portfolio_id,
+# base_currency, desglose de valor, net_external_flow_base ni source.
+# daily_return/cumulative_twr son null en la primera foto de la serie
+# (sin foto previa no hay retorno que enlazar).
+
+
+class PortfolioSnapshotCaptureOut(BaseModel):
+    id: int
+    snapshot_date: date
+    total_value_base: float
+    pricing_coverage: float
+    daily_return: float | None
+    cumulative_twr: float | None
     metadata: dict[str, Any]
 # --- GET /api/portfolio/dividends --------------------------------------------
 # Formas medidas contra DividendIngestionService.portfolio_yields (servicio
@@ -2083,3 +2637,39 @@ class PortfolioForecastOut(BaseModel):
 class PortfolioPriceUpdateOut(BaseModel):
     ticker: str
     market_price: float
+
+
+# --- POST /api/portfolio/refresh-market --------------------------------------
+# Forma medida contra MarketRefreshService.refresh (servicio real): sobre un
+# envelope fijo, los stages varian sus claves por paso (solo step/name/status
+# son comunes) -> todo lo demas opcional y response_model_exclude_unset en la
+# ruta. Los tres bloques operativos internos (risk, alert_results,
+# screen_results) quedan free-form a proposito: son salidas de otros
+# servicios con sus propias ramas, y tiparlos parcialmente borraria claves
+# del wire (response_model filtra lo no declarado).
+
+
+class RefreshMarketStageOut(BaseModel):
+    step: int
+    name: str
+    status: str
+    updated: int | None = None
+    errors: list[dict[str, Any]] | None = None
+    stale_prices: list[dict[str, Any]] | None = None
+    portfolio_snapshot_id: int | None = None
+    snapshot_pricing_coverage: float | None = None
+    market_data_status: str | None = None
+    alert_rules: int | None = None
+    saved_screens: int | None = None
+
+
+class PortfolioRefreshMarketOut(BaseModel):
+    status: Literal["ok", "partial"]
+    as_of: date
+    started_at: datetime
+    completed_at: datetime
+    order: list[str]
+    stages: list[RefreshMarketStageOut]
+    risk: dict[str, Any]
+    alert_results: list[dict[str, Any]]
+    screen_results: list[dict[str, Any]]

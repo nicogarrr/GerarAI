@@ -2,10 +2,11 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
 import type { AnalystTargets } from '@/lib/research/analyst-targets';
+import type { KeyStats } from '@/lib/research/key-stats';
 import type { ResearchLongTermModel, MoatScoreMetric } from '@/lib/actions/research.actions';
 import type { ShareCapital } from '@/lib/actions/share-capital.actions';
 import type { ManagementCredibility } from '@/components/research/sections/ManagementCredibilitySection';
-import { formatNumber, formatPrice, formatPercent } from '@/lib/format';
+import { formatMarketDate, formatNumber, formatPrice, formatPercent } from '@/lib/format';
 import { getT } from '@/lib/i18n/server';
 
 const GRADE_KEYS = {
@@ -15,7 +16,19 @@ const GRADE_KEYS = {
   insufficient_history: 'research.credibility.grade.insufficientHistory',
 } as const;
 
-function Row({ href, label, value, note }: { href: string; label: string; value: string; note?: string }) {
+function Row({ href, label, value, note }: { href?: string; label: string; value: string; note?: string }) {
+  if (!href) {
+    // Dato de mercado sin sección propia en la ficha: fila informativa, sin enlace.
+    return (
+      <li className="flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800/70 py-2 last:border-0">
+        <span className="min-w-0">
+          <span className="block text-xs text-gray-500">{label}</span>
+          {note ? <span className="mt-0.5 block text-[11px] leading-4 text-gray-500">{note}</span> : null}
+        </span>
+        <span className="shrink-0 text-sm font-semibold text-gray-100">{value}</span>
+      </li>
+    );
+  }
   return (
     <li>
       <Link className="group flex min-h-[44px] items-center justify-between gap-3 border-b border-gray-800/70 py-2 last:border-0" href={href} scroll={false}>
@@ -39,7 +52,7 @@ function Row({ href, label, value, note }: { href: string; label: string; value:
  * «venta fuerte» (descartado explícitamente). Una fila sin dato real no se
  * pinta: nada de relleno.
  */
-export async function QuickGlancePanel({ ticker, currency, model, analysts, livePrice, shareCapital, credibility, moatScore }: {
+export async function QuickGlancePanel({ ticker, currency, model, analysts, livePrice, shareCapital, credibility, moatScore, keyStats = null }: {
   ticker: string;
   currency: string | null | undefined;
   model: ResearchLongTermModel | null;
@@ -48,6 +61,7 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
   shareCapital: ShareCapital | null;
   credibility: ManagementCredibility | null;
   moatScore: MoatScoreMetric | null;
+  keyStats?: KeyStats | null;
 }) {
   const t = await getT();
   const tk = encodeURIComponent(ticker);
@@ -81,6 +95,50 @@ export async function QuickGlancePanel({ ticker, currency, model, analysts, live
         label={t('research.glance.analystsLabel')}
         note={recorrido !== null ? t('research.glance.medianUpside', { pct: formatPercent(recorrido, { digits: 1, signDisplay: 'always' }) }) : undefined}
         value={t('research.glance.medianValue', { price: analysts?.currency ? formatPrice(median, analysts.currency) : formatNumber(median) })}
+      />,
+    );
+  }
+
+  // Datos clave estilo Stock Analysis (REA, 31-oct-2026): solo con dato real
+  // de una fuente gratuita; cada nota dice de dónde sale.
+  const earnings = keyStats?.next_earnings ?? null;
+  if (earnings) {
+    const status = earnings.confirmed === true ? t('research.glance.earningsConfirmed')
+      : earnings.confirmed === false ? t('research.glance.earningsEstimated') : undefined;
+    rows.push(<Row key="resultados" label={t('research.glance.earningsLabel')} note={status} value={formatMarketDate(earnings.date)} />);
+  }
+  const exDividend = keyStats?.ex_dividend ?? null;
+  if (exDividend) {
+    rows.push(
+      <Row
+        key="exdividendo"
+        label={exDividend.upcoming ? t('research.glance.exDividendNext') : t('research.glance.exDividendLast')}
+        note={undefined}
+        value={formatMarketDate(exDividend.date)}
+      />,
+    );
+  }
+  const range = keyStats?.range_52w ?? null;
+  const rangeCurrency = keyStats?.currency ?? currency ?? null;
+  if (range) {
+    const fmt = (value: number) => (rangeCurrency ? formatPrice(value, rangeCurrency) : formatNumber(value));
+    rows.push(
+      <Row
+        key="rango52"
+        label={t('research.glance.range52wLabel')}
+        note={range.source.startsWith('Yahoo') ? undefined : t('research.glance.sourceOwnCloses')}
+        value={`${fmt(range.low)} – ${fmt(range.high)}`}
+      />,
+    );
+  }
+  const beta = keyStats?.beta ?? null;
+  if (beta) {
+    rows.push(
+      <Row
+        key="beta"
+        label={t('research.glance.betaLabel')}
+        note={t('research.glance.betaNote')}
+        value={formatNumber(beta.value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       />,
     );
   }

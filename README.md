@@ -9,12 +9,37 @@
 [![CodeQL](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml/badge.svg)](https://github.com/nicogarrr/GerarAI/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/nicogarrr/GerarAI?include_prereleases&label=release&color=orange)](https://github.com/nicogarrr/GerarAI/releases)
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![Live app](https://img.shields.io/badge/live-gerarai.duckdns.org-green)](https://gerarai.duckdns.org)
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](package.json)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](data-engine/pyproject.toml)
 
 > **Status:** v0.5.0 (pre-release), the production baseline of 30 October 2026. Hardening and review remain in progress.
+> Live at [gerarai.duckdns.org](https://gerarai.duckdns.org) (access by request).
 > The user interface is in Spanish (es-ES); code, APIs and this document are in English.
 > **Not financial advice.** See the [disclaimer](#disclaimer).
+
+## A quick look
+
+<p><img src="docs/images/readme/hero.jpg" alt="GerarAI: portfolio overview on desktop and mobile, with sample data" width="100%" /></p>
+
+**Your portfolio, your theses and your Spanish tax draft in one place.** Real UI captures, shown in the app's Spanish interface, with an invented sample portfolio.
+
+<p><img src="docs/images/readme/demo.gif" alt="GerarAI walkthrough: portfolio overview, positions, tax report and watchlist" width="100%" /></p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/images/readme/cartera-posiciones.jpg" alt="Portfolio positions with average cost, value and unrealised P/L" /></td>
+    <td width="33%"><img src="docs/images/readme/impuestos-irpf.jpg" alt="Draft Spanish IRPF tax report with FIFO and the 2-month rule" /></td>
+    <td width="33%"><img src="docs/images/readme/watchlist.jpg" alt="Watchlist with signals and per-stock analysis" /></td>
+  </tr>
+  <tr>
+    <td><b>Portfolio</b><br/>Positions with average cost, value and unrealised P/L in euros.</td>
+    <td><b>Taxes (IRPF)</b><br/>Draft capital-gains and dividend report with FIFO and the 2-month rule.</td>
+    <td><b>Watchlist</b><br/>The stocks you follow, with their analysis and signals.</td>
+  </tr>
+</table>
+
+<sub>Real app screenshots from a local run (Next.js + backend on SQLite) with the E2E test account and invented data: Northwind, Contoso, Fabrikam, Acme and Litware are sample companies; prices, amounts and trades are fictional. No real user data. Framed with <a href="https://github.com/benjitaylor/skills/tree/main/stageshow">Stageshow</a>.</sub>
 
 ## The research loop
 
@@ -46,6 +71,7 @@ The wordmark above is exported from the existing `GerarAIWordmark` header compon
 
 ## Contents
 
+- [A quick look](#a-quick-look)
 - [The research loop](#the-research-loop)
 - [App preview](#app-preview)
 - [What it is](#what-it-is)
@@ -382,6 +408,8 @@ Please do not open public issues for vulnerabilities. Report them privately as d
 ## License
 
 Copyright © 2025 Nicolás Iglesias García. Licensed under the [GNU Affero General Public License v3.0](LICENSE). If you run a modified version as a network service, the AGPL requires you to make its source available to its users.
+
+The README images in `docs/images/readme/` were framed following [Stageshow](https://github.com/benjitaylor/skills/tree/main/stageshow) by Benji Taylor (MIT License); no Stageshow brand icons or third-party artwork are included.
 
 A historical Spanish README is kept in [docs/README.es.md](docs/README.es.md); it is not the current setup or capability reference.
 

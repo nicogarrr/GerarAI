@@ -14,8 +14,14 @@ const BLOCKER_LABELS: Record<string, string> = {
   inferred_fcf_margin_target: 'margen FCF objetivo inferido (con fuentes): convergencia de margen orientativa para una empresa en crecimiento, no una valoración final',
 };
 
-export function blockerLabel(id: string): string {
-  return BLOCKER_LABELS[id] ?? id;
+const BLOCKER_LABELS_EN: Record<string, string> = {
+  traceable_wacc: 'WACC without a traceable calculation',
+  forecast_is_not_the_driver: 'terminal value is over 95 % of the value: the 5-year forecast is not what drives this valuation',
+  inferred_fcf_margin_target: 'inferred FCF margin target (with sources): indicative margin convergence for a growing company, not a final valuation',
+};
+
+export function blockerLabel(id: string, locale: 'es' | 'en' = 'es'): string {
+  return (locale === 'en' ? BLOCKER_LABELS_EN : BLOCKER_LABELS)[id] ?? id;
 }
 
 /** Procedencia del WACC usado por el motor (resolve_rates del backend). */

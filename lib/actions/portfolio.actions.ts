@@ -14,7 +14,7 @@ import { AppError, AuthorizationError, ValidationError } from '@/lib/types/error
 import { sumCashByCurrency } from '@/lib/portfolio-cash';
 import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
-import { importRejection } from '@/lib/portfolio/import-rejection';
+import { importRejection, type ImportRejection } from '@/lib/portfolio/import-rejection';
 import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
 import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
@@ -771,32 +771,15 @@ export async function updateAllPortfolioPrices(userId: string): Promise<{
     return { summary, scores };
 }
 
-export type IBKRImportResult = {
-    status: string;
-    positions_imported: number;
-    cash_imported: number;
-    trades_imported: number;
-    dividends_imported: number;
-    fees_imported: number;
-    cash_transactions_imported: number;
-    rows_skipped?: number;
-    row_errors?: string[];
-    duplicate_trades?: number;
-    identity_warning?: string | null;
-    /** Motivo del rechazo (status 'rejected'), en español. */
-    message?: string;
-    portfolio_snapshot_id: number | null;
-};
-
 /**
  * Dispara la descarga del Flex statement de IBKR (via IBKR_FLEX_TOKEN /
  * IBKR_FLEX_QUERY_ID) y la importación en el research backend.
  */
-export async function importFromIBKR(userId: string): Promise<IBKRImportResult> {
+export async function importFromIBKR(userId: string): Promise<IBKRDownloadImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRDownloadImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr', {
+        result = await researchRequest<IBKRDownloadImportResult>('/api/portfolio/import/ibkr', {
             method: 'POST',
         });
     } catch (error) {
@@ -811,11 +794,11 @@ export async function importFromIBKR(userId: string): Promise<IBKRImportResult> 
 /**
  * Importa un Flex XML crudo (por si el usuario lo descarga a mano).
  */
-export async function importIBKRXml(userId: string, xml: string): Promise<IBKRImportResult> {
+export async function importIBKRXml(userId: string, xml: string): Promise<IBKRXmlImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRXmlImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/xml', {
+        result = await researchRequest<IBKRXmlImportResult>('/api/portfolio/import/ibkr/xml', {
             method: 'POST',
             body: jsonBody({ xml }),
         });
@@ -831,11 +814,11 @@ export async function importIBKRXml(userId: string, xml: string): Promise<IBKRIm
 /**
  * Importa un CSV de actividad de IBKR (symbol, quantity, price, date + action/fees/currency opcionales).
  */
-export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRImportResult> {
+export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRCsvImportResult | ImportRejection> {
     const canonicalUserId = await resolveUserId(userId);
-    let result: IBKRImportResult;
+    let result: IBKRCsvImportResult;
     try {
-        result = await researchRequest<IBKRImportResult>('/api/portfolio/import/ibkr/csv', {
+        result = await researchRequest<IBKRCsvImportResult>('/api/portfolio/import/ibkr/csv', {
             method: 'POST',
             body: jsonBody({ csv }),
         });
@@ -850,6 +833,15 @@ export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRIm
 
 // Tipos generados desde el OpenAPI del backend (response_model en la ruta);
 // regenerar con `npx openapi-typescript data-engine/openapi.json`.
+// El CSV de IBKR tiene su propio contrato en el backend (no devuelve
+// positions_imported ni portfolio_snapshot_id: esos son del Flex XML).
+export type IBKRCsvImportResult = components['schemas']['PortfolioIbkrCsvImportOut'];
+// /import/ibkr devuelve el importado Flex o la variante not_configured
+// (discriminado por status; response_model + exclude_unset en la ruta).
+export type IBKRDownloadImportResult = components['schemas']['PortfolioIbkrImportOut'];
+
+export type IBKRXmlImportResult = components['schemas']['PortfolioIbkrXmlImportOut'];
+
 export type PortfolioTearsheetMetrics = components['schemas']['TearsheetMetricsOut'];
 
 export type PortfolioTearsheet = components['schemas']['PortfolioTearsheetOut'];

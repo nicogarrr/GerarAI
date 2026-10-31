@@ -27,8 +27,8 @@ interface ImportIBKRButtonProps {
 
 type ImportCounts = {
     status: string;
-    rows_skipped?: number;
-    row_errors?: string[];
+    rows_skipped?: number | null;
+    row_errors?: string[] | null;
     identity_warning?: string | null;
     positions_imported?: unknown;
     trades_imported?: unknown;

@@ -1,8 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// El inicio pide sus cuatro secciones en UNA server action (Next ejecuta en
-// serie las server actions de un cliente: antes eran cuatro POST encadenados).
+// El inicio pide sus TRES secciones rápidas en UNA server action (Next
+// ejecuta en serie las server actions de un cliente). Oportunidades va en
+// su propia llamada tras el primer pintado: su sondeo DCF cotiza con
+// proveedores externos en síncrono (~7 s medidos en prod, 31-oct) y retenía
+// el POST entero del primer pintado.
 
 vi.mock('@/components/HomeAttention', () => ({ default: () => <div>Atención aislada</div> }));
 
@@ -46,19 +49,35 @@ describe('PersonalizedOverview primera carga', () => {
             portfolio: { data: summary, error: null },
             alerts: { data: { rules: [], triggered: [] }, error: null },
             watchlist: { data: { unavailable: false, total: 0, items: [] }, error: null },
-            opportunities: { data: [], error: 'No se pudieron cargar los datos. Reintenta en unos segundos.' },
         });
+        getHomeOpportunities.mockRejectedValue(new Error('sin red'));
     });
 
-    it('una sola server action para las cuatro secciones, ninguna lectura suelta', async () => {
+    it('una sola server action para las tres secciones rápidas, ninguna lectura suelta', async () => {
         render(<PersonalizedOverview userId="u1" />);
         await waitFor(() => expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u)).toHaveLength(0));
         expect(getHomeOverviewBundle).toHaveBeenCalledTimes(1);
         expect(getHomeOverviewBundle).toHaveBeenCalledWith('u1', expect.objectContaining({ watchlistLimit: 3 }));
-        for (const read of [getPortfolioSummary, getUserAlerts, getRecentTriggeredAlerts, getHomeWatchlistPreview, getHomeOpportunities]) {
+        for (const read of [getPortfolioSummary, getUserAlerts, getRecentTriggeredAlerts, getHomeWatchlistPreview]) {
             expect(read).not.toHaveBeenCalled();
         }
         // El error de una sección se queda en su sección.
         expect((await screen.findAllByText(/No se pudieron cargar los datos/)).length).toBeGreaterThan(0);
+    });
+
+    it('oportunidades se piden APARTE tras el primer pintado, nunca en el bundle', async () => {
+        render(<PersonalizedOverview userId="u1" />);
+        await waitFor(() => expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u)).toHaveLength(0));
+        // Regression: en main las oportunidades viajaban DENTRO del POST del
+        // bundle (firstLoad('opportunities')) y su sondeo DCF (~7 s medidos
+        // en prod) hacía esperar a cartera, alertas y watchlist; además el
+        // componente no llamaba a getHomeOpportunities en la primera carga.
+        expect(getHomeOpportunities).toHaveBeenCalledTimes(1);
+        expect(getHomeOpportunities).toHaveBeenCalledWith(
+            expect.objectContaining({ marketCapMoreThan: expect.any(Number), limit: 10, candidateLimit: expect.any(Number) }),
+        );
+        const bundleArgs = getHomeOverviewBundle.mock.calls[0]?.[1] ?? {};
+        expect(bundleArgs).not.toHaveProperty('marketCapMoreThan');
+        expect(bundleArgs).not.toHaveProperty('candidateLimit');
     });
 });

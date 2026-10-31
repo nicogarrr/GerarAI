@@ -275,8 +275,13 @@ describe('screener: solo usa la divisa confirmada por el proveedor', () => {
 
     it('formatea con divisa opcional y conserva número sin símbolo si falta', () => {
         assert.ok(!/formatPrice\(r\.price,\s*'USD'\)/.test(page));
-        const row = actions.slice(actions.indexOf('export type RealScreenerRow'), actions.indexOf('export type RealScreenerResponse'));
-        assert.match(row, /currency\?: string \| null/);
+        // El tipo de la fila vive en el contrato OpenAPI generado (alias): la
+        // divisa sigue siendo opcional/anulable — solo la confirmada por el
+        // proveedor — y se verifica en la fuente de verdad nueva.
+        assert.ok(actions.includes("components['schemas']['ScreenerRealItemOut']"));
+        const generated = readFileSync(join(root, 'lib/research/openapi.generated.ts'), 'utf8');
+        const row = generated.slice(generated.indexOf('ScreenerRealItemOut: {'), generated.indexOf('ScreenerRealOut: {'));
+        assert.match(row, /currency: string \| null/);
         assert.ok(page.includes('isValidCurrencyCode(currency)'));
         assert.ok(page.includes('formatPrice(price, currency)'));
         assert.ok(page.includes('screenerPrice(r.price, r.currency)'));

@@ -3,6 +3,7 @@ export async function resolve(specifier, context, nextResolve) {
     if (specifier === 'next/headers') return { url: 'auth-endpoint:next', shortCircuit: true };
     if (specifier === '@/lib/types/errors') return { url: new URL('../lib/types/errors.ts', import.meta.url).href, shortCircuit: true };
     if (specifier === '@/lib/auth/signup-policy') return { url: new URL('../lib/auth/signup-policy.ts', import.meta.url).href, shortCircuit: true };
+    if (specifier === '@/lib/auth/account-approval') return { url: new URL('../lib/auth/account-approval.ts', import.meta.url).href, shortCircuit: true };
     return nextResolve(specifier, context);
 }
 export async function load(url, context, nextLoad) {

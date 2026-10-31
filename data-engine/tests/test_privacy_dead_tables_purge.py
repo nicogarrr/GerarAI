@@ -155,7 +155,7 @@ def test_delete_account_purga_tablas_sin_modelo_en_ci_postgres(monkeypatch):
         with engine.connect() as conn:
             for tabla in _TABLAS_MUERTAS | {"watch_items"}:
                 restantes = conn.execute(
-                    sa.text(f"select count(*) from {tabla} where tenant_id = :t"),
+                    sa.text(f"select count(*) from {tabla} where tenant_id = :t"),  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- tabla itera sobre _TABLAS_MUERTAS (lista constante del test) y el valor va ligado (:t)
                     {"t": tenant_id},
                 ).scalar_one()
                 assert restantes == 0, f"{tabla} conservo {restantes} filas"
@@ -174,5 +174,5 @@ def test_delete_account_purga_tablas_sin_modelo_en_ci_postgres(monkeypatch):
     finally:
         engine.dispose()
         with admin.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex del fixture _scratch (test_0114), sin input externo; BD efimera de CI
         admin.dispose()

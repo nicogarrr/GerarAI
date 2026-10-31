@@ -48,6 +48,11 @@ def _eligible_total(db: Session, label: str, source_name: str | None) -> int | N
 
 _CACHE: dict[int, tuple[float, dict]] = {}
 _LOCK = threading.Lock()
+# El inventario agrupa por fuente sobre tablas grandes (precios, hechos,
+# noticias): la lectura en frio tarda >10 s en prod (medido 16,4 s). Con TTL
+# 60 s ese coste se repetia cada minuto por worker; 10 min de frescura es
+# suficiente para un panel de salud de fuentes.
+_CACHE_TTL_SECONDS = 600.0
 LAYERS = (
     ("Fundamentales", FinancialFact, "source_type", 90),
     ("Documentos", Document, "source_type", 30),
@@ -197,7 +202,7 @@ def read_inventory(db: Session) -> dict:
         raise ValueError("Tenant context required")
     with _LOCK:
         cached = _CACHE.get(tenant)
-        if cached and time.monotonic() - cached[0] < 60:
+        if cached and time.monotonic() - cached[0] < _CACHE_TTL_SECONDS:
             return cached[1]
     result = inventory(db)
     with _LOCK:

@@ -81,6 +81,45 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
     }
 
 
+def _tx_dict_from_row(row: Any, line: int) -> dict[str, Any]:
+    """``_tx_dict`` sobre la fila de columnas del feed (misma salida exacta).
+
+    Los labels del SELECT se leen por nombre; cualquier deriva de campos entre
+    este builder y ``_tx_dict`` la cubren los tests de contrato del feed.
+    """
+    data_quality = row["data_quality"]
+    tx_form = row["tx_form"]
+    return {
+        "ticker": primary_ticker(row["tx_issuer_ticker"] or row["filing_issuer_ticker"]),
+        "issuer_tickers_raw": row["tx_issuer_ticker"] or row["filing_issuer_ticker"],
+        "issuer_name": row["issuer_name"],
+        "insider": row["insider"],
+        "insider_cik": row["insider_cik"],
+        "role": row["role"],
+        "officer_title": row["officer_title"],
+        "multi_reporter": bool(row["multi_reporter"]),
+        "type": row["code"],
+        "acquired_disposed": row["acquired_disposed"],
+        "shares": row["shares"],
+        "price": row["price"],
+        # Divisa declarada por transaccion. SEC Form 4: siempre USD (se
+        # declara y liquida en USD). PDMR UK: la que traiga la fuente; si
+        # falta (93/307 en el feed real), None -> UI: "divisa no informada".
+        "currency": ((data_quality or {}).get("currency")
+        if isinstance(data_quality, dict) else None)
+        or ("USD" if tx_form in ("4", "4/A") else None),
+        "value": row["value"],
+        "date": row["tx_date"] or row["filing_date"],
+        "is_derivative": bool(row["is_derivative"]),
+        "rule_10b5_1": bool(row["rule_10b5_1"]),
+        "accession_number": row["accession_number"],
+        "tx_line": line,
+        "filing_date": row["filing_date"],
+        "source_url": row["tx_source_url"] or row["filing_source_url"],
+        "form": tx_form or row["filing_form"],
+    }
+
+
 def _group_tranches(items: list[dict]) -> list[dict]:
     """Agrupa los tramos de una misma operacion (mismo filing + insider + codigo).
 
@@ -139,26 +178,55 @@ def build_feed(
     cutoff = (today - timedelta(days=days)).isoformat()
     wanted = ticker.strip().upper() if ticker else None
 
+    # Columnas, no entidades ORM: la respuesta muestra ``limit`` filas pero la
+    # ventana entera se usa para totales y senales; instanciar un ORM por fila
+    # era el 64% del coste (benchmark sintetico 45k filas, 2026-10-31: 1.013 ms
+    # ORM vs 346 ms solo columnas). Mismos valores, mismo WHERE.
+    tx_t = InsiderTransaction
     stmt = (
-        select(InsiderTransaction, InsiderFiling)
-        .join(InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id)
+        select(
+            tx_t.issuer_ticker.label("tx_issuer_ticker"),
+            InsiderFiling.issuer_ticker.label("filing_issuer_ticker"),
+            InsiderFiling.issuer_name.label("issuer_name"),
+            tx_t.insider.label("insider"),
+            tx_t.insider_cik.label("insider_cik"),
+            tx_t.role.label("role"),
+            tx_t.officer_title.label("officer_title"),
+            tx_t.multi_reporter.label("multi_reporter"),
+            tx_t.code.label("code"),
+            tx_t.acquired_disposed.label("acquired_disposed"),
+            tx_t.shares.label("shares"),
+            tx_t.price.label("price"),
+            tx_t.data_quality.label("data_quality"),
+            tx_t.value.label("value"),
+            tx_t.tx_date.label("tx_date"),
+            InsiderFiling.filing_date.label("filing_date"),
+            tx_t.is_derivative.label("is_derivative"),
+            tx_t.rule_10b5_1.label("rule_10b5_1"),
+            tx_t.accession_number.label("accession_number"),
+            tx_t.source_url.label("tx_source_url"),
+            InsiderFiling.source_url.label("filing_source_url"),
+            tx_t.form.label("tx_form"),
+            InsiderFiling.form.label("filing_form"),
+        )
+        .join(InsiderFiling, tx_t.filing_id == InsiderFiling.id)
         .where(
-            InsiderTransaction.is_derivative.is_(False),
-            InsiderTransaction.code.in_(("P", "S")),
-            func.coalesce(InsiderTransaction.tx_date, InsiderFiling.filing_date) >= cutoff,
+            tx_t.is_derivative.is_(False),
+            tx_t.code.in_(("P", "S")),
+            func.coalesce(tx_t.tx_date, InsiderFiling.filing_date) >= cutoff,
             *tenant_filters(db, InsiderTransaction, InsiderFiling),
         )
     )
-    rows = db.execute(stmt).all()
+    rows = db.execute(stmt).mappings().all()
     if wanted:
         # Mismo criterio que la lista mostrada: separadores, espacios y mayusculas.
         rows = [
-            (tx, filing)
-            for tx, filing in rows
-            if wanted in ticker_list(tx.issuer_ticker or filing.issuer_ticker)
+            row
+            for row in rows
+            if wanted in ticker_list(row["tx_issuer_ticker"] or row["filing_issuer_ticker"])
         ]
 
-    txs = [_tx_dict(tx, filing, i) for i, (tx, filing) in enumerate(rows)]
+    txs = [_tx_dict_from_row(row, i) for i, row in enumerate(rows)]
     txs.sort(key=lambda t: (str(t["date"] or ""), str(t["accession_number"])), reverse=True)
 
     # Totales y senales: solo Form 4/4A (SEC, importe declarado en USD).

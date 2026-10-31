@@ -59,11 +59,11 @@ def evaluate_candidate(
     if not series:
         return {"status": "invalid", "reason": "insufficient_history"}
     confirmed = [v for v in series if v.status == "confirmed"]
-    return {"status": "ok", "formula_version": "nico-v1", "price_verified": bool(verified),
+    return {"status": "ok", "formula_version": "nico-v2", "price_verified": bool(verified),
             "price_date": usable[-1].day.isoformat(), "source": usable[-1].source,
             "current": series[-1].as_dict(),
             "confirmed": confirmed[-1].as_dict() if confirmed else None,
-            # Separate context only: never feeds the nico-v1 level calculation.
+            # Separate context only: never feeds the nico-v2 level calculation.
             "daily_close_drawdown": 1 - bars[-1].close / max(
                 r.adjusted_close for r in usable if r.adjusted_close is not None),
             "drawdown_basis": "maximum available adjusted daily close, not intraday high",
@@ -134,7 +134,7 @@ def explain_candidate(price: dict, quality: dict) -> dict:
     if not quality.get('passed'):
         reasons.extend(quality.get('reasons') or ['quality_unavailable'])
     return {'clear_opportunity': not reasons, 'reasons': reasons,
-            'formula': 'nico-v1', 'confirmed': confirmed, 'current': current,
+            'formula': 'nico-v2', 'confirmed': confirmed, 'current': current,
             'notice': 'Decision support, not an automatic purchase or investment advice.'}
 
 

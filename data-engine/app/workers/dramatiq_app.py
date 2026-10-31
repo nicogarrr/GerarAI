@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 from urllib.parse import urlparse
 
 import dramatiq
+from dramatiq.middleware import CurrentMessage
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
@@ -27,6 +28,7 @@ settings = get_settings()
 broker = BoundedRedisBroker(url=settings.redis_url)
 broker.add_middleware(TaskTraceMiddleware())
 broker.add_middleware(TenantLLMSettingsMiddleware())
+broker.add_middleware(CurrentMessage())
 dramatiq.set_broker(broker)
 
 
@@ -213,6 +215,60 @@ def _status_from_message(text: str) -> int | None:
 GDELT_RETRY_FLOOR_SECONDS = 60.0
 
 
+# Disyuntor GDELT compartido entre procesos (scheduler y workers). Medido en
+# prod (31-oct-2026, piloto): 429 por IP en rachas de 3-16 fallos seguidos y
+# Retry de 225-309 s que queman los 2 hilos del carril gdelt en reencolados
+# sin progreso (la IP esta limitada: reintentar a los 4 min no atraviesa).
+# Al abrirse, los actores GDELT skippean al instante mientras dure el TTL y
+# el fan-out del scheduler queda pausado de facto (una copia en vuelo con
+# coalesced_send + skip inmediato). Fail-open: Redis caido no frena nada.
+GDELT_CIRCUIT_TTL_SECONDS = 30 * 60
+GDELT_CIRCUIT_THRESHOLD = 3
+_GDELT_CIRCUIT_KEY = "gdelt:circuit:open"
+_GDELT_CIRCUIT_STREAK_KEY = "gdelt:circuit:streak"
+_GDELT_CIRCUIT_STREAK_TTL_SECONDS = 10 * 60
+
+
+def _gdelt_circuit_open(client) -> bool:
+    try:
+        return client is not None and bool(client.exists(_GDELT_CIRCUIT_KEY))
+    except Exception:  # noqa: BLE001 - sonda best-effort, fail-open
+        return False
+
+
+def _gdelt_circuit_trip(client) -> None:
+    try:
+        if client is not None:
+            client.set(_GDELT_CIRCUIT_KEY, "1", ex=GDELT_CIRCUIT_TTL_SECONDS)
+            client.delete(_GDELT_CIRCUIT_STREAK_KEY)
+    except Exception:  # noqa: BLE001 - expira por TTL solo
+        logger.warning("GDELT circuit: no se pudo abrir el disyuntor en Redis; expira por TTL", exc_info=True)
+
+
+def _gdelt_429_recorded(client) -> bool:
+    """Cuenta un 429 en la racha; True si la racha abre el disyuntor."""
+    if client is None:
+        return False
+    try:
+        streak = client.incr(_GDELT_CIRCUIT_STREAK_KEY)
+        client.expire(_GDELT_CIRCUIT_STREAK_KEY, _GDELT_CIRCUIT_STREAK_TTL_SECONDS)
+    except Exception:  # noqa: BLE001 - best-effort
+        return False
+    if streak >= GDELT_CIRCUIT_THRESHOLD:
+        _gdelt_circuit_trip(client)
+        return True
+    return False
+
+
+def _gdelt_success_recorded(client) -> None:
+    """Un exito rompe la racha de 429 (el disyuntor abierto caduca por TTL)."""
+    try:
+        if client is not None:
+            client.delete(_GDELT_CIRCUIT_STREAK_KEY)
+    except Exception:  # noqa: BLE001 - best-effort
+        logger.warning("GDELT circuit: no se pudo romper la racha en Redis", exc_info=True)
+
+
 def _raise_gdelt_retry(exc: Exception) -> None:
     """Reencola el lote GDELT ni un segundo ANTES de la ventana del servidor.
 
@@ -223,14 +279,36 @@ def _raise_gdelt_retry(exc: Exception) -> None:
     min_backoff del actor y buclearia contra el 429). Sin este freno el
     barrido seguia empresa a empresa contra una ventana cerrada, quemando
     la cuota por IP.
+
+    Rachas: el 429 se contabiliza en el disyuntor compartido; al abrirse, el
+    reintento pasa a esperar el TTL del disyuntor (30 min) en vez de la
+    ventana de 4-5 min del servidor, y durante ese tiempo los nuevos ticks
+    skippean al entrar (ver la guarda al inicio de los actores GDELT).
     """
     retry_after = float(getattr(exc, "retry_after", 0.0) or 0.0)
-    delay_seconds = retry_after if retry_after > 0 else GDELT_RETRY_FLOOR_SECONDS
+    try:
+        client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        client = None
+    if _gdelt_429_recorded(client):
+        # Disyuntor abierto: esperar AL MENOS su TTL, pero nunca menos de lo
+        # que pide el servidor (una ventana de 1 h manda sobre los 30 min).
+        delay_seconds = max(retry_after, float(GDELT_CIRCUIT_TTL_SECONDS))
+    else:
+        delay_seconds = retry_after if retry_after > 0 else GDELT_RETRY_FLOOR_SECONDS
     delay_ms = int(delay_seconds * 1000)
     raise dramatiq.Retry(
         f"GDELT cerro la ventana (429): lote reencolado tras {delay_ms // 1000}s",
         delay=delay_ms,
     ) from exc
+
+
+def _retry_jitter_ms(max_ms: int = 30_000) -> int:
+    """Jitter [0, max_ms) para reencolados: decorrelaciona workers que
+    reciben 429 a la vez (sin el, todos reintentan en el mismo segundo)."""
+    import random
+
+    return random.randint(0, max_ms)
 
 
 def _handle_actor_error(actor: str, exc: Exception, **context: Any) -> dict[str, Any]:
@@ -253,7 +331,65 @@ def _batch_status(processed: int, errors: list[dict]) -> str:
     return "ok"
 
 
-def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = ()):
+_STALE_INHERIT = object()
+
+# Politicas registradas por _coalesce_on_success (ventana, partes de clave,
+# umbral de obsolescencia y firma). Las lee coalesced_send para NO encolar un
+# tick periodico cuando ya hay una copia en vuelo de la misma clave: sin este
+# freno el scheduler apila mensajes mas rapido de lo que el worker de default
+# (1 hilo) los drena y la cola crece sin techo (backlog del 28-oct-2026).
+_COALESCE_POLICIES: dict[str, dict[str, Any]] = {}
+
+# Backstop de la marca "copia en vuelo": el actor la borra al CONSUMIR el
+# mensaje; si el mensaje se pierde con Redis (restart sin persistencia), el
+# TTL reabre el encolado al cabo de un dia como muy tarde.
+ENQUEUE_MARK_TTL_SECONDS = 24 * 60 * 60
+
+
+def _enqueue_mark_key(job: str, parts: tuple[str, ...]) -> str:
+    return "coalesce-enq:" + ":".join((job, *parts))
+
+
+def _current_message_is_retry_or_delayed() -> bool:
+    """True si el mensaje en ejecucion es un reintento o un diferido.
+
+    Es trabajo YA ACEPTADO por el broker: no puede terminarse en ack sin
+    trabajar (se perderia), solo reprogramarse. Fail-open en False: sin
+    evidencia de reintento se trata como tick nuevo.
+    """
+    try:
+        message = CurrentMessage.get_current_message()
+    except Exception:  # noqa: BLE001 - sonda best-effort
+        return False
+    if message is None:
+        return False
+    options = getattr(message, "options", None) or {}
+    return "retries" in options or "eta" in options
+
+
+def _current_message_age_seconds() -> float | None:
+    """Edad del mensaje en ejecucion; None si la obsolescencia no aplica.
+
+    Los reintentos (options.retries) y los diferidos (options.eta) conservan
+    el timestamp original: descartarlos por viejos perderia trabajo ya
+    aceptado, asi que nunca se consideran obsoletos.
+    """
+    try:
+        message = CurrentMessage.get_current_message()
+    except Exception:  # noqa: BLE001 - sonda best-effort
+        return None
+    if message is None:
+        return None
+    options = getattr(message, "options", None) or {}
+    if "retries" in options or "eta" in options:
+        return None
+    timestamp = getattr(message, "message_timestamp", None)
+    if not timestamp:
+        return None
+    return max(0.0, (time.time() * 1000 - timestamp) / 1000.0)
+
+
+def _coalesce_on_success(job, window_seconds, key_parts=(), stale_after_seconds=_STALE_INHERIT):
     """Suprime re-encolados periodicos redundantes del backlog de ingesta.
 
     La cadencia del scheduler re-encola cada job aunque el anterior siga en
@@ -274,6 +410,14 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
       marca de 5 h se saltaria el tick de las 6 h y la cadencia pasaria a
       12 h (hallazgo del auditor).
 
+    OBSOLESCENCIA (stale_after_seconds): un mensaje que entra al worker mas
+    viejo que el umbral se salta sin trabajar (reason=stale_message), porque
+    el tick siguiente llega en menos de una cadencia y repone el refresco.
+    Asi un backlog de dias se drena a velocidad de Redis en vez de ejecutar
+    miles de corridas ya superadas. El umbral por defecto es la propia
+    ventana; stale_after_seconds=None lo desactiva (trabajo sin sustituto:
+    syncs IBKR, snapshots diarios) y esos mensajes se ejecutan siempre.
+
     Manejo de fallo: si el job devuelve error/partial o lanza, el claim se
     LIBERA (solo si seguimos siendo el dueno del token), asi un reintento o
     el siguiente tick del scheduler vuelven a correr el trabajo. Redis
@@ -289,6 +433,12 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
 
     def decorator(fn):
         sig = inspect.signature(fn)
+        _COALESCE_POLICIES[job] = {
+            "window": window_seconds,
+            "key_parts": key_parts,
+            "stale_after": stale_after_seconds,
+            "sig": sig,
+        }
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
@@ -302,6 +452,13 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
                 client = _redis_client()
                 claimed = True
                 if client is not None:
+                    # La marca "copia en vuelo" muere al CONSUMIR el mensaje:
+                    # desde ese instante un tick nuevo puede encolar y, si
+                    # esta corrida sigue fresca, el claim lo skippea abajo.
+                    try:
+                        client.delete(_enqueue_mark_key(job, parts))
+                    except Exception:  # noqa: BLE001 - best-effort
+                        logger.warning("enqueue mark: delete Redis fallo", exc_info=True)
                     claimed = bool(client.set(key, token, nx=True, ex=max(window, 1)))
             except Exception:  # noqa: BLE001 - sonda best-effort, fail-open
                 client, claimed = None, True
@@ -332,6 +489,25 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
                 except Exception:  # noqa: BLE001 - expira por TTL solo
                     pass
 
+            # Obsolescencia: despues del claim (una copia en vuelo deja la
+            # marca fresca puesta y el resto del backlog skippea arriba por
+            # fresh_or_running) y antes de trabajar. El claim NO se libera
+            # aqui a proposito: durante el drenado del backlog las copias
+            # viejas restantes deben seguir skippeando; como la ventana es
+            # menor que la cadencia, el siguiente tick siempre llega con el
+            # claim ya expirado.
+            stale = window if stale_after_seconds is _STALE_INHERIT else stale_after_seconds
+            if stale is not None:
+                age = _current_message_age_seconds()
+                if age is not None and age > stale:
+                    return {
+                        "status": "skipped",
+                        "actor": job,
+                        "reason": "stale_message",
+                        "age_seconds": int(age),
+                        "stale_after_seconds": int(stale),
+                    }
+
             try:
                 result = fn(*args, **kwargs)
             except BaseException:
@@ -348,6 +524,53 @@ def _coalesce_on_success(job: str, window_seconds, key_parts: tuple[str, ...] = 
 
     return decorator
 
+
+def coalesced_send(actor, *args, **kwargs):
+    """actor.send con dedup "una copia en vuelo por clave" para actores con politica.
+
+    El scheduler re-encola cada tick aunque el mensaje anterior siga en cola;
+    con el worker de default a 1 hilo eso apila decenas de mensajes por hora
+    que ya no se drenan. Para los actores con _coalesce_on_success (refrescos
+    periodicos idempotentes) una copia en vuelo basta: ejecutarla satisface
+    todos los ticks suprimidos, porque el trabajo se hace con el dato del
+    momento de la ejecucion, no del mensaje. Sin politica registrada (trabajo
+    por evento: documentos, KPI, alertas) se envia siempre. La marca la borra
+    el actor al consumir el mensaje y caduca a las 24 h como backstop.
+    Fail-open: Redis caido encola igual, porque un duplicado lo absorbe el
+    claim del actor y perder el tick seria peor. Devuelve el Message, o None
+    si se suprimio por copia en vuelo.
+    """
+    policy = _COALESCE_POLICIES.get(actor.actor_name)
+    if policy is None:
+        return actor.send(*args, **kwargs)
+    values = policy["sig"].bind_partial(*args, **kwargs).arguments
+    parts = tuple(str(values.get(part)) for part in policy["key_parts"])
+    key = _enqueue_mark_key(actor.actor_name, parts)
+    token = uuid.uuid4().hex
+    try:
+        client = _redis_client()
+        if client is None:
+            return actor.send(*args, **kwargs)
+        claimed = bool(client.set(key, token, nx=True, ex=ENQUEUE_MARK_TTL_SECONDS))
+    except Exception:  # noqa: BLE001 - fail-open: perder el tick es peor
+        return actor.send(*args, **kwargs)
+    if not claimed:
+        return None
+    try:
+        return actor.send(*args, **kwargs)
+    except BaseException:
+        try:  # liberar solo si seguimos siendo el dueno del token
+            client.eval(
+                "if redis.call('get', KEYS[1]) == ARGV[1] then"
+                " return redis.call('del', KEYS[1])"
+                " else return 0 end",
+                1,
+                key,
+                token,
+            )
+        except Exception:  # noqa: BLE001 - expira por TTL solo
+            logger.warning("enqueue token: no se pudo liberar la marca en Redis; expira por TTL", exc_info=True)
+        raise
 
 # Ventana de la marca "analisis ya encolado" del carril de alertas. El
 # dispatch corre cada 15 min y el actor es idempotente (lease + gate de
@@ -460,6 +683,23 @@ GDELT_QUEUE_NAME = "gdelt"
 # worker default: queue_name solo enruta mensajes NUEVOS, el actor se
 # resuelve por nombre al consumir.
 COMPUTED_QUEUE_NAME = "computed"
+# Carril de APIs externas (yfinance/Finnhub/SEC/proveedores de precios): los
+# trabajos que queman cuota HTTP fuera no comparten la cola default con el
+# resto (31-oct: 2 refresh_valuation_metrics ocupando los 2 hilos de default,
+# 7.617 pendientes; 1.077 HTTP 429 en 10 min). La consume worker-externa
+# (1 proceso, EXTERNA_THREADS=2 por defecto). queue_name solo enruta mensajes
+# NUEVOS: los ya encolados en default los drena el worker default.
+EXTERNA_QUEUE_NAME = "externa"
+# Carriles por proveedor (31-oct): cada proveedor externo ingiere en su cola,
+# asi una racha de 429 o una corrida larga de UNO no frena a los demas. El
+# ritmo real lo siguen poniendo los pacers/frenos globales en Redis (los
+# hilos solo solapan latencia, nunca suben la tasa): Finnhub ~60/min
+# compartido, Yahoo/Google noticias 1 req/1,5 s. GDELT ya tenia carril.
+FINNHUB_QUEUE_NAME = "finnhub"
+# Toda la ingesta ligada a Yahoo/yfinance (noticias, insiders CA, splits,
+# dividendos, calendario de resultados) comparte carril: el freno/pacer de
+# Yahoo es global en Redis, y una racha de 429 no debe atascar default.
+YAHOO_QUEUE_NAME = "yahoo"
 KPI_DEFERRED_KEY = "kpi_deferred"
 KPI_DEFER_MAX_ATTEMPTS = 5
 
@@ -791,7 +1031,7 @@ def enqueue_document_kpis(db, document) -> dict[str, Any]:
     return {"status": "queued", "message_id": str(message.message_id)}
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("backfill_document_kpis", 4 * 60)
 def backfill_document_kpis() -> dict[str, Any]:
     """Re-encola extracciones KPI diferidas por backpressure, mas antiguas primero.
@@ -1101,7 +1341,8 @@ def evaluate_alert_rules(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@_coalesce_on_success("refresh_asts_catalog", 110 * 60)
 def refresh_asts_catalog() -> dict[str, Any]:
     """One global network fetch, explicit tenant-scoped persisted copies."""
     from app.services.asts_catalog_service import (
@@ -1193,7 +1434,8 @@ def refresh_asts_catalog() -> dict[str, Any]:
     }
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@_coalesce_on_success("refresh_bottlenecks", 50 * 60, ("tenant_id",))
 def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Reconcile all local evidence, including historical letters, without AI."""
     from app.services.bottleneck_service import refresh_signals
@@ -1210,7 +1452,8 @@ def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
+@_coalesce_on_success("ingest_sec_bottleneck_filings", 330 * 60, ("tenant_id",))
 def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Pasajes de escasez de filings SEC (EFTS full-text, gratis) como documentos.
 
@@ -1230,7 +1473,8 @@ def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | N
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
+@_coalesce_on_success("ingest_uk_pdmr_filings", 330 * 60, ("tenant_id",))
 def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Movimientos PDMR del Reino Unido (tracefour, gratis, CC BY 4.0): 1 GET por corrida."""
     from app.services.uk_pdmr_ingestion import ingest_uk_pdmr
@@ -1246,7 +1490,9 @@ def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = N
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000,
+              queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("ingest_ca_insider_yahoo", 330 * 60, ("tenant_id",))
 def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Insiders de Canada via Yahoo quoteSummary (FUENTE NO OFICIAL; SEDI es la verdad)."""
     from app.services.ca_insider_ingestion import ingest_ca_insiders
@@ -1265,7 +1511,7 @@ def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = 
 DISCOVERY_DEADLINE_SECONDS = 480  # margen de 2 min bajo el time_limit de 10 min
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
 def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Candidatos INFERIDOS por tema de cuello de botella (solo proveedor gratuito, sin dinero)."""
     from app.services.bottleneck_discovery_service import discover
@@ -1290,7 +1536,8 @@ def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = Non
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
+@_coalesce_on_success("refresh_macro_context", 20 * 3600)
 def refresh_macro_context() -> dict[str, Any]:
     """Fetch public FRED CSV once globally, then persist an honest snapshot."""
     from app.core.database import SessionLocal
@@ -1313,7 +1560,8 @@ def refresh_macro_context() -> dict[str, Any]:
             return _handle_actor_error("refresh_macro_context", exc)
 
 
-@dramatiq.actor(max_retries=2, min_backoff=60_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=3_600_000)
+@_coalesce_on_success("sync_ibkr_flex", 20 * 3600, stale_after_seconds=None)
 def sync_ibkr_flex() -> dict[str, Any]:
     """Sincroniza la cartera real desde IBKR Flex Web Service (solo lectura).
 
@@ -1395,6 +1643,11 @@ def sync_ibkr_flex() -> dict[str, Any]:
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000, queue_name="prices")
+@_coalesce_on_success(
+    "refresh_market_pipeline",
+    lambda scope="tracked", **_: 50 * 60 if scope == "tracked" else 5 * 3600,
+    ("tenant_id", "scope"),
+)
 def refresh_market_pipeline(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1445,6 +1698,7 @@ def refresh_market_pipeline(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000)
+@_coalesce_on_success("refresh_portfolio_moves", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Digest the last completed session's closes (skips weekends) for one tenant."""
     from app.services.portfolio_moves_service import build_digest
@@ -1486,7 +1740,9 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000,
+              queue_name=FINNHUB_QUEUE_NAME)
+@_coalesce_on_success("backfill_finnhub_profiles", 20 * 3600, ("tenant_id",))
 def backfill_finnhub_profiles(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1517,7 +1773,9 @@ def backfill_finnhub_profiles(
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000,
+              queue_name=EXTERNA_QUEUE_NAME)
+@_coalesce_on_success("backfill_sec_fundamentals", 20 * 3600, ("tenant_id",))
 def backfill_sec_fundamentals(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1543,7 +1801,7 @@ def backfill_sec_fundamentals(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=600_000)
 def seed_company_fundamentals(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1589,7 +1847,8 @@ def seed_company_fundamentals(
 ESEF_REINGEST_CHUNK = 25
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=900_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=900_000)
+@_coalesce_on_success("ingest_class_shares_outstanding", 6 * 86400, ("tenant_id",))
 def ingest_class_shares_outstanding(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1634,7 +1893,8 @@ def ingest_class_shares_outstanding(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=60_000, time_limit=1_800_000)
+@dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000)
+@_coalesce_on_success("refresh_esef_fundamentals", 6 * 86400, ("tenant_id", "phase", "cursor"))
 def refresh_esef_fundamentals(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1777,7 +2037,8 @@ def split_sync_tickers(
     return chunk_tickers, next_cursor
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("ingest_corporate_splits", 6 * 86400, ("tenant_id", "scope", "cursor"))
 def ingest_corporate_splits(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1821,7 +2082,8 @@ def ingest_corporate_splits(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("sync_portfolio_dividends", 20 * 3600, ("tenant_id",))
 def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingesta diaria de dividendos declarados de las posiciones abiertas (Yahoo, FMP de respaldo)."""
     from app.services.async_bridge import run_from_any_context
@@ -1844,7 +2106,8 @@ def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None =
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name="prices")
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name="prices")
+@_coalesce_on_success("refresh_portfolio_prices_intraday", 12 * 60, ("tenant_id",))
 def refresh_portfolio_prices_intraday(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -1975,7 +2238,7 @@ def propicks_radar_scan(
 ) -> dict[str, Any]:
     """Radar ProPicks+DCA: barrido acotado y resumible del universo.
 
-    Escritor explicito de snapshots PUBLICOS de precio (nico-v1). Sin red,
+    Escritor explicito de snapshots PUBLICOS de precio (nico-v2). Sin red,
     sin LLM y SIN outbox de alertas: no comparte cola con el evaluador DCA
     de watchlist. El lease es global (datos publicos, no de tenant) y el
     cursor por dia hace seguro reanudar tras un fallo o un corte de
@@ -2011,20 +2274,45 @@ def propicks_radar_scan(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
+              queue_name=EXTERNA_QUEUE_NAME)
+@_coalesce_on_success("refresh_valuation_metrics", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def refresh_valuation_metrics(
     tenant_id: int | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
     """Metricas de valoracion (P/B, yield TTM) de todo el universo del tenant.
 
+    time_limit de 1 h: sin limite, una corrida lenta (universo grande con
+    pacing ~50/min sobre Finnhub) ocupaba un hilo del carril externa durante
+    horas (31-oct: 2 corridas sosteniendo 7.617 pendientes en default). Si el
+    limite mata la corrida, el cursor en Redis la reanuda por el ultimo
+    ticker comprometido y la cache de 24h no repite lo fresco: cortar no
+    rehace trabajo.
+
     Corre tras los cierres oficiales; mismo patron de lease que
     refresh_propicks_prices. Las fuentes (yfinance/Finnhub) son las por
     defecto del servicio; en tests se inyectan fixtures.
     """
+    from app.services.connectors.finnhub import finnhub_blocked_for
+    from app.services.valuation_metrics_service import (
+        ValuationUniverseRateSuspended,
+    )
     from app.services.valuation_metrics_service import (
         refresh_valuation_metrics as _refresh,
     )
+
+    # Breaker compartido: si Finnhub cerro la ventana (429), el actor se
+    # reencola tras el Retry-After en vez de ocupar un hilo de default
+    # martilleando (medido 31-oct-2026: 2 corridas asi bloqueaban los 2
+    # hilos de la cola default con 1.077 HTTP 429 en 10 min).
+    blocked = finnhub_blocked_for()
+    if blocked > 0:
+        delay_ms = int(blocked * 1000) + _retry_jitter_ms()
+        raise dramatiq.Retry(
+            f"Finnhub en cooldown 429: reintento tras {delay_ms // 1000}s",
+            delay=delay_ms,
+        )
 
     db = _session(tenant_id, user_id)
     try:
@@ -2043,9 +2331,42 @@ def refresh_valuation_metrics(
             "actor": "refresh_valuation_metrics",
             "reason": "lease_held",
         }
+    cursor_key = f"valuation_metrics:cursor:{tenant_id}"
     try:
-        result = _refresh(db)
+        client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open: sin cursor, corrida entera
+        client = None
+    cursor: str | None = None
+    if client is not None:
+        try:
+            raw = client.get(cursor_key)
+            cursor = raw.decode() if isinstance(raw, bytes) else raw
+        except Exception:  # noqa: BLE001 - sonda best-effort
+            cursor = None
+    try:
+        result = _refresh(db, start_after_ticker=cursor)
+        if client is not None and cursor is not None:
+            try:
+                client.delete(cursor_key)
+            except Exception:  # noqa: BLE001 - expira por TTL solo
+                logger.warning("valuation cursor: delete Redis fallo; expira por TTL", exc_info=True)
         return {"actor": "refresh_valuation_metrics", **result}
+    except ValuationUniverseRateSuspended as exc:
+        # Suspender con cursor: la corrida siguiente reanuda DESPUES del
+        # ultimo ticker completado, no repite el universo ya hecho.
+        _rollback(db)
+        if client is not None and exc.last_completed_ticker:
+            try:
+                client.set(cursor_key, exc.last_completed_ticker, ex=20 * 3600)
+            except Exception:  # noqa: BLE001 - expira por TTL solo
+                logger.warning("valuation cursor: no se pudo guardar el cursor en Redis; expira por TTL", exc_info=True)
+        delay_seconds = exc.retry_after or finnhub_blocked_for() or 60.0
+        delay_ms = int(delay_seconds * 1000) + _retry_jitter_ms()
+        raise dramatiq.Retry(
+            f"Finnhub 429 en universo (cursor {exc.last_completed_ticker!r}): "
+            f"reintento tras {delay_ms // 1000}s",
+            delay=delay_ms,
+        ) from exc
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("refresh_valuation_metrics", exc, tenant_id=tenant_id)
@@ -2115,7 +2436,7 @@ def freeze_propicks_snapshot(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=COMPUTED_QUEUE_NAME)
 def ingest_spy_daily(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2143,7 +2464,7 @@ def _official_close_session_key() -> str:
     return last_completed_us_session(datetime.now(UTC)).isoformat()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000, queue_name="official-closes")
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=3_600_000, queue_name="official-closes")
 def sync_official_closes(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2234,6 +2555,7 @@ def sync_official_closes(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=1_800_000)
+@_coalesce_on_success("evaluate_dca_signals", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def evaluate_dca_signals(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2283,7 +2605,8 @@ def evaluate_dca_signals(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000, queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("refresh_earnings_calendar", 11 * 3600, ("tenant_id",))
 def refresh_earnings_calendar(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2301,7 +2624,8 @@ def refresh_earnings_calendar(
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000,
+              queue_name=EXTERNA_QUEUE_NAME)
 def backfill_company_price_history(
     company_id: int,
     tenant_id: int | None = None,
@@ -2334,6 +2658,7 @@ def backfill_company_price_history(
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
+@_coalesce_on_success("refresh_sec_filings", 210 * 60, ("tenant_id", "ticker"))
 def refresh_sec_filings(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -2798,6 +3123,20 @@ def refresh_news(
 ) -> dict[str, Any]:
     actor_name = "refresh_news"
     try:
+        gdelt_client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        gdelt_client = None
+    if _gdelt_circuit_open(gdelt_client):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: NO se ack sin trabajar. Se reprograma
+            # tras el TTL del disyuntor; el coalescer libera su claim al
+            # propagarse el Retry (except BaseException -> _release).
+            raise dramatiq.Retry(
+                "Disyuntor GDELT abierto: lote reprogramado tras su TTL",
+                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000,
+            )
+        return {"status": "skipped", "actor": actor_name, "reason": "gdelt_circuit_open"}
+    try:
         from app.services.feed_ingestion_service import FeedIngestionService
 
         db = _session(tenant_id, user_id)
@@ -2853,6 +3192,7 @@ def refresh_news(
                     )
                     if result.status != "error":
                         processed += 1
+                        _gdelt_success_recorded(gdelt_client)
                 except Exception as exc:
                     _rollback(db)
                     from app.services.connectors.gdelt import GdeltRateLimited
@@ -2895,7 +3235,8 @@ def refresh_news(
         )
 
 
-@dramatiq.actor(max_retries=1, min_backoff=15_000, time_limit=2 * 3600 * 1000)
+@dramatiq.actor(max_retries=2, min_backoff=15_000, time_limit=2 * 3600 * 1000,
+              queue_name=YAHOO_QUEUE_NAME)
 @_coalesce_on_success(
     "refresh_ticker_news",
     lambda scope="tracked", **_: 20 * 60 if scope == "tracked" else 5 * 3600,
@@ -2913,6 +3254,23 @@ def refresh_ticker_news(
     solo Yahoo y solo cotizadas en EEUU. Pacing 1,5 s entre peticiones.
     """
     actor_name = "refresh_ticker_news"
+    from app.services.provider_brake import PROVIDER_BRAKES, is_open, record_429, record_success
+
+    try:
+        brake_client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        brake_client = None
+    # Proveedores del barrido segun alcance: scope=all solo usa Yahoo.
+    brake_providers = ["yahoo"] if (scope == "all" and not ticker) else ["yahoo", "google-news"]
+    if all(is_open(brake_client, p) for p in brake_providers):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: no ack sin trabajar; reprogramar tras la pausa.
+            cooldown_ms = min(PROVIDER_BRAKES[p].cooldown_s for p in brake_providers) * 1000
+            raise dramatiq.Retry(
+                "Frenos de proveedor abiertos (429): barrido reprogramado tras la pausa",
+                delay=cooldown_ms,
+            )
+        return {"status": "skipped", "actor": actor_name, "reason": "provider_brakes_open"}
     try:
         from app.services.feed_ingestion_service import (
             FeedIngestionService,
@@ -2955,10 +3313,23 @@ def refresh_ticker_news(
                     lanes.append(("google-en", google_feed_url(company, lang="en")))
                     if company.ticker.upper() in PRIORITY_TICKERS:
                         lanes.append(("google-es", google_feed_url(company, lang="es")))
-                return lanes
+                # Freno por proveedor: el carril pausado (429) ni se intenta.
+                return [
+                    (lane, url)
+                    for lane, url in lanes
+                    if not is_open(brake_client, "yahoo" if lane == "yahoo" else "google-news")
+                ]
 
             def _fetch(company, lane, url):
+                provider = "yahoo" if lane == "yahoo" else "google-news"
                 result = _run(service.poll_rss(url, ticker=company.ticker, max_items=30))
+                if result.status == "error":
+                    # Solo el 429 alimenta el freno (fallo de cuota del
+                    # proveedor); un 404/500 es otro problema.
+                    if any(_status_from_message(str(m)) == 429 for m in result.errors):
+                        record_429(brake_client, provider)
+                else:
+                    record_success(brake_client, provider)
                 if lane == "yahoo":
                     return label_yahoo(result, company, _ticker_evidence_level)
                 return label_google(result, company, _ticker_evidence_level)
@@ -3142,6 +3513,20 @@ def refresh_macro_news(
     """
     actor_name = "refresh_macro_news"
     try:
+        gdelt_client = _redis_client()
+    except Exception:  # noqa: BLE001 - fail-open
+        gdelt_client = None
+    if _gdelt_circuit_open(gdelt_client):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: NO se ack sin trabajar. Se reprograma
+            # tras el TTL del disyuntor; el coalescer libera su claim al
+            # propagarse el Retry (except BaseException -> _release).
+            raise dramatiq.Retry(
+                "Disyuntor GDELT abierto: lote reprogramado tras su TTL",
+                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000,
+            )
+        return {"status": "skipped", "actor": actor_name, "reason": "gdelt_circuit_open"}
+    try:
         from app.services.feed_ingestion_service import FeedIngestionService
         from app.services.macro_news import MACRO_NEWS_LANE, iter_macro_queries
 
@@ -3200,6 +3585,7 @@ def refresh_macro_news(
                                     ),
                                 }
                             )
+                            _gdelt_circuit_trip(gdelt_client)
                             break
                         continue
                     if result.status == "error":
@@ -3224,9 +3610,11 @@ def refresh_macro_news(
                                     ),
                                 }
                             )
+                            _gdelt_circuit_trip(gdelt_client)
                             break
                         continue
                     consecutive_failures = 0
+                    _gdelt_success_recorded(gdelt_client)
                     _gdelt_macro_cache_set(cache_client, theme, result)
                 if result.errors:
                     errors.extend(
@@ -3359,6 +3747,7 @@ def process_document_structured(
 
 
 @dramatiq.actor(max_retries=1)
+@_coalesce_on_success("consolidate_memory", 20 * 3600, ("tenant_id",))
 def consolidate_memory(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -3410,6 +3799,7 @@ def consolidate_memory(
 
 
 @dramatiq.actor(max_retries=1)
+@_coalesce_on_success("scan_contradictions", 50 * 60, ("tenant_id",))
 def scan_contradictions(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -3478,6 +3868,7 @@ def scan_contradictions(
 
 
 @dramatiq.actor(max_retries=1)
+@_coalesce_on_success("review_theses", 20 * 3600, ("tenant_id", "ticker"))
 def review_theses(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -3567,6 +3958,7 @@ def review_theses(
 
 
 @dramatiq.actor(max_retries=1)
+@_coalesce_on_success("run_daily_research", 20 * 3600, stale_after_seconds=None)
 def run_daily_research() -> dict[str, Any]:
     actor_name = "run_daily_research"
     jobs: list[tuple[str, Any]] = [
@@ -3675,6 +4067,7 @@ def scan_insider_watchlist(
 
 
 @dramatiq.actor(max_retries=2, min_backoff=15_000)
+@_coalesce_on_success("scan_schedule13dg_watchlist", 20 * 3600, ("tenant_id",))
 def scan_schedule13dg_watchlist(
     tenant_id: int | None = None,
     user_id: str | None = None,
@@ -3768,7 +4161,7 @@ def sync_investor_holdings(
         return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000)
 @_coalesce_on_success("ingest_letters_corpus", 6 * 60 * 60, ("tenant_id",))
 def ingest_letters_corpus(
     tenant_id: int | None = None,
@@ -4064,6 +4457,7 @@ def refresh_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
 
 
 @dramatiq.actor(max_retries=0, time_limit=900_000)
+@_coalesce_on_success("propose_paper_trades", 20 * 3600, ("tenant_id",), stale_after_seconds=None)
 def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Lote de propuestas LLM para el paper book (INFERIDO, solo proveedor gratuito).
 
@@ -4083,7 +4477,8 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
         db.close()
 
 
-@dramatiq.actor(max_retries=1, min_backoff=30_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, queue_name=YAHOO_QUEUE_NAME)
+@_coalesce_on_success("sync_paper_dividends", 20 * 3600, ("tenant_id",))
 def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Ingesta diaria de dividendos declarados de los tickers con paper trades vivos.
 
@@ -4128,7 +4523,8 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
 import app.workers.knowledge_rag_actors  # noqa: E402,F401
 
 
-@dramatiq.actor(max_retries=0, time_limit=600_000)
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=600_000)
+@_coalesce_on_success("sync_tenant_ibkr_connections", 20 * 3600, stale_after_seconds=None)
 def sync_tenant_ibkr_connections() -> dict[str, Any]:
     """Bounded daily reporting sync, one independently scoped account per tenant."""
     from sqlalchemy import select
@@ -4136,30 +4532,36 @@ def sync_tenant_ibkr_connections() -> dict[str, Any]:
     from app.core.database import SessionLocal
     from app.models import IBKRConnection
 
-    with SessionLocal() as admin:
-        ids = set(
-            admin.scalars(
-                select(IBKRConnection.tenant_id)
-                .where(
-                    IBKRConnection.enabled.is_(True),
-                )
-                .execution_options(include_all_tenants=True)
-            ).all()
-        )
-    scheduled = 0
-    for tenant_id, user_id in tenant_contexts():
-        if tenant_id in ids:
-            actor = (
-                sync_one_tenant_ibkr_dedicated
-                if get_settings().ibkr_dedicated_sync_enabled
-                else sync_one_tenant_ibkr
+    try:
+        with SessionLocal() as admin:
+            ids = set(
+                admin.scalars(
+                    select(IBKRConnection.tenant_id)
+                    .where(
+                        IBKRConnection.enabled.is_(True),
+                    )
+                    .execution_options(include_all_tenants=True)
+                ).all()
             )
-            actor.send(tenant_id, user_id)
-            scheduled += 1
-    return {"scheduled": scheduled}
+        scheduled = 0
+        for tenant_id, user_id in tenant_contexts():
+            if tenant_id in ids:
+                actor = (
+                    sync_one_tenant_ibkr_dedicated
+                    if get_settings().ibkr_dedicated_sync_enabled
+                    else sync_one_tenant_ibkr
+                )
+                actor.send(tenant_id, user_id)
+                scheduled += 1
+        return {"scheduled": scheduled}
+    except Exception as exc:
+        # max_retries=2 con backoff solo es real si el transitorio RELANZA:
+        # un PG/Redis caido reintenta; el error permanente queda registrado
+        # como fallo estructurado sin quemar los reintentos.
+        return _handle_actor_error("sync_tenant_ibkr_connections", exc)
 
 
-@dramatiq.actor(max_retries=2, time_limit=300_000)
+@dramatiq.actor(max_retries=2, min_backoff=3_600_000, time_limit=1_800_000)
 def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
     from app.services import ibkr_connection_service as ibkr
 
@@ -4210,13 +4612,13 @@ def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -
         db.close()
 
 
-@dramatiq.actor(queue_name="ibkr-sync", max_retries=0, time_limit=600_000)
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, min_backoff=30_000, time_limit=600_000)
 def sync_tenant_ibkr_connections_dedicated() -> dict[str, Any]:
     """Dedicated dispatcher so default backlog cannot delay tenant Flex imports."""
     return sync_tenant_ibkr_connections.fn()
 
 
-@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, time_limit=300_000)
+@dramatiq.actor(queue_name="ibkr-sync", max_retries=2, min_backoff=3_600_000, time_limit=1_800_000)
 def sync_one_tenant_ibkr_dedicated(tenant_id: int, user_id: str) -> dict[str, Any]:
     """Same revision/date validation, separate bounded read-only consumer."""
     return sync_one_tenant_ibkr.fn(tenant_id, user_id)

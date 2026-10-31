@@ -1,3 +1,4 @@
+import time
 from decimal import Decimal
 
 import pytest
@@ -268,6 +269,43 @@ def test_metric_coverage_lists_only_metrics_with_data():
     assert "revenue" in coverage
     assert "wacc" not in coverage
 
+
+
+def test_metric_coverage_caches_per_tenant(monkeypatch):
+    # La lectura agrega sobre tablas grandes (>15 s en frio en prod): la
+    # segunda llamada dentro del TTL no reconsulta.
+    from app.services import screener_service
+
+    screener_service._METRIC_COVERAGE_CACHE.clear()
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    db = Session(engine)
+    db.info["tenant_id"] = 424242
+    try:
+        company = _company("COVCACHE")
+        db.add(company)
+        db.flush()
+        _metric(db, company, "roic", "0.15")
+        db.commit()
+
+        service = ScreenerService()
+        first = service.metric_coverage(db)
+        assert "roic" in first
+
+        # Nuevo dato tras la primera lectura: no aparece hasta expirar el TTL.
+        _metric(db, company, "fcf_yield", "0.04")
+        db.commit()
+        assert service.metric_coverage(db) == first
+
+        # TTL expirado (reloj adelantado): reconsulta y ve el dato nuevo.
+        real_monotonic = time.monotonic
+        monkeypatch.setattr(
+            screener_service.time, "monotonic", lambda: real_monotonic() + 3600
+        )
+        assert "fcf_yield" in service.metric_coverage(db)
+    finally:
+        screener_service._METRIC_COVERAGE_CACHE.clear()
+        db.close()
 
 
 def test_fcf_per_share_cagr_ignores_quarterly_rows_like_plain_cagr():

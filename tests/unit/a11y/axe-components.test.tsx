@@ -16,8 +16,8 @@ vi.mock('@/lib/actions/catalysts.actions', () => ({ getFollowedEarnings: (...a: 
 vi.mock('@/components/calendar/CompanyLogo', () => ({
     CompanyLogo: ({ ticker }: { ticker: string }) => <span data-testid="logo">{ticker}</span>,
 }));
-const getExtendedQuote = vi.fn();
-vi.mock('@/lib/actions/watchlist.actions', () => ({ getExtendedQuote: (...a: unknown[]) => getExtendedQuote(...a) }));
+const getExtendedQuotes = vi.fn();
+vi.mock('@/lib/actions/watchlist.actions', () => ({ getExtendedQuotes: (...a: unknown[]) => getExtendedQuotes(...a) }));
 
 import UserDropdown from '@/components/UserDropdown';
 import EarningsDayStrip from '@/components/calendar/EarningsDayStrip';
@@ -30,7 +30,7 @@ async function axeViolations(node: Element, rules: string[]) {
 
 beforeEach(() => {
     getFollowedEarnings.mockReset();
-    getExtendedQuote.mockReset();
+    getExtendedQuotes.mockReset();
 });
 
 describe('a11y: nombre accesible contiene el texto visible (label-in-name)', () => {
@@ -59,10 +59,12 @@ describe('a11y: nombre accesible contiene el texto visible (label-in-name)', () 
 
 describe('a11y: <dl> solo agrupa dt/dd (definition-list)', () => {
     it('la linea de pre/post-mercado dentro de una ficha <dl> es un <dd>', async () => {
-        getExtendedQuote.mockResolvedValue({
-            symbol: 'AAPL', price: 101.5, currency: 'USD', change_percent: 0.4, price_session: 'post', session: 'post',
-            source: 'yahoo', status: 'ok', timestamp: 1_790_000_000, regular_close_timestamp: 1_789_990_000,
-        });
+        getExtendedQuotes.mockImplementation(async (symbols: string[]) =>
+            Object.fromEntries(symbols.map((s) => [s, {
+                symbol: s, price: 101.5, currency: 'USD', change_percent: 0.4, price_session: 'post', session: 'post',
+                source: 'yahoo', status: 'ok', timestamp: 1_790_000_000, regular_close_timestamp: 1_789_990_000,
+            }])),
+        );
         const { container } = render(
             <dl>
                 <div>

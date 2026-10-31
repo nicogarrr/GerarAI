@@ -20,6 +20,7 @@ from app.services.portfolio_fx_service import PortfolioFXService, currency_key
 from app.services.portfolio_ledger_service import BUY_ACTIONS, SELL_ACTIONS
 from app.services.portfolio_reconstruction_service import PortfolioReconstructionService
 from app.services.portfolio_snapshot_service import PortfolioSnapshotService
+from app.services.portfolio_xray import portfolio_xray
 from app.services.tax_report_service import (
     cash_amount,
     cash_quantity_is_canonical,
@@ -373,6 +374,11 @@ class PortfolioIntelligenceService:
                 },
             },
             "exposures": exposures,
+            "xray": portfolio_xray(
+                {"weights": {company.ticker: weights[company.id] for _, company in rows if company.id in weights}},
+                exposures,
+                base_currency,
+            ),
             "attribution": attribution,
             "ledger_contribution": ledger_contribution,
             "benchmark": benchmark,

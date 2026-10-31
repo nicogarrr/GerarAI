@@ -15,7 +15,9 @@ describe('analyst target heading inside mobile accordion', () => {
     expect(heading).toHaveClass('sr-only', 'md:not-sr-only');
     expect(screen.getByRole('region', { name: 'Precios objetivo de analistas' })).toBeInTheDocument();
     expect(screen.queryByTestId('analyst-consensus-note')).not.toBeInTheDocument();
-    expect(screen.getByText(/Consenso agregado de Yahoo: mediana/)).toBeInTheDocument();
+    expect(screen.getByText(/Consenso agregado de analistas: mediana/)).toBeInTheDocument();
+    // La etiqueta visible no nombra al proveedor aunque el dato lo identifique:
+    expect(screen.queryByText(/Yahoo/)).not.toBeInTheDocument();
     expect(screen.getAllByText('Scotiabank')).toHaveLength(2); // mobile list + desktop table unchanged
   });
 });

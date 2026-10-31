@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 from fastapi import FastAPI
@@ -470,3 +471,23 @@ def test_portfolio_pdf_valuation_hold_shows_nd(env):
     page1_ok = PdfReader(io.BytesIO(res_ok.content)).pages[0].extract_text()
     assert "n/d" not in page1_ok
 
+
+
+# --- Contrato de tipos (pyright) -------------------------------------------
+
+
+def test_thesis_pdf_usa_imports_canonicos_de_matplotlib():
+    """pyright fallaba: plt.Figure/plt.Axes/plt.Rectangle no son exports
+    publicos de matplotlib.pyplot (reportPrivateImportUsage), y add_axes
+    recibia una lista donde los stubs piden tupla (reportCallIssue). Los
+    imports canonicos son matplotlib.figure.Figure, matplotlib.axes.Axes y
+    matplotlib.patches.Rectangle."""
+    source = (Path(__file__).resolve().parents[1] / "app" / "services" / "thesis_pdf_service.py").read_text(
+        encoding="utf-8"
+    )
+    assert "from matplotlib.figure import Figure" in source
+    assert "from matplotlib.axes import Axes" in source
+    assert "from matplotlib.patches import Rectangle" in source
+    for uso_privado in ("plt.Figure", "plt.Axes", "plt.Rectangle"):
+        assert uso_privado not in source
+    assert "add_axes((0, 0, 1, 1))" in source

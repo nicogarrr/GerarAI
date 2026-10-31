@@ -35,8 +35,13 @@ test('F333: las tablas anchas de inteligencia llevan affordance de scroll y cont
     // La tabla de atribución (min-w-[1050px]) se salía 45px del wrapper sin
     // indicio visual de scroll; el patrón de F176 (scroll-affordance-x +
     // contain) lo deja visible y contenido en las 3 tablas.
+    // La regla no es un numero fijo: TODA tabla de la pagina (hoy 3 de
+    // inteligencia + 2 de la matriz de riesgo) va dentro de un wrapper con
+    // affordance; contar tablas y no wrappers impide que una tabla nueva sin
+    // wrapper pase el guard por no actualizar el numero.
     const wrappers = page.match(/scroll-affordance-x mt-4 overflow-x-auto \[contain:layout_paint\]/g) ?? [];
-    assert.equal(wrappers.length, 3);
+    const tables = page.match(/<table/g) ?? [];
+    assert.equal(wrappers.length, tables.length);
     assert.doesNotMatch(page, /className="mt-4 overflow-x-auto"/);
 });
 

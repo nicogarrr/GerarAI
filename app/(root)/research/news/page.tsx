@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -12,6 +13,7 @@ import { NewsEventsFlow } from '@/components/research/NewsEventsFlow';
 import { NEWS_PAGE_SIZE } from '@/lib/news-paging';
 import { getTickerContext } from '@/lib/actions/ticker-context.actions';
 import BackendOffline from '@/components/system/BackendOffline';
+import { NewsLoadingSkeleton } from '@/components/LoadingState';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT } from '@/lib/i18n/server';
 
@@ -35,15 +37,14 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('research.newsMetaTitle') };
 }
 
-export default async function ResearchNewsPage({ searchParams }: PageProps) {
+
+async function NewsFeedSection({ lane, ticker, page, tickerContextPromise }: {
+  lane: 'macro' | 'empresa' | 'para-ti' | 'gobierno' | null;
+  ticker: string | null;
+  page: number;
+  tickerContextPromise: ReturnType<typeof getTickerContext>;
+}) {
   const t = await getT();
-  const query = await searchParams;
-  const lane = query.lane === 'macro' || query.lane === 'empresa' || query.lane === 'para-ti' || query.lane === 'gobierno' ? query.lane : null;
-  const ticker = query.ticker?.trim().toUpperCase() || null;
-  const parsed = Number.parseInt(query.pagina ?? '1', 10);
-  const page = Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;
-  // Se pide uno de más para saber si hay página siguiente sin contar toda la tabla.
-  const tickerContextPromise = getTickerContext();
   // Carril «Para ti»: solo empresas de la cartera y la watchlist del usuario
   // (relevancia por contexto; el backend recibe los tickers explícitos). En el
   // resto de carriles el contexto se resuelve en paralelo con el feed.
@@ -85,6 +86,31 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
   const hasMore = fetched.length > NEWS_PAGE_SIZE;
   const events = dedupeNewsEvents(fetched.slice(0, NEWS_PAGE_SIZE));
 
+
+  return (
+    <NewsEventsFlow
+        events={events}
+        hasMore={hasMore}
+        key={`${lane ?? 'todas'}-${ticker ?? 'todos'}-${page}`}
+        lane={lane}
+        page={page}
+        ticker={ticker}
+        portfolioTickers={tickerContext.portfolioTickers}
+        watchlistTickers={tickerContext.watchlistTickers}
+      />
+
+  );
+}
+export default async function ResearchNewsPage({ searchParams }: PageProps) {
+  const t = await getT();
+  const query = await searchParams;
+  const lane = query.lane === 'macro' || query.lane === 'empresa' || query.lane === 'para-ti' || query.lane === 'gobierno' ? query.lane : null;
+  const ticker = query.ticker?.trim().toUpperCase() || null;
+  const parsed = Number.parseInt(query.pagina ?? '1', 10);
+  const page = Number.isFinite(parsed) ? Math.min(Math.max(1, parsed), 1000) : 1;
+  // Se pide uno de más para saber si hay página siguiente sin contar toda la tabla.
+  const tickerContextPromise = getTickerContext();
+
   return (
     <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
       <PageHeader
@@ -100,16 +126,9 @@ export default async function ResearchNewsPage({ searchParams }: PageProps) {
         title={t('research.newsTitle')}
       />
 
-      <NewsEventsFlow
-        events={events}
-        hasMore={hasMore}
-        key={`${lane ?? 'todas'}-${ticker ?? 'todos'}-${page}`}
-        lane={lane}
-        page={page}
-        ticker={ticker}
-        portfolioTickers={tickerContext.portfolioTickers}
-        watchlistTickers={tickerContext.watchlistTickers}
-      />
+      <Suspense fallback={<NewsLoadingSkeleton />}>
+        <NewsFeedSection lane={lane} page={page} ticker={ticker} tickerContextPromise={tickerContextPromise} />
+      </Suspense>
 
       <details className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <summary className="min-h-11 cursor-pointer py-2.5 font-semibold text-gray-300">{t('research.newsAdd')}</summary>

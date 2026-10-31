@@ -8,11 +8,14 @@ from datetime import date, timedelta
 import pytest
 
 from app.services.dca_signal_engine import (
+    DEFAULT_PARAMS,
     LEVEL_LIGHT_TRIM,
     LEVEL_STRONG_TRIM,
     NICO_V0_PARAMS,
+    NICO_V1_PARAMS,
     ZONES,
     DailyBar,
+    DcaParams,
     current_verdict,
     evaluate_series,
     monthly_closes,
@@ -166,16 +169,22 @@ def test_hit_rates_no_look_ahead() -> None:
         assert rf["signal_months"] >= rc["signal_months"]
 
 
-def test_nico_v1_defaults_and_volatility_adjustment() -> None:
-    from app.services.dca_signal_engine import DEFAULT_PARAMS
+def test_nico_v2_defaults_to_combined() -> None:
+    # La formula por defecto es la combinada (backtest comparativo 31-oct-2026);
+    # la vigente hasta entonces se conserva en NICO_V1_PARAMS.
+    assert DEFAULT_PARAMS.signal == "combined" and DEFAULT_PARAMS.version == "nico-v2"
+    assert NICO_V1_PARAMS.signal == "sma_gap" and NICO_V1_PARAMS.version == "nico-v1"
+    assert NICO_V0_PARAMS.signal == "sma_gap" and NICO_V0_PARAMS.version == "nico-v0"
 
-    assert DEFAULT_PARAMS.version == "nico-v1"
-    assert DEFAULT_PARAMS.sma_months == 30 and DEFAULT_PARAMS.gap_thresholds == (0.0, 0.10, 0.20)
+
+def test_nico_v1_defaults_and_volatility_adjustment() -> None:
+    assert NICO_V1_PARAMS.version == "nico-v1"
+    assert NICO_V1_PARAMS.sma_months == 30 and NICO_V1_PARAMS.gap_thresholds == (0.0, 0.10, 0.20)
     # Serie tranquila (vol baja) vs serie agitada con el mismo descuento final:
     calm = [100.0 * (1.0 + 0.02 * ((-1) ** i)) for i in range(40)]
     wild = [100.0 * (1.0 + 0.25 * ((-1) ** i)) for i in range(40)]
-    v_calm = evaluate_series(_month_end_bars([*calm, 80.0]), month_complete=True)[-1]
-    v_wild = evaluate_series(_month_end_bars([*wild, 80.0]), month_complete=True)[-1]
+    v_calm = evaluate_series(_month_end_bars([*calm, 80.0]), params=NICO_V1_PARAMS, month_complete=True)[-1]
+    v_wild = evaluate_series(_month_end_bars([*wild, 80.0]), params=NICO_V1_PARAMS, month_complete=True)[-1]
     assert v_calm.metrics["vol"] < 0.30 < v_wild.metrics["vol"]
     # La misma caida bajo la SMA pesa mas en un valor tranquilo.
     assert v_calm.level > v_wild.level
@@ -183,7 +192,7 @@ def test_nico_v1_defaults_and_volatility_adjustment() -> None:
     # El precio de cada nivel es exacto: cerrar en el precio 2X da al menos 2X.
     p2 = v_wild.level_prices["2x"]
     assert p2 is not None
-    at = evaluate_series(_month_end_bars([*wild, p2 * 0.999]), month_complete=True)[-1]
+    at = evaluate_series(_month_end_bars([*wild, p2 * 0.999]), params=NICO_V1_PARAMS, month_complete=True)[-1]
     assert at.level >= 2
 
 
@@ -231,3 +240,89 @@ def test_near_zero_volatility_has_no_artificial_4x() -> None:
     assert verdict is not None
     assert verdict.level != 4
     assert verdict.metrics["vol_ratio"] == 1.0
+
+
+# --- Modo combinado (nico-v2): max(sma_gap, drawdown) -------------------------
+
+
+def _parabolic_crash() -> list[float]:
+    """Subida parabolica y caida del 27%: la SMA queda lejos, el drawdown manda."""
+    base = [100.0 + i for i in range(30)]  # 100 -> 129
+    spike = [150.0, 180.0, 210.0, 240.0, 260.0, 280.0]
+    return [*base, *spike, 280.0 * 0.73]
+
+
+def test_combined_drawdown_binds_after_parabolic_rise() -> None:
+    verdict = evaluate_series(_month_end_bars(_parabolic_crash()), month_complete=True)[-1]
+    # La caida desde el maximo es >= 25% (3X por drawdown) pero el cierre sigue
+    # muy por encima de la SMA de 30 meses (1X por sma_gap).
+    assert verdict.metrics["level_drawdown"] == 3
+    assert verdict.metrics["level_sma_gap"] == 1
+    assert verdict.level == 3
+    assert verdict.metrics["binding"] == "drawdown"
+    assert verdict.metrics["signal"] == "combined"
+
+
+def test_combined_sma_binds_on_slow_bleed() -> None:
+    # Sangrado lento con volatilidad realista (~30% anualizada, ajuste neutro):
+    # <15% bajo el maximo (1X por drawdown) pero bajo la SMA (>=2X por gap).
+    # Plano con oscilacion (vol realista) y descenso final al 91.5: 12.9% bajo
+    # el maximo (1X por drawdown) pero 8.5% bajo la SMA (~2X por gap).
+    closes = [95.0 if i % 2 else 105.0 for i in range(35)]
+    closes += [97.0, 95.0, 93.0, 92.0, 91.5]
+    verdict = evaluate_series(_month_end_bars(closes), month_complete=True)[-1]
+    assert verdict.metrics["level_drawdown"] == 1
+    assert verdict.metrics["level_sma_gap"] >= 2
+    assert verdict.level == verdict.metrics["level_sma_gap"]
+    assert verdict.metrics["binding"] == "sma_gap"
+
+
+def test_combined_binding_tie_declared() -> None:
+    # Ambas familias en 1X: precio sobre la SMA y caida menor del 15%.
+    closes = [100.0 + i * 2 for i in range(39)] + [100.0 + 38 * 2 - 5]
+    verdict = evaluate_series(_month_end_bars(closes), month_complete=True)[-1]
+    assert verdict.metrics["level_sma_gap"] == 1
+    assert verdict.metrics["level_drawdown"] == 1
+    assert verdict.metrics["binding"] == "empate"
+    assert verdict.level == 1
+
+
+def test_combined_level_price_is_the_first_reached() -> None:
+    verdict = evaluate_series(_month_end_bars(_parabolic_crash()), month_complete=True)[-1]
+    # El 3X lo fija el drawdown: precio = 75% del maximo previo (280 * 0.75).
+    assert verdict.level_prices["3x"] == pytest.approx(210.0, abs=0.01)
+    # Cerrar en ese precio activa al menos 3X (el precio mostrado es real).
+    at = evaluate_series(
+        _month_end_bars([*_parabolic_crash()[:-1], 210.0 * 0.999]), month_complete=True
+    )[-1]
+    assert at.level >= 3
+
+
+def test_combined_young_ticker_without_sma_uses_drawdown() -> None:
+    params = DcaParams(signal="combined", sma_min_months=None)  # exige 30 meses de SMA
+    closes = [100.0] * 14 + [70.0]  # 15 meses: sin SMA; drawdown 30% -> 3X
+    verdict = evaluate_series(_month_end_bars(closes), params=params, month_complete=True)[-1]
+    assert verdict.metrics["level_sma_gap"] is None
+    assert verdict.metrics["level_drawdown"] == 3
+    assert verdict.metrics["binding"] == "drawdown"
+    assert verdict.level == 3
+
+
+def test_combined_cap4_before_months_still_caps() -> None:
+    closes = [100.0] * 14 + [50.0]  # 15 meses, drawdown 50% -> 4X, pero cap en 24m
+    verdict = evaluate_series(_month_end_bars(closes), month_complete=True)[-1]
+    assert verdict.metrics["level_drawdown"] == 4
+    assert verdict.level == 3
+    assert verdict.level_prices["4x"] is None
+
+
+def test_combined_touched_is_max_of_families() -> None:
+    history = _parabolic_crash()
+    probe = evaluate_series(_month_end_bars(history), month_complete=True)[-1]
+    close = history[-1]
+    # Minimo intrames que toca 4X por drawdown (60% del maximo previo = 168).
+    bars = _month_end_bars(history)
+    bars[-1] = DailyBar(day=bars[-1].day, close=close, low=280.0 * 0.60 * 0.999)
+    verdict = evaluate_series(bars, month_complete=True)[-1]
+    assert verdict.touched_level == 4
+    assert probe.touched_level is None or probe.touched_level < 4

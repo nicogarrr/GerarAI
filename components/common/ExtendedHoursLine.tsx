@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 
-import { getExtendedQuote } from '@/lib/actions/watchlist.actions';
+import { getExtendedQuotes } from '@/lib/actions/watchlist.actions';
+import { batchedSymbol } from '@/lib/cache/batch-symbols';
 import { requestCache } from '@/lib/cache/requestCache';
 import { extendedQuoteLabel, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { formatNumber, formatPercent, formatPrice } from '@/lib/format';
@@ -37,7 +38,7 @@ export default function ExtendedHoursLine({
 
     useEffect(() => {
         let cancelled = false;
-        requestCache.get(`extended-quote:${symbol.toUpperCase()}`, () => getExtendedQuote(symbol), EXTENDED_QUOTE_TTL_S)
+        requestCache.get(`extended-quote:${symbol.toUpperCase()}`, () => batchedSymbol('extended-quote', symbol.toUpperCase(), (symbols) => getExtendedQuotes(symbols)), EXTENDED_QUOTE_TTL_S)
             .then((data) => {
                 if (!cancelled) setQuote(data);
             })

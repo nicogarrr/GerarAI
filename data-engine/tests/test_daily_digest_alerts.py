@@ -224,6 +224,13 @@ def test_actor_reports_emitted_and_already_emitted(db, monkeypatch):
     app = _patch_actor(monkeypatch, db, lambda *_a: SimpleNamespace(id=42))
     out = app.refresh_portfolio_moves.fn(tenant_id=1, user_id="owner")
     assert out["status"] == "ok" and out["digest_alert"] == "emitted" and out["digest_alert_id"] == 42
+    # El decorador de coalescencia retiene el claim ~20 h a proposito (drenado
+    # del backlog): la segunda llamada del test necesita claim fresco, lo mismo
+    # que el fixture autouse hace entre tests. Sin Redis es no-op.
+    from tests.conftest import reset_shared_redis_dedup_state
+
+    reset_shared_redis_dedup_state()
+
     app2 = _patch_actor(monkeypatch, db, lambda *_a: None)
     out2 = app2.refresh_portfolio_moves.fn(tenant_id=1, user_id="owner")
     assert out2["status"] == "ok" and out2["digest_alert"] == "already_emitted"

@@ -1,6 +1,6 @@
 // Ruta relativa con .ts a proposito: se importa desde tests con node --test.
 // @ts-expect-error TS5097
-import { AuthenticationError } from '../types/errors.ts';
+import { AppError, AuthenticationError } from '../types/errors.ts';
 
 /**
  * Los route handlers que exigen sesion lanzaban AuthenticationError fuera de un
@@ -14,6 +14,17 @@ export function withAuthErrors<A extends unknown[]>(
         try {
             return await handler(...args);
         } catch (error) {
+            // Cuenta pendiente/rechazada con sesión: 403 con el código
+            // estable del contrato, nunca un 500.
+            if (
+                error instanceof AppError
+                && (error.code === 'ACCOUNT_PENDING' || error.code === 'ACCOUNT_REJECTED')
+            ) {
+                return Response.json(
+                    { error: error.message, code: error.code },
+                    { status: 403, headers: { 'Cache-Control': 'no-store' } },
+                );
+            }
             if (error instanceof AuthenticationError) {
                 return Response.json(
                     { error: 'No autenticado' },

@@ -344,7 +344,7 @@ def _deriva_actual(url: str) -> list[str]:
     scratch = "migdrift_" + uuid.uuid4().hex[:12]
     engine = sa.create_engine(url, isolation_level="AUTOCOMMIT")
     with engine.connect() as conn:
-        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))
+        conn.execute(sa.text(f'CREATE DATABASE "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex generado por el propio test, sin input externo; BD efimera de CI
 
     anterior = os.environ.get("DATABASE_URL", "")
     try:
@@ -378,7 +378,7 @@ def _deriva_actual(url: str) -> list[str]:
         os.environ["DATABASE_URL"] = anterior
         get_settings.cache_clear()
         with engine.connect() as conn:
-            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))
+            conn.execute(sa.text(f'DROP DATABASE IF EXISTS "{scratch}"'))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex generado por el propio test, sin input externo; BD efimera de CI
         engine.dispose()
 
 

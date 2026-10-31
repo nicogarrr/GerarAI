@@ -45,6 +45,12 @@ FAKE_VENDOR_ITEMS = [
         "pb": None,
         "roe": None,
         "beta": None,
+        # Campos requeridos por ScreenerRealItemOut (response_model, #3698).
+        "priceAsOf": None,
+        "priceTimestampKind": "quote",
+        "priceDate": None,
+        "currency": "USD",
+        "has_fundamentals": False,
     },
     {
         "symbol": "NVDA",
@@ -62,6 +68,12 @@ FAKE_VENDOR_ITEMS = [
         "pb": None,
         "roe": None,
         "beta": None,
+        # Campos requeridos por ScreenerRealItemOut (response_model, #3698).
+        "priceAsOf": None,
+        "priceTimestampKind": "quote",
+        "priceDate": None,
+        "currency": "USD",
+        "has_fundamentals": False,
     },
 ]
 

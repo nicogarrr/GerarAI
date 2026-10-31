@@ -14,10 +14,10 @@ const panel = readFileSync('components/research/FundamentalModelPanels.tsx', 'ut
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
 test('drivers, KPIs y entradas faltantes pasan por metricLabel', () => {
-    assert.match(panel, /revenue_drivers\.map\(termLabel\)/);
-    assert.match(panel, /kpis\.map\(termLabel\)/);
-    assert.match(panel, /missing_inputs\.map\(termLabel\)/);
-    assert.match(page, /formula\.missing_inputs\.map\(termLabel\)/);
+    assert.match(panel, /revenue_drivers\.map\(\(item\) => termLabel\(item\)\)/);
+    assert.match(panel, /kpis\.map\(\(item\) => termLabel\(item\)\)/);
+    assert.match(panel, /missing_inputs\.map\(\(item\) => termLabel\(item\)\)/);
+    assert.match(page, /formula\.missing_inputs\.map\(\(item\) => termLabel\(item, locale\)\)/);
 });
 
 test('no queda «Value/share» en la UI y unknown/low/high tienen etiqueta en espanol', () => {

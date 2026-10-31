@@ -83,7 +83,42 @@ def changes_since(db: Session, company_id: int, since: datetime) -> dict[str, An
             "por_metrica": [{"metric": metric, "n": n} for metric, n in fact_rows],
         },
         "cambios_tesis": _project_changes(db, changes),
+        # «Qué ha cambiado» (idea Jera Value): valor anterior → nuevo por métrica, de los hechos ya guardados.
+        "cambios_metricas": _metric_changes(db, company_id, since, [metric for metric, _n in fact_rows]),
     }
+
+
+def _fact_value(fact: FinancialFact) -> dict[str, Any]:
+    return {"valor": float(fact.value), "periodo": fact.period, "fecha": fact.created_at.isoformat() if fact.created_at else None}
+
+
+def _metric_changes(db: Session, company_id: int, since: datetime, metrics: list[str]) -> list[dict[str, Any]]:
+    """Por métrica: el último dato guardado después de ``since`` y el que había antes.
+
+    Si antes existía el mismo periodo, ese es el anterior (una revisión); si no, el último
+    periodo que ya conocías. Sin dato previo, ``anterior`` es None (dato nuevo, no un cambio).
+    """
+    out: list[dict[str, Any]] = []
+    for metric in metrics:
+        base = select(FinancialFact).where(
+            FinancialFact.company_id == company_id, FinancialFact.metric == metric, *tenant_filters(db, FinancialFact)
+        )
+        order = (FinancialFact.created_at.desc(), FinancialFact.id.desc())
+        new = db.scalars(base.where(FinancialFact.created_at > since).order_by(*order).limit(1)).first()
+        if new is None:
+            continue
+        before = base.where(FinancialFact.created_at <= since)
+        old = db.scalars(before.where(FinancialFact.period == new.period).order_by(*order).limit(1)).first()
+        old = old or db.scalars(before.order_by(*order).limit(1)).first()
+        out.append({
+            "metric": metric,
+            "unidad": new.unit,
+            "anterior": _fact_value(old) if old is not None else None,
+            "nuevo": _fact_value(new),
+            "fuente": new.source_type,
+            "accession": new.accession_number,
+        })
+    return out
 
 
 def _project_changes(db: Session, changes: list[ThesisChange]) -> list[dict[str, Any]]:

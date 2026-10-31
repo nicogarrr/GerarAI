@@ -2,7 +2,15 @@ import { cache } from 'react';
 import { headers } from 'next/headers';
 
 import { getAuth } from '@/lib/better-auth/auth';
-import { AuthenticationError } from '@/lib/types/errors';
+import { AppError, AuthenticationError } from '@/lib/types/errors';
+import {
+  ACCOUNT_PENDING_CODE,
+  ACCOUNT_PENDING_MESSAGE,
+  ACCOUNT_REJECTED_CODE,
+  ACCOUNT_REJECTED_MESSAGE,
+  isAccountActive,
+  normalizeAccountStatus,
+} from '@/lib/auth/account-approval';
 
 export type AuthenticatedUser = {
   id: string;
@@ -31,6 +39,19 @@ const resolveSessionUser = cache(async (): Promise<AuthenticatedUser> => {
   const user = session?.user;
   if (!user?.id) {
     throw new AuthenticationError('User not authenticated');
+  }
+  // Gate central de aprobación: una sesión de una cuenta pending/rejected
+  // (p.ej. creada antes de un rechazo) no abre la app. Coste cero: la sesión
+  // ya está cargada y accountStatus viaja en ella (additionalFields). Las
+  // cuentas sin el campo (anteriores a la función) cuentan como aprobadas.
+  const rawStatus = (user as { accountStatus?: unknown }).accountStatus;
+  if (!isAccountActive(rawStatus)) {
+    const status = normalizeAccountStatus(rawStatus);
+    throw new AppError(
+      status === 'rejected' ? ACCOUNT_REJECTED_MESSAGE : ACCOUNT_PENDING_MESSAGE,
+      status === 'rejected' ? ACCOUNT_REJECTED_CODE : ACCOUNT_PENDING_CODE,
+      403,
+    );
   }
   return { id: user.id, email: user.email, name: user.name };
 });

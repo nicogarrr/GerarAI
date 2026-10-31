@@ -317,8 +317,12 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     const retrySection = (section: SectionKey) =>
         setRetryTokens((tokens) => ({ ...tokens, [section]: tokens[section] + 1 }));
 
-    // Primera carga: las cuatro lecturas en UNA server action (Next ejecuta en
-    // serie las server actions de un cliente; eran cuatro POST encadenados).
+    // Primera carga: las TRES lecturas rápidas en UNA server action (Next
+    // ejecuta en serie las server actions de un cliente). Oportunidades NO
+    // va en ese POST: su sondeo DCF cotiza con proveedores externos en
+    // síncrono (~7 s medidos en prod, 31-oct) y, al compartir promesa,
+    // hacía esperar a cartera, alertas y watchlist esos ~7 s antes de
+    // pintar. Se pide aparte, tras el primer pintado (debajo del pliegue).
     // Cada sección toma su parte; los «Reintentar» usan la lectura suelta.
     const bundleRef = useRef<{ userId: string; promise: Promise<HomeOverviewBundle> } | null>(null);
     const firstLoad = useCallback(<K extends keyof HomeOverviewBundle>(
@@ -330,9 +334,6 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                 userId,
                 promise: getHomeOverviewBundle(userId, {
                     watchlistLimit: WATCHLIST_PREVIEW_LIMIT,
-                    marketCapMoreThan: MIN_MARKET_CAP,
-                    limit: 10,
-                    candidateLimit: DCF_CANDIDATE_LIMIT,
                 }),
             };
         }
@@ -433,16 +434,16 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         const load = async () => {
             setOpportunitiesLoading(true);
             setOpportunitiesError(null);
-            const probe = retryTokens.opportunities === 0
-                ? await firstLoad('opportunities', [])
-                : await settle(
-                    getHomeOpportunities({
-                        marketCapMoreThan: MIN_MARKET_CAP,
-                        limit: 10,
-                        candidateLimit: DCF_CANDIDATE_LIMIT,
-                    }),
-                    [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
-                );
+            // Siempre lectura propia, también en primera carga: no forma
+            // parte del bundle del primer pintado (ver nota sobre firstLoad).
+            const probe = await settle(
+                getHomeOpportunities({
+                    marketCapMoreThan: MIN_MARKET_CAP,
+                    limit: 10,
+                    candidateLimit: DCF_CANDIDATE_LIMIT,
+                }),
+                [] as Awaited<ReturnType<typeof getHomeOpportunities>>,
+            );
             if (!active) return;
             if (probe.error) {
                 setOpportunities([]);
@@ -560,23 +561,28 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                                             className="flex min-h-[44px] flex-wrap items-center justify-between gap-3 p-3 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors border border-gray-700/30"
                                         >
                                             <span className="flex min-w-0 flex-1 flex-col gap-1">
-                                                <span className="flex min-w-0 items-center justify-between gap-3">
+                                                {/* Simbolo y valor en la MISMA fila que envuelve: antes el
+                                                    valor era hermano de una columna flex-1 cuyo minimo lo
+                                                    fijaba el chip DCA (~150px); con valores largos la
+                                                    columna se encogia y el chip tapaba el importe
+                                                    (medido en prod a 390px: ASTS/BN/RKLB). */}
+                                                <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                                                     <span className="text-white font-semibold">{h.symbol}</span>
                                                     {holdingDisplayMode(h) === 'gain' ? (
-                                                        <span className={`shrink-0 font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
+                                                        <span className={`font-mono ${h.gainPercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                             {formatPercent(h.gainPercent, { fromRatio: false, digits: 2, signDisplay: 'always' })}
                                                         </span>
                                                     ) : holdingDisplayMode(h) === 'value' && isValidCurrencyCode(h.baseCurrency) ? (
                                                         // Sin base de coste no hay rentabilidad (N/D), pero el valor y el peso
                                                         // salen de la cotización y se muestran con su divisa.
-                                                        <span className="shrink-0 text-right font-mono text-gray-300">
+                                                        <span className="text-right font-mono text-gray-300">
                                                             {formatMoney(h.value, h.baseCurrency)}
                                                             {portfolioSummary && portfolioSummary.equityValue > 0
                                                                 ? `\u00a0\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue) * 100, { fromRatio: false, digits: 1 })}`
                                                                 : ''}
                                                         </span>
                                                     ) : (
-                                                        <span className="shrink-0 font-mono text-gray-500">{NA}</span>
+                                                        <span className="font-mono text-gray-500">{NA}</span>
                                                     )}
                                                 </span>
                                                 <span className="flex flex-wrap items-center gap-1">
