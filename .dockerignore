@@ -49,6 +49,13 @@ e2e/*
 !e2e/user-flows/
 e2e/user-flows/*
 !e2e/user-flows/warmup-routes.ts
+# Mismo motivo que warmup-routes.ts: playwright.config.ts (que `npm run build`
+# typechequea) importa ./e2e/fixtures/e2e-env y tests/unit/e2e/e2e-env-config.test.ts
+# importa ../../../e2e/fixtures/e2e-env. Sin el fichero en el contexto, el build
+# de frontend-prod falla con TS2307 (medido 2026-10-30, run 41144668084).
+!e2e/fixtures/
+e2e/fixtures/*
+!e2e/fixtures/e2e-env.ts
 
 # Debug
 npm-debug.log*

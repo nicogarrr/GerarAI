@@ -31,6 +31,15 @@ DEUDA_CONOCIDA = [
     "revision '0016_principle_jobs_snapshots' != fichero '0016_principle_jobs_and_portfolio_snapshots'",
 ]
 
+# Alembic crea alembic_version.version_num como VARCHAR(32): una revision mas
+# larga NO se puede registrar en ninguna base de datos (PostgreSQL aborta el
+# UPDATE de version con StringDataRightTruncation). Medido en el restore drill
+# de CI (seed -> alembic upgrade head) con 0108_add_database_check_constraints,
+# 35 caracteres, rojo en todos los runs del 2026-10-30/31. Renombrar una
+# revision ya aplicada rompe el historial, asi que el sitio barato de pillarlo
+# es este gate, antes del merge.
+_LIMITE_VERSION_NUM = 32
+
 _PATRON_PREFIJO = re.compile(r"^\d{4}_.+")
 _AUSENTE = object()
 
@@ -88,6 +97,12 @@ def violaciones_cadena(versions_dir: Path) -> list[str]:
             continue
         if revision != path.stem:
             problemas.append(f"{path.name}: revision '{revision}' != fichero '{path.stem}'")
+        if isinstance(revision, str) and len(revision) > _LIMITE_VERSION_NUM:
+            problemas.append(
+                f"{path.name}: revision '{revision}' mide {len(revision)} caracteres "
+                f"y alembic_version.version_num es VARCHAR({_LIMITE_VERSION_NUM}): "
+                "al aplicarla, el UPDATE de version aborta (StringDataRightTruncation)"
+            )
         if not _PATRON_PREFIJO.match(path.stem):
             problemas.append(f"{path.name}: el stem no empieza por prefijo de 4 digitos y '_'")
 
@@ -219,6 +234,18 @@ def test_ciclo_se_detecta(tmp_path):
     _migracion_sintetica(tmp_path, "0003_gamma", "0003_gamma", "0002_beta")
     problemas = violaciones_cadena(tmp_path)
     assert any("inalcanzables" in p for p in problemas), problemas
+
+
+def test_revision_mas_larga_que_varchar32_se_detecta(tmp_path):
+    _migracion_sintetica(tmp_path, "0001_alpha", "0001_alpha", None)
+    _migracion_sintetica(
+        tmp_path,
+        "0002_una_revision_con_nombre_larguisimo_de_mas",
+        "0002_una_revision_con_nombre_larguisimo_de_mas",
+        "0001_alpha",
+    )
+    problemas = violaciones_cadena(tmp_path)
+    assert any("VARCHAR(32)" in p for p in problemas), problemas
 
 
 def test_salto_huerfano_se_detecta(tmp_path):

@@ -1,6 +1,6 @@
 """Add database CHECK constraints for non-negative values.
 
-Revision ID: 0108_add_database_check_constraints
+Revision ID: 0108_add_db_check_constraints
 Revises: 0107_add_fk_cascades
 Create Date: 2026-10-30T22:30:00.000Z
 
@@ -16,7 +16,7 @@ Fulfills: VAL-DB-003, VAL-DB-008
 
 from alembic import op
 
-revision = "0108_add_database_check_constraints"
+revision = "0108_add_db_check_constraints"
 down_revision = "0107_add_fk_cascades"
 branch_labels = None
 depends_on = None
