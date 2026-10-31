@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import httpx
 
 from app.core.config import get_settings
-from app.services.connectors.base import get_with_retry
+from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.data_source_health import get_data_source_registry
+
+# Clave en el registry de salud de fuentes. 400/404 son dato por ticker y NO
+# degradan; 401/403 (clave rechazada), 429 y 5xx SI (fuente inutilizable).
+REGISTRY_KEY = "finnhub"
 
 
 class FinnhubClient:
@@ -35,9 +41,29 @@ class FinnhubClient:
         url = f"{self.base_url}{path}"
         query = {**params, "token": self.settings.finnhub_api_key}
         retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
-        async with httpx.AsyncClient(timeout=30) as client:
-            response = await get_with_retry(lambda: client.get(url, params=query), **retry_kwargs)
-            return response.json()
+        registry = get_data_source_registry()
+        started = time.perf_counter()
+        try:
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await get_with_retry(lambda: client.get(url, params=query), **retry_kwargs)
+                payload = response.json()
+        except UpstreamRateLimited:
+            registry.record_failure(REGISTRY_KEY, "HTTP 429: cuota/rate limit agotada")
+            raise
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in (400, 404):
+                # Ticker sin dato: la fuente respondio; no se degrada.
+                raise
+            registry.record_failure(REGISTRY_KEY, f"HTTP {exc.response.status_code}")
+            raise
+        except httpx.TransportError as exc:
+            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+            raise
+        except ValueError:
+            registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
+            raise
+        registry.record_success(REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+        return payload
 
     async def quote(self, ticker: str, *, max_retries: int | None = None) -> dict[str, Any]:
         payload = await self._get("/quote", {"symbol": ticker.upper()}, max_retries=max_retries)

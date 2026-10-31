@@ -37,6 +37,7 @@ from app.api.routes import (
     portfolio_moves,
     privacy,
     propicks,
+    propicks_radar,
     research_assistant,
     reviews,
     risk,
@@ -82,6 +83,7 @@ api_router.include_router(portfolio_images.router, prefix="/portfolio", tags=["p
 api_router.include_router(portfolio_moves.router, prefix="/portfolio", tags=["portfolio"])
 api_router.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
 api_router.include_router(propicks.router, prefix="/propicks", tags=["propicks"])
+api_router.include_router(propicks_radar.router, prefix="/propicks", tags=["propicks"])
 api_router.include_router(plan.router, prefix="/plan", tags=["plan"])
 api_router.include_router(ownership.router, prefix="/ownership", tags=["ownership"])
 api_router.include_router(investors.router, prefix="/investors", tags=["investors"])

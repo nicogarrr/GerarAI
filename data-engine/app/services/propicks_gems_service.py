@@ -158,10 +158,13 @@ def _latest_fcf_and_shares(db: Session, min_fiscal_year: int) -> dict[int, tuple
             fcf.setdefault(cid, (fy, float(value), period))
         else:
             sh.setdefault(cid, (fy, float(value)))
+    # Mismo ejercicio para FCF y acciones (doctrina del P/B: ejercicios
+    # distintos no se mezclan): una recompra o dilucion entre FYs haria el
+    # fcf_yield no verificable. Sin par del mismo FY: N/D (fail-closed).
     return {
         cid: (f[1], sh[cid][1], f[2])
         for cid, f in fcf.items()
-        if cid in sh and sh[cid][1] > 0
+        if cid in sh and sh[cid][1] > 0 and sh[cid][0] == f[0]
     }
 
 

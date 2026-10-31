@@ -4674,6 +4674,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/propicks/radar/opportunities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Radar Opportunities */
+        get: operations["list_radar_opportunities_api_propicks_radar_opportunities_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/propicks/radar/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enqueue Radar Scan
+         * @description Encola un lote del barrido (ops/sync manual; el diario lo da el scheduler).
+         *
+         *     El job es resumible por cursor: reintentar no duplica snapshots del día.
+         */
+        post: operations["enqueue_radar_scan_api_propicks_radar_scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/propicks/review": {
         parameters: {
             query?: never;
@@ -10467,6 +10506,8 @@ export interface components {
         };
         /** TransactionImportCommitRequest */
         TransactionImportCommitRequest: {
+            /** Source Filename */
+            source_filename?: string | null;
             /** Transactions */
             transactions: components["schemas"]["ParsedTransaction"][];
         };
@@ -10488,6 +10529,11 @@ export interface components {
             total_rows: number;
             /** Valid Rows Count */
             valid_rows_count: number;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: components["schemas"]["RowValidationError"][];
         };
         /** TtmMetricOut */
         TtmMetricOut: {
@@ -21814,6 +21860,92 @@ export interface operations {
         };
     };
     refresh_prices_api_propicks_prices_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_radar_opportunities_api_propicks_radar_opportunities_get: {
+        parameters: {
+            query?: {
+                page?: number;
+                level?: number | null;
+                sector?: string | null;
+                outside_tracked?: boolean;
+                quality?: string | null;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enqueue_radar_scan_api_propicks_radar_scan_post: {
         parameters: {
             query?: never;
             header?: {

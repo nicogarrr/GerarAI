@@ -21,6 +21,7 @@ Fulfills: VAL-DB-001 (limpieza de la deuda dejada por VAL-SEC-007)
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "0110_drop_dup_portfolio_fks"

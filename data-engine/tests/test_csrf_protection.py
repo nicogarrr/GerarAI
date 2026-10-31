@@ -40,6 +40,12 @@ def test_post_portfolio_add_without_csrf_returns_403(client: TestClient):
     assert "CSRF" in data["detail"]
 
 
+def test_delete_bajo_api_sin_token_sigue_dando_403(client: TestClient):
+    """DELETE mutante bajo /api/ sin token CSRF sigue dando 403."""
+    response = client.delete("/api/portfolio/transactions/1")
+    assert response.status_code == 403
+
+
 def test_get_csrf_token_endpoint(client: TestClient):
     """GET /api/csrf-token returns a valid CSRF token."""
     response = client.get("/api/csrf-token")

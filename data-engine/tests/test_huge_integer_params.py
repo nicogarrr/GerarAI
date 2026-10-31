@@ -42,7 +42,12 @@ def test_huge_integer_query_is_a_client_error(client, path):
 
 
 def test_huge_integer_path_id_is_not_a_server_error(client):
-    response = client.delete(f"/api/portfolio/transactions/{HUGE}")
+    from app.core.csrf import generate_csrf_token
+
+    # Token CSRF valido para que el middleware deje pasar la peticion y el
+    # handler responda 404/422 por el id fuera de rango (sin token seria 403).
+    headers = {"X-CSRF-Token": generate_csrf_token()}
+    response = client.delete(f"/api/portfolio/transactions/{HUGE}", headers=headers)
     assert response.status_code in (404, 422), (response.status_code, response.text[:300])
 
 

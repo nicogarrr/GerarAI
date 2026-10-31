@@ -544,9 +544,27 @@ describe('submitThesisHumanInput', () => {
 });
 
 describe('getResearchPortfolioPositions', () => {
-    it('pagina posiciones con la clave ticker', async () => {
-        researchRequest.mockResolvedValue([{ ticker: 'AAPL', quantity: 10 }]);
+    it('pide la primera página con page/page_size (el backend no acepta limit/offset)', async () => {
+        researchRequest.mockResolvedValue({ items: [{ ticker: 'AAPL', quantity: 10 }] });
         expect(await getResearchPortfolioPositions()).toEqual([{ ticker: 'AAPL', quantity: 10 }]);
-        expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?limit=2000&offset=0', { fast: true });
+        expect(researchRequest).toHaveBeenCalledTimes(1);
+        expect(researchRequest).toHaveBeenCalledWith('/api/portfolio/positions?page=1&page_size=200', { fast: true });
+    });
+
+    it('avanza de página hasta una página corta y devuelve todas las posiciones', async () => {
+        const firstPage = Array.from({ length: 200 }, (_, i) => ({ ticker: `T${i}`, quantity: 1 }));
+        researchRequest
+            .mockResolvedValueOnce({ items: firstPage })
+            .mockResolvedValueOnce({ items: [{ ticker: 'LAST', quantity: 2 }] });
+        const result = await getResearchPortfolioPositions();
+        expect(result).toHaveLength(201);
+        expect(result.at(-1)).toEqual({ ticker: 'LAST', quantity: 2 });
+        expect(researchRequest).toHaveBeenNthCalledWith(1, '/api/portfolio/positions?page=1&page_size=200', { fast: true });
+        expect(researchRequest).toHaveBeenNthCalledWith(2, '/api/portfolio/positions?page=2&page_size=200', { fast: true });
+    });
+
+    it('respuesta vacía paginada -> sin posiciones', async () => {
+        researchRequest.mockResolvedValue({ items: [] });
+        expect(await getResearchPortfolioPositions()).toEqual([]);
     });
 });

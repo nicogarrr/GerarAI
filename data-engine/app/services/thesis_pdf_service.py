@@ -37,12 +37,12 @@ class PdfSection:
 
 @dataclass
 class HoldingItem:
-    """Activo o posición en cartera."""
+    """Activo o posición en cartera. price/value a None = sin dato verificado (se muestra N/D)."""
 
     ticker: str
     shares: float
-    price: float
-    value: float
+    price: float | None
+    value: float | None
     weight: str
     currency: str = ""
     price_is_cost: bool = False
@@ -175,11 +175,16 @@ def build_thesis_pdf(data: ThesisPdfData) -> bytes:
             ax1.text(0.06, current_y, "Composición de la Cartera", fontsize=13, weight="bold", color="#1e293b", va="top")
             current_y -= 0.03
             table_data = [["Activo", "Títulos", "Precio", "Valor", "Peso"]]
+
+            def _fmt_money(v: float | None, ccy: str, is_cost: bool = False) -> str:
+                if v is None:
+                    return "n/d"
+                lbl = f"{v:,.2f} {ccy}".strip()
+                return lbl + (" *" if is_cost else "")
+
             for h in data.holdings[:6]:
-                price_lbl = f"{h.price:,.2f} {h.currency}".strip()
-                if h.price_is_cost:
-                    price_lbl += " *"
-                value_lbl = f"{h.value:,.2f} {h.value_currency}".strip()
+                price_lbl = _fmt_money(h.price, h.currency, h.price_is_cost)
+                value_lbl = _fmt_money(h.value, h.value_currency)
                 table_data.append([h.ticker, f"{h.shares:,.2f}", price_lbl, value_lbl, h.weight])
 
             tbl = ax1.table(
@@ -359,26 +364,32 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
     )
 
     base_ccy = (portfolio.base_currency or "EUR").upper()
+    # quantity/market_price/average_cost son NOT NULL en positions (Numeric, default 0).
+    # Una posicion con valoracion en suspenso (split sin precio verificado, coste
+    # "Realized P/L not ready" de IBKR, etc.) NO tiene precio fiable: se muestra
+    # n/d y se excluye del total, nunca se inventa un 0.
     holdings: list[HoldingItem] = []
     rows: list[tuple] = []
     for p in positions:
-        qty = float(p.quantity or 0)
-        market_px = float(p.market_price or 0)
-        cost_px = float(p.average_cost or 0)
-        price_is_cost = not market_px and bool(cost_px)
-        px = market_px if market_px else cost_px
+        qty = float(p.quantity)
+        held = bool(p.valuation_hold_reason)
+        market_px = float(p.market_price)
+        cost_px = float(p.average_cost)
+        price_is_cost = not held and not market_px and bool(cost_px)
+        px = None if held else (market_px if market_px else cost_px)
         native_ccy = (p.currency or "").upper()
         # Valor en divisa base si el libro lo tiene; si no, valor nativo estimado.
-        base_val = float(p.market_value_base) if p.market_value_base is not None else None
-        val = base_val if base_val is not None else qty * px
+        base_val = None if held else (float(p.market_value_base) if p.market_value_base is not None else None)
+        val = None if px is None else (base_val if base_val is not None else qty * px)
         rows.append((p, qty, px, price_is_cost, native_ccy, val, base_val is not None))
 
     # Pesos solo comparables cuando todas las valoraciones comparten divisa.
-    all_base = bool(rows) and all(r[6] for r in rows)
-    same_ccy = len({(base_ccy if r[6] else r[4]) for r in rows}) <= 1
-    total_val = sum(r[5] for r in rows) if (all_base or same_ccy) else 0.0
+    valued_rows = [r for r in rows if r[5] is not None]
+    all_base = bool(valued_rows) and all(r[6] for r in valued_rows)
+    same_ccy = len({(base_ccy if r[6] else r[4]) for r in valued_rows}) <= 1
+    total_val = sum(r[5] for r in valued_rows) if (all_base or same_ccy) else 0.0
     for p, qty, px, price_is_cost, native_ccy, val, is_base in rows:
-        weight = f"{(val / total_val * 100):.1f}%" if total_val > 0 else "n/d"
+        weight = "n/d" if val is None or total_val <= 0 else f"{(val / total_val * 100):.1f}%"
         ticker_name = p.company.ticker if p.company else f"ACT-{p.company_id}"
         holdings.append(
             HoldingItem(
@@ -394,10 +405,11 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
         )
 
     cost_rows = sum(1 for r in rows if r[3])
+    held_rows = sum(1 for r in rows if r[5] is None)
     composition_body = ""
     if rows:
         if total_val > 0:
-            top = sorted(rows, key=lambda r: r[5], reverse=True)[:3]
+            top = sorted(valued_rows, key=lambda r: r[5], reverse=True)[:3]
             lines = []
             for p, _qty, _px, _pc, _ccy, val, _ib in top:
                 share = f"{(val / total_val * 100):.1f}%"
@@ -405,16 +417,22 @@ def export_portfolio_pdf_report(db: Session, portfolio_id: int) -> tuple[bytes, 
                 lines.append(f"{name}: {share}")
             composition_body = "Mayores posiciones por peso estimado: " + ", ".join(lines) + "."
         else:
-            # Divisas mezcladas sin valor consolidado: no se ordenan por peso.
             names = [p.company.ticker if p.company else f"ACT-{p.company_id}" for p, *_r in rows]
-            composition_body = (
-                "Posiciones: " + ", ".join(names) + ". "
-                "Pesos no calculables: hay posiciones en divisas distintas sin valor consolidado en divisa base."
-            )
+            if not valued_rows:
+                reason = "todas las posiciones tienen la valoración en suspenso (sin precio verificado)"
+            elif not same_ccy:
+                # Divisas mezcladas sin valor consolidado: no se ordenan por peso.
+                reason = "hay posiciones en divisas distintas sin valor consolidado en divisa base"
+            else:
+                reason = "ninguna posición tiene valor consolidado distinto de cero"
+            composition_body = "Posiciones: " + ", ".join(names) + ". Pesos no calculables: " + reason + "."
+
 
     limitations: list[str] = []
     if cost_rows:
         limitations.append(f"{cost_rows} posición(es) valorada(s) al coste de adquisición por falta de cotización")
+    if held_rows:
+        limitations.append(f"{held_rows} posición(es) con valoración en suspenso (sin precio verificado): n/d y excluida(s) del total")
     ccys = sorted({r[4] for r in rows if r[4]})
     if len(ccys) > 1:
         limitations.append("posiciones en varias divisas (" + ", ".join(ccys) + ")")

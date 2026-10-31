@@ -25,6 +25,7 @@ const TabFallback = () => (
 );
 
 const RadarGlobalView = dynamic(() => import('./RadarGlobalView'), { loading: TabFallback });
+const RadarDcaView = dynamic(() => import('./RadarDcaView'), { loading: TabFallback });
 const GemsView = dynamic(() => import('./GemsView'), { loading: TabFallback });
 const DeepValueView = dynamic(() => import('./DeepValueView'), { loading: TabFallback });
 const PaperTradingView = dynamic(() => import('./PaperTradingView'), { loading: TabFallback });
@@ -167,11 +168,15 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 </TabsTrigger>
                 <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Resultados simulados de la IA</TabsTrigger>
                 <TabsTrigger value="radar" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Radar global</TabsTrigger>
+                <TabsTrigger value="oportunidades" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Oportunidades DCA</TabsTrigger>
             </TabsList>
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView /></TabsContent>
             <TabsContent value="radar" className="mt-6">
                 {activeTab === 'radar' && <RadarGlobalView />}
+            </TabsContent>
+            <TabsContent value="oportunidades" className="mt-6">
+                {activeTab === 'oportunidades' && <RadarDcaView />}
             </TabsContent>
 
             {/* forceMount: Radix desmonta el panel inactivo y EnhancedProPicksContent

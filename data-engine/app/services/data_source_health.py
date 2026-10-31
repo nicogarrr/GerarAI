@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitState(StrEnum):
-    CLOSED = "closed"        # Operativo normal
-    OPEN = "open"            # Cortocircuitado tras fallos consecutivos (usa fallback)
+    CLOSED = "closed"  # Operativo normal
+    OPEN = "open"  # Cortocircuitado tras fallos consecutivos (usa fallback)
     HALF_OPEN = "half_open"  # Probando recuperación
 
 
@@ -66,7 +66,10 @@ class DataSourceStatus:
             else:
                 logger.info(
                     "Fallo registrado en fuente '%s' (%d/%d): %s",
-                    self.name, self.consecutive_failures, self.failure_threshold, error,
+                    self.name,
+                    self.consecutive_failures,
+                    self.failure_threshold,
+                    error,
                 )
 
     def can_attempt(self) -> bool:
@@ -130,10 +133,40 @@ class DataSourceHealthRegistry:
                 is_primary=True,
                 fallback_source="cached_fx",
             ),
+            "stooq": DataSourceStatus(
+                name="Stooq",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "finnhub": DataSourceStatus(
+                name="Finnhub",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "fmp": DataSourceStatus(
+                name="Financial Modeling Prep",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "damodaran": DataSourceStatus(
+                name="Damodaran (NYU Stern)",
+                is_primary=False,
+                fallback_source="settings_erp",
+            ),
             "sec_edgar": DataSourceStatus(
                 name="SEC EDGAR",
                 is_primary=False,
                 fallback_source="hf_snapshot",
+            ),
+            "esef": DataSourceStatus(
+                name="ESEF (filings.xbrl.org)",
+                is_primary=False,
+                fallback_source="esef_snapshot",
+            ),
+            "openfigi": DataSourceStatus(
+                name="OpenFIGI",
+                is_primary=False,
+                fallback_source=None,
             ),
             "cnmv": DataSourceStatus(
                 name="CNMV",
