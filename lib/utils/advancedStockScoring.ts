@@ -48,8 +48,6 @@ export const SCORING_WEIGHTS = {
     debtLiquidity: 0.15,
 } as const;
 
-export type ScoringCategory = keyof typeof SCORING_WEIGHTS;
-
 export interface AdvancedScoreData {
     overallScore: number; // 0-100
     grade: 'A+' | 'A' | 'A-' | 'B+' | 'B' | 'B-' | 'C+' | 'C' | 'C-' | 'D' | 'F';
