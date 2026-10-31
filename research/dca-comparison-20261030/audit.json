@@ -1,0 +1,386 @@
+[
+  {
+    "symbol": "SPY",
+    "status": "included",
+    "rows": 8475,
+    "sha256": "5cca2841b94f94979e3c558eab174d14349e7ab68752789b892b0ff9e5b1594a"
+  },
+  {
+    "symbol": "QQQ",
+    "status": "included",
+    "rows": 6933,
+    "sha256": "40183dca84d9b1c9d19f3b33422537d672c3a0086d2d1c6bfb897d41e152a5d9"
+  },
+  {
+    "symbol": "DIA",
+    "status": "included",
+    "rows": 7219,
+    "sha256": "5aa41ecd57b91e30347c860c34b6ac0381eb87f243b8621c7a37cc11ddb54680"
+  },
+  {
+    "symbol": "IWM",
+    "status": "included",
+    "rows": 6625,
+    "sha256": "b4700be252f9469ee25c6bc214340bbcc15629f4e04b87a0561266b3559525bc"
+  },
+  {
+    "symbol": "EFA",
+    "status": "included",
+    "rows": 6310,
+    "sha256": "cc2e5f73f3e3648dd8612e03fa9f877e891a63edc90876f90415aea1049e4768"
+  },
+  {
+    "symbol": "EEM",
+    "status": "included",
+    "rows": 5904,
+    "sha256": "6a32b36b255d1498b35e6b59c5253f8fa89542191315b1c32b74e457c1e21cad"
+  },
+  {
+    "symbol": "XLF",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "86a2e124063f3d8f8acb264eaab42ed808a0cb023ac29113aebf56919996885a"
+  },
+  {
+    "symbol": "XLK",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "13a3510fbe448ed159707ebb272106e2797cdb91b9055e525cd9e92ab4921eb0"
+  },
+  {
+    "symbol": "XLE",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "e28732fd3cd05bb45e5bcb9dcac2169c5bbc655feab169e01c7c939039dad5b8"
+  },
+  {
+    "symbol": "XLV",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "24e74362c89ddc240f6312885b2e0351197e33e7abf970d08f27043c4470fd82"
+  },
+  {
+    "symbol": "XLI",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "464cd79c7c534d705feb8879a568977f5cfe1e8b520fe186ecf6d85d0a28d253"
+  },
+  {
+    "symbol": "XLP",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "3b5057a82f9a9a77d98096b15a905d000ae747989052e8d135f8b5db672a1f06"
+  },
+  {
+    "symbol": "XLU",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "88ac1ba4868a3639a9b207f59746955c5bef0cdb1ccfc0fb7681d9c2ce723754"
+  },
+  {
+    "symbol": "XLB",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "3755660e5058c14e5b0063386c30f0853d236bd100f4f420dd0e80c7d7f62780"
+  },
+  {
+    "symbol": "XLY",
+    "status": "included",
+    "rows": 6985,
+    "sha256": "6996209eb4e2b8e875004df27d98328707f93d0024811d588bf832fe983eeff7"
+  },
+  {
+    "symbol": "AMZN",
+    "status": "included",
+    "rows": 7390,
+    "sha256": "2c6d0483f713f8eefa01f2afb4f283c448a70b89301db338c3742794b4fbb63e"
+  },
+  {
+    "symbol": "NOW",
+    "status": "included",
+    "rows": 3583,
+    "sha256": "2e25e715b151bad64df1fc8184c085df812dd069711c0003f20fba95d3bb85eb"
+  },
+  {
+    "symbol": "META",
+    "status": "included",
+    "rows": 3612,
+    "sha256": "8111d175eeb8a4ca4f2feff90d82a4ff2a98d92bfe7a94a1195ab5c6f572c2df"
+  },
+  {
+    "symbol": "GOOGL",
+    "status": "included",
+    "rows": 5564,
+    "sha256": "f880d0637b3c4db8d8269f59e03d56ae5404b8ff499f43a876c956d05206ed44"
+  },
+  {
+    "symbol": "GOOG",
+    "status": "included",
+    "rows": 5564,
+    "sha256": "c09cceeba23c6bf9fede29d656cead73d764b646d5afd156aff1f79fde948a57"
+  },
+  {
+    "symbol": "AAPL",
+    "status": "included",
+    "rows": 11542,
+    "sha256": "283981c2c0c5bf4ec10b9bc3aa43a6d09ec27d5919e940f43a482e7772edbd03"
+  },
+  {
+    "symbol": "MSFT",
+    "status": "included",
+    "rows": 10216,
+    "sha256": "5710fc5b351e021562fe1bb46cfc7cf73aa14a9c7e39913eaf3e6d0f0e1ae5d3"
+  },
+  {
+    "symbol": "NVDA",
+    "status": "included",
+    "rows": 6965,
+    "sha256": "2d107f201ea5e77eb6b3aea9fc37be273c6f9d3399e63af2e884d5e2dca91ead"
+  },
+  {
+    "symbol": "INTC",
+    "status": "included",
+    "rows": 11730,
+    "sha256": "4d8fcff4f482b5b173c5b5bfc6c397cadbf6f0094939773be271a7fbd89f67e7"
+  },
+  {
+    "symbol": "IBM",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "9346544cf0fae7bbac3e4a71989a516b4fa42b4cf19af4ff305b1c0328f5b01f"
+  },
+  {
+    "symbol": "ORCL",
+    "status": "included",
+    "rows": 10217,
+    "sha256": "6de5ceef89c2105bd9b362c39ef1ab686822a1c2fb9efa36a3e1b4faa32233be"
+  },
+  {
+    "symbol": "CSCO",
+    "status": "included",
+    "rows": 9221,
+    "sha256": "59a073c241e24f052502aac50542c8cb38f91bd335a9e4e8ff33b5a85558f034"
+  },
+  {
+    "symbol": "ADBE",
+    "status": "included",
+    "rows": 10110,
+    "sha256": "989c0bf579d338a2afd8860d2fcdd8f3dd9846d458871478dffdc160cf281878"
+  },
+  {
+    "symbol": "CRM",
+    "status": "included",
+    "rows": 5604,
+    "sha256": "d4f5c81835e12a3d62600ae5bc6f8f909ee045e9227190b8c4ca59fb736239e2"
+  },
+  {
+    "symbol": "PYPL",
+    "status": "included",
+    "rows": 2827,
+    "sha256": "b4fe2a2d3d94a33a54eef0a558994c4f5e79f1a332e6c481f686b47f8db0594f"
+  },
+  {
+    "symbol": "NFLX",
+    "status": "included",
+    "rows": 6128,
+    "sha256": "ba7f5c0a47106b33ef459aaa430d29794452b332599765b4063e03c11edd7c7d"
+  },
+  {
+    "symbol": "TSLA",
+    "status": "included",
+    "rows": 4089,
+    "sha256": "9ea7ae35b4d81e634e6daf75cd37def2ecaf492bf0855655cbd106325fa62359"
+  },
+  {
+    "symbol": "BABA",
+    "status": "included",
+    "rows": 3025,
+    "sha256": "d24336d45b5452096bb1fd5dad1fd8f60888ce5f57c4fb072f4bc0be0160a552"
+  },
+  {
+    "symbol": "BIDU",
+    "status": "included",
+    "rows": 5321,
+    "sha256": "316c02bab96c8ffbdcbea0af6c32da21672e121034e19c14ab5a7f391ae6d836"
+  },
+  {
+    "symbol": "SNAP",
+    "status": "included",
+    "rows": 2409,
+    "sha256": "f31ea8c2e374c0e60e1684be4965115dca97170cc3d7eded53a8d0917ac98edd"
+  },
+  {
+    "symbol": "ROKU",
+    "status": "included",
+    "rows": 2263,
+    "sha256": "16da69235df88dcdc2a12c91382b6fb46007215a8a0c526bfde3abb08156a7b7"
+  },
+  {
+    "symbol": "ZM",
+    "status": "included",
+    "rows": 1873,
+    "sha256": "977148a141ecdda7cde5ac3b96c9458b0a78631ecee5691f4efed08c3dcb371d"
+  },
+  {
+    "symbol": "PTON",
+    "status": "included",
+    "rows": 1762,
+    "sha256": "8fdabf13a71b001fd6b0dedfafac6c3da097d1df4a353af583a4d932a19347d1"
+  },
+  {
+    "symbol": "PARA",
+    "status": "included",
+    "rows": 1414,
+    "sha256": "ab6518a6fe1231ec9fd34ad96f32cba2e8b1418b101409b9f00f066914f59de1"
+  },
+  {
+    "symbol": "GE",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "db18c7c19c344ade023f34ec109edcf212ad730bd942a0e33dd48ef895c1155d"
+  },
+  {
+    "symbol": "F",
+    "status": "included",
+    "rows": 13696,
+    "sha256": "3476be88970a6f1b728ff130c41c9b1aaa35bdcaf2f49fadb574956a500bb463"
+  },
+  {
+    "symbol": "C",
+    "status": "included",
+    "rows": 12539,
+    "sha256": "781d77fa7dca3a0f48f5277706198de5934eddda8b2ebf79afe498df082b4c29"
+  },
+  {
+    "symbol": "BA",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "5b4a97f9585a3a5912e14b3d6384c77a236ef4b192f8e4e1f149eb21d18a92cf"
+  },
+  {
+    "symbol": "DIS",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "2b96cac49a7e1deb67071e3668063d818fbb6242ac1e6dafce2dfa94dbeb8b1a"
+  },
+  {
+    "symbol": "XOM",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "b51b2a981604573b184858e4ddb2374fe0051500d588a1ee29aceae67dffb42a"
+  },
+  {
+    "symbol": "CVX",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "addf2f2c1471f0a33db09c2019069db3853dfbea38344c861810f11297d60e8f"
+  },
+  {
+    "symbol": "JPM",
+    "status": "included",
+    "rows": 11730,
+    "sha256": "0e1dcb19356cde09a0796da79d5cdc5a4034ccbd4b25a3738ccfd0a382dd1cc2"
+  },
+  {
+    "symbol": "BAC",
+    "status": "included",
+    "rows": 13516,
+    "sha256": "da3b105a3cc6de011e75c8f29bc1e2d246bde9e4b8522b25f763f90c6e6015c3"
+  },
+  {
+    "symbol": "WFC",
+    "status": "included",
+    "rows": 13696,
+    "sha256": "37cd8660ab104fb81bc7b0390b8afaf3945b1bdf7287f7aad9473d9ceabeccad"
+  },
+  {
+    "symbol": "JNJ",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "756e87628b02f2d2a8851e83c21f92c4d8c7169af7626b3e7d27e805abecde83"
+  },
+  {
+    "symbol": "PFE",
+    "status": "included",
+    "rows": 13696,
+    "sha256": "5d67ea7eb788b33261e6e9976cb80fbc0a85e911511f5ff692659ad4bc0b123f"
+  },
+  {
+    "symbol": "MRK",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "e71885ca99496165d89f0a6060975d2f7bf81a5146919c94b934cfc9a77b4e61"
+  },
+  {
+    "symbol": "KO",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "64265dfa2847f738f5095df5d6a07afc376b5ebbf924223533d900e07fb2116a"
+  },
+  {
+    "symbol": "PEP",
+    "status": "included",
+    "rows": 13696,
+    "sha256": "24354959c7625b363904310c8017c3b1ad0a94a7f4e4ca13e92fb2d635967423"
+  },
+  {
+    "symbol": "WMT",
+    "status": "included",
+    "rows": 13636,
+    "sha256": "92caf347e56cc1d7da0b679d0e5f9313c0e02a8bbfbdc24d67caff077c2f1763"
+  },
+  {
+    "symbol": "TGT",
+    "status": "included",
+    "rows": 13516,
+    "sha256": "1671fa91b128478bbc8789063312af964bc24320db6237471ec5c8841d718265"
+  },
+  {
+    "symbol": "HD",
+    "status": "included",
+    "rows": 11347,
+    "sha256": "1bb37018649f0027fdec884afa8e1349035a0d054897e155e16ff514828d89f0"
+  },
+  {
+    "symbol": "LOW",
+    "status": "included",
+    "rows": 11730,
+    "sha256": "df530711be00d0fcfd3643db24ef3b13ce4abe3e86ed366e9ff26f60f516b9fd"
+  },
+  {
+    "symbol": "MCD",
+    "status": "included",
+    "rows": 15160,
+    "sha256": "43c6073b990dd75ef0a4f1e46efbdf57d388469ac86b361b1a43e83cfa9f56a0"
+  },
+  {
+    "symbol": "NKE",
+    "status": "included",
+    "rows": 11550,
+    "sha256": "37952e0df27df4ce9a6cfe195844927b1586f6069555d1790bbfc4060bd922e8"
+  },
+  {
+    "symbol": "MMM",
+    "status": "included",
+    "rows": 16295,
+    "sha256": "5d902ba313c2734dba32df683477a45cad32ae2b46a2e5dfc65d03d9f8c5026d"
+  },
+  {
+    "symbol": "AIG",
+    "status": "included",
+    "rows": 13550,
+    "sha256": "46fef6dee71fb9ea0808478e1d263f28276c4ec788f39102a94c4203ae99f4b1"
+  },
+  {
+    "symbol": "T",
+    "status": "included",
+    "rows": 10798,
+    "sha256": "8caa1b268a2ac605c8be1cf33fdcf6ff1f24ee0b2deb96154a107ca93bc2f047"
+  },
+  {
+    "symbol": "VZ",
+    "status": "included",
+    "rows": 10798,
+    "sha256": "3406f61e9b02fcdf58d5cf7ca2e8b8c8a8193aa1703269088f8fa1c021e0466e"
+  }
+]
