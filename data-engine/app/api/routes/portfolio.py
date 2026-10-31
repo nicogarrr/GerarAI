@@ -66,12 +66,17 @@ from app.valuation.currency import canonical_currency_code
 router = APIRouter()
 
 
+# Un extracto Flex anual completo cabe con mucho en 15 MB; sin tope, un body
+# gigante se parsea entero en memoria (mismo vector que /import/file).
+MAX_IBKR_IMPORT_BYTES = 15 * 1024 * 1024
+
+
 class IBKRXmlImportRequest(BaseModel):
-    xml: str = Field(min_length=20)
+    xml: str = Field(min_length=20, max_length=MAX_IBKR_IMPORT_BYTES)
 
 
 class IBKRCsvImportRequest(BaseModel):
-    csv: str = Field(min_length=10)
+    csv: str = Field(min_length=10, max_length=MAX_IBKR_IMPORT_BYTES)
 
 
 # Umbral fiscal: más de 365 días en cartera = largo plazo.
