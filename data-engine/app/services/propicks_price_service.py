@@ -152,24 +152,31 @@ class PriceBar:
     day: date
     close: Decimal
     adj_close: Decimal
-    volume: int
+    volume: int | None  # None = la fuente no da el dato; 0 explicito es dato
     quote_currency: str | None = None
     market_timezone: str | None = None
     session_end: datetime | None = None
 
 
-def _volume(raw: Any) -> int:
-    """Volumen entero; NaN/None/no numerico -> 0.
+def _volume(raw: Any) -> int | None:
+    """Volumen entero; NaN/None/no numerico/negativo -> None (ausente).
 
     yfinance devuelve Volume=NaN en algunas sesiones (indices, LSE, dias
     festivos parciales). ``int(nan)`` lanzaba ValueError fuera del try por
     simbolo y abortaba la descarga ENTERA del lote: ningun cierre escrito.
+    Un 0 EXPLICITO de la fuente se conserva como 0: None y 0 no son lo
+    mismo (None = sin dato; 0 = dato), y mezclarlos hacia que una ausencia
+    pisara el volumen real guardado o que un 0 legitimo se perdiera.
     """
+    if raw is None:
+        return None
     try:
         value = float(raw)
     except (TypeError, ValueError):
-        return 0
-    return int(value) if math.isfinite(value) and value > 0 else 0
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return int(value)
 
 
 def fetch_history_yfinance(
@@ -293,9 +300,8 @@ def upsert_prices(
             continue
         if not bar_unit_is_known(company, bar):
             continue
-        # Volumen ausente (yfinance NaN -> 0) es NULL, nunca un 0 fabricado
-        # (contrato del modelo: 0 coronaba al ticker como el menos activo).
-        volume = bar.volume if bar.volume > 0 else None
+        # None = ausente -> NULL/preserva; 0 explicito de la fuente es dato.
+        volume = bar.volume
         values = {
             "company_id": company.id,
             "date": bar.day,
