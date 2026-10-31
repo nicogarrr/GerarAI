@@ -1,3 +1,4 @@
+import ast
 import os
 import shutil
 import subprocess
@@ -85,10 +86,30 @@ def test_latest_fundamental_migration_is_explicit_and_not_metadata_driven():
     assert "decision_journal_entries" in migration
 
 
+def _executable_code(source: str) -> str:
+    """Devuelve el codigo sin comentarios y con docstrings vaciados.
+
+    El guard de migraciones congeladas debe inspeccionar codigo, no prosa:
+    un docstring que mencione "Base.metadata" (p.ej. describiendo como se
+    midio la reconciliacion) no es una importacion de metadata mutable.
+    """
+    tree = ast.parse(source.lstrip("\ufeff"))
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            first = node.body[0] if node.body else None
+            if (
+                isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)
+            ):
+                first.value.value = ""
+    return ast.unparse(tree)
+
+
 def test_every_committed_migration_is_frozen_and_explicit():
     versions = Path(__file__).resolve().parents[1] / "alembic" / "versions"
 
     for path in sorted(versions.glob("*.py")):
-        migration = path.read_text(encoding="utf-8")
+        migration = _executable_code(path.read_text(encoding="utf-8"))
         assert "Base.metadata" not in migration, f"{path.name} imports mutable ORM metadata"
         assert "metadata.create_all" not in migration, f"{path.name} creates the current schema dynamically"
