@@ -487,26 +487,33 @@ class PortfolioSnapshotService:
         *,
         start: date | None = None,
         page: int = 1,
-        page_size: int = 20,
+        page_size: int | None = 20,
         offset: int | None = None,
     ) -> list[PortfolioDailySnapshot]:
+        """Historial ascendente; ``page_size=None`` devuelve la ventana entera.
+
+        El endpoint pagina (20 por defecto). Los consumidores internos que
+        calculan rentabilidad (portfolio_intelligence_service) necesitan TODA
+        la ventana: con el default recibian las 20 sesiones mas antiguas y un
+        TWR de un mes se publicaba como el de la ventana completa.
+        """
         portfolio = self.fx.portfolio(db)
         if portfolio is None:
             return []
-        # offset explicito (contrato limit/offset) gana a la pagina derivada:
-        # la division entera pierde desplazamientos no multiplos de limit.
-        if offset is None:
-            offset = (page - 1) * page_size
         statement = select(PortfolioDailySnapshot).where(
             PortfolioDailySnapshot.portfolio_id == portfolio.id
         )
         if start:
             statement = statement.where(PortfolioDailySnapshot.snapshot_date >= start)
-        return list(
-            db.scalars(
-                statement.order_by(PortfolioDailySnapshot.snapshot_date).limit(page_size).offset(offset)
-            ).all()
-        )
+        statement = statement.order_by(PortfolioDailySnapshot.snapshot_date)
+        if page_size is not None:
+            # offset explicito (contrato limit/offset) gana a la pagina
+            # derivada: la division entera pierde desplazamientos no
+            # multiplos de limit.
+            if offset is None:
+                offset = (page - 1) * page_size
+            statement = statement.limit(page_size).offset(offset)
+        return list(db.scalars(statement).all())
 
     def _external_flows(
         self,
