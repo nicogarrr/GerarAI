@@ -36,7 +36,8 @@ test('la tarjeta del índice no usa contadores de pendientes', () => {
 
 test('la tarjeta conserva el motivo no valorable en gris neutro', () => {
     const page = readFileSync('app/(root)/research/page.tsx', 'utf8');
-    assert.match(page, /<span[^>]*text-gray-500[^>]*>\s*No valorable: falta evidencia\s*<\/span>/);
-    assert.doesNotMatch(page, />No valorable: falta evidencia<\/span>.{0,120}amber/);
+    assert.match(page, /<span[^>]*text-gray-500[^>]*>\s*\{t\('research\.notValuable'\)\}\s*<\/span>/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).notValuable, 'No valorable: falta evidencia');
+    assert.doesNotMatch(page, /notValuable'\)\}<\/span>.{0,120}amber/);
     assert.doesNotMatch(page, /\{pending \? <span[^>]*>\{pending\}<\/span> : null\}/);
 });
