@@ -21,6 +21,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/db-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Db Metrics
+         * @description Get database performance metrics.
+         *
+         *     Returns:
+         *         - Connection pool statistics (active, idle, max connections)
+         *         - Disk usage (database size, table sizes)
+         *         - Table bloat detection (PostgreSQL only)
+         *
+         *     This endpoint requires authentication and is intended for monitoring
+         *     and operational visibility.
+         */
+        get: operations["db_metrics_api_admin_db_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/alerts": {
         parameters: {
             query?: never;
@@ -350,6 +378,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/audit/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Audit Logs
+         * @description Consulta registros de auditoria inmutables para el tenant activo.
+         */
+        get: operations["get_audit_logs_api_audit_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/bottlenecks": {
         parameters: {
             query?: never;
@@ -406,6 +454,133 @@ export interface paths {
          *     encola, nunca se llama al modelo desde la peticion.
          */
         post: operations["run_discovery_api_bottlenecks_discoveries_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate All
+         * @description Invalidate all cache entries for current tenant.
+         */
+        post: operations["invalidate_all_api_cache_invalidate_all_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/dca": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Dca
+         * @description Invalidate DCA schedule cache for current tenant.
+         */
+        post: operations["invalidate_dca_api_cache_invalidate_dca_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/market-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Market Data
+         * @description Invalidate all market data cache entries.
+         */
+        post: operations["invalidate_market_data_api_cache_invalidate_market_data_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/invalidate/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invalidate Portfolio
+         * @description Invalidate portfolio valuation cache for current tenant.
+         */
+        post: operations["invalidate_portfolio_api_cache_invalidate_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Stats
+         * @description Get cache statistics including hit rates.
+         *
+         *     Returns cache hits, misses, and hit rate percentage for:
+         *     - market_data: Market prices, quotes, history
+         *     - portfolio_valuation: Portfolio snapshots and valuations
+         *     - dca_schedule: DCA signals and schedules
+         *
+         *     Expected hit rate >70% for repeated requests.
+         */
+        get: operations["get_stats_api_cache_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/cache/stats/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Stats
+         * @description Reset cache statistics counters (for testing).
+         */
+        post: operations["reset_stats_api_cache_stats_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1861,6 +2036,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/csrf-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Csrf Token
+         * @description Obtiene un token CSRF para peticiones mutantes sin firma Research OS.
+         */
+        get: operations["get_csrf_token_api_csrf_token_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data-health": {
         parameters: {
             query?: never;
@@ -1906,6 +2101,26 @@ export interface paths {
         put?: never;
         /** Shorts Refresh */
         post: operations["shorts_refresh_api_data_health_shorts__ticker__refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Sources Health
+         * @description Estado, latencia y circuit breakers de las fuentes de datos externas.
+         */
+        get: operations["data_sources_health_api_data_sources_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1975,6 +2190,26 @@ export interface paths {
          * @description Readiness: BD (SELECT 1), scheduler y versión.
          */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/data-sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Sources Health
+         * @description Estado, latencia y circuit breakers de las fuentes de datos externas.
+         */
+        get: operations["data_sources_health_api_health_data_sources_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3619,6 +3854,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Portfolios */
+        get: operations["list_portfolios_api_portfolio_get"];
+        put?: never;
+        /** Create Portfolio */
+        post: operations["create_portfolio_api_portfolio_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Portfolios */
+        get: operations["list_portfolios_api_portfolio__get"];
+        put?: never;
+        /** Create Portfolio */
+        post: operations["create_portfolio_api_portfolio__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/add": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Portfolio Transaction
+         * @description Añade una transacción/posición a la cartera (alias para contratos de API).
+         */
+        post: operations["add_portfolio_transaction_api_portfolio_add_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/cash": {
         parameters: {
             query?: never;
@@ -3878,6 +4169,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/import/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit Transaction Import
+         * @description Inserta atómicamente el lote de transacciones validadas en la cartera.
+         */
+        post: operations["commit_transaction_import_api_portfolio_import_commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/import/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Transaction Import File
+         * @description Sube un archivo CSV o Excel (.xlsx) y realiza la validación previa de transacciones.
+         */
+        post: operations["upload_transaction_import_file_api_portfolio_import_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/import/ibkr": {
         parameters: {
             query?: never;
@@ -3923,6 +4254,26 @@ export interface paths {
         put?: never;
         /** Import Ibkr Xml */
         post: operations["import_ibkr_xml_api_portfolio_import_ibkr_xml_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/import/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Transaction Import
+         * @description Valida un archivo CSV o texto tabular y devuelve informe previo con errores y mapeo detectado.
+         */
+        post: operations["preview_transaction_import_api_portfolio_import_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4107,6 +4458,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/transactions/batch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Transaction Batch
+         * @description Bulk transaction creation with atomic commit.
+         *
+         *     All transactions are validated before any are inserted. If any transaction
+         *     fails validation or causes a ledger error (oversell, mixed currency), the
+         *     entire batch is rolled back.
+         *
+         *     Returns the count of created transactions and their IDs.
+         */
+        post: operations["create_transaction_batch_api_portfolio_transactions_batch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/transactions/page": {
         parameters: {
             query?: never;
@@ -4137,6 +4514,26 @@ export interface paths {
         post?: never;
         /** Delete Transaction */
         delete: operations["delete_transaction_api_portfolio_transactions__transaction_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/portfolio/{portfolio_id}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Portfolio Pdf Export
+         * @description Exporta el informe consolidado de la cartera y sus posiciones a formato PDF.
+         */
+        get: operations["portfolio_pdf_export_api_portfolio__portfolio_id__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5538,6 +5935,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis/{ticker}/pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Thesis Pdf
+         * @description Descarga la última tesis como PDF con diseño profesional y branding GerarAI.
+         *
+         *     404 limpio cuando no hay tesis: nunca se genera un documento vacío.
+         */
+        get: operations["thesis_pdf_api_thesis__ticker__pdf_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/{ticker}/versions": {
         parameters: {
             query?: never;
@@ -6298,6 +6717,11 @@ export interface components {
             /** Title */
             title: string;
         };
+        /** Body_upload_transaction_import_file_api_portfolio_import_file_post */
+        Body_upload_transaction_import_file_api_portfolio_import_file_post: {
+            /** File */
+            file: string;
+        };
         /** BotLinkIn */
         BotLinkIn: {
             /** Chat Id */
@@ -6935,6 +7359,16 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** CreatePortfolioInput */
+        CreatePortfolioInput: {
+            /**
+             * Base Currency
+             * @default EUR
+             */
+            base_currency: string;
+            /** Name */
+            name: string;
+        };
         /** Criterion */
         Criterion: {
             /** Left */
@@ -6946,6 +7380,20 @@ export interface components {
             operator: ">" | ">=" | "<" | "<=" | "==" | "!=";
             /** Right */
             right: string;
+        };
+        /** CsvPreviewRequest */
+        CsvPreviewRequest: {
+            /** Column Mapping */
+            column_mapping?: {
+                [key: string]: string;
+            } | null;
+            /** Content */
+            content: string;
+            /**
+             * Filename
+             * @default import.csv
+             */
+            filename: string;
         };
         /** CustomMetricCreate */
         CustomMetricCreate: {
@@ -8780,6 +9228,33 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** ParsedTransaction */
+        ParsedTransaction: {
+            /** Action */
+            action: string;
+            /**
+             * Currency
+             * @default EUR
+             */
+            currency: string;
+            /** Date */
+            date: string;
+            /**
+             * Fees
+             * @default 0
+             */
+            fees: number;
+            /** Notes */
+            notes?: string | null;
+            /** Price */
+            price: number;
+            /** Quantity */
+            quantity: number;
+            /** Row Number */
+            row_number: number;
+            /** Ticker */
+            ticker: string;
+        };
         /** PlanTarget */
         PlanTarget: {
             /**
@@ -8826,6 +9301,11 @@ export interface components {
             price: number | string;
             /** Ticker */
             ticker: string;
+        };
+        /** PortfolioTransactionBatchInput */
+        PortfolioTransactionBatchInput: {
+            /** Transactions */
+            transactions: components["schemas"]["PortfolioTransactionInput"][];
         };
         /** PortfolioTransactionInput */
         PortfolioTransactionInput: {
@@ -9343,6 +9823,17 @@ export interface components {
             image_hash: string;
             /** Rows */
             rows: components["schemas"]["ConfirmedImageRow"][];
+        };
+        /** RowValidationError */
+        RowValidationError: {
+            /** Field */
+            field: string;
+            /** Message */
+            message: string;
+            /** Raw Value */
+            raw_value?: string | null;
+            /** Row Number */
+            row_number: number;
         };
         /** ScreenCreate */
         ScreenCreate: {
@@ -9974,6 +10465,30 @@ export interface components {
             /** Tickers */
             tickers: string[];
         };
+        /** TransactionImportCommitRequest */
+        TransactionImportCommitRequest: {
+            /** Transactions */
+            transactions: components["schemas"]["ParsedTransaction"][];
+        };
+        /** TransactionImportPreviewResponse */
+        TransactionImportPreviewResponse: {
+            /** Detected Columns */
+            detected_columns: {
+                [key: string]: string;
+            };
+            /** Errors */
+            errors: components["schemas"]["RowValidationError"][];
+            /** Invalid Rows Count */
+            invalid_rows_count: number;
+            /** Preview Items */
+            preview_items: components["schemas"]["ParsedTransaction"][];
+            /** Success */
+            success: boolean;
+            /** Total Rows */
+            total_rows: number;
+            /** Valid Rows Count */
+            valid_rows_count: number;
+        };
         /** TtmMetricOut */
         TtmMetricOut: {
             /**
@@ -10033,10 +10548,15 @@ export interface components {
              */
             include_vector: boolean;
             /**
-             * Limit
+             * Page
+             * @default 1
+             */
+            page: number;
+            /**
+             * Page Size
              * @default 20
              */
-            limit: number;
+            page_size: number;
             /** Query */
             query: string;
             /** Source Types */
@@ -10220,6 +10740,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    db_metrics_api_admin_db_metrics_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -11056,6 +11616,49 @@ export interface operations {
             };
         };
     };
+    get_audit_logs_api_audit_logs_get: {
+        parameters: {
+            query?: {
+                action?: string | null;
+                resource_type?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_bottlenecks_api_bottlenecks_get: {
         parameters: {
             query?: never;
@@ -11161,6 +11764,246 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_all_api_cache_invalidate_all_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_dca_api_cache_invalidate_dca_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_market_data_api_cache_invalidate_market_data_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    invalidate_portfolio_api_cache_invalidate_portfolio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_stats_api_cache_stats_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_stats_api_cache_stats_reset_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
                     };
                 };
             };
@@ -14542,6 +15385,28 @@ export interface operations {
             };
         };
     };
+    get_csrf_token_api_csrf_token_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
+    };
     data_health_api_data_health_get: {
         parameters: {
             query?: never;
@@ -14662,6 +15527,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    data_sources_health_api_data_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };
@@ -14795,6 +15682,28 @@ export interface operations {
         };
     };
     health_api_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    data_sources_health_api_health_data_sources_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -18905,6 +19814,210 @@ export interface operations {
             };
         };
     };
+    list_portfolios_api_portfolio_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_portfolio_api_portfolio_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortfolioInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_portfolios_api_portfolio__get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_portfolio_api_portfolio__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePortfolioInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_portfolio_transaction_api_portfolio_add_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cash_api_portfolio_cash_get: {
         parameters: {
             query?: never;
@@ -19234,8 +20347,8 @@ export interface operations {
     list_fx_rates_api_portfolio_fx_rates_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
+                page?: number;
+                page_size?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -19260,7 +20373,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    }[];
+                    };
                 };
             };
             /** @description Validation Error */
@@ -19530,6 +20643,92 @@ export interface operations {
             };
         };
     };
+    commit_transaction_import_api_portfolio_import_commit_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransactionImportCommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_transaction_import_file_api_portfolio_import_file_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_transaction_import_file_api_portfolio_import_file_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionImportPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     import_ibkr_api_portfolio_import_ibkr_post: {
         parameters: {
             query?: never;
@@ -19658,6 +20857,48 @@ export interface operations {
             };
         };
     };
+    preview_transaction_import_api_portfolio_import_preview_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CsvPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionImportPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     portfolio_intelligence_api_portfolio_intelligence_get: {
         parameters: {
             query?: {
@@ -19743,8 +20984,10 @@ export interface operations {
     positions_api_portfolio_positions_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
+                page?: number;
+                page_size?: number;
+                limit?: number | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -19769,7 +21012,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    }[];
+                    };
                 };
             };
             /** @description Validation Error */
@@ -19873,7 +21116,8 @@ export interface operations {
         parameters: {
             query?: {
                 start?: string | null;
-                limit?: number;
+                page?: number;
+                page_size?: number;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -19898,7 +21142,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    }[];
+                    };
                 };
             };
             /** @description Validation Error */
@@ -20037,8 +21281,10 @@ export interface operations {
     transactions_api_portfolio_transactions_get: {
         parameters: {
             query?: {
-                limit?: number;
-                offset?: number;
+                page?: number;
+                page_size?: number;
+                ticker?: string | null;
+                action?: ("buy" | "sell") | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -20063,7 +21309,7 @@ export interface operations {
                 content: {
                     "application/json": {
                         [key: string]: unknown;
-                    }[];
+                    };
                 };
             };
             /** @description Validation Error */
@@ -20096,6 +21342,50 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PortfolioTransactionInput"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_transaction_batch_api_portfolio_transactions_batch_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PortfolioTransactionBatchInput"];
             };
         };
         responses: {
@@ -20238,6 +21528,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_pdf_export_api_portfolio__portfolio_id__pdf_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                portfolio_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
@@ -23726,6 +25056,46 @@ export interface operations {
         };
     };
     export_obsidian_api_thesis__ticker__obsidian_zip_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    thesis_pdf_api_thesis__ticker__pdf_get: {
         parameters: {
             query?: never;
             header?: {
