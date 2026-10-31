@@ -441,6 +441,9 @@ class DcaSignalStateOut(BaseModel):
     # nivel guardado ya no es actual (la evaluacion lo omite por datos viejos).
     data_age_days: int | None = None
     stale: bool = False
+    # True cuando el nivel guardado lo calculo una formula distinta de la
+    # vigente (cuenta como desactualizado aunque el cierre sea de hoy).
+    params_outdated: bool = False
 
 
 class DcaHitRateCellOut(BaseModel):
@@ -634,10 +637,16 @@ def _dca_staleness(signal_date: date | None, today: date | None = None) -> tuple
 
 def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> dict:
     from app.services.dca_alert_copy import currency_label
-    from app.services.dca_signal_engine import ZONES
+    from app.services.dca_signal_engine import DEFAULT_PARAMS, ZONES
 
     zone = ZONES.get(state.level, ZONES[1])
     data_age_days, stale = _dca_staleness(state.signal_date, today)
+    # Desactualizado tambien por FORMULA: un nivel calculado con una version
+    # anterior (p. ej. estados nico-v1 persistidos tras el cambio a nico-v2)
+    # no es actual aunque el cierre sea de hoy. La cola manual ya la recoge
+    # como pendiente (pending_symbols); el listado ahora tambien lo declara.
+    params_outdated = state.params_version != DEFAULT_PARAMS.version
+    stale = stale or params_outdated
     return {
         "level": state.level,
         "previous_level": state.previous_level,
@@ -655,6 +664,7 @@ def _dca_state_payload(state: DcaSignalState, *, today: date | None = None) -> d
         "metrics": state.metrics or {},
         "level_prices": state.level_prices or {},
         "params_version": state.params_version,
+        "params_outdated": params_outdated,
         "data_source": state.data_source,
         "evaluated_at": state.evaluated_at,
         "last_alerted_level": state.last_alerted_level,

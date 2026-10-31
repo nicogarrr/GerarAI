@@ -86,8 +86,13 @@ def client(monkeypatch):
     store = _RedisGate()
     monkeypatch.setattr(redis.Redis, 'from_url', lambda *a, **kw: store)
     today = date.today()
+    # Ultimo cierre SIEMPRE asentado y fresco: ayer. El dia 1 de mes, una
+    # barra fechada «dia 1» es el dia en curso y settled_rows la descarta; la
+    # serie quedaba con el cierre del dia 1 del mes pasado (>max_age) y todo
+    # el archivo fallaba solo ese dia (main rojo el 1-nov-2026).
+    last_day = today - timedelta(days=1)
     rows: list[PriceRow] = []
-    y, m = today.year, today.month
+    y, m = last_day.year, last_day.month
     months = []
     for _ in range(30):
         months.append((y, m))
@@ -97,9 +102,6 @@ def client(monkeypatch):
     months.reverse()
     for y, m in months[:-1]:
         rows.append(PriceRow(day=date(y, m, 1), close=100.0))
-    # Ultimo cierre reciente: con la puerta de frescura una barra del dia 1 de
-    # hace semanas ya no cuenta como senal actual.
-    last_day = max(date(months[-1][0], months[-1][1], 1), today - timedelta(days=1))
     rows.append(PriceRow(day=last_day, close=55.0))
 
     def fake_fetch(symbol: str) -> FetchedHistory:
@@ -307,3 +309,25 @@ def test_manual_limits_batch_and_reports_remaining(client, monkeypatch):
     assert len(seen[0]) == result['requested'] == 10
     assert result['pending_remaining'] == 13
     assert result['cooldown_seconds'] == 300
+
+
+def test_list_marks_old_formula_state_as_stale(client):
+    """Estado fresco pero de la formula anterior: marcado desactualizado.
+
+    Prod 31-oct-2026: estados nico-v1 evaluados hace minutos se mostraban como
+    actuales porque el listado solo miraba la edad del ultimo cierre, no la
+    version de la formula que produjo el nivel.
+    """
+    client.post("/api/watchlist", json={"symbol": "DCATST"})
+    summary = run_manual_batch()
+    assert "blocked" not in summary, summary
+    with SessionLocal() as db:
+        state = db.scalar(select(DcaSignalState).where(DcaSignalState.symbol == "DCATST"))
+        assert state is not None, summary
+        state.params_version = "nico-v1"  # formula anterior, cierre de hoy
+        db.commit()
+    item = next(i for i in client.get("/api/watchlist/dca-signals").json()["items"] if i["symbol"] == "DCATST")
+    assert item["state"]["params_outdated"] is True
+    assert item["state"]["stale"] is True
+    # El nivel se conserva visible, pero marcado (misma regla que con datos viejos).
+    assert item["state"]["level"] is not None
