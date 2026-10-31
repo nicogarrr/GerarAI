@@ -43,7 +43,7 @@ def test_macro_feeds_oficiales_en_carril_macro():
 # ---------- disyuntor y dedupe del actor ----------
 
 class _FakeRedis:
-    """Redis mínimo en memoria (get/set) para la cache de lotes."""
+    """Redis mínimo en memoria para la cache de lotes y el disyuntor GDELT."""
 
     def __init__(self):
         self.store: dict[str, str] = {}
@@ -51,8 +51,24 @@ class _FakeRedis:
     def get(self, key):
         return self.store.get(key)
 
-    def set(self, key, value, ex=None):
+    def set(self, key, value, ex=None, nx=False):
+        if nx and key in self.store:
+            return None
         self.store[key] = value
+        return True
+
+    def delete(self, key):
+        self.store.pop(key, None)
+
+    def exists(self, key):
+        return int(key in self.store)
+
+    def incr(self, key):
+        self.store[key] = int(self.store.get(key, 0)) + 1
+        return self.store[key]
+
+    def expire(self, key, seconds):
+        return True
 
 
 class _FakeMacroDB:
@@ -132,7 +148,10 @@ def test_resultado_failed_no_se_cachea_para_otros_tenants(macro_env):
     redis_client = _FakeRedis()
     macro_env(_FailedResultMacroService(), redis_client)
     dramatiq_app.refresh_macro_news(tenant_id=3, user_id="u1")
-    assert redis_client.store == {}
+    # El fallo no se cachea para otros tenants; solo queda el disyuntor
+    # compartido (gdelt:circuit:open), que caduca por TTL.
+    assert [k for k in redis_client.store if k.startswith("gdelt:macro:")] == []
+    redis_client.delete("gdelt:circuit:open")  # simula la caducidad del TTL
     item = ConnectorItem(source="gdelt", title="Oro al alza", url="https://x.example/1")
     service_b = _FakeMacroService(items=[item])
     macro_env(service_b, redis_client)
