@@ -21,5 +21,7 @@ test('el calendario se pinta después de Alertas y antes de Watchlist', () => {
 });
 
 test('la watchlist indica que muestra las últimas añadidas', () => {
-    assert.ok(OVERVIEW.includes('últimas añadidas de'));
+    assert.ok(OVERVIEW.includes('home.watchlist.lastNOfTotal'));
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.ok(dict.watchlist.lastNOfTotal.includes('últimas añadidas de'), dict.watchlist.lastNOfTotal);
 });

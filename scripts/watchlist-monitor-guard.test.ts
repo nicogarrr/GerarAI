@@ -36,7 +36,9 @@ test('inicio y screener leen el mismo valor justo único, con etiqueta', () => {
     const screener = readFileSync('lib/actions/screener.actions.ts', 'utf8');
     const home = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
     assert.match(screener, /\/fair-value`/);
-    assert.match(home, /Fuente: \{op\.fairValueLabel\}/);
+    assert.match(home, /home\.opportunities\.source/);
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.equal(dict.opportunities.source, 'Fuente: {label}');
 });
 
 test('sin URLs de proveedor construidas a mano en el frontend', () => {

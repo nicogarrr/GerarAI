@@ -15,6 +15,10 @@ describe('tearsheet: honestidad de Sharpe y fecha de corte', () => {
         assert.match(view, /metrics\.sharpe === null \? 'text-gray-400'/);
     });
     it('las métricas declaran la fecha de corte de los datos', () => {
-        assert.match(view, /datos hasta el \$\{formatDate\(tearsheet\.exposure\.snapshot_date\)\}/);
+        // i18n: el texto vive en messages/<locale>/portfolio.json.
+        assert.match(view, /portfolio\.tearsheetExtra\.exposureAsOf/);
+        assert.match(view, /f\.formatDate\(tearsheet\.exposure\.snapshot_date\)/);
+        const dict = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
+        assert.ok(dict.tearsheetExtra.exposureAsOf.includes('datos hasta el '), 'valor es de la fecha de corte');
     });
 });

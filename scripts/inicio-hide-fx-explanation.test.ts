@@ -7,6 +7,9 @@ test('Inicio hides the exchange-rate explanation and mixed-date note without cha
     assert.doesNotMatch(src, /Tipos de cambio usados\./);
     assert.doesNotMatch(src, /summary\.valuationDatesDiffer/);
     assert.doesNotMatch(src, /el total combina fechas distintas/);
-    assert.match(src, /Faltan tipos de cambio\. El desglose excluye esos saldos y posiciones\./);
+    // i18n: el aviso vive en messages/<locale>/portfolio.json.
+    assert.match(src, /portfolio\.breakdown\.incompleteFx/);
+    const breakdownEs = JSON.parse(readFileSync(new URL('../lib/i18n/messages/es/portfolio.json', import.meta.url), 'utf8'));
+    assert.equal(breakdownEs.breakdown.incompleteFx, 'Faltan tipos de cambio. El desglose excluye esos saldos y posiciones.');
     assert.match(src, /formatMoney\(totalValue, baseCurrency\)/);
 });

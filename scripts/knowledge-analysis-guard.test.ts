@@ -70,7 +70,9 @@ describe('componente y acción', () => {
     assert.ok(chat.includes('setMessages(prev => [...prev,') && !chat.includes('setMessages([])'));
   });
   it('un error se muestra en su turno y no tumba el historial', () => {
-    assert.ok(chat.includes('No se pudo consultar la biblioteca'));
+    assert.ok(chat.includes('brain.panel.libraryError'));
+    const dictBrain = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
+    assert.ok(dictBrain.panel.libraryError.startsWith('No se pudo consultar la biblioteca'), dictBrain.panel.libraryError);
   });
   it('la acción no traga errores (la UI los muestra)', () => {
     const core = action.slice(action.indexOf('export async function askKnowledge('), action.indexOf('export type AskKnowledgeResult'));

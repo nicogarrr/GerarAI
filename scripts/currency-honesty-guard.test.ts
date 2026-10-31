@@ -234,8 +234,12 @@ describe('PortfolioTransactions: la divisa la manda el ledger y el importe se de
         assert.ok(!/"(total|amount|notional)"/.test(payload), 'el backend sigue sin mandar importe por movimiento');
         assert.ok(/fees/.test(payload), 'las comisiones sí están en el ledger: por eso el importe va como «bruto»');
         assert.match(src, /const gross = tx\.quantity \* tx\.price;/, 'el nocional se deriva en un punto con nombre');
-        assert.match(src, />bruto</, 'el importe declara que no descuenta comisiones');
-        assert.match(src, /no descuenta las\s*\n?\s*comisiones/, 'la leyenda de la tarjeta explica el alcance del importe');
+        // i18n: la etiqueta y la leyenda viven en messages/<locale>/portfolio.json.
+        assert.match(src, /portfolio\.transactions\.grossTag/, 'el importe referencia la etiqueta «bruto» vía i18n');
+        assert.match(src, /portfolio\.transactions\.grossNote/, 'la tarjeta referencia la leyenda vía i18n');
+        const txEs = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/portfolio.json'), 'utf8'));
+        assert.equal(txEs.transactions.grossTag, 'bruto', 'la etiqueta declara que no descuenta comisiones');
+        assert.match(txEs.transactions.grossNote, /no descuenta las comisiones/, 'la leyenda de la tarjeta explica el alcance del importe');
     });
 });
 
@@ -244,13 +248,19 @@ describe('alertas: el umbral no es un importe en dólares', () => {
 
     it('el umbral se pinta sin símbolo y con la nota que declara el hueco', () => {
         assert.ok(!/\$\$\{/.test(src), 'nada de «$» pegado al valor');
-        assert.match(src, /const threshold = formatNumber\(value,/, 'el umbral se formatea con formatNumber, no con un $ pegado');
-        assert.match(src, /no guarda la\s*\n?\s*divisa/, 'la lista declara que la regla no guarda la divisa');
+        assert.match(src, /const threshold = f\.formatNumber\(value,/, 'el umbral se formatea con formatNumber, no con un $ pegado');
+        // i18n: la nota vive en messages/<locale>/alerts.json; el código referencia la clave.
+        assert.match(src, /alerts\.list\.thresholdNote/, 'la lista referencia la nota que declara el hueco');
+        const alertsEs = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/alerts.json'), 'utf8'));
+        assert.match(alertsEs.list.thresholdNote, /no guarda la divisa/, 'la nota declara que la regla no guarda la divisa');
     });
 
     it('el input no rotula una divisa que el usuario no puede elegir', () => {
         assert.ok(!/\(USD\)/.test(src), 'sin (USD) fijo en la etiqueta');
-        assert.match(src, /Precio \(divisa de la cotización\)/);
+        // i18n: la etiqueta vive en messages/<locale>/alerts.json; el código referencia la clave.
+        assert.match(src, /alerts\.form\.valuePrice/);
+        const alertsEsForm = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/alerts.json'), 'utf8'));
+        assert.match(alertsEsForm.form.valuePrice, /Precio \(divisa de la cotización\)/);
         // El input numérico precludes la coma decimal: el umbral es-ES
         // ("1522,60") llegaba vacío al parseo.
         assert.match(src, /type="text"/);
@@ -283,6 +293,8 @@ describe('ficha DCF del inicio: el precio con la divisa del listado', () => {
         assert.match(src, /currency: listing\.currency/, 'la divisa del precio viene del listado real (master)');
         assert.match(src, /getWatchlistEntryData\(sym\)/, 'precio y divisa salen de la MISMA fuente (nunca ticker desnudo)');
         assert.ok(!/getStockQuote\(/.test(src), 'getStockQuote no devuelve divisa: se cae en la línea US');
-        assert.match(src, /Valor justo \(divisa N\/D\)/, 'el valor justo declara la divisa que el modelo no propaga');
+        assert.match(src, /home\.opportunities\.fairUnknown/, 'el valor justo declara la divisa que el modelo no propaga');
+        const dictHome = JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/home.json'), 'utf8'));
+        assert.ok(dictHome.opportunities.fairUnknown.startsWith('Valor justo (divisa'), dictHome.opportunities.fairUnknown);
     });
 });

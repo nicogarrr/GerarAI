@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useRef, useState } from 'react';
+import { useT } from '@/lib/i18n/client';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
@@ -16,19 +17,22 @@ import type { BrainMessage } from './GlobalBrainPanel';
 // se precarga al rozar el gatillo (pointerdown/focus) o al llegar una apertura
 // por evento/handoff.
 const loadBrainPanel = () => import('./GlobalBrainPanel');
-const GlobalBrainPanel = dynamic(() => loadBrainPanel().then((mod) => mod.GlobalBrainPanel), {
-    loading: () => (
+function BrainPanelLoading() {
+    const t = useT();
+    return (
         <div
             role="status"
-            aria-label="Cargando el cerebro"
+            aria-label={t('brain.loading')}
             className="fixed z-50 inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 rounded-lg border border-indigo-500/30 bg-slate-950/95 p-4 md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none"
         >
             <span className="block h-4 w-1/2 animate-pulse rounded bg-slate-700/60" aria-hidden="true" />
         </div>
-    ),
+    );
+}
+const GlobalBrainPanel = dynamic(() => loadBrainPanel().then((mod) => mod.GlobalBrainPanel), {
+    loading: () => <BrainPanelLoading />,
 });
 
-const GREETING: BrainMessage = { role: 'assistant', content: '¡Hola! Soy el cerebro de GerarAI. Pregúntame sobre tu cartera, tus tesis de inversión o lo que estés viendo.' };
 
 interface GlobalBrainProps {
     userId: string;
@@ -43,6 +47,7 @@ interface GlobalBrainProps {
  * desmonte. El panel pesado vive en GlobalBrainPanel (chunk diferido).
  */
 export function GlobalBrain({ userId }: GlobalBrainProps) {
+    const t = useT();
     const pathname = usePathname();
     const [isOpen, setIsOpen] = useState(false);
     // Pista de apertura: la etiqueta "Pregunta al Cerebro" se ve unos
@@ -54,7 +59,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // al montar (solo cliente, así el SSR siempre pinta el saludo y no hay
     // desajuste de hidratación) y se guarda recortada tras cada cambio.
     const restoredRef = useRef(false);
-    const [messages, setMessages] = useState<BrainMessage[]>([GREETING]);
+    const [messages, setMessages] = useState<BrainMessage[]>(() => [{ role: 'assistant', content: t('brain.greeting') }]);
     // Handoffs de apertura con el panel desmontado: el contador obliga al
     // panel a aplicar cada apertura aunque llegue con el mismo detalle.
     const openSeqRef = useRef(0);
@@ -168,7 +173,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
         );
     }
 
-    const hint = knowledge ? 'Pregunta a la biblioteca' : 'Pregunta al Cerebro';
+    const hint = knowledge ? t('brain.hintLibrary') : t('brain.hintBrain');
 
     // Burbuja fija: en móvil queda POR ENCIMA de la BottomNav (min-h-14 +
     // safe-area), nunca la tapa; en escritorio vuelve a la esquina habitual.
@@ -189,7 +194,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                 onClick={() => setIsOpen(true)}
                 onPointerDown={() => void loadBrainPanel()}
                 onFocus={() => void loadBrainPanel()}
-                aria-label="Abrir el cerebro"
+                aria-label={t('brain.openAria')}
                 title={hint}
                 className="h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white"
             >

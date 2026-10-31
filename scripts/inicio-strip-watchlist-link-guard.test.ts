@@ -14,5 +14,7 @@ test('tira de calendario: 7 columnas y logos de 48px solo desde 2xl; por debajo,
 });
 
 test('cabecera de Watchlist con texto visible "Ver todo"', () => {
-    assert.ok(OVERVIEW.includes('<span className="whitespace-nowrap">Ver todo</span>'));
+    assert.ok(OVERVIEW.includes('<span className="whitespace-nowrap">{t(\'home.watchlist.viewAll\')}</span>'));
+    const dict = JSON.parse(readFileSync('lib/i18n/messages/es/home.json', 'utf8'));
+    assert.equal(dict.watchlist.viewAll, 'Ver todo');
 });

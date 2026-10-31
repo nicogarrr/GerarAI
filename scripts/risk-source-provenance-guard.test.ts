@@ -5,7 +5,12 @@ import test from 'node:test';
 import {ownershipLimitations} from '../lib/research/ownership-display.ts';
 test('risk never attributes a missing source to Postgres',()=>{
  const src=readFileSync('components/risk/RiskDashboardView.tsx','utf8');
- assert.match(src,/rawSource === null \? 'Fuente interna' : rawSource === 'CavaAI Postgres' \? 'Base de datos de GerarAI'/);
+ // Tras la migración i18n los literales viven en el diccionario; el código
+ // conserva la ramificación null / 'CavaAI Postgres' / sourceDisplay.
+ assert.match(src,/rawSource === null \? t\('risk.values.sourceInternal'\) : rawSource === 'CavaAI Postgres' \? t\('risk.values.sourceCava'\)/);
+ const es=JSON.parse(readFileSync('lib/i18n/messages/es/risk.json','utf8'));
+ assert.equal(es.values.sourceInternal,'Fuente interna');
+ assert.equal(es.values.sourceCava,'Base de datos de GerarAI');
 });
 test('13F limitations share one helper for list/text and preserve unknown warnings',()=>{
  assert.equal(existsSync('lib/limitation-labels.ts'),false);

@@ -68,7 +68,11 @@ describe('copy sin estados intermedios en las piezas degradadas', () => {
 
   it('las copias «no disponible» dicen qué haría falta', () => {
     const taxes = readFileSync('components/taxes/FilingSections.tsx', 'utf8');
-    assert.match(taxes, /haría falta verificar ese mapeo/);
+    // El texto visible vive en el diccionario i18n (carril C); el componente
+    // lo referencia por clave. El guard verifica ambos extremos.
+    const esFiling = JSON.parse(readFileSync('lib/i18n/messages/es/taxes.json', 'utf8')).filing;
+    assert.match(taxes, /taxes\.filing\.fallbackBoxes/);
+    assert.match(esFiling.fallbackBoxes, /haría falta verificar ese mapeo/);
     const insider = readFileSync('lib/insider-status-copy.ts', 'utf8');
     assert.match(insider, /no una ausencia de Form 4/);
     const rebalance = readFileSync('components/proPicks/MonthlyRebalanceView.tsx', 'utf8');

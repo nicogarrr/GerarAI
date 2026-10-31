@@ -8,23 +8,20 @@ import { PageHeader } from '@/components/ui/page-header';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getCatalystCalendar, type CatalystCalendar, type CatalystEvent } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { formatMarketDate, formatNumber } from '@/lib/format';
+import { getT, getFormat } from '@/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Catalizadores | Calendarios',
-    description: 'Resultados, ex-dividendos y fechas de pago de tus posiciones y tu watchlist, plazos 10-Q/10-K y acciones corporativas, con acceso al gestor de alertas.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const ti = await getT();
+    return {
+        title: ti('calendar.meta.catalystsTitle'),
+        description: ti('calendar.meta.catalystsDescription'),
+    };
+}
 
-const TYPE_LABEL: Record<CatalystEvent['type'], string> = {
-    earnings: 'Resultados',
-    dividend_ex: 'Ex-dividendo',
-    dividend_payment: 'Pago de dividendo',
-    filing_deadline: 'Plazo 10-Q/10-K',
-    corporate_action: 'Acción corporativa',
-};
+
 
 function groupByDate(events: CatalystEvent[]): [string, CatalystEvent[]][] {
     const groups = new Map<string, CatalystEvent[]>();
@@ -39,6 +36,15 @@ export default async function CalendarPage({
 }: {
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+    const ti = await getT();
+    const f = await getFormat();
+    const TYPE_LABEL: Record<CatalystEvent['type'], string> = {
+        earnings: ti('calendar.catalysts.typeEarnings'),
+        dividend_ex: ti('calendar.catalysts.typeDividendEx'),
+        dividend_payment: ti('calendar.catalysts.typeDividendPayment'),
+        filing_deadline: ti('calendar.catalysts.typeFilingDeadline'),
+        corporate_action: ti('calendar.catalysts.typeCorporateAction'),
+    };
     const params = await searchParams;
     if (params.view === 'alertas') {
         // Los enlaces antiguos conservan sus filtros y parámetros repetidos.
@@ -51,12 +57,12 @@ export default async function CalendarPage({
     }
 
     const tabs = (
-        <nav aria-label="Calendario y alertas" className="flex gap-2 text-sm">
+        <nav aria-label={ti('calendar.catalysts.navAria')} className="flex gap-2 text-sm">
             <Link href="/calendar" aria-current="page" className="inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300">
-                Calendario
+                {ti('calendar.catalysts.tabCalendar')}
             </Link>
             <Link href="/alerts" className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-100">
-                Alertas
+                {ti('calendar.catalysts.tabAlerts')}
             </Link>
         </nav>
     );
@@ -66,7 +72,7 @@ export default async function CalendarPage({
         calendar = await getCatalystCalendar();
     } catch (error) {
         if (isBackendUnavailableError(error)) {
-            return <BackendOffline feature="Calendario de catalizadores" retryHref="/calendar" />;
+            return <BackendOffline feature={ti('calendar.catalysts.offlineFeature')} retryHref="/calendar" />;
         }
         throw error;
     }
@@ -77,12 +83,12 @@ export default async function CalendarPage({
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-4xl flex-col gap-6">
             <PageHeader
-                kicker="Cartera"
-                title="Catalizadores de tu cartera"
-                description={`Del ${formatMarketDate(calendar.desde)} al ${formatMarketDate(calendar.hasta)}. Los resultados y ex-dividendos cubren tus posiciones y tu watchlist cotizadas en EE. UU. (USD); las fechas de pago y los ex-dividendos de fuera de EE. UU. salen de tu historial de dividendos ya importado (posiciones y watchlist); los plazos 10-Q/10-K solo cubren posiciones, y las acciones corporativas registradas cubren todas tus posiciones abiertas.`}
+                kicker={ti('calendar.catalysts.kicker')}
+                title={ti('calendar.catalysts.headerTitle')}
+                description={ti('calendar.catalysts.headerDescription', { desde: f.formatMarketDate(calendar.desde), hasta: f.formatMarketDate(calendar.hasta) })}
                 actions={<div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <CalendarDays aria-hidden="true" className="h-4 w-4 text-teal-300" />
-                    {formatNumber(calendar.count, { maximumFractionDigits: 0 })} {calendar.count === 1 ? 'evento' : 'eventos'}
+                    {f.formatNumber(calendar.count, { maximumFractionDigits: 0 })} {calendar.count === 1 ? ti('calendar.catalysts.countSingular') : ti('calendar.catalysts.countPlural')}
                 </div>}
             >
                 {tabs}
@@ -91,36 +97,34 @@ export default async function CalendarPage({
             {degraded ? (
                 <p role="status" className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3 text-sm text-amber-200">
                     {calendar.status === 'unavailable'
-                        ? 'El calendario público de NASDAQ no responde: no se pueden mostrar resultados ni dividendos. Esto no significa que no haya eventos.'
-                        : 'El calendario público de NASDAQ falló para algunos días: la lista puede estar incompleta.'}
+                        ? ti('calendar.catalysts.degradedUnavailable')
+                        : ti('calendar.catalysts.degradedPartial')}
                 </p>
             ) : null}
 
             {calendar.held_count === 0 && !calendar.watchlist_count ? (
                 <div className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
-                    <p>No tienes posiciones abiertas ni watchlist, así que no hay catalizadores que seguir.</p>
-                    <p className="mt-1">Sigue una empresa o registra una compra y aquí verás sus resultados y dividendos.</p>
+                    <p>{ti('calendar.catalysts.emptyNoFollow1')}</p>
+                    <p className="mt-1">{ti('calendar.catalysts.emptyNoFollow2')}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                         <Link href="/watchlist?anadir=1" className="inline-flex min-h-11 items-center rounded-lg bg-teal-400/10 px-3 font-medium text-teal-300 hover:bg-teal-400/20">
-                            Añadir a la watchlist
+                            {ti('calendar.catalysts.addWatchlist')}
                         </Link>
                         <Link href="/portfolio?anadir=1" className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-gray-300 hover:bg-gray-800 hover:text-gray-100">
-                            Añadir inversión
+                            {ti('calendar.catalysts.addInvestment')}
                         </Link>
                     </div>
                 </div>
             ) : groups.length === 0 && !degraded ? (
                 <p className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
-                    Sin eventos en este rango. Los resultados y ex-dividendos en vivo solo cubren EE. UU. (USD);
-                    las fechas de pago y los ex-dividendos de otros mercados salen de tu historial de dividendos importado,
-                    que solo muestra lo que su fuente ha declarado.
+                    {ti('calendar.catalysts.emptyRange')}
                 </p>
             ) : (
                 <ol className="flex flex-col gap-4">
                     {groups.map(([day, events]) => (
                         <li key={day} className="rounded-lg border border-gray-800 bg-surface-1 p-4">
                             <h2 className="text-sm font-semibold text-gray-200 first-letter:uppercase">
-                                {formatMarketDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}
+                                {f.formatMarketDate(day, { weekday: 'long', day: 'numeric', month: 'long' })}
                             </h2>
                             <ul className="mt-3 flex flex-col gap-2">
                                 {events.map((event, index) => (
@@ -138,7 +142,7 @@ export default async function CalendarPage({
                                         {event.origin === 'watchlist' ? (
                                             <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">Watchlist</Badge>
                                         ) : null}
-                                        <span className="ml-auto text-xs text-gray-500">Fuente: {event.source}</span>
+                                        <span className="ml-auto text-xs text-gray-500">{ti('calendar.catalysts.sourcePre', { source: event.source })}</span>
                                         </div>
                                     </li>
                                 ))}
