@@ -149,6 +149,8 @@ class FakeFMPClient:
 def test_research_api_core_flow():
     seed()
     client = TestClient(main.app)
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     companies = client.get("/api/companies")
     assert companies.status_code == 200
@@ -179,6 +181,8 @@ def test_research_api_core_flow():
 def test_memory_api_tracks_claims_evidence_sections_and_sessions():
     seed()
     client = TestClient(main.app)
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     thesis = client.post("/api/thesis/generate", json={"ticker": "MSFT", "force_new_version": True})
     assert thesis.status_code == 200
@@ -587,6 +591,8 @@ def test_ibkr_xml_import_endpoint_ingests_positions_cash_and_trades(monkeypatch)
     """
     try:
         client = TestClient(main.app)
+        token = client.get("/api/csrf-token").json()["csrf_token"]
+        client.headers.update({"x-csrf-token": token})
         response = client.post("/api/portfolio/import/ibkr/xml", json={"xml": xml})
         assert response.status_code == 200
         payload = response.json()
@@ -614,6 +620,8 @@ def test_fmp_refresh_normalizes_facts_and_valuation_uses_them(monkeypatch):
     seed()
     monkeypatch.setattr(companies_route, "FMPClient", FakeFMPClient)
     client = TestClient(main.app)
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     refresh = client.post("/api/companies/MSFT/refresh/fmp")
     assert refresh.status_code == 200
@@ -681,6 +689,9 @@ def test_fmp_refresh_402_returns_actionable_message(monkeypatch):
     seed()
     monkeypatch.setattr(companies_route, "FMPClient", DeniedFMPClient)
     client = TestClient(main.app)
+    # El endpoint muta estado: exige token CSRF (VAL-SEC-001).
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    client.headers.update({"x-csrf-token": token})
 
     refresh = client.post("/api/companies/MSFT/refresh/fmp")
     assert refresh.status_code == 424
