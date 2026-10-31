@@ -40,7 +40,7 @@ def _drop(admin, scratch: str) -> None:
         try:
             with admin.connect() as conn:
                 conn.execute(
-                    sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)')
+                    sa.text(f'DROP DATABASE IF EXISTS "{scratch}" WITH (FORCE)')  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text -- fixture: nombre scratch uuid-hex del fixture _scratch (test_0114), sin input externo; BD efimera de CI
                 )
             break
         except sa.exc.OperationalError:
