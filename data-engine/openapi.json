@@ -14479,6 +14479,117 @@
         "title": "PortfolioRefreshMarketOut",
         "type": "object"
       },
+      "PortfolioRiskMatrixOut": {
+        "properties": {
+          "as_of": {
+            "title": "As Of",
+            "type": "string"
+          },
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "concentration": {
+            "$ref": "#/components/schemas/RiskMatrixConcentrationOut"
+          },
+          "correlation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixCorrelationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "covariance_annualized": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixGridOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "estimator": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixEstimatorOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/RiskMatrixExcludedOut"
+            },
+            "title": "Excluded",
+            "type": "array"
+          },
+          "portfolio": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskMatrixPortfolioOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/RiskMatrixPositionOut"
+            },
+            "title": "Positions",
+            "type": "array"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "trace": {
+            "additionalProperties": true,
+            "title": "Trace",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RiskMatrixWarningOut"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "window": {
+            "$ref": "#/components/schemas/RiskMatrixWindowOut"
+          }
+        },
+        "required": [
+          "as_of",
+          "base_currency",
+          "status",
+          "window",
+          "estimator",
+          "covariance_annualized",
+          "correlation",
+          "portfolio",
+          "positions",
+          "excluded",
+          "concentration",
+          "warnings",
+          "trace",
+          "provenance"
+        ],
+        "title": "PortfolioRiskMatrixOut",
+        "type": "object"
+      },
       "PortfolioRiskOut": {
         "properties": {
           "beta": {
@@ -17495,6 +17606,355 @@
           "rows"
         ],
         "title": "ReviewInput",
+        "type": "object"
+      },
+      "RiskMatrixConcentrationOut": {
+        "properties": {
+          "effective_positions": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Positions"
+          },
+          "herfindahl": {
+            "title": "Herfindahl",
+            "type": "number"
+          },
+          "top_1": {
+            "title": "Top 1",
+            "type": "number"
+          },
+          "top_5": {
+            "title": "Top 5",
+            "type": "number"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Weights",
+            "type": "object"
+          }
+        },
+        "required": [
+          "top_1",
+          "top_5",
+          "herfindahl",
+          "effective_positions",
+          "weights"
+        ],
+        "title": "RiskMatrixConcentrationOut",
+        "type": "object"
+      },
+      "RiskMatrixCorrelationOut": {
+        "properties": {
+          "matrix": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tickers",
+          "matrix",
+          "source"
+        ],
+        "title": "RiskMatrixCorrelationOut",
+        "type": "object"
+      },
+      "RiskMatrixEstimatorOut": {
+        "properties": {
+          "annualization": {
+            "title": "Annualization",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "shrinkage": {
+            "title": "Shrinkage",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "shrinkage",
+          "annualization"
+        ],
+        "title": "RiskMatrixEstimatorOut",
+        "type": "object"
+      },
+      "RiskMatrixExcludedOut": {
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticker",
+          "reason",
+          "sessions"
+        ],
+        "title": "RiskMatrixExcludedOut",
+        "type": "object"
+      },
+      "RiskMatrixGridOut": {
+        "properties": {
+          "matrix": {
+            "items": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tickers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tickers",
+          "matrix"
+        ],
+        "title": "RiskMatrixGridOut",
+        "type": "object"
+      },
+      "RiskMatrixPortfolioOut": {
+        "properties": {
+          "variance_annualized": {
+            "title": "Variance Annualized",
+            "type": "number"
+          },
+          "vol_annualized": {
+            "title": "Vol Annualized",
+            "type": "number"
+          }
+        },
+        "required": [
+          "vol_annualized",
+          "variance_annualized"
+        ],
+        "title": "RiskMatrixPortfolioOut",
+        "type": "object"
+      },
+      "RiskMatrixPositionOut": {
+        "properties": {
+          "excluded_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excluded Reason"
+          },
+          "fx_dropped_returns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Dropped Returns"
+          },
+          "fx_mode": {
+            "title": "Fx Mode",
+            "type": "string"
+          },
+          "included": {
+            "title": "Included",
+            "type": "boolean"
+          },
+          "marginal_contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Marginal Contribution"
+          },
+          "risk_contribution": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Contribution"
+          },
+          "sessions": {
+            "title": "Sessions",
+            "type": "integer"
+          },
+          "sessions_common": {
+            "title": "Sessions Common",
+            "type": "integer"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "vol_annualized": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vol Annualized"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          },
+          "weight_included": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Included"
+          }
+        },
+        "required": [
+          "ticker",
+          "weight",
+          "included",
+          "sessions",
+          "sessions_common",
+          "fx_mode"
+        ],
+        "title": "RiskMatrixPositionOut",
+        "type": "object"
+      },
+      "RiskMatrixWarningOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "RiskMatrixWarningOut",
+        "type": "object"
+      },
+      "RiskMatrixWindowOut": {
+        "properties": {
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "min_sessions": {
+            "title": "Min Sessions",
+            "type": "integer"
+          },
+          "requested_days": {
+            "title": "Requested Days",
+            "type": "integer"
+          },
+          "sessions_common": {
+            "title": "Sessions Common",
+            "type": "integer"
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          }
+        },
+        "required": [
+          "requested_days",
+          "sessions_common",
+          "min_sessions",
+          "start",
+          "end"
+        ],
+        "title": "RiskMatrixWindowOut",
         "type": "object"
       },
       "RowValidationError": {
@@ -65792,6 +66252,167 @@
           }
         },
         "summary": "Refresh Portfolio Market Data",
+        "tags": [
+          "portfolio"
+        ]
+      }
+    },
+    "/api/portfolio/risk-matrix": {
+      "get": {
+        "operationId": "portfolio_risk_matrix_api_portfolio_risk_matrix_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-cavaai-user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-User"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-tenant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Tenant"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-timestamp",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Timestamp"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-signature",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Signature"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-nonce",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Nonce"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-method",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Method"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Path"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-cavaai-body-hash",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Cavaai-Body-Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioRiskMatrixOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Portfolio Risk Matrix",
         "tags": [
           "portfolio"
         ]

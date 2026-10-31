@@ -4409,6 +4409,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/portfolio/risk-matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Portfolio Risk Matrix */
+        get: operations["portfolio_risk_matrix_api_portfolio_risk_matrix_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/portfolio/snapshots": {
         parameters: {
             query?: never;
@@ -11170,6 +11187,35 @@ export interface components {
              */
             status: "ok" | "partial";
         };
+        /** PortfolioRiskMatrixOut */
+        PortfolioRiskMatrixOut: {
+            /** As Of */
+            as_of: string;
+            /** Base Currency */
+            base_currency: string;
+            concentration: components["schemas"]["RiskMatrixConcentrationOut"];
+            correlation: components["schemas"]["RiskMatrixCorrelationOut"] | null;
+            covariance_annualized: components["schemas"]["RiskMatrixGridOut"] | null;
+            estimator: components["schemas"]["RiskMatrixEstimatorOut"] | null;
+            /** Excluded */
+            excluded: components["schemas"]["RiskMatrixExcludedOut"][];
+            portfolio: components["schemas"]["RiskMatrixPortfolioOut"] | null;
+            /** Positions */
+            positions: components["schemas"]["RiskMatrixPositionOut"][];
+            /** Provenance */
+            provenance: {
+                [key: string]: unknown;
+            };
+            /** Status */
+            status: string;
+            /** Trace */
+            trace: {
+                [key: string]: unknown;
+            };
+            /** Warnings */
+            warnings: components["schemas"]["RiskMatrixWarningOut"][];
+            window: components["schemas"]["RiskMatrixWindowOut"];
+        };
         /** PortfolioRiskOut */
         PortfolioRiskOut: {
             /** Beta */
@@ -12146,6 +12192,109 @@ export interface components {
             image_hash: string;
             /** Rows */
             rows: components["schemas"]["ConfirmedImageRow"][];
+        };
+        /** RiskMatrixConcentrationOut */
+        RiskMatrixConcentrationOut: {
+            /** Effective Positions */
+            effective_positions: number | null;
+            /** Herfindahl */
+            herfindahl: number;
+            /** Top 1 */
+            top_1: number;
+            /** Top 5 */
+            top_5: number;
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
+        /** RiskMatrixCorrelationOut */
+        RiskMatrixCorrelationOut: {
+            /** Matrix */
+            matrix: (number | null)[][];
+            /** Source */
+            source: string;
+            /** Tickers */
+            tickers: string[];
+        };
+        /** RiskMatrixEstimatorOut */
+        RiskMatrixEstimatorOut: {
+            /** Annualization */
+            annualization: number;
+            /** Name */
+            name: string;
+            /** Shrinkage */
+            shrinkage: number;
+        };
+        /** RiskMatrixExcludedOut */
+        RiskMatrixExcludedOut: {
+            /** Reason */
+            reason: string;
+            /** Sessions */
+            sessions: number;
+            /** Ticker */
+            ticker: string;
+        };
+        /** RiskMatrixGridOut */
+        RiskMatrixGridOut: {
+            /** Matrix */
+            matrix: (number | null)[][];
+            /** Tickers */
+            tickers: string[];
+        };
+        /** RiskMatrixPortfolioOut */
+        RiskMatrixPortfolioOut: {
+            /** Variance Annualized */
+            variance_annualized: number;
+            /** Vol Annualized */
+            vol_annualized: number;
+        };
+        /** RiskMatrixPositionOut */
+        RiskMatrixPositionOut: {
+            /** Excluded Reason */
+            excluded_reason?: string | null;
+            /** Fx Dropped Returns */
+            fx_dropped_returns?: number | null;
+            /** Fx Mode */
+            fx_mode: string;
+            /** Included */
+            included: boolean;
+            /** Marginal Contribution */
+            marginal_contribution?: number | null;
+            /** Risk Contribution */
+            risk_contribution?: number | null;
+            /** Sessions */
+            sessions: number;
+            /** Sessions Common */
+            sessions_common: number;
+            /** Ticker */
+            ticker: string;
+            /** Vol Annualized */
+            vol_annualized?: number | null;
+            /** Weight */
+            weight: number;
+            /** Weight Included */
+            weight_included?: number | null;
+        };
+        /** RiskMatrixWarningOut */
+        RiskMatrixWarningOut: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+        };
+        /** RiskMatrixWindowOut */
+        RiskMatrixWindowOut: {
+            /** End */
+            end: string | null;
+            /** Min Sessions */
+            min_sessions: number;
+            /** Requested Days */
+            requested_days: number;
+            /** Sessions Common */
+            sessions_common: number;
+            /** Start */
+            start: string | null;
         };
         /** RowValidationError */
         RowValidationError: {
@@ -24025,6 +24174,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortfolioRefreshMarketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    portfolio_risk_matrix_api_portfolio_risk_matrix_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortfolioRiskMatrixOut"];
                 };
             };
             /** @description Validation Error */

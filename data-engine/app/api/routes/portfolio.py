@@ -49,6 +49,7 @@ from app.schemas.api import (
     PortfolioPositionItemOut,
     PortfolioPriceUpdateOut,
     PortfolioRefreshMarketOut,
+    PortfolioRiskMatrixOut,
     PortfolioSnapshotCaptureOut,
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
@@ -443,6 +444,13 @@ def portfolio_intelligence(
     db: Session = Depends(get_db),
 ) -> dict:
     return PortfolioIntelligenceService().build(db, years=years)
+
+
+@router.get("/risk-matrix", response_model=PortfolioRiskMatrixOut, response_model_exclude_unset=True)
+def portfolio_risk_matrix(db: Session = Depends(get_db)) -> dict:
+    from app.services.portfolio_risk_matrix_service import PortfolioRiskMatrixService
+
+    return PortfolioRiskMatrixService().build(db)
 
 
 @router.get("/data-quality", response_model=PortfolioDataQualityOut, response_model_exclude_unset=True)
