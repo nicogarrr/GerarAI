@@ -9803,6 +9803,26 @@
         "title": "PaginatedResponse[PortfolioPositionItemOut]",
         "type": "object"
       },
+      "PaginatedResponse_PortfolioSnapshotOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioSnapshotOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "page_info": {
+            "$ref": "#/components/schemas/PageInfo"
+          }
+        },
+        "required": [
+          "items",
+          "page_info"
+        ],
+        "title": "PaginatedResponse[PortfolioSnapshotOut]",
+        "type": "object"
+      },
       "PaginatedResponse_PortfolioTransactionOut_": {
         "properties": {
           "items": {
@@ -12170,6 +12190,95 @@
           "correlation_min_observations"
         ],
         "title": "PortfolioRiskOut",
+        "type": "object"
+      },
+      "PortfolioSnapshotOut": {
+        "properties": {
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "cash_value_base": {
+            "title": "Cash Value Base",
+            "type": "number"
+          },
+          "cumulative_twr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Twr"
+          },
+          "daily_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Return"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "net_external_flow_base": {
+            "title": "Net External Flow Base",
+            "type": "number"
+          },
+          "portfolio_id": {
+            "title": "Portfolio Id",
+            "type": "integer"
+          },
+          "positions_value_base": {
+            "title": "Positions Value Base",
+            "type": "number"
+          },
+          "pricing_coverage": {
+            "title": "Pricing Coverage",
+            "type": "number"
+          },
+          "snapshot_date": {
+            "format": "date",
+            "title": "Snapshot Date",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "total_value_base": {
+            "title": "Total Value Base",
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "portfolio_id",
+          "snapshot_date",
+          "base_currency",
+          "positions_value_base",
+          "cash_value_base",
+          "total_value_base",
+          "net_external_flow_base",
+          "daily_return",
+          "cumulative_twr",
+          "pricing_coverage",
+          "source",
+          "metadata"
+        ],
+        "title": "PortfolioSnapshotOut",
         "type": "object"
       },
       "PortfolioSummaryAlertOut": {
@@ -61074,9 +61183,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Snapshots Api Portfolio Snapshots Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PaginatedResponse_PortfolioSnapshotOut_"
                 }
               }
             },

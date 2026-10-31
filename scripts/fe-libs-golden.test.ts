@@ -233,7 +233,7 @@ describe('Cartera: resumen de una línea (lib/portfolio-insight.ts)', () => {
 
 describe('Cartera: histórico verificado (lib/portfolio-history.ts)', () => {
     const row = (snapshot_date: string, total_value_base: number, net_external_flow_base: number, daily_return: number, cumulative_twr: number) =>
-        ({ snapshot_date, base_currency: 'EUR', total_value_base, pricing_coverage: 1, net_external_flow_base, daily_return, cumulative_twr });
+        ({ id: 0, portfolio_id: 1, snapshot_date, base_currency: 'EUR', positions_value_base: total_value_base, cash_value_base: 0, total_value_base, pricing_coverage: 1, net_external_flow_base, daily_return, cumulative_twr, source: 'market_refresh', metadata: {} });
 
     it('golden: el rendimiento del día descuenta la aportación: (1.210 − 100) / 1.000 − 1 = 11 %', () => {
         // Día 3: (1.110 − 0) / 1.210 − 1 = −0,0826446…; TWR = 1,11 · (1 − 0,0826446) − 1 = 0,0182645…

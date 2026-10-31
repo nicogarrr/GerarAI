@@ -38,6 +38,7 @@ from app.schemas.api import (
     PortfolioDataQualityOut,
     PortfolioIntelligenceOut,
     PortfolioPositionItemOut,
+    PortfolioSnapshotOut,
     PortfolioSummaryOut,
     PortfolioTransactionOut,
     PortfolioTransactionPageOut,
@@ -453,7 +454,7 @@ def _snapshot_payload(snapshot: PortfolioDailySnapshot) -> dict:
     }
 
 
-@router.get("/snapshots")
+@router.get("/snapshots", response_model=PaginatedResponse[PortfolioSnapshotOut])
 def portfolio_snapshots(
     start: date | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
