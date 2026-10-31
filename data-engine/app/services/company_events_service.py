@@ -23,11 +23,20 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
+from app.core.tenancy import tenant_filters
 from app.models import Company, Document
+from app.models.entities import (
+    DividendRecord,
+    EarningsDate,
+    InsiderTransaction,
+    NewsEvent,
+    Position,
+    Transaction,
+)
 from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.sec import SECClient
 from app.services.document_visibility import without_archive_duplicates
@@ -384,3 +393,143 @@ class CompanyEventsService:
             }
             for row in rows
         ]
+
+
+
+# ---------------------------------------------------------------------------
+# Eventos guardados para el gráfico de precio de la ficha («Precio y eventos»).
+# Solo tablas propias: resultados (earnings_dates), dividendos (dividend_records),
+# filings y noticias (news_events), insiders (insider_transactions) y la posición
+# (positions/transactions). Ninguna llamada a proveedores en la petición.
+# ---------------------------------------------------------------------------
+TIMELINE_INSIDER_MIN_VALUE = 100_000.0
+TIMELINE_NEWS_MIN_MATERIALITY = 5
+TIMELINE_FILING_TYPES = frozenset({"new_filing", "ownership_disclosure", "sec_filing"})
+
+
+def _timeline_float(value: Any) -> float | None:
+    try:
+        out = float(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+    return out if out is not None and out == out and out not in (float("inf"), float("-inf")) else None
+
+
+def _timeline_day(value: Any) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def stored_holding(db: Session, company: Company) -> dict[str, Any] | None:
+    """Precio medio ponderado y primera compra de la posición del tenant (None si no la tiene)."""
+    positions = db.scalars(select(Position).where(Position.company_id == company.id, *tenant_filters(db, Position))).all()
+    qty = sum((_timeline_float(p.quantity) or 0.0) for p in positions)
+    if qty <= 0:
+        return None
+    cost = sum((_timeline_float(p.quantity) or 0.0) * (_timeline_float(p.average_cost) or 0.0) for p in positions)
+    first_buy = db.scalar(
+        select(func.min(Transaction.trade_date)).where(
+            Transaction.company_id == company.id,
+            func.lower(Transaction.action) == "buy",
+            *tenant_filters(db, Transaction),
+        )
+    )
+    return {
+        "average_cost": round(cost / qty, 4) if cost > 0 else None,
+        "first_buy_date": first_buy.isoformat() if first_buy else None,
+    }
+
+
+def stored_timeline_events(db: Session, company: Company, desde: date, hasta: date) -> list[dict[str, Any]]:
+    """Eventos fechados y con fuente entre ``desde`` y ``hasta`` (ambos incluidos), más recientes primero."""
+    events: list[dict[str, Any]] = []
+    ticker = (company.ticker or "").upper()
+    for row in db.scalars(
+        select(EarningsDate).where(
+            func.upper(EarningsDate.ticker) == ticker,
+            EarningsDate.event_date >= desde,
+            EarningsDate.event_date <= hasta,
+        )
+    ).all():
+        source = row.source_label or row.source
+        if not source:
+            continue
+        events.append({
+            "id": f"earnings-{row.id}",
+            "date": row.event_date.isoformat(),
+            "kind": "results",
+            "title": f"Resultados {row.fiscal_label}" if row.fiscal_label else "Resultados",
+            "detail": "Fecha confirmada por la fuente" if row.confirmed else None,
+            "source": source,
+            "source_url": row.source_url,
+        })
+    for row in db.scalars(
+        select(DividendRecord).where(
+            DividendRecord.company_id == company.id,
+            DividendRecord.ex_date >= desde,
+            DividendRecord.ex_date <= hasta,
+            *tenant_filters(db, DividendRecord),
+        )
+    ).all():
+        if not row.source:
+            continue
+        amount = _timeline_float(row.amount)
+        events.append({
+            "id": f"dividend-{row.id}",
+            "date": row.ex_date.isoformat(),
+            "kind": "ex_dividend",
+            "title": "Ex-dividendo",
+            "detail": f"{amount:g} {row.currency} por acción" if amount else None,
+            "source": row.source,
+            "source_url": None,
+        })
+    start_dt = datetime.combine(desde, datetime.min.time(), tzinfo=UTC)
+    end_dt = datetime.combine(hasta + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
+    for row in db.scalars(
+        select(NewsEvent).where(
+            NewsEvent.company_id == company.id,
+            NewsEvent.date >= start_dt,
+            NewsEvent.date < end_dt,
+            *tenant_filters(db, NewsEvent),
+        )
+    ).all():
+        is_filing = bool(row.sec_filing_identity) or row.event_type in TIMELINE_FILING_TYPES
+        if not is_filing and (row.materiality_score or 0) < TIMELINE_NEWS_MIN_MATERIALITY:
+            continue
+        if not row.source or not row.date or not row.title:
+            continue
+        events.append({
+            "id": f"news-{row.id}",
+            "date": row.date.date().isoformat(),
+            "kind": "filing" if is_filing else "news",
+            "title": row.title,
+            "detail": row.summary or None,
+            "source": row.source,
+            "source_url": row.url,
+        })
+    for row in db.scalars(
+        select(InsiderTransaction).where(
+            func.upper(InsiderTransaction.issuer_ticker) == ticker, *tenant_filters(db, InsiderTransaction)
+        )
+    ).all():
+        value = _timeline_float(row.value)
+        day = _timeline_day(row.tx_date)
+        if day is None or not (desde <= day <= hasta) or value is None or value < TIMELINE_INSIDER_MIN_VALUE:
+            continue
+        if row.code not in ("P", "S") or row.is_derivative:
+            continue
+        events.append({
+            "id": f"insider-{row.id}",
+            "date": day.isoformat(),
+            "kind": "insider",
+            "title": f"{row.insider or 'Un directivo'} {'compra' if row.code == 'P' else 'vende'} acciones",
+            "detail": f"Operación de {value:,.0f} $ (formulario {row.form})".replace(",", "."),
+            "source": "SEC",
+            "source_url": row.source_url,
+        })
+    events.sort(key=lambda e: (e["date"], e["id"]), reverse=True)
+    return events
