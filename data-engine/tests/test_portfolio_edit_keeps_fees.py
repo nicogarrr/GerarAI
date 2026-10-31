@@ -66,10 +66,14 @@ def test_put_with_future_trade_date_is_rejected_like_create(monkeypatch):
     assert r.status_code == 422, r.text
     assert "trade_date" in str(r.json()["detail"])
 
-    # La operacion conserva su fecha original: el 400 no escribio nada.
-    r = signed_request(client, SECRET, tenant, user, "GET", "/api/portfolio/transactions")
+    # La operacion conserva su fecha original: el 422 no escribio nada.
+    # Filtro por ticker exacto: sin el, el listado devuelve solo la pagina 1
+    # (20 operaciones) y el ID podria no aparecer si la suite deja filas.
+    r = signed_request(client, SECRET, tenant, user, "GET",
+                       "/api/portfolio/transactions", params={"ticker": ticker})
+    assert r.status_code == 200, r.text
     mine = [row for row in r.json()["items"] if row["id"] == tid]
-    assert mine and mine[0]["trade_date"] == "2026-01-02"
+    assert len(mine) == 1 and mine[0]["trade_date"] == "2026-01-02"
 
 
 
