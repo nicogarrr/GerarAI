@@ -41,11 +41,17 @@ def test_comision_de_fraccion_de_centimo_se_guarda_exacta():
     client = csrf_client(app)
     response = _post(client)
     assert response.status_code == 201, response.text
-    assert response.json()["fees"] == 0.355
+    created = response.json()
+    assert created["fees"] == 0.355
     assert _fees("FEE4DP") == [Decimal("0.3550")]
-    listed = client.get("/api/portfolio/transactions").json()
-    rows = listed if isinstance(listed, list) else listed.get("items", listed.get("transactions", []))
-    assert [r["fees"] for r in rows if r["ticker"] == "FEE4DP"] == [0.355]
+    # Listado filtrado por ticker: la primera página sin filtro ordena por
+    # trade_date desc y depende de cuántos movimientos posteriores haya
+    # insertado el resto de la suite en la base compartida.
+    listed = client.get("/api/portfolio/transactions", params={"ticker": "FEE4DP"})
+    assert listed.status_code == 200, listed.text
+    rows = listed.json()["items"]
+    assert [r["id"] for r in rows] == [created["id"]]
+    assert [r["fees"] for r in rows] == [0.355]
 
 
 def test_mas_de_cuatro_decimales_se_rechaza_en_vez_de_redondear():
