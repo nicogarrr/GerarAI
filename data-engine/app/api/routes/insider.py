@@ -183,16 +183,32 @@ def insider_filings(
             )
             or 0
         )
+        # Las transacciones de la pagina se cargan en UNA consulta (nunca una
+        # por filing): row_number por filing conserva el cap de 50 y el orden
+        # por id que tenia el bucle, sin leer de mas en filings enormes.
+        filing_ids = [filing.id for filing in filings]
+        txs_by_filing: dict[int, list[InsiderTransaction]] = {fid: [] for fid in filing_ids}
+        if filing_ids:
+            numbered = (
+                select(
+                    InsiderTransaction.id.label("id"),
+                    func.row_number()
+                    .over(partition_by=InsiderTransaction.filing_id, order_by=InsiderTransaction.id)
+                    .label("rn"),
+                )
+                .where(InsiderTransaction.filing_id.in_(filing_ids))
+                .subquery()
+            )
+            for tx in db.scalars(
+                select(InsiderTransaction)
+                .join(numbered, InsiderTransaction.id == numbered.c.id)
+                .where(numbered.c.rn <= 50)
+                .order_by(InsiderTransaction.filing_id, InsiderTransaction.id)
+            ).all():
+                txs_by_filing[tx.filing_id].append(tx)
         items = []
         for filing in filings:
-            txs = list(
-                db.scalars(
-                    select(InsiderTransaction)
-                    .where(InsiderTransaction.filing_id == filing.id)
-                    .order_by(InsiderTransaction.id)
-                    .limit(50)
-                ).all()
-            )
+            txs = txs_by_filing[filing.id]
             items.append(
                 {
                     "accession_number": filing.accession_number,
