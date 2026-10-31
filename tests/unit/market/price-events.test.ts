@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { availableIndicators, barsSince, eventsInRange, indicatorSeries, markersByDay, volumeSpikeFlags, type PriceEvent } from '@/lib/market/price-events';
+import { availableIndicators, barsSince, detectMovements, eventsInRange, movementEvents, indicatorSeries, markersByDay, volumeSpikeFlags, type PriceEvent } from '@/lib/market/price-events';
 
 const day = (i: number) => new Date(Date.UTC(2026, 0, 1) + i * 86_400_000).toISOString().slice(0, 10);
 
@@ -46,5 +46,22 @@ describe('Precio y eventos: cálculos del gráfico de la ficha', () => {
         const bars = [{ date: '2024-01-02' }, { date: '2024-03-04' }, { date: '2024-05-06' }];
         expect(barsSince(bars, '2024-03-04').map((b) => b.date)).toEqual(['2024-03-04', '2024-05-06']);
         expect(barsSince(bars, null)).toHaveLength(3);
+    });
+
+    it('¿Por qué se movió?: detecta movimientos y dice qué pasó o «Sin noticias ese día», sin afirmar la causa', () => {
+        const bars = Array.from({ length: 40 }, (_, i) => ({ date: day(i), close: 100 * (1 + (i % 2 ? 0.005 : -0.005)), volume: 1000 }));
+        bars[30] = { date: day(30), close: bars[29].close * 1.06, volume: 1000 }; // +6 %: supera 4 % y 2,5 σ
+        bars[35] = { date: day(35), close: bars[34].close, volume: 3000 }; // solo volumen 3×
+        const moves = detectMovements(bars);
+        expect(moves.map((m) => [m.date, m.byPrice, m.byVolume])).toEqual([[day(30), true, false], [day(31), true, false], [day(35), false, true]]);
+        const news: PriceEvent[] = [{ id: 'n', date: day(29), kind: 'news', title: 'Sube la guía', source: 'Reuters' }];
+        const [first, , third] = movementEvents(moves, news);
+        expect(first.kind).toBe('movement');
+        expect(first.title).toContain('+6,0 %');
+        expect(first.detail).toContain('Puede explicarlo');
+        expect(first.detail).toContain('Sube la guía (Reuters)');
+        expect(third.title).toContain('volumen 3× la media');
+        expect(third.detail).toMatch(/^Sin noticias ese día/);
+        expect(`${first.title}${first.detail}`).not.toMatch(/porque|causa|debido/i);
     });
 });
