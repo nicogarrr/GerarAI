@@ -150,7 +150,15 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
 
     useEffect(() => {
         if (scrollRef.current) {
-            scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+            // Con movimiento reducido el salto es instantaneo (WCAG 2.3.3).
+            // jsdom no implementa matchMedia: typeof protege los tests.
+            const reduce =
+                typeof window.matchMedia === 'function' &&
+                window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            scrollRef.current.scrollTo({
+                top: scrollRef.current.scrollHeight,
+                behavior: reduce ? 'auto' : 'smooth',
+            });
         }
     }, [messages, isMaximized]);
 
