@@ -452,6 +452,27 @@ class DcaHitRateRowOut(BaseModel):
     cells: list[DcaHitRateCellOut]
 
 
+class DcaZoneVisitOut(BaseModel):
+    start: str
+    end: str
+    months: int
+
+
+class DcaZoneVisitsOut(BaseModel):
+    available: bool = False
+    reason: str | None = None
+    levels: list[int] = Field(default_factory=list)
+    months_completed: int = 0
+    first_period: str | None = None
+    last_period: str | None = None
+    completed_visits: int = 0
+    avg_months: float | None = None
+    max_months: int | None = None
+    visits: list[DcaZoneVisitOut] = Field(default_factory=list)
+    open_visit_months: int | None = None
+    params_version: str | None = None
+
+
 class DcaHitRatesOut(BaseModel):
     symbol: str
     available: bool
@@ -463,6 +484,7 @@ class DcaHitRatesOut(BaseModel):
     params_version: str | None = None
     evaluated_at: datetime | None = None
     rows: list[DcaHitRateRowOut] = Field(default_factory=list)
+    zone_visits: DcaZoneVisitsOut | None = None
     disclaimer: str = "Histórico, hipotético. No es asesoramiento."
 
 
@@ -844,6 +866,7 @@ def dca_hit_rates(symbol: str, db: Session = Depends(get_db)) -> dict:
         "params_version": data.get("params_version"),
         "evaluated_at": state.evaluated_at,
         "rows": rows,
+        "zone_visits": data.get("zone_visits"),
     }
 
 

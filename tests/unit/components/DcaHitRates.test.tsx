@@ -26,6 +26,19 @@ describe('DCA historical evidence display',()=>{
   expect(screen.queryByText(/n=4/)).not.toBeInTheDocument();
   expect(screen.getByText('2X')).toHaveStyle({color:color==='#000000'?'#FFFFFF':'#111827'});
  });
+ it('muestra el tiempo medio en 2X-4X solo con visitas completadas y declara la abierta',()=>{
+  const zone_visits={available:true,reason:null,levels:[2,3,4],months_completed:130,first_period:'2015-01',last_period:'2026-09',completed_visits:2,avg_months:2.5,max_months:3,visits:[{start:'2018-06',end:'2018-08',months:3},{start:'2019-01',end:'2019-02',months:2}],open_visit_months:1,params_version:'v1'};
+  render(<DcaHitRatesCard data={data({zone_visits})}/>);
+  expect(screen.getByTestId('dca-zone-visits')).toHaveTextContent('Tiempo medio en 2X-4X: 2,5 meses · 2 visitas completadas · en curso 1 m (no cuenta)');
+ });
+ it('no inventa el tiempo medio: sin dato o sin visitas completadas se dice y no se muestra cifra',()=>{
+  const view=render(<DcaHitRatesCard data={data()}/>);
+  expect(view.container.querySelector('[data-testid="dca-zone-visits"]')).toBeNull();
+  const zero={available:true,reason:null,levels:[2,3,4],months_completed:8,first_period:'2025-01',last_period:'2025-08',completed_visits:0,avg_months:null,max_months:null,visits:[],open_visit_months:null,params_version:'v1'};
+  view.rerender(<DcaHitRatesCard data={data({zone_visits:zero})}/>);
+  expect(screen.getByTestId('dca-zone-visits')).toHaveTextContent('Sin visitas completadas a 2X-4X en el histórico');
+  expect(screen.getByTestId('dca-zone-visits')).not.toHaveTextContent('meses ·');
+ });
  it('loads only on demand, reports loading and caches a successful response',async()=>{
   let resolve!:(d:DcaHitRates)=>void;mocks.load.mockReturnValue(new Promise(r=>resolve=r));
   render(<DcaHitRatesPopover symbol="TEST"/>);expect(mocks.load).not.toHaveBeenCalled();

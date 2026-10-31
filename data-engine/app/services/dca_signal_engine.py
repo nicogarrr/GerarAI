@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Sequence
+from decimal import ROUND_HALF_UP, Decimal
 from dataclasses import asdict, dataclass, field
 from datetime import date
 
@@ -391,4 +392,80 @@ def hit_rates(
         "horizons": list(horizons),
         "params_version": params.version,
         "rows": rows,
+    }
+
+
+# Niveles de compra que definen una «visita» a zona de oportunidad (2X-4X).
+BUY_VISIT_LEVELS: tuple[int, ...] = (2, 3, 4)
+
+
+def zone_visits(
+    bars: Iterable[DailyBar],
+    *,
+    params: DcaParams = DEFAULT_PARAMS,
+    today: date | None = None,
+    levels: Sequence[int] = BUY_VISIT_LEVELS,
+) -> dict:
+    """Duración de las visitas a la zona de compra (2X-4X), en meses.
+
+    Una visita es una racha maximal de meses CONFIRMADOS con nivel en
+    ``levels``. Solo las visitas COMPLETADAS (cerradas por un mes confirmado
+    fuera de la zona) entran en la media: la racha que llega al último mes
+    confirmado sigue abierta, se declara aparte y no cuenta. El mes en
+    formación no entra (misma disciplina sin look-ahead que ``hit_rates``).
+    Histórico e hipotético; no predice resultados.
+    """
+    series = [v for v in evaluate_series(bars, params=params, today=today) if v.status == "confirmed"]
+    wanted = {int(level) for level in levels}
+    empty = {
+        "available": False,
+        "reason": "sin meses confirmados",
+        "levels": sorted(wanted),
+        "months_completed": 0,
+        "first_period": None,
+        "last_period": None,
+        "completed_visits": 0,
+        "avg_months": None,
+        "max_months": None,
+        "visits": [],
+        "open_visit_months": None,
+        "params_version": params.version,
+    }
+    if not series:
+        return empty
+    visits: list[dict] = []
+    run_start: int | None = None
+    for i, verdict in enumerate(series):
+        if verdict.level in wanted:
+            if run_start is None:
+                run_start = i
+        elif run_start is not None:
+            visits.append({
+                "start": series[run_start].period,
+                "end": series[i - 1].period,
+                "months": i - run_start,
+            })
+            run_start = None
+    open_months = (len(series) - run_start) if run_start is not None else None
+    lengths = [visit["months"] for visit in visits]
+    avg = None
+    if lengths:
+        avg = float(
+            (Decimal(sum(lengths)) / Decimal(len(lengths))).quantize(
+                Decimal("0.1"), rounding=ROUND_HALF_UP
+            )
+        )
+    return {
+        "available": True,
+        "reason": None,
+        "levels": sorted(wanted),
+        "months_completed": len(series),
+        "first_period": series[0].period,
+        "last_period": series[-1].period,
+        "completed_visits": len(visits),
+        "avg_months": avg,
+        "max_months": max(lengths) if lengths else None,
+        "visits": visits,
+        "open_visit_months": open_months,
+        "params_version": params.version,
     }

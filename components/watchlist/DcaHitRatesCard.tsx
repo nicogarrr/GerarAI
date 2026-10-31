@@ -16,6 +16,20 @@ function contrast(color: string | null): string {
  * confirmados con señal cuyo cierre era más alto N meses después. Solo
  * histórico: sin dato en una celda se dice, no se rellena.
  */
+const MONTHS = new Intl.NumberFormat('es-ES', { maximumFractionDigits: 1 });
+
+/** «Tiempo medio en 2X-4X»: solo visitas completadas reales; la abierta se declara aparte. */
+function zoneVisitsLine(data: DcaHitRates): string | null {
+    const zv = data.zone_visits;
+    if (!zv || !zv.available) return null;
+    const open = zv.open_visit_months ? ` · en curso ${MONTHS.format(zv.open_visit_months)} m (no cuenta)` : '';
+    if (!zv.completed_visits || zv.avg_months === null) {
+        return `Sin visitas completadas a 2X-4X en el histórico${open}`;
+    }
+    const n = zv.completed_visits;
+    return `Tiempo medio en 2X-4X: ${MONTHS.format(zv.avg_months)} meses · ${n} ${n === 1 ? 'visita completada' : 'visitas completadas'}${open}`;
+}
+
 export default function DcaHitRatesCard({ data, compact = false, scope = 'full' }: {
     data: DcaHitRates | null;
     compact?: boolean;
@@ -37,6 +51,9 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full' 
                     {data.first_period ? ` (${data.first_period} – ${data.last_period})` : ''}
                 </p>
             </div>
+            {zoneVisitsLine(data) ? (
+                <p className="text-[11px] text-gray-400" data-testid="dca-zone-visits">{zoneVisitsLine(data)}</p>
+            ) : null}
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[420px] border-separate border-spacing-y-1 text-xs">
                     <caption className="sr-only">Porcentaje de meses con señal cuyo cierre era más alto N meses después</caption>
