@@ -2,6 +2,7 @@ import { withAuthErrors } from '@/lib/auth/route-auth';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { companyDomainFor, normalizeLogoTicker } from '@/lib/logos/company-domains';
 import { domainFromWebsite, fetchSiteIcon, type SiteIcon } from '@/lib/logos/site-icon';
+import { LOGO_TOTAL_BUDGET_MS } from '@/lib/logos/logo-budget';
 
 /**
  * Segunda fuente de logos (la primera es FMP image-stock en el navegador):
@@ -55,13 +56,17 @@ async function getHandler(_request: Request, { params }: { params: Promise<{ tic
     });
 }
 
-async function finnhubDomain(ticker: string): Promise<string | null> {
+const FINNHUB_TIMEOUT_MS = 2500;
+
+async function finnhubDomain(ticker: string, outer?: AbortSignal): Promise<string | null> {
     const token = process.env.FINNHUB_API_KEY;
     if (!token) return null;
     const base = process.env.FINNHUB_BASE_URL || 'https://finnhub.io/api/v1';
+    const own = AbortSignal.timeout(FINNHUB_TIMEOUT_MS);
+    const signal = outer && typeof AbortSignal.any === 'function' ? AbortSignal.any([own, outer]) : own;
     try {
         const res = await fetch(`${base}/stock/profile2?symbol=${encodeURIComponent(ticker)}&token=${encodeURIComponent(token)}`, {
-            signal: AbortSignal.timeout(5000),
+            signal,
         });
         if (!res.ok) return null;
         const profile = (await res.json()) as { weburl?: unknown };
@@ -71,14 +76,35 @@ async function finnhubDomain(ticker: string): Promise<string | null> {
     }
 }
 
+// Medido en prod (31-oct-2026): /api/logo/AENA llegó a 10.3s y Vercel la
+// mató con 504 (función Hobby de 10s) porque fetchSiteIcon encadena home +
+// candidatos, cada uno con su propio timeout de 8s. Con 4s el peor caso
+// cabe con margen y el fallo queda cacheado (memoria 24h + Cache-Control 1h).
 async function resolveLogo(ticker: string): Promise<SiteIcon | null> {
     const key = normalizeLogoTicker(ticker);
     const cached = memory.get(key);
     if (cached && Date.now() - cached.at < MEMORY_TTL_MS) return cached.icon;
-    const domain = companyDomainFor(key) ?? (await finnhubDomain(key));
-    const icon = domain ? await fetchSiteIcon(domain) : null;
-    remember(key, icon);
-    return icon;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), LOGO_TOTAL_BUDGET_MS);
+    try {
+        const domain = companyDomainFor(key) ?? (await finnhubDomain(key, controller.signal));
+        const boundedFetch: typeof fetch = (input, init) =>
+            fetch(input, {
+                ...init,
+                signal:
+                    init?.signal && typeof AbortSignal.any === 'function'
+                        ? AbortSignal.any([init.signal, controller.signal])
+                        : controller.signal,
+            });
+        const icon = domain ? await fetchSiteIcon(domain, boundedFetch).catch(() => null) : null;
+        remember(key, icon);
+        return icon;
+    } catch {
+        remember(key, null);
+        return null;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 function miss(status: number) {
