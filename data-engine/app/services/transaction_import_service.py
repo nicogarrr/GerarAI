@@ -13,6 +13,7 @@ Expected Behavior:
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import re
 import unicodedata
@@ -441,25 +442,59 @@ class TransactionImportService:
         service = PortfolioLedgerService()
         inserted_count = 0
         duplicates_skipped = 0
-        import_batch = f"csv-{uuid4().hex[:12]}"
+        # Lote estable: huella del CONTENIDO del fichero (no aleatoria). Reimportar
+        # el mismo CSV produce el mismo lote, lo que permite distinguir "mismo
+        # fichero otra vez" (omite) de "otro fichero con patas idénticas" (importa).
+        canonical = "\n".join(
+            f"{t.ticker.upper()}|{t.date}|{t.action.lower()}|{t.quantity}|{t.price}|{t.fees}|{t.currency.upper()}|{t.notes or ''}|{t.row_number}"
+            for t in transactions
+        )
+        import_batch = f"csv-{hashlib.sha256(canonical.encode()).hexdigest()[:12]}"
 
-        def _already_imported(company_id: int | None, portfolio_id: int | None, tx: ParsedTransaction) -> bool:
+        def _fingerprint(company_id: int | None, portfolio_id: int | None, tx: ParsedTransaction) -> tuple | None:
+            """Huella de una pata del CSV: empresa + cartera + campos económicos.
+
+            La huella NO prueba identidad por sí sola: dos operaciones reales
+            idénticas el mismo día comparten huella. La identidad se resuelve
+            con el contador de ocurrencias del fichero (ver _existing_count):
+            la ocurrencia k solo se omite si la cartera ya tiene k patas con
+            esa huella, así dos compras idénticas legítimas importan las dos y
+            reimportar el mismo CSV no duplica.
+            """
             if company_id is None:
-                return False
-            existing = db.scalar(
+                return None
+            return (
+                company_id,
+                portfolio_id,
+                date.fromisoformat(tx.date),
+                tx.action.lower(),
+                Decimal(str(tx.quantity)),
+                Decimal(str(tx.price)),
+                Decimal(str(tx.fees)),
+                tx.currency.upper(),
+            )
+
+        def _leg_external_id(fp: tuple, occurrence: int) -> str:
+            """Id estable de una pata importada: (lote, huella, nº de ocurrencia).
+
+            Dos compras idénticas el mismo día comparten huella pero no ocurrencia,
+            así ambas importan; reimportar el mismo fichero reproduce los mismos
+            ids y se omite; otro fichero con una pata idéntica tiene lote distinto
+            y sí importa. external_id es UNIQUE por tenant: la base lo garantiza.
+            """
+            digest = hashlib.sha256(repr(fp).encode()).hexdigest()[:16]
+            return f"{import_batch}-{digest}-{occurrence}"
+
+        def _already_imported_leg(leg_id: str) -> bool:
+            return db.scalar(
                 select(Transaction.id).where(
-                    Transaction.company_id == company_id,
-                    Transaction.portfolio_id == portfolio_id,
-                    Transaction.trade_date == date.fromisoformat(tx.date),
-                    Transaction.action == tx.action.lower(),
-                    Transaction.quantity == Decimal(str(tx.quantity)),
-                    Transaction.price == Decimal(str(tx.price)),
-                    Transaction.fees == Decimal(str(tx.fees)),
-                    Transaction.currency == tx.currency.upper(),
+                    Transaction.external_id == leg_id,
                     *tenant_filters(db, Transaction),
                 ).limit(1)
-            )
-            return existing is not None
+            ) is not None
+
+
+        seen_in_file: dict[tuple, int] = {}
 
         def _resolve_company(ticker_or_isin: str) -> Company | None:
             raw = ticker_or_isin.upper()
@@ -483,9 +518,14 @@ class TransactionImportService:
                         f"ISIN {tx.ticker} sin empresa registrada (fila {tx.row_number}): "
                         "importa primero por ticker o registra la empresa con su ISIN"
                     )
-                if _already_imported(company.id if company else None, target_portfolio.id, tx):
-                    duplicates_skipped += 1
-                    continue
+                fp = _fingerprint(company.id if company else None, target_portfolio.id, tx)
+                leg_id: str | None = None
+                if fp is not None:
+                    seen_in_file[fp] = seen_in_file.get(fp, 0) + 1
+                    leg_id = _leg_external_id(fp, seen_in_file[fp])
+                    if _already_imported_leg(leg_id):
+                        duplicates_skipped += 1
+                        continue
                 origin = f"Importación masiva ({source_filename}, fila {tx.row_number})" if source_filename else f"Importación masiva (fila {tx.row_number})"
                 service.create_transaction(
                     db,
@@ -496,7 +536,8 @@ class TransactionImportService:
                     trade_date=date.fromisoformat(tx.date),
                     fees=Decimal(str(tx.fees)),
                     currency=tx.currency,
-                    notes=tx.notes or f"{origin} · lote {import_batch}",
+                    notes=f"{tx.notes + ' · ' if tx.notes else ''}{origin} · lote {import_batch}",
+                    external_id=leg_id,
                 )
                 inserted_count += 1
 

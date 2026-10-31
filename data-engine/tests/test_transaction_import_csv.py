@@ -431,3 +431,34 @@ def test_dedupe_is_per_portfolio_not_tenant_wide(env):
         )], source_filename="a.csv")
         assert third["imported_count"] == 0
         assert third["duplicates_skipped"] == 1
+
+
+def test_identical_legitimate_operations_all_import_and_reimport_skips(env):
+    """Dos compras idénticas el mismo día son legítimas: importan las dos.
+    Reimportar el mismo CSV no duplica ninguna."""
+    _, factory, _, _ = env
+    from app.models.entities import Transaction
+
+    service = TransactionImportService()
+    rows = [
+        ParsedTransaction(row_number=2, ticker="SAN.MC", date="2024-03-01", action="buy",
+                          quantity=10, price=3.5, fees=0.0, currency="EUR"),
+        ParsedTransaction(row_number=3, ticker="SAN.MC", date="2024-03-01", action="buy",
+                          quantity=10, price=3.5, fees=0.0, currency="EUR"),
+    ]
+    with factory() as s:
+        s.info["tenant_id"] = "tenant-csv-test"
+        first = service.commit_import(s, rows, source_filename="a.csv")
+        assert first["imported_count"] == 2
+        assert first["duplicates_skipped"] == 0
+
+        second = service.commit_import(s, rows, source_filename="a.csv")
+        assert second["imported_count"] == 0
+        assert second["duplicates_skipped"] == 2
+
+        # Importar solo UNA de las patas otra vez: no es duplicado (solo hay 2, se pide la 3a)
+        third = service.commit_import(s, rows[:1], source_filename="b.csv")
+        assert third["imported_count"] == 1
+
+        count = s.query(Transaction).filter(Transaction.action == "buy").count()
+        assert count == 3
