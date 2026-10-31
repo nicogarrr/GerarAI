@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, date, datetime
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -162,8 +163,23 @@ def test_refresh_market_runs_service(monkeypatch):
     import app.api.routes.portfolio as portfolio_routes
 
     class _FakeService:
+        # Misma forma que MarketRefreshService.refresh (contrato
+        # PortfolioRefreshMarketOut): sin ella el response_model responde 500.
         async def refresh(self, db, as_of=None):
-            return {"refreshed": 5, "as_of": str(as_of) if as_of else None}
+            return {
+                "status": "ok",
+                "as_of": as_of or date(2026, 10, 31),
+                "started_at": datetime(2026, 10, 31, 9, 0, tzinfo=UTC),
+                "completed_at": datetime(2026, 10, 31, 9, 1, tzinfo=UTC),
+                "order": ["precios", "fx"],
+                "stages": [
+                    {"step": 1, "name": "precios", "status": "ok", "updated": 5},
+                    {"step": 2, "name": "fx", "status": "ok", "updated": 3},
+                ],
+                "risk": {"status": "ok"},
+                "alert_results": [],
+                "screen_results": [],
+            }
 
     monkeypatch.setattr(portfolio_routes, "MarketRefreshService", _FakeService)
     client, tenant = _setup(monkeypatch)
@@ -171,4 +187,7 @@ def test_refresh_market_runs_service(monkeypatch):
         client, SECRET, tenant, "u1", "POST", "/api/portfolio/refresh-market",
     )
     assert res.status_code == 200, res.text
-    assert res.json()["refreshed"] == 5
+    body = res.json()
+    assert body["status"] == "ok"
+    assert body["order"] == ["precios", "fx"]
+    assert body["stages"][0]["updated"] == 5
