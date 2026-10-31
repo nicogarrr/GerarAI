@@ -54,7 +54,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     // preventDefault evita que Radix cierre el tooltip en pointerdown/click.
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }}
-                    className="inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
+                    className="relative before:absolute before:-inset-2.5 before:content-[''] inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
                     style={{ backgroundColor: state.color, color: state.fg, borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
                     aria-label={`${item?.symbol ?? ''}: ${state.label}, ${DCA_STATUS_LABEL[state.status] ?? state.status}${staleText ? `, ${staleText}` : ''}`}
                 >

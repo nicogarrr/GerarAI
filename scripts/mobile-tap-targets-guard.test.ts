@@ -76,3 +76,31 @@ describe('móvil: 44 px en biblioteca, estados vacíos y enlaces de panel (audit
         assert.ok(own.includes(`inline-flex ${AREA} sm:min-h-0 items-center text-sm text-teal-300" href={holdersHref}`), 'Ver propietarios con area tactil');
     });
 });
+
+describe('móvil: 44 px en inicio, índice research, watchlist y ProPicks (recorrido 390 px, 31-oct-2026)', () => {
+    // Medido en prod con la cuenta de auditoría a 390x844: insignias de ticker
+    // de 16 px de alto, chip DCA de 24 px, Filtrar 38 px y paginación 34 px.
+    const HIT = "before:absolute before:-inset-2.5 before:content-['']";
+    it('insignia de ticker de las noticias de inicio: 44 px sin crecer lo visible', () => {
+        const src = readFileSync('components/NewsSection.tsx', 'utf8');
+        assert.ok(src.includes(`${HIT} text-xs text-teal-300`), 'insignia de ticker con área táctil invisible de 44 px');
+    });
+    it('chip de nivel DCA (watchlist/cartera): visible de 24 px, hit de 44 px', () => {
+        const src = readFileSync('components/watchlist/DcaLevelBadge.tsx', 'utf8');
+        assert.ok(src.includes(`${HIT} inline-flex min-h-6`), 'chip DCA con área táctil invisible de 44 px');
+    });
+    it('índice de research: Filtrar y paginación con 44 px en móvil', () => {
+        const src = readFileSync('app/(root)/research/page.tsx', 'utf8');
+        assert.ok(src.includes('min-h-[44px] rounded-lg border border-gray-700 px-3 py-2'), 'Filtrar con 44 px');
+        const pagers = src.match(/inline-flex min-h-\[44px\] items-center rounded-lg border border-gray-700 px-3 py-1\.5/g) ?? [];
+        assert.equal(pagers.length, 2, 'Anterior y Siguiente con 44 px');
+    });
+    it('tira de tickers relacionados: enlaces con 44 px', () => {
+        const src = readFileSync('components/research/RelatedTickersStrip.tsx', 'utf8');
+        assert.ok(src.includes('inline-flex min-h-[44px] min-w-[44px] items-center font-medium text-gray-200'), 'ticker relacionado con 44 px');
+    });
+    it('ProPicks: el conmutador de filtros (solo icono) tiene 44x44', () => {
+        const src = readFileSync('components/proPicks/EnhancedProPicksFilters.tsx', 'utf8');
+        assert.ok(src.includes('min-h-[44px] min-w-[44px] xl:hidden'), 'conmutador de filtros 44x44');
+    });
+});
