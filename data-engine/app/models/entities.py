@@ -312,7 +312,10 @@ class Position(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "positions"
     __table_args__ = (
         Index("ix_positions_portfolio_company", "portfolio_id", "company_id"),
-        CheckConstraint("quantity >= 0", name="ck_positions_quantity_non_negative"),
+        # Sin CHECK de quantity >= 0 (0108 la puso y 0111 la retira): el dominio
+        # admite cortos (quantity < 0) — tax_modelo720, historical_stress y
+        # portfolio_reconstruction los modelan, y un import IBKR con corto
+        # reventaba contra la restriccion.
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

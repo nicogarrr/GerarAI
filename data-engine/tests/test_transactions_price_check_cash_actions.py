@@ -16,7 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, Transaction
+from app.models.entities import Base, Company, Position, Transaction
 from app.services.portfolio_fx_service import PortfolioFXService
 
 
@@ -63,3 +63,16 @@ def test_patas_de_compraventa_rechazan_precio_negativo(db, book, action):
     db.add(_tx(portfolio, company, action, "-15"))
     with pytest.raises(IntegrityError):
         db.commit()
+
+
+def test_posicion_corta_quantity_negativa_se_guarda(db, book):
+    # El dominio admite cortos: ck_positions_quantity_non_negative (0108)
+    # los rechazaba en BD y 0111 la retira.
+    portfolio, company = book
+    db.add(Position(
+        portfolio_id=portfolio.id, company_id=company.id,
+        quantity=Decimal("-5"), average_cost=Decimal("100"),
+        market_price=Decimal("100"), market_value=Decimal("-500"),
+        currency="EUR", as_of=date(2026, 5, 3),
+    ))
+    db.commit()  # no IntegrityError
