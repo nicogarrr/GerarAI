@@ -434,3 +434,33 @@ def test_migration_0118_has_upgrade_and_downgrade() -> None:
     assert len(module.revision) <= 32
     assert module.down_revision == "0117_fk_child_indexes"
     assert callable(module.upgrade) and callable(module.downgrade)
+
+
+def test_migration_0119_has_upgrade_and_downgrade() -> None:
+    """0119: indices cobertores para los DISTINCT de /api/screeners/metric-coverage.
+
+    MEDIDO 2026-10-31 (benchmark local sqlite, 500 empresas, 240.000
+    financial_facts, 200.000 calculated_metrics): los dos DISTINCT del
+    camino frio eran el tramo dominante (34,4 y 37,4 ms de un total de 94);
+    con (tenant_id, metric) - parcial en calculated_metrics, que ademas
+    filtra value IS NOT NULL AND status = 'ok' - bajan a 15,6 y 14,6 ms
+    (plan: SEARCH por el indice, sin tocar la tabla). En PG el salto es
+    mayor (inferido, no medido): hoy cada fila exige heap fetch de una fila
+    ancha (JSON de trazas) para el DISTINCT; el indice cobertor lo evita.
+    """
+    import importlib.util
+
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "alembic"
+        / "versions"
+        / "0119_metric_coverage_covering.py"
+    )
+    assert path.exists(), "falta la migración 0119"
+    spec = importlib.util.spec_from_file_location("m0119", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    assert module.revision == "0119_metric_coverage_covering"
+    assert module.down_revision == "0118_thesis_changes_attention_thesis"
+    assert callable(module.upgrade) and callable(module.downgrade)
