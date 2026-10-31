@@ -199,3 +199,17 @@ def test_circuit_breaker_half_open_transition_is_locked():
     # Solo la transición a HALF_OPEN permite intentos; el resto espera
     assert status.state == CircuitState.HALF_OPEN
     assert len(allowed) >= 1
+
+
+def test_record_failure_log_incluye_umbral(caplog):
+    """El logger.info de fallo tiene 4 placeholders y 4 argumentos (regresión del piloto)."""
+    import logging
+
+    status = get_data_source_registry().get_status("ecb_fx")
+    status.consecutive_failures = 0
+    status.state = CircuitState.CLOSED
+    with caplog.at_level(logging.INFO, logger="app.services.data_source_health"):
+        status.record_failure("Timeout")
+    msgs = [r.getMessage() for r in caplog.records if "Fallo registrado" in r.getMessage()]
+    assert len(msgs) == 1
+    assert "(1/3): Timeout" in msgs[0]

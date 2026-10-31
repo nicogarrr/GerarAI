@@ -64,7 +64,10 @@ class DataSourceStatus:
                     error,
                 )
             else:
-                logger.info("Fallo registrado en fuente '%s' (%d/%d): %s", self.name, self.consecutive_failures, error)
+                logger.info(
+                    "Fallo registrado en fuente '%s' (%d/%d): %s",
+                    self.name, self.consecutive_failures, self.failure_threshold, error,
+                )
 
     def can_attempt(self) -> bool:
         with self._transition_lock:
