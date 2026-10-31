@@ -58339,9 +58339,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Add Portfolio Transaction Api Portfolio Add Post",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTransactionCreateOut"
                 }
               }
             },
