@@ -84,6 +84,13 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         if any(path.startswith(prefix) for prefix in _EXCLUDED_PATH_PREFIXES):
             return await call_next(request)
 
+        # Toda la superficie real vive bajo /api/. Fuera de /api/ solo quedan
+        # rutas legacy retiradas, que deben responder 404; exigir CSRF antes
+        # del routing las convertia en 403 y rompia el contrato de retirada
+        # (tests/test_router_contracts.py).
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
         # Extraer token de cabeceras o cookies
         csrf_token = (
             request.headers.get("x-csrf-token")

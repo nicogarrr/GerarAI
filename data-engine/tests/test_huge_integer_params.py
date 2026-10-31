@@ -42,7 +42,12 @@ def test_huge_integer_query_is_a_client_error(client, path):
 
 
 def test_huge_integer_path_id_is_not_a_server_error(client):
-    response = client.delete(f"/api/portfolio/transactions/{HUGE}")
+    # VAL-SEC-001: los metodos mutantes exigen CSRF antes del routing; sin
+    # token la respuesta legitima es 403, no el 404/422 del handler.
+    token = client.get("/api/csrf-token").json()["csrf_token"]
+    response = client.delete(
+        f"/api/portfolio/transactions/{HUGE}", headers={"x-csrf-token": token}
+    )
     assert response.status_code in (404, 422), (response.status_code, response.text[:300])
 
 

@@ -110,6 +110,22 @@ def test_post_with_valid_csrf_token_passes_csrf_filter(client: TestClient):
     assert response.status_code != 403
 
 
+def test_delete_bajo_api_sin_token_sigue_dando_403(client: TestClient):
+    """El scope /api no abre ninguna puerta: mutantes bajo /api/ sin token, 403."""
+    response = client.delete("/api/portfolio/transactions/1")
+    assert response.status_code == 403
+
+
+def test_post_fuera_de_api_no_exige_csrf_y_404(client: TestClient):
+    """Las rutas legacy retiradas deben 404, no 403 por CSRF previo al routing."""
+    response = client.post(
+        "/analytics/portfolio",
+        json={"symbols": ["AAPL"]},
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 404
+
+
 def test_safe_get_methods_do_not_require_csrf(client: TestClient):
     """GET requests are safe methods and do not require CSRF token."""
     response = client.get("/api/health")
