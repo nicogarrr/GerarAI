@@ -52,7 +52,7 @@ describe('PersonalizedOverview primera carga', () => {
 
     it('una sola server action para las cuatro secciones, ninguna lectura suelta', async () => {
         render(<PersonalizedOverview userId="u1" />);
-        await waitFor(() => expect(screen.queryAllByText('Cargando…')).toHaveLength(0));
+        await waitFor(() => expect(screen.queryAllByText(/Cargando(?:…|\.\.\.)/u)).toHaveLength(0));
         expect(getHomeOverviewBundle).toHaveBeenCalledTimes(1);
         expect(getHomeOverviewBundle).toHaveBeenCalledWith('u1', expect.objectContaining({ watchlistLimit: 3 }));
         for (const read of [getPortfolioSummary, getUserAlerts, getRecentTriggeredAlerts, getHomeWatchlistPreview, getHomeOpportunities]) {
