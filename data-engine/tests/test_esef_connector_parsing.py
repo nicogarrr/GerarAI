@@ -9,7 +9,6 @@ graban).
 
 import asyncio
 import json
-from datetime import date, timedelta
 
 import httpx
 import pytest

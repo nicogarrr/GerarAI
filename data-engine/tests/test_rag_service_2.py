@@ -10,15 +10,15 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-import app.services.rag as rag
 import app.services.hybrid_retrieval as hr
+import app.services.rag as rag
 from app.models.entities import (
     Base,
     Company,
     Document,
     DocumentChunk,
-    KnowledgeDocument,
     KnowledgeChunk,
+    KnowledgeDocument,
 )
 
 

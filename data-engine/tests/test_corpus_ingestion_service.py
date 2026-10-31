@@ -10,8 +10,6 @@ from __future__ import annotations
 from datetime import date
 from uuid import uuid4
 
-import pytest
-
 import app.services.corpus_ingestion_service as cis
 from app.core.database import SessionLocal, init_db
 from app.models import Tenant
@@ -47,7 +45,7 @@ class _FakeClient:
             raise route
         return route
 
-    def __enter__(self) -> "_FakeClient":
+    def __enter__(self) -> _FakeClient:
         return self
 
     def __exit__(self, *exc) -> None:

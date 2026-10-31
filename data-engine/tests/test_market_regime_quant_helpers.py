@@ -88,7 +88,7 @@ def test_paired_beta_varianza_nula_es_sin_datos():
 
 
 def _caps(symbols, as_of: date, cap: float = 100.0):
-    return {s: (cap, "proveedor", as_of) for s in symbols}
+    return dict.fromkeys(symbols, (cap, "proveedor", as_of))
 
 
 def test_top_ten_concentration_exige_universo_completo():

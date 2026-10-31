@@ -20,7 +20,6 @@ from app.models import Tenant
 from app.services.manager_holding_ingestion_service import (
     ManagerHoldingIngestionService,
 )
-
 from tests.auth_helpers import auth_settings, signed_request
 
 SECRET = "ownership-read-routes-test-secret-at-least-32-chars"

@@ -8,12 +8,13 @@ via init_db()/SessionLocal, como hace el worker.
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import pytest
 
 import app.workers.dramatiq_app as da
 from app.core.database import SessionLocal, init_db
 from app.models import Company, Tenant
-from uuid import uuid4
 
 
 def _tenant(ext: str, status: str = "active", metadata: dict | None = None) -> int:
