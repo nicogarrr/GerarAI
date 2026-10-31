@@ -12,6 +12,8 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import WorkProductButton from '@/components/work-products/WorkProductButton';
 import { formatDate, formatNumber } from '@/lib/format';
+import { getT } from '@/lib/i18n/server';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { Badge } from '@/components/ui/badge';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { PageHeader } from '@/components/ui/page-header';
@@ -30,11 +32,13 @@ import {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Índice de research',
-    description:
-        'Índice de las empresas con research en GerarAI: cobertura de su research, rating de la última tesis y fecha de la última versión.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return {
+        title: t('research.indexMetaTitle'),
+        description: t('research.indexMetaDescription'),
+    };
+}
 
 /**
  * El registro de empresas (`/api/companies`) solo trae la ficha de la empresa,
@@ -47,25 +51,25 @@ export const metadata: Metadata = {
  */
 const SNAPSHOT_BATCH_SIZE = 50;
 
-/** Ratings persistidos por el backend, en español (mismo mapa que la ficha). */
-const RATING_LABELS: Record<string, string> = {
-    buy: 'compra',
-    accumulate: 'acumular',
-    overweight: 'sobreponderar',
-    hold: 'mantener',
-    underweight: 'infraponderar',
-    trim: 'recortar',
-    sell: 'venta',
-    avoid: 'evitar',
-    watch: 'seguimiento',
+/** Ratings persistidos por el backend (mismo mapa que la ficha); el texto sale de research.rating.*. */
+const RATING_KEYS = {
+    buy: 'research.rating.buy',
+    accumulate: 'research.rating.accumulate',
+    overweight: 'research.rating.overweight',
+    hold: 'research.rating.hold',
+    underweight: 'research.rating.underweight',
+    trim: 'research.rating.trim',
+    sell: 'research.rating.sell',
+    avoid: 'research.rating.avoid',
+    watch: 'research.rating.watch',
     // Ratings del motor de tesis (thesis_service._rating): eje de valoracion,
     // no de recomendacion.
-    attractive: 'atractiva',
-    expensive: 'cara',
-    incomplete_price: 'precio incompleto',
-    blocked: 'bloqueada',
-    insufficient_data: 'datos insuficientes',
-};
+    attractive: 'research.rating.attractive',
+    expensive: 'research.rating.expensive',
+    incomplete_price: 'research.rating.incompletePrice',
+    blocked: 'research.rating.blocked',
+    insufficient_data: 'research.rating.insufficientData',
+} as const;
 
 type Dashboard = Awaited<ReturnType<typeof getResearchDashboard>>;
 type Company = Dashboard['companies'][number];
@@ -79,13 +83,13 @@ type CompanyRow = {
     unreadable: boolean;
 };
 
-function ratingLabel(value: string | null | undefined): string {
-    if (!value) return 'Sin rating';
-    return RATING_LABELS[value] ?? value.replaceAll('_', ' ');
+function ratingLabel(value: string | null | undefined, t: TranslateFn): string {
+    if (!value) return t('research.noRating');
+    return Object.hasOwn(RATING_KEYS, value) ? t(RATING_KEYS[value as keyof typeof RATING_KEYS]) : value.replaceAll('_', ' ');
 }
 
 /** Una fila del índice: ticker, nombre, cobertura del research y última tesis. */
-function CompanyCard({ row }: { row: CompanyRow }) {
+function CompanyCard({ row, t }: { row: CompanyRow; t: TranslateFn }) {
     const { company, snapshot, unreadable } = row;
     const health = snapshot?.research_health;
     const thesis = snapshot?.latest_thesis ?? null;
@@ -117,14 +121,14 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                     {unreadable ? (
-                        <span className="text-xs text-warn">No se pudo leer su research</span>
+                        <span className="text-xs text-warn">{t('research.unreadable')}</span>
                     ) : !snapshot ? (
-                        <span className="text-xs text-gray-500">Sin research generado</span>
+                        <span className="text-xs text-gray-500">{t('research.noResearch')}</span>
                     ) : (
                         <>
                             {valuable ? (
                                 <>
-                                    {thesis && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating)}</Badge> : null}
+                                    {thesis && visibleThesisRating(thesis.rating, snapshot) ? <Badge>{ratingLabel(thesis.rating, t)}</Badge> : null}
                                     {thesis ? (
                                         <span className="text-xs text-gray-500">
                                             v{formatNumber(thesis.version)} · {formatDate(thesis.created_at)}
@@ -132,24 +136,24 @@ function CompanyCard({ row }: { row: CompanyRow }) {
                                     ) : null}
                                     <span
                                         className="text-xs text-gray-500"
-                                        title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
+                                        title={t('research.layersTitle')}
                                     >
-                                        Capas disponibles {formatNumber(health?.score)}/100
+                                        {t('research.layersAvailable', { score: formatNumber(health?.score) })}
                                     </span>
                                 </>
                             ) : (
                                 <>
                                     <span
                                         className="text-xs text-gray-500"
-                                        title="Mide qué capas existen (documentos, hechos, tesis, modelo), no si la empresa se puede valorar ni la fiabilidad de los datos."
+                                        title={t('research.layersTitle')}
                                     >
-                                        Capas disponibles {formatNumber(health?.score)}/100
+                                        {t('research.layersAvailable', { score: formatNumber(health?.score) })}
                                     </span>
                                     <span
                                         className="text-xs text-gray-500"
-                                        title="Hay capas de datos, pero faltan inputs o evidencia con fuente para publicar una valoración."
+                                        title={t('research.notValuableTitle')}
                                     >
-                                        No valorable: falta evidencia
+                                        {t('research.notValuable')}
                                     </span>
                                 </>
                             )}
@@ -166,6 +170,7 @@ export default async function ResearchPage({
 }: {
     searchParams?: Promise<{ q?: string | string[]; page?: string | string[] }>;
 }) {
+    const t = await getT();
     // Las lecturas de contexto del usuario (cartera, watchlist) no dependen del
     // dashboard: se lanzan a la vez en vez de esperar a que termine el
     // dashboard. Antes eran dos tramos secuenciales (dashboard, luego
@@ -262,83 +267,83 @@ export default async function ResearchPage({
         <main id="content" tabIndex={-1} className="mx-auto flex max-w-7xl flex-col gap-6">
             <PageHeader
                 actions={<WorkProductButton />}
-                kicker="Research OS"
-                title="Índice de research"
+                kicker={t('research.kicker')}
+                title={t('research.indexTitle')}
             />
 
             <Panel
-                title="Registro de empresas"
+                title={t('research.registryTitle')}
             >
-                <p className="mb-4 text-sm text-gray-400">Capas disponibles indica la presencia de documentos, hechos, tesis y modelo. No mide la fiabilidad de los datos ni garantiza que la empresa sea valorable.</p>
+                <p className="mb-4 text-sm text-gray-400">{t('research.coverageNote')}</p>
                 {ordered.length ? (
                     <>
                         <form action="/research" className="mb-4 flex flex-wrap items-center gap-2" method="get">
                             <label className="sr-only" htmlFor="research-index-q">
-                                Filtrar por ticker o nombre
+                                {t('research.filterLabel')}
                             </label>
                             <TickerSearchInput
                                 className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-surface-1 px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:border-teal-600 focus:outline-none sm:max-w-xs sm:flex-none"
                                 defaultValue={query}
                                 id="research-index-q"
                                 name="q"
-                                placeholder="Filtrar por ticker o nombre"
+                                placeholder={t('research.filterLabel')}
                                 options={ordered.map(company => ({symbol: company.ticker, name: company.name}))}
                             />
                             <button
                                 className="min-h-[44px] rounded-lg border border-gray-700 px-3 py-2 text-sm text-gray-200 transition hover:border-teal-700 sm:min-h-0"
                                 type="submit"
                             >
-                                Filtrar
+                                {t('research.filterSubmit')}
                             </button>
                             {query ? (
                                 <Link
                                     className="text-sm text-teal-300 hover:text-teal-200"
                                     href="/research"
                                 >
-                                    Quitar filtro
+                                    {t('research.filterClear')}
                                 </Link>
                             ) : null}
                         </form>
                         <p className="mb-3 text-xs text-gray-500">
                             {query
                                 ? slice.total
-                                    ? `Mostrando ${formatNumber(slice.from)}-${formatNumber(slice.to)} de ${formatNumber(slice.total)} coincidencias para «${query}» (de ${formatNumber(ordered.length)} empresas en el registro)`
-                                    : `0 coincidencias para «${query}» (de ${formatNumber(ordered.length)} empresas en el registro)`
-                                : `Mostrando ${formatNumber(slice.from)}-${formatNumber(slice.to)} de ${formatNumber(slice.total)} empresas`}
+                                    ? t('research.showingMatches', { from: formatNumber(slice.from), to: formatNumber(slice.to), total: formatNumber(slice.total), query, companies: formatNumber(ordered.length) })
+                                    : t('research.zeroMatches', { query, companies: formatNumber(ordered.length) })
+                                : t('research.showingAll', { from: formatNumber(slice.from), to: formatNumber(slice.to), total: formatNumber(slice.total) })}
                         </p>
                         {rows.length ? (
                             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 {rows.map((row) => (
-                                    <CompanyCard key={row.company.ticker} row={row} />
+                                    <CompanyCard key={row.company.ticker} row={row} t={t} />
                                 ))}
                             </ul>
                         ) : (
                             <EmptyState
-                                action={<EmptyLink href="/research">Quitar el filtro</EmptyLink>}
-                                description="Ninguna empresa del registro coincide con ese filtro. Prueba con otro ticker o nombre, o quita el filtro para ver el índice completo."
+                                action={<EmptyLink href="/research">{t('research.filterClearLong')}</EmptyLink>}
+                                description={t('research.noMatchDescription')}
                                 icon={FileSearch}
-                                title={`Sin coincidencias para «${query}».`}
+                                title={t('research.noMatchTitle', { query })}
                             />
                         )}
                         {slice.pages > 1 ? (
-                            <nav aria-label="Paginación del índice" className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                            <nav aria-label={t('research.paginationAria')} className="mt-4 flex flex-wrap items-center gap-3 text-sm">
                                 {slice.page > 1 ? (
                                     <Link
                                         className="inline-flex min-h-[44px] items-center rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700 sm:min-h-0"
                                         href={researchIndexHref(query, slice.page - 1)}
                                     >
-                                        Anterior
+                                        {t('research.previous')}
                                     </Link>
                                 ) : null}
                                 <span className="text-xs whitespace-nowrap text-gray-500">
-                                    Página {formatNumber(slice.page)} de {formatNumber(slice.pages)}
+                                    {t('research.pageOf', { current: formatNumber(slice.page), total: formatNumber(slice.pages) })}
                                 </span>
                                 {slice.page < slice.pages ? (
                                     <Link
                                         className="inline-flex min-h-[44px] items-center rounded-lg border border-gray-700 px-3 py-1.5 text-gray-200 transition hover:border-teal-700 sm:min-h-0"
                                         href={researchIndexHref(query, slice.page + 1)}
                                     >
-                                        Siguiente
+                                        {t('research.next')}
                                     </Link>
                                 ) : null}
                             </nav>
@@ -348,13 +353,13 @@ export default async function ResearchPage({
                     <EmptyState
                         action={
                             <div className="flex flex-wrap justify-center gap-3">
-                                <EmptyLink href="/search">Buscar una empresa</EmptyLink>
-                                <EmptyLink href="/watchlist">Ver mi watchlist</EmptyLink>
+                                <EmptyLink href="/search">{t('research.emptyActionSearch')}</EmptyLink>
+                                <EmptyLink href="/watchlist">{t('research.emptyActionWatchlist')}</EmptyLink>
                             </div>
                         }
-                        description="Busca una empresa y genera su research desde su ficha. También puedes empezar por tu watchlist."
+                        description={t('research.emptyDescription')}
                         icon={FileSearch}
-                        title="Todavía no hay ninguna empresa con research."
+                        title={t('research.emptyTitle')}
                     />
                 )}
             </Panel>
