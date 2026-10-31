@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
+const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
 const actions = readFileSync('lib/actions/research.actions.ts', 'utf8');
 
 describe('cifras de la ficha enlazadas a su fuente', () => {
@@ -11,23 +11,23 @@ describe('cifras de la ficha enlazadas a su fuente', () => {
         assert.ok(actions.includes('source_title?: string | null;'));
         assert.ok(actions.includes('source_published_at?: string | null;'));
     });
-    it('la fuente solo enlaza con URL real del backend y lleva fecha', () => {
-        assert.ok(page.includes('function FactSource({ fact }: { fact: ResearchFact })'));
-        assert.ok(page.includes('if (!fact.source_url) return <>{text}<FactCalculatedLabel fact={fact} /></>;'));
-        assert.ok(page.includes("import { FactCalculatedLabel }"));
-        assert.ok(page.includes('formatUserDate(fact.source_published_at)'));
-        assert.ok(page.includes('rel="noopener noreferrer"'));
-        assert.ok(page.includes('target="_blank"'));
+    it('la fuente solo enlaza con URL real del backend', () => {
+        // #3527: la etiqueta textual de fuente (FactSource) se elimino; la
+        // cifra sigue enlazando a la URL que devuelve el backend via FactValueLink.
+        assert.ok(panels.includes('function FactValueLink({ fact, children }: { fact: ResearchFact; children: ReactNode })'));
+        assert.ok(panels.includes('if (!fact.source_url) return <>{children}</>;'));
+        assert.ok(panels.includes('href={fact.source_url}'));
+        assert.ok(panels.includes('rel="noopener noreferrer"'));
+        assert.ok(panels.includes('target="_blank"'));
     });
     it('la cifra enlaza a su fuente en tabla de escritorio y en tarjeta móvil', () => {
-        assert.ok(page.includes('function FactValueLink({ fact, children }'));
-        assert.ok(page.includes('<FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>'));
-        assert.ok(page.includes('<FactSource fact={fact} />'));
+        assert.ok(panels.includes('<FactValueLink fact={fact}>{metricValue(fact.value, fact.unit)}</FactValueLink>'));
+        assert.equal((panels.match(/<FactValueLink fact=\{fact\}>/g) ?? []).length, 2, 'tarjeta móvil y tabla de escritorio');
     });
-    it('sin documento de origen la fuente queda como texto plano', () => {
-        // Sin URL solo texto y etiqueta Calculado; nunca un enlace.
-        const factSource = page.slice(page.indexOf('function FactSource'), page.indexOf('function FactValueLink'));
-        assert.ok(factSource.includes('label(fact.source_type)'));
-        assert.ok(!factSource.includes('sec.gov/cgi-bin'), 'sin URLs construidas a mano');
+    it('sin documento de origen la cifra queda como texto plano', () => {
+        // Sin URL solo texto; nunca un enlace ni URLs construidas a mano.
+        const link = panels.slice(panels.indexOf('function FactValueLink'), panels.indexOf('export function FactCard'));
+        assert.ok(link.includes('if (!fact.source_url) return <>{children}</>;'));
+        assert.ok(!link.includes('sec.gov/cgi-bin'), 'sin URLs construidas a mano');
     });
 });

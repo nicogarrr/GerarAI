@@ -17,9 +17,11 @@ test('EPS dimensional mismatch is not displayed as a valid figure', () => {
   assert.equal(factDisplayAudit('ASTS', {...bad, unit: 'EUR/share', value: '2.8'}), null);
 });
 test('mobile and desktop facts both call the audit with ticker and use N/D', () => {
+  // La tabla/tarjetas de hechos viven en FactsPanels; la ficha las compone.
+  const panels = readFileSync('components/research/FactsPanels.tsx', 'utf8');
   const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-  assert.match(page, /const audit = factDisplayAudit\(ticker, fact\)/);
-  assert.match(page, /audit \? 'N\/D' : <FactValueLink/);
-  assert.match(page, /factDisplayAudit\(ticker, fact\) \? <span/);
+  assert.match(panels, /const audit = factDisplayAudit\(ticker, fact\)/);
+  assert.match(panels, /audit \? 'N\/D' : <><FactValueLink/);
+  assert.match(panels, /factDisplayAudit\(ticker, fact\) \? <span/);
   assert.match(page, /<FactTable ticker=\{ticker\}/);
 });
