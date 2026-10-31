@@ -1325,8 +1325,9 @@ class InvestorDetailOut(InvestorSummaryOut):
 
 # --- GET /api/portfolio/intelligence ---------------------------------------
 # Formas medidas contra PortfolioIntelligenceService.build (servicio real).
-# La ruta devuelve siempre todas las claves (ramas None, no omision), asi que
-# no hace falta response_model_exclude_unset.
+# La ruta usa response_model_exclude_unset=True: la rama sin posiciones de
+# _ledger_contribution OMITE base_currency (no la emite null) y hay que
+# conservar la omision en el wire.
 
 
 class PortfolioTwrPeriodOut(BaseModel):

@@ -74,12 +74,11 @@ def test_intelligence_empty_portfolio_validates_full_wire(monkeypatch) -> None:
     assert "base_currency" not in payload["ledger_contribution"]
 
 
-def test_ledger_position_reconciliation_branch_emits_null_flows() -> None:
-    """La rama de reconciliacion fallida del servicio (cantidades que no
-    cuadran tras ajustes corporativos) emite contribution_pnl/end_value/
-    start_value/net_invested/income en None con la razon. Literal medido en
-    PortfolioIntelligenceService._ledger_contribution; el front tipaba
-    net_invested e income como number."""
+def test_ledger_position_schema_accepts_null_flows() -> None:
+    """El schema admite contribution/valores/flujos en null: los emite la
+    rama de ledger no reconciliable del servicio (missing_ledger, ejercitada
+    por HTTP en el test de cartera poblada; incomplete_ledger se cubre en
+    los tests de servicio). El front los tipaba como number."""
     PortfolioLedgerPositionOut.model_validate(
         {
             "ticker": "ASTS",
@@ -89,6 +88,76 @@ def test_ledger_position_reconciliation_branch_emits_null_flows() -> None:
             "start_value": None,
             "net_invested": None,
             "income": None,
-            "reason": "quantity_mismatch_after_corporate_actions",
+            "reason": None,
         }
     )
+
+
+def test_intelligence_populated_portfolio_http(monkeypatch) -> None:
+    """Cartera poblada por HTTP con el servicio real: tenant SQLite, una
+    posicion EUR y dos precios. La posicion no tiene valor en divisa base
+    (market_value_base None): el peso usa el fallback nativo EUR (sin
+    missing_fx) pero ledger_contribution declara la razon y deja la
+    contribucion en null en lugar de inventar un P&L."""
+    from datetime import date
+    from decimal import Decimal
+
+    from app.models import Company, MarketPrice, Portfolio, Position
+
+    client, tenant, user = _client(monkeypatch)
+    db = SessionLocal()
+    tenant_row = db.query(Tenant).filter(Tenant.external_id == tenant).one()
+    db.info["tenant_id"] = tenant_row.id
+    db.add(Portfolio(name="Main", base_currency="EUR", is_default=True))
+    company = Company(
+        ticker="POP", name="POP", exchange="BME", currency="EUR",
+        sector="Tech", industry="I", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[],
+        factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    db.add(Position(
+        company_id=company.id, quantity=Decimal("10"), currency="EUR",
+        market_value=Decimal("1100"), market_value_base=None,
+        as_of=date(2026, 10, 30),
+    ))
+    for day, close in [(28, "10"), (29, "11")]:
+        db.add(MarketPrice(
+            company_id=company.id, date=date(2026, 10, day),
+            open=Decimal(close), high=Decimal(close), low=Decimal(close),
+            close=Decimal(close), adj_close=Decimal(close), source="yfinance",
+        ))
+    db.commit()
+    db.close()
+
+    res = signed_request(client, SECRET, tenant, user, "GET", "/api/portfolio/intelligence")
+
+    assert res.status_code == 200, res.text
+    payload = res.json()
+    PortfolioIntelligenceOut.model_validate(payload)
+
+    # Peso con fallback nativo (EUR = divisa base): sin missing_fx.
+    assert payload["missing_fx"] == []
+    assert payload["concentration"]["weights"] == {"POP": 1.0}
+
+    # Attribution: retorno medido de los dos extremos ajustados (11/10 - 1).
+    position = payload["attribution"]["positions"][0]
+    assert position["ticker"] == "POP"
+    assert abs(position["total_return"] - 0.1) < 1e-9
+    assert position["fx_known"] is True
+    # Sin filas de dividendos el componente es desconocido (null-propagante),
+    # no cero supuesto.
+    assert position["dividends_known"] is False
+    assert position["partial_history"] is False
+
+    # Ledger: sin operaciones no hay ledger que reconciliar: el P&L y los
+    # flujos son desconocidos (null) con la razon declarada, nunca ceros.
+    ledger = payload["ledger_contribution"]["positions"][0]
+    assert ledger["ticker"] == "POP"
+    assert ledger["reason"] == "missing_ledger"
+    assert ledger["contribution_pnl"] is None
+    assert ledger["start_value"] is None
+    assert ledger["net_invested"] is None
+    assert ledger["income"] is None
+    assert payload["ledger_contribution"]["base_currency"] == "EUR"
