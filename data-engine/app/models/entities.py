@@ -1522,6 +1522,9 @@ class ThesisChange(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "thesis_changes"
     __table_args__ = (
         Index("ix_thesis_changes_company_created", "company_id", "created_at"),
+        # /api/attention-thesis: sondas del nestloop por (tenant, company, id);
+        # sin el id en el indice cada sonda leia ~64 filas y descartaba 63.
+        Index("ix_thesis_changes_tenant_company_id", "tenant_id", "company_id", "id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
