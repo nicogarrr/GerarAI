@@ -1,0 +1,109 @@
+"""GET /api/propicks/radar/opportunities: paginación, filtros y cobertura."""
+
+from __future__ import annotations
+
+from datetime import UTC, date, datetime
+
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from app.api.routes import propicks_radar as radar_module
+from app.core.database import Base, get_db
+from app.models import Company, Tenant, WatchItem
+from app.services.propicks_radar_store import save_snapshot
+
+NOW = datetime(2026, 10, 30, 22, 0, tzinfo=UTC)
+
+
+def _payload(level: int, *, status: str = "ok") -> dict:
+    if status != "ok":
+        return {"status": status, "reason": "stale"}
+    current = {"level": level, "status": "forming", "signal_date": "2026-10-29",
+               "close": 91.5, "zone": {"label": f"{level}X DCA"}}
+    return {"status": "ok", "formula_version": "nico-v1", "price_verified": True,
+            "price_date": "2026-10-29", "source": "yfinance",
+            "current": current, "confirmed": {"level": 1, "period": "2026-09"},
+            "clear_price_signal": level == 4}
+
+
+@pytest.fixture
+def client():
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False},
+                           poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(engine)()
+    db.add(Tenant(id=1, external_id="t"))
+    # 25 empresas ok (niveles variados) + 1 inválida + 1 sin snapshot.
+    for cid in range(1, 27):
+        db.add(Company(id=cid, ticker=f"T{cid:02d}", name=f"Co {cid}", exchange="NASDAQ",
+                       currency="USD", sector="Technology" if cid % 2 else "Energy",
+                       industry="Test", company_type="large_cap", valuation_model="dcf"))
+    db.add(Company(id=99, ticker="NOSNAP", name="Sin snapshot", exchange="NASDAQ",
+                   currency="USD", sector="Technology", industry="Test",
+                   company_type="large_cap", valuation_model="dcf"))
+    # El universo = empresas con al menos un precio persistido (27 aquí).
+    from app.models import MarketPrice
+    for cid in list(range(1, 27)) + [99]:
+        db.add(MarketPrice(company_id=cid, date=NOW.date(), open=1, high=1, low=1,
+                           close=1, adj_close=1, volume=1, quote_currency="USD", source="test"))
+    db.commit()
+    for cid in range(1, 26):
+        save_snapshot(db, cid, _payload(4 if cid <= 3 else (3 if cid <= 10 else 1)), now=NOW)
+    save_snapshot(db, 26, _payload(0, status="invalid"), now=NOW)
+    db.add(WatchItem(tenant_id=1, symbol="T01"))
+    db.commit()
+
+    app = FastAPI()
+    app.include_router(radar_module.router, prefix="/api/propicks")
+
+    def _override_db():
+        yield db
+
+    app.dependency_overrides[get_db] = _override_db
+    return TestClient(app)
+
+
+def test_pagination_20_per_page_and_counts(client):
+    page1 = client.get("/api/propicks/radar/opportunities").json()
+    assert page1["page_size"] == 20
+    assert len(page1["items"]) == 20
+    assert page1["total"] == 25
+    assert page1["has_more"] is True
+    page2 = client.get("/api/propicks/radar/opportunities", params={"page": 2}).json()
+    assert len(page2["items"]) == 5
+    assert page2["has_more"] is False
+    # Nivel 4 primero (orden por nivel desc, ticker).
+    assert [i["level"] for i in page1["items"][:3]] == [4, 4, 4]
+    assert page1["counts_by_level"] == {"4": 3, "3": 7, "1": 15}
+    # Cobertura honesta: la inválida cuenta aparte; NOSNAP no está evaluada.
+    assert page1["coverage"] == {"universe": 27, "evaluated": 26, "ok": 25, "invalid": 1}
+    row = page1["items"][0]
+    assert row["formula_version"] == "nico-v1"
+    assert row["status"] == "forming"
+    assert row["confirmed_level"] == 1
+    assert row["signal_date"] == "2026-10-29"
+    assert row["source"] == "yfinance"
+    assert row["clear_price_signal"] is True
+
+
+def test_level_and_sector_filters(client):
+    only4 = client.get("/api/propicks/radar/opportunities", params={"level": 4}).json()
+    assert only4["total"] == 3
+    assert {i["level"] for i in only4["items"]} == {4}
+    energy = client.get("/api/propicks/radar/opportunities", params={"sector": "Energy"}).json()
+    assert energy["total"] == 12
+    assert {i["sector"] for i in energy["items"]} == {"Energy"}
+    assert set(client.get("/api/propicks/radar/opportunities").json()["sectors"]) == {"Energy", "Technology"}
+
+
+def test_outside_tracked_excludes_watchlist(client):
+    # Sin contexto de tenant en dev, WatchItem(tenant_id=1) es visible (legacy
+    # unscoped): el filtro excluye T01 y no inventa pertenencia.
+    res = client.get("/api/propicks/radar/opportunities", params={"outside_tracked": True}).json()
+    assert res["total"] == 24
+    assert "T01" not in {i["ticker"] for i in res["items"]}
+    assert res["counts_by_level"]["4"] == 2
