@@ -1,16 +1,8 @@
+import type { components } from '@/lib/research/openapi.generated';
+
 /** Only a continuous, complete, return-qualified suffix. Never bridge a missing return
  * or turn empty/partial snapshots into a chart of losses. Read-only, no backfill. */
-export type PortfolioSnapshotPoint = {
-    snapshot_date: string;
-    base_currency: string;
-    total_value_base: number;
-    pricing_coverage: number;
-    net_external_flow_base: number;
-    daily_return: number | null;
-    cumulative_twr: number | null;
-    /** metadata de la foto (GET /api/portfolio/snapshots); solo se lee la marca de reconstrucción. */
-    metadata?: Record<string, unknown> | null;
-};
+export type PortfolioSnapshotPoint = components['schemas']['PortfolioSnapshotOut'];
 
 /** Primera foto real tras una serie reconstruida (twr_rebuild): el TWR acumulado vuelve a 0 ahí. */
 function isRebuildBase(row: PortfolioSnapshotPoint): boolean {

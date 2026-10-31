@@ -9743,6 +9743,12 @@ export interface components {
             items: components["schemas"]["PortfolioPositionItemOut"][];
             page_info: components["schemas"]["PageInfo"];
         };
+        /** PaginatedResponse[PortfolioSnapshotOut] */
+        PaginatedResponse_PortfolioSnapshotOut_: {
+            /** Items */
+            items: components["schemas"]["PortfolioSnapshotOut"][];
+            page_info: components["schemas"]["PageInfo"];
+        };
         /** PaginatedResponse[PortfolioTransactionOut] */
         PaginatedResponse_PortfolioTransactionOut_: {
             /** Items */
@@ -10420,6 +10426,40 @@ export interface components {
             var_95: number | null;
             /** Volatility */
             volatility: number | null;
+        };
+        /** PortfolioSnapshotOut */
+        PortfolioSnapshotOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Cash Value Base */
+            cash_value_base: number;
+            /** Cumulative Twr */
+            cumulative_twr: number | null;
+            /** Daily Return */
+            daily_return: number | null;
+            /** Id */
+            id: number;
+            /** Metadata */
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Net External Flow Base */
+            net_external_flow_base: number;
+            /** Portfolio Id */
+            portfolio_id: number;
+            /** Positions Value Base */
+            positions_value_base: number;
+            /** Pricing Coverage */
+            pricing_coverage: number;
+            /**
+             * Snapshot Date
+             * Format: date
+             */
+            snapshot_date: string;
+            /** Source */
+            source: string;
+            /** Total Value Base */
+            total_value_base: number;
         };
         /** PortfolioSummaryAlertOut */
         PortfolioSummaryAlertOut: {
@@ -22625,9 +22665,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PaginatedResponse_PortfolioSnapshotOut_"];
                 };
             };
             /** @description Validation Error */

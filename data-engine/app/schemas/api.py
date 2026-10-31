@@ -1717,3 +1717,25 @@ class FXRateOut(BaseModel):
     rate: float
     rate_date: str
     source: str
+
+
+# --- GET /api/portfolio/snapshots --------------------------------------------
+# Forma medida contra _snapshot_payload (servicio real): emite siempre todas
+# las claves; daily_return/cumulative_twr llegan como null (la primera foto
+# es base sin retorno). Paginado PaginatedResponse como /positions.
+
+
+class PortfolioSnapshotOut(BaseModel):
+    id: int
+    portfolio_id: int
+    snapshot_date: date
+    base_currency: str
+    positions_value_base: float
+    cash_value_base: float
+    total_value_base: float
+    net_external_flow_base: float
+    daily_return: float | None
+    cumulative_twr: float | None
+    pricing_coverage: float
+    source: str
+    metadata: dict[str, Any]
