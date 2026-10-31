@@ -6,11 +6,23 @@ import httpx
 
 from app.core.config import get_settings
 from app.services.connectors.base import UpstreamRateLimited, get_with_retry
+from app.services.connectors.minute_budget import MinuteBudget
 from app.services.data_source_health import get_data_source_registry
 
 # Clave en el registry de salud de fuentes. 400/404 son dato por ticker y NO
 # degradan; 401/403 (clave rechazada), 429 y 5xx SI (fuente inutilizable).
 REGISTRY_KEY = "finnhub"
+
+# Plan gratis: 60 llamadas/minuto (finnhub.io/pricing, consultada 2026-09-26).
+FINNHUB_MAX_CALLS_PER_MINUTE = 60
+
+# UN presupuesto por proceso, compartido por todos los FinnhubClient (refresco
+# de mercado, IR, metricas, eventos, tesis): el reparto entre tareas sale
+# solo y ninguna combinacion de consumidores supera el ritmo del plan. Sin el
+# presupuesto, el fan-out del refresco (6 en vuelo, respuestas de ~0.2 s) son
+# ~1800 llamadas/minuto: 429 en racha y el servicio marcaba el proveedor
+# caido perdiendo la corrida. La espera es asyncio.sleep fuera del cerrojo.
+_finnhub_minute_budget = MinuteBudget(FINNHUB_MAX_CALLS_PER_MINUTE)
 
 
 class FinnhubClient:
@@ -41,6 +53,9 @@ class FinnhubClient:
         query = {**params, "token": self.settings.finnhub_api_key}
         retry_kwargs = {} if max_retries is None else {"max_retries": max_retries}
         registry = get_data_source_registry()
+        # Turno del presupuesto ANTES de la peticion: cuenta llamadas
+        # intentadas (las fallidas tambien las cuenta el proveedor).
+        await _finnhub_minute_budget.acquire()
         try:
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await get_with_retry(lambda: client.get(url, params=query), **retry_kwargs)
