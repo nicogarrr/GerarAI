@@ -42,6 +42,7 @@ from app.schemas.api import (
     PortfolioPositionItemOut,
     PortfolioSnapshotOut,
     PortfolioSummaryOut,
+    PortfolioTearsheetOut,
     PortfolioTransactionOut,
     PortfolioTransactionPageOut,
 )
@@ -772,7 +773,7 @@ def portfolio_dividend_projection(
     return DividendProjectionService().project(db, months=months)
 
 
-@router.get("/tearsheet")
+@router.get("/tearsheet", response_model=PortfolioTearsheetOut, response_model_exclude_unset=True)
 def portfolio_tearsheet(db: Session = Depends(get_db)) -> dict:
     """Tearsheet del portfolio: Sharpe, Sortino, drawdown, win rate y exposición.
 

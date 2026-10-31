@@ -1885,3 +1885,65 @@ class PortfolioDividendProjectionOut(BaseModel):
     gross_summary: DividendProjectionGrossSummaryOut
     declared_future: list[DividendProjectionDeclaredFutureOut]
     coverage: DividendProjectionCoverageOut
+
+
+# --- GET /api/portfolio/tearsheet --------------------------------------------
+# Formas medidas contra TearsheetService.build (servicio real). La rama
+# no_portfolio publica metrics/qualification/exposure como null y trace SOLO
+# con method: n_snapshots/n_returns se omiten -> response_model_exclude_unset
+# en la ruta conserva la omision.
+
+
+class TearsheetMetricsOut(BaseModel):
+    status: Literal["ok", "insufficient_data"]
+    n_observations: int
+    cumulative_return: float | None
+    sharpe: float | None
+    sortino: float | None
+    max_drawdown: float | None
+    win_rate: float | None
+    best_day: float | None
+    worst_day: float | None
+    periods_per_year: int
+
+
+class TearsheetQualificationOut(BaseModel):
+    continuous: bool
+    series_breaks: int
+    excluded_returns: int
+    start_date: str | None
+    end_date: str | None
+
+
+class TearsheetExposureOut(BaseModel):
+    snapshot_date: str
+    base_currency: str
+    total_value_base: float | None
+    equity_weight: float | None
+    cash_weight: float | None
+    n_positions: int
+    top_1_weight: float | None
+    top_5_weight: float | None
+    positions_value_base: float | None
+    cash_value_base: float | None
+    net_leverage: float | None
+    gross_leverage: float | None
+    weight_bases: dict[str, str]
+    gross_positions_value_base: float | None
+    top_1_gross_positions_weight: float | None
+    top_5_gross_positions_weight: float | None
+
+
+class TearsheetTraceOut(BaseModel):
+    method: str
+    # Solo presentes con portfolio (la rama no_portfolio los omite).
+    n_snapshots: int | None = None
+    n_returns: int | None = None
+
+
+class PortfolioTearsheetOut(BaseModel):
+    status: Literal["ok", "insufficient_data", "no_portfolio"]
+    metrics: TearsheetMetricsOut | None
+    qualification: TearsheetQualificationOut | None
+    exposure: TearsheetExposureOut | None
+    trace: TearsheetTraceOut
