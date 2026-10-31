@@ -26,7 +26,9 @@ from sqlalchemy import (
     event,
     text,
 )
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
+from sqlalchemy.sql.elements import TextClause
 
 from app.core.database import Base
 
@@ -927,6 +929,26 @@ class KPIExtractionCandidate(TenantOwnedMixin, Base, TimestampMixin):
     trace: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
+class _DescNullsLast(TextClause):
+    """'col DESC NULLS LAST' en Postgres; 'col DESC' en sqlite.
+
+    sqlite no acepta NULLS LAST dentro de CREATE INDEX ("unsupported use"),
+    asi que la variante sqlite lo omite: mismo orden de filas no nulas,
+    que es lo unico que recorren las consultas. El texto base es el DDL
+    fiel de Postgres para que el rachet de deriva (compare_metadata contra
+    la BD reflejada) coincida.
+    """
+
+    def __init__(self, columna: str) -> None:
+        super().__init__(f"{columna} DESC NULLS LAST")
+        self.columna = columna
+
+
+@compiles(_DescNullsLast, "sqlite")
+def _desc_nulls_last_sqlite(element, compiler, **kw):  # noqa: ANN001, ANN202, ARG001
+    return f"{element.columna} DESC"
+
+
 class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "calculated_metrics"
     __table_args__ = (
@@ -948,15 +970,16 @@ class CalculatedMetric(TenantOwnedMixin, Base, TimestampMixin):
         ),
         # 0120: la ventana row_number del screener (particion company+metric,
         # orden fiscal_year DESC NULLS LAST, id DESC) la recorre sin sort.
-        # text() a proposito: con desc() el NULLS LAST se perderia (en PG
-        # DESC por defecto es NULLS FIRST) y el indice declarado no seria
-        # el que crea la migracion.
+        # Variante por dialecto como la propia migracion 0120: el texto del
+        # modelo es el DDL fiel de PG (lo que compara el rachet de deriva
+        # contra la BD reflejada) y sqlite emite la misma columna sin NULLS
+        # LAST, que no acepta en CREATE INDEX.
         Index(
             "ix_calc_metrics_screener_window",
             "tenant_id",
             "company_id",
             "metric",
-            text("fiscal_year DESC NULLS LAST"),
+            _DescNullsLast("fiscal_year"),
             text("id DESC"),
             postgresql_where=text("status = 'ok' AND value IS NOT NULL"),
         ),
