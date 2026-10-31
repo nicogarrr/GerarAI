@@ -173,6 +173,16 @@ class DataSourceHealthRegistry:
                 is_primary=False,
                 fallback_source=None,
             ),
+            "nasdaq": DataSourceStatus(
+                name="Nasdaq (calendario API)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "finra": DataSourceStatus(
+                name="FINRA",
+                is_primary=False,
+                fallback_source=None,
+            ),
             "qdrant": DataSourceStatus(
                 name="Qdrant Vector Database",
                 is_primary=True,

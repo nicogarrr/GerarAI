@@ -31,12 +31,15 @@ from typing import Any
 
 import httpx
 
-FINRA_REGSHO_DAILY_URL = (
-    "https://cdn.finra.org/equity/regsho/daily/CNMSshvol{yyyymmdd}.txt"
-)
-FINRA_SHORT_INTEREST_URL = (
-    "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
-)
+from app.services.data_source_health import get_data_source_registry
+
+# Clave en el registry de salud de fuentes. Un 404 del fichero diario RegSHO
+# es "aun no publicado ese dia" (exploracion normal del lookback) y NO
+# degrada; red/401/403/429/5xx SI. En la API quincenal 400/404 son neutrales.
+REGISTRY_KEY = "finra"
+
+FINRA_REGSHO_DAILY_URL = "https://cdn.finra.org/equity/regsho/daily/CNMSshvol{yyyymmdd}.txt"
+FINRA_SHORT_INTEREST_URL = "https://api.finra.org/data/group/otcMarket/name/consolidatedShortInterest"
 
 _HEADERS = {
     "User-Agent": (
@@ -79,7 +82,12 @@ def parse_regsho_daily(text: str, symbol: str) -> dict | None:
             continue
         if short_volume > total_volume:
             continue
-        if short_exempt is not None and (not math.isfinite(short_exempt) or short_exempt < 0 or short_exempt > short_volume or not short_exempt.is_integer()):
+        if short_exempt is not None and (
+            not math.isfinite(short_exempt)
+            or short_exempt < 0
+            or short_exempt > short_volume
+            or not short_exempt.is_integer()
+        ):
             continue
         yyyymmdd = parts[0]
         trade_date = (
@@ -124,18 +132,26 @@ async def fetch_short_volume(
         current = day - timedelta(days=offset)
         yyyymmdd = current.strftime("%Y%m%d")
         url = FINRA_REGSHO_DAILY_URL.format(yyyymmdd=yyyymmdd)
+        registry = get_data_source_registry()
         try:
             if client is not None:
                 response = await client.get(url, headers=dict(_HEADERS))
             else:
                 async with httpx.AsyncClient(timeout=30, headers=dict(_HEADERS)) as owned:
                     response = await owned.get(url)
-        except httpx.HTTPError:
+        except httpx.HTTPError as exc:
+            registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
             return None
         if response.status_code in {401, 403, 429}:
+            registry.record_failure(REGISTRY_KEY, f"HTTP {response.status_code}")
             return None
         if response.status_code != 200:
+            # 404 = fichero de ese dia aun no publicado (finde/festivo o antes
+            # del cierre): exploracion normal del lookback, no fuente caida.
+            if response.status_code not in (400, 404):
+                registry.record_failure(REGISTRY_KEY, f"HTTP {response.status_code}")
             continue
+        registry.record_success(REGISTRY_KEY)
         row = parse_regsho_daily(response.text, symbol)
         if row is not None:
             return row
@@ -158,11 +174,7 @@ def parse_short_interest_record(record: dict, symbol: str) -> dict | None:
     days_to_cover = _to_float(record.get("daysToCoverQuantity"))
     if days_to_cover is None and current is not None and avg_volume:
         days_to_cover = current / avg_volume
-    change_pct = (
-        (current - previous) / previous
-        if current is not None and previous
-        else None
-    )
+    change_pct = (current - previous) / previous if current is not None and previous else None
     return {
         "symbol": code,
         "issue_name": record.get("issueName"),
@@ -184,20 +196,30 @@ async def _short_interest_page(
     client: httpx.AsyncClient | None,
 ) -> list | None:
     params = {"limit": limit, "offset": offset, "sortField": "symbolCode", "sortOrder": "asc"}
+    registry = get_data_source_registry()
     try:
         if client is not None:
-            response = await client.get(
-                FINRA_SHORT_INTEREST_URL, params=params, headers=dict(_HEADERS)
-            )
+            response = await client.get(FINRA_SHORT_INTEREST_URL, params=params, headers=dict(_HEADERS))
         else:
             async with httpx.AsyncClient(timeout=30, headers=dict(_HEADERS)) as owned:
                 response = await owned.get(FINRA_SHORT_INTEREST_URL, params=params)
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
         return None
     if response.status_code != 200:
+        if response.status_code not in (400, 404):
+            registry.record_failure(REGISTRY_KEY, f"HTTP {response.status_code}")
         return None
-    data = response.json()
-    return data if isinstance(data, list) else None
+    try:
+        data = response.json()
+    except ValueError:
+        registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
+        return None
+    if not isinstance(data, list):
+        registry.record_failure(REGISTRY_KEY, "payload no lista")
+        return None
+    registry.record_success(REGISTRY_KEY)
+    return data
 
 
 async def fetch_short_interest(

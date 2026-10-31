@@ -22,6 +22,13 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
+# Clave en el registry de salud de fuentes (api.nasdaq.com, URLs fijas por
+# fecha): cualquier fallo de red/HTTP/no-JSON es de la fuente. El conector
+# degrada a None para no romper el flujo; el registry es la senal honesta.
+REGISTRY_KEY = "nasdaq"
+
 EARNINGS_URL = "https://api.nasdaq.com/api/calendar/earnings"
 DIVIDENDS_URL = "https://api.nasdaq.com/api/calendar/dividends"
 
@@ -129,22 +136,30 @@ async def _get_json(
     client: httpx.AsyncClient | None,
 ) -> dict | None:
     """GET con degradacion a None ante cualquier fallo de red o parseo."""
+    registry = get_data_source_registry()
+    started = time.monotonic()
     if client is not None:
         try:
             response = await client.get(url, params=params, headers=BROWSER_HEADERS)
             response.raise_for_status()
             payload = response.json()
-            return payload if isinstance(payload, dict) else None
-        except Exception:  # noqa: BLE001 — el calendario nunca debe romper el flujo
+        except Exception as exc:  # noqa: BLE001 — el calendario nunca debe romper el flujo
+            registry.record_failure(REGISTRY_KEY, type(exc).__name__)
             return None
-    try:
-        pooled = _pooled_client()
-        response = await pooled.get(url, params=params)
-        response.raise_for_status()
-        payload = response.json()
-        return payload if isinstance(payload, dict) else None
-    except Exception:  # noqa: BLE001 — ver nota anterior
+    else:
+        try:
+            pooled = _pooled_client()
+            response = await pooled.get(url, params=params)
+            response.raise_for_status()
+            payload = response.json()
+        except Exception as exc:  # noqa: BLE001 — ver nota anterior
+            registry.record_failure(REGISTRY_KEY, type(exc).__name__)
+            return None
+    if not isinstance(payload, dict):
+        registry.record_failure(REGISTRY_KEY, "payload no dict")
         return None
+    registry.record_success(REGISTRY_KEY, (time.monotonic() - started) * 1000)
+    return payload
 
 
 async def fetch_earnings_day(
