@@ -7,18 +7,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
+const fichaEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).ficha;
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 const headline = readFileSync('components/research/NewsHeadline.tsx', 'utf8');
 
 test('la fecha de la noticia se pinta es-ES, nunca ISO crudo', () => {
     const fn = page.slice(page.indexOf('function newsDateLabel'));
     const body = fn.slice(0, fn.indexOf('\n}'));
-    assert.ok(body.includes('formatUserDate(event.date)'), 'newsDateLabel debe usar formatUserDate');
+    assert.ok(body.includes('formatUserDate(event.date, undefined, undefined, locale)'), 'newsDateLabel debe usar formatUserDate');
     assert.ok(!body.includes('.slice(0, 10)'), 'prohibido el ISO crudo YYYY-MM-DD');
     // La provenance se conserva: solo 'source' afirma fecha de publicación.
     assert.ok(body.includes("date_source === 'source'"));
-    assert.ok(body.includes('Detectada el'));
-    assert.ok(body.includes('Incorporada el'));
+    assert.ok(body.includes("t('research.ficha.dateDetected', { date: day })"));
+    assert.ok(body.includes("t('research.ficha.dateIngested', { date: day })"));
+    assert.equal(fichaEs.dateDetected, 'Detectada el {date}');
+    assert.equal(fichaEs.dateIngested, 'Incorporada el {date}');
+    assert.equal(fichaEs.dateUnverified, 'Fecha no verificada ({date})');
 });
 
 test('el panel deduplica por el titular que se pinta', () => {

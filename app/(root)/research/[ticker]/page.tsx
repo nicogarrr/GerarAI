@@ -1,3 +1,6 @@
+import { getLocale, getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
+import type { TranslateFn } from '@/lib/i18n/translate';
 import { getParticipationFilings } from '@/lib/actions/research.actions';
 import { ParticipationFilingsPanel } from '@/components/research/ParticipationFilingsPanel';
 import { FactTable } from '@/components/research/FactsPanels';
@@ -50,7 +53,6 @@ import { researchRequest } from '@/lib/research/client';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import type { ExtendedQuote } from '@/lib/market/extended-quote';
 import { isE2EMarketFixtureEnabled } from '@/lib/e2e-market-fixture';
-import { getT } from '@/lib/i18n/server';
 import { e2eExtendedQuoteFixture } from '@/lib/e2e-extended-quote-fixture';
 import { MoatTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
@@ -184,15 +186,15 @@ type PageProps = {
 
 /** Fecha de la noticia con su provenance: nunca afirmar fecha de publicacion
  *  cuando es el fallback de ingesta o no hay metadato. */
-function newsDateLabel(event: { date: string; date_source?: string | null }): string {
+function newsDateLabel(event: { date: string; date_source?: string | null }, t: TranslateFn, locale: Locale): string {
   // es-ES («16 oct 2026»), no ISO crudo: el resto de la app ya pinta así.
-  const day = formatUserDate(event.date);
+  const day = formatUserDate(event.date, undefined, undefined, locale);
   // Mismo criterio que NewsEventsFlow y ResearchAssistant: solo 'source' es
   // fecha de publicacion verificada; el resto se etiqueta, nunca se afirma.
   if (event.date_source === 'source') return day;
-  if (event.date_source === 'gdelt_first_seen') return `Detectada el ${day}`;
-  if (event.date_source === 'ingested_at_fallback') return `Incorporada el ${day}`;
-  return `Fecha no verificada (${day})`;
+  if (event.date_source === 'gdelt_first_seen') return t('research.ficha.dateDetected', { date: day });
+  if (event.date_source === 'ingested_at_fallback') return t('research.ficha.dateIngested', { date: day });
+  return t('research.ficha.dateUnverified', { date: day });
 }
 
 function number(value: number | string | null | undefined): number | null {
@@ -327,9 +329,9 @@ function moatDefinition(type: string): string | null {
   return key ? glossary[key].short : null;
 }
 
-function metricValue(value: number | string | null | undefined, unit: string) {
+function metricValue(value: number | string | null | undefined, unit: string, t: TranslateFn) {
   const parsed = number(value);
-  if (parsed === null) return 'desconocido';
+  if (parsed === null) return t('research.ficha.unknownValue');
   return formatResearchMetric(parsed, unit);
 }
 
@@ -338,12 +340,13 @@ function thesisIsPublic(status: string | null | undefined): boolean {
   return status === 'published' || status === 'approved';
 }
 
-function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
+async function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
+  const t = await getT();
   if (!metrics.length) {
     return (
       <EmptyState
-        description="Las métricas se derivan de los hechos financieros: pulsa «Recalcular» arriba. Si todavía no hay hechos, refresca primero los financieros con el botón de actualización correspondiente."
-        title="Las métricas calculadas aún no se han refrescado."
+        description={t('research.ficha.metricsEmptyDescription')}
+        title={t('research.ficha.metricsEmptyTitle')}
       />
     );
   }
@@ -358,7 +361,7 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
             <span className="min-w-0 break-all font-medium text-gray-200">{metricLabel(metric.metric)}</span>
             <Badge className="shrink-0" variant="outline">{label(metric.status)}</Badge>
           </div>
-          <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit)}</div>
+          <div className="mt-2 text-xl text-teal-300">{metricValue(metric.value, metric.unit, t)}</div>
           <div className="mt-2 text-xs text-gray-500">{financialPeriod(metric.period)} · {financialVersionLabel(metric.definition_version)}</div>
           <div className="mt-2 text-xs leading-5 text-gray-400">{financialFormula(metric.formula)}</div>
         </div>
@@ -367,12 +370,14 @@ function MetricsGrid({ metrics }: { metrics: ResearchCalculatedMetric[] }) {
   );
 }
 
-function ValuationView({ valuation, currency, ticker }: { valuation: ResearchValuation | null; currency: string; ticker: string }) {
+async function ValuationView({ valuation, currency, ticker }: { valuation: ResearchValuation | null; currency: string; ticker: string }) {
+  const t = await getT();
+  const locale = await getLocale();
   if (!valuation) {
     return (
       <EmptyState
-        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Genera primero el modelo a largo plazo</EmptyLink>}
-        title="No hay ninguna valoración persistida."
+        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{t('research.ficha.valuationEmptyAction')}</EmptyLink>}
+        title={t('research.ficha.valuationEmptyTitle')}
       />
     );
   }
@@ -413,8 +418,8 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
   const basisLabel = scenarios.label;
   const priceAsOf = typeof valuation.trace?.price_as_of === 'string' ? valuation.trace.price_as_of : null;
   const modelPriceLabel = priceAsOf
-    ? `Precio del modelo al ${formatMarketDate(priceAsOf, { day: 'numeric', month: 'short' })}`
-    : 'Precio del modelo (sin fecha)';
+    ? t('research.ficha.modelPriceAt', { date: formatMarketDate(priceAsOf, { day: 'numeric', month: 'short' }, undefined, locale) })
+    : t('research.ficha.modelPriceNoDate');
   if (notPublishable) {
     return (
       <div className="space-y-3">
@@ -422,19 +427,18 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
           <Stat label={modelPriceLabel} value={formatMoney(valuation.current_price, currency)} />
         </div>
         <div className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-4 text-sm text-amber-200">
-          <p className="font-semibold">Orientación del motor, no precio objetivo.</p>
+          <p className="font-semibold">{t('research.ficha.engineGuidanceTitle')}</p>
           <p className="mt-1">
-            Esta valoración no es publicable (estado {label(valuation.status ?? 'unknown')}): los números de
-            abajo son una orientación del motor, no una valoración final ni un precio objetivo.
+            {t('research.ficha.notPublishable', { status: label(valuation.status ?? 'unknown') })}
           </p>
-          {blockers.length ? <p className="mt-2 text-xs">Motivos registrados: {blockers.map(blockerLabel).join('; ')}.</p> : null}
-          {missingInputs.length ? <p className="mt-2 text-xs">Entradas faltantes: {missingInputs.map(termLabel).join(', ')}.</p> : null}
-          {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">Nota del motor: {engineNotice}</p> : null}
+          {blockers.length ? <p className="mt-2 text-xs">{t('research.ficha.blockers', { list: blockers.map(blockerLabel).join('; ') })}</p> : null}
+          {missingInputs.length ? <p className="mt-2 text-xs">{t('research.ficha.missingInputs', { list: missingInputs.map(termLabel).join(', ') })}</p> : null}
+          {engineNotice ? <p className="mt-2 text-xs text-amber-200/70">{t('research.ficha.engineNote', { note: engineNotice })}</p> : null}
         </div>
         <div className="grid grid-cols-1 gap-4 opacity-60 sm:grid-cols-3">
-          <Stat label={`Bear (orientación)${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
-          <Stat label={`Base (orientación)${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
-          <Stat label={`Bull (orientación)${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
+          <Stat label={`${t('research.ficha.bearGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
+          <Stat label={`${t('research.ficha.baseGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
+          <Stat label={`${t('research.ficha.bullGuidance')}${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
         </div>
         {scenarioNotes.length ? (
           <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
@@ -444,9 +448,9 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
         {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
         {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
         <p className="text-xs leading-5 text-gray-500">
-          Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
-          El «valor por acción» del Modelo a largo plazo es otro cálculo (otra versión/fecha/motor).
-          Periodos de los inputs: {periods ? periods : NA}.
+          {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown') })}{' '}
+          {t('research.ficha.persistedNoteGuidance')}{' '}
+          {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
         </p>
       </div>
     );
@@ -455,9 +459,9 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
     <div className="space-y-3">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label={modelPriceLabel} value={formatMoney(valuation.current_price, currency)} />
-        <Stat label={`Bear${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
-        <Stat label={`Base${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
-        <Stat label={`Bull${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
+        <Stat label={`${t('research.ficha.bear')}${basisLabel}`} value={formatMoney(scenarios.values.bear as number | null, currency)} />
+        <Stat label={`${t('research.ficha.base')}${basisLabel}`} value={formatMoney(scenarios.values.base as number | null, currency)} />
+        <Stat label={`${t('research.ficha.bull')}${basisLabel}`} value={formatMoney(scenarios.values.bull as number | null, currency)} />
       </div>
       {scenarioNotes.length ? (
         <ul className="list-disc space-y-1 pl-5 text-xs leading-5 text-amber-300/80">
@@ -467,21 +471,21 @@ function ValuationView({ valuation, currency, ticker }: { valuation: ResearchVal
       {reverseText ? <p className="text-xs leading-5 text-gray-400">{reverseText}</p> : null}
       {assumptionsText ? <p className="text-xs leading-5 text-gray-500">{assumptionsText}</p> : null}
       <p className="text-xs leading-5 text-gray-500">
-        Valoración persistida ({termLabel(valuation.model_type)}{engine ? ` · motor ${engine}` : ''}{method ? ` · ${method}` : ''} · estado {label(valuation.status ?? 'unknown')}).
-        No es comparable 1:1 con el «valor por acción» del Modelo a largo plazo: ese es un cálculo interno
-        del escenario (otra versión/fecha/motor). Antes de fiarte, comprueba versión y fecha en ambas vistas.
-        Periodos de los inputs: {periods ? periods : NA}.
+        {t('research.ficha.persistedHead', { model: termLabel(valuation.model_type), engine: engine ? t('research.ficha.engineSuffix', { engine }) : '', method: method ? ` · ${method}` : '', status: label(valuation.status ?? 'unknown') })}{' '}
+        {t('research.ficha.persistedNote')}{' '}
+        {t('research.ficha.inputPeriods', { periods: periods ? periods : NA })}
       </p>
     </div>
   );
 }
 
-function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel | null; ticker: string }) {
+async function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel | null; ticker: string }) {
+  const t = await getT();
   if (!model || model.status === 'not_generated') {
     return (
       <EmptyState
-        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>Generar el modelo a largo plazo</EmptyLink>}
-        title="Genera el modelo a largo plazo antes de valorar la oportunidad de mercado."
+        action={<EmptyLink href={`/research/${encodeURIComponent(ticker)}?view=valoracion#modelo`}>{t('research.ficha.marketEmptyAction')}</EmptyLink>}
+        title={t('research.ficha.marketEmptyTitle')}
       />
     );
   }
@@ -489,27 +493,27 @@ function MarketOpportunityView({ model, ticker }: { model: ResearchLongTermModel
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Stat label="TAM (mercado total)" value={metricValue(opportunity.top_down.tam.value, opportunity.top_down.tam.unit)} />
-        <Stat label="SAM (mercado atendible)" value={metricValue(opportunity.top_down.sam.value, opportunity.top_down.sam.unit)} />
-        <Stat label="SOM (mercado obtenible)" value={metricValue(opportunity.top_down.som.value, opportunity.top_down.som.unit)} />
+        <Stat label={t('research.ficha.tam')} value={metricValue(opportunity.top_down.tam.value, opportunity.top_down.tam.unit, t)} />
+        <Stat label={t('research.ficha.sam')} value={metricValue(opportunity.top_down.sam.value, opportunity.top_down.sam.unit, t)} />
+        <Stat label={t('research.ficha.som')} value={metricValue(opportunity.top_down.som.value, opportunity.top_down.som.unit, t)} />
       </div>
-      <Panel title="Veredicto con restricciones">
+      <Panel title={t('research.ficha.verdictTitle')}>
         <div className="flex flex-wrap gap-2">
           <Badge>{label(opportunity.verdict.label)}</Badge>
-          <Badge variant="outline">confianza: {label(opportunity.verdict.confidence)}</Badge>
-          <Badge variant="outline">restricción ligante: {opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint) : 'desconocida'}</Badge>
+          <Badge variant="outline">{t('research.ficha.confidence', { value: label(opportunity.verdict.confidence) })}</Badge>
+          <Badge variant="outline">{t('research.ficha.bindingConstraint', { value: opportunity.constraints.binding_constraint ? termLabel(opportunity.constraints.binding_constraint) : t('research.ficha.unknownFem') })}</Badge>
         </div>
         <p className="mt-3 text-sm text-gray-300">{opportunity.verdict.conclusion}</p>
       </Panel>
-      <Panel title="Fórmulas bottom-up">
+      <Panel title={t('research.ficha.bottomUpTitle')}>
         <div className="space-y-3">
           {opportunity.bottom_up.formulas.map((formula) => (
             <div className="rounded-lg border border-gray-800 p-3" key={formula.label}>
               <div className="flex justify-between gap-4 text-sm">
                 <span className="text-gray-200">{formula.label}</span>
-                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, formula.unit ?? '')}</span>
+                <span className="text-teal-300">{formula.value === null ? label(formula.status) : metricValue(formula.value, formula.unit ?? '', t)}</span>
               </div>
-              {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">Faltan entradas: {formula.missing_inputs.map(termLabel).join(', ')}</p> : null}
+              {formula.missing_inputs?.length ? <p className="mt-2 text-xs text-amber-300">{t('research.ficha.missingInputsShort', { list: formula.missing_inputs.map(termLabel).join(', ') })}</p> : null}
             </div>
           ))}
         </div>
@@ -713,6 +717,8 @@ const ENTRY_WORKSPACE: Partial<Record<View, keyof ViewWorkspaces>> = {
 export default async function ResearchCompanyPage({ params, searchParams }: PageProps) {
   const [{ ticker: rawTicker }, query] = await Promise.all([params, searchParams]);
   assertTickerShape(rawTicker);
+  const t = await getT();
+  const locale = await getLocale();
   const ticker = rawTicker.trim().toUpperCase();
   if (rawTicker !== ticker) {
     const search = new URLSearchParams();
@@ -1112,7 +1118,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                   <NewsHeadline event={event} />
                   <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
                     <ImpactBadge direction={event.impact_direction} />
-                    <span>{event.source} · {newsDateLabel(event)}</span>
+                    <span>{event.source} · {newsDateLabel(event, t, locale)}</span>
                   </p>
                 </li>
               ))}

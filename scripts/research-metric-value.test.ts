@@ -29,6 +29,6 @@ test('formulas cannot invent USD and per-share figures retain cents', () => {
  assert.equal(formatResearchMetric(250.75, 'EUR/share'), '250,75\u00a0€/acción');
  assert.equal(formatResearchMetric(148.4, 'USD_millions'), '148,4');
  const src=readFileSync('app/(root)/research/[ticker]/page.tsx','utf8');
- assert.ok(src.includes("metricValue(formula.value, formula.unit ?? '')"));
+ assert.ok(src.includes("metricValue(formula.value, formula.unit ?? '', t)"));
  assert.ok(!src.includes("metricValue(formula.value, 'USD')"));
 });

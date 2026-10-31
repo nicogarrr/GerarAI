@@ -51,8 +51,11 @@ test('F309: los estados vacíos de la vista financieros ya no mandan a importar 
     assert.match(factTable, /no hay datos persistidos: comprueba el resultado del refresh y la fuente/);
     const metrics = page.slice(page.indexOf('function MetricsGrid'), page.indexOf('function ValuationView'));
     assert.doesNotMatch(metrics, /view=documents/);
-    assert.match(metrics, /pulsa «Recalcular» arriba/);
-    assert.match(metrics, /botón de actualización correspondiente/);
+    assert.match(metrics, /t\('research\.ficha\.metricsEmptyDescription'\)/);
+    const fichaEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).ficha;
+    assert.match(fichaEs.metricsEmptyDescription, /pulsa «Recalcular» arriba/);
+    assert.match(fichaEs.metricsEmptyDescription, /botón de actualización correspondiente/);
+    assert.doesNotMatch(fichaEs.metricsEmptyDescription, /fuente oficial/);
     // «Fuente oficial» solo cuando el flujo lo sea: FMP es proveedor comercial.
     assert.doesNotMatch(factTable, /fuente oficial/);
     assert.doesNotMatch(metrics, /fuente oficial/);
