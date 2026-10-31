@@ -65,5 +65,24 @@
     "viewOriginal": "View original",
     "translating": "Translating…",
     "translate": "Translate"
-  }
+  },
+  "newsMetaTitle": "News",
+  "newsFeature": "The news section",
+  "newsKicker": "Market intelligence",
+  "newsTitle": "News events",
+  "newsAdd": "Add news",
+  "analyzeTitle": "Analyze an article",
+  "analyzeSuccess": "News analyzed",
+  "analyzeTextLabel": "News text",
+  "analyzeTextPlaceholder": "Paste the article, press release or investor relations note here...",
+  "sourceLabel": "Source",
+  "sourcePlaceholder": "Bloomberg, FT, IR...",
+  "sourceUrlLabel": "Source URL",
+  "analyzeSubmit": "Analyze news",
+  "ingestTitle": "Import news in bulk",
+  "ingestSuccess": "News imported",
+  "ingestItemsLabel": "Batch news (JSON)",
+  "ingestItemsPlaceholder": "[{\"ticker\":\"MSFT\",\"title\":\"MSFT cuts guidance\",\"text\":\"results below expectations and guidance cut\",\"url\":\"https://...\"}]",
+  "ingestSubmit": "Import batch",
+  "backToTicker": "Back to {ticker}"
 }
