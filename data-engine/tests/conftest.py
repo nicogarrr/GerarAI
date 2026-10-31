@@ -263,7 +263,8 @@ _TEST_REDIS_EPHEMERAL_VAR = "TEST_REDIS_EPHEMERAL"
 
 # Los tres primeros son dedup/lease del scheduler; global_pacer y los dos
 # breakers son el estado compartido en Redis de los commits de colas del
-# 31-oct (d2b567c pacing global, 9092063 disyuntores): mismo patron de fuga.
+# 31-oct (d2b567c pacing global, 9092063 disyuntores, d1f2578 cache live de
+# fair-value): mismo patron de fuga.
 _REDIS_TEST_KEY_PREFIXES = (
     "cavaai:*",
     "coalesce:*",
@@ -271,6 +272,7 @@ _REDIS_TEST_KEY_PREFIXES = (
     "global_pacer:*",
     "gdelt:circuit:*",
     "sec_breaker:*",
+    "fair_value_live:*",
 )
 
 
