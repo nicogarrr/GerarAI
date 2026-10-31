@@ -846,33 +846,11 @@ export async function importIBKRCsv(userId: string, csv: string): Promise<IBKRIm
     return result;
 }
 
-export type PortfolioTearsheetMetrics = {
-    status: string;
-    n_observations: number;
-    cumulative_return: number | null;
-    sharpe: number | null;
-    sortino: number | null;
-    max_drawdown: number | null;
-    win_rate: number | null;
-    best_day: number | null;
-    worst_day: number | null;
-    periods_per_year: number;
-};
+// Tipos generados desde el OpenAPI del backend (response_model en la ruta);
+// regenerar con `npx openapi-typescript data-engine/openapi.json`.
+export type PortfolioTearsheetMetrics = components['schemas']['TearsheetMetricsOut'];
 
-export type PortfolioTearsheet = {
-    status: string;
-    metrics: PortfolioTearsheetMetrics | null;
-    exposure: {
-        snapshot_date: string;
-        base_currency: string;
-        total_value_base: number;
-        equity_weight: number | null;
-        cash_weight: number | null;
-        n_positions: number;
-        top_1_weight: number | null;
-        top_5_weight: number | null;
-    } | null;
-};
+export type PortfolioTearsheet = components['schemas']['PortfolioTearsheetOut'];
 
 /**
  * Tearsheet del portfolio (Sharpe, drawdown, win rate) desde los snapshots persistidos.

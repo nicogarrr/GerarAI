@@ -13286,6 +13286,61 @@
         "title": "PortfolioSummaryOut",
         "type": "object"
       },
+      "PortfolioTearsheetOut": {
+        "properties": {
+          "exposure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TearsheetExposureOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TearsheetMetricsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "qualification": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TearsheetQualificationOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient_data",
+              "no_portfolio"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "trace": {
+            "$ref": "#/components/schemas/TearsheetTraceOut"
+          }
+        },
+        "required": [
+          "status",
+          "metrics",
+          "qualification",
+          "exposure",
+          "trace"
+        ],
+        "title": "PortfolioTearsheetOut",
+        "type": "object"
+      },
       "PortfolioTransactionBatchInput": {
         "properties": {
           "transactions": {
@@ -16722,6 +16777,374 @@
           "body"
         ],
         "title": "SynthesisSection",
+        "type": "object"
+      },
+      "TearsheetExposureOut": {
+        "properties": {
+          "base_currency": {
+            "title": "Base Currency",
+            "type": "string"
+          },
+          "cash_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Value Base"
+          },
+          "cash_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Weight"
+          },
+          "equity_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity Weight"
+          },
+          "gross_leverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Leverage"
+          },
+          "gross_positions_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Positions Value Base"
+          },
+          "n_positions": {
+            "title": "N Positions",
+            "type": "integer"
+          },
+          "net_leverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Leverage"
+          },
+          "positions_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positions Value Base"
+          },
+          "snapshot_date": {
+            "title": "Snapshot Date",
+            "type": "string"
+          },
+          "top_1_gross_positions_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top 1 Gross Positions Weight"
+          },
+          "top_1_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top 1 Weight"
+          },
+          "top_5_gross_positions_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top 5 Gross Positions Weight"
+          },
+          "top_5_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Top 5 Weight"
+          },
+          "total_value_base": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Value Base"
+          },
+          "weight_bases": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Weight Bases",
+            "type": "object"
+          }
+        },
+        "required": [
+          "snapshot_date",
+          "base_currency",
+          "total_value_base",
+          "equity_weight",
+          "cash_weight",
+          "n_positions",
+          "top_1_weight",
+          "top_5_weight",
+          "positions_value_base",
+          "cash_value_base",
+          "net_leverage",
+          "gross_leverage",
+          "weight_bases",
+          "gross_positions_value_base",
+          "top_1_gross_positions_weight",
+          "top_5_gross_positions_weight"
+        ],
+        "title": "TearsheetExposureOut",
+        "type": "object"
+      },
+      "TearsheetMetricsOut": {
+        "properties": {
+          "best_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Day"
+          },
+          "cumulative_return": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cumulative Return"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown"
+          },
+          "n_observations": {
+            "title": "N Observations",
+            "type": "integer"
+          },
+          "periods_per_year": {
+            "title": "Periods Per Year",
+            "type": "integer"
+          },
+          "sharpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sharpe"
+          },
+          "sortino": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sortino"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "insufficient_data"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
+          },
+          "worst_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Day"
+          }
+        },
+        "required": [
+          "status",
+          "n_observations",
+          "cumulative_return",
+          "sharpe",
+          "sortino",
+          "max_drawdown",
+          "win_rate",
+          "best_day",
+          "worst_day",
+          "periods_per_year"
+        ],
+        "title": "TearsheetMetricsOut",
+        "type": "object"
+      },
+      "TearsheetQualificationOut": {
+        "properties": {
+          "continuous": {
+            "title": "Continuous",
+            "type": "boolean"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          },
+          "excluded_returns": {
+            "title": "Excluded Returns",
+            "type": "integer"
+          },
+          "series_breaks": {
+            "title": "Series Breaks",
+            "type": "integer"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          }
+        },
+        "required": [
+          "continuous",
+          "series_breaks",
+          "excluded_returns",
+          "start_date",
+          "end_date"
+        ],
+        "title": "TearsheetQualificationOut",
+        "type": "object"
+      },
+      "TearsheetTraceOut": {
+        "properties": {
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "n_returns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Returns"
+          },
+          "n_snapshots": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "N Snapshots"
+          }
+        },
+        "required": [
+          "method"
+        ],
+        "title": "TearsheetTraceOut",
         "type": "object"
       },
       "TelegramSubscriptionIn": {
@@ -62508,9 +62931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Portfolio Tearsheet Api Portfolio Tearsheet Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/PortfolioTearsheetOut"
                 }
               }
             },

@@ -10758,6 +10758,18 @@ export interface components {
             /** Valuation Hold */
             valuation_hold: components["schemas"]["PortfolioValuationHoldOut"][];
         };
+        /** PortfolioTearsheetOut */
+        PortfolioTearsheetOut: {
+            exposure: components["schemas"]["TearsheetExposureOut"] | null;
+            metrics: components["schemas"]["TearsheetMetricsOut"] | null;
+            qualification: components["schemas"]["TearsheetQualificationOut"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data" | "no_portfolio";
+            trace: components["schemas"]["TearsheetTraceOut"];
+        };
         /** PortfolioTransactionBatchInput */
         PortfolioTransactionBatchInput: {
             /** Transactions */
@@ -11883,6 +11895,91 @@ export interface components {
              * @enum {string}
              */
             key: "facts" | "calculations" | "user_hypotheses" | "unverified_claims" | "inferences" | "contradictions" | "insufficient_data" | "conclusion";
+        };
+        /** TearsheetExposureOut */
+        TearsheetExposureOut: {
+            /** Base Currency */
+            base_currency: string;
+            /** Cash Value Base */
+            cash_value_base: number | null;
+            /** Cash Weight */
+            cash_weight: number | null;
+            /** Equity Weight */
+            equity_weight: number | null;
+            /** Gross Leverage */
+            gross_leverage: number | null;
+            /** Gross Positions Value Base */
+            gross_positions_value_base: number | null;
+            /** N Positions */
+            n_positions: number;
+            /** Net Leverage */
+            net_leverage: number | null;
+            /** Positions Value Base */
+            positions_value_base: number | null;
+            /** Snapshot Date */
+            snapshot_date: string;
+            /** Top 1 Gross Positions Weight */
+            top_1_gross_positions_weight: number | null;
+            /** Top 1 Weight */
+            top_1_weight: number | null;
+            /** Top 5 Gross Positions Weight */
+            top_5_gross_positions_weight: number | null;
+            /** Top 5 Weight */
+            top_5_weight: number | null;
+            /** Total Value Base */
+            total_value_base: number | null;
+            /** Weight Bases */
+            weight_bases: {
+                [key: string]: string;
+            };
+        };
+        /** TearsheetMetricsOut */
+        TearsheetMetricsOut: {
+            /** Best Day */
+            best_day: number | null;
+            /** Cumulative Return */
+            cumulative_return: number | null;
+            /** Max Drawdown */
+            max_drawdown: number | null;
+            /** N Observations */
+            n_observations: number;
+            /** Periods Per Year */
+            periods_per_year: number;
+            /** Sharpe */
+            sharpe: number | null;
+            /** Sortino */
+            sortino: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "insufficient_data";
+            /** Win Rate */
+            win_rate: number | null;
+            /** Worst Day */
+            worst_day: number | null;
+        };
+        /** TearsheetQualificationOut */
+        TearsheetQualificationOut: {
+            /** Continuous */
+            continuous: boolean;
+            /** End Date */
+            end_date: string | null;
+            /** Excluded Returns */
+            excluded_returns: number;
+            /** Series Breaks */
+            series_breaks: number;
+            /** Start Date */
+            start_date: string | null;
+        };
+        /** TearsheetTraceOut */
+        TearsheetTraceOut: {
+            /** Method */
+            method: string;
+            /** N Returns */
+            n_returns?: number | null;
+            /** N Snapshots */
+            n_snapshots?: number | null;
         };
         /** TelegramSubscriptionIn */
         TelegramSubscriptionIn: {
@@ -23013,9 +23110,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["PortfolioTearsheetOut"];
                 };
             };
             /** @description Validation Error */
