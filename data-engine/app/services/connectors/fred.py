@@ -114,8 +114,12 @@ class FREDClient:
             registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
             raise
         text = response.text
-        header = text.split("\n", 1)[0].strip().upper()
-        if text.lstrip().startswith("<") or not header.startswith("DATE"):
+        header = text.split("\n", 1)[0].strip().lower()
+        first_col = header.split(",", 1)[0]
+        # Cabecera real verificada contra la fuente viva el 2026-10-31:
+        # "observation_date,CPIAUCSL" (primera columna observation_date; la
+        # segunda es el propio id de serie). "DATE" era el formato legado.
+        if text.lstrip().startswith("<") or first_col not in ("observation_date", "date"):
             # Un 200 con HTML (challenge) o un CSV con cabecera distinta no es
             # salud: validar el esquema ANTES de registrar el exito.
             registry.record_failure(REGISTRY_KEY, "respuesta no CSV (challenge o cambio de formato)")

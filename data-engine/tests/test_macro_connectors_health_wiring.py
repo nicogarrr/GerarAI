@@ -245,12 +245,16 @@ def test_fred_series_csv_200_html_no_es_exito(monkeypatch):
 
 
 def test_fred_series_csv_valido_es_exito(monkeypatch):
+    """Fixture autentico: primeras lineas reales de
+    GET https://fred.stlouisfed.org/graph/fredgraph.csv?id=CPIAUCSL
+    (verificado en vivo el 2026-10-31)."""
+
     def handler(request):
-        return httpx.Response(200, text="DATE,VALUE\n2026-01-01,3.2\n")
+        return httpx.Response(200, text="observation_date,CPIAUCSL\n1947-01-01,21.480\n1947-02-01,21.620\n")
 
     registry = get_data_source_registry()
     registry.record_failure("fred", "fallo previo")
     client = fred.FREDClient(client=_client(handler))
     data = asyncio.run(client.series_csv("CPIAUCSL"))
-    assert data["observations"][0]["value"] == "3.2"
+    assert data["observations"][0]["value"] == "21.620"  # mas reciente primero
     assert registry.get_status("fred").consecutive_failures == 0
