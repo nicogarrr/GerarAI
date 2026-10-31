@@ -314,7 +314,7 @@ class AnalystTargetsService:
             fetched_at=fetched_at,
             currency=data.get("currency"),
             reference_price=reference,
-            reference_price_source="Yahoo Finance, precio al obtener los datos" if reference else None,
+            reference_price_source="fuente de mercado, precio al obtener los datos" if reference else None,
             consensus=consensus if has_consensus else None,
             rows=rows,
             note=note,
