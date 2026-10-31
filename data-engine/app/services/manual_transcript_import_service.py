@@ -1,8 +1,11 @@
+import hashlib
 import logging
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tenancy import tenant_filters
 from app.models import Document, DocumentChunk, Transcript
 from app.services.company_resolver import resolve_company
 
@@ -25,11 +28,37 @@ class ManualTranscriptImportService:
         if not company:
             raise ValueError(f"Unknown ticker: {ticker}")
 
+        # Identidad estable por contenido: reimportar la misma transcripción
+        # (mismo texto para la misma empresa del tenant) no duplica el
+        # documento, sus chunks ni su índice RAG; devuelve el registro previo.
+        checksum = hashlib.sha256(text.encode()).hexdigest()
+        prior = db.scalar(
+            select(Document).where(
+                Document.checksum == checksum,
+                Document.company_id == company.id,
+                Document.source_type == "manual_transcript",
+                *tenant_filters(db, Document),
+            ).limit(1)
+        )
+        if prior is not None:
+            transcript_id = db.scalar(
+                select(Transcript.id).where(Transcript.source_id == prior.id).limit(1)
+            )
+            return {
+                "document_id": prior.id,
+                "transcript_id": transcript_id,
+                "ticker": company.ticker,
+                "chunks": 0,
+                "source_type": "manual_transcript",
+                "already_imported": True,
+            }
+
         document = Document(
             company_id=company.id,
             title=title,
             source_type="manual_transcript",
             source_url=source_url,
+            checksum=checksum,
             published_at=datetime.now(UTC),
             metadata_={
                 "source_app": "external_ir_source",
