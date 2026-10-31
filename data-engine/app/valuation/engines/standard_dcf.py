@@ -78,6 +78,81 @@ def _scenario_nd_note(name: str, raw_value: float | None, scenario_margin: float
     )
 
 
+def _normalized_fcf_margin(
+    context: "ValuationContext", snapshot
+) -> tuple[float | None, dict | None]:
+    """Margen FCF del DCF como mediana de los ultimos 3 ejercicios fiscales.
+
+    Motivacion: KO tenia un margen del ultimo FY de 10,1 % frente a 21,3 % y
+    22,2 % de los dos anteriores (caida puntual del flujo operativo con
+    beneficio estable, hechos SEC reales) y usar el ultimo ano en crudo
+    deprimia la base de forma severa. La magnitud exacta observada en prod
+    durante el analisis no es reproducible de forma aislada (depende de los
+    demas supuestos del motor: WACC, crecimiento, terminal); la auditoria
+    externa con supuestos propios obtuvo otra magnitud en la misma direccion.
+
+    Reglas: con >= 2 FY la mediana resiste un ano puntual; con 1 FY se
+    mantiene el comportamiento anterior. Guarda de tendencia: con caidas en
+    todos los pares consecutivos del historial (tendencia monotona a la
+    baja) la mediana sobrevalora, asi que se usa el ultimo FY
+    (equivale a min(mediana, ultimo) en ese caso). La traza publica la
+    normalizacion con los valores por periodo y la tendencia detectada.
+    Nunca se inventa un margen que no salga de hechos.
+
+    Limite conocido (preexistente): un margen negativo no tiene floor; esta
+    normalizacion no cambia ese comportamiento.
+    """
+    latest = snapshot.value("fcf_margin")
+    try:
+        from app.models import FinancialFact
+        from sqlalchemy import select
+
+        rows = context.db.execute(
+            select(FinancialFact.value, FinancialFact.fiscal_year, FinancialFact.period)
+            .where(
+                FinancialFact.company_id == context.company.id,
+                FinancialFact.metric == "fcf_margin",
+                FinancialFact.fiscal_quarter == "FY",
+            )
+            .order_by(FinancialFact.fiscal_year.desc())
+            .limit(3)
+        ).all()
+    except Exception:  # noqa: BLE001 - sin historial, comportamiento anterior
+        return latest, None
+    values = []
+    for value, fiscal_year, period in rows:
+        if value is None:
+            continue
+        v = float(value)
+        values.append({"period": period, "fiscal_year": fiscal_year, "value": v})
+    if len(values) < 2:
+        return latest, None
+    ordered = sorted(item["value"] for item in values)
+    n = len(ordered)
+    median = ordered[n // 2] if n % 2 == 1 else (ordered[n // 2 - 1] + ordered[n // 2]) / 2
+    # Tendencia sobre el historial reciente (values viene del mas nuevo al
+    # mas viejo): caida monotona = todos los pares consecutivos caen.
+    pairs_declining = all(
+        values[i]["value"] < values[i + 1]["value"] for i in range(len(values) - 1)
+    )
+    pairs_rising = all(
+        values[i]["value"] > values[i + 1]["value"] for i in range(len(values) - 1)
+    )
+    trend = "declining" if pairs_declining else "rising" if pairs_rising else "mixed"
+    normalized = values[0]["value"] if trend == "declining" else median
+    normalization = {
+        "method": "median_last_n_fiscal_years",
+        "n": n,
+        "periods": values,
+        "latest_value": values[0]["value"],
+        "median_value": median,
+        "trend": trend,
+        "trend_guard_applied": trend == "declining",
+        "normalized_value": normalized,
+    }
+    return normalized, normalization
+
+
 class StandardDCFEngine(ValuationEngine):
     """DCF FCFF estándar sobre snapshot coherente.
 
@@ -135,7 +210,7 @@ class StandardDCFEngine(ValuationEngine):
             )
             return result
 
-        margin = snapshot.value("fcf_margin")
+        margin, margin_normalization = _normalized_fcf_margin(context, snapshot)
         if margin is None:
             fcf = snapshot.value("free_cash_flow")
             if fcf is None:
@@ -424,6 +499,7 @@ class StandardDCFEngine(ValuationEngine):
                 "growth_source": growth_source,
                 "growth_clamped_from": raw_growth if growth != raw_growth else None,
                 "fcf_margin_source": "financial_facts",
+                "fcf_margin_normalization": margin_normalization,
                 "fcf_margin_clamped_from": raw_margin if margin_clamped else None,
                 "wacc_source": wacc_source,
                 "terminal_source": terminal_source,
