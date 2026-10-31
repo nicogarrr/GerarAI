@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { AutoscaleInfo, IChartApi, IPriceLine, ISeriesApi, Time, UTCTimestamp } from 'lightweight-charts';
+import type { AutoscaleInfo, IChartApi, IPriceLine, ISeriesApi, ISeriesMarkersPluginApi, SeriesMarker, Time, UTCTimestamp } from 'lightweight-charts';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 import { formatMarketDate, formatMoney, formatNumber, isValidCurrencyCode } from '@/lib/format';
 import { getCompanyChartHistory, type CompanyChartHistory, type CompanyChartBar } from '@/lib/actions/company-chart.actions';
@@ -10,6 +10,9 @@ import { TRADINGVIEW_URL } from '@/lib/market/candles';
 import { CHART_RANGES, type CompanyChartRange } from '@/lib/market/chart-ranges';
 import { normalizeChartPriceUnits } from '@/lib/market/chart-price-units';
 import { adx, cleanBars, dailyPivots, fibonacci, rangeBars, sma, structure } from '@/lib/market/technical';
+import { getChartEvents, type ChartEvents } from '@/lib/actions/price-events.actions';
+import { availableIndicators, barsSince, eventsInRange, indicatorSeries, INDICATOR_LABELS, markersByDay, volumeSpikeFlags, type IndicatorKind, type PriceEventKind } from '@/lib/market/price-events';
+import { PriceEventsPanel } from '@/components/research/PriceEventsPanel';
 
 function price(value: number, currency: string | null) {
     return isValidCurrencyCode(currency) ? formatMoney(value, currency) : formatNumber(value);
@@ -33,9 +36,40 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
         return () => { cancelled = true; };
     }, [snapshot.ticker, range, needsRemote, retry]);
     const remotePrices = useMemo(() => normalizeChartPriceUnits(remote?.range === range ? remote.data.bars : [], { ticker: snapshot.ticker, currency: snapshot.currency, candleCurrency: remote?.range === range ? remote.data.currency : null }), [remote, range, snapshot.ticker, snapshot.currency]);
-    const visible = useMemo(() => needsRemote ? remotePrices.bars : rangeBars(bars, range as '1M' | '6M' | 'YTD' | '1A'), [bars, range, needsRemote, remotePrices]);
+    const [sinceBuy, setSinceBuy] = useState(false);
+    const [chartEvents, setChartEvents] = useState<{ key: string; data: ChartEvents } | null>(null);
+    const rangeVisible = useMemo(() => needsRemote ? remotePrices.bars : rangeBars(bars, range as '1M' | '6M' | 'YTD' | '1A'), [bars, range, needsRemote, remotePrices]);
+    const visible = useMemo(() => sinceBuy ? barsSince(rangeVisible, chartEvents?.data.firstBuyDate) : rangeVisible, [rangeVisible, sinceBuy, chartEvents]);
     const visibleCurrency = needsRemote ? remotePrices.currency : daily.currency;
     const hourly = range === '1D' || range === '5D';
+    // «Precio y eventos»: eventos guardados del tramo visible (solo base de datos) sobre las mismas velas.
+    const firstDay = visible[0]?.date.slice(0, 10);
+    const lastDay = visible.at(-1)?.date.slice(0, 10);
+    const eventsKey = firstDay && lastDay ? `${snapshot.ticker}|${firstDay}|${lastDay}` : null;
+    useEffect(() => {
+        if (!eventsKey || !firstDay || !lastDay) return;
+        let cancelled = false;
+        getChartEvents(snapshot.ticker, firstDay, lastDay).then((data) => {
+            if (!cancelled) setChartEvents({ key: eventsKey, data });
+        }).catch(() => undefined);
+        return () => { cancelled = true; };
+    }, [eventsKey, snapshot.ticker, firstDay, lastDay]);
+    const eventData = chartEvents?.data ?? null;
+    const target = eventData && eventData.target != null && (!eventData.targetCurrency || eventData.targetCurrency === visibleCurrency) ? eventData.target : null;
+    const averageCost = eventData?.averageCost ?? null;
+    const indicators = availableIndicators({ target, averageCost });
+    const [indicatorChoice, setIndicatorChoice] = useState<IndicatorKind | null>(null);
+    const indicator: IndicatorKind = indicatorChoice && indicators.includes(indicatorChoice) ? indicatorChoice : indicators[0];
+    const indicatorValues = useMemo(() => hourly ? [] : indicatorSeries(visible, indicator, { target, averageCost }), [visible, indicator, target, averageCost, hourly]);
+    const spikes = useMemo(() => volumeSpikeFlags(visible), [visible]);
+    const [hiddenKinds, setHiddenKinds] = useState<ReadonlySet<PriceEventKind>>(() => new Set());
+    const [focusDate, setFocusDate] = useState<string | null>(null);
+    const rangeEvents = useMemo(() => eventsInRange(eventData?.events ?? [], firstDay, lastDay), [eventData, firstDay, lastDay]);
+    const markers = useMemo(() => hourly ? [] : markersByDay(rangeEvents, hiddenKinds), [rangeEvents, hiddenKinds, hourly]);
+    const priceLines = useMemo(() => [
+        ...(target != null ? [{ label: 'Objetivo analistas', price: target, color: '#a78bfa' }] : []),
+        ...(averageCost != null ? [{ label: 'Tu precio medio', price: averageCost, color: '#fbbf24' }] : []),
+    ], [target, averageCost]);
 
     const levels = useMemo(() => dailyPivots(bars), [bars]);
     const fib = useMemo(() => fibonacci(visible), [visible]);
@@ -55,14 +89,25 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         <h2 className="text-sm font-semibold text-gray-200">Precio</h2>
                         <span className="text-xs text-gray-500">{hourly ? 'Horario (UTC)' : 'Diario'}{visible.at(-1) ? ` · ${formatMarketDate(visible.at(-1)!.date)}` : ''}</span>
                     </div>
-                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">Cargando rango {range}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">No se pudo cargar este rango</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} />}
+                    {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">Cargando rango {range}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">No se pudo cargar este rango</div> : <PriceCanvas bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} indicator={indicatorValues} indicatorLabel={INDICATOR_LABELS[indicator]} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex w-full flex-wrap gap-1 sm:w-auto" aria-label="Rango del gráfico">
-                            {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setRange(value); }}>{value}</button>)}
+                            {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 rounded-md px-1 text-[11px] transition sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{value}</button>)}
+                            {eventData?.firstBuyDate ? <button type="button" aria-pressed={sinceBuy} className={`min-h-11 rounded-md px-2 text-[11px] transition sm:px-3 sm:text-xs ${sinceBuy ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { setSinceBuy(true); if (range !== 'Máx') { setRequestState('loading'); setRange('Máx'); } }}>Desde compra</button> : null}
                         </div>
                         <a href={TRADINGVIEW_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-[10px] text-gray-500 underline">TradingView</a>
                     </div>
                     {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {visible.length} {hourly ? 'velas horarias' : 'sesiones'}{range === 'Máx' ? ' · Máximo disponible del proveedor' : ''}{hourly ? ' · Ventana sobre la última vela disponible' : ''}</p> : null}
+                    <PriceEventsPanel
+                        events={rangeEvents}
+                        hiddenKinds={hiddenKinds}
+                        onToggleKind={(kind) => setHiddenKinds((current) => { const next = new Set(current); if (next.has(kind)) next.delete(kind); else next.add(kind); return next; })}
+                        onFocus={setFocusDate}
+                        indicators={indicators}
+                        indicator={indicator}
+                        onIndicator={setIndicatorChoice}
+                        hourly={hourly}
+                    />
                 </div>
                 <MobileCollapse title="Lectura técnica"><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
                     <h2 className="hidden text-base font-semibold text-gray-100 md:block">Lectura técnica</h2>
@@ -97,9 +142,32 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
     return <div className="min-w-0 rounded-lg bg-gray-900/60 p-2"><dt className="text-[10px] text-gray-500">{label}</dt><dd className="mt-1 break-words text-xs font-semibold text-gray-200">{value}</dd><dd className="mt-1 text-[10px] leading-4 text-gray-500">{detail}</dd></div>;
 }
 
-function PriceCanvas({ bars, levels, currency, hourly = false }: { bars: CompanyChartBar[]; hourly?: boolean; levels: { label: string; price: number; kind: string }[]; currency: string | null }) {
+type CanvasMarker = { date: string; text: string; color: string; count: number };
+type CanvasPriceLine = { label: string; price: number; color: string };
+
+function PriceCanvas({ bars, levels, currency, hourly = false, indicator = [], indicatorLabel = '', spikes = [], markers = [], priceLines = [], focusDate = null }: {
+    bars: CompanyChartBar[];
+    hourly?: boolean;
+    levels: { label: string; price: number; kind: string }[];
+    currency: string | null;
+    indicator?: Array<{ date: string; value: number }>;
+    indicatorLabel?: string;
+    spikes?: boolean[];
+    markers?: CanvasMarker[];
+    priceLines?: CanvasPriceLine[];
+    focusDate?: string | null;
+}) {
     const container = useRef<HTMLDivElement>(null);
-    const engine = useRef<{ chart: IChartApi; line: ISeriesApi<'Area', Time>; volume: ISeriesApi<'Histogram', Time>; levels: IPriceLine[] } | null>(null);
+    const engine = useRef<{
+        chart: IChartApi;
+        line: ISeriesApi<'Area', Time>;
+        indicator: ISeriesApi<'Line', Time>;
+        volume: ISeriesApi<'Histogram', Time>;
+        markers: ISeriesMarkersPluginApi<Time>;
+        levels: IPriceLine[];
+        dashed: IPriceLine[];
+        dashedStyle: number;
+    } | null>(null);
     const latest = useRef({ bars, levels, currency });
     // Sincroniza el ref tras cada render (react-hooks/refs prohibe escribirlo
     // durante el render). Declarado antes del resto de efectos: se ejecuta primero.
@@ -113,20 +181,26 @@ function PriceCanvas({ bars, levels, currency, hourly = false }: { bars: Company
         let chart: IChartApi | null = null;
         (async () => {
             try {
-                const { createChart, AreaSeries, HistogramSeries, ColorType } = await import('lightweight-charts');
+                const { createChart, createSeriesMarkers, AreaSeries, HistogramSeries, LineSeries, LineStyle, ColorType } = await import('lightweight-charts');
                 if (disposed || !container.current) return;
                 chart = createChart(container.current, {
                     autoSize: true,
-                    layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#71717a', fontSize: 11, attributionLogo: true },
+                    layout: { background: { type: ColorType.Solid, color: 'transparent' }, textColor: '#71717a', fontSize: 11, attributionLogo: true, panes: { separatorColor: '#27272a' } },
                     grid: { vertLines: { visible: false }, horzLines: { color: '#27272a' } },
-                    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.18, bottom: 0.22 } },
+                    rightPriceScale: { borderVisible: false, scaleMargins: { top: 0.12, bottom: 0.08 } },
                     timeScale: { borderVisible: false, rightOffset: 6 },
                     localization: { locale: 'es-ES', priceFormatter: (value: number) => price(value, latest.current.currency) },
                 });
                 const line = chart.addSeries(AreaSeries, { lineColor: '#5eead4', topColor: 'rgba(94,234,212,0.12)', bottomColor: 'rgba(94,234,212,0)', lineWidth: 2, priceLineVisible: false });
-                const volume = chart.addSeries(HistogramSeries, { priceScaleId: 'volume', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
-                chart.priceScale('volume').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 }, visible: false });
-                engine.current = { chart, line, volume, levels: [] };
+                // Tres paneles con el mismo eje de tiempo: precio, indicador y volumen.
+                const indicatorSeriesApi = chart.addSeries(LineSeries, { color: '#a78bfa', lineWidth: 1, priceLineVisible: false, lastValueVisible: true, priceFormat: { type: 'custom', formatter: (value: number) => `${formatNumber(value, { maximumFractionDigits: 1 })} %`, minMove: 0.01 } }, 1);
+                const volume = chart.addSeries(HistogramSeries, { priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false }, 2);
+                const panes = chart.panes();
+                panes[0]?.setStretchFactor(3);
+                panes[1]?.setStretchFactor(1);
+                panes[2]?.setStretchFactor(1);
+                const markerApi = createSeriesMarkers(line, []);
+                engine.current = { chart, line, indicator: indicatorSeriesApi, volume, markers: markerApi, levels: [], dashed: [], dashedStyle: LineStyle.Dashed };
                 if (!disposed) setReady(true);
             } catch { if (!disposed) setError(true); }
         })();
@@ -136,21 +210,38 @@ function PriceCanvas({ bars, levels, currency, hourly = false }: { bars: Company
         const current = engine.current;
         if (!ready || !current) return;
         current.chart.timeScale().applyOptions({ timeVisible: hourly });
+        const extra = [...levels.map((level) => level.price), ...priceLines.map((line) => line.price)];
         current.line.applyOptions({ autoscaleInfoProvider: (original: () => AutoscaleInfo | null) => {
             const info = original();
-            if (!info || !info.priceRange || !levels.length) return info;
-            return { ...info, priceRange: { minValue: Math.min(info.priceRange.minValue, ...levels.map((level) => level.price)), maxValue: Math.max(info.priceRange.maxValue, ...levels.map((level) => level.price)) } };
+            if (!info || !info.priceRange || !extra.length) return info;
+            return { ...info, priceRange: { minValue: Math.min(info.priceRange.minValue, ...extra), maxValue: Math.max(info.priceRange.maxValue, ...extra) } };
         } });
-        current.line.setData(bars.map((bar) => ({ time: bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date, value: bar.close })));
-        current.volume.setData(bars.filter((bar) => typeof bar.volume === 'number' && Number.isFinite(bar.volume) && bar.volume >= 0).map((bar) => ({ time: bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date, value: bar.volume!, color: 'rgba(113,113,122,0.3)' })));
+        const timeOf = (bar: CompanyChartBar) => (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time;
+        current.line.setData(bars.map((bar) => ({ time: timeOf(bar), value: bar.close })));
+        current.volume.setData(bars.flatMap((bar, index) => typeof bar.volume === 'number' && Number.isFinite(bar.volume) && bar.volume >= 0
+            ? [{ time: timeOf(bar), value: bar.volume, color: spikes[index] ? 'rgba(251,113,133,0.85)' : bar.close >= (bars[index - 1]?.close ?? bar.close) ? 'rgba(45,212,191,0.35)' : 'rgba(248,113,113,0.35)' }]
+            : []));
+        current.indicator.setData(hourly ? [] : indicator.map((point) => ({ time: point.date as Time, value: point.value })));
+        current.indicator.applyOptions({ title: indicatorLabel });
+        const known = new Set(bars.map((bar) => bar.date));
+        const seriesMarkers: SeriesMarker<Time>[] = hourly ? [] : markers.filter((marker) => known.has(marker.date)).map((marker) => ({ time: marker.date as Time, position: 'aboveBar', shape: 'circle', color: marker.color, text: marker.text, size: marker.count > 1 ? 1.4 : 1 }));
+        current.markers.setMarkers(seriesMarkers);
         // En movil las etiquetas de precio de R/S taparian las del eje; los niveles exactos van en la tabla de pivotes.
         const wide = window.matchMedia('(min-width: 640px)').matches;
         for (const level of current.levels) current.line.removePriceLine(level);
         current.levels = levels.map((level) => current.line.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: wide }));
+        for (const dashed of current.dashed) current.line.removePriceLine(dashed);
+        current.dashed = priceLines.map((line) => current.line.createPriceLine({ price: line.price, title: line.label, color: line.color, lineWidth: 1, lineStyle: current.dashedStyle, axisLabelVisible: true }));
         current.chart.timeScale().fitContent();
-    }, [ready, bars, levels, hourly]);
+    }, [ready, bars, levels, hourly, indicator, indicatorLabel, spikes, markers, priceLines]);
+    useEffect(() => {
+        const current = engine.current;
+        if (!ready || !current || !focusDate) return;
+        const bar = bars.find((item) => item.date.slice(0, 10) === focusDate);
+        if (bar) current.chart.setCrosshairPosition(bar.close, (bar.timestamp ? bar.timestamp as UTCTimestamp : bar.date) as Time, current.line);
+    }, [ready, focusDate, bars]);
     return <div className="relative">
-        <div ref={container} className="h-[280px] w-full sm:h-[360px]" role="figure" aria-label={`Evolución del precio${bars.length ? ` del ${formatMarketDate(bars[0].date)} al ${formatMarketDate(bars.at(-1)!.date)}` : ': sin datos'}`} data-testid="technical-price-canvas" />
+        <div ref={container} className="h-[380px] w-full sm:h-[480px]" role="figure" aria-label={`Evolución del precio${bars.length ? ` del ${formatMarketDate(bars[0].date)} al ${formatMarketDate(bars.at(-1)!.date)}` : ': sin datos'}`} data-testid="technical-price-canvas" />
         {error || bars.length < 2 ? <p role="status" className="absolute inset-0 grid place-items-center bg-surface-1 text-sm text-gray-500">{error ? 'No se pudo cargar el gráfico' : 'Sin datos suficientes para este rango'}</p> : !ready ? <p role="status" className="absolute inset-0 grid animate-pulse place-items-center text-xs text-gray-500">Cargando gráfico</p> : null}
     </div>;
 }
