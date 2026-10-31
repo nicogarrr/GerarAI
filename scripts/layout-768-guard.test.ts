@@ -43,7 +43,7 @@ test('F320: el nombre de métrica irrompible no empuja el badge fuera de la tarj
     // net_debt_to_ebitda es un token largo sin puntos de corte: min-w-0 +
     // break-all dejan que envuelva y shrink-0 protege el badge de estado.
     assert.match(researchPage, /min-w-0 break-all font-medium text-gray-200">\{metricLabel\(metric\.metric\)\}<\/span>/);
-    assert.match(researchPage, /<Badge className="shrink-0" variant="outline">\{label\(metric\.status\)\}<\/Badge>/);
+    assert.match(researchPage, /<Badge className="shrink-0" variant="outline">\{label\(metric\.status, locale\)\}<\/Badge>/);
 });
 
 test('F290: los KPIs de /portfolio dimensionan por ancho de contenido (sidebar en md)', () => {
