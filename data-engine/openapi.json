@@ -673,6 +673,7 @@
           "source_url": {
             "anyOf": [
               {
+                "maxLength": 1000,
                 "type": "string"
               },
               {
@@ -2639,6 +2640,7 @@
             "title": "Column Mapping"
           },
           "content": {
+            "maxLength": 10485760,
             "title": "Content",
             "type": "string"
           },
@@ -3333,6 +3335,16 @@
           "symbol": {
             "title": "Symbol",
             "type": "string"
+          },
+          "zone_visits": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DcaZoneVisitsOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -3999,6 +4011,146 @@
           "fg"
         ],
         "title": "DcaZoneOut",
+        "type": "object"
+      },
+      "DcaZoneVisitOut": {
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "months"
+        ],
+        "title": "DcaZoneVisitOut",
+        "type": "object"
+      },
+      "DcaZoneVisitsOut": {
+        "properties": {
+          "available": {
+            "default": false,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "avg_months": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Months"
+          },
+          "completed_visits": {
+            "default": 0,
+            "title": "Completed Visits",
+            "type": "integer"
+          },
+          "excluded_gap_visits": {
+            "default": 0,
+            "title": "Excluded Gap Visits",
+            "type": "integer"
+          },
+          "first_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Period"
+          },
+          "last_period": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Period"
+          },
+          "levels": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Levels",
+            "type": "array"
+          },
+          "max_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Months"
+          },
+          "months_completed": {
+            "default": 0,
+            "title": "Months Completed",
+            "type": "integer"
+          },
+          "open_visit_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Visit Months"
+          },
+          "params_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Params Version"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "visits": {
+            "items": {
+              "$ref": "#/components/schemas/DcaZoneVisitOut"
+            },
+            "title": "Visits",
+            "type": "array"
+          }
+        },
+        "title": "DcaZoneVisitsOut",
         "type": "object"
       },
       "DecisionJournalCreate": {
@@ -7633,12 +7785,14 @@
         "properties": {
           "period": {
             "default": "unknown",
+            "maxLength": 40,
             "title": "Period",
             "type": "string"
           },
           "source_url": {
             "anyOf": [
               {
+                "maxLength": 1000,
                 "type": "string"
               },
               {
@@ -7648,6 +7802,7 @@
             "title": "Source Url"
           },
           "text": {
+            "maxLength": 10485760,
             "minLength": 20,
             "title": "Text",
             "type": "string"
@@ -52819,6 +52974,41 @@
             }
           },
           {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
+            }
+          },
+          {
             "in": "header",
             "name": "x-cavaai-user",
             "required": false,
@@ -55988,6 +56178,41 @@
               "minimum": 1,
               "title": "Page Size",
               "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2000,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Offset"
             }
           },
           {

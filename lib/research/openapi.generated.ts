@@ -7665,6 +7665,7 @@ export interface components {
             rows?: components["schemas"]["DcaHitRateRowOut"][];
             /** Symbol */
             symbol: string;
+            zone_visits?: components["schemas"]["DcaZoneVisitsOut"] | null;
         };
         /** DcaManualStatusOut */
         DcaManualStatusOut: {
@@ -7883,6 +7884,56 @@ export interface components {
             level: number;
             /** Zone */
             zone: string;
+        };
+        /** DcaZoneVisitOut */
+        DcaZoneVisitOut: {
+            /** End */
+            end: string;
+            /** Months */
+            months: number;
+            /** Start */
+            start: string;
+        };
+        /** DcaZoneVisitsOut */
+        DcaZoneVisitsOut: {
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /** Avg Months */
+            avg_months?: number | null;
+            /**
+             * Completed Visits
+             * @default 0
+             */
+            completed_visits: number;
+            /**
+             * Excluded Gap Visits
+             * @default 0
+             */
+            excluded_gap_visits: number;
+            /** First Period */
+            first_period?: string | null;
+            /** Last Period */
+            last_period?: string | null;
+            /** Levels */
+            levels?: number[];
+            /** Max Months */
+            max_months?: number | null;
+            /**
+             * Months Completed
+             * @default 0
+             */
+            months_completed: number;
+            /** Open Visit Months */
+            open_visit_months?: number | null;
+            /** Params Version */
+            params_version?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Visits */
+            visits?: components["schemas"]["DcaZoneVisitOut"][];
         };
         /** DecisionJournalCreate */
         DecisionJournalCreate: {
@@ -20395,6 +20446,8 @@ export interface operations {
             query?: {
                 page?: number;
                 page_size?: number;
+                limit?: number | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -21164,6 +21217,8 @@ export interface operations {
                 start?: string | null;
                 page?: number;
                 page_size?: number;
+                limit?: number | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
@@ -21331,6 +21386,7 @@ export interface operations {
                 page_size?: number;
                 ticker?: string | null;
                 action?: ("buy" | "sell") | null;
+                offset?: number | null;
             };
             header?: {
                 "x-cavaai-user"?: string | null;
