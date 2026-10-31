@@ -291,7 +291,9 @@ def _raise_gdelt_retry(exc: Exception) -> None:
     except Exception:  # noqa: BLE001 - fail-open
         client = None
     if _gdelt_429_recorded(client):
-        delay_seconds = float(GDELT_CIRCUIT_TTL_SECONDS)
+        # Disyuntor abierto: esperar AL MENOS su TTL, pero nunca menos de lo
+        # que pide el servidor (una ventana de 1 h manda sobre los 30 min).
+        delay_seconds = max(retry_after, float(GDELT_CIRCUIT_TTL_SECONDS))
     else:
         delay_seconds = retry_after if retry_after > 0 else GDELT_RETRY_FLOOR_SECONDS
     delay_ms = int(delay_seconds * 1000)
@@ -338,6 +340,23 @@ ENQUEUE_MARK_TTL_SECONDS = 24 * 60 * 60
 
 def _enqueue_mark_key(job: str, parts: tuple[str, ...]) -> str:
     return "coalesce-enq:" + ":".join((job, *parts))
+
+
+def _current_message_is_retry_or_delayed() -> bool:
+    """True si el mensaje en ejecucion es un reintento o un diferido.
+
+    Es trabajo YA ACEPTADO por el broker: no puede terminarse en ack sin
+    trabajar (se perderia), solo reprogramarse. Fail-open en False: sin
+    evidencia de reintento se trata como tick nuevo.
+    """
+    try:
+        message = CurrentMessage.get_current_message()
+    except Exception:  # noqa: BLE001 - sonda best-effort
+        return False
+    if message is None:
+        return False
+    options = getattr(message, "options", None) or {}
+    return "retries" in options or "eta" in options
 
 
 def _current_message_age_seconds() -> float | None:
@@ -3022,6 +3041,14 @@ def refresh_news(
     except Exception:  # noqa: BLE001 - fail-open
         gdelt_client = None
     if _gdelt_circuit_open(gdelt_client):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: NO se ack sin trabajar. Se reprograma
+            # tras el TTL del disyuntor; el coalescer libera su claim al
+            # propagarse el Retry (except BaseException -> _release).
+            raise dramatiq.Retry(
+                "Disyuntor GDELT abierto: lote reprogramado tras su TTL",
+                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000,
+            )
         return {"status": "skipped", "actor": actor_name, "reason": "gdelt_circuit_open"}
     try:
         from app.services.feed_ingestion_service import FeedIngestionService
@@ -3373,6 +3400,14 @@ def refresh_macro_news(
     except Exception:  # noqa: BLE001 - fail-open
         gdelt_client = None
     if _gdelt_circuit_open(gdelt_client):
+        if _current_message_is_retry_or_delayed():
+            # Trabajo ya aceptado: NO se ack sin trabajar. Se reprograma
+            # tras el TTL del disyuntor; el coalescer libera su claim al
+            # propagarse el Retry (except BaseException -> _release).
+            raise dramatiq.Retry(
+                "Disyuntor GDELT abierto: lote reprogramado tras su TTL",
+                delay=GDELT_CIRCUIT_TTL_SECONDS * 1000,
+            )
         return {"status": "skipped", "actor": actor_name, "reason": "gdelt_circuit_open"}
     try:
         from app.services.feed_ingestion_service import FeedIngestionService

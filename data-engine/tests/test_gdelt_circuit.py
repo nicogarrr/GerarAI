@@ -150,3 +150,60 @@ def test_refresh_macro_news_skips_fast_while_circuit_open(monkeypatch):
     result = dramatiq_app.refresh_macro_news.fn(None, None)
     assert result["status"] == "skipped"
     assert result["reason"] == "gdelt_circuit_open"
+
+
+def test_retry_message_is_rescheduled_not_acked(monkeypatch):
+    """Bloqueo del piloto: un retry/eta nunca se ack sin trabajo con el
+    disyuntor abierto: se reprograma tras el TTL y el claim se libera."""
+    import time
+    from types import SimpleNamespace
+
+    client = FakeRedis()
+    client.set("gdelt:circuit:open", "1")
+    _patch_client(monkeypatch, client)
+    retry_msg = SimpleNamespace(
+        options={"retries": 2}, message_timestamp=time.time() * 1000
+    )
+    monkeypatch.setattr(
+        dramatiq_app.CurrentMessage,
+        "get_current_message",
+        classmethod(lambda cls: retry_msg),
+    )
+    with pytest.raises(dramatiq.Retry) as caught:
+        dramatiq_app.refresh_news.fn(None, None)
+    assert caught.value.delay == GDELT_CIRCUIT_TTL_SECONDS * 1000
+    # El claim del coalescer se libera: el lote reprogramado puede reclamar.
+    assert "coalesce:refresh_news:None" not in client.store
+
+
+def test_delayed_message_is_rescheduled_not_acked(monkeypatch):
+    import time
+    from types import SimpleNamespace
+
+    client = FakeRedis()
+    client.set("gdelt:circuit:open", "1")
+    _patch_client(monkeypatch, client)
+    eta_msg = SimpleNamespace(options={"eta": 123}, message_timestamp=time.time() * 1000)
+    monkeypatch.setattr(
+        dramatiq_app.CurrentMessage,
+        "get_current_message",
+        classmethod(lambda cls: eta_msg),
+    )
+    with pytest.raises(dramatiq.Retry):
+        dramatiq_app.refresh_macro_news.fn(None, None)
+
+
+def test_server_window_longer_than_circuit_ttl_wins(monkeypatch):
+    """Bloqueo del piloto: al abrirse el disyuntor el delay es
+    max(retry_after del servidor, TTL del disyuntor)."""
+    client = FakeRedis()
+    _patch_client(monkeypatch, client)
+    exc = Exception("429")
+    exc.retry_after = 3600.0  # ventana de 1 h > TTL de 30 min
+    delay = None
+    for _ in range(GDELT_CIRCUIT_THRESHOLD):
+        with pytest.raises(dramatiq.Retry) as caught:
+            _raise_gdelt_retry(exc)
+        delay = caught.value.delay
+    assert _gdelt_circuit_open(client)
+    assert delay == 3_600_000
