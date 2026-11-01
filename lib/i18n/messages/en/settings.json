@@ -164,7 +164,25 @@
     "testHelpNoKey": " Enter a key to enable it. You don't need your own key to use GerarAI's AI.",
     "saving": "Saving...",
     "testing": "Testing...",
-    "test": "Test connection"
+    "test": "Test connection",
+    "usage": {
+      "subtitle": "Platform AI chain: OpenCode Go, then OpenCode free, finally Gemini. No per-use cost.",
+      "state": {
+        "ok": "Operational",
+        "limited": "Quota exhausted",
+        "off": "Disabled"
+      },
+      "limitedUntil": "no quota until {date}",
+      "estimated": "Estimated",
+      "providerData": "Provider data",
+      "weekly": "Weekly",
+      "monthly": "Monthly",
+      "resetsAt": "resets {date}",
+      "today": "Today: {calls} calls · {tokens} tokens",
+      "publishedLimits": "Published free cap: up to {rpd} requests/day depending on model",
+      "tenant": "You use your own key: your usage is managed by your provider and is not shown here.",
+      "generatedAt": "Updated {date}"
+    }
   },
   "tax": {
     "title": "Declarant tax details",

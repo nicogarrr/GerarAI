@@ -3,7 +3,7 @@ import { getT } from '@/lib/i18n/server';
 import type { Metadata } from 'next';
 import { getIBKRConnection } from '@/lib/actions/ibkr-settings.actions';
 import SettingsContent from '@/components/settings/SettingsContent';
-import { getLlmSettings } from '@/lib/actions/llm-settings.actions';
+import { getLlmSettings, getLlmUsage } from '@/lib/actions/llm-settings.actions';
 import { getPortfolioCurrencySettings } from '@/lib/actions/portfolio-settings.actions';
 import { getTaxDeclarant } from '@/lib/actions/taxes.actions';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
@@ -23,13 +23,14 @@ export default async function SettingsPage() {
   } catch {
     return redirectToSignIn();
   }
-  const [declarant, llm, currency, ibkr, dca] = await Promise.all([
+  const [declarant, llm, llmUsage, currency, ibkr, dca] = await Promise.all([
     getTaxDeclarant().catch(() => null),
     getLlmSettings().catch(() => null),
+    getLlmUsage().catch(() => null),
     getPortfolioCurrencySettings().catch(() => null),
     getIBKRConnection().catch(() => null),
     getDcaAlertSettings().catch(() => null),
   ]);
 
-  return <SettingsContent declarant={declarant} llm={llm} currency={currency} ibkr={ibkr} dca={dca} />;
+  return <SettingsContent declarant={declarant} llm={llm} llmUsage={llmUsage} currency={currency} ibkr={ibkr} dca={dca} />;
 }

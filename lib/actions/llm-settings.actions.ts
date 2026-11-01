@@ -82,3 +82,35 @@ export async function testLlmConnection(input: LlmTestInput): Promise<LlmTestRes
         timeoutMs: 15_000,
     });
 }
+
+export type LlmUsageLeg = {
+    id: string;
+    label: string;
+    provider: string;
+    model: string | null;
+    active: boolean;
+    state: 'ok' | 'limited' | 'off';
+    /** true = contadores propios (el proveedor no expone su cuota); false = dato real de la API del proveedor. */
+    estimated: boolean;
+    limited_until: string | null;
+    quota?: {
+        rolling?: { percent?: number } & Record<string, unknown>;
+        weekly?: { status?: string; percent?: number; resetsAt?: string } & Record<string, unknown>;
+        monthly?: { percent?: number; resetsAt?: string } & Record<string, unknown>;
+    } | null;
+    today?: { date: string; calls: number; tokens: number } | null;
+    published_limits?: Record<string, { rpm?: number; rpd?: number; tpm?: number }> | null;
+};
+
+export type LlmUsage = {
+    source: 'platform' | 'tenant';
+    generated_at: string;
+    legs: LlmUsageLeg[];
+    message?: string | null;
+};
+
+/** GET /api/settings/llm/usage: cuota real de Go y contadores propios estimados. */
+export async function getLlmUsage(): Promise<LlmUsage> {
+    await requireAuthenticatedUser();
+    return researchRequest<LlmUsage>('/api/settings/llm/usage', { cache: 'no-store' });
+}
