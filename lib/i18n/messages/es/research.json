@@ -213,9 +213,7 @@
     "expensive": "cara",
     "incompletePrice": "precio incompleto",
     "blocked": "bloqueada",
-    "insufficientData": "datos insuficientes",
-    "incomplete_price": "precio incompleto",
-    "insufficient_data": "datos insuficientes"
+    "insufficientData": "datos insuficientes"
   },
   "translate": {
     "reason": {
@@ -227,10 +225,7 @@
       "providerRateLimited": "Los traductores gratuitos están saturados ahora mismo. Inténtalo en unos minutos.",
       "providerTimeout": "El traductor no respondió a tiempo. Inténtalo de nuevo en unos minutos.",
       "provider": "El traductor falló. Inténtalo de nuevo en unos minutos.",
-      "changed": "La noticia cambió mientras se traducía. Inténtalo de nuevo.",
-      "bad_output": "El traductor automático no dio un resultado fiable para este texto.",
-      "provider_rate_limited": "Los traductores gratuitos están saturados ahora mismo. Inténtalo en unos minutos.",
-      "provider_timeout": "El traductor no respondió a tiempo. Inténtalo de nuevo en unos minutos."
+      "changed": "La noticia cambió mientras se traducía. Inténtalo de nuevo."
     },
     "genericFailure": "Traducción no disponible ahora mismo. Inténtalo de nuevo en un rato.",
     "autoLabel": "Traducción automática · español",
@@ -289,8 +284,7 @@
       "high": "alta",
       "mixed": "mixta",
       "low": "baja",
-      "insufficientHistory": "historial insuficiente",
-      "insufficient_history": "historial insuficiente"
+      "insufficientHistory": "historial insuficiente"
     }
   },
   "flow": {

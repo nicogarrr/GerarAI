@@ -80,8 +80,7 @@
       "degree": "No incident edges: the graph does not relate this node to any other.",
       "description": "The graph keeps no description for this node type.",
       "attributes": "The backend returned no attributes for this node."
-    },
-    "provenance": "Provenance"
+    }
   },
   "listing": {
     "title": "Graph nodes in text",
