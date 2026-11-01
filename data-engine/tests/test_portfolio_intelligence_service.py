@@ -188,3 +188,55 @@ def test_performance_summary_uses_the_whole_snapshot_window(db):
     expected = (1 + 0.001) ** 30 - 1  # 30 retornos diarios exactos
     assert result["performance"]["twr"] == pytest.approx(expected, rel=1e-9)
     assert result["performance"]["twr_is_exact"] is True
+
+
+def test_build_no_hidrata_entidades_completas_de_snapshots_ni_benchmark(db):
+    """Perf: build() solo lee 4 columnas de cada snapshot (snapshot_date,
+    daily_return, pricing_coverage, metadata_) y 2 del benchmark (date,
+    adj_close), asi que no debe materializar entidades ORM completas de
+    esas tablas. Medido 2026-10-31 (19 pos x 1250 dias): la hidratacion de
+    snapshots + benchmark eran ~40 de ~190 ms del build."""
+    from datetime import timedelta
+
+    from app.models.entities import Portfolio
+
+    db.add(Portfolio(name="Main", base_currency="USD", is_default=True))
+    db.commit()
+    portfolio = db.query(Portfolio).one()
+    company = _company(db, "LIGHT")
+    _position(db, company, currency="USD", market_value_base="1000")
+    start = date.today() - timedelta(days=1300)
+    days = [start + timedelta(days=i) for i in range(1250)]
+    _snapshots(db, portfolio, days)
+    spy = _company(db, "SPY")
+    for day in days:
+        db.add(
+            MarketPrice(
+                company_id=spy.id, date=day, open=Decimal("500"), high=Decimal("500"),
+                low=Decimal("500"), close=Decimal("500"), adj_close=Decimal("500"),
+                volume=100, source="test",
+            )
+        )
+    db.commit()
+
+    from sqlalchemy import event
+    from sqlalchemy.orm import Session as _Session
+
+    from app.models.entities import PortfolioDailySnapshot
+
+    hidratadas = {"snapshots": 0, "benchmark": 0}
+
+    @event.listens_for(_Session, "loaded_as_persistent")
+    def _cuenta(session, instance):  # identity map es debil: hay que contar en caliente
+        if isinstance(instance, PortfolioDailySnapshot):
+            hidratadas["snapshots"] += 1
+        elif isinstance(instance, MarketPrice):
+            hidratadas["benchmark"] += 1
+
+    result = PortfolioIntelligenceService().build(db, years=5)
+    event.remove(_Session, "loaded_as_persistent", _cuenta)
+    assert result["performance"]["twr_is_exact"] is True  # mismo calculo
+    # Sin el arreglo: 1250 snapshots + 1250 filas de benchmark hidratadas.
+    assert hidratadas == {"snapshots": 0, "benchmark": 0}, (
+        f"build() hidrato {hidratadas}; debia leer solo columnas"
+    )
