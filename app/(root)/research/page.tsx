@@ -13,7 +13,8 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import WorkProductButton from '@/components/work-products/WorkProductButton';
 import { formatDate, formatNumber } from '@/lib/format';
-import { getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
+import { getLocale, getT } from '@/lib/i18n/server';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -91,13 +92,13 @@ function ratingLabel(value: string | null | undefined, t: TranslateFn): string {
 }
 
 /** Una fila del índice: ticker, nombre, cobertura del research y última tesis. */
-function CompanyCard({ row, t }: { row: CompanyRow; t: TranslateFn }) {
+function CompanyCard({ row, t, locale }: { row: CompanyRow; t: TranslateFn; locale: Locale }) {
     const { company, snapshot, unreadable } = row;
     const health = snapshot?.research_health;
     const thesis = snapshot?.latest_thesis ?? null;
     const valuable = snapshot ? researchValuability(snapshot) !== NOT_VALUABLE : false;
 
-    const sectorLine = sectorIndustryLine(company.sector, company.industry);
+    const sectorLine = sectorIndustryLine(company.sector, company.industry, locale);
 
     return (
         <li>
@@ -169,6 +170,7 @@ function CompanyCard({ row, t }: { row: CompanyRow; t: TranslateFn }) {
 
 async function ResearchIndexSection({ query, requestedPage }: { query: string; requestedPage: number }) {
     const t = await getT();
+    const locale = await getLocale();
     // Las lecturas de contexto del usuario (cartera, watchlist) no dependen del
     // dashboard: se lanzan a la vez en vez de esperar a que termine el
     // dashboard. Antes eran dos tramos secuenciales (dashboard, luego
@@ -297,7 +299,7 @@ async function ResearchIndexSection({ query, requestedPage }: { query: string; r
                         {rows.length ? (
                             <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 {rows.map((row) => (
-                                    <CompanyCard key={row.company.ticker} row={row} t={t} />
+                                    <CompanyCard key={row.company.ticker} row={row} t={t} locale={locale} />
                                 ))}
                             </ul>
                         ) : (

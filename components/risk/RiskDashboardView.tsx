@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { RecordDetail, formatRecordValue, type DataRecord } from '@/components/data/RecordViews';
+import type { Locale } from '@/lib/i18n/locale';
 import { etiquetaFactor, etiquetaSector, etiquetaSeveridad } from '@/lib/labels';
 import { useT, useFormat } from '@/lib/i18n/client';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
@@ -160,9 +161,9 @@ function humanizeRiskDashboard(t: TFunction, f: Formatters, dashboard: DataRecor
         } else if (key === 'sector_exposure') {
             // F208: las claves de sector llegan en inglés del backend y la
             // cabecera las pintaba tal cual; las posiciones ya usan etiquetaSector.
-            display[label] = exposureRecord(t, f, value, etiquetaSector);
+            display[label] = exposureRecord(t, f, value, (name) => etiquetaSector(name, f.locale));
         } else if (key === 'factor_exposure') {
-            display[label] = exposureRecord(t, f, value, etiquetaFactor);
+            display[label] = exposureRecord(t, f, value, (name) => etiquetaFactor(name, f.locale));
         } else if (key === 'status') {
             display[label] = riskStatusLabels(t)[String(value)] ?? String(value);
         } else if (key === 'missing_fx') {
@@ -225,10 +226,10 @@ function positionValueText(t: TFunction, f: Formatters, position: DataRecord, ba
     return f.formatMoney(numeric, baseCurrency);
 }
 
-function positionSectorText(t: TFunction, position: DataRecord): string {
+function positionSectorText(t: TFunction, position: DataRecord, locale: Locale): string {
     const sector = position.sector;
     if (sector === null || sector === undefined || sector === '') return t('common.na');
-    return etiquetaSector(String(sector));
+    return etiquetaSector(String(sector), locale);
 }
 
 function weightText(t: TFunction, f: Formatters, position: DataRecord): string {
@@ -338,7 +339,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                             {alerts.map((alert) => (
                                 <div className="rounded-md border border-gray-700/60 bg-black/20 p-3" key={alertKey(alert)}>
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant="outline">{etiquetaSeveridad(formatRecordValue(alert.severity))}</Badge>
+                                        <Badge variant="outline">{etiquetaSeveridad(formatRecordValue(alert.severity), f.locale)}</Badge>
                                         <span className="text-sm text-gray-200">{formatRecordValue(alert.message)}</span>
                                     </div>
                                     <p className="mt-2 text-xs leading-5 text-gray-400">{thresholdExplanation(t, alert)}</p>
@@ -415,7 +416,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                                     {formatRecordValue(position.name)}
                                                 </TableCell>
                                                 <TableCell className="text-sm text-gray-400">
-                                                    {positionSectorText(t, position)}
+                                                    {positionSectorText(t, position, f.locale)}
                                                 </TableCell>
                                                 <TableCell className="text-right text-sm text-gray-200">
                                                     {positionValueText(t, f, position, baseCurrency)}
@@ -440,7 +441,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                             </div>
                                             <div className="min-w-0">
                                                 <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colSector')}</dt>
-                                                <dd className="break-words text-sm text-gray-400">{positionSectorText(t, position)}</dd>
+                                                <dd className="break-words text-sm text-gray-400">{positionSectorText(t, position, f.locale)}</dd>
                                             </div>
                                             <div className="min-w-0">
                                                 <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colValue')}</dt>

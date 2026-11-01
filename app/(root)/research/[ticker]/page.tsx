@@ -303,7 +303,7 @@ export async function generateMetadata({ params }: Pick<PageProps, 'params'>): P
 
 function label(value: string | null | undefined, locale: Locale = 'es'): string {
   if (value === null || value === undefined || value === '') return NA;
-  if (locale === 'en') return STATUS_LABELS_EN[value] ?? RATING_LABELS_EN[value] ?? etiquetaValor(value);
+  if (locale === 'en') return STATUS_LABELS_EN[value] ?? RATING_LABELS_EN[value] ?? etiquetaValor(value, 'en');
   return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? etiquetaValor(value);
 }
 
@@ -1853,7 +1853,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
   // posicion viva se muestra como candidato de analisis.
   const holdingBadge = snapshot.in_portfolio
     ? t('research.fichaInPortfolio')
-    : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type);
+    : companyTypeLabel(company.company_type === 'portfolio_holding' ? 'research_candidate' : company.company_type, locale);
 
   return (
     <main id="content" tabIndex={-1} className="min-h-screen bg-surface-0 text-gray-100">
@@ -1881,7 +1881,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               (entre logo y 3 botones) quedaban en ~110px y partían en 3-4 líneas. En
               ≥sm se alinean con la columna del ticker (logo 56px + gap 16px). */}
           <div className="-mt-1 sm:pl-[72px]">
-            <p className="text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry)}</p>
+            <p className="text-sm text-gray-400 sm:text-base">{company.name} · {sectorIndustryLine(company.sector, company.industry, locale)}</p>
             <p className="mt-1 inline-flex items-center gap-1 text-xs text-gray-500"><Target className="h-3.5 w-3.5" />{holdingBadge}</p>
           </div>
           <CompanyNavigation ticker={ticker} activeView={activeView} />
