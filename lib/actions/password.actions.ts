@@ -3,6 +3,8 @@
 import { callAuthEndpoint } from '@/lib/auth/endpoint';
 import { isPasswordResetEmailConfigured } from '@/lib/auth/email';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
+import { getLocale } from '@/lib/i18n/server';
+import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 import { toAppError } from '@/lib/types/errors';
 
 export type PasswordActionResult = {
@@ -21,22 +23,32 @@ function siteUrl(): string {
     return raw.replace(/\/$/, '');
 }
 
-const RESET_REQUESTED =
-    'Si ese email tiene cuenta, recibirás un enlace para restablecer la contraseña. Revisa también la carpeta de spam.';
+/**
+ * Mensajes en el idioma de la petición (cookie de Ajustes → Idioma). Fuera de
+ * una petición (tests, scripts) quedan en español.
+ */
+async function requestT(): Promise<TranslateFn> {
+    let locale: 'es' | 'en' = 'es';
+    try {
+        locale = await getLocale();
+    } catch {
+        // Sin contexto de petición: español por defecto.
+    }
+    return createTranslator(locale);
+}
 
 export async function requestPasswordReset(email: string): Promise<PasswordActionResult> {
+    const t = await requestT();
     if (!isPasswordResetEmailConfigured()) {
         return {
             success: false,
             emailConfigured: false,
-            message:
-                'El restablecimiento por correo no está configurado en este despliegue. '
-                + 'Inicia sesión y cambia la contraseña desde Seguridad, o contacta con soporte.',
+            message: t('security.password.resetNotConfigured'),
         };
     }
     const normalized = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-        return { success: false, emailConfigured: true, message: 'Introduce un email válido.' };
+        return { success: false, emailConfigured: true, message: t('security.password.invalidEmail') };
     }
     try {
         await callAuthEndpoint('/request-password-reset', {
@@ -47,7 +59,7 @@ export async function requestPasswordReset(email: string): Promise<PasswordActio
         // No se revela si el email existe ni el detalle del proveedor.
         console.error('Password reset request failed:', toAppError(error).code);
     }
-    return { success: true, emailConfigured: true, message: RESET_REQUESTED };
+    return { success: true, emailConfigured: true, message: t('security.password.resetRequested') };
 }
 
 export async function resetPasswordWithToken(input: {
@@ -55,20 +67,21 @@ export async function resetPasswordWithToken(input: {
     newPassword: string;
     confirmPassword: string;
 }): Promise<PasswordActionResult> {
+    const t = await requestT();
     if (!input.token.trim()) {
         return {
             success: false,
-            message: 'El enlace no es válido o ha caducado. Pide uno nuevo.',
+            message: t('security.password.invalidLink'),
         };
     }
     if (input.newPassword.length < 8 || input.newPassword.length > 128) {
         return {
             success: false,
-            message: 'La contraseña debe tener entre 8 y 128 caracteres.',
+            message: t('security.password.lengthError'),
         };
     }
     if (input.newPassword !== input.confirmPassword) {
-        return { success: false, message: 'Las contraseñas no coinciden.' };
+        return { success: false, message: t('security.password.mismatch') };
     }
     try {
         await callAuthEndpoint('/reset-password', {
@@ -77,13 +90,13 @@ export async function resetPasswordWithToken(input: {
         });
         return {
             success: true,
-            message: 'Contraseña actualizada. Inicia sesión con la nueva contraseña.',
+            message: t('security.password.resetDone'),
         };
     } catch (error: unknown) {
         console.error('Password reset failed:', toAppError(error).code);
         return {
             success: false,
-            message: 'El enlace no es válido o ha caducado. Pide uno nuevo.',
+            message: t('security.password.invalidLink'),
         };
     }
 }
@@ -94,20 +107,21 @@ export async function changePassword(input: {
     confirmPassword: string;
 }): Promise<PasswordActionResult> {
     await requireAuthenticatedUser();
+    const t = await requestT();
     if (!input.currentPassword) {
-        return { success: false, message: 'Introduce tu contraseña actual.' };
+        return { success: false, message: t('security.password.currentRequired') };
     }
     if (input.newPassword.length < 8 || input.newPassword.length > 128) {
         return {
             success: false,
-            message: 'La contraseña nueva debe tener entre 8 y 128 caracteres.',
+            message: t('security.password.newLengthError'),
         };
     }
     if (input.newPassword !== input.confirmPassword) {
-        return { success: false, message: 'Las contraseñas nuevas no coinciden.' };
+        return { success: false, message: t('security.password.newMismatch') };
     }
     if (input.newPassword === input.currentPassword) {
-        return { success: false, message: 'La contraseña nueva debe ser distinta de la actual.' };
+        return { success: false, message: t('security.password.sameAsCurrent') };
     }
     try {
         await callAuthEndpoint('/change-password', {
@@ -118,7 +132,7 @@ export async function changePassword(input: {
         });
         return {
             success: true,
-            message: 'Contraseña cambiada. Las demás sesiones se han cerrado.',
+            message: t('security.password.changed'),
         };
     } catch (error: unknown) {
         const appError = toAppError(error);
@@ -126,10 +140,10 @@ export async function changePassword(input: {
         return {
             success: false,
             message: appError.statusCode === 429
-                ? 'Demasiados intentos. Espera un momento antes de volver a intentarlo.'
+                ? t('security.password.tooManyAttempts')
                 : appError.statusCode === 400 || appError.statusCode === 401
-                    ? 'No se pudo cambiar la contraseña. Revisa que la actual sea correcta.'
-                    : 'No se pudo cambiar la contraseña. Inténtalo de nuevo.',
+                    ? t('security.password.checkCurrent')
+                    : t('security.password.changeFailed'),
         };
     }
 }

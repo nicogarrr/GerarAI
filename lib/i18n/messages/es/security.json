@@ -74,5 +74,31 @@
     "noSmtp": "El restablecimiento por correo no está configurado en este despliegue (falta SMTP). Usa el cambio autenticado de arriba o contacta con soporte.",
     "dataTitle": "Datos y cuenta",
     "dataDescription": "Exporta una copia o elimina la cuenta y todos sus datos."
+  },
+  "password": {
+    "currentLabel": "Contraseña actual",
+    "newLabel": "Contraseña nueva",
+    "lengthHint": "Entre 8 y 128 caracteres.",
+    "confirmLabel": "Repite la contraseña nueva",
+    "submit": "Cambiar contraseña",
+    "submitting": "Cambiando…",
+    "errorTitle": "No se cambió la contraseña",
+    "successTitle": "Contraseña cambiada",
+    "sessionUnavailable": "La sesión no está disponible. Vuelve a iniciar sesión.",
+    "resetRequested": "Si ese email tiene cuenta, recibirás un enlace para restablecer la contraseña. Revisa también la carpeta de spam.",
+    "resetNotConfigured": "El restablecimiento por correo no está configurado en este despliegue. Inicia sesión y cambia la contraseña desde Seguridad, o contacta con soporte.",
+    "invalidEmail": "Introduce un email válido.",
+    "invalidLink": "El enlace no es válido o ha caducado. Pide uno nuevo.",
+    "lengthError": "La contraseña debe tener entre 8 y 128 caracteres.",
+    "mismatch": "Las contraseñas no coinciden.",
+    "resetDone": "Contraseña actualizada. Inicia sesión con la nueva contraseña.",
+    "currentRequired": "Introduce tu contraseña actual.",
+    "newLengthError": "La contraseña nueva debe tener entre 8 y 128 caracteres.",
+    "newMismatch": "Las contraseñas nuevas no coinciden.",
+    "sameAsCurrent": "La contraseña nueva debe ser distinta de la actual.",
+    "changed": "Contraseña cambiada. Las demás sesiones se han cerrado.",
+    "tooManyAttempts": "Demasiados intentos. Espera un momento antes de volver a intentarlo.",
+    "checkCurrent": "No se pudo cambiar la contraseña. Revisa que la actual sea correcta.",
+    "changeFailed": "No se pudo cambiar la contraseña. Inténtalo de nuevo."
   }
 }

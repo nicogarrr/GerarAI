@@ -76,7 +76,6 @@
   "components/research/ThesisScenariosPanel.tsx": 6,
   "components/research/ThesisSummary.tsx": 5,
   "components/research/TtmPanel.tsx": 2,
-  "components/security/ChangePassword.tsx": 8,
   "lib/access-request.ts": 8,
   "lib/alerts/delivery-labels.ts": 4,
   "lib/audit-status-copy.ts": 11,

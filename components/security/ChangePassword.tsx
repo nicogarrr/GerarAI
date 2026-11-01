@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { changePassword } from '@/lib/actions/password.actions';
+import { useT } from '@/lib/i18n/client';
 
 export default function ChangePassword() {
+    const t = useT();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -24,16 +26,16 @@ export default function ChangePassword() {
                 confirmPassword,
             });
             if (!result.success) {
-                toast.error('No se cambió la contraseña', { description: result.message });
+                toast.error(t('security.password.errorTitle'), { description: result.message });
                 return;
             }
             setCurrentPassword('');
             setNewPassword('');
             setConfirmPassword('');
-            toast.success('Contraseña cambiada', { description: result.message });
+            toast.success(t('security.password.successTitle'), { description: result.message });
         } catch {
-            toast.error('No se cambió la contraseña', {
-                description: 'La sesión no está disponible. Vuelve a iniciar sesión.',
+            toast.error(t('security.password.errorTitle'), {
+                description: t('security.password.sessionUnavailable'),
             });
         } finally {
             setBusy(false);
@@ -43,7 +45,7 @@ export default function ChangePassword() {
     return (
         <form className="space-y-4" onSubmit={onSubmit}>
             <div>
-                <Label htmlFor="current-password">Contraseña actual</Label>
+                <Label htmlFor="current-password">{t('security.password.currentLabel')}</Label>
                 <Input
                     autoComplete="current-password"
                     className="mt-2 min-h-11"
@@ -55,7 +57,7 @@ export default function ChangePassword() {
                 />
             </div>
             <div>
-                <Label htmlFor="new-password">Contraseña nueva</Label>
+                <Label htmlFor="new-password">{t('security.password.newLabel')}</Label>
                 <Input
                     autoComplete="new-password"
                     className="mt-2 min-h-11"
@@ -66,10 +68,10 @@ export default function ChangePassword() {
                     type="password"
                     value={newPassword}
                 />
-                <p className="mt-1 text-xs text-gray-500">Entre 8 y 128 caracteres.</p>
+                <p className="mt-1 text-xs text-gray-500">{t('security.password.lengthHint')}</p>
             </div>
             <div>
-                <Label htmlFor="confirm-password">Repite la contraseña nueva</Label>
+                <Label htmlFor="confirm-password">{t('security.password.confirmLabel')}</Label>
                 <Input
                     autoComplete="new-password"
                     className="mt-2 min-h-11"
@@ -82,7 +84,7 @@ export default function ChangePassword() {
                 />
             </div>
             <Button disabled={busy} type="submit">
-                {busy ? 'Cambiando…' : 'Cambiar contraseña'}
+                {busy ? t('security.password.submitting') : t('security.password.submit')}
             </Button>
         </form>
     );
