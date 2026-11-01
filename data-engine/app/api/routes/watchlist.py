@@ -198,6 +198,7 @@ async def watchlist_monitor(
     from decimal import Decimal
 
     from app.services.price_units import close_in_company_currency
+    from app.valuation.currency import normalize_currency
 
     items: dict[str, dict] = {}
     for company in companies:
@@ -217,6 +218,9 @@ async def watchlist_monitor(
                 company=company, on=last_close.date,
             )
             if comparable is not None:
+                # Ficha en subunidad («GBX»): el cierre queda en peniques y el
+                # valor justo va en libras (precio del modelo en divisa principal).
+                comparable = comparable / Decimal(normalize_currency(company.currency)[1])
                 side = "infravalorada" if float(comparable) < fair_value else "sobrevalorada"
         items[ticker] = {
             "low_52w": float(low_row.close) if low_row is not None else None,
