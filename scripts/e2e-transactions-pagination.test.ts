@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: node strip-types requires the extension.
 import { readTransactions } from '../e2e/user-flows/transactions.ts';
 
@@ -21,4 +22,11 @@ test('empty page is valid only when total is zero', async () => {
 test('auth failures and obsolete array contracts fail closed, not as an empty portfolio', async () => {
   await assert.rejects(readTransactions(async () => ({ status: 403, json: { detail: 'denied' } })), /403/);
   await assert.rejects(readTransactions(async () => ({ status: 200, json: [] })), /Invalid/);
+});
+
+test('E2E auth signs pathname without query, matching the strict backend bridge', () => {
+  const source = readFileSync('e2e/user-flows/support.ts', 'utf8');
+  assert.match(source, /signedPath = new URL\(path, backendURL\)\.pathname/);
+  assert.match(source, /\$\{method\}:\$\{signedPath\}:\$\{bodyHash\}/);
+  assert.match(source, /"X-CavaAI-Path": signedPath/);
 });
