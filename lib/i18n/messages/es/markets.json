@@ -1,1 +1,27 @@
-{}
+{
+  "live": {
+    "tabs": {
+      "indice": "Índices",
+      "futuro": "Futuros",
+      "accion": "Acciones ES",
+      "materia": "Materias primas",
+      "divisa": "Divisas"
+    },
+    "notes": {
+      "indice": "Nivel del índice en puntos.",
+      "futuro": "Futuros sobre índices USA, en puntos.",
+      "accion": "Selección de valores del IBEX 35. No es un ranking por volumen: sin una fuente gratuita de «más negociadas» no sostenemos esa etiqueta.",
+      "materia": "Futuros de referencia en dólares.",
+      "divisa": "Tipo de cambio entre divisas."
+    },
+    "premarket": "premercado",
+    "postmarket": "postmercado",
+    "noTime": "sin hora",
+    "updatedAt": "Actualizado a las {time} (hora de Madrid)",
+    "noData": "Sin datos todavía",
+    "lastFailed": " · la última actualización falló; se reintenta cada minuto",
+    "refresh": "Actualizar ahora",
+    "groupEmpty": "No hay datos disponibles ahora. Se reintenta cada minuto.",
+    "footer": "Cada fila muestra la hora que informa el proveedor y su antigüedad al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de mercado ni sirven para operar con garantías."
+  }
+}

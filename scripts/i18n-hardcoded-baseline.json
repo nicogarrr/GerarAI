@@ -54,7 +54,6 @@
   "components/knowledge/DeleteDocumentButton.tsx": 5,
   "components/knowledge/LibrarySearchForm.tsx": 5,
   "components/market/MarketRegime.tsx": 19,
-  "components/markets/LiveMarketsPanel.tsx": 13,
   "components/paper-trading/ManualDemoPanel.tsx": 1,
   "components/paper-trading/submit.ts": 1,
   "components/PersonalizedOverview.tsx": 2,
