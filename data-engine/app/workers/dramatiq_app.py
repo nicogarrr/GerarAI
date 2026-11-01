@@ -2162,7 +2162,19 @@ def ingest_corporate_splits(
     try:
         tickers, next_cursor = split_sync_tickers(db, scope, cursor, chunk=SPLIT_SYNC_UNIVERSE_CHUNK)
         service = SplitIngestionService()
-        results = [run_from_any_context(service.sync_company(db, ticker=ticker)) for ticker in tickers]
+        results, failed = [], []
+        for ticker in tickers:
+            try:
+                results.append(run_from_any_context(service.sync_company(db, ticker=ticker)))
+            except Exception as exc:
+                # Un ticker que revienta al guardar ya no corta el resto del
+                # chunk (ni el auto-encolado del siguiente); lo transitorio
+                # (BD o red caidas) relanza para que Dramatiq reintente.
+                if _is_transient(exc):
+                    raise
+                _rollback(db)
+                failed.append(ticker)
+                logger.warning("ingest_corporate_splits: %s fallo: %s", ticker, type(exc).__name__)
         if next_cursor is not None:
             ingest_corporate_splits.send(tenant_id, user_id, scope=scope, cursor=next_cursor)
         return {
@@ -2175,6 +2187,7 @@ def ingest_corporate_splits(
             "synced": sum(1 for r in results if r["status"] == "ok"),
             "unavailable": sum(1 for r in results if r["status"] == "unavailable"),
             "unknown": sum(1 for r in results if r["status"] == "unknown_company"),
+            "failed": failed,
             "inserted": sum(r.get("inserted", 0) for r in results),
             "existing": sum(r.get("existing", 0) for r in results),
         }

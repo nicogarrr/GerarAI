@@ -279,6 +279,26 @@ class DividendIngestionService(ProviderIngestionService):
 
         El rendimiento de cartera (portfolio_yields) sigue contando solo posiciones.
         """
+        results = await self.sync_each(db, self._portfolio_tickers(db))
+        ok = sum(1 for r in results if r["status"] == "ok")
+        failed = sum(1 for r in results if r["status"] == "failed")
+        unavailable = sum(1 for r in results if r["status"] == "unavailable") + failed
+        unknown = sum(1 for r in results if r["status"] == "currency_unknown" or r.get("currency_unknown_rows"))
+        unavailable += unknown  # desconocido/no actualizado: cobertura parcial, nunca OK
+        summary: dict[str, Any] = {
+            "companies": len(results), "synced": ok, "unavailable": unavailable,
+            "currency_unknown": unknown, "results": results,
+            "provenance": provenance(
+                self._PROVENANCE_SOURCE, SourceKind.UNOFFICIAL,
+                coverage=(Coverage.OK if unavailable == 0 else Coverage.PARTIAL if ok else Coverage.UNAVAILABLE),
+                note=self._PROVENANCE_NOTE,
+            ),
+        }
+        if failed:  # solo si hubo fallos: el contrato de siempre no cambia
+            summary["failed"] = failed
+        return summary
+
+    def _portfolio_tickers(self, db: Session) -> list[str]:
         held = set(
             db.scalars(
                 select(Position.company_id)
@@ -295,21 +315,7 @@ class DividendIngestionService(ProviderIngestionService):
         }
         watched = set(db.scalars(select(Company.id).where(Company.ticker.in_(symbols))).all()) if symbols else set()
         ids = held | watched
-        tickers = sorted(db.scalars(select(Company.ticker).where(Company.id.in_(ids))).all()) if ids else []
-        results = [await self.sync_company(db, ticker=t) for t in tickers]
-        ok = sum(1 for r in results if r["status"] == "ok")
-        unavailable = sum(1 for r in results if r["status"] == "unavailable")
-        unknown = sum(1 for r in results if r["status"] == "currency_unknown" or r.get("currency_unknown_rows"))
-        unavailable += unknown  # desconocido/no actualizado: cobertura parcial, nunca OK
-        return {
-            "companies": len(results), "synced": ok, "unavailable": unavailable,
-            "currency_unknown": unknown, "results": results,
-            "provenance": provenance(
-                self._PROVENANCE_SOURCE, SourceKind.UNOFFICIAL,
-                coverage=(Coverage.OK if unavailable == 0 else Coverage.PARTIAL if ok else Coverage.UNAVAILABLE),
-                note=self._PROVENANCE_NOTE,
-            ),
-        }
+        return sorted(db.scalars(select(Company.ticker).where(Company.id.in_(ids))).all()) if ids else []
 
     def portfolio_yields(self, db: Session) -> dict[str, Any]:
         """Trailing-12-month dividend yield per held position + portfolio aggregate.

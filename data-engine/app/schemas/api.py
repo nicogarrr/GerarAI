@@ -1872,7 +1872,7 @@ class PortfolioImportCommitOut(BaseModel):
 
 class DividendSyncResultOut(BaseModel):
     ticker: str
-    status: Literal["ok", "unavailable", "unknown_company", "no_safe_symbol", "currency_unknown"]
+    status: Literal["ok", "unavailable", "unknown_company", "no_safe_symbol", "currency_unknown", "failed"]
     inserted: int
     existing: int
     error: str | None = None
@@ -1889,6 +1889,8 @@ class PortfolioDividendSyncOut(BaseModel):
     synced: int
     unavailable: int
     currency_unknown: int
+    # Tickers que fallaron al guardar (deshechos; el resto se sincronizo).
+    failed: int = 0
     results: list[DividendSyncResultOut]
     provenance: ProvenanceOut
 # --- POST /api/portfolio/import/ibkr/csv -------------------------------------
