@@ -66,3 +66,10 @@ def test_london_close_in_pence_below_fair_value_is_undervalued(monkeypatch):
 def test_london_close_in_pence_above_fair_value_is_overvalued(monkeypatch):
     _seed("PNCX.L", 3200.0, "GBp", "GBP", 30.0)
     assert _side(monkeypatch, "PNCX.L") == "sobrevalorada"
+
+
+def test_ficha_en_gbx_compara_en_libras(monkeypatch):
+    # Ficha creada solo con el ticker: divisa «GBX» (sufijo .L). El cierre en
+    # peniques quedaba en peniques (misma unidad que la ficha) frente a 30 £.
+    _seed("PNCZ.L", 2650.0, "GBp", "GBX", 30.0)
+    assert _side(monkeypatch, "PNCZ.L") == "infravalorada"
