@@ -38,9 +38,14 @@ def default_experts() -> list[ExpertSpec]:
         ),
         ExpertSpec(
             name="news",
+            broad=True,
             prompt_name="expert_news",
             tools=("news_events",),
-            keywords=("noticia", "prensa", "titular", "sentimiento", "news", "headline", "sentiment"),
+            # Además de «noticia», lo reciente: caídas/subidas, anuncios, «últimamente».
+            keywords=("noticia", "prensa", "titular", "sentimiento", "news", "headline", "sentiment",
+                      "ha pasado", "ultim", "recient", "esta semana", "anunci", "caido", "cayo", "desplom",
+                      "hunde", "se dispara", "subido", "bajado", "what happened", "recent", "lately",
+                      "this week", "announc", "dropp", "plung", "soar", "surg", "rall"),
         ),
         ExpertSpec(
             name="tax",
