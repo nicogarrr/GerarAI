@@ -13,6 +13,11 @@ name: a11y-perf (axe + Lighthouse)
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: "Ref a medir (rama, tag o SHA; vacío = la rama del disparo). Para A/B: dos disparos manuales, uno por ref."
+        required: false
+        default: ""
   schedule:
     - cron: "40 3 * * *"
 
@@ -20,7 +25,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: a11y-perf-${{ github.ref }}
+  # El input ref entra en el grupo: un A/B manual (base y rama) no se cancela
+  # entre sí; el nocturno (sin input) mantiene su grupo original.
+  group: a11y-perf-${{ github.ref }}-${{ inputs.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -46,7 +53,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ inputs.ref || '' }}
           fetch-depth: 1
+      - name: Slug del ref para artefactos
+        env:
+          MEASURE_REF: ${{ inputs.ref }}
+        run: |
+          REF_SLUG=$(printf '%s' "$MEASURE_REF" | tr -cs 'A-Za-z0-9._-' '-')
+          printf 'REF_SLUG=%s\n' "$REF_SLUG" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
@@ -80,7 +94,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: a11y-axe-playwright
+          name: a11y-axe-playwright${{ env.REF_SLUG && format('-{0}', env.REF_SLUG) || '' }}
           path: |
             playwright-report/
             test-results/
@@ -117,7 +131,14 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ inputs.ref || '' }}
           fetch-depth: 1
+      - name: Slug del ref para artefactos
+        env:
+          MEASURE_REF: ${{ inputs.ref }}
+        run: |
+          REF_SLUG=$(printf '%s' "$MEASURE_REF" | tr -cs 'A-Za-z0-9._-' '-')
+          printf 'REF_SLUG=%s\n' "$REF_SLUG" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
@@ -154,10 +175,13 @@ jobs:
       - name: Lighthouse CI
         run: npx --yes @lhci/cli@0.15.1 autorun --config=scripts/lhci/lighthouserc.js
       - name: Informes de Lighthouse y logs
+        # Incluye los LHR JSON por corrida (.lighthouseci/reports/*.json) para
+        # comparar antes/después con el mismo método: dos disparos manuales con
+        # inputs.ref = base y rama, y diff de largest-contentful-paint.
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: a11y-lighthouse
+          name: a11y-lighthouse${{ env.REF_SLUG && format('-{0}', env.REF_SLUG) || '' }}
           path: |
             .lighthouseci/
             backend.log
