@@ -23,6 +23,7 @@ from app.core.tenancy import tenant_filters
 from app.models import Company, CorporateAction, DividendRecord, Position, WatchItem
 from app.services.company_resolver import resolve_company
 from app.services.dividend_records import records_in_position_currency, resolve_yahoo_events
+from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
 
@@ -361,6 +362,10 @@ class DividendIngestionService(ProviderIngestionService):
                 .order_by(DividendRecord.company_id, DividendRecord.ex_date, DividendRecord.id)
             ).all():
                 records_by_company.setdefault(record.company_id, []).append(record)
+        # A3: sin cotización real el «precio» de la posición es el de tu última
+        # operación; dividir entre él da la rentabilidad sobre lo que pagaste,
+        # no la de mercado. Sin precio no hay yield (el dividendo sí se enseña).
+        quote_missing = trade_price_fallbacks(db, [position for position, _company in rows])
         positions = []
         with_data = 0
         weighted_yield = 0.0
@@ -375,7 +380,7 @@ class DividendIngestionService(ProviderIngestionService):
         for position, company in rows:
             records, uncertain = resolve_yahoo_events(records_by_company.get(company.id, []))
             # nosemgrep: gerarai-money-none-to-zero -- columna NOT NULL (default 0): el `or 0` no convierte ningun None real
-            price = float(position.market_price or 0)
+            price = 0.0 if company.id in quote_missing else float(position.market_price or 0)
             # Peso solo en divisa base: `market_value` esta en la divisa nativa
             # y sumarlo mezclaria monedas distintas en el mismo total.
             if position.market_value_base is None:
