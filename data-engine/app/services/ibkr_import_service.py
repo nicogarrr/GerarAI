@@ -67,6 +67,62 @@ def _exceeds(value: str, ceiling: Decimal) -> bool:
     return parsed is not None and abs(parsed[0]) > ceiling
 
 
+_SCIENTIFIC = re.compile(r"^[+-]?\d+(?:[.,]\d+)?[eE][+-]?\d+$")
+
+
+def _nan_reason(value: str | None) -> str:
+    """Por qué un valor no se lee como número, en palabras del usuario.
+
+    «1E+23» es como Excel guarda las cifras muy largas: decir «no es un
+    número» despistaba (el valor sí es un número, solo que escrito así).
+    """
+    if value is not None and _SCIENTIFIC.match(str(value).strip()):
+        return "está en notación científica (Excel la usa con cifras muy largas): escribe la cifra completa"
+    return "no es un número"
+
+
+def _flex_amount_errors(where: str, checks: tuple[tuple[str, str | None, Decimal], ...]) -> list[str]:
+    """Importes del Flex que son número pero no caben en su columna.
+
+    Mismos topes que POST /transactions (#2606) y el CSV (#4044): un valor
+    así hacía fallar el INSERT en Postgres (500) y se perdía el fichero entero.
+    """
+    return [
+        f"{where}: {word} '{raw}' es demasiado grande. Esa fila se omite; revísala a mano."
+        for word, raw, ceiling in checks
+        if raw is not None and _is_number(raw) and _exceeds(raw, ceiling)
+    ]
+
+
+def _flex_trade_amount_errors(where: str, element: ElementTree.Element) -> list[str]:
+    errors = _flex_amount_errors(
+        where,
+        (
+            ("la cantidad", _attr(element, "quantity", "shares"), _MAX_NUMERIC_20_6),
+            ("el precio", _attr(element, "tradePrice", "price"), _MAX_NUMERIC_20_6),
+        ),
+    )
+    raw_fee = _attr(element, "ibCommission", "commission", "fees")
+    if raw_fee not in (None, "") and (not _is_number(raw_fee) or _exceeds(raw_fee, _MAX_NUMERIC_20_2)):
+        # Antes _decimal lanzaba y se rechazaba el fichero completo.
+        errors.append(
+            f"{where}: la comisión '{raw_fee}' no es un importe válido. Esa operación se omite; revísala a mano."
+        )
+    return errors
+
+
+def _flex_position_amount_errors(where: str, element: ElementTree.Element) -> list[str]:
+    return _flex_amount_errors(
+        where,
+        (
+            ("la cantidad", _attr(element, "position", "quantity"), _MAX_NUMERIC_20_6),
+            ("el precio", _attr(element, "markPrice", "marketPrice", "price"), _MAX_NUMERIC_20_6),
+            ("el valor", _attr(element, "positionValue", "marketValue"), _MAX_NUMERIC_20_2),
+            ("el coste", _attr(element, "costBasisPrice", "costPrice", "avgPrice"), _MAX_NUMERIC_20_6),
+        ),
+    )
+
+
 def _is_negative_number(value: str | None) -> bool:
     """Un precio de operación negativo no cabe en la cartera (la BD lo rechaza)."""
     if value in (None, ""):
@@ -205,7 +261,7 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                 if raw is not None and not _is_number(raw):
                     errors.append(
                         f"Fila {index} (OpenPosition {symbol or '?'}): la cantidad '{raw}' "
-                        f"(atributo {attr}) no es un número. Corrige el valor o excluye la fila."
+                        f"(atributo {attr}) {_nan_reason(raw)}. Corrige el valor o excluye la fila."
                     )
                     break
             for attr in ("markPrice", "marketPrice", "price", "positionValue", "marketValue",
@@ -214,9 +270,11 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                 if raw is not None and not _is_number(raw):
                     errors.append(
                         f"Fila {index} (OpenPosition {symbol or '?'}): el precio/valor '{raw}' "
-                        f"(atributo {attr}) no es un número. Corrige el valor o excluye la fila."
+                        f"(atributo {attr}) {_nan_reason(raw)}. Corrige el valor o excluye la fila."
                     )
                     break
+            if symbol and not missing_fields:
+                errors.extend(_flex_position_amount_errors(f"Fila {index} (OpenPosition {symbol})", element))
         elif tag == "Trade":
             symbol = _attr(element, "symbol", "underlyingSymbol")
             if not symbol:
@@ -227,13 +285,13 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
             raw_qty = _attr(element, "quantity", "shares")
             if raw_qty is not None and not _is_number(raw_qty):
                 errors.append(
-                    f"Fila {index} (Trade {symbol or '?'}): la cantidad '{raw_qty}' no es un número. "
+                    f"Fila {index} (Trade {symbol or '?'}): la cantidad '{raw_qty}' {_nan_reason(raw_qty)}. "
                     "Corrige el valor o excluye la fila."
                 )
             raw_price = _attr(element, "tradePrice", "price")
             if raw_price is not None and not _is_number(raw_price):
                 errors.append(
-                    f"Fila {index} (Trade {symbol or '?'}): el precio '{raw_price}' no es un número. "
+                    f"Fila {index} (Trade {symbol or '?'}): el precio '{raw_price}' {_nan_reason(raw_price)}. "
                     "Corrige el valor o excluye la fila."
                 )
             elif _is_negative_number(raw_price):
@@ -241,6 +299,7 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
                     f"Fila {index} (Trade {symbol or '?'}): el precio '{raw_price}' es negativo. "
                     "Esa operación se omite; revísala a mano."
                 )
+            errors.extend(_flex_trade_amount_errors(f"Fila {index} (Trade {symbol or '?'})", element))
             raw_date = _attr(element, "tradeDate", "dateTime", "date")
             if raw_date is not None and not _is_date(raw_date):
                 errors.append(
@@ -251,9 +310,12 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
             raw_amount = _attr(element, "amount", "netCash", "proceeds")
             if raw_amount is not None and not _is_number(raw_amount):
                 errors.append(
-                    f"Fila {index} (CashTransaction): el importe '{raw_amount}' no es un número. "
+                    f"Fila {index} (CashTransaction): el importe '{raw_amount}' {_nan_reason(raw_amount)}. "
                     "Corrige el valor o excluye la fila."
                 )
+            errors.extend(
+                _flex_amount_errors(f"Fila {index} (CashTransaction)", (("el importe", raw_amount, _MAX_NUMERIC_20_6),))
+            )
             raw_date = _attr(element, "dateTime", "date", "tradeDate")
             if raw_date is not None and not _is_date(raw_date):
                 errors.append(
@@ -271,9 +333,10 @@ def _validate_flex_xml(xml_text: str) -> list[str]:
             raw_cash = _attr(element, "endingCash", "cash", "balance")
             if raw_cash is not None and not _is_number(raw_cash):
                 errors.append(
-                    f"Fila {index} (CashReport): el saldo '{raw_cash}' no es un número. "
+                    f"Fila {index} (CashReport): el saldo '{raw_cash}' {_nan_reason(raw_cash)}. "
                     "Corrige el valor o excluye la fila."
                 )
+            errors.extend(_flex_amount_errors(f"Fila {index} (CashReport)", (("el saldo", raw_cash, _MAX_NUMERIC_20_2),)))
     return errors
 
 
@@ -483,13 +546,13 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
         quantity = row[mapping["quantity"]].strip() if mapping["quantity"] < len(row) else ""
         if not _is_number(quantity):
             errors.append(
-                f"Fila {line_number} del CSV ({symbol}): la cantidad '{quantity}' no es un número. "
+                f"Fila {line_number} del CSV ({symbol}): la cantidad '{quantity}' {_nan_reason(quantity)}. "
                 "Corrige el valor o elimina la fila."
             )
         price = row[mapping["price"]].strip() if mapping["price"] < len(row) else ""
         if not _is_number(price):
             errors.append(
-                f"Fila {line_number} del CSV ({symbol}): el precio '{price}' no es un número. "
+                f"Fila {line_number} del CSV ({symbol}): el precio '{price}' {_nan_reason(price)}. "
                 "Corrige el valor o elimina la fila."
             )
         # Topes de Transaction (los de POST /transactions, #2606): un importe
@@ -1496,7 +1559,7 @@ class IBKRImportService:
                 if any(
                     raw is not None and not _is_number(raw)
                     for raw in (raw_quantity, raw_price, raw_value, raw_cost)
-                ):
+                ) or _flex_position_amount_errors("", element):
                     rows_skipped += 1
                     position_rows_skipped += 1
                     continue
@@ -1616,7 +1679,11 @@ class IBKRImportService:
                     cash_rows_skipped += 1
                     continue
                 raw_cash = _attr(element, "endingCash", "cash", "balance")
-                if raw_cash is None or not _is_number(raw_cash):
+                if (
+                    raw_cash is None
+                    or not _is_number(raw_cash)
+                    or _exceeds(raw_cash, _MAX_NUMERIC_20_2)
+                ):
                     # A missing amount is not zero: it would overwrite a real
                     # CashBalance with 0 (same rule as OpenPosition, F377).
                     rows_skipped += 1
@@ -1656,6 +1723,7 @@ class IBKRImportService:
                     (raw_qty is not None and not _is_number(raw_qty))
                     or (raw_price is not None and not _is_number(raw_price))
                     or _is_negative_number(raw_price)
+                    or _flex_trade_amount_errors("", element)
                     # A missing or invalid date is never replaced with today:
                     # the row is skipped (a fabricated trade_date would poison
                     # the FIFO tax ledger).
@@ -1753,6 +1821,7 @@ class IBKRImportService:
                 raw_date = _attr(element, "dateTime", "date", "tradeDate")
                 if (
                     (raw_amount is not None and not _is_number(raw_amount))
+                    or (raw_amount is not None and _exceeds(raw_amount, _MAX_NUMERIC_20_6))
                     or raw_date is None
                     or not _is_date(raw_date)
                 ):
