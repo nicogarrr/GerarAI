@@ -19,12 +19,12 @@ def _redis():
 
 
 @lru_cache(maxsize=4)
-def _client_for_url(url):
+def _client_for_url(redis_url):
     from redis import Redis
 
     from app.core.redis_retry import no_retry
 
-    return Redis.from_url(url, socket_connect_timeout=0.5, socket_timeout=1.0, retry=no_retry())
+    return Redis.from_url(redis_url, socket_connect_timeout=0.5, socket_timeout=1.0, retry=no_retry())
 
 
 class SecQuotaDeferred(RuntimeError):
