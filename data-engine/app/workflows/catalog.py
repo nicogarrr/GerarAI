@@ -147,6 +147,25 @@ WORKFLOW_CATALOG = [
         ],
         "pipeline_owner": "RedTeamService.run (in-process, deterministic)",
     },
+    {
+        "name": "ExpertTeamThesisWorkflow",
+        "implementation_status": "implemented",
+        "api_executable": True,
+        "feature_flag": "EXPERT_TEAM_ENABLED",
+        "truth": "Only with EXPERT_TEAM_ENABLED=true (default off: the entry is not listed and /run answers 404 without running or recording anything). POST /run plans the expert team for the ticker (fundamental, valuation, risk, news; tax only if the caller holds the position) and runs it: each expert reads ONLY its whitelisted read-only tools filtered by the caller's tenant, makes one LLM call with its versioned prompt (expert_*), and every claim must cite evidence returned in that run with its numbers inside the cited data, or it is dropped. Stance conflicts go to the debate judge prompt. The result (sections, sources, conflicts, verdict) is returned and stored in the workflow run; it does NOT write a ThesisVersion and does not replace GenerateThesisWorkflow.",
+        "execution_mode": "expert_team",
+        "input": "ticker",
+        "steps": ["plan_experts", "run_expert_team"],
+        "pipeline_steps": [
+            "gather_read_only_evidence",
+            "expert_llm_call",
+            "validate_citations",
+            "merge_sources",
+            "detect_conflicts",
+            "judge_stance_conflict",
+        ],
+        "pipeline_owner": "ExpertTeam.run (app/services/expert_team, in-process)",
+    },
 ]
 
 # Concepts that were advertised here without an execution route. They are not
@@ -192,3 +211,18 @@ def find_workflow(name: str) -> dict | None:
 
 def find_retired(name: str) -> dict | None:
     return next((w for w in RETIRED_WORKFLOWS if w["name"] == name), None)
+
+
+def flag_enabled(workflow: dict) -> bool:
+    """Una entrada con ``feature_flag`` solo existe hacia fuera con su flag encendido."""
+    flag = workflow.get("feature_flag")
+    if not flag:
+        return True
+    from app.core.config import get_settings
+
+    return bool(getattr(get_settings(), str(flag).lower(), False))
+
+
+def visible_catalog() -> list[dict]:
+    """El catálogo que ve GET /api/workflows: sin las entradas con flag apagado."""
+    return [workflow for workflow in WORKFLOW_CATALOG if flag_enabled(workflow)]

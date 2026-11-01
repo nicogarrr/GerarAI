@@ -15,7 +15,8 @@ ReportStatus = Literal["ok", "no_data", "timeout", "error"]
 class RunContext:
     """Quién pregunta y sobre qué. Lo fija el servidor, nunca el modelo."""
 
-    tenant_id: int | str
+    #: None solo en modo legado sin auth (como tenant_filters): filas sin tenant.
+    tenant_id: int | str | None
     user_id: str | None = None
     ticker: str | None = None
     question: str | None = None

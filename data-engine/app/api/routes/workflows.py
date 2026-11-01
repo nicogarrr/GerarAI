@@ -13,9 +13,10 @@ from app.services.async_bridge import run_from_any_context
 from app.services.workflow_run_service import WorkflowEnvelope, begin_run
 from app.workflows.catalog import (
     RETIRED_WORKFLOWS,
-    WORKFLOW_CATALOG,
     find_retired,
     find_workflow,
+    flag_enabled,
+    visible_catalog,
 )
 
 router = APIRouter()
@@ -72,10 +73,16 @@ def workflows() -> dict:
     # en los propios campos (implementation_status + api_executable) y en
     # `retired_workflows`, que es la parte aditiva: los nombres retirados ya no
     # se ejecutan aqui y la API lo dice en vez de devolver un 200 vacío.
-    return {"workflows": WORKFLOW_CATALOG, "retired_workflows": RETIRED_WORKFLOWS}
+    return {"workflows": visible_catalog(), "retired_workflows": RETIRED_WORKFLOWS}
 
 
 def _unknown_workflow(name: str) -> HTTPException:
+    gated = find_workflow(name)
+    if gated is not None and not flag_enabled(gated):
+        return HTTPException(
+            status_code=404,
+            detail=f"Workflow '{name}' is off: it only exists with {gated['feature_flag']}=true.",
+        )
     retired = find_retired(name)
     if retired is not None:
         return HTTPException(
@@ -91,7 +98,7 @@ def _unknown_workflow(name: str) -> HTTPException:
 @router.get("/{name}")
 def get_workflow(name: str) -> dict:
     workflow = find_workflow(name)
-    if not workflow:
+    if not workflow or not flag_enabled(workflow):
         raise _unknown_workflow(name)
     return workflow
 
@@ -138,7 +145,7 @@ def run_workflow(
     idempotency_key: str | None = Header(default=None),
 ) -> dict:
     workflow = find_workflow(name)
-    if not workflow:
+    if not workflow or not flag_enabled(workflow):
         raise _unknown_workflow(name)
     if not workflow.get("api_executable"):
         # Honest and actionable: the entry exists but nothing consumes the
@@ -472,6 +479,32 @@ def run_workflow(
             "steps": workflow["steps"],
             "estimated_minutes": 0,
             "result": result,
+        }
+
+    if name == "ExpertTeamThesisWorkflow":
+        ticker = _require_ticker(payload, name)
+        if db.scalar(select(Company).where(Company.ticker == ticker)) is None:
+            raise HTTPException(status_code=404, detail=f"Company {ticker} not found")
+        envelope = open_envelope({"ticker": ticker, "params": payload.params})
+        if envelope.replayed:
+            return _replay_response(envelope, workflow, ticker)
+        from app.services.expert_team.service import build_team, run_context
+
+        team = build_team(db)
+        ctx = run_context(db, ticker=ticker, mode="thesis")
+        plan = envelope.record_step(1, "plan_experts", lambda: {"plan": team.plan(ctx)})
+        result = envelope.record_step(2, "run_expert_team", lambda: run_from_any_context(team.run(ctx)).to_dict())
+        envelope.finish({"status": "completed", "result": result})
+        return {
+            "status": "completed",
+            "workflow": name,
+            "execution_mode": workflow["execution_mode"],
+            "ticker": ticker,
+            "run_id": envelope.run.id,
+            "plan": plan["plan"],
+            "result": result,
+            "steps": workflow["steps"],
+            "estimated_minutes": 0,
         }
 
     # Every catalog entry has a branch above. If one is ever added without it,

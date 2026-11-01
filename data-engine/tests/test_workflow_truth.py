@@ -61,7 +61,8 @@ def test_every_retired_workflow_documents_reason_and_replacement():
 def test_catalog_endpoint_lists_only_executable_workflows():
     body = client.get("/api/workflows").json()
     names = {w["name"] for w in body["workflows"]}
-    assert names == {w["name"] for w in WORKFLOW_CATALOG}
+    # Las entradas detrás de un flag apagado (p. ej. EXPERT_TEAM_ENABLED) no se listan.
+    assert names == {w["name"] for w in WORKFLOW_CATALOG if not w.get("feature_flag")}
     assert not names & RETIRED_WORKFLOW_NAMES
     for workflow in body["workflows"]:
         assert workflow["implementation_status"] == "implemented"
@@ -126,9 +127,6 @@ def test_catalog_entry_without_api_execution_route_501s(monkeypatch):
         "steps": ["do_nothing"],
     }
     monkeypatch.setattr(catalog, "WORKFLOW_CATALOG", [*catalog.WORKFLOW_CATALOG, ghost])
-    monkeypatch.setattr(
-        "app.api.routes.workflows.WORKFLOW_CATALOG", catalog.WORKFLOW_CATALOG
-    )
 
     listed = client.get("/api/workflows").json()["workflows"]
     assert "GhostWorkflow" in {w["name"] for w in listed}
@@ -166,3 +164,14 @@ def test_catalog_entry_detail_still_exposes_steps_and_truth():
 def test_red_team_is_documented_as_deterministic():
     workflow = next(w for w in WORKFLOW_CATALOG if w["name"] == "RedTeamWorkflow")
     assert "DETERMINIST" in workflow["truth"].upper()
+
+
+def test_flagged_entry_is_hidden_and_not_runnable_while_its_flag_is_off():
+    """Una entrada con feature_flag apagado no existe hacia fuera: ni lista, ni detalle, ni /run."""
+    flagged = [w for w in WORKFLOW_CATALOG if w.get("feature_flag")]
+    assert flagged, "ExpertTeamThesisWorkflow va detrás de EXPERT_TEAM_ENABLED"
+    for workflow in flagged:
+        assert client.get(f"/api/workflows/{workflow['name']}").status_code == 404
+        response = client.post(f"/api/workflows/{workflow['name']}/run", json={"ticker": "AAPL"})
+        assert response.status_code == 404
+        assert workflow["feature_flag"] in response.json()["detail"]
