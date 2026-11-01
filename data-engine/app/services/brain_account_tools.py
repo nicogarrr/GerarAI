@@ -739,6 +739,75 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
     return _response("\n".join(lines), sources, "account_withholding")
 
 
+_PLAN = re.compile(
+    r"\bplan(?:es)?\s+(?:de\s+)?(?:aportacion\w*|inversion\w*|dca)\b|\bmis?\s+aportaciones\b"
+    r"|\bcuanto\s+(?:he\s+)?aportado\b|\bvoy\s+al\s+dia\s+con\s+mi\s+plan\b|\b(?:cual|como)\s+(?:es|va)\s+mi\s+plan\b"
+    r"|\b(?:investment|contribution|dca)\s+plans?\b|\bhow\s+much\s+have\s+i\s+contributed\b|\bmy\s+plan\b"
+)
+_PLAN_NOT = re.compile(r"\bpensiones\b|\bque\s+compro\b|\bsegun\s+mi\s+plan\b|\bwhat\s+(?:should\s+i|to)\s+buy\b")
+
+
+def _asks_plan(text: str, question: str) -> bool:
+    return bool(_PLAN.search(text) and not _PLAN_NOT.search(text) and re.search(r"\b(?:mi|mis|my)\b", text)
+                and not _tickers_in(question))
+
+
+def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    from datetime import date
+
+    from app.models import InvestmentPlan
+    from app.services.investment_plan_service import InvestmentPlanService
+
+    english = _english()
+    sources = [_source("investment_plan", None, "Plan", "/plan")]
+    has_plan = db.scalar(select(InvestmentPlan.id).where(InvestmentPlan.tenant_id == tenant).limit(1))
+    metrics = InvestmentPlanService().plan_metrics(db, today=local_today()) if has_plan else {}
+    if not metrics.get("plan_exists"):
+        text_out = ("You have no saved contribution plan. You can create one in Plan." if english
+                    else "No tienes un plan de aportación guardado. Puedes crearlo en Plan.")
+        return _response(text_out, sources, "account_plan")
+    base = metrics.get("base_currency")
+    monthly = _money(float(metrics["monthly_contribution"]), metrics.get("monthly_contribution_currency") or base,
+                     english=english)
+    start = date.fromisoformat(metrics["start_date"])
+    years = metrics.get("horizon_years")
+    if english:
+        lines = [f"Your contribution plan: {monthly} a month since {_date_en(start)}, over {years} years."]
+    else:
+        lines = [f"Tu plan de aportación: {monthly} al mes desde el {fecha_es(start)}, a {years} años."]
+    actual, expected = metrics.get("actual_contributions_base"), metrics.get("expected_contributions_base")
+    months = metrics.get("months_elapsed") or 0
+    if actual is not None and expected is not None:
+        gap = float(metrics.get("gap_base") or 0)
+        done = _money(float(actual), base, english=english)
+        due = _money(float(expected), base, english=english)
+        if english:
+            state = (f"{_money(gap, base, english=True)} behind" if gap > 0 else
+                     f"{_money(-gap, base, english=True)} ahead" if gap < 0 else "on track")
+            lines.append(f"Contributed: {done} of {due} expected so far ({months} months); {state}.")
+        else:
+            state = (f"vas {_money(gap, base)} por detrás" if gap > 0 else
+                     f"vas {_money(-gap, base)} por delante" if gap < 0 else "vas al día")
+            lines.append(f"Aportado: {done} de {due} previstos hasta hoy ({months} meses); {state}.")
+    else:
+        lines.append("Contributed vs expected: unknown (missing currency or FX), see Plan." if english
+                     else "Aportado frente a previsto: sin dato (falta divisa o tipo de cambio), míralo en Plan.")
+    targets = [t for t in metrics.get("target_allocations") or [] if str(t.get("label") or "").strip()]
+    if targets:
+        parts = ", ".join(
+            f"{t['label']} {float(t.get('target_pct') or 0):g}%" if english
+            else f"{t['label']} {float(t.get('target_pct') or 0):g} %".replace(".", ",") for t in targets)
+        lines.append(f"Target split: {parts}." if english else f"Reparto objetivo: {parts}.")
+    if re.search(r"\bdca\b", text):
+        from app.services.brain_context_tools import dca_answer
+
+        levels = dca_answer(db, tenant, None)
+        lines.append(levels.answer)
+        sources += levels.sources
+    lines.append("To change it, go to Plan." if english else "Para cambiarlo, ve a Plan.")
+    return _response("\n".join(lines), sources, "account_plan")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -749,6 +818,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _daily_change_answer(db, tenant)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_plan(text, question):
+        return _plan_answer(db, tenant, text)
     if _asks_return_ranking(text, question):
         return _ranking_answer(db, tenant, text)
     year = _asked_year(text)
