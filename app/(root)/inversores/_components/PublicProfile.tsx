@@ -1,9 +1,11 @@
 import type { PublicProfile } from '@/lib/actions/investors.actions';
+import { getT } from '@/lib/i18n/server';
 
 const LINK = 'text-gray-300 underline-offset-2 hover:underline';
 
 /** Ficha pública sin 13F: vehículo, cifras con fuente y fecha, cartas y reuniones. "Sin datos" solo por bloque. */
-export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
+export async function PublicProfileSection({ profile }: { profile: PublicProfile }) {
+    const t = await getT();
     const { vehicle } = profile;
     return (
         <div className="flex flex-col gap-10">
@@ -12,19 +14,19 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
                 <p className="text-sm text-gray-400">{vehicle.type}</p>
                 <p className="text-sm text-gray-500">
                     {vehicle.regulator_id}
-                    {vehicle.start_date ? ` · Inicio ${vehicle.start_date}` : ''}
+                    {vehicle.start_date ? ` · ${t('investors.publicProfile.start', { date: vehicle.start_date })}` : ''}
                 </p>
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-xl font-semibold text-gray-100">Cifras publicadas</h2>
+                <h2 className="text-xl font-semibold text-gray-100">{t('investors.publicProfile.facts')}</h2>
                 <ul className="flex flex-col divide-y divide-gray-900">
                     {profile.facts.map((fact) => (
                         <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3" key={fact.label}>
                             <span className="text-sm text-gray-300">{fact.label}</span>
                             <span className="text-sm font-medium text-gray-100">{fact.value}</span>
                             <span className="w-full text-xs text-gray-500">
-                                {fact.kind === 'oficial' ? 'Oficial' : fact.kind === 'prensa' ? 'Prensa' : 'Inferido'} · {fact.as_of}
+                                {fact.kind === 'oficial' ? t('investors.publicProfile.official') : fact.kind === 'prensa' ? t('investors.publicProfile.press') : t('investors.publicProfile.inferred')} · {fact.as_of}
                             </span>
                         </li>
                     ))}
@@ -32,13 +34,13 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-xl font-semibold text-gray-100">Cartera</h2>
+                <h2 className="text-xl font-semibold text-gray-100">{t('investors.publicProfile.holdings')}</h2>
                 <p className="text-sm text-gray-500">{profile.holdings_note}</p>
             </section>
 
             {profile.letters.length > 0 ? (
                 <section className="flex flex-col gap-3">
-                    <h2 className="text-xl font-semibold text-gray-100">Fuentes sobre el inversor</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('investors.investorLetters.publicSources')}</h2>
                     <ul className="flex flex-col divide-y divide-gray-900">
                         {profile.letters.map((letter) => (
                             <li className="py-2 text-sm" key={letter.url}>
@@ -53,7 +55,7 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
 
             {profile.meetings.length > 0 ? (
                 <section className="flex flex-col gap-3">
-                    <h2 className="text-xl font-semibold text-gray-100">Reuniones anuales</h2>
+                    <h2 className="text-xl font-semibold text-gray-100">{t('investors.publicProfile.meetings')}</h2>
                     <ul className="flex flex-col divide-y divide-gray-900">
                         {profile.meetings.map((meeting) => (
                             <li className="py-2 text-sm" key={meeting.url}>
@@ -67,7 +69,7 @@ export function PublicProfileSection({ profile }: { profile: PublicProfile }) {
             ) : null}
 
             <p className="text-xs text-gray-500">
-                Fuentes:{' '}
+                {t('investors.publicProfile.sources')}{' '}
                 {profile.links.map((link, index) => (
                     <span key={link.url}>
                         {index > 0 ? ' · ' : ''}

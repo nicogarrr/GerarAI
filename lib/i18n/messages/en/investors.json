@@ -131,5 +131,42 @@
     "longCall": "Long call",
     "longPut": "Long put",
     "formula": "Call: max(price - strike, 0) - premium. Put: max(strike - price, 0) - premium. Before expiry the option's price also depends on time and volatility."
+  },
+  "views": {
+    "aria": "Investor content",
+    "posiciones": "Portfolio",
+    "distribucion": "Allocation",
+    "cambios": "Latest changes",
+    "cartas": "Letters",
+    "videos": "Videos"
+  },
+  "portfolio": {
+    "aria": "Declared portfolio",
+    "positionsOne": "{count} documented position",
+    "positionsMany": "{count} documented positions",
+    "noMovements": "No documented changes",
+    "sharesChange": "Shares · change",
+    "sharesAfter": "Shares after",
+    "price": "Price",
+    "value": "Value",
+    "weight": "Portfolio weight",
+    "shares": "Shares",
+    "ownership": "Stake in issuer"
+  },
+  "publicProfile": {
+    "start": "Since {date}",
+    "facts": "Published figures",
+    "official": "Official",
+    "press": "Press",
+    "inferred": "Inferred",
+    "holdings": "Portfolio",
+    "meetings": "Annual meetings",
+    "sources": "Sources:"
+  },
+  "detail": {
+    "metaTitle": "Investors · {name}",
+    "notFound": "Investor not found",
+    "photo": "Photo:",
+    "via": "via"
   }
 }

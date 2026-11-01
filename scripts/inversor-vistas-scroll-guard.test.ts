@@ -13,7 +13,9 @@ describe('inversor: las vistas de la cartera conservan el scroll', () => {
         // selector de contenido en la ficha, no otra barra.
         const src = readFileSync('app/(root)/inversores/_components/InvestorViewSelector.tsx', 'utf8');
         assert.ok(src.includes('scroll: false'), 'el selector conserva scroll al cambiar ?vista=');
-        assert.ok(src.includes('Contenido del inversor'));
+        // La etiqueta vive en el diccionario español (sección views).
+        assert.ok(src.includes("t('investors.views.aria')"));
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/investors.json', 'utf8')).views.aria, 'Contenido del inversor');
 
     });
 });

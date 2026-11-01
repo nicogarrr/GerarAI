@@ -8,6 +8,7 @@ import {
   getInvestorPortfolio,
 } from "@/lib/actions/investors.actions";
 import { isBackendUnavailableError } from "@/lib/backend-offline";
+import { getT } from "@/lib/i18n/server";
 import { getKnowledgeLetters } from "@/lib/actions/research-tools.actions";
 import { Portfolio } from "../_components/Portfolio";
 import { InvestorLetters } from "../_components/InvestorLetters";
@@ -34,11 +35,12 @@ export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
   const { slug } = await params;
+  const t = await getT();
   try {
     const investor = await getInvestor(slug);
-    return { title: investor ? `Inversores · ${investor.name}` : 'Inversor no encontrado' };
+    return { title: investor ? t('investors.detail.metaTitle', { name: investor.name }) : t('investors.detail.notFound') };
   } catch {
-    return { title: 'Inversores' };
+    return { title: t('investors.hub.title') };
   }
 }
 
@@ -48,6 +50,7 @@ export default async function InvestorPage({
 }: PageProps) {
   const { slug } = await params;
   const { vista, pagina } = await searchParams;
+  const t = await getT();
   const view = VIEWS.some((item) => item.id === vista) ? vista : "posiciones";
 
   let choices: Awaited<ReturnType<typeof getInvestors>>;
@@ -72,7 +75,7 @@ export default async function InvestorPage({
     if (isBackendUnavailableError(error)) {
       return (
         <BackendOffline
-          feature="Inversores"
+          feature={t('investors.hub.title')}
           retryHref={`/inversores/${slug}`}
         />
       );
@@ -99,7 +102,7 @@ export default async function InvestorPage({
           <p className="text-base text-gray-500">{investor.firm}</p>
           {photo ? (
             <p className="mt-1 text-xs text-gray-500">
-              Foto: {photo.author},{" "}
+              {t('investors.detail.photo')} {photo.author},{" "}
               <a
                 className="hover:underline"
                 href={photo.licenseUrl}
@@ -108,7 +111,7 @@ export default async function InvestorPage({
               >
                 {photo.license}
               </a>
-              , vía{" "}
+              , {t('investors.detail.via')}{" "}
               <a
                 className="hover:underline"
                 href={photo.source}
@@ -126,7 +129,7 @@ export default async function InvestorPage({
       {view !== "cartas" && view !== "videos" && portfolio ? <>
       {investor.has_13f && portfolio.positions.length === 0 ? (
         <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
-          <p className="text-gray-300">Aún no hay carteras descargadas en esta cuenta.</p>
+          <p className="text-gray-300">{t('investors.hub.noneSynced')}</p>
           <SyncPortfoliosButton />
         </div>
       ) : (

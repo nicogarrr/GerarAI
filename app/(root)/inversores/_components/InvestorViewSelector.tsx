@@ -2,13 +2,23 @@
 
 import { useRouter } from 'next/navigation';
 
-import { VIEWS } from './investor-views';
+import { useT } from '@/lib/i18n/client';
+
+import { VIEWS, type InvestorViewId } from './investor-views';
 
 export function InvestorViewSelector({ slug, view }: { slug: string; view: string }) {
     const router = useRouter();
+    const t = useT();
+    const labels: Record<InvestorViewId, string> = {
+        posiciones: t('investors.views.posiciones'),
+        distribucion: t('investors.views.distribucion'),
+        cambios: t('investors.views.cambios'),
+        cartas: t('investors.views.cartas'),
+        videos: t('investors.views.videos'),
+    };
     return (
         <select
-            aria-label="Contenido del inversor"
+            aria-label={t('investors.views.aria')}
             className="min-h-11 w-full rounded-lg border border-gray-800 bg-surface-1 px-3 text-base text-gray-100 sm:text-sm"
             value={view}
             onChange={(event) => {
@@ -18,7 +28,7 @@ export function InvestorViewSelector({ slug, view }: { slug: string; view: strin
                 }
             }}
         >
-            {VIEWS.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+            {VIEWS.map(({ id }) => <option key={id} value={id}>{labels[id]}</option>)}
         </select>
     );
 }
