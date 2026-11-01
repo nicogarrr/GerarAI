@@ -16,6 +16,10 @@ const STATUS_KEYS: Record<string, TranslationKey> = {
     error: 'brain.expertTeam.thesis.statusError',
 };
 
+function expertNames(experts: string[] | undefined, t: TranslateFn): string {
+    return (experts ?? []).map((expert) => (EXPERT_KEYS[expert] ? t(EXPERT_KEYS[expert]) : expert)).join(' · ');
+}
+
 /** Solo http(s): un enlace de fuente nunca ejecuta nada en la página. */
 function safeUrl(url: string | null | undefined): string | null {
     if (!url) return null;
@@ -30,7 +34,8 @@ function safeUrl(url: string | null | undefined): string | null {
 /**
  * Tesis guardada del equipo de expertos: una sección por experto con sus
  * afirmaciones (cada una con su [n]) y las fuentes numeradas, con enlace
- * cuando la fuente lo tiene (p. ej. el filing de la SEC).
+ * cuando la fuente lo tiene (p. ej. el filing de la SEC). Debajo, un
+ * historial corto de corridas anteriores (la más reciente primero).
  */
 export function ExpertThesisPanel({
     thesis,
@@ -95,6 +100,30 @@ export function ExpertThesisPanel({
                     <span className="font-semibold">{t('brain.expertTeam.thesis.verdict')}</span>
                     {`: ${thesis.verdict.label}. ${thesis.verdict.rationale ?? ''}`.trimEnd()}
                 </p>
+            ) : null}
+            {thesis.history?.length ? (
+                <div className="mt-6" data-testid="expert-thesis-history">
+                    <h3 className="text-sm font-semibold text-gray-100">{t('brain.expertTeam.thesis.history')}</h3>
+                    <ol className="mt-2 space-y-1 text-xs leading-5 text-gray-400">
+                        {thesis.history.map((run) => (
+                            <li key={run.run_id} data-testid={`expert-thesis-run-${run.run_id}`}>
+                                <span className="text-gray-300">
+                                    {run.finished_at ? (formatDate ? formatDate(run.finished_at) : run.finished_at.slice(0, 10)) : '—'}
+                                </span>
+                                {' · '}
+                                {run.verdict
+                                    ? t('brain.expertTeam.thesis.historyVerdict', { label: run.verdict })
+                                    : t('brain.expertTeam.thesis.historyNoVerdict')}
+                                {run.answered?.length
+                                    ? ` · ${t('brain.expertTeam.thesis.historyAnswered', { experts: expertNames(run.answered, t) })}`
+                                    : null}
+                                {run.timed_out?.length
+                                    ? ` · ${t('brain.expertTeam.thesis.historyTimedOut', { experts: expertNames(run.timed_out, t) })}`
+                                    : null}
+                            </li>
+                        ))}
+                    </ol>
+                </div>
             ) : null}
             {sources.length ? (
                 <div className="mt-6">

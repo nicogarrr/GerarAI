@@ -6422,6 +6422,13 @@
             ],
             "title": "Finished At"
           },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/ExpertThesisRunOut"
+            },
+            "title": "History",
+            "type": "array"
+          },
           "plan": {
             "items": {
               "type": "string"
@@ -6467,6 +6474,57 @@
           "run_id"
         ],
         "title": "ExpertThesisOut",
+        "type": "object"
+      },
+      "ExpertThesisRunOut": {
+        "description": "Resumen de una corrida anterior: fecha, veredicto y qui\u00e9n respondi\u00f3.",
+        "properties": {
+          "answered": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Answered",
+            "type": "array"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          },
+          "timed_out": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Timed Out",
+            "type": "array"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "ExpertThesisRunOut",
         "type": "object"
       },
       "ExpertThesisSectionOut": {
@@ -83145,7 +83203,7 @@
     },
     "/api/thesis/{ticker}/experts": {
       "get": {
-        "description": "\u00daltima tesis guardada del equipo de expertos (404 con EXPERT_TEAM_ENABLED apagado).",
+        "description": "\u00daltima tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag).",
         "operationId": "latest_expert_thesis_api_thesis__ticker__experts_get",
         "parameters": [
           {

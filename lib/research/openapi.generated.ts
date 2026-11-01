@@ -5954,7 +5954,7 @@ export interface paths {
         };
         /**
          * Latest Expert Thesis
-         * @description Última tesis guardada del equipo de expertos (404 con EXPERT_TEAM_ENABLED apagado).
+         * @description Última tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag).
          */
         get: operations["latest_expert_thesis_api_thesis__ticker__experts_get"];
         put?: never;
@@ -8809,6 +8809,8 @@ export interface components {
             conflicts?: string[];
             /** Finished At */
             finished_at?: string | null;
+            /** History */
+            history?: components["schemas"]["ExpertThesisRunOut"][];
             /** Plan */
             plan?: string[];
             /** Run Id */
@@ -8820,6 +8822,22 @@ export interface components {
             /** Ticker */
             ticker: string;
             verdict?: components["schemas"]["ExpertThesisVerdictOut"] | null;
+        };
+        /**
+         * ExpertThesisRunOut
+         * @description Resumen de una corrida anterior: fecha, veredicto y quién respondió.
+         */
+        ExpertThesisRunOut: {
+            /** Answered */
+            answered?: string[];
+            /** Finished At */
+            finished_at?: string | null;
+            /** Run Id */
+            run_id: number;
+            /** Timed Out */
+            timed_out?: string[];
+            /** Verdict */
+            verdict?: string | null;
         };
         /** ExpertThesisSectionOut */
         ExpertThesisSectionOut: {

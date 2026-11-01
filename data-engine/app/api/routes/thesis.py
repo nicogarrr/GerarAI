@@ -265,18 +265,18 @@ def latest_thesis(ticker: str, db: Session = Depends(get_db)) -> dict:
 
 @router.get("/{ticker}/experts", response_model=ExpertThesisOut | None)
 def latest_expert_thesis(ticker: str, db: Session = Depends(get_db)) -> ExpertThesisOut | None:
-    """Última tesis guardada del equipo de expertos (404 con EXPERT_TEAM_ENABLED apagado)."""
+    """Última tesis guardada del equipo de expertos y un historial corto de las anteriores (404 sin flag)."""
     from app.core.config import get_settings
     from app.core.i18n import current_language
     from app.services.expert_team import view as expert_view
 
     if not get_settings().expert_team_enabled:
         raise HTTPException(status_code=404, detail="Expert team is off")
-    found = expert_view.latest_expert_thesis(db, ticker)
-    if found is None:
+    found = expert_view.expert_thesis_runs(db, ticker, expert_view.HISTORY_LIMIT + 1)
+    if not found:
         return None
-    run, result = found
-    return expert_view.thesis_view(run, result, current_language())
+    (run, result), earlier = found[0], found[1:]
+    return expert_view.thesis_view(run, result, current_language(), earlier)
 
 
 @router.get("/{ticker}/versions", response_model=list[ThesisOut])

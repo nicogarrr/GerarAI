@@ -145,7 +145,12 @@
       "statusError": "No disponible.",
       "conflicts": "Choques entre expertos",
       "verdict": "Veredicto del juez",
-      "sources": "Fuentes"
+      "sources": "Fuentes",
+      "history": "Corridas anteriores",
+      "historyVerdict": "Veredicto: {label}",
+      "historyNoVerdict": "Sin veredicto",
+      "historyAnswered": "Respondieron: {experts}",
+      "historyTimedOut": "Sin respuesta a tiempo: {experts}"
     }
   }
 }
