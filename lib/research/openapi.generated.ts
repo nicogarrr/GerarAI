@@ -5945,6 +5945,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/thesis/{ticker}/experts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Latest Expert Thesis
+         * @description Última tesis guardada del equipo de expertos (404 con EXPERT_TEAM_ENABLED apagado).
+         */
+        get: operations["latest_expert_thesis_api_thesis__ticker__experts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thesis/{ticker}/graph": {
         parameters: {
             query?: never;
@@ -8775,6 +8795,69 @@ export interface components {
             source: string;
             /** Year */
             year?: number | null;
+        };
+        /** ExpertThesisClaimOut */
+        ExpertThesisClaimOut: {
+            /** Refs */
+            refs?: number[];
+            /** Text */
+            text: string;
+        };
+        /** ExpertThesisOut */
+        ExpertThesisOut: {
+            /** Conflicts */
+            conflicts?: string[];
+            /** Finished At */
+            finished_at?: string | null;
+            /** Plan */
+            plan?: string[];
+            /** Run Id */
+            run_id: number;
+            /** Sections */
+            sections?: components["schemas"]["ExpertThesisSectionOut"][];
+            /** Sources */
+            sources?: components["schemas"]["ExpertThesisSourceOut"][];
+            /** Ticker */
+            ticker: string;
+            verdict?: components["schemas"]["ExpertThesisVerdictOut"] | null;
+        };
+        /** ExpertThesisSectionOut */
+        ExpertThesisSectionOut: {
+            /** Claims */
+            claims?: components["schemas"]["ExpertThesisClaimOut"][];
+            /** Expert */
+            expert: string;
+            /**
+             * Stance
+             * @default neutral
+             */
+            stance: string;
+            /** Status */
+            status: string;
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+        };
+        /** ExpertThesisSourceOut */
+        ExpertThesisSourceOut: {
+            /** N */
+            n: number;
+            /** Title */
+            title: string;
+            /** Url */
+            url?: string | null;
+        };
+        /** ExpertThesisVerdictOut */
+        ExpertThesisVerdictOut: {
+            /** Label */
+            label: string;
+            /**
+             * Rationale
+             * @default
+             */
+            rationale: string;
         };
         /** ExtendedQuote */
         ExtendedQuote: {
@@ -28199,6 +28282,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    latest_expert_thesis_api_thesis__ticker__experts_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-cavaai-user"?: string | null;
+                "x-cavaai-tenant"?: string | null;
+                "x-cavaai-timestamp"?: string | null;
+                "x-cavaai-signature"?: string | null;
+                "x-cavaai-nonce"?: string | null;
+                "x-cavaai-method"?: string | null;
+                "x-cavaai-path"?: string | null;
+                "x-cavaai-body-hash"?: string | null;
+            };
+            path: {
+                ticker: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpertThesisOut"] | null;
                 };
             };
             /** @description Validation Error */

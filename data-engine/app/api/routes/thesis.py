@@ -23,6 +23,7 @@ from app.schemas.api import (
 from app.services import thesis_audio_service
 from app.services.company_resolver import resolve_company
 from app.services.driver_assumption_service import DriverAssumptionService, driver_assumption_payload
+from app.services.expert_team.view import ExpertThesisOut
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.thesis_approval_service import (
     DECISION_APPROVE,
@@ -260,6 +261,22 @@ def latest_thesis(ticker: str, db: Session = Depends(get_db)) -> dict:
         db, thesis.company_id, thesis.valuation_basis
     )
     return payload
+
+
+@router.get("/{ticker}/experts", response_model=ExpertThesisOut | None)
+def latest_expert_thesis(ticker: str, db: Session = Depends(get_db)) -> ExpertThesisOut | None:
+    """Última tesis guardada del equipo de expertos (404 con EXPERT_TEAM_ENABLED apagado)."""
+    from app.core.config import get_settings
+    from app.core.i18n import current_language
+    from app.services.expert_team import view as expert_view
+
+    if not get_settings().expert_team_enabled:
+        raise HTTPException(status_code=404, detail="Expert team is off")
+    found = expert_view.latest_expert_thesis(db, ticker)
+    if found is None:
+        return None
+    run, result = found
+    return expert_view.thesis_view(run, result, current_language())
 
 
 @router.get("/{ticker}/versions", response_model=list[ThesisOut])
