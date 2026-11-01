@@ -209,6 +209,19 @@ describe('GlobalBrain: pastilla "Viendo"', () => {
 });
 
 describe('GlobalBrain: chat de cartera', () => {
+    it('respuesta del equipo de expertos: dice quién respondió; una respuesta normal no', async () => {
+        chatWithPortfolio.mockResolvedValueOnce({
+            success: true, message: '**Fundamental**: sube [1]', citations: [], experts: ['fundamental', 'risk'],
+        });
+        render(<GlobalBrain userId="u1" />);
+        await open();
+        ask('¿Riesgo y fundamentales de ASTS?');
+        expect(await screen.findByTestId('brain-expert-team')).toHaveTextContent('Respuesta del equipo de expertos: Fundamental · Riesgo');
+        chatWithPortfolio.mockResolvedValueOnce({ success: true, message: 'Tienes 3 posiciones', citations: [] });
+        ask('¿Cuántas posiciones tengo?');
+        await screen.findByText('Tienes 3 posiciones');
+        expect(screen.getAllByTestId('brain-expert-team')).toHaveLength(1);
+    });
     it('envía pregunta recortada con userId, página e historial y pinta la respuesta markdown con fuentes', async () => {
         chatWithPortfolio.mockResolvedValue({
             success: true,

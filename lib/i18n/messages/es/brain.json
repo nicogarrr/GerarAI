@@ -125,5 +125,16 @@
       "q3": "¿Cómo piensa Munger sobre la inversión de problemas (invertir al revés)?",
       "q4": "¿Qué dicen las cartas sobre los fosos competitivos?"
     }
+  },
+  "expertTeam": {
+    "title": "Respuesta del equipo de expertos",
+    "note": "Cada [n] es un dato que leyó un experto en esta consulta; lo tienes en «Fuentes».",
+    "experts": {
+      "fundamental": "Fundamental",
+      "valuation": "Valoración",
+      "risk": "Riesgo",
+      "news": "Noticias",
+      "tax": "Fiscal"
+    }
   }
 }

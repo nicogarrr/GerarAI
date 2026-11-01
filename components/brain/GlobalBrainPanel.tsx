@@ -26,6 +26,8 @@ const ReactMarkdown = dynamic(() => import('react-markdown'), {
     loading: () => <span className="block h-4 w-2/3 animate-pulse rounded bg-slate-700/60" aria-hidden="true" />,
 });
 import type { PortfolioChatCitation } from '@/lib/chat/citations';
+import type { ExpertName } from '@/lib/chat/expert-team';
+import { BrainExpertTeam } from './BrainExpertTeam';
 import { BrainSources } from './BrainSources';
 import { askKnowledgeResult, type LibraryAnswer } from '@/lib/actions/knowledge-chat.actions';
 import { analysisLabels, analysisToText, isSubmitShortcut } from '@/lib/knowledge/analysis';
@@ -40,6 +42,7 @@ export interface BrainMessage {
     role: 'user' | 'assistant';
     content: string;
     citations?: PortfolioChatCitation[];
+    experts?: ExpertName[] | null;
     guide?: AssistantResponse;
     library?: LibraryAnswer;
 }
@@ -328,7 +331,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             const result = await chatWithPortfolio(userMsg, userId, page, history);
             if (result.context) setEcho(result.context);
             if (result.success) {
-                setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations }]);
+                setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations, experts: result.experts }]);
             } else {
                 setMessages(prev => [...prev, { role: 'assistant', content: result.message || t('brain.panel.unknownError') }]);
             }
@@ -485,6 +488,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                             >
                                                 {m.content}
                                             </ReactMarkdown>
+                                            <BrainExpertTeam experts={m.experts} />
                                             <BrainSources citations={m.citations} />
                                         </div>
                                     ) : (
