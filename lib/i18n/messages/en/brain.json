@@ -54,6 +54,9 @@
     }
   },
   "library": {
+    "unregisteredPage": "page not recorded",
+    "pageShort": "p. {n}",
+    "scenarioLine": "{name}: {probability}%. Trigger: {trigger}",
     "unregisteredAuthor": "Author not recorded",
     "pageN": "Page {n}",
     "chunkN": "Chunk {n}",
@@ -108,5 +111,19 @@
     "guideError": "The guide could not be fetched. Try again; nothing was changed.",
     "unknownError": "Sorry, an unknown error occurred.",
     "responseError": "The answer could not be completed. If it takes longer than usual, try again in a few seconds."
+  },
+  "suggested": {
+    "general": {
+      "q1": "How is my portfolio doing?",
+      "q2": "What's the news on my companies?",
+      "q3": "Which theses do I have active?",
+      "q4": "What are the risks in my portfolio?"
+    },
+    "library": {
+      "q1": "When does a share buyback make sense?",
+      "q2": "What is the margin of safety?",
+      "q3": "How does Munger think about inverting problems?",
+      "q4": "What do the letters say about competitive moats?"
+    }
   }
 }

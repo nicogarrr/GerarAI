@@ -49,10 +49,12 @@ test('el panel restaura, guarda, sugiere y copia', () => {
     const panel = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
     assert.ok(panel.includes('restoreConversation'));
     assert.ok(panel.includes('sessionStorage.setItem'));
-    assert.ok(panel.includes('BRAIN_SUGGESTED_QUESTIONS'));
+    assert.ok(panel.includes('brain.suggested.general.q1'));
     assert.ok(panel.includes('brain.panel.copy'));
     const dictBrain = JSON.parse(readFileSync('lib/i18n/messages/es/brain.json', 'utf8'));
     assert.equal(dictBrain.panel.copy, 'Copiar');
+    // Las sugeridas del panel salen del diccionario: en español, las mismas de BRAIN_SUGGESTED_QUESTIONS.
+    assert.deepEqual(Object.values(dictBrain.suggested.general), [...BRAIN_SUGGESTED_QUESTIONS]);
     assert.equal(dictBrain.panel.copied, 'Copiado');
     // El saludo inicial no lleva botón de copiar: no hay nada del usuario que copiar.
     assert.ok(panel.includes("m.role === 'assistant' && i > 0"));
