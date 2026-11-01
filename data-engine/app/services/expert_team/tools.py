@@ -14,7 +14,15 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.entities import Company, FinancialFact, NewsEvent, Position, RiskEvent, ThesisVersion
+from app.models.entities import (
+    Company,
+    Document,
+    FinancialFact,
+    NewsEvent,
+    Position,
+    RiskEvent,
+    ThesisVersion,
+)
 from app.services.expert_team.models import RunContext, ToolOutput, ToolSpec
 
 FACT_YEARS = 2
@@ -46,6 +54,32 @@ def _company(db: Session, ctx: RunContext) -> Company | None:
     return db.scalars(select(Company).where(Company.ticker == ctx.ticker.strip().upper())).first()
 
 
+def _filing_links(
+    db: Session, company: Company, groups: dict[tuple, Any], accessions: dict[tuple, str]
+) -> dict[tuple, str]:
+    """URL del archivo SEC de cada grupo de cifras: la del documento guardado si
+    es un archivo inmutable de la SEC; si no, el índice EDGAR por accession."""
+    from app.services.document_visibility import is_immutable_archive_url
+    from app.services.sec_filing_evidence import derive_index_url
+
+    doc_ids = {key[3] for key in groups if isinstance(key[3], int)}
+    urls: dict[int, str] = {}
+    if doc_ids:
+        urls = {
+            doc_id: str(url)
+            for doc_id, url in db.execute(select(Document.id, Document.source_url).where(Document.id.in_(doc_ids)))
+            if url and is_immutable_archive_url(url)
+        }
+    cik = "".join(ch for ch in str(company.cik or "") if ch.isdigit())
+    links: dict[tuple, str] = {}
+    for key in groups:
+        if isinstance(key[3], int) and key[3] in urls:
+            links[key] = urls[key[3]]
+        elif cik and int(cik) and key in accessions:
+            links[key] = derive_index_url(cik, accessions[key])
+    return links
+
+
 def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec]:
     """Herramientas ligadas a la sesión de ESTA petición (una por corrida)."""
 
@@ -65,6 +99,7 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
         ).all()
         years = sorted({r.fiscal_year for r in rows if r.fiscal_year is not None}, reverse=True)[:FACT_YEARS]
         groups: dict[tuple, dict[str, Any]] = {}
+        accessions: dict[tuple, str] = {}
         for row in rows:
             if row.fiscal_year not in years or row.value is None:
                 continue
@@ -72,18 +107,23 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             group = groups.setdefault(key, {"values": {}, "units": {}})
             group["values"].setdefault(row.metric, float(row.value))
             group["units"].setdefault(row.metric, row.unit or "")
-        return [
-            ToolOutput(
-                source={
-                    "table": "financial_facts",
-                    "filing": f"{source_type or '-'}:{source_id or '-'}",
-                    "period": str(period or ""),
-                    "date": str(fiscal_year or ""),
-                },
-                data={"ticker": company.ticker, **group},
-            )
-            for (period, fiscal_year, source_type, source_id), group in groups.items()
-        ]
+            if row.accession_number and key not in accessions:
+                accessions[key] = row.accession_number
+        links = _filing_links(db, company, groups, accessions)
+        out: list[ToolOutput] = []
+        for key, group in groups.items():
+            period, fiscal_year, source_type, source_id = key
+            source = {
+                "table": "financial_facts",
+                "filing": f"{source_type or '-'}:{source_id or '-'}",
+                "period": str(period or ""),
+                "date": str(fiscal_year or ""),
+            }
+            if key in links:
+                # Enlace al filing de la SEC del que sale la cifra (se abre desde «Fuentes»).
+                source.update({"source": "SEC EDGAR", "url": links[key]})
+            out.append(ToolOutput(source=source, data={"ticker": company.ticker, **group}))
+        return out
 
     def valuation_engine(ctx: RunContext) -> list[ToolOutput]:
         company = _company(db, ctx)
