@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ResearchNewsEvent } from '@/lib/actions/research.actions';
 import { newsDisplayTitle } from '@/lib/news-display';
 import { isTranslatable } from '@/lib/news-language';
-import { useT } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
 import { RelatedTickersStrip } from '@/components/research/RelatedTickersStrip';
 
 const queue: Array<() => void> = [];
@@ -22,10 +22,13 @@ function translate(id: number): Promise<string | null> {
 
 export function NewsHeadline({ event }: { event: ResearchNewsEvent }) {
   const t = useT();
+  // Con Ajustes → Idioma en inglés no se traduce al español: el titular sale
+  // tal cual lo publicó la fuente (antes un titular en inglés se pasaba a español).
+  const english = useLocale() === 'en';
   const original = event.original_headline ?? event.title;
-  const [translated, setTranslated] = useState<string | null>(event.headline_translation?.text ?? null);
+  const [translated, setTranslated] = useState<string | null>(english ? null : event.headline_translation?.text ?? null);
   const ref = useRef<HTMLDivElement>(null);
-  const needsTranslation = event.headline_from_source !== false && isTranslatable(original);
+  const needsTranslation = !english && event.headline_from_source !== false && isTranslatable(original);
   useEffect(() => {
     if (!needsTranslation || translated || !ref.current) return;
     let active = true;
