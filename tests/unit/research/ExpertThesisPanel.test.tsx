@@ -50,6 +50,25 @@ describe('tesis guardada del equipo de expertos', () => {
         expect(screen.getByText(/\[2\] Estados financieros · FY · 2024/)).toBeInTheDocument();
     });
 
+    it('las fuentes de valoración y cartera enlazan a su pantalla de la app; riesgo sin enlace', () => {
+        const internal: ExpertThesis = {
+            ...thesis,
+            sources: [
+                { n: 1, title: 'Motor de valoración · 2026-10-30', url: '/research/MSFT?view=valoracion' },
+                { n: 2, title: 'Cartera · 2026-11-01', url: '/portfolio' },
+                { n: 3, title: 'Alertas de riesgo · 2026-10-31', url: null },
+                { n: 4, title: 'Redirección', url: '//evil.example/x' },
+            ],
+        };
+        render(<ExpertThesisPanel thesis={internal} t={createTranslator('es')} />);
+        const valuation = screen.getByRole('link', { name: /\[1\] Motor de valoración/ });
+        expect(valuation).toHaveAttribute('href', '/research/MSFT?view=valoracion');
+        expect(valuation).not.toHaveAttribute('target');
+        expect(screen.getByRole('link', { name: /\[2\] Cartera/ })).toHaveAttribute('href', '/portfolio');
+        expect(screen.queryByRole('link', { name: /\[3\] Alertas de riesgo/ })).toBeNull();
+        expect(screen.queryByRole('link', { name: /\[4\] Redirección/ })).toBeNull();
+    });
+
     it('en inglés', () => {
         render(<ExpertThesisPanel thesis={thesis} t={createTranslator('en')} />);
         expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Expert team thesis');

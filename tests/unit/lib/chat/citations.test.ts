@@ -67,6 +67,7 @@ describe('toPortfolioChatCitations', () => {
         ['enlace interno de cartera', '/portfolio', '/portfolio'],
         ['ficha de research', '/research/MSFT', '/research/MSFT'],
         ['ficha con vista permitida', '/research/MSFT?view=thesis', '/research/MSFT?view=thesis'],
+        ['vista de valoración (equipo de expertos)', '/research/BRK.B?view=valoracion', '/research/BRK.B?view=valoracion'],
         ['https externa', 'https://sec.gov/x', 'https://sec.gov/x'],
     ])('admite %s', (_e, input, expected) => {
         expect(toPortfolioChatCitations([{ type: 'position', id: 1, title: 'X', url: input }])[0].url).toBe(expected);

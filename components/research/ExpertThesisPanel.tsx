@@ -1,4 +1,6 @@
+import Link from 'next/link';
 import type { ExpertThesis } from '@/lib/actions/expert-thesis.actions';
+import { isInternalSourcePath } from '@/lib/chat/citations';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import type { TranslationKey } from '@/lib/i18n/t';
 
@@ -34,7 +36,8 @@ function safeUrl(url: string | null | undefined): string | null {
 /**
  * Tesis guardada del equipo de expertos: una sección por experto con sus
  * afirmaciones (cada una con su [n]) y las fuentes numeradas, con enlace
- * cuando la fuente lo tiene (p. ej. el filing de la SEC). Debajo, un
+ * cuando la fuente lo tiene (p. ej. el filing de la SEC, o la pantalla de
+ * valoración / cartera de la propia app). Debajo, un
  * historial corto de corridas anteriores (la más reciente primero).
  */
 export function ExpertThesisPanel({
@@ -130,10 +133,15 @@ export function ExpertThesisPanel({
                     <h3 className="text-sm font-semibold text-gray-100">{t('brain.expertTeam.thesis.sources')}</h3>
                     <ol className="mt-2 space-y-1 text-xs leading-5 text-gray-400">
                         {sources.map((source) => {
-                            const url = safeUrl(source.url);
+                            const internal = isInternalSourcePath(source.url) ? source.url : null;
+                            const url = internal ? null : safeUrl(source.url);
                             return (
                                 <li key={source.n} id={anchor(source.n)}>
-                                    {url ? (
+                                    {internal ? (
+                                        <Link href={internal} className="text-teal-300 underline underline-offset-2">
+                                            [{source.n}] {source.title}
+                                        </Link>
+                                    ) : url ? (
                                         <a href={url} target="_blank" rel="noopener noreferrer" className="text-teal-300 underline underline-offset-2">
                                             [{source.n}] {source.title}
                                         </a>
