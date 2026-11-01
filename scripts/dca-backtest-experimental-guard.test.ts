@@ -10,16 +10,19 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 
 const source = readFileSync('components/proPicks/DcaBacktestPanel.tsx', 'utf8');
+// El texto vive en el diccionario (es por defecto); el componente lo pinta con t().
+const es = JSON.parse(readFileSync('lib/i18n/messages/es/propicks.json', 'utf8')).dcaBacktest;
 
 test('el aviso experimental está visible antes del formulario', () => {
-  const notice = source.indexOf('Experimental: este backtest simula datos históricos');
+  assert.match(es.experimental, /^Experimental: este backtest simula datos históricos/);
+  const notice = source.indexOf("t('propicks.dcaBacktest.experimental')");
   assert.ok(notice > 0, 'falta el aviso experimental');
   assert.ok(notice < source.indexOf('<form onSubmit={run}'), 'el aviso debe ir antes del formulario');
   assert.match(source, /role="note"/);
 });
 
 test('el aviso no presenta la simulación como predicción ni consejo', () => {
-  assert.match(source, /No predice resultados futuros/);
-  assert.match(source, /costes, impuestos/);
-  assert.match(source, /No es una recomendación de inversión/);
+  assert.match(es.experimental, /No predice resultados futuros/);
+  assert.match(es.experimental, /costes, impuestos/);
+  assert.match(es.experimental, /No es una recomendación de inversión/);
 });
