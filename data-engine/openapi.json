@@ -2052,7 +2052,7 @@
           "ticker": {
             "maxLength": 20,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9.\\-]+$",
+            "pattern": "^[A-Za-z0-9]+(?:[.\\-][A-Za-z0-9]+)*$",
             "title": "Ticker",
             "type": "string"
           }
@@ -8290,7 +8290,7 @@
           "ticker": {
             "maxLength": 20,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9.\\-]+$",
+            "pattern": "^[A-Za-z0-9]+(?:[.\\-][A-Za-z0-9]+)*$",
             "title": "Ticker",
             "type": "string"
           }
@@ -12017,6 +12017,7 @@
           "notes": {
             "anyOf": [
               {
+                "maxLength": 2000,
                 "type": "string"
               },
               {
@@ -15779,7 +15780,7 @@
           "ticker": {
             "maxLength": 20,
             "minLength": 1,
-            "pattern": "^[A-Za-z0-9.\\-]+$",
+            "pattern": "^[A-Za-z0-9]+(?:[.\\-][A-Za-z0-9]+)*$",
             "title": "Ticker",
             "type": "string"
           },
@@ -31111,7 +31112,7 @@
             "schema": {
               "maxLength": 20,
               "minLength": 1,
-              "pattern": "^[A-Za-z0-9.\\-]+$",
+              "pattern": "^[A-Za-z0-9]+(?:[.\\-][A-Za-z0-9]+)*$",
               "title": "Ticker",
               "type": "string"
             }
