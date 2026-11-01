@@ -110,8 +110,6 @@
   "components/proPicks/TrackRecordView.tsx": 7,
   "components/proPicks/WalkForwardResults.tsx": 24,
   "components/research/AnalystTargetsView.tsx": 17,
-  "components/research/AstOrbitPanel.tsx": 22,
-  "components/research/AstSmaChart.tsx": 5,
   "components/research/BrainAskForm.tsx": 1,
   "components/research/ChangesSinceVisit.tsx": 7,
   "components/research/CompanyActionsMenu.tsx": 12,
