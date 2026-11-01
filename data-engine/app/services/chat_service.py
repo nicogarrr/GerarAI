@@ -830,12 +830,64 @@ _RANK_WEIGHT_LABEL_RE = re.compile(r"(?i)\bpes[oa]\b")
 _RANK_POSITION_RE = re.compile(r"(?i)\bposici[oó]n\b")
 
 
+# Inglés: «What's my biggest position?», «Which holding weighs the least?»,
+# «Which position has the highest average cost?». Solo con el inglés elegido.
+_PORTFOLIO_RANKING_EN_RE = re.compile(
+    r"(?i)\b(?:biggest|largest|smallest|top)\s+(?:position|holding|stake)s?\b"
+    r"|\b(?:which|what)\b[^.!?\n]{0,30}\b(?:position|holding|stock|share)s?\b[^.!?\n]{0,30}"
+    r"\b(?:weighs?|is\s+worth|has|have)\s+(?:the\s+)?(?:most|least|highest|lowest|biggest|largest|smallest)\b"
+    r"|\b(?:position|holding)s?\b[^.!?\n]{0,40}\b(?:highest|lowest)\s+(?:average\s+(?:cost|price)|weight|value)\b"
+)
+_RANK_HIGH_EN_RE = re.compile(r"(?i)\b(?:biggest|largest|highest|most|top|heaviest)\b")
+_RANK_LOW_EN_RE = re.compile(r"(?i)\b(?:smallest|lowest|least|lightest)\b")
+_RANK_COST_EN_RE = re.compile(r"(?i)\baverage\s+(?:cost|price)\b|\bcost\s+basis\b")
+_RANK_WEIGHT_EN_RE = re.compile(r"(?i)\bweigh(?:s|t)?\b")
+_RANK_VALUE_EN_RE = re.compile(r"(?i)\b(?:value|worth)\b")
+_RANK_POSITION_EN_RE = re.compile(r"(?i)\b(?:position|holding|stake|stock|share)s?\b")
+# Etiqueta en inglés de cada métrica de _ranking_metric.
+_RANK_LABEL_EN = {"coste medio": "average cost", "peso": "weight", "valor": "value"}
+
+
+# «Analyze my portfolio», «How concentrated is my portfolio?», «What's my
+# exposure?»: el análisis calculado (concentración, reparto, panel de riesgo).
+_PORTFOLIO_ANALYSIS_EN_RE = re.compile(
+    r"(?i)\b(?:analy[sz]e|analysis|concentrat\w*|exposure|how\s+risky|weaknesses|strengths"
+    r"|what\s+do\s+you\s+think|how\s+(?:can\s+I\s+)?improve)\b"
+)
+
+
+def _asks_portfolio_analysis(question: str) -> bool:
+    if _PORTFOLIO_ANALYSIS_RE.search(question):
+        return True
+    return _english() and bool(_PORTFOLIO_ANALYSIS_EN_RE.search(question))
+
+
+def _asks_ranking(question: str) -> bool:
+    if _PORTFOLIO_RANKING_RE.search(question):
+        return True
+    return _english() and bool(_PORTFOLIO_RANKING_EN_RE.search(question))
+
+
+def _ranking_metric_en(question: str) -> tuple[str, str, bool] | None:
+    high = bool(_RANK_HIGH_EN_RE.search(question))
+    low = bool(_RANK_LOW_EN_RE.search(question))
+    if high == low:
+        return None
+    if _RANK_COST_EN_RE.search(question):
+        return ("cost", "coste medio", high)
+    if _RANK_WEIGHT_EN_RE.search(question):
+        return ("value", "peso", high)
+    if _RANK_VALUE_EN_RE.search(question) or _RANK_POSITION_EN_RE.search(question):
+        return ("value", "valor", high)
+    return None
+
+
 def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
     """(métrica, etiqueta, ¿el más alto?) si es una pregunta de ranking; si no, None."""
     high = bool(_RANK_HIGH_RE.search(question))
     low = bool(_RANK_LOW_RE.search(question))
     if high == low:
-        return None
+        return _ranking_metric_en(question) if _english() else None
     if _RANK_COST_RE.search(question):
         return ("cost", "coste medio", high)
     if _RANK_VALUE_RE.search(question):
@@ -845,7 +897,7 @@ def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
         # «¿Cuál es mi mayor posición?»: sin métrica explícita, la mayor es la
         # de más valor (antes acababa en «No tengo fuentes verificadas…»).
         return ("value", "valor", high)
-    return None
+    return _ranking_metric_en(question) if _english() else None
 
 
 def _history_is_portfolio(history: list[ChatTurn] | None) -> bool:
@@ -1517,7 +1569,7 @@ class ChatService:
         if (
             company is None
             and not ticker
-            and _PORTFOLIO_RANKING_RE.search(question or "")
+            and _asks_ranking(question or "")
             and not _ORDER_VERB_RE.search(question or "")
             and not doctrine_question
         ):
@@ -1540,7 +1592,7 @@ class ChatService:
             company is None
             and not ticker
             and _PORTFOLIO_SELF_RE.search(question or "")
-            and _PORTFOLIO_ANALYSIS_RE.search(question or "")
+            and _asks_portfolio_analysis(question or "")
             and not _ORDER_VERB_RE.search(question or "")
             and not doctrine_question
         ):
@@ -1554,7 +1606,7 @@ class ChatService:
             and (
                 (
                     _PORTFOLIO_SELF_RE.search(question or "")
-                    and not _PORTFOLIO_ANALYSIS_RE.search(question or "")
+                    and not _asks_portfolio_analysis(question or "")
                 )
                 or _PORTFOLIO_QUERY_RE.search(question or "")
             )
@@ -1974,6 +2026,8 @@ class ChatService:
         valued.sort(key=lambda row: row[2], reverse=True)
         top = valued[:limit]
         weights = [v / total * 100 for _, _, v in valued]
+        if _english():
+            return self._portfolio_analysis_en(db, tenant_id, rows, valued, unvalued, total, top, weights, limit)
         lines = [
             f"- Mayor posición: {top[0][1].ticker} con {_fmt_number_es(weights[0], 1)} % de la cartera valorada.",
             f"- Las 3 mayores suman {_fmt_number_es(sum(weights[:3]), 1)} %.",
@@ -2070,9 +2124,13 @@ class ChatService:
                 else (row[0].currency or "EUR")
             )
         currencies = sorted({currency_of(row) for row in rows})
+        english = _english()
         if len(currencies) > 1:
             return ChatResponse(
                 answer=(
+                    f"I can't rank them by {_RANK_LABEL_EN[label]}: your positions are in different currencies "
+                    f"({', '.join(currencies)}) and can't be compared without converting them."
+                ) if english else (
                     f"No puedo ordenarlas por {label}: tus posiciones están en monedas distintas "
                     f"({', '.join(currencies)}) y no se pueden comparar sin convertirlas."
                 ),
@@ -2096,14 +2154,97 @@ class ChatService:
         if len(rows) > 1:
             nxt_pos, nxt = rows[1]
             answer += f" Le sigue {nxt.ticker} con {_fmt_money_es(keyfn(rows[1]))} {_currency_display(cur)}."
+        if english:
+            answer = self._ranking_text_en(rows, keyfn, key_name, label, highest, _currency_display(cur))
         return ChatResponse(
             answer=answer,
-            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
+            sources=[self._source_entry(
+                "position", pos.id, f"{'Position' if english else 'Posición'} {comp.ticker}",
+                url="/portfolio", as_of=str(pos.as_of),
+            )],
             model="deterministic",
             prompt_version="portfolio-ranking-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_ranking", "generated": False, "provider_calls": 0},
         )
+
+    def _portfolio_analysis_en(self, db, tenant_id, rows, valued, unvalued, total, top, weights, limit):
+        """_portfolio_analysis en inglés (Ajustes → Idioma = English): mismas cifras."""
+        def pct(value: float) -> str:
+            return f"{_fmt_number_en(value, 1)}%"
+
+        lines = [
+            f"- Largest position: {top[0][1].ticker} with {pct(weights[0])} of the valued portfolio.",
+            f"- The top 3 add up to {pct(sum(weights[:3]))}.",
+            "- Largest weights: " + ", ".join(f"{comp.ticker} {pct(v / total * 100)}" for _, comp, v in top) + ".",
+        ]
+        by_currency: dict[str, float] = {}
+        by_sector: dict[str, float] = {}
+        for pos, comp, v in valued:
+            cur = _currency_display(pos.currency)
+            by_currency[cur] = by_currency.get(cur, 0.0) + v
+            sector = comp.sector if comp.sector and comp.sector != "Unknown" else "no sector"
+            by_sector[sector] = by_sector.get(sector, 0.0) + v
+        lines.append(
+            "- By position currency: "
+            + ", ".join(f"{k} {pct(v / total * 100)}" for k, v in sorted(by_currency.items(), key=lambda kv: -kv[1]))
+            + "."
+        )
+        lines.append(
+            "- By sector: "
+            + ", ".join(f"{k} {pct(v / total * 100)}" for k, v in sorted(by_sector.items(), key=lambda kv: -kv[1])[:limit])
+            + "."
+        )
+        if unvalued:
+            lines.append(f"- No value in the base currency (left out of the percentages): {', '.join(sorted(unvalued))}.")
+        from app.services.brain_context_tools import portfolio_risk_lines
+
+        try:
+            risk_lines, risk_sources = portfolio_risk_lines(db, tenant_id, english=True)
+        except Exception:  # noqa: BLE001 - el panel nunca rompe la respuesta de concentración
+            risk_lines, risk_sources = [], []
+        lines.extend(f"- {line}" if not line.startswith("- ") else line for line in risk_lines)
+        as_of = min(pos.as_of for pos, _ in rows)
+        answer = (
+            "Figures calculated from your saved positions "
+            f"(data as of {_fmt_date_en(as_of.isoformat())}), without a language model. "
+            "They measure concentration and spread; they are not a market risk analysis or a recommendation:\n"
+            + "\n".join(lines)
+        )
+        sources = [
+            self._source_entry("position", pos.id, f"Position {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
+            for pos, comp, _ in top
+        ]
+        sources.extend(risk_sources)
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            model="deterministic",
+            prompt_version="portfolio-analysis-v1",
+            confidence=0.9,
+            llm_trace={"path": "portfolio_analysis", "generated": False, "provider_calls": 0},
+        )
+
+    @staticmethod
+    def _ranking_text_en(rows, keyfn, key_name: str, label: str, highest: bool, currency: str) -> str:
+        """Texto del ranking en inglés; ``rows`` ya viene ordenado."""
+        comp = rows[0][1]
+        word = "highest" if highest else "lowest"
+        if key_name == "value" and label == "peso":
+            head = f"Your {'heaviest' if highest else 'lightest'} position is {comp.ticker}"
+        elif key_name == "value":
+            head = f"Your {'largest' if highest else 'smallest'} position by value is {comp.ticker}"
+        else:
+            head = f"Your position with the {word} {_RANK_LABEL_EN[label]} is {comp.ticker}"
+        answer = f"{head}: {_fmt_money_en(keyfn(rows[0]))} {currency}"
+        if key_name == "value":
+            total = sum(keyfn(row) for row in rows)
+            if total > 0:
+                answer += f", {_fmt_number_en(keyfn(rows[0]) / total * 100, 1)}% of your portfolio"
+        answer += "."
+        if len(rows) > 1:
+            answer += f" Next is {rows[1][1].ticker} with {_fmt_money_en(keyfn(rows[1]))} {currency}."
+        return answer
 
     def _portfolio_performance(
         self, db: Session, question: str, company: Company | None

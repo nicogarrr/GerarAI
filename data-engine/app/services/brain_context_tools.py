@@ -193,8 +193,46 @@ def _snapshot_metrics(db: Session, tenant: int, *, today: date | None = None) ->
     return out
 
 
-def portfolio_risk_lines(db: Session, tenant: int, *, today: date | None = None) -> tuple[list[str], list[dict]]:
-    """Reglas del panel de riesgo y métricas del histórico; vacío si no hay datos."""
+_RISK_ALERT_EN = (
+    (re.compile(r"^(?P<t>\S+) supera el 20 % de peso en la cartera$"), "{t} is over 20% of the portfolio"),
+    (re.compile(r"^(?P<t>\S+) es pre-FCF y supera el 10 % de peso en la cartera$"),
+     "{t} is pre-FCF (no free cash flow yet) and over 10% of the portfolio"),
+    (re.compile(r"^El saldo neto de caja, convertido a (?P<c>\S+), es negativo(?: \(saldo negativo en (?P<n>.+)\))?$"),
+     "The net cash balance, converted to {c}, is negative"),
+    (re.compile(r"^El saldo de caja en (?P<c>\S+) es negativo$"), "The cash balance in {c} is negative"),
+)
+_SEVERITY_EN = {"critical": "critical", "high": "high", "medium": "medium", "low": "low", "info": "info"}
+
+
+def _risk_alert_en(message: str) -> str:
+    """Mensaje de una regla del panel de riesgo en inglés (las tres reglas fijas)."""
+    for pattern, template in _RISK_ALERT_EN:
+        match = pattern.match(message)
+        if match:
+            text = template.format(**{k: v for k, v in match.groupdict().items() if v is not None})
+            if match.groupdict().get("n"):
+                text += f" (negative balance in {match.group('n')})"
+            return text
+    return message
+
+
+def _pct_en(value: float, digits: int = 1) -> str:
+    return f"{value * 100:,.{digits}f}%"
+
+
+def _date_en(value: date | datetime | None) -> str:
+    if value is None:
+        return "no date"
+    return f"{value:%b} {value.day}, {value.year}"
+
+
+def portfolio_risk_lines(
+    db: Session, tenant: int, *, today: date | None = None, english: bool = False
+) -> tuple[list[str], list[dict]]:
+    """Reglas del panel de riesgo y métricas del histórico; vacío si no hay datos.
+
+    ``english``: las mismas cifras en inglés (Ajustes → Idioma = English).
+    """
     from app.services.risk_service import RiskService
 
     lines: list[str] = []
@@ -205,25 +243,57 @@ def portfolio_risk_lines(db: Session, tenant: int, *, today: date | None = None)
         dashboard = None
     if dashboard and dashboard.get("positions"):
         alerts = dashboard.get("alerts") or []
-        if alerts:
+        if alerts and english:
+            lines.append("Risk panel rules currently broken:")
+            for alert in alerts[:6]:
+                severity = _SEVERITY_EN.get(str(alert.get("severity")), str(alert.get("severity")))
+                lines.append(f"- {_risk_alert_en(str(alert.get('message')))} (severity {severity}).")
+        elif english:
+            lines.append("Risk panel: no rule broken (weight > 20%, pre-FCF > 10%, margin).")
+        elif alerts:
             lines.append("Reglas del panel de riesgo que se incumplen ahora:")
             for alert in alerts[:6]:
                 severity = _SEVERITY_ES.get(str(alert.get("severity")), str(alert.get("severity")))
                 lines.append(f"- {alert.get('message')} (gravedad {severity}).")
         else:
             lines.append("Panel de riesgo: ninguna regla incumplida (peso > 20 %, pre-FCF > 10 %, margen).")
-        lines.append(
-            # nosemgrep: gerarai-money-none-to-zero -- contexto de texto para el LLM; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
-            f"Concentración: la mayor posición pesa {_pct(float(dashboard.get('top_1_weight') or 0))} "
-            # nosemgrep: gerarai-money-none-to-zero -- contexto de texto para el LLM; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
-            f"y las 5 mayores {_pct(float(dashboard.get('top_5_weight') or 0))}."
-        )
-        if dashboard.get("status") not in (None, "ok"):
+        if english:
+            lines.append(
+                # nosemgrep: gerarai-money-none-to-zero -- texto; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
+                f"Concentration: the largest position weighs {_pct_en(float(dashboard.get('top_1_weight') or 0))} "
+                # nosemgrep: gerarai-money-none-to-zero -- texto; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
+                f"and the top 5 {_pct_en(float(dashboard.get('top_5_weight') or 0))}."
+            )
+        else:
+            lines.append(
+                # nosemgrep: gerarai-money-none-to-zero -- contexto de texto para el LLM; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
+                f"Concentración: la mayor posición pesa {_pct(float(dashboard.get('top_1_weight') or 0))} "
+                # nosemgrep: gerarai-money-none-to-zero -- contexto de texto para el LLM; dashboard trae siempre los pesos cuando hay posiciones (risk_service)
+                f"y las 5 mayores {_pct(float(dashboard.get('top_5_weight') or 0))}."
+            )
+        if dashboard.get("status") not in (None, "ok") and english:
+            lines.append("Note: the panel is incomplete (missing exchange rate or suspended valuations).")
+        elif dashboard.get("status") not in (None, "ok"):
             lines.append("Ojo: el panel está incompleto (falta tipo de cambio o hay valoraciones en suspenso).")
         sources.append(_source("risk_dashboard", "dashboard",
+                               f"Risk panel (data as of {dashboard.get('data_as_of') or 'N/A'})" if english else
                                f"Panel de riesgo (datos a {dashboard.get('data_as_of') or 'N/D'})", "/risk"))
     metrics = _snapshot_metrics(db, tenant, today=today)
-    if metrics and metrics.get("count"):
+    if metrics and metrics.get("count") and english:
+        part = (
+            f"Portfolio history ({_date_en(metrics['first'])} to {_date_en(metrics['last'])}, "
+            f"{metrics['count']} closes): TWR return {_pct_en(metrics['twr'])}, "
+            f"max drawdown {_pct_en(metrics['max_drawdown'])}"
+        )
+        if metrics.get("volatility") is not None:
+            part += f", annualized volatility {_pct_en(metrics['volatility'])}"
+        lines.append(part + ".")
+        coverage = float(metrics["latest"].pricing_coverage or 0)
+        if coverage < 1:
+            lines.append(f"The latest snapshot has a price for {_pct_en(coverage, 0)} of the portfolio.")
+        sources.append(_source("portfolio_snapshot", metrics["latest"].id,
+                               f"Portfolio snapshot {_date_en(metrics['latest'].snapshot_date)}", "/portfolio"))
+    elif metrics and metrics.get("count"):
         part = (
             f"Histórico de la cartera ({fecha_es(metrics['first'])} a {fecha_es(metrics['last'])}, "
             f"{metrics['count']} cierres): rentabilidad TWR {_pct(metrics['twr'])}, "
@@ -237,6 +307,8 @@ def portfolio_risk_lines(db: Session, tenant: int, *, today: date | None = None)
             lines.append(f"El último snapshot tiene precio para el {_pct(coverage, 0)} de la cartera.")
         sources.append(_source("portfolio_snapshot", metrics["latest"].id,
                                f"Snapshot de cartera {fecha_es(metrics['latest'].snapshot_date)}", "/portfolio"))
+    elif metrics is not None and english:
+        lines.append("There are portfolio snapshots, but no daily returns: no TWR or max drawdown calculated.")
     elif metrics is not None:
         lines.append("Hay snapshots de la cartera, pero sin rentabilidades diarias: no calculo TWR ni caída máxima.")
     return lines, sources
