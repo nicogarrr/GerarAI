@@ -799,6 +799,14 @@ _SALE_CONTEXT_RE = re.compile(
 # AAPL?» sin AAPL en cartera cambiaba a la información de la empresa sin
 # decir que no calculaba el impuesto.
 _SALE_VERB_RE = re.compile(r"(?i)\b(?:vend\w*|venta)\b")
+# «¿Cuánto ganaría si vendo todo UBER?» / «si vendiera UBER, ¿cuánto gano?»:
+# venta hipotética propia sin la palabra impuesto. Es la misma simulación que
+# la del IRPF; antes caía en «No ejecuto órdenes» o en el volcado de empresa.
+# «¿Cuánto he ganado vendiendo KO?» (pasado) no es hipotética y no entra.
+_HYPO_SALE_RE = re.compile(r"(?i)\bsi\s+(?:las?\s+|los\s+)?vend\w*|\bvendi(?:era|ese)\w*")
+_HYPO_SALE_GAIN_RE = re.compile(
+    r"(?i)\b(?:gan(?:o|as|ar[ií]a|ar[ií]as)|ganancias?|beneficio|me\s+quedar[ií]a|sacar[ií]a)\b"
+)
 _NO_POSITION_OFFER = "Si me dices cuántas acciones, a qué precio y cuándo las compraste, te hago la estimación."
 # Primera palabra de un nombre que no identifica a una empresa por sí sola.
 _GENERIC_NAME_WORDS = frozenset({"grupo", "banco", "compania", "compañía", "company", "corporation", "holdings"})
@@ -1815,6 +1823,26 @@ class ChatService:
         bases = {pos.base_currency or "EUR" for pos, _ in rows}
         mixed = len(bases) > 1
         base = rows[0][0].base_currency or "EUR"
+        english = _english()
+        if english:
+            answer = self._portfolio_overview_en(rows, _value, total, unvalued, mixed, base, as_of.isoformat(), limit)
+            cash_line = self._cash_line(
+                db, tenant_id, base if not mixed else None,
+                positions_total=None if mixed or unvalued else total, english=True,
+            )
+            if cash_line:
+                answer += "\n\n" + cash_line
+            return ChatResponse(
+                answer=answer,
+                sources=[
+                    self._source_entry("position", pos.id, f"Position {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
+                    for pos, comp in rows[:limit]
+                ],
+                model="deterministic",
+                prompt_version="portfolio-overview-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_overview", "generated": False, "provider_calls": 0},
+            )
         lines = []
         sources = []
         for pos, comp in rows[:limit]:
@@ -1862,6 +1890,43 @@ class ChatService:
             prompt_version="portfolio-overview-v1",
             confidence=0.9,
             llm_trace={"path": "portfolio_overview", "generated": False, "provider_calls": 0},
+        )
+
+    @staticmethod
+    def _portfolio_overview_en(rows, value_of, total, unvalued, mixed, base, as_of, limit) -> str:
+        """El mismo resumen de cartera que en español, redactado en inglés."""
+        lines = []
+        for pos, comp in rows[:limit]:
+            value = value_of(pos)
+            weight = (
+                f" ({_fmt_number_en(value / total * 100, 1)}%)"
+                if value is not None and total > 0 and not mixed
+                else ""
+            )
+            value_text = (
+                f"value {_fmt_number_en(value, 2)} {_currency_display(pos.base_currency or 'EUR')}{weight}"
+                if value is not None
+                else _UNVALUED_TEXT_EN.format(base=_currency_display(pos.base_currency or "EUR"))
+            )
+            quantity = float(pos.quantity)
+            lines.append(
+                f"- {comp.ticker}: {_fmt_number_en(quantity, 4)} share{'' if quantity == 1 else 's'}, "
+                f"average cost {_fmt_money_en(float(pos.average_cost))} {_currency_display(pos.currency)}, "
+                + value_text
+            )
+        extra = f"\n(Showing the {limit} largest of {len(rows)}.)" if len(rows) > limit else ""
+        total_text = (
+            "different base currencies, no total"
+            if mixed
+            else f"total value {_fmt_money_en(total)} {_currency_display(base)}"
+            + (f" not counting {unvalued} with no value in {_currency_display(base)}" if unvalued else "")
+        )
+        count_label = "open position" if len(rows) == 1 else "open positions"
+        return (
+            f"Your saved portfolio has {len(rows)} {count_label}, {total_text}, "
+            f"as of {_fmt_date_en(as_of)}:\n"
+            + "\n".join(lines)
+            + extra
         )
 
     def _portfolio_analysis(self, db: Session, limit: int = 5) -> ChatResponse | None:
@@ -2221,6 +2286,7 @@ class ChatService:
         base: str | None,
         *,
         positions_total: float | None = None,
+        english: bool = False,
     ) -> str | None:
         """Bloque de caja/margen/neto leido de cash_balances del tenant.
 
@@ -2241,10 +2307,13 @@ class ChatService:
         for row in cash_rows:
             native[row.currency] = native.get(row.currency, 0.0) + float(row.balance)
         if base is None:
+            fmt_money = _fmt_money_en if english else _fmt_money_es
             parts = [
-                f"{_fmt_money_es(amount)} {_currency_display(currency)}"
+                f"{fmt_money(amount)} {_currency_display(currency)}"
                 for currency, amount in sorted(native.items())
             ]
+            if english:
+                return "Saved cash by currency (not added up, different base currencies): " + ", ".join(parts) + "."
             return (
                 "Caja guardada por divisa (sin sumar, monedas base distintas): "
                 + ", ".join(parts) + "."
@@ -2274,6 +2343,8 @@ class ChatService:
                 assets += converted
             else:
                 debt += -converted
+        if english:
+            return self._cash_text_en(assets, debt, base, positions_total, missing, native)
         line = ""
         pieces: list[str] = []
         if assets:
@@ -2291,6 +2362,32 @@ class ChatService:
             line += (
                 f" Sin tipo de cambio guardado para {', '.join(missing)}"
                 f" ({detalle}): esa caja no entra en la suma."
+            )
+        return line.strip() or None
+
+    @staticmethod
+    def _cash_text_en(
+        assets: float, debt: float, base: str, positions_total: float | None,
+        missing: list[str], native: dict[str, float],
+    ) -> str | None:
+        """El bloque de caja/margen/neto de _cash_line, redactado en inglés."""
+        line = ""
+        pieces: list[str] = []
+        if assets:
+            pieces.append(f"cash {_fmt_money_en(assets)} {_currency_display(base)}")
+        if debt:
+            pieces.append(f"margin debt {_fmt_money_en(debt)} {_currency_display(base)}")
+        if pieces:
+            line = "Also: " + " and ".join(pieces)
+            if positions_total is not None:
+                net = positions_total + assets - debt
+                line += f"; net worth {_fmt_money_en(net)} {_currency_display(base)}"
+            line += "."
+        if missing:
+            detail = ", ".join(f"{_fmt_money_en(native[c])} {_currency_display(c)}" for c in missing)
+            line += (
+                f" No saved exchange rate for {', '.join(missing)}"
+                f" ({detail}): that cash is not included in the total."
             )
         return line.strip() or None
 
@@ -2469,7 +2566,11 @@ class ChatService:
         if type(tenant_id) is not int or tenant_id <= 0:
             return None
         lots = parse_purchase_lots(q)
-        intent = bool(_SALE_TAX_RE.search(q) and _SALE_VERB_RE.search(q) and _SALE_CONTEXT_RE.search(q))
+        intent = bool(
+            (_SALE_TAX_RE.search(q) or (_HYPO_SALE_RE.search(q) and _HYPO_SALE_GAIN_RE.search(q)))
+            and _SALE_VERB_RE.search(q)
+            and _SALE_CONTEXT_RE.search(q)
+        )
         offered: str | None = None
         if not intent:
             if not lots:

@@ -106,6 +106,52 @@ def _company_in_question(db: Session, question: str) -> Company | None:
     return next(iter(found.values())) if len(found) == 1 else None
 
 
+_MONTHS_EN = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def _english() -> bool:
+    """True si la petición pide inglés (Ajustes → Idioma, con la generación multidioma activa)."""
+    from app.core.i18n import current_language
+
+    return current_language() == "en"
+
+
+def _date_en(value) -> str:
+    """«Aug 20, 2026» (date/datetime o ISO); None → «N/A»."""
+    if value is None:
+        return "N/A"
+    if isinstance(value, str):
+        try:
+            value = date.fromisoformat(value[:10])
+        except ValueError:
+            return value
+    return f"{_MONTHS_EN[value.month - 1]} {value.day}, {value.year}"
+
+
+def _money_en(value, currency) -> str:
+    """$120.50 para USD; el resto, 1,234.50 con su código."""
+    if currency == "USD":
+        return f"${float(value):,.2f}"
+    return f"{float(value):,.2f} {currency or ''}".strip()
+
+
+def _dividend_line_en(company: Company, record: DividendRecord) -> str:
+    pay = f", paid {_date_en(record.pay_date)}" if record.pay_date else ""
+    source = _source_label(record.source) if record.source else "source not recorded"
+    return (f"{company.ticker}: {_money_en(record.amount, record.currency)} per share, "
+            f"ex-dividend {_date_en(record.ex_date)}{pay} ({source}).")
+
+
+# Con el inglés elegido: «How much MSFT dividends have I received?», «What
+# dividends have I received this year?» son de tu cartera (en español,
+# «cobrado» / «mis dividendos»).
+_PORTFOLIO_DIVIDENDS_EN_RE = re.compile(
+    r"(?i)\bmy\s+(?:portfolio|positions|holdings|shares|stocks|dividends)\b"
+    r"|\b(?:receive[ds]?|collect(?:ed)?|earned|been\s+paid|did\s+I\s+(?:get|earn))\b|\bmy\s+dividend\s+(?:yield|income)\b"
+)
+_LAST_YEAR_EN_RE = re.compile(r"(?i)\blast\s+(?:year|fiscal\s+year)\b")
+
+
 def _dividend_line(company: Company, record: DividendRecord) -> str:
     pay = f", pago {_fecha_es(record.pay_date)}" if record.pay_date else ""
     return (f"{company.ticker}: {_money(record.amount, record.currency)} por acción, "
@@ -131,11 +177,14 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
     today = local_today()  # año/día del usuario (Madrid), no el UTC del servidor
     # «¿Cuál es mi rentabilidad por dividendo?» / «¿cuáles son mis dividendos?»
     # también son de la cartera (antes, la rentabilidad sobre coste o nada).
+    english = _english()
     portfolio = bool(re.search(
         r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas|dividendos)\b|\bcobr\w*\b"
         r"|\bmi\s+(?:rentabilidad|rendimiento)\s+(?:por|de|del)\s+dividendos?\b",
         question,
-    ))
+    )) or (english and bool(_PORTFOLIO_DIVIDENDS_EN_RE.search(question)))
+    line_for = _dividend_line_en if english else _dividend_line
+    money = _money_en if english else _money
     named = _company_in_question(db, question)
     company = None if portfolio else named
     if company is not None:
@@ -143,44 +192,60 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
             DividendRecord.company_id == company.id, DividendRecord.tenant_id == tenant,
         ).order_by(DividendRecord.ex_date.desc()).limit(40)).all())
         records = sorted(kept, key=lambda r: r.ex_date, reverse=True)
-        sources = [_source("dividend_record", r.id, f"Dividendo {company.ticker} · {r.ex_date}", _link(company)) for r in records[:1]]
+        label = "Dividend" if english else "Dividendo"
+        sources = [_source("dividend_record", r.id, f"{label} {company.ticker} · {r.ex_date}", _link(company)) for r in records[:1]]
         upcoming = sorted((r for r in records if r.ex_date >= today), key=lambda r: r.ex_date)
         past = [r for r in records if r.ex_date < today]
         if not records and not uncertain:
-            return _response([f"No tengo dividendos guardados de {company.ticker}. No he consultado el proveedor en directo."], [], "company_dividends")
-        lines = [f"**Dividendos guardados de {company.ticker} · {company.name}**"]
+            return _response([
+                f"I don't have any saved dividends for {company.ticker}. I haven't checked the provider live."
+                if english else
+                f"No tengo dividendos guardados de {company.ticker}. No he consultado el proveedor en directo."
+            ], [], "company_dividends")
+        lines = [f"**{'Saved dividends for' if english else 'Dividendos guardados de'} {company.ticker} · {company.name}**"]
         if upcoming:
-            lines.append("Próximo declarado: " + _dividend_line(company, upcoming[0]))
-            sources = [_source("dividend_record", upcoming[0].id, f"Dividendo {company.ticker} · {upcoming[0].ex_date}", _link(company))]
+            lines.append(("Next declared: " if english else "Próximo declarado: ") + line_for(company, upcoming[0]))
+            sources = [_source("dividend_record", upcoming[0].id, f"{label} {company.ticker} · {upcoming[0].ex_date}", _link(company))]
         else:
-            lines.append("No hay un próximo dividendo declarado guardado.")
+            lines.append("There is no saved upcoming declared dividend." if english
+                         else "No hay un próximo dividendo declarado guardado.")
         if past:
-            lines.append("Último pagado guardado: " + _dividend_line(company, past[0]))
-            sources.append(_source("dividend_record", past[0].id, f"Dividendo {company.ticker} · {past[0].ex_date}", _link(company)))
+            lines.append(("Last paid (saved): " if english else "Último pagado guardado: ") + line_for(company, past[0]))
+            sources.append(_source("dividend_record", past[0].id, f"{label} {company.ticker} · {past[0].ex_date}", _link(company)))
         for event in uncertain:
+            amounts = f"{', '.join(str(a.normalize()) for a in event.amounts)} {event.currency}"
             lines.append(
-                f"Importe incierto el {_fecha_es(event.ex_date)}: "
-                f"{', '.join(str(a.normalize()) for a in event.amounts)} {event.currency}; no lo doy por válido.")
+                f"Uncertain amount on {_date_en(event.ex_date)}: {amounts}; I don't treat it as valid."
+                if english else
+                f"Importe incierto el {_fecha_es(event.ex_date)}: {amounts}; no lo doy por válido.")
         return _response(lines, sources, "company_dividends")
     if not portfolio:
         return None
     rows = db.execute(select(Position, Company).join(Company, Company.id == Position.company_id).where(
         Position.tenant_id == tenant, Position.quantity > 0)).all()
     if not rows:
-        return _response(["No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
+        return _response(["There are no open positions in your portfolio." if english
+                          else "No hay posiciones abiertas en tu cartera."], [], "portfolio_dividends")
     # «¿Cuántos dividendos he cobrado de MSFT?»: solo esa posición (antes,
     # toda la cartera).
     if named is not None:
         rows = [row for row in rows if row[1].id == named.id]
         if not rows:
-            return _response([f"No tienes {named.ticker} en tu cartera ahora mismo; los dividendos de la cartera "
-                              "se calculan con las acciones que tienes hoy."], [], "portfolio_dividends")
+            return _response([
+                f"You don't hold {named.ticker} in your portfolio right now; portfolio dividends "
+                "are calculated with the shares you hold today."
+                if english else
+                f"No tienes {named.ticker} en tu cartera ahora mismo; los dividendos de la cartera "
+                "se calculan con las acciones que tienes hoy."
+            ], [], "portfolio_dividends")
     lines, sources, totals, without, uncertain_tickers = [], [], {}, [], []
     # Lote anti N+1: una consulta de dividendos del año para TODAS las
     # posiciones (misma ventana y orden por ex_date), agrupada por empresa.
     # «¿Cuántos dividendos he cobrado en 2025?» / «el año pasado»: antes
     # respondía siempre con el año en curso («… para 2026»).
     year = _year_in_question(question, today)
+    if english and not _YEAR_IN_QUESTION_RE.search(question or "") and _LAST_YEAR_EN_RE.search(question or ""):
+        year = today.year - 1
     year_start, year_end = date(year, 1, 1), date(year, 12, 31)
     company_ids = sorted({comp.id for _, comp in rows})
     dividends_by_company: dict[int, list[DividendRecord]] = {cid: [] for cid in company_ids}
@@ -202,16 +267,35 @@ def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | 
             continue
         amount = sum((r.amount for r in records), Decimal("0")) * Decimal(str(position.quantity))
         totals[position.currency] = totals.get(position.currency, Decimal("0")) + amount
-        lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {year}, {_money(amount, position.currency)} "
-                     f"({_number(position.quantity)} acciones, importes brutos del proveedor; los de Yahoo van ajustados por splits).")
-        sources.append(_source("dividend_record", records[-1].id, f"Dividendo {comp.ticker} · {records[-1].ex_date}", _link(comp)))
+        if english:
+            lines.append(f"- {comp.ticker}: {len(records)} payment{'' if len(records) == 1 else 's'} in {year}, "
+                         f"{_money_en(amount, position.currency)} ({float(position.quantity):,.2f} shares, gross amounts "
+                         "from the provider; Yahoo's are split-adjusted).")
+        else:
+            lines.append(f"- {comp.ticker}: {len(records)} pago(s) en {year}, {_money(amount, position.currency)} "
+                         f"({_number(position.quantity)} acciones, importes brutos del proveedor; los de Yahoo van ajustados por splits).")
+        sources.append(_source("dividend_record", records[-1].id,
+                               f"{'Dividend' if english else 'Dividendo'} {comp.ticker} · {records[-1].ex_date}", _link(comp)))
     if not lines and not uncertain_tickers:
-        return _response([f"No hay dividendos guardados de tus posiciones para {year}. No he consultado el proveedor en directo."], [], "portfolio_dividends")
-    head = f"Dividendos declarados guardados de tus posiciones abiertas en {year} (brutos, cantidad actual por acción según el proveedor):"
-    total = "Total: " + " · ".join(f"{_money(v, cur)}" for cur, v in sorted(totals.items())) + "."
-    tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
-    if uncertain_tickers:
-        tail.append(f"Excluidos del total por importe incierto: {', '.join(uncertain_tickers)}.")
+        return _response([
+            f"There are no saved dividends from your positions for {year}. I haven't checked the provider live."
+            if english else
+            f"No hay dividendos guardados de tus posiciones para {year}. No he consultado el proveedor en directo."
+        ], [], "portfolio_dividends")
+    if english:
+        head = (f"Saved declared dividends from your open positions in {year} "
+                "(gross, current share count per share as reported by the provider):")
+    else:
+        head = f"Dividendos declarados guardados de tus posiciones abiertas en {year} (brutos, cantidad actual por acción según el proveedor):"
+    total = "Total: " + " · ".join(f"{money(v, cur)}" for cur, v in sorted(totals.items())) + "."
+    if english:
+        tail = [f"No saved dividends: {', '.join(without)}."] if without else []
+        if uncertain_tickers:
+            tail.append(f"Left out of the total because the amount is uncertain: {', '.join(uncertain_tickers)}.")
+    else:
+        tail = [f"Sin dividendos guardados: {', '.join(without)}."] if without else []
+        if uncertain_tickers:
+            tail.append(f"Excluidos del total por importe incierto: {', '.join(uncertain_tickers)}.")
     return _response([head, *lines, total, *tail], sources, "portfolio_dividends")
 
 

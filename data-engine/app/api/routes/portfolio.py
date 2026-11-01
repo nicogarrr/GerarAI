@@ -563,13 +563,13 @@ _QUOTE_MISSING_PNL_KEYS = (
 
 
 def _trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
-    """Posiciones del ledger cuyo «precio de mercado» es el de su última operación.
+    """Posiciones del ledger cuyo «precio de mercado» es el de una de sus operaciones.
 
     Sin cotización guardada, rebuild_position valora con el precio de la última
     compra/venta: con una sola compra la plusvalía sale exactamente 0, un dato
     que parece real y no lo es (auditoría A3). Señal sin columna nueva: fuente
-    ledger, precio igual al de la última operación y ninguna cotización
-    (MarketPrice) desde esa fecha. Un precio manual idéntico al de compra cae
+    ledger, precio igual al de alguna operación y ninguna cotización
+    (MarketPrice) desde la última con ese precio. Un precio manual idéntico al de compra cae
     aquí también; rotularlo «sin cotización real» es inocuo.
     """
     candidates = {
@@ -579,7 +579,9 @@ def _trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
     }
     if not candidates:
         return set()
-    last_trade: dict[int, Transaction] = {}
+    # Última operación con el precio guardado: el rebuild anterior conservaba el
+    # de la PRIMERA operación como si fuera cotización, no solo el de la última.
+    matching_trade: dict[int, Transaction] = {}
     for transaction in db.scalars(
         select(Transaction)
         .where(
@@ -589,12 +591,10 @@ def _trade_price_fallbacks(db: Session, positions: list[Position]) -> set[int]:
         )
         .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
     ):
-        last_trade[transaction.company_id] = transaction
+        if candidates[transaction.company_id].market_price == transaction.price:
+            matching_trade[transaction.company_id] = transaction
     fallbacks: set[int] = set()
-    for company_id, transaction in last_trade.items():
-        position = candidates[company_id]
-        if position.market_price != transaction.price:
-            continue
+    for company_id, transaction in matching_trade.items():
         quoted = db.scalar(
             select(MarketPrice.id)
             .where(MarketPrice.company_id == company_id, MarketPrice.date >= transaction.trade_date)

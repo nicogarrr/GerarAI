@@ -51,9 +51,10 @@ def test_average_cost_and_realized_pnl_from_ledger(db):
     assert position.average_cost == Decimal("110")
     assert position.realized_pnl == Decimal("200")
     assert position.cost_basis_native == Decimal("1650")
-    # A stored market price wins over stale trade prices (live feed preserved);
-    # the last trade price is only a fallback when no price was ever stored.
-    assert position.market_price == Decimal("100")
+    # No quote was ever stored: the 100 kept by earlier rebuilds is only the
+    # first trade's provisional price, so the last trade (sell @ 150) values it.
+    # A real stored quote still wins (test_ledger_rebuild_quote_date_f366).
+    assert position.market_price == Decimal("150")
     assert position.currency == "EUR"
     assert position.source == "postgres_ledger"
     # Same-currency ledger in EUR base: base fields fully populated.
