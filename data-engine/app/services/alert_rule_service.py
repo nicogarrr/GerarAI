@@ -9,6 +9,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.i18n import generation_language
 from app.models import (
     AlertRule,
     Company,
@@ -175,8 +176,12 @@ class AlertRuleService:
         # ante cualquier error, la alerta se emite igual sin `jev_urgency`.
         jev_urgency: dict | None = None
         if triggered:
+            # Idioma guardado del usuario (Ajustes); sin preferencia, espanol como siempre.
+            language = generation_language(db)
             alert_message = (
-                f"{company.ticker}: se cumplió la regla «{rule.name}» "
+                f"{company.ticker}: rule «{rule.name}» was met (observed value: {observed})."
+                if language == "en"
+                else f"{company.ticker}: se cumplió la regla «{rule.name}» "
                 f"(valor observado: {observed})."
             )
             if observation.get("kind") == "thesis_metric":
@@ -191,7 +196,9 @@ class AlertRuleService:
             if news_event is not None:
                 # La alerta cita la noticia concreta (titular de la fuente), no "valor observado: 1".
                 alert_message = (
-                    f"{company.ticker}: noticia nueva para la regla «{rule.name}»: "
+                    f"{company.ticker}: new news for rule «{rule.name}»: {news_event.title.strip()}"
+                    if language == "en"
+                    else f"{company.ticker}: noticia nueva para la regla «{rule.name}»: "
                     f"{news_event.title.strip()}"
                 )
             try:
@@ -209,6 +216,8 @@ class AlertRuleService:
                 "target": rule.target,
                 "observation": observation,
             }
+            if language != "es":
+                alert_metadata["language"] = language
             if news_event is not None:
                 alert_metadata["news_event_id"] = news_event.id
                 if news_event.url:
