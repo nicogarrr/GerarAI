@@ -45,7 +45,7 @@ test('F30: una excepción cruda nunca llega al usuario', () => {
 });
 
 test('la reason nunca sustituye a la cabecera en el componente', () => {
-    assert.match(view, /degradedCopy\(initialTicker, initialResult, \(v\) => countText\(f, v\)\)\.header/);
+    assert.match(view, /degradedCopy\(initialTicker, initialResult, \(v\) => countText\(f, v\), f\.locale\)\.header/);
     assert.match(view, /insider\.degraded\.readFailureNote/);
     assert.equal(esInsider.degraded.readFailureNote, 'Es un fallo de lectura, no una ausencia de actividad insider.');
     assert.match(view, /insider\.degraded\.retryLater/);
@@ -80,7 +80,7 @@ test('partial muestra las señales con aviso de cobertura incompleta', () => {
 });
 
 test('el vacío usa analyzedCountCopy (consciente del estado)', () => {
-    assert.match(view, /analyzedCountCopy\(initialResult\.status, initialResult, \(v\) => countText\(f, v\)\)/);
+    assert.match(view, /analyzedCountCopy\(initialResult\.status, initialResult, \(v\) => countText\(f, v\), f\.locale\)/);
 });
 
 test('unavailable afirma solo lo probado: sin CIK en EDGAR (backend: insider_service devuelve unavailable solo sin CIK)', () => {
@@ -114,7 +114,7 @@ test('lectura durable: el 0 de un status no-ok es «desconocido», no un recuent
 
 test('el panel usa durableReadCopy y no muestra el count si el status no es ok', () => {
     assert.ok(!/lectura durable no disponible/.test(view), 'el copy crudo de status/reason queda vetado');
-    assert.match(view, /durableReadCopy\(initialFilings\)/);
+    assert.match(view, /durableReadCopy\(initialFilings, f\.locale\)/);
     assert.ok(!view.includes('Monitor cada 15 min'), 'telemetría del monitor retirada');
     // Con status no-ok el número NO se pinta como recuento.
     assert.match(view, /\{durable\.header\}/); // explica el fallo sin convertirlo en recuento
@@ -140,5 +140,5 @@ test('filings persistidos: la lectura live fallida se declara con fecha del ulti
 test('filings persistidos: sin copia persistida no hay etiqueta, y la vista la renderiza', () => {
     assert.equal(persistedSourceCopy('ASTS', { filings_scanned: 20 }, count), null);
     assert.equal(persistedSourceCopy('ASTS', { filings_from_persisted: 0 }, count), null);
-    assert.match(view, /persistedSourceCopy\(initialTicker, initialResult, \(v\) => countText\(f, v\)\)/);
+    assert.match(view, /persistedSourceCopy\(initialTicker, initialResult, \(v\) => countText\(f, v\), f\.locale\)/);
 });

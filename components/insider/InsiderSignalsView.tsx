@@ -165,7 +165,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
     }
 
     const durable = initialFilings && initialFilings.status !== 'ok'
-        ? durableReadCopy(initialFilings)
+        ? durableReadCopy(initialFilings, f.locale)
         : null;
 
     return (
@@ -229,7 +229,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 // palabra cruda. Y se deja claro que no es un «sin actividad».
                 <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
                     <p>
-                        {degradedCopy(initialTicker, initialResult, (v) => countText(f, v)).header}{' '}
+                        {degradedCopy(initialTicker, initialResult, (v) => countText(f, v), f.locale).header}{' '}
                         {ti('insider.degraded.readFailureNote')}{' '}
                         {initialFilings && initialFilings.status === 'ok' && initialFilings.filings.length > 0
                             /* Con filings guardados debajo, «reintenta más tarde» a pelo
@@ -238,9 +238,9 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             ? ti('insider.degraded.savedBelow', { count: countText(f, initialFilings.total ?? initialFilings.filings.length) })
                             : ti('insider.degraded.retryLater')}
                     </p>
-                    {degradedCopy(initialTicker, initialResult, (v) => countText(f, v)).detail ? (
+                    {degradedCopy(initialTicker, initialResult, (v) => countText(f, v), f.locale).detail ? (
                         <p className="mt-2 text-xs text-amber-300/80">
-                            {ti('insider.technicalDetail', { detail: degradedCopy(initialTicker, initialResult, (v) => countText(f, v)).detail! })}
+                            {ti('insider.technicalDetail', { detail: degradedCopy(initialTicker, initialResult, (v) => countText(f, v), f.locale).detail! })}
                         </p>
                     ) : null}
                 </div>
@@ -265,15 +265,15 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                 : null}
                         </p>
                     ) : null}
-                    {persistedSourceCopy(initialTicker, initialResult, (v) => countText(f, v)) ? (
+                    {persistedSourceCopy(initialTicker, initialResult, (v) => countText(f, v), f.locale) ? (
                         <p className="rounded-lg border border-amber-900/60 bg-amber-950/20 p-6 text-sm text-amber-200">
-                            {persistedSourceCopy(initialTicker, initialResult, (v) => countText(f, v))}
+                            {persistedSourceCopy(initialTicker, initialResult, (v) => countText(f, v), f.locale)}
                         </p>
                     ) : null}
                     {signals.length === 0 ? (
                         <p className="rounded-lg border border-dashed border-gray-800 p-6 text-sm text-gray-500">
                             {initialTicker}: {ti('insider.noSignals')} (
-                            {analyzedCountCopy(initialResult.status, initialResult, (v) => countText(f, v))}).
+                            {analyzedCountCopy(initialResult.status, initialResult, (v) => countText(f, v), f.locale)}).
                         </p>
                     ) : (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50">

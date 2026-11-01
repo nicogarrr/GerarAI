@@ -135,5 +135,20 @@
     "canadaSourcePost": " (manual check)",
     "sideBuyLabel": "Buy",
     "sideSellLabel": "Sell"
+  },
+  "statusCopy": {
+    "reason": {
+      "secBlocksDatacenter": "the SEC rejects automated requests from this server (HTTP 403)",
+      "secRateLimited": "the SEC rate-limited the requests; try again in a minute",
+      "sourceUnavailable": "the source didn't respond"
+    },
+    "degradedCounts": "{ticker}: SEC EDGAR returned no readable Form 4 ({failed} failed out of {scanned} scanned).",
+    "degradedGeneric": "{ticker}: the Form 4 signals from SEC EDGAR couldn't be fetched or read.",
+    "readableOfScanned": "{parsed} readable of {scanned} scanned",
+    "analyzed": "{count} analyzed",
+    "durableReadFailed": "The history of filings saved by the monitor couldn't be read, so their number is unknown, not zero: this is a failure of that read, not an absence of Form 4s. The signals above are read directly from SEC EDGAR and don't depend on that history.",
+    "noDate": "n/a",
+    "persistedOf": "{ticker}: {count} of {scanned} Form 4s from saved filings (latest filing: {latest}); the live SEC EDGAR read failed. The data comes from those filings, not from today.",
+    "persisted": "{ticker}: {count} Form 4s from saved filings (latest filing: {latest}); the live SEC EDGAR read failed. The data comes from those filings, not from today."
   }
 }
