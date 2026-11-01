@@ -41,7 +41,8 @@
     "prevAria": "Página anterior: {label}",
     "nextAria": "Página siguiente: {label}",
     "prev": "Anterior",
-    "next": "Siguiente"
+    "next": "Siguiente",
+    "ariaOf": "Paginación de {label}"
   },
   "panel": {
     "collapse": "Contraer",

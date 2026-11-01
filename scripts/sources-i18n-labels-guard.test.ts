@@ -22,7 +22,7 @@ const BACKEND_TIERS = [
 ];
 
 test('F323: tipo y nivel de fuente se pintan con etiqueta en espanol', () => {
-    assert.match(page, /\{sourceTypeLabel\(document\.source_type\)\}/);
+    assert.match(page, /\{sourceTypeLabel\(document\.source_type(, locale === 'en' \? t : undefined)?\)\}/);
     assert.match(page, /\{sourceTierLabel\(document\.source_tier\)\}/);
     assert.doesNotMatch(page, /\{document\.source_type\}<\/td>/);
     assert.doesNotMatch(page, /\{document\.source_tier\}<\/td>/);

@@ -24,7 +24,8 @@ describe('cortes de lista declarados', () => {
         assert.match(tickerPage, /<details[\s\S]*previous\.map\(renderAudit\)/);
     });
     it('auditorías en /research/sources: 8 de N declarado', () => {
-        assert.match(sourcesPage, /Se muestran 8 de \{formatNumber\(audits\.length/);
+        assert.match(sourcesPage, /t\('research\.sourcesPage\.auditsShown', \{ total: formatNumber\(audits\.length/);
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage.auditsShown, 'Se muestran 8 de {total} auditorías.');
     });
     it('«Lo que debe cumplirse» se muestra completo, sin corte', () => {
         assert.ok(!panels.includes('what_must_be_true.slice('), 'corte silencioso en lo que debe cumplirse');
@@ -36,7 +37,8 @@ describe('cortes de lista declarados', () => {
         assert.match(list, /total=\{main\.length\}/);
         assert.match(list, /total=\{pending\.length\}/);
         // «Página x de y» va en su propio span (huérfanos 390px): el contrato es paginación con total, no la adyacencia literal.
-        assert.match(pager, /Página \{page\} de \{pages\}/);
+        assert.match(pager, /t\('research\.pageOf', \{ current: page, total: pages \}\)/);
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).pageOf, 'Página {current} de {total}');
         assert.match(pager, /· \{total\} \{label\}/);
     });
 });
