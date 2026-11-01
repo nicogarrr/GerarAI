@@ -674,6 +674,8 @@ _POSITION_QUERY_RE = re.compile(
     r"(?i)\b(?:peso|posici[oó]n|acciones)\b[^.!?\n]{0,40}\b(?:cartera|tengo|mis)\b"
     r"|\b(?:peso|posici[oó]n)\s+(?:de|en|que)\b"
     r"|\bcu[aá]nt[oa]s?\s+(?:acciones\s+)?(?:tengo|vale|valen|tienen)\b"
+    # «¿Cuántas UBER tengo?»: el ticker entre «cuántas» y «tengo».
+    r"|\bcu[aá]nt[oa]s\s+(?:acciones\s+(?:de\s+)?)?[A-Z][A-Z0-9.\-]{0,9}\s+tengo\b"
     # "cuánto pesa ASTS (en mi cartera)" / "qué peso tiene ASTS": la forma
     # verbal de peso tambien es pregunta de posicion.
     r"|\bcu[aá]nt[oa]\s+pesa[n]?\b"
@@ -685,7 +687,16 @@ _POSITION_QUERY_RE = re.compile(
     r"|(?:^|¿)\s*tengo\s+(?!que\b)(?![^.!?\n]*\b(?:watchlist|lista|seguimiento|alertas?|avisos?|dividendos?)\b)"
     r"|\bporcentaje\b[^.!?\n]{0,30}\b(?:cartera|tengo)\b"
     r"|\bmi\s+(?:precio|coste)\s+medio\b"
+    # «¿A qué precio compré UBER?», «¿cuánto pagué por mis ASTS?», «¿cuánto me
+    # costaron las MSFT?»: tu coste de compra. Antes salía la cotización, el
+    # volcado de la empresa o «No ejecuto órdenes» (por «compra»).
+    r"|\bprecio\s+(?:medio\s+)?(?:compr[eé]|pagu[eé]|tengo)\b"
+    r"|\bcu[aá]nto\s+(?:l[oa]s?\s+)?(?:compr[eé]|pagu[eé])\b"
+    r"|\bcu[aá]nto\s+me\s+cost(?:[oó]|aron)\b"
+    r"|\bmi\s+precio\s+(?:medio\s+)?de\s+compra\b"
 )
+# «mi precio de compra» lleva «compra» pero es pregunta, no una orden.
+_PURCHASE_COST_RE = re.compile(r"(?i)\bmi\s+precio\s+(?:medio\s+)?de\s+compra\b")
 # Impuesto de una venta de un ticker concreto («¿cuánto IRPF pagaría si vendo
 # todo UBER?»). Antes el verbo «vendo» la sacaba de la ruta de posición (es
 # un verbo de orden) y el sintetizador de empresa no recibía la posición:
@@ -1326,7 +1337,10 @@ class ChatService:
         if (
             company is not None
             and _POSITION_QUERY_RE.search(question or "")
-            and not _ORDER_VERB_RE.search(question or "")
+            and (
+                not _ORDER_VERB_RE.search(question or "")
+                or _PURCHASE_COST_RE.search(question or "")
+            )
         ):
             position_answer = self._position_answer(db, company, question or "")
             if position_answer is not None:
