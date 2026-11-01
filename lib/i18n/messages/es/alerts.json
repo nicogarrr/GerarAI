@@ -150,5 +150,20 @@
     "create": "+ Alerta",
     "viewAlerts": "Ver alertas",
     "loadingAria": "Cargando el formulario de alerta"
+  },
+  "deliveryLabels": {
+    "channel": {
+      "inApp": "en la app",
+      "email": "correo",
+      "telegram": "Telegram",
+      "push": "notificación"
+    },
+    "status": {
+      "delivered": "entregada",
+      "failed": "fallida",
+      "pending": "pendiente",
+      "skipped": "omitida",
+      "none": "sin registro de entrega"
+    }
   }
 }

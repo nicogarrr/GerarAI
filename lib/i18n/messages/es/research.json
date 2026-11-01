@@ -1749,5 +1749,9 @@
     "actionFinancialFacts": "Refresca los financieros",
     "actionThesis": "Abre la tesis para generarla",
     "actionLongTermModel": "Genera el modelo"
+  },
+  "listingStale": {
+    "withClose": "Ticker sin cotización vigente (último cierre {date})",
+    "noClose": "Ticker sin cotización vigente (sin cierre conocido)"
   }
 }

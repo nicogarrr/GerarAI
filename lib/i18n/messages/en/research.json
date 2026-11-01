@@ -1749,5 +1749,9 @@
     "actionFinancialFacts": "Refresh the financials",
     "actionThesis": "Open the thesis to generate it",
     "actionLongTermModel": "Generate the model"
+  },
+  "listingStale": {
+    "withClose": "Ticker with no current quote (last close {date})",
+    "noClose": "Ticker with no current quote (no known close)"
   }
 }

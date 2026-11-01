@@ -737,7 +737,15 @@
     "rmReasonCalendar": "calendario bursátil incompatible",
     "rmReasonFallback": "sin datos suficientes",
     "rmColWeightIncluded": "Peso en la matriz",
-    "rmCoverageNote": "Contribuciones calculadas solo sobre las {n} posiciones incluidas: sus pesos se renormalizan para sumar 100 %. Las excluidas se listan abajo con su motivo."
+    "rmCoverageNote": "Contribuciones calculadas solo sobre las {n} posiciones incluidas: sus pesos se renormalizan para sumar 100 %. Las excluidas se listan abajo con su motivo.",
+    "xirrReasons": {
+      "missingFx": "faltan tipos de cambio o valores necesarios para incluir todos los flujos y el valor final",
+      "ambiguousCash": "hay flujos de caja ambiguos en el registro",
+      "missingCashBalance": "hay aportaciones registradas pero falta el saldo de caja de la cuenta",
+      "insufficientCashflows": "faltan flujos de caja en el registro de transacciones",
+      "noRoot": "no converge con los flujos registrados",
+      "default": "sin flujos suficientes en el registro de transacciones"
+    }
   },
   "ledgerRejection": {
     "deleteInsufficient": "No se puede borrar: una venta posterior se quedaría sin acciones. Borra o corrige antes esa venta.",

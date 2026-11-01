@@ -514,10 +514,10 @@ function AlertsManager() {
                                             ? ti('alerts.list.lastTriggered', { date: f.formatUserDateTime(alert.lastTriggered) })
                                             : cardT('common.states.neverTriggered')}
                                     </p>
-                                    <p className="inline-flex items-center gap-1 text-xs text-gray-500" title={ti('alerts.list.channelsTitle', { channels: (alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app')), count: String(alert.triggerCount) })}>
+                                    <p className="inline-flex items-center gap-1 text-xs text-gray-500" title={ti('alerts.list.channelsTitle', { channels: (alert.channels.map((c) => etiquetaCanal(c, ti)).join(', ') || etiquetaCanal('in_app', ti)), count: String(alert.triggerCount) })}>
                                         <Send aria-hidden="true" className="h-3.5 w-3.5" />
                                         {alert.lastEvaluatedAt
-                                            ? ti('alerts.list.motorEvaluated', { date: f.formatUserDateTime(alert.lastEvaluatedAt), count: String(alert.triggerCount), channels: (alert.channels.map(etiquetaCanal).join(', ') || etiquetaCanal('in_app')) })
+                                            ? ti('alerts.list.motorEvaluated', { date: f.formatUserDateTime(alert.lastEvaluatedAt), count: String(alert.triggerCount), channels: (alert.channels.map((c) => etiquetaCanal(c, ti)).join(', ') || etiquetaCanal('in_app', ti)) })
                                             : ti('alerts.list.motorPending')}
                                         {alertSkipNote(alert.lastResultStatus) ? ` · ${alertSkipNote(alert.lastResultStatus)}` : null}
                                     </p>
@@ -622,8 +622,8 @@ function AlertsManager() {
                                             // Sin registro de entrega no hay estado «pendiente»:
                                             // mostrar pendiente sería inventar un envío en curso.
                                             const status = delivery?.status ?? ti('alerts.triggered.noDeliveryRecord');
-                                            const statusText = etiquetaEstadoEntrega(status);
-                                            const channelText = etiquetaCanal(channel);
+                                            const statusText = etiquetaEstadoEntrega(status, ti);
+                                            const channelText = etiquetaCanal(channel, ti);
                                             const tone =
                                                 status === 'delivered'
                                                     ? 'border-teal-800 text-teal-300'

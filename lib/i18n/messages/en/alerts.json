@@ -150,5 +150,20 @@
     "create": "+ Alert",
     "viewAlerts": "View alerts",
     "loadingAria": "Loading the alert form"
+  },
+  "deliveryLabels": {
+    "channel": {
+      "inApp": "in the app",
+      "email": "email",
+      "telegram": "Telegram",
+      "push": "notification"
+    },
+    "status": {
+      "delivered": "delivered",
+      "failed": "failed",
+      "pending": "pending",
+      "skipped": "skipped",
+      "none": "no delivery record"
+    }
   }
 }
