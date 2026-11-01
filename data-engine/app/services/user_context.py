@@ -656,7 +656,16 @@ def _plan_block(db: Session, tenant: int) -> ContextBlock:
     return block
 
 
-def _fiscal_block(db: Session, year: int) -> ContextBlock:
+_FISCAL_LABELS_EN = {
+    "total_dividends_base": "gross dividends",
+    "total_withholding_base": "withholding at source",
+    "total_realized_gain_base": "realized gain/loss",
+    "total_blocked_loss_base": "blocked losses (two-month rule)",
+    "net_taxable_base": "estimated savings income base",
+}
+
+
+def _fiscal_block(db: Session, year: int, *, english: bool = False) -> ContextBlock:
     block = ContextBlock("fiscal")
     try:
         from app.services.tax_report_service import TaxReportService
@@ -664,9 +673,21 @@ def _fiscal_block(db: Session, year: int) -> ContextBlock:
         summary = (TaxReportService().get_report(db, year) or {}).get("summary") or {}
     except Exception:  # noqa: BLE001 - el resumen fiscal nunca rompe el chat
         db.rollback()
-        block.lines.append(f"- Ejercicio {year}: no se pudo calcular el informe fiscal ahora.")
+        block.lines.append(
+            f"- Tax year {year}: the tax report couldn't be calculated right now." if english
+            else f"- Ejercicio {year}: no se pudo calcular el informe fiscal ahora."
+        )
         return block
     base = summary.get("base_currency") or "EUR"
+    if english:
+        # Ajustes → Idioma = English: las mismas cifras, en inglés.
+        parts_en = []
+        for key, label in _FISCAL_LABELS_EN.items():
+            value = _f(summary.get(key))
+            parts_en.append(f"{label} {value:,.2f} {base}" if value is not None else f"{label}: no reliable data")
+        block.lines.append(f"- Tax year {year}: " + "; ".join(parts_en) + ". Draft, not tax advice.")
+        block.sources.append(_source("tax_report", year, f"Tax report {year}", "/taxes"))
+        return block
     labels = (
         ("total_dividends_base", "dividendos brutos"),
         ("total_withholding_base", "retenciones en origen"),
@@ -691,6 +712,7 @@ def build_user_context(
     now: datetime | None = None,
     dca_reader: DcaReader | None = None,
     fiscal_year: int | None = None,
+    english: bool = False,
 ) -> UserContext | None:
     """Foto compacta de los datos del usuario. None sin tenant (nunca datos ajenos)."""
     tenant = _tenant(db)
@@ -718,7 +740,10 @@ def build_user_context(
         "avisos": lambda: _alerts_block(db, tenant, now),
         "diario": lambda: _journal_block(db, tenant),
         "plan": lambda: _plan_block(db, tenant),
-        "fiscal": lambda: _fiscal_block(db, fiscal_year or (today.year - 1)),
+        "fiscal": lambda: (
+            _fiscal_block(db, fiscal_year or (today.year - 1), english=True) if english
+            else _fiscal_block(db, fiscal_year or (today.year - 1))
+        ),
     }
     for key in wanted:
         try:
