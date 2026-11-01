@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -800,10 +801,18 @@ def _resuelve_modulo_ts(base: Path) -> Path | None:
     return None
 
 
-def test_los_imports_del_build_apuntan_a_ficheros_del_contexto():
+def _es_salida_de_build(rel: str) -> bool:
+    """`.next/` (y variantes como `.next-e2e-a11y/`) lo genera `next build`
+    DENTRO de la imagen: un import hacia ahí (next-env.d.ts importa
+    ./.next/types/routes.d.ts) se resuelve en el build, no desde el contexto.
+    Solo existe en local si alguien compiló el frontend en ese worktree."""
+    return rel.split("/", 1)[0].startswith(".next")
+
+
+def _imports_fuera_del_contexto(ficheros: list[str]) -> list[str]:
     patterns = read_patterns(DOCKERIGNORE_ROOT)
     rotos: list[str] = []
-    for fichero in _ficheros_ts_del_contexto():
+    for fichero in ficheros:
         texto = (REPO / fichero).read_text(encoding="utf-8", errors="replace")
         for espec in _PATRON_IMPORT_TS.findall(texto):
             if espec.startswith("@/"):
@@ -815,9 +824,33 @@ def test_los_imports_del_build_apuntan_a_ficheros_del_contexto():
                 # No existe ni en el repo: eso lo pillan tsc y el CI de frontend.
                 continue
             rel = resuelto.relative_to(REPO).as_posix()
+            if _es_salida_de_build(rel):
+                continue
             if is_excluded(rel, patterns):
                 rotos.append(f"{fichero} importa '{espec}' -> {rel} queda FUERA del contexto de build")
+    return rotos
+
+
+def test_los_imports_del_build_apuntan_a_ficheros_del_contexto():
+    rotos = _imports_fuera_del_contexto(_ficheros_ts_del_contexto())
     assert not rotos, "\n".join(rotos[:10])
+
+
+def test_los_imports_hacia_la_salida_de_next_build_no_cuentan(tmp_path, monkeypatch):
+    """Tras un `next build` local, next-env.d.ts importa ./.next/types/*.d.ts
+    y .next/ está en el .dockerignore: el test fallaba en cualquier worktree
+    con el frontend compilado. Un import real fuera del contexto sigue en rojo."""
+    (tmp_path / ".next" / "types").mkdir(parents=True)
+    (tmp_path / ".next" / "types" / "routes.d.ts").write_text("export {};\n", encoding="utf-8")
+    (tmp_path / "data-engine" / "data").mkdir(parents=True)
+    (tmp_path / "data-engine" / "data" / "snap.ts").write_text("export {};\n", encoding="utf-8")
+    (tmp_path / "next-env.d.ts").write_text('import "./.next/types/routes.d.ts";\n', encoding="utf-8")
+    (tmp_path / "malo.ts").write_text('import "./data-engine/data/snap";\n', encoding="utf-8")
+    monkeypatch.setattr(sys.modules[__name__], "REPO", tmp_path)
+    assert _imports_fuera_del_contexto(["next-env.d.ts"]) == []
+    assert _imports_fuera_del_contexto(["malo.ts"]) == [
+        "malo.ts importa './data-engine/data/snap' -> data-engine/data/snap.ts queda FUERA del contexto de build"
+    ]
 
 
 def test_todo_dockerfile_con_npm_ci_copia_antes_el_prepare():
