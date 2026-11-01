@@ -21,7 +21,7 @@ void test('el backend ordena por publicación, sin fecha al final', () => {
 
 void test('la UI declara el criterio y etiqueta los sin fecha', () => {
     const src = readFileSync(join(here, '..', 'app/(root)/research/sources/page.tsx'), 'utf8');
-    assert.ok(src.includes('por fecha de publicación'), 'criterio declarado junto a la cuenta');
-    assert.ok(src.includes('los\n            documentos sin fecha van al final') || src.includes('sin fecha van al final'), 'sin fecha al final declarado');
-    assert.ok(src.includes(": 'sin fecha'"), 'celda «sin fecha» explícita, no un guion ambiguo');
+    assert.ok(src.includes("t('research.sourcesPage.sortNote')") && JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage.sortNote.includes('por fecha de publicación'), 'criterio declarado junto a la cuenta');
+    assert.ok(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage.sortNote.includes('sin fecha van al final'), 'sin fecha al final declarado');
+    assert.ok(src.includes(": t('research.sourcesPage.noDate')") && JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage.noDate === 'sin fecha', 'celda «sin fecha» explícita, no un guion ambiguo');
 });

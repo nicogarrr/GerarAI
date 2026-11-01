@@ -8,6 +8,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const ES_SOURCES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage;
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -45,7 +46,7 @@ void test('si /count no responde el total es desconocido, nunca un 0 fingido (F1
         'la cabecera y el truncado solo usan el total cuando es conocido',
     );
     assert.ok(
-        page.includes('documentos en esta página'),
+        page.includes("t('research.sourcesPage.docsOnPage'") && ES_SOURCES.docsOnPage.includes('documentos en esta página'),
         'con total desconocido se declara el alcance: documentos de esta página',
     );
 });
@@ -53,8 +54,8 @@ void test('si /count no responde el total es desconocido, nunca un 0 fingido (F1
 void test('la tabla declara cuando esta truncada', () => {
     const page = source('app/(root)/research/sources/page.tsx');
     assert.ok(page.includes('(pageInfo?.pages ?? 1) > 1'), 'condicion de paginacion presente');
-    assert.ok(page.includes('`Mostrando ${formatNumber(pageInfo?.from ?? 0'), 'el rango visible se declara (X-Y de N), no solo el total');
-    assert.ok(page.includes('por fecha de publicación; los documentos sin fecha van al final.'), 'copy honesto del orden');
+    assert.ok(page.includes("t('research.sourcesPage.showing") && ES_SOURCES.showing.startsWith('Mostrando {from}-{to} de {total}'), 'el rango visible se declara (X-Y de N), no solo el total');
+    assert.ok(ES_SOURCES.sortNote === 'por fecha de publicación; los documentos sin fecha van al final.' && page.includes("t('research.sourcesPage.sortNote')"), 'copy honesto del orden');
 });
 
 void test('/documents/count se registra antes que /documents/{document_id} (FastAPI casa en orden)', () => {

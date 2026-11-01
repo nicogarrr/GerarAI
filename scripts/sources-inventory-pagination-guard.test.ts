@@ -9,6 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const ES_SOURCES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage;
 import test from 'node:test';
 
 import {
@@ -59,9 +60,12 @@ void test('la página declara el subconjunto filtrado y pagina con enlaces', () 
     assert.match(page, /firstSearchParam\(params\.ticker\)/, 'ticker normalizado');
     assert.match(page, /<form action="\/research\/sources"[^>]*method="get">/, 'filtro por GET');
     assert.match(page, /htmlFor="sources-ticker"/, 'label accesible');
-    assert.match(page, /documentos de \$\{ticker\}/, 'el contador nombra el filtro');
+    assert.match(page, /t\('research\.sourcesPage\.docsOfTicker', \{[\s\S]{0,120}?ticker \}\)/, 'el contador nombra el filtro');
+    assert.match(ES_SOURCES.docsOfTicker, /documentos de \{ticker\}/, 'el contador nombra el filtro (es)');
     assert.match(page, /sourcesHref\(ticker, pageInfo\.page [+-] 1, filters\)/, 'paginación conserva todos los filtros');
-    assert.match(page, /Sin documentos de \{ticker\}\./, 'filtro sin resultados lo dice y no finge inventario vacío');
-    assert.match(page, /Quitar (el )?filtro/, 'salida explícita del filtro');
-    assert.match(page, /auditorías\{ticker \? ' \(global\)' : ''\}/, 'el contador de auditorías declara que es global bajo filtro');
+    assert.match(page, /t\('research\.sourcesPage\.emptyTicker', \{ ticker \}\)/, 'filtro sin resultados lo dice y no finge inventario vacío');
+    assert.equal(ES_SOURCES.emptyTicker, 'Sin documentos de {ticker}.');
+    assert.match(page, /t\('research\.sourcesPage\.removeTickerFilter'\)/, 'salida explícita del filtro');
+    assert.match(ES_SOURCES.removeTickerFilter, /Quitar (el )?filtro/, 'salida explícita del filtro (es)');
+    assert.match(page, /t\('research\.sourcesPage\.auditsCount'[\s\S]{0,120}?\}\)\}\{ticker \? ' \(global\)' : ''\}/, 'el contador de auditorías declara que es global bajo filtro');
 });

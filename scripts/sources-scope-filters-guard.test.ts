@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const ES_SOURCES = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).sourcesPage;
 import test from 'node:test';
 
 import {
@@ -43,12 +44,16 @@ test('los enlaces conservan alcance, tipo, búsqueda y ticker al paginar', () =>
 test('la página expone los tres controles y un vacío honesto que lleva a «Todas»', () => {
   const page = readFileSync(PAGE, 'utf8');
   assert.match(page, /name="scope"/);
-  assert.match(page, /<option value="followed">Mi universo<\/option>/);
-  assert.match(page, /<option value="all">Todas<\/option>/);
+  assert.match(page, /<option value="followed">\{t\('research\.sourcesPage\.scopeFollowed'\)\}<\/option>/);
+  assert.equal(ES_SOURCES.scopeFollowed, 'Mi universo');
+  assert.match(page, /<option value="all">\{t\('research\.sourcesPage\.scopeAll'\)\}<\/option>/);
+  assert.equal(ES_SOURCES.scopeAll, 'Todas');
   assert.match(page, /name="source_type"/);
   assert.match(page, /name="q"/);
-  assert.match(page, /Sin documentos en tu universo\./);
-  assert.match(page, /Cambia el alcance a «Todas» para ver el inventario completo\./);
+  assert.match(page, /t\('research\.sourcesPage\.emptyFollowed'\)/);
+  assert.equal(ES_SOURCES.emptyFollowed, 'Sin documentos en tu universo.');
+  assert.match(page, /t\('research\.sourcesPage\.followedHint'\)/);
+  assert.match(ES_SOURCES.followedHint, /Cambia el alcance a «Todas» para ver el inventario completo\./);
   assert.match(page, /href=\{sourcesHref\(ticker, 1, \{ scope: 'all', sourceType: sourceType \|\| undefined, q: query \|\| undefined \}\)\}/);
 });
 
