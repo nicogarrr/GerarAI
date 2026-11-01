@@ -79,8 +79,8 @@ export function fiscalYearNote(data: DividendProjectionFiscalYear): string | nul
  * posición fraccionaria 0,000001 no puede pintarse como "0" (sería inventar
  * una ausencia). Los ceros de relleno a la derecha se recortan.
  */
-export function formatPositionQuantity(quantity: number): string {
-  return quantity.toLocaleString('es-ES', {
+export function formatPositionQuantity(quantity: number, locale: 'es' | 'en' = 'es'): string {
+  return quantity.toLocaleString(locale === 'en' ? 'en-US' : 'es-ES', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 6,
   });

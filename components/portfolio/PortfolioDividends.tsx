@@ -322,7 +322,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                                                 </Link>
                                             </td>
                                             <td className="py-2 pr-4">
-                                                {formatPositionQuantity(position.quantity)}
+                                                {formatPositionQuantity(position.quantity, f.locale === 'en' ? 'en' : 'es')}
                                             </td>
                                             <td className="py-2 pr-4">{position.frequency_last_year}</td>
                                             <td className="py-2 pr-4">{f.formatMoney(position.gross_base, baseCurrency)}</td>
@@ -346,7 +346,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                                             {position.ticker}
                                         </Link>
                                         <span className="text-xs text-gray-500">
-                                            {ti('portfolio.dividends.sharesLine', { quantity: formatPositionQuantity(position.quantity), count: position.frequency_last_year })}
+                                            {ti('portfolio.dividends.sharesLine', { quantity: formatPositionQuantity(position.quantity, f.locale === 'en' ? 'en' : 'es'), count: position.frequency_last_year })}
                                         </span>
                                     </div>
                                     <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1">
