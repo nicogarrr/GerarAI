@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { getHoldingSignals } from '@/lib/actions/holding-signals.actions';
 import {
     dcaLevelText,
+    fairValueLabelText,
     fairValueGapPercent,
     type HoldingSignals,
 } from '@/lib/portfolio/holding-signals';
 import { isValidCurrencyCode } from '@/lib/format';
-import { useT, useFormat } from '@/lib/i18n/client';
+import { useLocale, useT, useFormat } from '@/lib/i18n/client';
 import { cn } from '@/lib/utils';
 
 const EMPTY_SIGNALS: HoldingSignals = { fairValues: {}, dca: null };
@@ -40,6 +41,7 @@ export function useHoldingSignals(symbols: string[]): HoldingSignals | null {
 /** Chip del nivel DCA: color de la zona del motor o «Sin nivel» gris. */
 export function DcaLevelChip({ symbol, signals }: { symbol: string; signals: HoldingSignals | null }) {
     const ti = useT();
+    const locale = useLocale();
     const f = useFormat();
     if (signals === null) return <span className="text-xs text-gray-500">…</span>;
     const level = signals.dca?.[symbol.toUpperCase()] ?? null;
@@ -59,7 +61,7 @@ export function DcaLevelChip({ symbol, signals }: { symbol: string; signals: Hol
             style={level?.color ? { backgroundColor: level.color, color: level.fg ?? undefined } : undefined}
             title={title}
         >
-            {dcaLevelText(level)}
+            {dcaLevelText(level, locale)}
         </span>
     );
 }
@@ -78,6 +80,7 @@ export function FairValueLine({
 }) {
     const ti = useT();
     const f = useFormat();
+    const locale = useLocale();
     if (signals === null) return <span className="text-xs text-gray-500">…</span>;
     const fair = signals.fairValues[symbol.toUpperCase()];
     if (!fair) return <span className="text-xs text-gray-500" title={ti('portfolio.holdingSignals.noFairValueTitle')}>{ti('portfolio.holdingSignals.noFairValue')}</span>;
@@ -86,7 +89,7 @@ export function FairValueLine({
     return (
         <span
             className="block text-right text-xs text-gray-300"
-            title={ti('portfolio.holdingSignals.fairSource', { label: fair.label }) + (fair.asOf ? ` · ${f.formatMarketDate(fair.asOf)}` : '')}
+            title={ti('portfolio.holdingSignals.fairSource', { label: fairValueLabelText(fair.label, locale) }) + (fair.asOf ? ` · ${f.formatMarketDate(fair.asOf)}` : '')}
         >
             {amount}
             {gap !== null ? (
@@ -94,7 +97,7 @@ export function FairValueLine({
                     ({f.formatPercent(gap, { fromRatio: false, digits: 1, signDisplay: 'always' })})
                 </span>
             ) : null}
-            <span className="block text-[10px] text-gray-500">{fair.label}</span>
+            <span className="block text-[10px] text-gray-500">{fairValueLabelText(fair.label, locale)}</span>
         </span>
     );
 }
