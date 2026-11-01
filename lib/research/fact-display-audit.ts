@@ -1,5 +1,19 @@
 /** Read-time quarantine. The persisted fact is preserved for source repair. */
+const AUDIT_EN: Record<string, string> = {
+  'Capitalización pendiente de auditoría: unidad monetaria no verificada': 'Market cap pending audit: currency unit not verified',
+  'BPA pendiente de auditoría: unidad no verificada': 'EPS pending audit: unit not verified',
+  'BPA pendiente de auditoría: valor sin linaje de filing verificable': 'EPS pending audit: value without a verifiable filing lineage',
+};
+
+/** Motivo de cuarentena en el idioma elegido (español por defecto). */
 export function factDisplayAudit(ticker: string, fact: {
+  metric: string; unit: string; period: string; value: string;
+}, locale: 'es' | 'en' = 'es'): string | null {
+  const reason = factDisplayAuditEs(ticker, fact);
+  return reason && locale === 'en' ? AUDIT_EN[reason] ?? reason : reason;
+}
+
+function factDisplayAuditEs(ticker: string, fact: {
   metric: string; unit: string; period: string; value: string;
 }): string | null {
   if (fact.metric === 'market_cap' && !/^[A-Z]{3}$/.test(fact.unit)) {
@@ -40,9 +54,12 @@ const BALANCE_SNAPSHOT_METRICS = new Set([
 export function factStalenessNotice(
   fact: { metric: string; fiscal_year: number | null },
   context: { isLatestForMetric: boolean; latestFiscalYear: number | null },
+  locale: 'es' | 'en' = 'es',
 ): string | null {
   if (!context.isLatestForMetric || context.latestFiscalYear === null) return null;
   if (!BALANCE_SNAPSHOT_METRICS.has(fact.metric) || fact.fiscal_year === null) return null;
   if (context.latestFiscalYear - fact.fiscal_year <= 1) return null;
-  return `Último dato disponible: ${fact.fiscal_year}, sin refresco posterior`;
+  return locale === 'en'
+    ? `Latest available figure: ${fact.fiscal_year}, not refreshed since`
+    : `Último dato disponible: ${fact.fiscal_year}, sin refresco posterior`;
 }
