@@ -9,7 +9,10 @@ test('ownership: el estado «Sin datos 13F» tiene el botón que el texto anunci
   assert.ok(!page.includes('Pulsa &quot;Sincronizar 13F&quot;'), 'no queda la instrucción sin botón');
 
   const button = (readFileSync('app/(root)/inversores/_components/SyncPortfoliosButton.tsx', 'utf8') + ES_INVESTORS_JSON);
-  assert.ok(page.includes('label="Sincronizar 13F"'), 'la etiqueta coincide con lo que el estado anunciaba');
+  // La etiqueta vive en es/ownership.json (page.sync); el estado vacío la anuncia igual.
+  const esOwnership = JSON.parse(readFileSync('lib/i18n/messages/es/ownership.json', 'utf8'));
+  assert.ok(page.includes("label={t('ownership.page.sync')}"), 'la etiqueta coincide con lo que el estado anunciaba');
+  assert.equal(esOwnership.page.sync, 'Sincronizar 13F');
   assert.ok(button.includes("label ?? t('investors.sync.label')"), 'etiqueta por defecto conservada');
   assert.ok(button.includes('"label": "Sincronizar carteras ahora"'), 'etiqueta por defecto conservada (diccionario)');
   assert.ok(!button.includes('bg-teal-600'), 'sin override de primario: usa el Button por defecto');

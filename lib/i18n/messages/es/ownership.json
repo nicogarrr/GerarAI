@@ -1,1 +1,97 @@
-{}
+{
+  "page": {
+    "metaTitle": "Propiedad institucional (13F)",
+    "metaDescription": "Carteras de gestores institucionales tal como se declaran ante la SEC (Form 13F, EDGAR), con cambios trimestre a trimestre.",
+    "feature": "Propiedad institucional (13F)",
+    "title": "Movimientos 13F",
+    "viewsAria": "Vistas de Movimientos 13F",
+    "views": {
+      "gestor": "Por gestor",
+      "masCompradas": "Más compradas",
+      "solape": "Solape con tu cartera"
+    },
+    "noManagers": "No hay gestores revisados en esta versión",
+    "report": "informe {date}",
+    "publishedLag": "publicado hasta 45 días después",
+    "coverage": "cobertura {value}",
+    "holdingsAria": "Posiciones 13F declaradas",
+    "holdingsCaption": "Posiciones declaradas en el último informe 13F del gestor, tal como constan en EDGAR",
+    "col": {
+      "issuerDeclared": "Emisor (tal como se declaró)",
+      "class": "Clase",
+      "value": "Valor",
+      "shares": "Acciones",
+      "type": "Tipo",
+      "issuer": "Emisor",
+      "change": "Cambio",
+      "sharesBefore": "Acciones antes",
+      "sharesNow": "Acciones ahora",
+      "valueBefore": "Valor antes",
+      "valueNow": "Valor ahora"
+    },
+    "amendment": "enmienda",
+    "fetchedAt": "Datos obtenidos el {datetime}.",
+    "noData": "Sin datos 13F todavía",
+    "noDataHint": "Sincroniza para consultar el último informe declarado ante la SEC.",
+    "sync": "Sincronizar 13F",
+    "syncQueued": "Sincronización en curso; recarga la página en unos minutos para ver el informe.",
+    "changesTitle": "Cambios trimestre a trimestre ({from} → {to})",
+    "changesLag": "informes publicados hasta 45 días después de cada cierre",
+    "moves": "{n} movimientos",
+    "changesAria": "Cambios 13F trimestre a trimestre",
+    "changesCaption": "Cambios de cada emisor entre los dos últimos informes 13F, con acciones y valor antes y ahora",
+    "change": {
+      "new": "nueva posición",
+      "closed": "cerrada",
+      "increased": "aumentada",
+      "decreased": "reducida",
+      "unchanged": "sin cambios"
+    },
+    "noMoves": "Sin movimientos entre los dos últimos informes.",
+    "changesUnavailable": "Cambios trimestrales no disponibles todavía",
+    "needTwoReports": "Hacen falta dos informes 13F almacenados para comparar; estará disponible tras el próximo trimestre.",
+    "syncToCompare": "Sincroniza este gestor para poder comparar informes.",
+    "limits": "Límites de este dato"
+  },
+  "sync": {
+    "done": "Sincronización completada.",
+    "unknownError": "error desconocido",
+    "failed": "No se pudo sincronizar {manager}: {reason}",
+    "theManager": "el gestor",
+    "error": "No se pudo completar la sincronización. Inténtalo de nuevo.",
+    "syncing": "Sincronizando…"
+  },
+  "mostBought": {
+    "feature": "Más compradas",
+    "intro": "Lo que más inversores añadieron a su cartera en el último trimestre.",
+    "empty": "Sin datos todavía: faltan dos trimestres de 13F sincronizados.",
+    "buyers": "{n} compran",
+    "sellers": "{n} reducen",
+    "source": "Fuente: SEC, Form 13F (EDGAR){reports}. Trimestral, con hasta 45 días de retardo. Compara cada inversor con su trimestre anterior ({n} comparados{withoutHistory}{partial}). Solo acciones largas en EE. UU.; las opciones no cuentan. El 13F no trae ticker, se muestra el emisor y su CUSIP. Valor = posición actual de quienes compran, en dólares.",
+    "reportsAt": ", informes a {period}",
+    "withoutHistory": ", {n} sin dos trimestres todavía",
+    "partial": ", {n} con datos parciales"
+  },
+  "overlap": {
+    "feature": "Solape de cartera",
+    "summary": "DERIVADO · Coincidencia por CUSIP · {withData} gestores con datos · {withoutData} sin datos · {partial} parciales",
+    "note": "13F histórico, no cartera actual. Hasta 45 días de retraso; posiciones largas declaradas en EE. UU., sin opciones.",
+    "noCusip": "Sin CUSIP verificado: no se puede cruzar.",
+    "noMatches": "Sin coincidencias en los informes disponibles.",
+    "portfolioAt": "Cartera a {period}",
+    "filed": "Presentado {date}",
+    "noFilingDate": "sin fecha registrada",
+    "partialData": "Datos parciales",
+    "original": "13F original",
+    "boughtTitle": "Compradas por varios, fuera de tu cartera",
+    "unresolved": "Sin comparación completa: {n} posiciones sin CUSIP verificado.",
+    "noBought": "Sin coincidencias con compras de dos o más gestores.",
+    "buyers": "CUSIP {cusip} · {n} compradores",
+    "noPeriod": "Periodo sin registrar",
+    "pagerAria": "Paginación de compras",
+    "prev": "Anterior",
+    "next": "Siguiente",
+    "page": "Página {page} de {total}",
+    "periods": "Periodos 13F: {periods}"
+  }
+}

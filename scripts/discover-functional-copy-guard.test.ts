@@ -11,6 +11,6 @@ test('Descubrir: se retira telemetría sin quitar avisos de calidad',()=>{
  for(const code of ['durable.header','durable.detail','degradedCopy','persistedSourceCopy','loadMoreInsiderFilings'])assert.ok(signals.includes(code));
  assert.ok(!(read('app/(root)/propicks/page.tsx') + ES_PROPICKS_JSON).includes('Selección vigente del último run'));
  assert.ok((read('app/(root)/propicks/page.tsx') + ES_PROPICKS_JSON).includes('no como validación de la estrategia'));
- assert.ok(read('app/(root)/ownership/page.tsx').includes('ownershipLimitations(item)'), 'los límites siguen en el desplegable final de #1937');
+ assert.ok(read('app/(root)/ownership/page.tsx').includes('ownershipLimitations(item, fmt.locale, NA)'), 'los límites siguen en el desplegable final de #1937');
  assert.ok(!read('app/(root)/ownership/page.tsx').includes('tabla revisada en código'));
 });

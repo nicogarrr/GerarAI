@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 // Movidas a vistas de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
-const page = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8');
+// El texto vive en es/ownership.json: solo se añade la sección de Más compradas.
+const page = readFileSync('app/(root)/ownership/_components/MostBought.tsx', 'utf8')
+    + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/ownership.json', 'utf8')).mostBought);
 const grid = readFileSync('app/(root)/inversores/_components/HubNav.tsx', 'utf8');
 
 test('Más compradas dice "Sin datos todavía" cuando no hay dos trimestres', () => {

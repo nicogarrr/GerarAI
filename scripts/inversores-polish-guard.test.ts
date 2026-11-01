@@ -31,7 +31,7 @@ test('singular "1 nueva" y plural "2 nuevas" (comportamiento real, no regex)', (
 });
 
 test('la página de Más compradas usa newLabel dentro de la plantilla (sin llaves literales)', () => {
-    assert.match(bought, /\$\{newLabel\(item\.new_count\)\}/);
+    assert.match(bought, /\$\{newLabel\(item\.new_count, locale\)\}/);
     assert.ok(!/\{item\.new_count === 1/.test(bought));
 });
 
