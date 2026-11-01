@@ -637,12 +637,20 @@ _PORTFOLIO_RANKING_RE = re.compile(
     r"|\bposici[oó]n\b[^.!?\n]{0,25}\b(?:m[aá]s|mayor|menos|menor)\s+(?:peso|grande|peque[nñ]a|valor)\b"
     r"|\bposici[oó]n\s+(?:que\s+)?pesa\s+(?:m[aá]s|menos)\b"
     r"|\b(?:mayor|menor)\s+posici[oó]n\b"
+    # «¿qué posición tiene el coste medio más alto?»: _ranking_metric ya lo
+    # sabía calcular, pero la pregunta no llegaba a la ruta. Sin «posición»
+    # (ni historial de cartera) sigue sin secuestrarse.
+    r"|\bposici[oó]n\b[^.!?\n]{0,40}\b(?:coste|precio)\s+medio\s+m[aá]s\s+(?:alto|bajo)\b"
 )
 # Rentabilidad de la cartera o de una posición: cifra guardada (coste base y
 # valor base), declarada como rentabilidad simple sobre coste, nunca TWR.
 _PERFORMANCE_RE = re.compile(
     r"(?i)\b(?:rentabilidad|rendimiento|ganancia(?:s)?|p[ée]rdida(?:s)?|"
     r"cu[aá]nto\s+(?:he\s+)?(?:ganado|perdido)|c[oó]mo\s+(?:me\s+)?va\s+(?:la|mi)\s+inversi[oó]n)\b"
+    # «¿cuánto pierdo con ASTS?» / «¿voy ganando o perdiendo?»: antes iban al
+    # volcado de la empresa. Con «si …» es un escenario, no la cifra guardada.
+    r"|\b(?:cu[aá]nto\s+(?:gano|pierdo|llevo\s+(?:ganado|perdido))|voy\s+(?:ganando|perdiendo))\b"
+    r"(?![^.!?\n]*\bsi\b)"
 )
 # "¿Qué es la rentabilidad?" / "¿cómo se calcula?" son preguntas de concepto:
 # las responde la ruta educativa, no la cifra de cartera.
@@ -713,6 +721,7 @@ _RANK_LOW_RE = re.compile(
 _RANK_COST_RE = re.compile(r"(?i)\bcoste\s+medio\b|\bprecio\s+medio\b")
 _RANK_VALUE_RE = re.compile(r"(?i)\b(?:valor|pes[oa])\b")
 _RANK_WEIGHT_LABEL_RE = re.compile(r"(?i)\bpes[oa]\b")
+_RANK_POSITION_RE = re.compile(r"(?i)\bposici[oó]n\b")
 
 
 def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
@@ -726,6 +735,10 @@ def _ranking_metric(question: str) -> tuple[str, str, bool] | None:
     if _RANK_VALUE_RE.search(question):
         label = "peso" if _RANK_WEIGHT_LABEL_RE.search(question) else "valor"
         return ("value", label, high)
+    if _RANK_POSITION_RE.search(question):
+        # «¿Cuál es mi mayor posición?»: sin métrica explícita, la mayor es la
+        # de más valor (antes acababa en «No tengo fuentes verificadas…»).
+        return ("value", "valor", high)
     return None
 
 
