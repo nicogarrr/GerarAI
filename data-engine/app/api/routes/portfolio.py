@@ -1,5 +1,6 @@
 import logging
 import math
+import re
 from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
@@ -96,7 +97,7 @@ from app.services.transaction_import_service import (
     TransactionImportPreviewResponse,
     TransactionImportService,
 )
-from app.valuation.currency import canonical_currency_code
+from app.valuation.currency import MINOR_UNITS, canonical_currency_code
 
 logger = logging.getLogger(__name__)
 
@@ -212,6 +213,9 @@ MAX_NUMERIC_20_10 = Decimal("9999999999.9999999999")
 MIN_NUMERIC_20_10 = Decimal("0.0000000001")
 
 
+_MINOR_UNIT_CODES = frozenset(code.upper() for code in MINOR_UNITS)
+
+
 class PortfolioTransactionInput(BaseModel):
     ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
     action: Literal["buy", "sell", "dividend", "interest", "fee", "cash_misc"]
@@ -233,6 +237,18 @@ class PortfolioTransactionInput(BaseModel):
         if value > 0 and value.quantize(MIN_NUMERIC_20_6, rounding=ROUND_HALF_EVEN) == 0:
             raise ValueError("must be at least 0.000001 (6 decimal places)")
         return value
+
+    @field_validator("currency")
+    @classmethod
+    def _currency_is_a_code(cls, value: str) -> str:
+        # «1e30», «EURO» o «€» se guardaban tal cual y esa posicion no
+        # encontraba nunca tipo de cambio («incompleta» para siempre). Valen
+        # los ISO de 3 letras y las subunidades que conoce la valoracion
+        # (GBp, GBX, GBPENCE, ZAc...); canonical_currency_code las normaliza.
+        text = value.strip()
+        if re.fullmatch(r"[A-Za-z]{3}", text) or text.upper() in _MINOR_UNIT_CODES:
+            return text
+        raise ValueError("currency must be a currency code such as EUR, USD or GBp")
 
     @field_validator("fees")
     @classmethod
