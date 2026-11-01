@@ -286,3 +286,8 @@ def test_lote_con_mis_n_acciones_que_compre_a():
     assert [(lot.quantity, lot.price, lot.currency, lot.trade_date) for lot in lots] == [
         (D("50"), D("150"), "USD", date(2024, 3, 3))
     ]
+
+
+def test_porcentaje_de_venta_no_es_cantidad_del_lote():
+    """«vendo 15 % de lo que compré a 100 €»: 15 es un porcentaje, no 15 acciones del lote."""
+    assert parse_purchase_lots("si vendo 15% de las que compré a 100 € el 2 de enero de 2025") == []

@@ -66,6 +66,19 @@ _BOUGHT_AT_RE = re.compile(
 # verbo y la cifra la cantidad no se leía y se simulaba la venta de TODO.
 _SALE_QTY_RE = re.compile(
     rf"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|mis|las|los|unas|unos|hoy|ahora)\s+)*(?P<qty>-?(?:{_NUM}))\b"
+    # «vendo 15 %» es un porcentaje, no 15 acciones.
+    r"(?![\d.,]*\s*(?:%|por\s*ciento))"
+)
+# «vendo el 50 %», «un 20 por ciento»: parte de la posición, no una cantidad.
+_SALE_PCT_RE = re.compile(
+    rf"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|el|un|hoy|ahora)\s+)*(?P<pct>{_NUM})\s*(?:%|por\s*ciento)"
+)
+# «vendo un tercio», «tres cuartos»: antes se simulaba la venta de TODO.
+_SALE_FRACTIONS = {
+    "un tercio": (1, 3), "dos tercios": (2, 3), "un cuarto": (1, 4), "tres cuartos": (3, 4),
+}
+_SALE_FRACTION_RE = re.compile(
+    r"(?i)\bvend\w*\s+(?:(?:solo|s[oó]lo|hoy|ahora)\s+)*(?P<frac>un\s+tercio|dos\s+tercios|un\s+cuarto|tres\s+cuartos)\b"
 )
 _SALE_HALF_RE = re.compile(r"(?i)\bvend\w*\s+(?:la\s+)?mitad\b")
 
@@ -215,6 +228,15 @@ def parse_sale_price(text: str) -> tuple[Decimal, str | None] | None:
 def _sale_quantity(text: str, held: Decimal) -> Decimal:
     if _SALE_HALF_RE.search(text):
         return held / 2
+    pct = _SALE_PCT_RE.search(text)
+    if pct:
+        share = parse_number(pct.group("pct"))
+        if share is not None:
+            return held * share / 100
+    frac = _SALE_FRACTION_RE.search(text)
+    if frac:
+        num, den = _SALE_FRACTIONS[" ".join(frac.group("frac").lower().split())]
+        return held * num / den
     m = _SALE_QTY_RE.search(text)
     if m:
         asked = parse_number(m.group("qty"))
