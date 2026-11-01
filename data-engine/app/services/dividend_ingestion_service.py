@@ -26,6 +26,7 @@ from app.services.dividend_records import records_in_position_currency, resolve_
 from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.provenance import Coverage, SourceKind, provenance
 from app.services.split_ingestion_service import ProviderIngestionService
+from app.valuation.currency import is_currency_code
 
 
 class DividendIngestionService(ProviderIngestionService):
@@ -59,14 +60,15 @@ class DividendIngestionService(ProviderIngestionService):
         """Primera divisa presente, o None. La divisa sale del dividendo/listado
         (Yahoo meta.currency, fila FMP), NUNCA de company.currency (divisa de
         reporte: Novartis SIX reporta en USD y paga en CHF) ni de USD por
-        omision: sin divisa el dividendo no se ingiere."""
+        omision: sin divisa el dividendo no se ingiere. Un codigo que no es
+        ISO 4217 ni subunidad («NaN», «N/A», «XYZ») cuenta como sin divisa:
+        ningun tipo de cambio sabria convertirlo."""
         for value in candidates:
             raw = str(value or "").strip()
             if raw == "GBp":  # peniques: no son libras
                 return "GBX"
-            text = raw.upper()[:10]
-            if text:
-                return text
+            if raw and is_currency_code(raw):
+                return raw.upper()
         return None
 
     async def _fetch_rows(
