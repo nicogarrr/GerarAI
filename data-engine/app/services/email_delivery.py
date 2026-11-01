@@ -171,21 +171,23 @@ def generic_alert_content(payload: dict) -> EmailContent:
     from html import escape
 
     severity = str(payload.get("severity") or "").upper()
-    title = str(payload.get("title") or "Alerta")
+    en = payload.get("language") == "en"
+    title = str(payload.get("title") or ("Alert" if en else "Alerta"))
     message = str(payload.get("message") or "")
     ticker = payload.get("ticker")
+    footer = "Open GerarAI to see the alert details." if en else "Abre GerarAI para ver el detalle de la alerta."
     subject = f"[GerarAI] {title}"
     lines = [f"[{severity}] {title}", "", message]
     if ticker:
         lines += ["", f"Ticker: {ticker}"]
-    lines += ["", "Abre GerarAI para ver el detalle de la alerta."]
+    lines += ["", footer]
     html = (
         "<div style=\"font-family:Arial,Helvetica,sans-serif;color:#111\">"
         f"<p style=\"font-size:12px;color:#555\">{escape(severity)}</p>"
         f"<h2 style=\"margin:0 0 8px\">{escape(title)}</h2>"
         f"<p style=\"white-space:pre-line\">{escape(message)}</p>"
         + (f"<p>Ticker: <strong>{escape(str(ticker))}</strong></p>" if ticker else "")
-        + "<p style=\"font-size:12px;color:#555\">Abre GerarAI para ver el detalle de la alerta.</p>"
+        + f"<p style=\"font-size:12px;color:#555\">{escape(footer)}</p>"
         "</div>"
     )
     return EmailContent(subject=subject[:250], text="\n".join(lines), html=html)

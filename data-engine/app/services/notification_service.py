@@ -88,6 +88,9 @@ class NotificationService:
             "title": alert.title,
             "message": alert.message,
             "created_at": alert.created_at.isoformat(),
+            # Idioma guardado al disparar (solo si no es espanol): Telegram y el
+            # correo generico envuelven el aviso en ese idioma.
+            **({"language": "en"} if (alert.metadata_ or {}).get("language") == "en" else {}),
             "jev_urgency": jev_urgency,
         }
         from app.services.outbound_alerts import event_type, subscription_for
@@ -454,17 +457,23 @@ class NotificationService:
         company = payload.get("company_name") or payload.get("ticker")
         headline = payload.get("source_headline")
         match = re.search(r"\b(10-K|10-Q|8-K|20-F|6-K)\b", headline, re.IGNORECASE) if isinstance(headline, str) else None
+        en = payload.get("language") == "en"
         if company and (match or payload.get("type") in ("tracked_news", "news_material_update")):
-            kind = match.group(1).upper() if match else "Noticia"
+            kind = match.group(1).upper() if match else ("News" if en else "Noticia")
             date = payload.get("event_date")
             if isinstance(date, datetime):
                 # Label a GDELT first-seen as detection, never publication.
                 date_label = date.strftime("%d/%m/%Y")
-                suffix = f" · {'detectada ' if payload.get('event_date_source') == 'gdelt_first_seen' else ''}{date_label}"
+                detected = "detected " if en else "detectada "
+                suffix = f" · {detected if payload.get('event_date_source') == 'gdelt_first_seen' else ''}{date_label}"
             else:
                 suffix = ""
-            summary = (f"Documento {kind} asociado a {company}; revisa la fuente antes de cambiar la tesis."
-                       if match else f"Noticia sobre {company}; revisa la fuente antes de sacar conclusiones.")
+            if en:
+                summary = (f"{kind} filing linked to {company}; check the source before changing the thesis."
+                           if match else f"News about {company}; check the source before drawing conclusions.")
+            else:
+                summary = (f"Documento {kind} asociado a {company}; revisa la fuente antes de cambiar la tesis."
+                           if match else f"Noticia sobre {company}; revisa la fuente antes de sacar conclusiones.")
             text = f"{company} · {kind}{suffix}\n{summary}"
             url = payload.get("source_url")
             try:
@@ -475,9 +484,10 @@ class NotificationService:
                 safe = False
             ticker = payload.get("ticker")
             if ticker and re.fullmatch(r"[A-Z0-9.\-]{1,20}", ticker):
-                text += f"\nVer tesis afectada: {ticker} (en la app)"
+                text += (f"\nSee affected thesis: {ticker} (in the app)" if en
+                         else f"\nVer tesis afectada: {ticker} (en la app)")
             if safe:
-                text += f"\nAbrir documento: {url}"
+                text += f"\nOpen document: {url}" if en else f"\nAbrir documento: {url}"
             # Plain-text delivery has no expandable detail; omit machine traces.
             return text[:4090]
         if payload.get("type") == "dca_level":
