@@ -2168,6 +2168,25 @@ class ChatService:
             },
         )
 
+    def _several_sales_answer(self, tickers: list[str]) -> ChatResponse:
+        """Varias empresas en una venta: se piden una a una, sin elegir ni negar posiciones."""
+        names = ", ".join(tickers[:-1]) + f" y {tickers[-1]}"
+        return ChatResponse(
+            answer=(
+                f"Calculo el IRPF de la venta de un valor cada vez y has nombrado {names}. "
+                "Pregúntamelos una a una (por ejemplo, «¿cuánto IRPF pagaría si vendo "
+                f"{tickers[0]}?») y te doy cada cálculo con tu posición guardada."
+            ),
+            sources=[],
+            model="deterministic",
+            prompt_version=_SALE_TAX_PROMPT_VERSION,
+            confidence=0.8,
+            llm_trace={
+                "path": "portfolio_sale_tax", "generated": False, "provider_calls": 0,
+                "clarification": "several_tickers", "tickers": tickers,
+            },
+        )
+
     def _company_by_name(self, db: Session, question: str) -> Company | None:
         """Empresa nombrada por su nombre («mis acciones de Apple»), solo si es única."""
         words = {w.lower() for w in re.findall(r"[A-Za-zÀ-ÿ]{4,}", question or "")}
@@ -2237,6 +2256,16 @@ class ChatService:
             offered = match.group(1)
         company = self._resolve_company(db, q, scope, ticker)
         label: str | None = None
+        if company is None and not ticker and any(ch.islower() for ch in q):
+            # «si vendo UBER y MSFT»: con dos valores nombrados no se elige
+            # uno (calculaba solo UBER) ni se dice «No tienes UBER en cartera».
+            known = {c.ticker.upper() for c in all_companies(db) if c.ticker}
+            named_tickers = list(dict.fromkeys(
+                token for token in re.findall(r"\b[A-Z][A-Z0-9.\-]{1,9}\b", q)
+                if token in known and token not in _COMMON_WORD_TICKERS and token != "IRPF"
+            ))
+            if len(named_tickers) >= 2:
+                return self._several_sales_answer(named_tickers)
         if company is None:
             from app.services.chat_unknown_ticker import unknown_ticker_mentions
 

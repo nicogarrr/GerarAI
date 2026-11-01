@@ -585,3 +585,22 @@ def test_venta_por_fraccion_con_cifras(db, question, expected):
     answer = _ask(db, question).answer
     for fragment in expected:
         assert fragment in answer
+
+
+def test_varios_valores_en_la_misma_venta_no_dice_que_no_los_tienes(db):
+    """«si vendo todas mis UBER y MSFT» decía «No tienes UBER en cartera» con 30 UBER.
+
+    Con dos empresas nombradas no se elige ninguna; tampoco se afirma que no
+    estén en cartera: se pide la venta de una en una.
+    """
+    _uber(db)
+    _company(db, "MSFT", "Microsoft")
+    db.commit()
+    for question in (
+        "¿Cuánto IRPF pagaría si vendo todas mis UBER y MSFT?",
+        "¿Cuánto IRPF pagaría si vendo UBER y MSFT?",
+    ):
+        answer = _ask(db, question).answer
+        assert "No tienes UBER" not in answer
+        assert "UBER" in answer and "MSFT" in answer
+        assert "una a una" in answer
