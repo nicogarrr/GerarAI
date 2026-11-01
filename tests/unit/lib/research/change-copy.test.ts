@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
+import { changeHeadlineCopy, changeSummaryText, changeTypeLabel } from '@/lib/research/change-copy';
 
 describe('changeTypeLabel', () => {
     it('vacío -> N/D; conocido en español; desconocido humanizado', () => {
@@ -37,5 +37,15 @@ describe('changeSummaryText', () => {
     it('nulo/vacío no rompe', () => {
         expect(changeSummaryText('')).toBe('');
         expect(changeSummaryText(undefined as unknown as string)).toBe('');
+    });
+});
+
+describe('changeSummaryText con el inglés elegido', () => {
+    it('no pasa a español el texto del backend', () => {
+        expect(changeSummaryText('No stored thesis is available for semantic impact mapping.', 'en')).toBe('There is no saved thesis to assess the impact against.');
+        expect(changeSummaryText('News. Affects 2 claims and thesis nodes: Funding.', 'en')).toBe('News. Affects 2 claims and these areas of the thesis: Funding.');
+        expect(changeSummaryText('Noticia. Afecta a 1 afirmaciones y a estos apartados de la tesis: Moat.', 'en')).toBe('Noticia. Affects 1 claim and these areas of the thesis: Moat.');
+        expect(changeHeadlineCopy('Noticia material que requiere revisión de la tesis: Acme wins a contract.', 'en').text).toBe('Acme wins a contract.');
+        expect(changeSummaryText('No stored thesis is available for semantic impact mapping.')).toBe('No hay una tesis guardada para evaluar el impacto.');
     });
 });

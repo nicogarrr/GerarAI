@@ -1704,5 +1704,12 @@
   "assistantMetaTitle": "Research assistant",
   "assistantMetaDescription": "The research guide now lives in the Brain.",
   "sourcesMetaTitle": "Sources",
-  "metricPerShare": "{amount}/share"
+  "metricPerShare": "{amount}/share",
+  "changeCopy": {
+    "noStoredThesis": "There is no saved thesis to assess the impact against.",
+    "noNodeMatched": "No sufficiently reliable link to the thesis was found.",
+    "affectsClaims": "Affects {count} claims and these areas of the thesis: {areas}",
+    "affectsNoClaim": "Doesn't affect any specific claim; touches these areas of the thesis: {areas}",
+    "affectsOneClaim": "Affects 1 claim and these areas of the thesis: {areas}"
+  }
 }

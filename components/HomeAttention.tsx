@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useT } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
 import Link from 'next/link';
 import { BellRing, ArrowRight } from 'lucide-react';
 import { getHomeAttention } from '@/lib/actions/home-attention.actions';
@@ -16,6 +16,7 @@ const DIRECTION_KEYS = { positive: 'home.attention.direction.positive', negative
 
 export default function HomeAttention() {
     const t = useT();
+    const locale = useLocale();
     const [data, setData] = useState<HomeAttentionState | null>(null);
     const [retry, setRetry] = useState(0);
     const [page, setPage] = useState(0);
@@ -28,7 +29,7 @@ export default function HomeAttention() {
     }, [retry]);
     const items = [
         ...(data?.thesis.items ?? []).map(item => ({ key: `thesis-${item.id}`, symbol: item.symbol,
-            title: t(DIRECTION_KEYS[item.direction as keyof typeof DIRECTION_KEYS] ?? 'home.attention.direction.neutral'), detail: changeHeadlineCopy(item.summary).text, detailNote: changeHeadlineCopy(item.summary).note,
+            title: t(DIRECTION_KEYS[item.direction as keyof typeof DIRECTION_KEYS] ?? 'home.attention.direction.neutral'), detail: changeHeadlineCopy(item.summary, locale).text, detailNote: changeHeadlineCopy(item.summary, locale).note,
             note: t('home.attention.reviewPending', { date: formatMarketDate(item.createdAt) }), href: `/research/${encodeURIComponent(item.symbol)}?view=changes#thesis-change-${item.id}`, cta: t('home.attention.ctaReviewChange') })),
         ...(data?.dca.items ?? []).map(item => ({ key: item.id, symbol: item.symbol, title: t('home.attention.dcaTitle', { level: item.level }),
             detailNote: null, detail: item.inPortfolio ? t('home.attention.dcaInPortfolio') : t('home.attention.dcaNotInPortfolio'),

@@ -1159,7 +1159,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                       {t('research.fichaMaterialityScore', { score: change.materiality_score })} · {formatDate(change.created_at)}
                     </span>
                   </div>
-                  <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary)}</p>
+                  <p className="break-words leading-6 [overflow-wrap:anywhere]">{changeSummaryText(change.summary, locale)}</p>
                 </li>
               ))}
             </ul>

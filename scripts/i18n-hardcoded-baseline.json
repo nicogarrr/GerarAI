@@ -118,7 +118,7 @@
   "lib/research/analyst-rating-es.ts": 19,
   "lib/research/assistant-client.ts": 6,
   "lib/research/backend-error-es.ts": 58,
-  "lib/research/change-copy.ts": 19,
+  "lib/research/change-copy.ts": 20,
   "lib/research/chat-intents.ts": 3,
   "lib/research/claim-groups.ts": 2,
   "lib/research/client.ts": 2,
