@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
 // @ts-expect-error TS5097: node strip-types requires the extension.
-import { readTransactions } from '../e2e/user-flows/transactions.ts';
+import { readTransactions } from './e2e-transactions.ts';
 
 test('ledger helper follows every page instead of treating an envelope as empty', async () => {
   const calls: string[] = [];

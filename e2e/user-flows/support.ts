@@ -195,6 +195,6 @@ export async function backendCall(method: string, path: string, body?: unknown) 
 
 /** Full paginated transaction list for the isolated E2E tenant. */
 export async function backendTransactions() {
-  const { readTransactions } = await import('./transactions');
+  const { readTransactions } = await import('../../scripts/e2e-transactions');
   return readTransactions(backendCall);
 }
