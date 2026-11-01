@@ -19,7 +19,7 @@ from app.schemas.api import AlertRuleOut
 )
 def test_rule_channels_validate_legacy_shapes_without_inventing_external_channel(raw, expected):
     # Exercise Pydantic's actual field validator, not a direct helper call.
-    values = {name: None for name in AlertRuleOut.model_fields}
+    values = dict.fromkeys(AlertRuleOut.model_fields)
     values.update(
         id=1, company_id=1, name="legacy", rule_type="price", condition={},
         target={}, severity="info", channels=raw, active=True,
