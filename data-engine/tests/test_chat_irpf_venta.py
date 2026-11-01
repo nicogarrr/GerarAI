@@ -553,3 +553,20 @@ def test_venta_parcial_con_determinante_lee_la_cantidad(db, question):
     resp = _ask(db, question)
     assert "10 de tus 30 acciones de UBER" in resp.answer
     assert "valor 800,00 €" in resp.answer
+
+
+# «el 50 %», «un 20 %», «un tercio»: antes «el 50 %» simulaba la venta de TODO
+# y «15 %» vendía 15 acciones (la cifra del porcentaje leída como cantidad).
+@pytest.mark.parametrize(("question", "expected"), [
+    ("IRPF si vendo el 50% de UBER", ("15 de tus 30 acciones de UBER", "valor 1.200,00 €")),
+    ("IRPF si vendo un 20 % de UBER", ("6 de tus 30 acciones de UBER", "valor 480,00 €")),
+    ("IRPF si vendo 15% de UBER", ("4,5 de tus 30 acciones de UBER", "valor 360,00 €")),
+    ("IRPF si vendo el 10 por ciento de UBER", ("3 de tus 30 acciones de UBER", "valor 240,00 €")),
+    ("IRPF si vendo un tercio de UBER", ("10 de tus 30 acciones de UBER", "valor 800,00 €")),
+    ("IRPF si vendo un cuarto de mis UBER", ("7,5 de tus 30 acciones de UBER", "valor 600,00 €")),
+])
+def test_venta_por_porcentaje_o_fraccion(db, question, expected):
+    _uber(db)
+    answer = _ask(db, question).answer
+    for fragment in expected:
+        assert fragment in answer
