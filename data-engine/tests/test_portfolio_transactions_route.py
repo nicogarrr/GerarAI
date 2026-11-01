@@ -41,6 +41,10 @@ def _client(monkeypatch) -> tuple[TestClient, str, str]:
     return TestClient(main.app), tenant_ext, "portfolio-transactions-user"
 
 
+def _ticker(tenant: str) -> str:
+    return f"TXN{tenant.rsplit('-', 1)[-1].upper()}"
+
+
 def _seed(tenant: str, ticker: str) -> None:
     db = SessionLocal()
     tenant_row = db.query(Tenant).filter(Tenant.external_id == tenant).one()
@@ -89,11 +93,11 @@ def test_transactions_empty_portfolio(monkeypatch) -> None:
 
 def test_transactions_full_wire_and_review_flag(monkeypatch) -> None:
     client, tenant, user = _client(monkeypatch)
-    _seed(tenant, f"TXN{tenant[-2:].upper()}")
+    _seed(tenant, _ticker(tenant))
 
     res = signed_request(
         client, SECRET, tenant, user, "GET", "/api/portfolio/transactions",
-        params={"ticker": f"TXN{tenant[-2:].upper()}"},
+        params={"ticker": _ticker(tenant)},
     )
 
     assert res.status_code == 200, res.text
@@ -102,7 +106,7 @@ def test_transactions_full_wire_and_review_flag(monkeypatch) -> None:
     items = payload["items"]
     for item in items:
         PortfolioTransactionOut.model_validate(item)
-        assert item["ticker"] == f"TXN{tenant[-2:].upper()}"
+        assert item["ticker"] == _ticker(tenant)
     by_date = {item["trade_date"]: item for item in items}
 
     first = by_date["2026-01-15"]
@@ -121,11 +125,11 @@ def test_transactions_full_wire_and_review_flag(monkeypatch) -> None:
 
 def test_transactions_page_limit_offset(monkeypatch) -> None:
     client, tenant, user = _client(monkeypatch)
-    _seed(tenant, f"TXN{tenant[-2:].upper()}")
+    _seed(tenant, _ticker(tenant))
 
     res = signed_request(
         client, SECRET, tenant, user, "GET", "/api/portfolio/transactions/page",
-        params={"limit": 50, "offset": 0, "ticker": f"TXN{tenant[-2:].upper()}"},
+        params={"limit": 50, "offset": 0, "ticker": _ticker(tenant)},
     )
 
     assert res.status_code == 200, res.text
@@ -134,3 +138,17 @@ def test_transactions_page_limit_offset(monkeypatch) -> None:
     assert len(payload["items"]) == 3
     for item in payload["items"]:
         PortfolioTransactionOut.model_validate(item)
+
+
+def test_transactions_ticker_does_not_collide_for_same_short_suffix(monkeypatch) -> None:
+    import sys
+    from types import SimpleNamespace
+
+    prefixes = [uuid4().hex[:6], uuid4().hex[:6]]
+    generated = iter(SimpleNamespace(hex=p + "c6" + "0" * 24) for p in prefixes)
+    monkeypatch.setattr(sys.modules[__name__], "uuid4", lambda: next(generated))
+    _, first, _ = _client(monkeypatch)
+    _, second, _ = _client(monkeypatch)
+    assert first != second
+    _seed(first, _ticker(first))
+    _seed(second, _ticker(second))
