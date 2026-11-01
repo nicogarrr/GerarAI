@@ -10,7 +10,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const page = readFileSync(join(here, '..', 'app', '(root)', 'cuellos', 'page.tsx'), 'utf8');
+// Los textos viven en es/bottlenecks.json: solo se añade la sección de la página.
+const page = readFileSync(join(here, '..', 'app', '(root)', 'cuellos', 'page.tsx'), 'utf8')
+  + JSON.stringify(JSON.parse(readFileSync(join(here, '..', 'lib', 'i18n', 'messages', 'es', 'bottlenecks.json'), 'utf8')).page);
 
 describe('/cuellos paginación honesta', () => {
   it('el estado vacío exige total === 0, no solo items vacíos', () => {

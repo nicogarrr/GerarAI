@@ -23,9 +23,14 @@ const discovery = readFileSync('data-engine/app/services/bottleneck_discovery_se
 
 describe('Cuellos: la etiqueta N/D muestra «n de min_sources fuentes»', () => {
   it('la tarjeta muestra el progreso con los números reales', () => {
+    // El texto vive en es/bottlenecks.json (page.sourcesShort) con n y min reales.
     assert.ok(
-      pagina.includes('`${signal.n_sources} de ${minSources} fuentes independientes · sin evidencia suficiente`'),
+      pagina.includes("t('bottlenecks.page.sourcesShort', { n: signal.n_sources, min: minSources })"),
       'la etiqueta N/D tiene que mostrar n de min_sources',
+    );
+    assert.equal(
+      JSON.parse(readFileSync('lib/i18n/messages/es/bottlenecks.json', 'utf8')).page.sourcesShort,
+      '{n} de {min} fuentes independientes · sin evidencia suficiente',
     );
     assert.ok(pagina.includes('minSources={bottlenecks.min_sources}'), 'la página no pasa min_sources a la tarjeta');
   });

@@ -1,1 +1,44 @@
-{}
+{
+  "page": {
+    "metaTitle": "Temas",
+    "metaDescription": "Rentabilidad YTD y 1M de temas de mercado: cestas curadas, media simple, cobertura declarada.",
+    "title": "Temas",
+    "feature": "Temas",
+    "brainQuestion": "Analiza el tema {name}{metrics}: qué lo está moviendo, qué empresas de la cesta destacan y qué vigilarías.",
+    "brainMetrics": " ({metrics}, media simple de {n} valores)",
+    "badge": {
+      "turnUp": "Giro al alza",
+      "turnDown": "Giro a la baja",
+      "hot": "Caliente"
+    },
+    "notEnoughData": "Sin datos suficientes",
+    "coverage": "{n}/{total} con datos",
+    "composition": "Composición de {name}",
+    "col": {
+      "stock": "Valor",
+      "weight": "Peso",
+      "contributes": "Aporta"
+    },
+    "bottleneck": "Cuello de botella detectado:",
+    "inPortfolio": "En tu cartera",
+    "inWatchlist": "En tu lista de seguimiento",
+    "noMarketData": "Sin datos de mercado ahora mismo",
+    "pagerAria": "Paginación de temas",
+    "prev": "Anterior",
+    "next": "Siguiente",
+    "page": "Página {page} de {total}",
+    "intraday": "Intradía del {date}",
+    "close": "Cierre del {date}",
+    "noDate": "Sin fecha de datos disponible",
+    "partial": " · datos parciales",
+    "stale": " · recalculando: se muestra la última versión calculada",
+    "methodology": "Metodología",
+    "method": {
+      "basket": "Cada tema es una cesta curada; su rentabilidad es la media simple (mismo peso) de los valores con dato.",
+      "fixed": "Las cestas son listas fijas curadas a mano (no hay una fuente gratuita fiable de pertenencia), con sesgo de valores de EE. UU. y de supervivencia: es la cesta de hoy, no la histórica. Algunos valores aparecen en más de una cesta (p. ej. GOOGL en 3), así que los temas no son independientes entre sí.",
+      "threshold": "Un tema sólo publica una métrica si al menos el 70 % de sus valores tiene dato.",
+      "labels": "Caliente: los 3 primeros del orden elegido. Giro: YTD y 1M con signo contrario y 1M relevante; el giro sustituye a Caliente.",
+      "contributes": "Aporta: peso × rentabilidad del valor, en puntos porcentuales."
+    }
+  }
+}

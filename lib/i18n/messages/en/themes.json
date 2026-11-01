@@ -1,1 +1,44 @@
-{}
+{
+  "page": {
+    "metaTitle": "Themes",
+    "metaDescription": "YTD and 1M performance of market themes: curated baskets, simple average, declared coverage.",
+    "title": "Themes",
+    "feature": "Themes",
+    "brainQuestion": "Analyse the {name} theme{metrics}: what is moving it, which companies in the basket stand out and what you would watch.",
+    "brainMetrics": " ({metrics}, simple average of {n} stocks)",
+    "badge": {
+      "turnUp": "Turning up",
+      "turnDown": "Turning down",
+      "hot": "Hot"
+    },
+    "notEnoughData": "Not enough data",
+    "coverage": "{n}/{total} with data",
+    "composition": "Composition of {name}",
+    "col": {
+      "stock": "Stock",
+      "weight": "Weight",
+      "contributes": "Contributes"
+    },
+    "bottleneck": "Bottleneck detected:",
+    "inPortfolio": "In your portfolio",
+    "inWatchlist": "In your watchlist",
+    "noMarketData": "No market data right now",
+    "pagerAria": "Themes pagination",
+    "prev": "Previous",
+    "next": "Next",
+    "page": "Page {page} of {total}",
+    "intraday": "Intraday as of {date}",
+    "close": "Close of {date}",
+    "noDate": "Data date not available",
+    "partial": " · partial data",
+    "stale": " · recalculating: showing the latest calculated version",
+    "methodology": "Methodology",
+    "method": {
+      "basket": "Each theme is a curated basket; its return is the simple (equal-weight) average of the stocks with data.",
+      "fixed": "Baskets are fixed, hand-curated lists (there is no reliable free source for membership), biased towards US stocks and with survivorship bias: it is today's basket, not the historical one. Some stocks appear in more than one basket (e.g. GOOGL in 3), so themes are not independent of each other.",
+      "threshold": "A theme only publishes a metric if at least 70% of its stocks have data.",
+      "labels": "Hot: the top 3 in the chosen order. Turning: YTD and 1M with opposite signs and a meaningful 1M; a turn replaces Hot.",
+      "contributes": "Contributes: weight × the stock's return, in percentage points."
+    }
+  }
+}
