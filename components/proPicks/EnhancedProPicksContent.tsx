@@ -12,10 +12,17 @@ import { generateFunnelRunNow } from '@/lib/actions/propicks-funnel.actions';
 import { allNeutralCategory, categoryDisplay } from '@/lib/propicks/category-display';
 import { CATEGORY_KEYS, categoryNeutralNote } from './category-display';
 import { addToWatchlist } from '@/lib/actions/watchlist.actions';
-import { formatCompanyName, formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime, formatCountEs } from '@/lib/format';
 import { etiquetaSector } from '@/lib/labels';
-import { useT } from '@/lib/i18n/client';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { toast } from 'sonner';
+
+const SORT_LABEL_KEYS = {
+    score: 'propicks.content.sort.score',
+    momentum: 'propicks.content.sort.momentum',
+    value: 'propicks.content.sort.value',
+    growth: 'propicks.content.sort.growth',
+    profitability: 'propicks.content.sort.profitability',
+} as const satisfies Record<ProPicksFilters['sortBy'], string>;
 
 interface EnhancedProPicksContentProps {
     initialPicks: ProPick[];
@@ -29,6 +36,9 @@ interface EnhancedProPicksContentProps {
 
 export default function EnhancedProPicksContent({ initialPicks, generatedAt, initialPassedCount = null, onRunUpdated }: EnhancedProPicksContentProps) {
     const t = useT();
+    const locale = useLocale();
+    const { formatCompanyName, formatNumber, formatPercent, formatPrice, formatUserDate, formatUserDateTime } = useFormat();
+    const sectorLabel = (sector: string) => (locale === 'en' ? sector : etiquetaSector(sector));
     const [picks, setPicks] = useState<ProPick[]>(initialPicks);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -57,12 +67,12 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
             const res = await addToWatchlist(symbol, company);
             if (res.success) {
                 setFollowed((prev) => ({ ...prev, [symbol]: true }));
-                toast.success(`${symbol} añadido a la watchlist`);
+                toast.success(t('propicks.content.followAdded', { symbol }));
             } else {
-                toast.error('No se pudo añadir a la watchlist');
+                toast.error(t('propicks.content.followError'));
             }
         } catch {
-            toast.error('No se pudo añadir a la watchlist');
+            toast.error(t('propicks.content.followError'));
         } finally {
             setFollowing(null);
         }
@@ -84,14 +94,14 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
             setPassedCount(result.passedCount);
             setAppliedFilters(requestedFilters);
             setRefreshStatus(result.picks.length
-                ? `Selección consultada: ${formatCountEs(result.picks.length, 'empresa', 'empresas')}.`
+                ? t(result.picks.length === 1 ? 'propicks.content.queriedOne' : 'propicks.content.queriedOther', { count: result.picks.length })
                 // Mensaje honesto del 0: distingue "tus filtros excluyen todo"
                 // de "el embudo no seleccionó nada", que no es fallo del usuario.
                 : result.passedCount
-                    ? `Consulta completada: 0 empresas con estos filtros. El último embudo sí seleccionó ${result.passedCount}; baja la puntuación mínima o amplía el sector para verlas.`
-                    : 'Consulta completada: 0 empresas. El último embudo no seleccionó ninguna con los datos disponibles; no es un fallo de tus filtros.');
+                    ? t('propicks.content.queriedNoneFiltered', { count: result.passedCount })
+                    : t('propicks.content.queriedNone'));
         } catch {
-            setError('No se pudo actualizar la selección. Los resultados anteriores se conservan.');
+            setError(t('propicks.content.refreshError'));
         } finally {
             requestInFlight.current = false;
             setLoading(false);
@@ -112,20 +122,20 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
         try {
             const run = await generateFunnelRunNow();
             if ('error' in run) {
-                setError('No se pudo generar la selección. Inténtalo de nuevo.');
+                setError(t('propicks.content.generateError'));
                 return;
             }
             setRefreshStatus(run.passed_count > 0
                 ? run.passed_count === 1
-                    ? 'Selección generada: 1 empresa supera el embudo.'
-                    : `Selección generada: ${formatCountEs(run.passed_count, 'empresa', 'empresas')} superan el embudo.`
-                : `Selección generada: 0 de ${run.universe_size} empresas del universo superan el embudo con los datos disponibles; ninguna cumple todos los criterios ahora mismo.`);
+                    ? t('propicks.content.generatedOne')
+                    : t('propicks.content.generatedOther', { count: run.passed_count })
+                : t('propicks.content.generatedNone', { universe: run.universe_size }));
             requestInFlight.current = false;
             setLoading(false);
             await loadPicks();
             return;
         } catch {
-            setError('No se pudo generar la selección. Inténtalo de nuevo.');
+            setError(t('propicks.content.generateError'));
         } finally {
             requestInFlight.current = false;
             setLoading(false);
@@ -196,15 +206,15 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         )}
                         {/* QA: el botón debe anunciar el estado por sí mismo
                             (primario legible y etiqueta que cambia). */}
-                        <span>{loading ? 'Actualizando selección...' : 'Actualizar selección'}</span>
+                        <span>{loading ? t('propicks.content.refreshing') : t('propicks.content.refresh')}</span>
                     </Button>
                     <p aria-live="polite" role="status" className="mt-3 text-xs text-gray-400">
-                        {loading ? 'Consultando selección...' : refreshStatus}
+                        {loading ? t('propicks.content.querying') : refreshStatus}
                     </p>
                     {lastGenerated && (
                         <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
                             <Clock aria-hidden="true" className="h-3 w-3" />
-                            Datos: {formatLastGenerated(lastGenerated)}
+                            {t('propicks.content.dataAsOf', { date: formatLastGenerated(lastGenerated) ?? '' })}
                         </div>
                     )}
                 </Card>
@@ -222,25 +232,19 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-teal-400 border-teal-400">
-                                {picks.length > 0 ? `Top ${formatNumber(picks.length, { maximumFractionDigits: 0 })}` : 'Sin selección'}
+                                {picks.length > 0 ? t('propicks.content.top', { count: formatNumber(picks.length, { maximumFractionDigits: 0 }) }) : t('propicks.content.noSelection')}
                             </Badge>
                         </div>
                         {loading && (
                             <div aria-busy="true" className="flex items-center gap-2 text-sm text-gray-400">
                                 <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                                Procesando...
+                                {t('propicks.content.processing')}
                             </div>
                         )}
                     </div>
                     {picks.length > 0 ? (
                         <p className="text-sm text-gray-400">
-                            Acciones seleccionadas con puntuación mínima de {appliedFilters.minScore} ordenadas por {
-                                appliedFilters.sortBy === 'score' ? 'puntuación general' :
-                                    appliedFilters.sortBy === 'momentum' ? 'momentum' :
-                                        appliedFilters.sortBy === 'value' ? 'valor' :
-                                            appliedFilters.sortBy === 'growth' ? 'crecimiento' :
-                                                'rentabilidad'
-                            }
+                            {t('propicks.content.appliedSummary', { score: appliedFilters.minScore, sort: t(SORT_LABEL_KEYS[appliedFilters.sortBy]) })}
                         </p>
                     ) : null}
                 </div>
@@ -249,7 +253,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                     <Card className="p-6 rounded-lg border border-red-700 bg-red-900/20 mb-4 text-center">
                         <p className="text-red-400">{error}</p>
                         <p className="text-sm text-gray-400 mt-2">
-                            Reintenta para consultar el último run disponible.
+                            {t('propicks.content.retryHint')}
                         </p>
                         <Button
                             onClick={handleRefresh}
@@ -275,11 +279,11 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                         </p>
                         <p className="text-sm text-gray-500 mt-2">
                             {!lastGenerated &&
-                                'El embudo todavía no ha publicado un run completado. Pulsa «Generar selección ahora» para ejecutarlo con las empresas disponibles.'}
+                                t('propicks.content.emptyNoRun')}
                             {lastGenerated && passedCount === 0 &&
-                                `La selección del ${formatLastGenerated(lastGenerated)} no contiene candidatos que superen los criterios del embudo. Si el espacio de trabajo es nuevo o los datos se recargaron después, ejecuta la selección de nuevo para evaluar las empresas con los datos de mercado actuales.`}
+                                t('propicks.content.emptyNoEligible', { date: formatLastGenerated(lastGenerated) ?? '' })}
                             {lastGenerated && passedCount !== 0 &&
-                                `Ninguna acción de la selección del ${formatLastGenerated(lastGenerated)} cumple los filtros actuales (puntuación ≥ ${appliedFilters.minScore}${appliedFilters.sector !== 'all' ? `, sector ${etiquetaSector(appliedFilters.sector)}` : ''}). Prueba a bajar la puntuación mínima o cambiar de sector.`}
+                                t('propicks.content.emptyFiltered', { date: formatLastGenerated(lastGenerated) ?? '', score: appliedFilters.minScore, sector: appliedFilters.sector !== 'all' ? t('propicks.content.sectorSuffix', { sector: sectorLabel(appliedFilters.sector) }) : '' })}
                         </p>
                         <Button
                             onClick={emptyStateNeedsRun ? handleGenerateRun : handleRefresh}
@@ -292,7 +296,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                             ) : (
                                 <RefreshCw aria-hidden="true" className="h-4 w-4" />
                             )}
-<span>{emptyStateNeedsRun ? (loading ? 'Generando selección...' : 'Generar selección ahora') : (loading ? 'Actualizando selección...' : 'Actualizar selección')}</span>
+<span>{emptyStateNeedsRun ? (loading ? t('propicks.content.generating') : t('propicks.content.generateNow')) : (loading ? t('propicks.content.refreshing') : t('propicks.content.refresh'))}</span>
                         </Button>
                     </Card>
                 ) : picks.length > 0 ? (
@@ -315,7 +319,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                                 </h3>
                                                 {pick.isStrongBuy && (
                                                     <span className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-gradient-to-r from-teal-500 to-emerald-500 animate-pulse">
-                                                        💎 JOYA
+                                                        {t('propicks.content.gemBadge')}
                                                     </span>
                                                 )}
                                                 {!pick.isStrongBuy && (
@@ -326,14 +330,14 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                             </div>
                                             <p className="line-clamp-1 min-w-0 break-words text-sm text-gray-400">{formatCompanyName(pick.company)}</p>
                                             {pick.sector && (
-                                                <p className="mt-1 break-words text-xs text-gray-500">{etiquetaSector(pick.sector)}</p>
+                                                <p className="mt-1 break-words text-xs text-gray-500">{sectorLabel(pick.sector)}</p>
                                             )}
                                         </div>
                                         <div className={`text-right px-3 py-2 rounded-lg border ${getScoreColor(pick.score)}`}>
                                             <div className="text-2xl font-bold">
                                                 {formatNumber(pick.score, { maximumFractionDigits: 1 })}
                                             </div>
-                                            <div className="text-xs">Puntuación</div>
+                                            <div className="text-xs">{t('propicks.content.score')}</div>
                                         </div>
                                     </div>
 
@@ -351,7 +355,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                                 <div className={`text-xl font-bold ${pick.upsidePotential > 15 ? 'text-emerald-400' : 'text-green-400'}`}>
                                                     {formatPercent(pick.upsidePotential, { fromRatio: false, digits: 1, signDisplay: 'always' })}
                                                 </div>
-                                                <div className="text-xs text-gray-500">Potencial (12m)</div>
+                                                <div className="text-xs text-gray-500">{t('propicks.content.upside')}</div>
                                             </div>
                                         )}
                                     </div>
@@ -360,16 +364,16 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                         muestra n/d, nunca como un «50» que parece score real) */}
                                     <div className="grid grid-cols-3 gap-2 mb-1">
                                         {([
-                                            { label: 'Valor', key: 'value' as const },
-                                            { label: 'Momentum', key: 'momentum' as const },
-                                            { label: 'Rentab.', key: 'profitability' as const },
+                                            { label: t('propicks.content.catValue'), key: 'value' as const },
+                                            { label: t('propicks.content.catMomentum'), key: 'momentum' as const },
+                                            { label: t('propicks.content.catProfitability'), key: 'profitability' as const },
                                         ]).map(({ label, key }) => {
                                             const display = categoryDisplay(pick, key);
                                             return (
                                                 <div className="text-center" key={key}>
                                                     <div className="text-xs text-gray-500">{label}</div>
                                                     {display.kind === 'neutral' ? (
-                                                        <div className="text-sm font-semibold text-gray-500">n/d*</div>
+                                                        <div className="text-sm font-semibold text-gray-500">{t('propicks.content.naMark')}</div>
                                                     ) : (
                                                         <div className={`text-sm font-semibold ${display.value >= 70 ? 'text-green-400' : 'text-gray-400'}`}>
                                                             {formatNumber(display.value, { maximumFractionDigits: 1 })}
@@ -381,13 +385,13 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                     </div>
                                     {(['value', 'momentum', 'profitability'] as const).some((key) => categoryDisplay(pick, key).kind === 'neutral') && (
                                         <div className="text-[10px] leading-4 text-gray-500 mb-2">
-                                            * Sin datos para puntuarla: entra neutral (50) en el score y no discrimina entre los picks actuales.
+                                            {t('propicks.content.naNote')}
                                         </div>
                                     )}
 
                                     <div className="mb-3 rounded-md border border-teal-500/20 bg-teal-500/5 px-3 py-2">
                                         <span className="text-xs text-gray-400">
-                                            Confianza:{' '}
+                                            {t('propicks.content.confidence')}{' '}
                                             <span className="font-semibold text-teal-300">
                                                 {pick.confidenceLevel} ({formatNumber(pick.confidence, { maximumFractionDigits: 0 })}/100)
                                             </span>
@@ -436,7 +440,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                             (HTML invalido) y un boton que no
                                             hace nada. El enlace ya es la accion. */}
                                         <span className="inline-flex h-11 items-center gap-2 text-xs text-gray-400 group-hover:text-teal-400 sm:h-8">
-                                            Ver análisis completo
+                                            {t('propicks.content.viewAnalysis')}
                                             <ArrowRight aria-hidden="true" className="h-3 w-3" />
                                         </span>
                                     </div>

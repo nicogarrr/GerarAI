@@ -18,10 +18,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+// Los textos de Pro Picks viven en el diccionario es (i18n): se comprueban junto al código.
+const ES_PROPICKS_JSON = readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
-const factsheet = readFileSync('components/proPicks/StrategyFactsheet.tsx', 'utf8');
-const walkForward = readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8');
-const rebalance = readFileSync('components/proPicks/MonthlyRebalanceView.tsx', 'utf8');
+const factsheet = (readFileSync('components/proPicks/StrategyFactsheet.tsx', 'utf8') + ES_PROPICKS_JSON);
+const walkForward = (readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8') + ES_PROPICKS_JSON);
+const rebalance = (readFileSync('components/proPicks/MonthlyRebalanceView.tsx', 'utf8') + ES_PROPICKS_JSON);
 
 describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () => {
   it('la ficha no promete un backtest por estrategia', () => {
@@ -91,8 +93,9 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
   });
 });
  it('la referencia de la ficha coincide con la pestaña Selección IA', () => {
-    const tabs = readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8');
-    assert.match(tabs, />\s*Selección IA\s*</);
+    const tabs = (readFileSync('components/proPicks/ProPicksTabs.tsx', 'utf8') + ES_PROPICKS_JSON);
+    assert.match(tabs, /"picks": "Selección IA"/);
+    assert.match(tabs, /t\('propicks\.tabs\.picks'\)/);
     assert.match(tabs, /No valida la selección IA:/);
     assert.match(factsheet, /pestaña «Selección IA»/);
  });

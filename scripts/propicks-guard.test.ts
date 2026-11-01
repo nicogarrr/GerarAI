@@ -26,6 +26,8 @@ import {
     selectRebalancedPicks,
 // @ts-expect-error TS5097: la extensión .ts explícita la exige node --experimental-strip-types en runtime
 } from '../lib/utils/proPicksStrategies.ts';
+// Los textos de Pro Picks viven en el diccionario es (i18n): se comprueban junto al código.
+const ES_PROPICKS_JSON = readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -178,10 +180,10 @@ describe('propicks-guard', () => {
     });
 
         it('UI en español con reintento', () => {
-            const content = readSource('components/proPicks/EnhancedProPicksContent.tsx');
-            const tabs = readSource('components/proPicks/ProPicksTabs.tsx');
+            const content = (readSource('components/proPicks/EnhancedProPicksContent.tsx') + ES_PROPICKS_JSON);
+            const tabs = (readSource('components/proPicks/ProPicksTabs.tsx') + ES_PROPICKS_JSON);
             assert.ok(content.includes('Actualizar selección'));
-            assert.ok(tabs.includes('Reintentar'));
+            assert.ok(tabs.includes("t('common.actions.retry')"));
         assert.ok(!content.includes('Regenerar Picks') || content.includes('Actualizar selección'));
     });
 });
@@ -364,20 +366,20 @@ describe('propicks overlays en el action (contrato fuente)', () => {
 
 describe('F49: la fecha de ProPicks es la del run real, no la de carga', () => {
     it('la página no fabrica la fecha con new Date() y usa runAsOf del run', () => {
-        const page = readSource('app/(root)/propicks/page.tsx');
+        const page = (readSource('app/(root)/propicks/page.tsx') + ES_PROPICKS_JSON);
         assert.ok(!page.includes('new Date().toISOString()'), 'page.tsx no debe fechar con la hora de carga');
         assert.ok(page.includes('generateEnhancedProPicksWithRun'), 'page.tsx debe leer runAsOf del run');
         assert.ok(page.includes('initialResult.runAsOf'), 'la fecha mostrada debe ser runAsOf');
     });
 
     it('el contenido no re-fecha tras aplicar filtros o reintentar', () => {
-        const content = readSource('components/proPicks/EnhancedProPicksContent.tsx');
+        const content = (readSource('components/proPicks/EnhancedProPicksContent.tsx') + ES_PROPICKS_JSON);
         assert.ok(!content.includes('new Date().toISOString()'), 'la fecha nunca es la hora del clic');
         assert.ok(content.includes('setLastGenerated(result.runAsOf)'), 'los refetch fijan la fecha del run');
     });
 
     it('el estado vacío distingue "sin run", "run sin candidatos aptos" y "filtros descartan"', () => {
-        const content = readSource('components/proPicks/EnhancedProPicksContent.tsx');
+        const content = (readSource('components/proPicks/EnhancedProPicksContent.tsx') + ES_PROPICKS_JSON);
         assert.ok(
             content.includes('El embudo todavía no ha publicado un run completado'),
             'sin run completado el estado vacío debe decirlo',

@@ -6,7 +6,8 @@ import { BarChart3, Loader2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useLocale } from '@/lib/i18n/client';
+import { useLocale, useT } from '@/lib/i18n/client';
+import { createTranslator } from '@/lib/i18n/translate';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
 import { STRATEGY_CATALOG, mergeStrategies } from './monthlyRebalance';
 import { runWalkForwardBacktest, type WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
@@ -18,12 +19,15 @@ import { generateProPicksForStrategy, type ProPick } from '@/lib/actions/proPick
 // cada vista se descarga la primera vez que se abre su pestaña. «Selección IA»
 // se queda eager: es la pestaña inicial (LCP) y va montada siempre (forceMount)
 // para no perder la selección al cambiar de pestaña.
-const TabFallback = () => (
+const TabFallback = () => {
+    const t = useT();
+    return (
     <Card aria-busy="true" className="flex items-center justify-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-10 text-gray-400">
         <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-teal-400" />
-        <span>Cargando vista…</span>
+        <span>{t('propicks.tabs.loadingView')}</span>
     </Card>
-);
+    );
+};
 
 const RadarGlobalView = dynamic(() => import('./RadarGlobalView'), { loading: TabFallback });
 const RadarDcaView = dynamic(() => import('./RadarDcaView'), { loading: TabFallback });
@@ -47,6 +51,7 @@ interface ProPicksTabsProps {
 
 export default function ProPicksTabs({ strategies, initialPicks, generatedAt, passedCount = null, initialTab = 'picks' }: ProPicksTabsProps) {
     const locale = useLocale();
+    const t = useT();
     const merged = mergeStrategies(strategies);
     const [activeTab, setActiveTab] = useState<string>(initialTab);
     const [currentStrategy, setCurrentStrategy] = useState<string>(merged[0]?.id ?? 'adaptive');
@@ -136,12 +141,12 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 }
             })
             .catch(() => {
-                if (!cancelled) setStrategyPicksError('No se pudieron cargar los picks de esta estrategia.');
+                if (!cancelled) setStrategyPicksError(createTranslator(locale)('propicks.tabs.strategyPicksError'));
             });
         return () => {
             cancelled = true;
         };
-    }, [activeTab, currentStrategy, cachedStrategyPicks, latestRunAsOf]);
+    }, [activeTab, currentStrategy, cachedStrategyPicks, latestRunAsOf, locale]);
 
     return (
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6 w-full min-w-0">
@@ -150,27 +155,27 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 alcanzaba por scroll horizontal sin affordance. Todos los
                 triggers son alcanzables con flechas (tablist de Radix). */}
             <TabsList
-                aria-label="Secciones de Pro Picks"
+                aria-label={t('propicks.tabs.ariaLabel')}
                 className="flex h-auto w-full min-w-0 max-w-full flex-wrap justify-start gap-1 border border-gray-700 bg-gray-800 p-1 pb-2 text-gray-400 sm:inline-flex sm:h-auto sm:w-auto sm:max-w-none sm:pb-[3px]"
             >
                 <TabsTrigger value="picks" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
-                    Selección IA
+                    {t('propicks.tabs.picks')}
                 </TabsTrigger>
                 <TabsTrigger value="joyas" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
-                    Joyas
+                    {t('propicks.tabs.gems')}
                 </TabsTrigger>
                 <TabsTrigger value="deepvalue" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
-                    Valor profundo
+                    {t('propicks.tabs.deepValue')}
                 </TabsTrigger>
                 <TabsTrigger value="estrategia" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
-                    Estrategia y rebalanceo
+                    {t('propicks.tabs.strategy')}
                 </TabsTrigger>
                 <TabsTrigger value="backtest" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">
-                    Backtest
+                    {t('propicks.tabs.backtest')}
                 </TabsTrigger>
-                <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Resultados simulados de la IA</TabsTrigger>
-                <TabsTrigger value="radar" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Radar global</TabsTrigger>
-                <TabsTrigger value="oportunidades" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">Oportunidades DCA</TabsTrigger>
+                <TabsTrigger value="paper" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">{t('propicks.tabs.paper')}</TabsTrigger>
+                <TabsTrigger value="radar" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">{t('propicks.tabs.radar')}</TabsTrigger>
+                <TabsTrigger value="oportunidades" className="min-h-[44px] min-w-fit flex-none snap-start whitespace-nowrap px-2.5 text-sm data-[state=active]:bg-gray-700 data-[state=active]:text-teal-300 sm:px-3">{t('propicks.tabs.dca')}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="paper" className="mt-6"><PaperTradingView locale={locale} /></TabsContent>
@@ -246,12 +251,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
 
                 <Card className="flex min-w-0 flex-col gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4 md:flex-row md:items-center md:justify-between">
                     <p className="max-w-xl text-sm leading-6 text-gray-400">
-                        Baseline walk-forward point-in-time (momentum 12-1M,
-                        universo líquido de 30 valores, costes 15 pb por pata,
-                        SPY como benchmark). No valida la selección IA:
-                        valida que el motor no mira el futuro. El backtest por
-                        estrategia con fundamentales point-in-time llegará
-                        cuando haya TTM persistido.
+                        {t('propicks.tabs.baselineNote')}
                     </p>
                     <Button
                         onClick={() => runBacktest()}
@@ -264,7 +264,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                         ) : (
                             <Play aria-hidden="true" className="h-4 w-4" />
                         )}
-                        {loading ? 'Calculando...' : 'Ejecutar backtest'}
+                        {loading ? t('propicks.tabs.calculating') : t('propicks.tabs.runBacktest')}
                     </Button>
                 </Card>
 
@@ -272,7 +272,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                     <Card className="rounded-lg border border-red-700 bg-red-900/20 p-6 text-center">
                         <p className="text-red-400">{error}</p>
                         <p className="text-sm text-gray-400 mt-2">
-                            No se pudo calcular el backtest. Comprueba tu conexión e inténtalo de nuevo.
+                            {t('propicks.tabs.backtestError')}
                         </p>
                         <Button
                             onClick={() => runBacktest()}
@@ -285,7 +285,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                             ) : (
                                 <Play aria-hidden="true" className="h-4 w-4" />
                             )}
-                            Reintentar
+                            {t('common.actions.retry')}
                         </Button>
                     </Card>
                 )}
@@ -293,7 +293,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 {loading && !walkForward && (
                     <Card aria-busy="true" className="flex items-center justify-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-10 text-gray-400">
                         <Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-teal-400" />
-                        <span>Calculando backtest walk-forward con datos históricos... puede tardar unos segundos.</span>
+                        <span>{t('propicks.tabs.backtestLoading')}</span>
                     </Card>
                 )}
 
@@ -302,7 +302,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 {!loading && !error && !walkForward && (
                     <Card className="flex flex-col items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-10 text-gray-500">
                         <BarChart3 aria-hidden="true" className="h-10 w-10 text-gray-500" />
-                        <p className="text-sm">Pulsa «Ejecutar backtest» para lanzar la simulación walk-forward point-in-time.</p>
+                        <p className="text-sm">{t('propicks.tabs.backtestEmpty')}</p>
                     </Card>
                 )}
 

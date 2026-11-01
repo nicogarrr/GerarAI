@@ -6,15 +6,17 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+// Los textos de Pro Picks viven en el diccionario es (i18n): se comprueban junto al código.
+const ES_PROPICKS_JSON = readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
 
 const disclosure = readFileSync('components/ui/methodology-disclosure.tsx', 'utf8');
-const propicks = readFileSync('app/(root)/propicks/page.tsx', 'utf8');
+const propicks = (readFileSync('app/(root)/propicks/page.tsx', 'utf8') + ES_PROPICKS_JSON);
 const risk = readFileSync('app/(root)/risk/page.tsx', 'utf8');
 // Las cadenas visibles de /risk viven en el diccionario i18n (carril C); la
 // página las referencia por clave. El guard verifica ambos extremos.
 const esRisk = JSON.parse(readFileSync('lib/i18n/messages/es/risk.json', 'utf8'));
 const esPortfolio = JSON.parse(readFileSync('lib/i18n/messages/es/portfolio.json', 'utf8'));
-const walkforward = readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8');
+const walkforward = (readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8') + ES_PROPICKS_JSON);
 
 test('el desplegable es nativo, sin estado de apertura JS y cerrado por defecto', () => {
     assert.doesNotMatch(disclosure, /useState|useReducer|onClick|onToggle|onKeyDown/, 'la apertura es nativa, no controlada por JS');
