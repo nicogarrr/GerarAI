@@ -27,16 +27,19 @@ test("landing shots: ficha MSFT desktop", async ({ page }) => {
   await fichaLista(page, 1440, 900);
   await page.goto("/research/MSFT?view=thesis");
   await expect(header(page).getByText(/^336,56\sUS\$$/)).toBeVisible();
+  await arribaYAsentada(page);
   await page.screenshot({ path: "test-results/landing-desktop.png" });
 });
 
 test("landing shots: ficha MSFT tablet", async ({ page }) => {
   await fichaLista(page, 834, 1112);
+  await arribaYAsentada(page);
   await page.screenshot({ path: "test-results/landing-tablet.png" });
 });
 
 test("landing shots: ficha MSFT movil", async ({ page }) => {
   await fichaLista(page, 390, 844);
+  await arribaYAsentada(page);
   await page.screenshot({ path: "test-results/landing-mobile.png" });
 });
 
@@ -70,6 +73,20 @@ async function landingAsentada(page: import("@playwright/test").Page, alts: RegE
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
 }
 
+
+// Las capturas fullPage salen desde arriba: tras recorrer el selector de
+// dispositivo el scroll queda a media pagina y en la captura el header fijo
+// se pinta sobre el titular/subtitulo. Volver a (0,0) y esperar a que scroll
+// y layout asienten (dos frames: uno aplica el scroll, otro re-posiciona el
+// header fijo) antes de capturar.
+async function arribaYAsentada(page: import("@playwright/test").Page) {
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForFunction(() => window.scrollY === 0 && window.scrollX === 0);
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+}
+
 // Cambia la maqueta de dispositivo por su botón y espera a que la nueva
 // captura tenga píxeles de verdad (el selector monta la imagen al pulsar).
 async function seleccionaDispositivo(page: import("@playwright/test").Page, boton: string, alt: RegExp) {
@@ -86,6 +103,7 @@ test("landing shots: landing desktop fullpage", async ({ page }) => {
   await seleccionaDispositivo(page, "Ver en tablet", /GerarAI en tablet/);
   await seleccionaDispositivo(page, "Ver en móvil", /GerarAI en móvil/);
   await seleccionaDispositivo(page, "Ver en ordenador", /Ficha de empresa de GerarAI/);
+  await arribaYAsentada(page);
   await page.screenshot({ path: "test-results/landing-page-desktop.png", fullPage: true });
 });
 
@@ -116,5 +134,6 @@ test("landing shots: landing movil fullpage", async ({ page }) => {
     overflowInfo.excess,
     `overflow: scrollWidth=${overflowInfo.scrollWidth} client=${overflowInfo.clientWidth}; offenders: ${overflowInfo.offenders.join(" | ") || "ninguno >1px"}`,
   ).toBeLessThanOrEqual(1);
+  await arribaYAsentada(page);
   await page.screenshot({ path: "test-results/landing-page-mobile.png", fullPage: true });
 });
