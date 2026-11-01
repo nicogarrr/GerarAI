@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 const player = readFileSync('components/research/ThesisAudioPlayer.tsx', 'utf8');
 const memo = readFileSync('components/research/ThesisMemo.tsx', 'utf8');
 const route = readFileSync('app/api/thesis/[ticker]/audio/route.ts', 'utf8');
+const audioEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisAudio;
 
 describe('audio de tesis', () => {
     it('es un <audio controls> con URL por ticker y versión, sin speechSynthesis', () => {
@@ -21,9 +22,11 @@ describe('audio de tesis', () => {
     });
     it('estados claros: sin audio no hay reproductor; pending se consulta; error reintenta', () => {
         assert.match(player, /state === 'ready' \?/);
-        assert.match(player, /Generando audio…/);
+        assert.match(player, /t\('research\.thesisAudio\.generating'\)/);
+        assert.match(audioEs.generating, /Generando audio…/);
         assert.match(player, /setTimeout\(tick, 5000\)/);
-        assert.match(player, /No se pudo generar el audio\./);
+        assert.match(player, /t\('research\.thesisAudio\.failed'\)/);
+        assert.match(audioEs.failed, /No se pudo generar el audio\./);
         assert.match(player, /onError=\{\(\) => setState\('error'\)\}/);
     });
     it('va arriba de la vista de tesis, con la última PUBLICADA (no el borrador) y antes de la tesis actual', () => {
@@ -34,7 +37,8 @@ describe('audio de tesis', () => {
         assert.match(page.slice(at, at + 400), /entry\.status === 'published'/);
     });
     it('sin tesis publicada se dice sin audio (no es un error) y el proxy reenvía ?version', () => {
-        assert.match(player, /Sin audio: aún no hay tesis publicada\./);
+        assert.match(player, /t\('research\.thesisAudio\.unpublished'\)/);
+        assert.match(audioEs.unpublished, /Sin audio: aún no hay tesis publicada\./);
         assert.match(player, /hasKey === false/);
         assert.match(route, /\?version=/);
     });

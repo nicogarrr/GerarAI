@@ -1599,5 +1599,57 @@
     "year": "Ejercicio",
     "unverifiedCurrency": "Divisa del emisor no verificada.",
     "source": "Proyección del modelo {model} v{version}, corte {date}."
+  },
+  "thesisAudio": {
+    "group": "Escuchar la tesis",
+    "generating": "Generando audio…",
+    "generate": "Generar audio",
+    "unpublished": "Sin audio: aún no hay tesis publicada.",
+    "failed": "No se pudo generar el audio.",
+    "retry": "Reintentar"
+  },
+  "thesisDebate": {
+    "failedFallback": "No se pudo generar el debate",
+    "running": "Debatiendo…",
+    "retryDebate": "Reintentar debate",
+    "generate": "Generar debate bull/bear",
+    "degraded": "degradado · veredicto determinista",
+    "llmJudge": "juez LLM",
+    "calls": "{count} llamadas LLM · modelo {model}",
+    "deterministic": "determinista",
+    "failed": "El debate falló: {error}",
+    "retry": "Reintentar",
+    "bullTitle": "Caso alcista",
+    "bullEmpty": "Sin caso alcista registrado.",
+    "bearTitle": "Caso bajista",
+    "bearEmpty": "Sin caso bajista registrado.",
+    "verdict": "veredicto: {verdict}",
+    "notPersisted": "veredicto no persistido (se muestra igual)",
+    "empty": "Sin debate persistido. Genera el debate para contrastar la tesis con su contraparte bajista antes de aprobarla."
+  },
+  "memoPager": {
+    "previous": "Sección anterior",
+    "select": "Sección del memorando",
+    "next": "Sección siguiente",
+    "loadingSection": "Cargando la sección"
+  },
+  "participation": {
+    "title": "Grandes accionistas (13D/G)",
+    "intro": "Declaraciones de participación ante la SEC, no operaciones de compra o venta. El declarante puede representar solo algunas entidades del grupo. La fecha de la posición no es la fecha de presentación.",
+    "loadError": "No se pudieron cargar las declaraciones ahora.",
+    "empty": "Sin declaraciones 13D/G sincronizadas. Esto no demuestra ausencia de grandes accionistas.",
+    "holderUnknown": "Declarante N/D",
+    "shares": "{shares} acciones · {percent}",
+    "positionAt": "Posición a {date}",
+    "filedOn": "Presentado {date}",
+    "pending": "Documento pendiente de lectura completa; los campos no verificados figuran como N/D.",
+    "secDocument": "Documento SEC",
+    "sourceUnknown": "Fuente N/D"
+  },
+  "tickerNotFound": {
+    "title": "Acción no encontrada",
+    "body": "No hemos encontrado datos para este símbolo. Puede que el ticker sea incorrecto o que aún no tenga cobertura de análisis.",
+    "backResearch": "Volver a Análisis",
+    "watchlist": "Ir a la watchlist"
   }
 }
