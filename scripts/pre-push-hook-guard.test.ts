@@ -75,7 +75,7 @@ function runHook(dir: string, { withOriginMain = true } = {}) {
 }
 
 test('borrados no van a lint y las rutas con espacios llegan como UN argumento', () => {
-    const { dir, git } = makeRepo();
+    const { dir } = makeRepo();
     writeFileSync(join(dir, '.githooks-placeholder'), '');
     mkdirSync(join(dir, '.githooks'));
     writeFileSync(join(dir, '.githooks', 'pre-push'), HOOK, { mode: 0o755 });

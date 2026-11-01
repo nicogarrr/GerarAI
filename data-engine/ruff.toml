@@ -30,7 +30,6 @@ select = [
 # Coste de migrar 200 ficheros de una vez: los codigos nuevos que ya hemos
 # corregido se avisan aqui en vez de bloquear el PR, y se pueden ir quitando.
 ignore = [
-  "UP038",  # isinstance(x, (A, B)) vs Union: py3.10+ lo prefiere, pero es ruido
   "SIM108", # ternario en vez de if/else: estilo, no correccion
   # B008: `db: Session = Depends(get_db)` ES el patron de FastAPI. Marcarlo
   # globalmente es correcto: exijalo solo en app/models/ dejaria los 184

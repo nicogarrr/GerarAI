@@ -11,7 +11,6 @@ import {
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
-import type { Formatters } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;

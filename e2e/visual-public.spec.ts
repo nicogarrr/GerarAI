@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { test } from "@playwright/test";
 
 // Capturas deterministas de las paginas publicas para visual regression.
 // NO se versionan PNGs en git (el repo ya arrastra historial de snapshots):

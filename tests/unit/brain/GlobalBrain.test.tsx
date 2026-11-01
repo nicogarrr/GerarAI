@@ -42,7 +42,6 @@ const ask = (text: string) => {
     fireEvent.change(box(), { target: { value: text } });
     fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
 };
-const logEl = () => screen.getByRole('log', { name: 'Mensajes del cerebro' });
 
 beforeEach(() => {
     // jsdom no implementa Element.scrollTo (el panel lo usa para ir al último mensaje).

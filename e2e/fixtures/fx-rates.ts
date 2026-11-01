@@ -1,5 +1,4 @@
 import { execFileSync } from "node:child_process";
-import path from "node:path";
 import { e2eUiDatabasePath } from "./e2e-env";
 
 /**

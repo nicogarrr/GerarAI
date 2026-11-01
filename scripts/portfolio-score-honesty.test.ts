@@ -17,7 +17,6 @@ import { formatNumber, formatPercent } from '../lib/format.ts';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { loadMessages } from './i18n-messages.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');

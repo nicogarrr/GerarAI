@@ -31,7 +31,6 @@ import Knowledge from '@/app/(root)/knowledge/page';
 import Graph from '@/app/(root)/knowledge-graph/page';
 import News from '@/app/(root)/research/news/page';
 
-const params = Promise.resolve({ticker: 'DEMO'});
 const searchParams = Promise.resolve({});
 const cases = [
  ['search', () => Search({searchParams}), {'Buscar en el research':'q', 'Tipos de entidad':'entity_types','Tipos de fuente':'source_types','Estados':'statuses','ID de colección':'collection_id','Fecha desde':'date_from','Fecha hasta':'date_to','Tipo de búsqueda':'vector'}],
