@@ -129,7 +129,13 @@ def _year_in_question(question: str, today: date) -> int:
 def _dividend_answer(db: Session, question: str, tenant: int) -> ChatResponse | None:
     """Dividendos GUARDADOS (declarados por el proveedor); nada proyectado ni inventado."""
     today = local_today()  # año/día del usuario (Madrid), no el UTC del servidor
-    portfolio = bool(re.search(r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas)\b|\bcobr\w*\b", question))
+    # «¿Cuál es mi rentabilidad por dividendo?» / «¿cuáles son mis dividendos?»
+    # también son de la cartera (antes, la rentabilidad sobre coste o nada).
+    portfolio = bool(re.search(
+        r"(?i)\bmi\s+cartera\b|\bmis\s+(?:posiciones|acciones|empresas|dividendos)\b|\bcobr\w*\b"
+        r"|\bmi\s+(?:rentabilidad|rendimiento)\s+(?:por|de|del)\s+dividendos?\b",
+        question,
+    ))
     company = None if portfolio else _company_in_question(db, question)
     if company is not None:
         kept, uncertain = resolve_yahoo_events(db.scalars(select(DividendRecord).where(
