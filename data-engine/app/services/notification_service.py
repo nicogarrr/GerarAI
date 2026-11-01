@@ -303,7 +303,7 @@ class NotificationService:
         if alert.alert_type == "dca_level" and isinstance(dca, dict):
             from app.services.dca_alert_copy import email_content
 
-            content = email_content(dca)
+            content = email_content(dca, str((alert.metadata_ or {}).get("language") or "es"))
         elif alert.alert_type == "earnings_reminder" and isinstance(earnings, dict):
             from app.services.earnings_alert_copy import email_content
 
