@@ -36,7 +36,7 @@ function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; tick
   const dateTime = (value: string | null | undefined) => formatUserDateTime(value, undefined, undefined, locale);
   const lead = event.changes[0];
   const openReview = event.reviews.find((r) => isOpenReview(r.status));
-  const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? t('research.changesFeed.noSummary'));
+  const title = changeHeadlineCopy(lead?.summary ?? openReview?.title ?? event.alerts[0]?.message ?? t('research.changesFeed.noSummary'), locale);
   const records = event.changes.length + event.reviews.length + event.alerts.length;
   const touches = [
     ...event.metrics.map((metric) => metricLabel(metric, locale)),
@@ -71,7 +71,7 @@ function EventCard({ event, ticker, open, onToggle }: { event: ChangeEvent; tick
           <summary className="min-h-11 cursor-pointer text-xs text-gray-400 sm:min-h-0">{t('research.changesFeed.viewRecords', { count: records })}</summary>
           <div className="mt-2 space-y-2">
             {event.changes.map((c: ResearchThesisChange) => (
-              <p className="rounded border border-gray-800 p-2 text-xs" id={`thesis-change-${c.id}`} key={`c${c.id}`}><span className="text-gray-500">{t('research.changesFeed.changeMeta', { date: dateTime(c.created_at), score: c.materiality_score })}</span><br />{changeSummaryText(c.summary)}</p>
+              <p className="rounded border border-gray-800 p-2 text-xs" id={`thesis-change-${c.id}`} key={`c${c.id}`}><span className="text-gray-500">{t('research.changesFeed.changeMeta', { date: dateTime(c.created_at), score: c.materiality_score })}</span><br />{changeSummaryText(c.summary, locale)}</p>
             ))}
             {groupReviews(event.reviews.map((r) => ({ id: r.id, title: r.title, created_at: r.created_at }))).map((g) => (
               <p className="rounded border border-gray-800 p-2 text-xs" key={`r${g.ids[0]}`}><span className="text-gray-500">{t('research.changesFeed.review')}{g.count > 1 ? ` ×${g.count}` : ''}{g.latest ? ` · ${dateTime(g.latest)}` : ''}</span><br />{g.title}</p>

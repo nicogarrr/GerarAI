@@ -1,4 +1,7 @@
-/** Textos de «Qué ha cambiado» en español y sin repetir el titular en el cuerpo. */
+/** Textos de «Qué ha cambiado» en el idioma elegido y sin repetir el titular en el cuerpo. */
+// @ts-expect-error TS5097
+import { createTranslator } from '../i18n/translate.ts';
+
 const CHANGE_TYPE_LABELS: Record<string, string> = {
     update: 'actualización',
     earnings_update: 'resultados',
@@ -46,10 +49,36 @@ function normalize(value: string): string {
     return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 }
 
-/** Quita frases repetidas y traduce los prefijos antiguos en inglés. */
-export function changeSummaryText(summary: string): string {
-    let text = (summary ?? '').trim();
-    for (const [pattern, replacement] of LEGACY_PREFIXES) text = text.replace(pattern, replacement);
+/**
+ * Con Ajustes → Idioma en inglés: los prefijos del backend (antiguos en inglés
+ * y actuales en español) salen en inglés. Antes se pasaban siempre a español.
+ */
+const NO_STORED_THESIS = /No stored thesis is available for semantic impact mapping\.|No hay una tesis guardada para evaluar el impacto\./g;
+const NO_NODE_MATCHED = /No structural thesis node matched with sufficient confidence\.|No se ha encontrado una relación suficientemente fiable con la tesis\./g;
+const AFFECTS_AREAS =
+    /(?:Affects (\d+) claims and thesis nodes|Afecta a (\d+) afirmaciones y (?:a estos apartados|nodos) de la tesis|No afecta a ninguna afirmación concreta; toca estos apartados de la tesis):\s*([^.!?]*)/g;
+
+const SPANISH_NODE_TO_EN: Record<string, string> = {
+    Tecnología: 'Technology', Financiación: 'Funding', Comercialización: 'Commercialization',
+    Ejecución: 'Execution', Regulación: 'Regulatory', 'Economía del negocio': 'Economics', 'Ventaja competitiva': 'Moat',
+};
+
+function englishSummary(text: string): string {
+    const t = createTranslator('en');
+    return text
+        .replace(NO_STORED_THESIS, t('research.changeCopy.noStoredThesis'))
+        .replace(NO_NODE_MATCHED, t('research.changeCopy.noNodeMatched'))
+        .replace(AFFECTS_AREAS, (_match: string, en?: string, es?: string, labels: string = '') => {
+            const count = Number(en ?? es ?? 0);
+            const areas = labels.split(', ').filter(Boolean).map((label: string) => SPANISH_NODE_TO_EN[label] ?? label).join(', ');
+            if (count === 1) return t('research.changeCopy.affectsOneClaim', { areas });
+            return count > 0
+                ? t('research.changeCopy.affectsClaims', { count: String(count), areas })
+                : t('research.changeCopy.affectsNoClaim', { areas });
+        });
+}
+
+function dedupeSentences(text: string): string {
     const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean);
     const seen: string[] = [];
     const kept = sentences.filter((sentence) => {
@@ -59,7 +88,15 @@ export function changeSummaryText(summary: string): string {
         seen.push(key);
         return true;
     });
-    return kept.join(' ').replace(/((?:Afecta a \d+ afirmaciones y a|No afecta a ninguna afirmación concreta; toca) estos apartados de la tesis: )([^.!?]+)/g, (_, prefix: string, labels: string) => {
+    return kept.join(' ');
+}
+
+/** Quita frases repetidas y traduce los prefijos antiguos al idioma elegido (español por defecto). */
+export function changeSummaryText(summary: string, locale: 'es' | 'en' = 'es'): string {
+    let text = (summary ?? '').trim();
+    if (locale === 'en') return dedupeSentences(englishSummary(text));
+    for (const [pattern, replacement] of LEGACY_PREFIXES) text = text.replace(pattern, replacement);
+    return dedupeSentences(text).replace(/((?:Afecta a \d+ afirmaciones y a|No afecta a ninguna afirmación concreta; toca) estos apartados de la tesis: )([^.!?]+)/g, (_, prefix: string, labels: string) => {
         const nodes: Record<string, string> = {
             Technology: 'Tecnología', Funding: 'Financiación', Commercialization: 'Comercialización',
             Execution: 'Ejecución', Regulatory: 'Regulación', Economics: 'Economía del negocio', Moat: 'Ventaja competitiva',
@@ -69,12 +106,12 @@ export function changeSummaryText(summary: string): string {
 }
 
 /** Render old persisted wrappers without changing the original evidence. */
-export function changeHeadlineCopy(summary: string): { text: string; note: string | null } {
+export function changeHeadlineCopy(summary: string, locale: 'es' | 'en' = 'es'): { text: string; note: string | null } {
     let text = (summary ?? '').trim();
     text = text.replace(/^Noticia material que requiere revisión de la tesis:\s*/i, '');
     text = text.replace(/^Artículo de [\s\S]*?,\s*(?:fechad[ao] el \d{4}-\d{2}-\d{2} por [^:]+|detectad[ao] por GDELT el \d{4}-\d{2}-\d{2}):\s*/i, '');
     const warning = text.search(/Revisa la fuente;\s*(?:la fecha de GDELT|el titular no confirma)/i);
     const note = warning >= 0 ? text.slice(warning).trim() : null;
     if (warning >= 0) text = text.slice(0, warning).trim();
-    return { text: changeSummaryText(text), note };
+    return { text: changeSummaryText(text, locale), note };
 }

@@ -1704,5 +1704,12 @@
   "assistantMetaTitle": "Asistente de investigación",
   "assistantMetaDescription": "La guía de investigación vive en el Cerebro.",
   "sourcesMetaTitle": "Fuentes",
-  "metricPerShare": "{amount}/acción"
+  "metricPerShare": "{amount}/acción",
+  "changeCopy": {
+    "noStoredThesis": "No hay una tesis guardada para evaluar el impacto.",
+    "noNodeMatched": "No se ha encontrado una relación suficientemente fiable con la tesis.",
+    "affectsClaims": "Afecta a {count} afirmaciones y a estos apartados de la tesis: {areas}",
+    "affectsNoClaim": "No afecta a ninguna afirmación concreta; toca estos apartados de la tesis: {areas}",
+    "affectsOneClaim": "Afecta a 1 afirmación y a estos apartados de la tesis: {areas}"
+  }
 }

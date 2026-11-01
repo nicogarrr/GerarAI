@@ -69,8 +69,8 @@ export function ChangesSinceVisit({ ticker }: { ticker: string }) {
                 ) : null}
                 {data.cambios_tesis.slice(0, 3).map((change, index) => (
                     <li key={`${change.fecha}-${index}`}>
-                        {t('research.changesSinceVisit.thesis', { text: changeHeadlineCopy(change.resumen).text })}{change.requiere_revision ? t('research.changesSinceVisit.needsReview') : ''}
-                        {changeHeadlineCopy(change.resumen).note ? <p className="mt-1 text-xs text-amber-300">{changeHeadlineCopy(change.resumen).note}</p> : null}
+                        {t('research.changesSinceVisit.thesis', { text: changeHeadlineCopy(change.resumen, locale).text })}{change.requiere_revision ? t('research.changesSinceVisit.needsReview') : ''}
+                        {changeHeadlineCopy(change.resumen, locale).note ? <p className="mt-1 text-xs text-amber-300">{changeHeadlineCopy(change.resumen, locale).note}</p> : null}
                     </li>
                 ))}
             </ul>
