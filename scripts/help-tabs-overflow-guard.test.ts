@@ -18,7 +18,7 @@ test('F302: la barra de tabs de /help se alcanza con teclado', () => {
     // alcanzables (WCAG 2.1.1). El nombre accesible no puede ser role="region"
     // porque sobrescribiria el tablist de Radix y su navegacion con flechas.
     assert.match(help, /<TabsList\s+tabIndex=\{0\}/, 'el list es enfocable');
-    assert.match(help, /<TabsList[\s\S]*?aria-label="/, 'el list tiene nombre accesible');
+    assert.match(help, /<TabsList[\s\S]*?aria-label=("|\{en \? HELP_EN\.tabsAria : ')/, 'el list tiene nombre accesible');
 });
 
 test('F302: la barra de tabs de /help usa el primitivo Tabs de Radix', () => {
@@ -37,10 +37,11 @@ test('F302: la barra de tabs de /help usa el primitivo Tabs de Radix', () => {
 });
 
 test('F302: los tres tabs siguen siendo FAQs, Documentacion y Contacto', () => {
+    // En inglés (Ajustes → Idioma) la etiqueta sale de HELP_EN; el español sigue en el código.
     for (const [value, label] of [
         ['faq', 'FAQs'],
-        ['api', 'Documentación'],
-        ['community', 'Contacto'],
+        ['api', "{en ? HELP_EN.tabDocs : 'Documentación'}"],
+        ['community', "{en ? HELP_EN.tabContact : 'Contacto'}"],
     ]) {
         const trigger = help.match(new RegExp(`<TabsTrigger\\s+value="${value}"[\\s\\S]*?>([\\s\\S]*?)</TabsTrigger>`));
         assert.ok(trigger, `hay un TabsTrigger para "${value}"`);
