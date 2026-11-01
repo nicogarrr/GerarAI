@@ -4,7 +4,7 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { trimBrainHistory, type BrainHistoryTurn } from '@/lib/brain/history';
 import type { BrainPageContext } from '@/lib/brain/page-context';
 import { toPortfolioChatCitations } from '@/lib/chat/citations';
-import { expertTeamFromResponse } from '@/lib/chat/expert-team';
+import { expertTeamFromResponse, expertTeamTimeoutsFromResponse } from '@/lib/chat/expert-team';
 import { requestLocale } from '@/lib/research/backend-error-locale';
 import { jsonBody, researchRequest } from '@/lib/research/client';
 import { AppError, AuthorizationError, ExternalAPIError, ValidationError } from '@/lib/types/errors';
@@ -100,6 +100,7 @@ export async function chatWithPortfolio(
         citations: toPortfolioChatCitations(response.sources),
         // Equipo de expertos (flag del motor, apagado por defecto): quién respondió.
         experts: expertTeamFromResponse(response),
+        expertsTimedOut: expertTeamTimeoutsFromResponse(response),
         context: response.context ?? null,
     };
 }

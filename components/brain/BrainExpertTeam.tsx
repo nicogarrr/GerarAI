@@ -11,8 +11,8 @@ const EXPERT_KEYS = {
     tax: 'brain.expertTeam.experts.tax',
 } as const;
 
-/** Aviso de que la respuesta la dio el equipo de expertos, con los que participaron. */
-export function BrainExpertTeam({ experts }: { experts?: ExpertName[] | null }) {
+/** Aviso de que la respuesta la dio el equipo de expertos: quién respondió y quién no llegó a tiempo. */
+export function BrainExpertTeam({ experts, timedOut }: { experts?: ExpertName[] | null; timedOut?: ExpertName[] | null }) {
     const t = useT();
     if (!experts?.length) return null;
     return (
@@ -20,6 +20,11 @@ export function BrainExpertTeam({ experts }: { experts?: ExpertName[] | null }) 
             <span className="font-semibold text-slate-300">{t('brain.expertTeam.title')}</span>
             {': '}
             {experts.map((name) => t(EXPERT_KEYS[name])).join(' · ')}
+            {timedOut?.length ? (
+                <span data-testid="brain-expert-team-timeout" className="block text-amber-300">
+                    {t('brain.expertTeam.timedOut', { experts: timedOut.map((name) => t(EXPERT_KEYS[name])).join(' · ') })}
+                </span>
+            ) : null}
             <span className="block">{t('brain.expertTeam.note')}</span>
         </p>
     );
