@@ -74,13 +74,19 @@ class SafeFormula:
     def __init__(self, expression: str) -> None:
         if len(expression) > 1000:
             raise ValueError("La fórmula supera los 1000 caracteres")
-        try:
-            self.tree = ast.parse(expression, mode="eval")
-        except SyntaxError as exc:
-            raise ValueError("Sintaxis de fórmula no válida") from exc
         self.expression = expression
         self.names: set[str] = set()
-        self._validate(self.tree)
+        # Un anidamiento profundo dentro de los 1000 caracteres («------1»,
+        # «-(-(-(…)))») agota la pila al parsear o validar: RecursionError no es
+        # ValueError y los llamadores solo capturan ValueError, asi que crear la
+        # metrica o el screen respondia 500 en vez de un error de formula.
+        try:
+            self.tree = ast.parse(expression, mode="eval")
+            self._validate(self.tree)
+        except SyntaxError as exc:
+            raise ValueError("Sintaxis de fórmula no válida") from exc
+        except RecursionError as exc:
+            raise ValueError("La fórmula está demasiado anidada") from exc
 
     def _validate(self, node: ast.AST) -> None:
         if isinstance(node, ast.Expression):
@@ -134,6 +140,8 @@ class SafeFormula:
         # ValueError: antes un decimal.Overflow tumbaba la ejecucion entera.
         except (DecimalException, ZeroDivisionError) as exc:
             raise ValueError("No se puede evaluar la fórmula con estos valores") from exc
+        except RecursionError as exc:
+            raise ValueError("La fórmula está demasiado anidada") from exc
 
     def _evaluate(self, node: ast.AST, values: dict[str, Decimal]) -> Decimal:
         if isinstance(node, ast.Constant):
