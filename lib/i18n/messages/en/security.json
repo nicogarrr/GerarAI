@@ -74,5 +74,31 @@
     "noSmtp": "Email password reset is not configured on this deployment (SMTP is missing). Use the authenticated change above or contact support.",
     "dataTitle": "Data and account",
     "dataDescription": "Export a copy or delete the account and all its data."
+  },
+  "password": {
+    "currentLabel": "Current password",
+    "newLabel": "New password",
+    "lengthHint": "Between 8 and 128 characters.",
+    "confirmLabel": "Repeat the new password",
+    "submit": "Change password",
+    "submitting": "Changing…",
+    "errorTitle": "Password not changed",
+    "successTitle": "Password changed",
+    "sessionUnavailable": "Your session isn't available. Please sign in again.",
+    "resetRequested": "If that email has an account, you'll get a link to reset your password. Check your spam folder too.",
+    "resetNotConfigured": "Password reset by email isn't set up on this deployment. Sign in and change your password from Security, or contact support.",
+    "invalidEmail": "Enter a valid email address.",
+    "invalidLink": "This link is invalid or has expired. Ask for a new one.",
+    "lengthError": "The password must be between 8 and 128 characters.",
+    "mismatch": "The passwords don't match.",
+    "resetDone": "Password updated. Sign in with your new password.",
+    "currentRequired": "Enter your current password.",
+    "newLengthError": "The new password must be between 8 and 128 characters.",
+    "newMismatch": "The new passwords don't match.",
+    "sameAsCurrent": "The new password must be different from the current one.",
+    "changed": "Password changed. Your other sessions have been signed out.",
+    "tooManyAttempts": "Too many attempts. Wait a moment before trying again.",
+    "checkCurrent": "Couldn't change the password. Check that your current password is correct.",
+    "changeFailed": "Couldn't change the password. Please try again."
   }
 }
