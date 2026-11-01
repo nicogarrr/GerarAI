@@ -1016,6 +1016,7 @@ def create_transaction(
     payload: PortfolioTransactionInput, db: Session = Depends(get_db)
 ) -> dict:
     _reject_noncanonical_cash_row(payload)
+    _reject_zero_amount_row(payload)
     service = PortfolioLedgerService()
     try:
         transaction = service.create_transaction(
@@ -1101,6 +1102,33 @@ def _reject_noncanonical_cash_row(payload: PortfolioTransactionInput) -> None:
 
 
 
+def _reject_zero_amount_row(payload: PortfolioTransactionInput) -> None:
+    """400 for a row that moves nothing: 0 shares bought/sold, 0 cash paid.
+
+    ``POST /transactions`` already refused a 0-share buy/sell through
+    ``PortfolioLedgerService.create_transaction``, but the batch and the
+    edit write the row themselves: a 0-share sale reached the tax report as a
+    sale. A dividend or interest of amount 0 entered every door and was
+    counted as a payment («Dividendos (nº)»). A price of 0 stays valid on
+    buy/sell (shares received free, worthless shares sold to book the loss).
+    """
+    if payload.action in {"buy", "sell"}:
+        if payload.quantity <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Action '{payload.action}' needs a quantity greater than 0",
+            )
+        return
+    if payload.action in {"dividend", "interest"} and payload.price <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Action '{payload.action}' needs an amount greater than 0 "
+                "(the amount goes in 'price')"
+            ),
+        )
+
+
 class PortfolioTransactionBatchInput(BaseModel):
     transactions: list[PortfolioTransactionInput] = Field(min_length=1, max_length=1000)
 
@@ -1123,6 +1151,7 @@ def create_transaction_batch(
     for i, tx_input in enumerate(payload.transactions):
         try:
             _reject_noncanonical_cash_row(tx_input)
+            _reject_zero_amount_row(tx_input)
         except HTTPException as exc:
             db.rollback()
             raise HTTPException(
@@ -1341,6 +1370,7 @@ def update_transaction(
                 f"cash transaction for '{payload.action}'"
             ),
         )
+    _reject_zero_amount_row(payload)
     service = PortfolioLedgerService()
     original_company_id = transaction.company_id
     original_price, original_trade_date = transaction.price, transaction.trade_date
