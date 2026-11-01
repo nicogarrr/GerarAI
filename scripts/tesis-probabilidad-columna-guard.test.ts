@@ -23,7 +23,7 @@ void test('existe el flag hasProbabilities exigiendo probabilidad numérica real
 void test('la cabecera Probabilidad es condicional a hasProbabilities', () => {
     assert.match(
         source,
-        /\{hasProbabilities \? <th[^>]*>Probabilidad<\/th> : null\}/,
+        /\{hasProbabilities \? <th[^>]*>\{t\('research\.thesisDoc\.colProbability'\)\}<\/th> : null\}/,
         'el th Probabilidad no puede rendirse cuando no hay probabilidades',
     );
 });
@@ -49,7 +49,7 @@ void test('sin valores de escenario no se pinta la tabla y se dice tal cual', ()
     );
     assert.match(
         source,
-        /Sin cifras de valoración\./,
+        /\{t\('research\.thesisDoc\.noFigures'\)\}/,
         'sin valores debe mostrarse el mensaje honesto «Sin cifras de valoración.»',
     );
 });

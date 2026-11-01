@@ -5,6 +5,7 @@ import { researchRequest } from '@/lib/research/client';
 import ThesisReadingPage from '@/app/(root)/research/[ticker]/tesis/page';
 import { AppError } from '@/lib/types/errors';
 
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/actions/research.actions', () => ({ getResearchCompanySnapshot: vi.fn(), getResearchThesisWorkspace: vi.fn() }));
 vi.mock('@/lib/research/client', () => ({ researchRequest: vi.fn() }));
 vi.mock('@/lib/public-fonts-editorial', () => ({ publicEditorial: { variable: '' } }));

@@ -14,20 +14,21 @@ import { readFileSync } from 'node:fs';
 
 describe('QA ficha: tesis en borrador sin callejon sin salida (4)', () => {
     const tesis = readFileSync('app/(root)/research/[ticker]/tesis/page.tsx', 'utf8');
+    const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisDoc;
     it('el estado se muestra traducido, nunca en crudo («draft»)', () => {
         assert.ok(!tesis.includes('«${latest.status}»'), 'no se interpola el status crudo');
         assert.match(tesis, /draft: 'borrador'/, 'mapa de estados con draft traducido');
-        assert.ok(tesis.includes('statusLabel(latest.status)'), 'la descripcion usa statusLabel');
+        assert.ok(tesis.includes('statusLabel(latest.status, t, locale)'), 'la descripcion usa statusLabel');
     });
     it('el estado vacio ofrece volver a la ficha (no es un callejon)', () => {
         assert.ok(tesis.includes('EmptyLink'), 'usa EmptyLink');
-        assert.ok(tesis.includes('?view=thesis`}>Revisar la v'), 'accion al borrador en la ficha');
+        assert.ok(tesis.includes("?view=thesis`}>{t('research.thesisDoc.reviewVersion'") && es.reviewVersion.startsWith('Revisar la v'), 'accion al borrador en la ficha');
     });
     it('una version datos insuficientes se lee como PROVISIONAL rotulada, nunca vacia (Nico HYMC, 2026-10-21)', () => {
         assert.ok(tesis.includes("latest.status === 'insufficient_data'"), 'rama provisional solo para datos insuficientes (sin cifras por construccion)');
-        assert.ok(tesis.includes('PROVISIONAL — no publicada'), 'badge provisional explicito');
+        assert.ok(tesis.includes("t('research.thesisDoc.provisionalBadge')") && es.provisionalBadge === 'PROVISIONAL — no publicada', 'badge provisional explicito');
         assert.ok(tesis.includes('/pdf?draft=1'), 'PDF del borrador por la ruta draft existente (lista blanca backend, sin cifras)');
-        assert.ok(tesis.includes('Sin cifras de valoración en esta vista'), 'declara la ausencia de valoracion con causa, sin tabla de escenarios');
+        assert.ok(tesis.includes("t('research.thesisDoc.draftNoFigures')") && es.draftNoFigures.startsWith('Sin cifras de valoración en esta vista'), 'declara la ausencia de valoracion con causa, sin tabla de escenarios');
         // Rechazada/sustituida/obsoleta/borrador CON cifras: caen al estado
         // vacio honesto con salida a la ficha; nunca se presentan como
         // provisional valida.
