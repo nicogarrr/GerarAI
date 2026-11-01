@@ -6,7 +6,7 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
-from sqlalchemy import func, select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -165,22 +165,18 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
     for label, model, source_field, max_age in LAYERS:
         source = getattr(model, source_field)
         try:
-            tenant_clause = "" if model is MarketPrice else " AND tenant_id = :tenant"
-            extra = ""
+            statement = select(source, func.count(distinct(model.company_id)),
+                               func.max(model.updated_at)).where(
+                source.not_in(["seed", "manual", "test", "dummy", "placeholder"]),
+                model.company_id.is_not(None),
+            ).group_by(source)
+            if model is not MarketPrice:
+                statement = statement.where(model.tenant_id == tenant)
             if model is FinancialFact:
-                # Literal bare "is_reported": coincide textualmente con el predicado
-                # parcial de los indices de 0122 (con IS TRUE o con parametro el
-                # planner NO prueba la implicacion y barre la porcion del tenant:
-                # medido 103 ms vs 0,3 ms por sonda).
-                extra = " AND is_reported"
+                statement = statement.where(model.is_reported.is_(True))
             if model is MarketPrice:
-                extra = " AND close > 0"
-            params = {"tenant": tenant, "is_rep": True}
-            groups = _coverage_groups(
-                db, model=model, source=source, table=model.__tablename__,
-                source_col=source_field, tenant_clause=tenant_clause,
-                extra_clause=extra, params=params, tenant=tenant,
-            )
+                statement = statement.where(model.close > 0)
+            groups = db.execute(statement).all()
             for name, covered, stamp in groups:
                 stamp = utc(stamp)
                 status = "stale" if stamp and now - stamp > timedelta(days=max_age) else "available"
