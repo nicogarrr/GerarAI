@@ -7,8 +7,11 @@ event loop en su hilo va contra el hallazgo; sin loop, va por el pool.
 import asyncio
 from types import SimpleNamespace
 
+from sqlalchemy import select
+
 import main
-from app.core.database import init_db
+from app.core.database import SessionLocal, init_db
+from app.models import Company
 from app.schemas import ChatResponse
 from tests.auth_helpers import csrf_client
 
@@ -41,21 +44,61 @@ def test_chat_service_call_off_the_event_loop(monkeypatch):
     assert calls and all(calls)
 
 
+def _fake_held_tickers(calls: list[bool]):
+    def fake_held(db):  # noqa: ARG001
+        calls.append(_off_loop())
+        # Misma forma que held_tickers: (set, set); la ruta hace ``held | watch_all``.
+        return set(), set()
+
+    return fake_held
+
+
 def test_catalysts_held_tickers_off_the_event_loop(monkeypatch):
     init_db()
     calls: list[bool] = []
 
-    def fake_held(db):  # noqa: ARG001
-        calls.append(_off_loop())
-        return [], []
-
     monkeypatch.setattr(
-        "app.services.catalyst_calendar_service.held_tickers", fake_held
+        "app.services.catalyst_calendar_service.held_tickers", _fake_held_tickers(calls)
     )
     response = client.get("/api/calendar/catalysts")
     assert response.status_code == 200, response.text
     assert response.json()["held_count"] == 0
     assert calls and all(calls)
+
+
+def test_catalysts_held_tickers_off_the_event_loop_with_watchlist(monkeypatch):
+    """Con la watchlist no vacia la ruta sigue hasta ``held | watch_all``.
+
+    El fake devolvia listas: pasaba solo con la BD de tests sin watchlist y
+    caia (TypeError list | set) segun que fichero hubiera corrido antes.
+    Linea no-US: no se pregunta a NASDAQ/EDGAR."""
+    init_db()
+    symbol = "ZZOFFLOOP"
+    db = SessionLocal()
+    try:
+        if db.scalar(select(Company).where(Company.ticker == symbol)) is None:
+            db.add(Company(
+                ticker=symbol, name="Offload Watch SA", exchange="BME", currency="EUR",
+                company_type="general", valuation_model="dcf",
+            ))
+            db.commit()
+    finally:
+        db.close()
+    created = client.post("/api/watchlist", json={"symbol": symbol})
+    assert created.status_code in (200, 201), created.text
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        "app.services.catalyst_calendar_service.held_tickers", _fake_held_tickers(calls)
+    )
+    try:
+        response = client.get("/api/calendar/catalysts")
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["held_count"] == 0
+        assert body["watchlist_count"] >= 1
+        assert calls and all(calls)
+    finally:
+        client.delete(f"/api/watchlist/{symbol}")
 
 
 def test_sync_portfolio_dividends_off_the_event_loop(monkeypatch):
