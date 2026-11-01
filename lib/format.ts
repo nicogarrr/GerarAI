@@ -182,10 +182,15 @@ export function parseLocalizedNumber(value: string, locale: Locale = DEFAULT_LOC
  */
 export function formatNumberForInput(value: number, locale: Locale = DEFAULT_LOCALE): string {
   if (!Number.isFinite(value)) return '';
-  return new Intl.NumberFormat(intlLocale(locale), {
+  const text = new Intl.NumberFormat(intlLocale(locale), {
     useGrouping: false,
     maximumFractionDigits: 12,
   }).format(value);
+  // Justo 3 decimales («1,234» en es, «1.234» en en) es lo que el parser
+  // rechaza por ambiguo (¿decimal o miles?): editar una operación de 1,234
+  // acciones o un precio de 12,345 daba «formato ambiguo» sin tocar nada.
+  // Un 0 final lo deja inequívoco y con el mismo valor.
+  return /^-?[1-9]\d*[.,]\d{3}$/.test(text) ? `${text}0` : text;
 }
 
 function toDate(value: string | number | Date | null | undefined): Date | null {
