@@ -107,7 +107,7 @@ export type HistoryRow = {
 
 /**
  * Página del historial paginado (espejo de ManualDemoHistoryPage de
- * lib/actions/manual-demo-history.actions.ts): cursor estable
+ * lib/actions/manual-demo.actions.ts): cursor estable
  * (createdAt, _id) sin offset — las filas nuevas entran por arriba y no
  * desplazan el recorrido entre páginas.
  */

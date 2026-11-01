@@ -207,7 +207,7 @@ test('el historial es paginado: cursor estable cableado página -> panel -> pagi
     // server component y las siguientes las pide el panel con el cursor
     // (createdAt, _id); la contabilidad (readLedger) no pasa por aquí.
     const page = readFileSync(PAGE, 'utf8');
-    assert.match(page, /manual-demo-history\.actions/, 'la página usa la consulta paginada');
+    assert.match(page, /import \{ getManualDemoHistory \} from '@\/lib\/actions\/manual-demo\.actions'/, 'la página usa la consulta paginada');
     assert.match(page, /loadMoreHistory=\{loadMoreHistory\}/, 'la página pasa la acción de cargar más');
     assert.match(page, /historyHasMore=\{historyHasMore\}/, 'la página pasa hasMore');
     const panel = readFileSync(`${COMPONENTS_DIR}/ManualDemoPanel.tsx`, 'utf8');
