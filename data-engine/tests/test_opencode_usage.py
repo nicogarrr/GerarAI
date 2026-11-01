@@ -128,3 +128,17 @@ async def test_quota_429_without_retry_after_keeps_short_probe_cooldown():
             await provider.complete(LLMRequest([Message("user", "hola")], task="chat"))
         entry = next(b for b in base.breaker_snapshot() if b["provider"] == "opencode-go-subscription")
         assert entry["seconds_remaining"] <= 120
+
+
+@pytest.mark.parametrize("base_url", [
+    "http://opencode.ai/zen/go/v1", "https://opencode.ai.evil.invalid/zen/go/v1",
+    "https://opencode.ai@evil.invalid/zen/go/v1", "http://127.0.0.1:8000",
+    "https://evil.invalid", "https://opencode.ai/zen/v1",
+    "https://opencode.ai/zen/go/v1?redirect=evil", "https://opencode.ai/zen/go/v1/../other",
+])
+@run_async
+async def test_usage_refuses_nonofficial_origins_before_client_creation(base_url, monkeypatch):
+    def forbidden_client(**kwargs):
+        raise AssertionError("credential-bearing client must not be created")
+    monkeypatch.setattr(httpx, "AsyncClient", forbidden_client)
+    assert await fetch_go_usage(base_url, "platform-secret") is None
