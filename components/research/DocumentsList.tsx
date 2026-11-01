@@ -5,6 +5,7 @@ import { FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { paginate } from '@/lib/research/change-events';
 import { Pager } from './Pager';
+import { useT } from '@/lib/i18n/client';
 
 export type DocumentRow = { id: number | string; title: string; url: string | null; tier: string; tierRank: number; type: string; published: string; publishedTs: string | null };
 
@@ -18,6 +19,7 @@ const PAGE = 10;
  * oficiales por llegar más recientes.
  */
 export function DocumentsList({ documents }: { documents: DocumentRow[] }) {
+  const t = useT();
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
   const filtered = useMemo(() => {
@@ -36,10 +38,10 @@ export function DocumentsList({ documents }: { documents: DocumentRow[] }) {
     <div>
       {documents.length > PAGE ? (
         <input
-          aria-label="Buscar documentos"
+          aria-label={t('research.documentsList.searchAria')}
           className="mb-3 h-11 w-full rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 placeholder:text-gray-500 sm:h-10 sm:text-sm"
           onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-          placeholder="Buscar por título o tipo"
+          placeholder={t('research.documentsList.searchPlaceholder')}
           type="search"
           value={query}
         />
@@ -58,9 +60,9 @@ export function DocumentsList({ documents }: { documents: DocumentRow[] }) {
           ))}
         </div>
       ) : (
-        <p className="text-sm text-gray-500">Ningún documento coincide con la búsqueda.</p>
+        <p className="text-sm text-gray-500">{t('research.documentsList.noMatch')}</p>
       )}
-      <Pager label="documentos" onPage={setPage} page={view.page} pages={view.pages} total={filtered.length} />
+      <Pager label={t('research.documentsList.pagerUnit')} onPage={setPage} page={view.page} pages={view.pages} total={filtered.length} />
     </div>
   );
 }

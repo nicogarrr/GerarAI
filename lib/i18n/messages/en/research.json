@@ -1083,5 +1083,41 @@
     "reviewData": "Review data and sources",
     "reviewAssumptions": "Review assumptions",
     "viewModel": "View long-term model"
+  },
+  "changesFeed": {
+    "directionImproves": "Improves",
+    "directionWorsens": "Worsens",
+    "directionMixed": "Mixed",
+    "directionNone": "No conclusion",
+    "noSummary": "Record without a summary",
+    "claimsOne": "{count} thesis claim",
+    "claimsMany": "{count} thesis claims",
+    "reviewPending": "review pending",
+    "noOpenReview": "no open review",
+    "alertsOne": "1 alert",
+    "alertsMany": "{count} alerts",
+    "dateMadrid": "{date} (Madrid)",
+    "unknownDate": "Unknown date",
+    "affectedAssumption": "Affected assumption: {items}",
+    "openInBrain": "Open in the Brain",
+    "viewThesis": "View the thesis",
+    "viewRecords": "View the {count} original records",
+    "changeMeta": "Change · {date} · materiality {score}",
+    "review": "Review",
+    "alertMeta": "Alert ({severity}) · {date}",
+    "title": "What has changed",
+    "filterAria": "Filter events",
+    "filterAll": "All",
+    "filterReviews": "Open reviews",
+    "filterAlerts": "Alerts",
+    "emptyFiltered": "No events match this filter.",
+    "empty": "No material changes recorded.",
+    "pagerUnit": "events"
+  },
+  "documentsList": {
+    "searchAria": "Search documents",
+    "searchPlaceholder": "Search by title or type",
+    "noMatch": "No documents match your search.",
+    "pagerUnit": "documents"
   }
 }
