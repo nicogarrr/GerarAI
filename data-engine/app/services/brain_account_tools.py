@@ -372,6 +372,127 @@ def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_sales")
 
 
+# ------------------------------------------------------------ IRPF si vendo todo
+
+_SELL_ALL_ES = re.compile(
+    r"\b(?:vend\w*|liquid\w*)\s+(?:lo\s+|la\s+)?(?:todo|toda\s+(?:mi|la)\s+cartera|todas?\s+(?:mis|las)\s+(?:posiciones|acciones)"
+    r"|(?:mi|la)\s+cartera\s+entera|la\s+cartera|mi\s+cartera)\b"
+    r"|\blo\s+vend\w*\s+todo\b"
+)
+_SELL_ALL_EN = re.compile(r"\b(?:sell|sold|selling)\s+(?:everything|it\s+all|all\s+(?:of\s+)?my|my\s+(?:whole|entire)\s+portfolio)\b")
+_TAX_WORD = re.compile(r"\b(?:irpf|impuestos?|hacienda|tributar\w*|tax(?:es)?)\b")
+
+
+def _asks_sell_all_tax(text: str, question: str) -> bool:
+    return bool(_TAX_WORD.search(text) and (_SELL_ALL_ES.search(text) or _SELL_ALL_EN.search(text))
+                and not _tickers_in(question))
+
+
+def _sell_all_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import Company, Position
+    from app.services.chat_service import _savings_scale_label
+    from app.services.sale_simulation import simulate_fifo_sale
+    from app.services.tax_irpf_filing import calculate_savings_tax
+    from app.valuation.currency import canonical_currency_code
+
+    english = _english()
+    today = local_today()
+    rows = list(db.execute(
+        select(Position, Company).join(Company, Company.id == Position.company_id)
+        .where(Position.tenant_id == tenant, Position.quantity > 0)
+        .order_by(Company.ticker)
+    ).all())
+    if not rows:
+        text = ("You have no open positions saved, so there is nothing to sell." if english
+                else "No tienes posiciones abiertas guardadas: no hay nada que vender.")
+        return _response(text, [], "account_sell_all_tax")
+    items: list[tuple[str, Decimal, Decimal]] = []
+    missing: list[str] = []
+    average: list[str] = []
+    for pos, company in rows:
+        held = Decimal(pos.quantity)
+        value = pos.market_value_base if (pos.base_currency or "EUR") == "EUR" else None
+        currency = canonical_currency_code(pos.currency or company.currency or "EUR")
+        native = pos.market_value_native if pos.market_value_native is not None else pos.market_value
+        rate: Decimal | None = None
+        if currency == "EUR":
+            rate = Decimal("1")
+        elif value is not None and native:
+            rate = Decimal(value) / Decimal(native)
+        fifo = simulate_fifo_sale(db, tenant_id=tenant, company_id=company.id, quantity=held,
+                                  held_quantity=held, sale_date=today)
+        cost = fifo.cost_eur_dgt(currency, rate) if fifo is not None else None
+        if cost is None and (pos.base_currency or "EUR") == "EUR" and pos.cost_basis_base is not None:
+            cost = Decimal(pos.cost_basis_base)
+            average.append(company.ticker)
+        if value is None or cost is None:
+            missing.append(company.ticker)
+            continue
+        items.append((company.ticker, Decimal(value), Decimal(cost)))
+    if not items:
+        text = ("I can't estimate it: your positions have no value or cost in euros saved (Hacienda works in euros)."
+                if english else
+                "No puedo estimarlo: tus posiciones no tienen valor o coste en euros guardado (Hacienda calcula en euros).")
+        return _response(text, [_source("position", None, "Posiciones abiertas", "/portfolio")], "account_sell_all_tax")
+    value = sum((v for _t, v, _c in items), Decimal("0"))
+    cost = sum((c for _t, _v, c in items), Decimal("0"))
+    gain = value - cost
+    as_of = max(pos.as_of for pos, _c in rows)
+    day = _date_en(as_of) if english else fecha_es(as_of)
+
+    def eur(amount, signed=False):
+        return _money(float(amount), "EUR", signed=signed, english=english)
+
+    if english:
+        lines = [f"If you sold all {len(items)} positions today (data as of {day}): value {eur(value)}, "
+                 f"cost {eur(cost)} (FIFO), net {'gain' if gain >= 0 else 'loss'} {eur(abs(gain))}."]
+    else:
+        lines = [f"Si vendieras hoy tus {len(items)} posiciones (datos a {day}): valor {eur(value)}, "
+                 f"coste {eur(cost)} (FIFO), {'ganancia' if gain >= 0 else 'pérdida'} neta de {eur(abs(gain))}."]
+    ranked = sorted(items, key=lambda item: item[1] - item[2], reverse=True)
+    for ticker, v, c in ranked[:12]:
+        lines.append(f"- {ticker}: {eur(v - c, signed=True)}")
+    if len(ranked) > 12:
+        lines.append(f"- … and {len(ranked) - 12} more" if english else f"- … y {len(ranked) - 12} más")
+    year = today.year
+    if gain > 0:
+        tax = calculate_savings_tax(gain, year)
+        pct = _pct(float(tax / gain), english=english)
+        lines.append(
+            f"Estimated IRPF (Spanish income tax): {eur(tax)} ({pct} of the gain), "
+            f"{min(year, 2025)} savings scale{' (latest verified)' if year > 2025 else ''}, "
+            "as if it were your only sale this year. Gains and losses offset each other."
+            if english else
+            f"IRPF estimado: {eur(tax)} (un {pct} de la ganancia), {_savings_scale_label(year)}, "
+            "como si fuera tu única operación del año. Ganancias y pérdidas se compensan entre sí.")
+    else:
+        lines.append("You would pay no IRPF on it: the net result is a loss, which offsets other gains this year."
+                     if english else
+                     "No pagarías IRPF por ello: el resultado neto es pérdida, que compensa otras ganancias del año.")
+    data = _tax_data(db, year)
+    realized = ((data or {}).get("summary") or {}).get("total_realized_gain_base")
+    if realized:
+        base = gain + Decimal(str(realized))
+        both = calculate_savings_tax(base, year)
+        lines.append(
+            f"You've already realized {eur(realized, signed=True)} in {year}: adding it, the base would be "
+            f"{eur(base, signed=True)} and the IRPF {eur(both)}." if english else
+            f"En {year} ya llevas {eur(realized, signed=True)} realizado: sumándolo, la base sería "
+            f"{eur(base, signed=True)} y el IRPF {eur(both)}.")
+    if average:
+        lines.append(("Average cost, no FIFO lots: " if english else "Con coste medio, sin lotes FIFO: ")
+                     + ", ".join(average[:10]) + ".")
+    if missing:
+        lines.append(("Left out (no value or cost in euros): " if english else "Fuera del cálculo (sin valor o coste en euros): ")
+                     + ", ".join(missing[:10]) + ".")
+    lines.append("I don't place orders: you sell at your broker and record it in Portfolio. Draft, not tax advice."
+                 if english else
+                 "No ejecuto ventas: se vende en tu bróker y se registra en Cartera. Borrador, no asesoría fiscal.")
+    sources = [_source("position", None, "Posiciones abiertas", "/portfolio"),
+               _source("tax_report", year, f"Informe fiscal {year}", "/taxes")]
+    return _response("\n".join(lines), sources, "account_sell_all_tax")
+
+
 # ------------------------------------------------------------------ router
 
 
@@ -383,6 +504,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     text = _fold(question)
     if _asks_daily_change(text):
         return _daily_change_answer(db, tenant)
+    if _asks_sell_all_tax(text, question):
+        return _sell_all_answer(db, tenant)
     year = _asked_year(text)
     if year is not None and _SALES.search(text):
         return _sales_answer(db, year, _tickers_in(question))
