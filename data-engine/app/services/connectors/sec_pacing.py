@@ -64,7 +64,8 @@ class SecPacer(GlobalPacer):
             await asyncio.sleep(start - now)
 
 
-pacer = SecPacer("sec", min_interval_seconds=0.1, redis_client_factory=_redis)
+# 150 ms reserves headroom below the 10/s ceiling under VM scheduling jitter.
+pacer = SecPacer("sec", min_interval_seconds=0.15, redis_client_factory=_redis)
 
 
 def rate_limited(response, *, inline_cap: float = 60.0) -> None:
