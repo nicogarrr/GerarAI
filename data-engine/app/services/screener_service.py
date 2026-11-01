@@ -438,6 +438,16 @@ class ScreenerService:
         used_names: set[str] = set(ranking.names) if ranking else set()
         for _criterion_item, left, right in parsed_criteria:
             used_names.update(left.names | right.names)
+        # Nombres que la corrida realmente consulta: los del screener mas los
+        # de las formulas de metricas personalizadas (sus dependencias se
+        # expanden en _expand_missing/_custom_metrics, mismas formulas).
+        # Acotan tanto el read de calculated_metrics como el de contexto.
+        referenced_names = set(used_names)
+        for definition in definitions:
+            try:
+                referenced_names |= SafeFormula(definition.formula).names
+            except ValueError:
+                continue
         results = []
         # Names of the screen that at least ONE company has data for. A name
         # nobody has (typo, metric never ingested) used to look like "every
@@ -468,6 +478,16 @@ class ScreenerService:
             .where(
                 CalculatedMetric.value.is_not(None),
                 CalculatedMetric.status == "ok",
+                # Acotado a los nombres referenciados: la ventana particiona
+                # por (company_id, metric), asi que excluir metricas enteras
+                # no cambia rn de las que quedan (mismas filas, mismo orden).
+                # Antes rankeaba TODAS las metricas calculadas del tenant
+                # (todos los anos y periodos) en cada corrida; el resultado
+                # por empresa solo usa los nombres referenciados. Con el
+                # filtro, PG puede usar ix_calc_metrics_tenant_metric_ok
+                # (tenant_id, metric) en vez de barrer el indice de la
+                # ventana entero.
+                CalculatedMetric.metric.in_(sorted(referenced_names)),
                 *tenant_filters(db, CalculatedMetric),
             )
             .subquery("bounded_calculated_metrics")
@@ -488,13 +508,7 @@ class ScreenerService:
         facts_by_company = self._facts_by_company(db, self._required_fact_metrics(used_names, definitions))
         # Valoracion, tesis y nivel DCA como nombres del screener (tambien
         # dentro de metricas personalizadas). Solo se leen si se usan.
-        context_names = set(used_names)
-        for definition in definitions:
-            try:
-                context_names |= SafeFormula(definition.formula).names
-            except ValueError:
-                continue
-        context_by_company = context_observations(db, context_names, companies)
+        context_by_company = context_observations(db, referenced_names, companies)
         for company in companies:
             observations = self._observations_from_rows(
                 calculated_by_company.get(company.id, []),
