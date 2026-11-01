@@ -976,7 +976,8 @@
     "basisUndocumented": "Base no documentada",
     "sourceAria": "Fuente {n} de {label}: {host} (se abre en otra pestaña)",
     "evidenceScores": "Calidad de la evidencia: confianza de datos {data}/100 · cobertura de fuentes {sources}/100 · red-team {redTeam}/100.",
-    "disclaimer": "Documento informativo de investigación. No es asesoramiento financiero ni recomendación de compra o venta."
+    "disclaimer": "Documento informativo de investigación. No es asesoramiento financiero ni recomendación de compra o venta.",
+    "tocAria": "Índice de la tesis"
   },
   "sourcesPage": {
     "typeManualUpload": "Subida manual",
@@ -1678,5 +1679,26 @@
     "valoracion": "Valoración",
     "seguimiento": "Seguimiento",
     "fuentes": "Fuentes"
+  },
+  "ttm": {
+    "empty": "Sin trimestres ni ejercicios guardados para calcular el TTM. Refresca los financieros (SEC) para traer los 10-Q.",
+    "basisTtm": "TTM (últimos 4 trimestres)",
+    "basisFy": "FY (último ejercicio)",
+    "basisQ": "Último trimestre",
+    "noData": "Sin datos",
+    "provOfficial": "OFICIAL",
+    "provInferred": "INFERIDO",
+    "periodUntil": "{label} · hasta {date}",
+    "periodClose": "{label} · cierre {date}",
+    "quarterQ4Inferred": "{date} (Q4 = FY − 9 meses, inferido)",
+    "quarterCumulativeInferred": "{date} (acumulado restado, inferido)",
+    "sumOf": "Suma de: {quarters}"
+  },
+  "thesisWithheld": {
+    "dated": "Texto archivado de v{version}, generada el {date}: resumen y cifras retenidos porque {reason}. No se presentan como análisis actual; el original se conserva guardado.",
+    "undated": "Texto archivado de v{version}, sin fecha de generación verificada: resumen y cifras retenidos porque {reason}. No se presentan como análisis actual; el original se conserva guardado.",
+    "reasonNotPublic": "la tesis no está publicada ni aprobada",
+    "reasonNotPublishable": "el modelo no es publicable",
+    "reasonUnverified": "no se pudo verificar que el modelo sea publicable"
   }
 }

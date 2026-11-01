@@ -1063,13 +1063,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             {snapshot.latest_thesis ? (
               <>
                 <div className="flex flex-wrap gap-2">
-                  {thesisIsPublic(snapshot.latest_thesis.status) && visibleThesisRating(snapshot.latest_thesis.rating, snapshot) ? <Badge>{label(snapshot.latest_thesis.rating)}</Badge> : null}
+                  {thesisIsPublic(snapshot.latest_thesis.status) && visibleThesisRating(snapshot.latest_thesis.rating, snapshot) ? <Badge>{label(snapshot.latest_thesis.rating, locale)}</Badge> : null}
                   <Badge variant="outline">v{snapshot.latest_thesis.version}</Badge>
-                  {label(snapshot.latest_thesis.status) !== label(snapshot.latest_thesis.rating) ? (
-                    <Badge variant="outline">{label(snapshot.latest_thesis.status)}</Badge>
+                  {label(snapshot.latest_thesis.status, locale) !== label(snapshot.latest_thesis.rating, locale) ? (
+                    <Badge variant="outline">{label(snapshot.latest_thesis.status, locale)}</Badge>
                   ) : null}
                 </div>
-                <ThesisSummary thesis={snapshot.latest_thesis} model={snapshot.model_summary} />
+                <ThesisSummary thesis={snapshot.latest_thesis} model={snapshot.model_summary} locale={locale} />
                 <div className="mt-4 flex flex-wrap items-center gap-3">
                   {/*
                       Leer la tesis es la acción principal de una ficha (por eso
@@ -1154,7 +1154,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
               {snapshot.recent_changes.slice(0, 3).map((change) => (
                 <li className="min-w-0 rounded-lg border border-gray-800/70 bg-black/20 p-3 text-sm text-gray-300" key={change.id}>
                   <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <Badge variant="outline">{label(change.impact_direction)}</Badge>
+                    <Badge variant="outline">{label(change.impact_direction, locale)}</Badge>
                     <span className="text-xs text-gray-500">
                       {t('research.fichaMaterialityScore', { score: change.materiality_score })} · {formatDate(change.created_at)}
                     </span>
@@ -1404,7 +1404,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
                     key: `claim-${claim.id}`,
                     node: (
                       <div className="rounded-lg border border-gray-800 p-4">
-                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status)}</Badge><Badge variant="outline">{t('research.fichaMaterialityLower', { score: claim.materiality_score })}</Badge><Badge variant="outline">{t('research.fichaEvidenceCount', { count: claim.evidence.length })}</Badge></div>
+                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status, locale)}</Badge><Badge variant="outline">{t('research.fichaMaterialityLower', { score: claim.materiality_score })}</Badge><Badge variant="outline">{t('research.fichaEvidenceCount', { count: claim.evidence.length })}</Badge></div>
                         <p className="mt-3 text-sm text-gray-300">{claim.statement}</p>
                       </div>
                     ),
@@ -1571,7 +1571,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
           )}
           <MutationForm action={refreshCompanyResearchModel.bind(null, ticker)} successMessage={t('research.fichaModelMetricsRefreshed')}><Button type="submit"><RefreshCcw className="mr-2 h-4 w-4" />{t('research.fichaRecalculate')}</Button></MutationForm>
         </div>
-        <Panel title={t('research.fichaCurrentFundamentals')}><TtmPanel ttm={data.ttm} /></Panel>
+        <Panel title={t('research.fichaCurrentFundamentals')}><TtmPanel ttm={data.ttm} locale={locale} /></Panel>
         <Panel title={t('research.fichaTraceableMetrics')}><MetricsGrid metrics={data.calculatedMetrics} /></Panel>
         <Panel title={t('research.fichaCanonicalFacts')}><FactTable ticker={ticker} locale={locale} facts={data.facts} refreshLabel={
             fmpCovers(ticker, company.exchange)
@@ -1614,7 +1614,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
             return (
               <div className="rounded-xl border border-gray-800 bg-surface-1 p-4" key={item.type}>
                 <div className="flex justify-between gap-3"><MoatTerm type={item.type} /><Badge>{item.strength}/100</Badge></div>
-                <p className="mt-3 text-sm text-gray-400">{label(item.status)} · {label(item.trend)} · {t('research.fichaPersistence')} {label(item.persistence)}</p>
+                <p className="mt-3 text-sm text-gray-400">{label(item.status, locale)} · {label(item.trend, locale)} · {t('research.fichaPersistence')} {label(item.persistence, locale)}</p>
                 {definition ? <p className="mt-2 text-xs leading-5 text-gray-500">{definition}</p> : null}
                 <p className="mt-2 text-xs text-gray-500">{t('research.fichaMoatClaims', { forCount: item.supporting_claim_ids.length, againstCount: item.contradicting_claim_ids.length })}</p>
               </div>
