@@ -1,23 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CONCEPTS } from "./concepts";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { conceptsFor } from "./concepts-i18n";
 import { Pagination, paginate } from "../_components/Pagination";
 
-export const metadata: Metadata = { title: "Conceptos de inversión" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('investors.concepts.metaTitle') };
+}
+
 export default async function ConceptsPage({
   searchParams,
 }: {
   searchParams: Promise<{ pagina?: string }>;
 }) {
   const { pagina } = await searchParams;
-  const paged = paginate(CONCEPTS, pagina, 12);
+  const t = await getT();
+  const paged = paginate(conceptsFor(await getLocale()), pagina, 12);
   return (
     <main
       id="content"
       tabIndex={-1}
       className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-8 overflow-x-clip py-6"
     >
-      <h1 className="text-3xl font-semibold text-gray-100">Conceptos</h1>
+      <h1 className="text-3xl font-semibold text-gray-100">{t('investors.concepts.title')}</h1>
       <ul className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         {paged.items.map((concept) => (
           <li key={concept.slug}>

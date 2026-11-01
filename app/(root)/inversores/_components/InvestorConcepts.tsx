@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { conceptsForInvestor } from "../conceptos/concepts";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { conceptsForInvestorIn } from "../conceptos/concepts-i18n";
 
-export function InvestorConcepts({ slug }: { slug: string }) {
-  const concepts = conceptsForInvestor(slug);
+export async function InvestorConcepts({ slug }: { slug: string }) {
+  const t = await getT();
+  const concepts = conceptsForInvestorIn(slug, await getLocale());
   return (
     <section
       aria-labelledby="investor-concepts-title"
@@ -13,18 +15,18 @@ export function InvestorConcepts({ slug }: { slug: string }) {
           id="investor-concepts-title"
           className="text-xl font-semibold text-gray-100"
         >
-          Conceptos
+          {t('investors.concepts.title')}
         </h2>
         <Link
           className="text-sm text-teal-300 hover:underline"
           href="/inversores/conceptos"
         >
-          Ver todos
+          {t('investors.concepts.seeAll')}
         </Link>
       </div>
       {concepts.length === 0 ? (
         <p className="text-sm text-gray-500">
-          Sin conceptos documentados para este inversor
+          {t('investors.concepts.noneForInvestor')}
         </p>
       ) : (
         <ul className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">

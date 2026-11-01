@@ -109,5 +109,27 @@
     "queuing": "Encolando descarga...",
     "queued": "Descarga en curso; recarga la página en unos minutos para ver las cartas.",
     "error": "No se pudo encolar la descarga. Inténtalo de nuevo."
+  },
+  "concepts": {
+    "metaTitle": "Conceptos de inversión",
+    "title": "Conceptos",
+    "notFound": "Concepto no encontrado",
+    "application": "Aplicación",
+    "risk": "Riesgo",
+    "editorial": "Síntesis editorial",
+    "viewInvestor": "Ver inversor · {name}",
+    "seeAll": "Ver todos",
+    "noneForInvestor": "Sin conceptos documentados para este inversor"
+  },
+  "payoff": {
+    "aria": "Ejemplo hipotético de opciones compradas",
+    "title": "Ejemplo hipotético · al vencimiento",
+    "terms": "Ejercicio $100 · prima $5 por acción · sin comisiones ni impuestos",
+    "chartTitle": "Resultado de comprar una call o una put",
+    "chartDesc": "La call pierde $5 si el precio termina en $100 o menos, alcanza equilibrio en $105 y gana $15 en $120. La put gana $15 en $80, alcanza equilibrio en $95 y pierde $5 en $100 o más. Importes por acción.",
+    "axis": "Precio del subyacente",
+    "longCall": "Call comprada",
+    "longPut": "Put comprada",
+    "formula": "Call: max(precio - ejercicio, 0) - prima. Put: max(ejercicio - precio, 0) - prima. Antes del vencimiento el precio de la opción también depende del tiempo y la volatilidad."
   }
 }
