@@ -61,7 +61,10 @@ _SALE_PRICE_RE = re.compile(
 )
 # «… que compré a 150 $» sin cantidad: el lote es lo que se vende.
 _BOUGHT_AT_RE = re.compile(
-    rf"(?i)\bcompr\w*\s+(?:(?:las|los|todas|todo|todos)\s+)?(?:a|por)\s+(?:(?P<pre>{_CUR})\s*)?"
+    rf"(?i)\bcompr\w*\s+(?:(?:las|los|todas|todo|todos)\s+)?"
+    # «que compré el 1 de enero de 2024 a 100 €»: la fecha puede ir antes del precio.
+    r"(?P<when>(?:el|en)\s+[^.;,?!\n]{1,30}?\s+)?"
+    rf"(?:a|por)\s+(?:(?P<pre>{_CUR})\s*)?"
     rf"(?P<price>{_NUM})\s*(?P<cur>{_CUR})?"
 )
 # «vendo mis 10», «las 10», «hoy 10», «unas 10»: sin estas palabras entre el
@@ -241,6 +244,8 @@ def parse_purchase_lots(text: str) -> list[HypoLot]:
         price = parse_number(bought.group("price")) if bought else None
         if bought and qty and price and qty > 0 and price > 0:
             trade_date, approx = _find_date(text[bought.end():bought.end() + 60])
+            if trade_date is None and bought.group("when"):
+                trade_date, approx = _find_date(bought.group("when"))
             lots.append(HypoLot(qty, price, _currency(bought.group("pre"), bought.group("cur")), trade_date, approx))
     return lots
 

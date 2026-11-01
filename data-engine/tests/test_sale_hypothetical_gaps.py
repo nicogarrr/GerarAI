@@ -338,3 +338,12 @@ def test_el_ano_de_la_fecha_no_es_un_lote():
     ]
     lots = parse_purchase_lots("compré 5 acciones a 40 € el 3/4/2024 a 60 € si las vendo")
     assert [(lot.quantity, lot.price) for lot in lots] == [(D("5"), D("40"))]
+
+
+def test_compre_con_fecha_antes_del_precio():
+    """«…que compré el 1 de enero de 2024 a 100 €»: la fecha entre «compré» y el
+    precio dejaba la pregunta sin lote (pedía otra vez cantidad y precio)."""
+    lots = parse_purchase_lots("si vendo 10 acciones a 150 € que compré el 1 de enero de 2024 a 100 €")
+    assert [(lot.quantity, lot.price, lot.currency, lot.trade_date) for lot in lots] == [
+        (D("10"), D("100"), "EUR", date(2024, 1, 1))
+    ]
