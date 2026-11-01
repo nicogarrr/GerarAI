@@ -1781,13 +1781,13 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     return <FinancialTerminalSection metrics={terminalQuery.metrics} periodicity={terminalQuery.periodicity} terminal={terminal} years={terminalQuery.years} />;
   };
   const buildCapitalSection = async (): Promise<React.ReactNode> => <ShareCapitalSection data={await viewData('capital')} ticker={ticker} />;
-  const buildSupuestosSection = async (): Promise<React.ReactNode> => <DriverAssumptionsSection assumptions={await viewData('supuestos')} ticker={ticker} />;
+  const buildSupuestosSection = async (): Promise<React.ReactNode> => <DriverAssumptionsSection assumptions={await viewData('supuestos')} locale={locale} ticker={ticker} />;
   const buildDirectivaSection = async (): Promise<React.ReactNode> => {
     const dashboard = await viewData('directiva');
     if (!dashboard) return <EmptyState title={t('research.fichaDirectivaEmpty')} />;
-    return <ManagementCredibilitySection dashboard={dashboard} ticker={ticker} />;
+    return <ManagementCredibilitySection dashboard={dashboard} locale={locale} ticker={ticker} />;
   };
-  const buildLeccionesSection = async (): Promise<React.ReactNode> => <DecisionLessonsSection data={await viewData('lecciones')} ticker={ticker} />;
+  const buildLeccionesSection = async (): Promise<React.ReactNode> => <DecisionLessonsSection data={await viewData('lecciones')} locale={locale} ticker={ticker} />;
 
   type TabSection = { id?: string; title?: string; node: React.ReactNode };
 

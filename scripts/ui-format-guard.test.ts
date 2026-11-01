@@ -125,7 +125,9 @@ describe('guardas de UI', () => {
 
   it('mantiene las etiquetas de estado en español sin cambiar enums de API', () => {
     // La credibilidad de la directiva es una sección de Seguimiento desde el 29-oct-2026.
-    assert.ok(source('components/research/sections/ManagementCredibilitySection.tsx').includes("partial: 'Parcial'"));
+    const credibility = source('components/research/sections/ManagementCredibilitySection.tsx');
+    assert.ok(credibility.includes("partial: 'research.managementSection.statusPartial'"));
+    assert.equal(JSON.parse(source('lib/i18n/messages/es/research.json')).managementSection.statusPartial, 'Parcial');
   });
 
   it('traduce el typo del monitor insider y no lo replica en la UI', () => {
