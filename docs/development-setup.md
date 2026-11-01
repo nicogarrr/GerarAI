@@ -79,18 +79,21 @@ cd data-engine
 # Con el venv activado (paso 4)
 ruff check .                                   # lint
 pyright                                        # tipos (0 errores requeridos)
-python scripts/export_openapi.py               # contrato OpenAPI (el diff debe quedar vacío; ver README)
 APP_ENV=test python -m pytest -q -m "not services"   # tests sin servicios externos
 ```
 
 ### Quality gates del frontend
 Desde la raíz del proyecto:
 ```bash
-npm run lint          # ESLint
-npm run typecheck     # TypeScript (tsc --noEmit)
-npm run test:unit     # Vitest + Testing Library
-npm run test:guards   # guardas de scripts/*.test.*
-npm run build         # build de producción de Next.js
+npm run lint              # ESLint
+npm run typecheck         # TypeScript (tsc --noEmit)
+npm run test:routes       # rutas de la app
+npm run test:contract     # deriva del contrato front/back
+npm run check:i18n        # textos en los diccionarios es/en
+npm run test:unit         # Vitest + Testing Library
+npm run test:guards       # guardas de scripts/*.test.*
+npm run build             # build de producción de Next.js
+npm run generate:openapi  # contrato OpenAPI: no debe dejar diff en git
 ```
 Más detalle de los tests del frontend en [FRONTEND_TESTS.md](FRONTEND_TESTS.md).
 
