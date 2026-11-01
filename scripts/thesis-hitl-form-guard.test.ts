@@ -11,8 +11,10 @@ test('HITL form is connected to the thesis and explicitly saves assumptions', ()
   for (const field of ['driver_key', 'fiscal_year', 'scenario', 'value', 'source', 'rationale']) {
     assert.ok(form.includes(`name="${field}"`));
   }
-  assert.match(form, /no se ha convertido en un dato verificado/);
-  assert.match(form, /Regenera la tesis/);
+  assert.match(form, /t\('research\.thesisHumanInput\.saved'\)/);
+  const saved: string = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisHumanInput.saved;
+  assert.match(saved, /no se ha convertido en un dato verificado/);
+  assert.match(saved, /Regenera la tesis/);
   assert.match(form, /disabled=\{pending\}/);
 });
 

@@ -1415,5 +1415,61 @@
     "publishEffect": "Once published it goes to the Library and the Brain will use it as a reference.",
     "publishAnyway": "Publish anyway",
     "cancel": "Cancel"
+  },
+  "thesisHumanInput": {
+    "ambiguous": "Ambiguous number format: use a dot for decimals and a comma for thousands (e.g. 1,234.56).",
+    "invalid": "Enter a valid numeric value in the driver’s unit.",
+    "saved": "Assumption saved. Regenerate the thesis to include it; it has not become verified data.",
+    "saveFailed": "The assumption could not be saved.",
+    "summary": "Add a human assumption",
+    "intro": "It is saved as an assumption, with source and rationale. Use the exact key of a model driver, for example revenue. A pending financial figure is not filled in with an assumption as if it were a fact.",
+    "driverKey": "Driver key",
+    "fiscalYear": "Fiscal year",
+    "scenario": "Scenario",
+    "value": "Value (driver unit)",
+    "source": "Source or reference",
+    "rationale": "Rationale",
+    "saving": "Saving...",
+    "save": "Save assumption"
+  },
+  "thesisInvalidation": {
+    "none": "No measurable criteria: nothing is being watched.",
+    "savedOne": "Saved. 1 criterion is checked on every alert run.",
+    "savedMany": "Saved. {count} criteria are checked on every alert run.",
+    "thresholdInvalid": "The threshold must be a number (decimal comma or point).",
+    "metricNameRequired": "Enter the name of the financial metric.",
+    "title": "Measurable criteria with alerts",
+    "removeAria": "Remove criterion {rule}",
+    "remove": "Remove",
+    "empty": "None yet. Add one and I will alert you when it is met.",
+    "add": "Add a measurable criterion",
+    "metric": "Metric",
+    "name": "Name",
+    "operator": "Operator",
+    "threshold": "Threshold",
+    "description": "Description (optional)",
+    "descriptionPlaceholder": "The stock trades above the expected value",
+    "saving": "Saving…",
+    "save": "Save criterion"
+  },
+  "thesisGenerate": {
+    "status": {
+      "insufficientData": "insufficient data",
+      "failedAudit": "did not pass the audit"
+    },
+    "generate": "Generate thesis",
+    "recoverFailed": "The generation could not be recovered. Retrying…",
+    "submitUnconfirmed": "The submission could not be confirmed. Recovering the server state…",
+    "recovering": "Recovering generation…",
+    "queuing": "Queuing…",
+    "generating": "Generating…",
+    "unknownState": "Unknown state: the generation has not responded for 30 min. The server job is not cancelled; reload the page to read its state again.",
+    "waitingQueue": "Waiting for the queue to reconnect",
+    "retrying": "Retrying on the server",
+    "preparing": "Preparing the generation",
+    "queued": "Queued",
+    "generated": "Thesis v{version} generated",
+    "view": "View thesis v{version}",
+    "failed": "The generation failed{errorClass}. You can retry."
   }
 }

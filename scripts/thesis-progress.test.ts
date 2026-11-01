@@ -44,8 +44,9 @@ void test('en cola o sin fase: null (el botón pone su propio texto)', () => {
 
 void test('el botón usa el texto de progreso y dice «Preparando» si corre sin fase', () => {
     const button = readFileSync('components/research/ThesisGenerateButton.tsx', 'utf8');
-    assert.match(button, /thesisProgressText\(job, polledAt\)/);
-    assert.match(button, /'Preparando la generación'/);
+    assert.match(button, /thesisProgressText\(job, polledAt, locale\)/);
+    assert.match(button, /t\('research\.thesisGenerate\.preparing'\)/);
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisGenerate.preparing, 'Preparando la generación');
 });
 
 void test('los segundos avanzan cada 1 s con un reloj propio, no solo en cada sondeo de 3 s', () => {

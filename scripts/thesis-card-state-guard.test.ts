@@ -18,7 +18,8 @@ test('el copy de vacío solo entra por la prop emptyCopy del componente cliente'
 });
 
 test('el éxito no esconde el botón de regenerar ni falsea publicación', () => {
-    assert.ok(BTN.includes("insufficient_data: 'datos insuficientes'"), 'datos insuficientes se etiquetan como tales');
+    assert.ok(BTN.includes("insufficient_data: 'research.thesisGenerate.status.insufficientData'"), 'datos insuficientes se etiquetan como tales');
+    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisGenerate.status.insufficientData, 'datos insuficientes');
     // El botón solo se oculta en el caso «primera tesis» (emptyCopy presente).
     assert.ok(BTN.includes('succeededHere && emptyCopy'), 'ocultar botón solo con emptyCopy');
 });
