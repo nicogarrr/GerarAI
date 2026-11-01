@@ -87,3 +87,29 @@ def test_busy_lease_never_retries(monkeypatch):
 def test_both_tenant_actors_allow_two_retries():
     assert worker.sync_one_tenant_ibkr.options["max_retries"] == 2
     assert worker.sync_one_tenant_ibkr_dedicated.options["max_retries"] == 2
+
+
+
+# ---------- ultimo intento: sin dead-letter (prod, 1-nov-2026) ----------
+# 2 mensajes «PyG aun no disponible» acabaron en la cola XQ: el tercer
+# not_ready seguido lanzaba otro Retry con los reintentos ya agotados. La
+# espera es esperada; el siguiente sync programado lo cubre.
+
+
+def _last_attempt(monkeypatch, actor_name):
+    import time
+    from types import SimpleNamespace
+
+    message = SimpleNamespace(
+        options={"retries": 2}, actor_name=actor_name, message_timestamp=time.time() * 1000
+    )
+    monkeypatch.setattr(worker.CurrentMessage, "get_current_message", classmethod(lambda cls: message))
+
+
+def test_not_ready_en_el_ultimo_intento_no_va_a_dead_letter(monkeypatch):
+    db, record_failure = _drive(monkeypatch, download_exc=service.SyncError("not_ready", "PyG pendiente"))
+    _last_attempt(monkeypatch, "sync_one_tenant_ibkr")
+    result = worker.sync_one_tenant_ibkr.fn(2, "user")
+    assert result["status"] == "error"
+    assert result["reason"] == "pnl_not_ready"
+    record_failure.assert_called_once()

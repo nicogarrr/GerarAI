@@ -1668,6 +1668,13 @@ def sync_ibkr_flex() -> dict[str, Any]:
         _rollback(db)
         # At most the actor's two retries, one hour apart. Each retry obtains
         # a new statement; no repeated polling of the incomplete report.
+        from app.workers.rate_limit_retry import retries_exhausted
+
+        if retries_exhausted():
+            # Espera esperada, no fallo: sin otro Retry (iria a dead-letter);
+            # el siguiente sync programado pide un extracto nuevo.
+            logger.warning("sync_ibkr_flex: PyG de IBKR aun no disponible tras los reintentos; lo cubre el siguiente sync")
+            return {"actor": "sync_ibkr_flex", "status": "error", "reason": "pnl_not_ready"}
         raise dramatiq.Retry("IBKR PyG aun no disponible; reintento en una hora", delay=3_600_000) from exc
     except IBKRImportError as exc:
         _rollback(db)
@@ -4775,10 +4782,21 @@ def sync_one_tenant_ibkr(tenant_id: int, user_id: str) -> dict[str, Any]:
                         # Solo not_ready reintenta: credentials/report/import no
                         # las arregla la espera y reintentar un timeout en
                         # caliente martillea la Flex Web API.
-                        raise dramatiq.Retry(
-                            "IBKR PyG aun no disponible; reintento en una hora",
-                            delay=3_600_000,
-                        ) from exc
+                        from app.workers.rate_limit_retry import retries_exhausted
+
+                        if not retries_exhausted():
+                            raise dramatiq.Retry(
+                                "IBKR PyG aun no disponible; reintento en una hora",
+                                delay=3_600_000,
+                            ) from exc
+                        # Ultimo intento: sin otro Retry (iria a dead-letter);
+                        # el recibo ya registra not_ready y el siguiente sync
+                        # programado lo cubre.
+                        return {
+                            "status": "error",
+                            "reason": "pnl_not_ready",
+                            "message": "IBKR aún no tiene la PyG; se reintentará en el próximo sync.",
+                        }
                     return {
                         "status": "error",
                         "message": "IBKR no disponible; se conservan los datos anteriores.",
