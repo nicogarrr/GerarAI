@@ -597,6 +597,68 @@ def _cash_answer(db: Session, tenant: int) -> ChatResponse:
     return _response(text, [_source("cash_balance", rows[0].id, "Efectivo", "/portfolio")], "account_cash")
 
 
+# ------------------------------------------------------------ ranking por rentabilidad
+
+_RANK_RETURN = re.compile(
+    r"\b(?:mi|mis)\s+(?:mejor|peor)(?:es)?\s+(?:posicion|accion|inversion|valor)"
+    r"|\b(?:posicion|accion|inversion|valor)(?:es)?\s+(?:de\s+mi\s+cartera\s+)?(?:que\s+)?(?:va|van|me\s+va|esta|estan|lleva|llevan)\s+(?:peor|mejor)"
+    r"|\b(?:ranking|ordena\w*|clasifica\w*)\b.*\brentab"
+    r"|\bme\s+da\w*\s+(?:mas|menos)\s+rentab|\b(?:mas|menos)\s+rentables?\s+de\s+(?:mi|la)\s+cartera"
+    r"|\b(?:best|worst)[- ]performing\b|\bmy\s+(?:best|worst)\s+(?:position|stock|holding|investment)"
+    r"|\bwhich\s+(?:position|stock|holding)\s+is\s+(?:doing\s+)?(?:best|worst)"
+)
+
+
+def _asks_return_ranking(text: str, question: str) -> bool:
+    return bool(_RANK_RETURN.search(text)) and not _tickers_in(question)
+
+
+def _ranking_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    from app.models import Company, Position
+
+    english = _english()
+    rows = list(db.execute(
+        select(Position, Company.ticker).join(Company, Company.id == Position.company_id)
+        .where(Position.tenant_id == tenant, Position.quantity > 0)
+    ).all())
+    known = [(t, float(p.market_value_base), float(p.cost_basis_base), p.base_currency or "EUR", p.as_of)
+             for p, t in rows
+             if p.market_value_base is not None and p.cost_basis_base is not None and p.cost_basis_base > 0]
+    unknown = sorted(t for p, t in rows if not any(k[0] == t for k in known))
+    if not known:
+        text_out = ("You have no open positions with a saved value and cost, so I can't rank them." if english
+                    else "No tienes posiciones abiertas con valor y coste guardados: no puedo ordenarlas.")
+        return _response(text_out, [], "account_return_ranking")
+    ranked = sorted(known, key=lambda k: (k[1] - k[2]) / k[2], reverse=True)
+    worst_first = bool(re.search(r"\b(?:peor|menos|worst)\b", text))
+
+    def line(item) -> str:
+        ticker, value, cost, currency, _as_of = item
+        return (f"{ticker} {_pct((value - cost) / cost, signed=True, english=english)} "
+                f"({_money(value - cost, currency, signed=True, english=english)})")
+
+    lead = ranked[-1] if worst_first else ranked[0]
+    as_of = max(k[4] for k in known)
+    day = _date_en(as_of) if english else fecha_es(as_of)
+    if english:
+        head = f"{'Worst' if worst_first else 'Best'} return on cost: {line(lead)}."
+        lines = [head, f"All your positions by return on purchase cost (data as of {day}):"]
+    else:
+        head = f"La que {'peor' if worst_first else 'mejor'} va sobre su coste: {line(lead)}."
+        lines = [head, f"Todas tus posiciones por rentabilidad sobre el coste de compra (datos a {day}):"]
+    order = list(reversed(ranked)) if worst_first else ranked
+    lines += [f"{i}. {line(item)}" for i, item in enumerate(order[:15], 1)]
+    if len(order) > 15:
+        lines.append(f"… and {len(order) - 15} more" if english else f"… y {len(order) - 15} más")
+    if unknown:
+        lines.append(("No saved cost or value, left out: " if english else "Sin coste o valor guardado, fuera: ")
+                     + ", ".join(unknown[:10]) + ".")
+    lines.append("Simple return since purchase, without dividends." if english
+                 else "Rentabilidad simple desde la compra, sin dividendos.")
+    return _response("\n".join(lines), [_source("position", None, "Posiciones abiertas", "/portfolio")],
+                     "account_return_ranking")
+
+
 # ------------------------------------------------------------------ router
 
 
@@ -610,6 +672,8 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
         return _daily_change_answer(db, tenant)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_return_ranking(text, question):
+        return _ranking_answer(db, tenant, text)
     year = _asked_year(text)
     if _asks_fees(text):
         return _fees_answer(db, tenant, year, _tickers_in(question))
