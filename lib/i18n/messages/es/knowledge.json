@@ -169,5 +169,17 @@
     "confirmCollectionTitle": "¿Eliminar la colección vacía «{name}»?",
     "confirmCollectionDescription": "Esta acción no se puede deshacer."
   },
-  "statsAria": "Resumen de la biblioteca"
+  "statsAria": "Resumen de la biblioteca",
+  "search": {
+    "label": "Buscar en la biblioteca",
+    "placeholder": "Título, autor o ticker",
+    "submit": "Buscar",
+    "clear": "Quitar búsqueda",
+    "noMatch": "Ningún documento coincide con «{query}» en título, autor o ticker.",
+    "inText": "Buscar «{query}» dentro del texto",
+    "matches": {
+      "one": "{count} documento coincide con «{query}».",
+      "other": "{count} documentos coinciden con «{query}»."
+    }
+  }
 }

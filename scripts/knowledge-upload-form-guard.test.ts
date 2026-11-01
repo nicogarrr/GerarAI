@@ -20,15 +20,18 @@ const backendRoutes = readFileSync('data-engine/app/api/routes/knowledge.py', 'u
 
 describe('knowledge upload form guard (F142)', () => {
   it('cada campo tiene etiqueta visible asociada', () => {
-    for (const [id, label] of [
-      ['kw-title', 'Título'],
-      ['kw-collection', 'Colección'],
-      ['kw-author', 'Autor'],
-      ['kw-doctype', 'Tipo de documento'],
-      ['kw-pubdate', 'Fecha de publicación'],
-      ['kw-language', 'Idioma del documento'],
+    // La etiqueta sale del diccionario (es/en); el español sigue siendo el de referencia.
+    const esK = JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8'));
+    for (const [id, key, label] of [
+      ['kw-title', 'titleLabel', 'Título'],
+      ['kw-collection', 'colCollection', 'Colección'],
+      ['kw-author', 'authorLabel', 'Autor'],
+      ['kw-doctype', 'typeLabel', 'Tipo de documento'],
+      ['kw-pubdate', 'publicationDateLabel', 'Fecha de publicación'],
+      ['kw-language', 'languageLabel', 'Idioma del documento'],
     ]) {
-      assert.match(page, new RegExp(`htmlFor="${id}"[^>]*>${label}`), `etiqueta ${label}`);
+      assert.ok(page.includes(`htmlFor="${id}">{t('knowledge.${key}')}`), `etiqueta ${label}`);
+      assert.equal(esK[key], label, `etiqueta ${label} en español`);
     }
   });
 
@@ -45,8 +48,9 @@ describe('knowledge upload form guard (F142)', () => {
 
   it('el idioma es un select es|en (el backend rechaza otros)', () => {
     assert.match(page, /name="language" defaultValue="en" required/, 'select de idioma');
-    assert.ok(page.includes('<option value="es">Español</option>'), 'opción Español');
-    assert.ok(page.includes('<option value="en">Inglés</option>'), 'opción Inglés');
+    const esK = JSON.parse(readFileSync('lib/i18n/messages/es/knowledge.json', 'utf8'));
+    assert.ok(page.includes(`<option value="es">{t('knowledge.languageEs')}</option>`) && esK.languageEs === 'Español', 'opción Español');
+    assert.ok(page.includes(`<option value="en">{t('knowledge.languageEn')}</option>`) && esK.languageEn === 'Inglés', 'opción Inglés');
     assert.match(backendRoutes, /normalized_language not in \("en", "es"\)/, 'el backend sigue validando es|en');
   });
 
