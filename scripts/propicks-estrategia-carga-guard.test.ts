@@ -20,16 +20,20 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const view = readFileSync('components/proPicks/MonthlyRebalanceView.tsx', 'utf8');
+const esRebalance = JSON.parse(readFileSync('lib/i18n/messages/es/propicks.json', 'utf8')).rebalance;
 
 describe('ProPicks: Estrategia no pinta un 0 mientras carga', () => {
   it('el recuento de valores vigentes existe solo con picks listos', () => {
     assert.match(
       view,
-      /picksStatus === 'ready'\s*\?\s*`\$\{formatNumber\(currentPicks\.length[^`]*\}\s*valores vigentes`/,
+      /picksStatus === 'ready'\s*\?\s*t\('propicks\.rebalance\.activeCount', \{\s*count: formatNumber\(currentPicks\.length/,
       '«N valores vigentes» tiene que estar condicionado a picksStatus ready',
     );
-    assert.ok(view.includes("'cargando valores…'"), 'falta el texto de carga del recuento');
-    assert.ok(view.includes("'valores no disponibles'"), 'falta el texto de error del recuento');
+    assert.equal(esRebalance.activeCount, '{count} valores vigentes');
+    assert.ok(view.includes("t('propicks.rebalance.loadingValues')"), 'falta el texto de carga del recuento');
+    assert.equal(esRebalance.loadingValues, 'cargando valores…');
+    assert.ok(view.includes("t('propicks.rebalance.valuesUnavailable')"), 'falta el texto de error del recuento');
+    assert.equal(esRebalance.valuesUnavailable, 'valores no disponibles');
   });
 
   it('el aviso de sin-comparación y los resultados solo se pintan en ready', () => {

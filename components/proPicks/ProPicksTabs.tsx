@@ -10,6 +10,7 @@ import { useLocale, useT } from '@/lib/i18n/client';
 import { createTranslator } from '@/lib/i18n/translate';
 import EnhancedProPicksContent from './EnhancedProPicksContent';
 import { STRATEGY_CATALOG, mergeStrategies } from './monthlyRebalance';
+import { localizeStrategy } from './strategy-display';
 import { runWalkForwardBacktest, type WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
 import { generateProPicksForStrategy, type ProPick } from '@/lib/actions/proPicks.actions';
 
@@ -52,7 +53,7 @@ interface ProPicksTabsProps {
 export default function ProPicksTabs({ strategies, initialPicks, generatedAt, passedCount = null, initialTab = 'picks' }: ProPicksTabsProps) {
     const locale = useLocale();
     const t = useT();
-    const merged = mergeStrategies(strategies);
+    const merged = mergeStrategies(strategies).map((s) => localizeStrategy(s, locale, t));
     const [activeTab, setActiveTab] = useState<string>(initialTab);
     const [currentStrategy, setCurrentStrategy] = useState<string>(merged[0]?.id ?? 'adaptive');
     const [walkForward, setWalkForward] = useState<WalkForwardBacktestResult | null>(null);
@@ -217,8 +218,8 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
             <TabsContent value="estrategia" className="mt-6 space-y-4">
                 <Card className="flex min-w-0 flex-col gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4 md:flex-row md:items-center md:justify-between">
                     <StrategySelector
-                        strategies={strategies}
-                        catalog={STRATEGY_CATALOG}
+                        strategies={strategies.map((s) => localizeStrategy(s, locale, t))}
+                        catalog={STRATEGY_CATALOG.map((s) => localizeStrategy(s, locale, t))}
                         currentStrategy={currentStrategy}
                         onStrategyChange={handleStrategyChange}
                     />

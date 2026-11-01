@@ -396,5 +396,58 @@
     "colHorizon": "At {days} days",
     "spyThrough": "SPY ({source}) with data through {date}.",
     "spyMissing": "The SPY series has no data yet: the vs-SPY columns will appear once it's ingested."
+  },
+  "rebalance": {
+    "emptyGroup": "There are zero stocks in this group.",
+    "enters": "In",
+    "exits": "Out",
+    "verifiedTitle": "Verified data",
+    "source": "Source: {metric} = {value}",
+    "defaultStrategy": "AI Adaptive Selection",
+    "notSnapshot": "That file isn't a GerarAI Propicks monthly snapshot.",
+    "readError": "Couldn't read the JSON file.",
+    "title": "{month} rebalancing",
+    "activeCount": "{count} current stocks",
+    "loadingValues": "loading stocks…",
+    "valuesUnavailable": "stocks unavailable",
+    "comparedWith": "compared with {month}",
+    "noComparison": "without a previous-month comparison",
+    "loadPrevious": "Load previous snapshot",
+    "download": "Download JSON snapshot",
+    "loadingPicks": "Loading this strategy's picks…",
+    "picksUnavailable": "The strategy's picks are unavailable.",
+    "noHistory": "GerarAI doesn't keep a month-by-month history: it only keeps the funnel's latest run, so the previous month exists only if you load here the JSON snapshot you downloaded back then. Without that file, what you see below is the full current selection for {month}, with zero entries or exits to attribute: there's nothing to compare it against. Save this month's JSON and compare it with next month's.",
+    "currentSelection": "Current selection · {month}",
+    "currentReasonsNote": "These reasons come from the current ranking, they aren't moves: without the previous month's snapshot it's impossible to say what comes in or goes out.",
+    "currentEmpty": "The funnel returned zero picks for this strategy, so there's nothing to rebalance.",
+    "entered": "Coming in",
+    "exited": "Going out",
+    "kept": "{count} stocks stay",
+    "rejectOtherStrategy": "That snapshot belongs to another strategy, so it can't be compared with the current one.",
+    "rejectNotPrevious": "That snapshot isn't from a month before the current one."
+  },
+  "strategies": {
+    "adaptive": {
+      "name": "AI Adaptive Selection",
+      "description": "The AI analyzes real, current market data and picks the best opportunities at each moment"
+    },
+    "value": {
+      "name": "Value",
+      "description": "Companies that are cheap relative to their fundamentals: weights value and profitability, and requires solid cash flow and balance sheet"
+    },
+    "momentum": {
+      "name": "Momentum",
+      "description": "Trend and growth: weights momentum and growth, backed by profitability and value"
+    },
+    "defensiva": {
+      "name": "Defensive",
+      "description": "Quality and balance sheet: weights profitability, financial health and cash to ride out market drops"
+    }
+  },
+  "strategySelector": {
+    "label": "Strategy:",
+    "aria": "Strategy",
+    "placeholder": "Select strategy",
+    "noData": "Data missing"
   }
 }

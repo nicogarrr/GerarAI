@@ -10,7 +10,8 @@
  */
 
 import type { ProPick } from '@/lib/actions/proPicks.actions';
-import { formatDate, formatNumber } from '@/lib/format';
+import { createFormatters, formatNumber } from '@/lib/format';
+import type { Locale } from '@/lib/i18n/locale';
 
 export interface StrategyCatalogEntry {
     id: string;
@@ -182,13 +183,41 @@ export function monthKey(date: Date = new Date()): string {
     return `${y}-${m}`;
 }
 
-/** Etiqueta de mes en español («septiembre de 2026»). */
-export function monthLabelEs(month: string): string {
+/** Etiqueta de mes en el idioma elegido («septiembre de 2026» / «September 2026»). */
+export function monthLabel(month: string, locale: Locale = 'es'): string {
     const [y, m] = month.split('-').map(Number);
     if (!y || !m) return month;
     // Fecha de solo día: formatDate la parsea en hora local, así que el mes
     // sale igual en el servidor (UTC) y en el navegador.
-    return formatDate(`${y}-${String(m).padStart(2, '0')}-01`, { month: 'long', year: 'numeric' });
+    return createFormatters(locale).formatDate(`${y}-${String(m).padStart(2, '0')}-01`, {
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
+/** Etiqueta de mes en español («septiembre de 2026»). */
+export function monthLabelEs(month: string): string {
+    return monthLabel(month, 'es');
+}
+
+/** Motivo de quien sale cuando el snapshot anterior no guardó ninguno. */
+export const PREVIOUS_MONTH_REASON = 'Estaba en la selección del mes anterior';
+
+const CONFIDENCE_EN: Record<string, string> = { alta: 'high', media: 'medium', baja: 'low' };
+
+/**
+ * Los motivos se guardan tal cual en el snapshot JSON (en español): solo se
+ * traducen al pintarlos. Los motivos del backend llegan como vienen.
+ */
+export function reasonDisplayText(text: string, locale: Locale = 'es'): string {
+    if (locale !== 'en') return text;
+    if (text === PREVIOUS_MONTH_REASON) return "It was in the previous month's selection";
+    const score = /^Score (\S+)\/100 con confianza (.+)$/.exec(text);
+    if (score) {
+        const level = CONFIDENCE_EN[score[2].trim().toLowerCase()] ?? score[2];
+        return `Score ${score[1]}/100 with ${level} confidence`;
+    }
+    return text;
 }
 
 export function toSnapshotPick(pick: ProPick): SnapshotPick {
@@ -264,11 +293,11 @@ export function diffSnapshots(
     }
     for (const prev of previous.picks) {
         if (!currBySymbol.has(prev.symbol)) {
-            const reason = prev.reasons?.[0] ?? { text: 'Estaba en la selección del mes anterior' };
+            const reason = prev.reasons?.[0] ?? { text: PREVIOUS_MONTH_REASON };
             exited.push({ symbol: prev.symbol, company: prev.company, reason });
         }
     }
     return { entered, exited, kept, hasPrevious: true };
 }
 
-export { isMonthlySnapshot, previousSnapshotError } from './snapshotValidation';
+export { isMonthlySnapshot, previousSnapshotError, previousSnapshotRejection } from './snapshotValidation';

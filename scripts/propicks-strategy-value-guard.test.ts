@@ -15,11 +15,11 @@ const source = readFileSync('components/proPicks/StrategySelector.tsx', 'utf8');
 describe('propicks strategy value guard (F151)', () => {
   it('el valor cerrado es el nombre de la estrategia seleccionada', () => {
     assert.match(source, /const selectedOption = options\.find\(\(option\) => option\.id === currentStrategy\)/, 'resuelve la opción seleccionada');
-    assert.match(source, /<SelectValue placeholder="Seleccionar estrategia">\{selectedOption\?\.name\}<\/SelectValue>/, 'SelectValue pinta solo el nombre');
+    assert.match(source, /<SelectValue placeholder=\{t\('propicks\.strategySelector\.placeholder'\)\}>\{selectedOption\?\.name\}<\/SelectValue>/, 'SelectValue pinta solo el nombre');
   });
 
   it('SelectValue no va vacío (volvería a pintar nombre+descripción)', () => {
-    assert.equal(source.includes('<SelectValue placeholder="Seleccionar estrategia" />'), false, 'SelectValue vacío reproduce el bug');
+    assert.equal(source.includes("<SelectValue placeholder={t('propicks.strategySelector.placeholder')} />"), false, 'SelectValue vacío reproduce el bug');
   });
 
   it('la descripción sigue disponible dentro del desplegable', () => {
