@@ -239,7 +239,8 @@ export function quoteAgeSeconds(fetchedAtMs: number, timestampSec: number | null
  * Cero o futuros (desfase de reloj; clamp preexistente de quoteAgeSeconds)
  * => "hace 0 s" (comportamiento anterior, registrado, sin ampliar).
  */
-export function formatQuoteAge(ageSeconds: number): string {
+export function formatQuoteAge(ageSeconds: number, locale: 'es' | 'en' = 'es'): string {
+    if (locale === 'en') return formatQuoteAgeEn(ageSeconds);
     if (!Number.isFinite(ageSeconds)) return 'N/D';
     if (ageSeconds <= 0) return 'hace 0 s';
     if (ageSeconds < 60) return `hace ${Math.floor(ageSeconds)} s`;
@@ -252,8 +253,22 @@ export function formatQuoteAge(ageSeconds: number): string {
     return m === 0 ? `hace ${h} h` : `hace ${h} h ${m} min`;
 }
 
-const numberFormat = (decimals: number, sign: boolean) =>
-    new Intl.NumberFormat('es-ES', {
+/** Misma escala que formatQuoteAge, en inglés (Ajustes → Idioma). */
+function formatQuoteAgeEn(ageSeconds: number): string {
+    if (!Number.isFinite(ageSeconds)) return 'N/A';
+    if (ageSeconds <= 0) return '0 s ago';
+    if (ageSeconds < 60) return `${Math.floor(ageSeconds)} s ago`;
+    if (ageSeconds < 3600) {
+        const m = Math.round(ageSeconds / 60);
+        return m >= 60 ? '1 h ago' : `~${m} min ago`;
+    }
+    const h = Math.floor(ageSeconds / 3600);
+    const m = Math.floor((ageSeconds % 3600) / 60);
+    return m === 0 ? `${h} h ago` : `${h} h ${m} min ago`;
+}
+
+const numberFormat = (decimals: number, sign: boolean, locale: 'es' | 'en' = 'es') =>
+    new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-ES', {
         minimumFractionDigits: decimals,
         maximumFractionDigits: decimals,
         signDisplay: sign ? 'always' : 'auto',
@@ -266,10 +281,10 @@ const ZERO_PATTERN = /^[+-]?0[,.]0+$/;
  * a cero pero NO es cero ("-0,00" engañoso), amplia a decimals+2 para que
  * el signo y la magnitud sean reales.
  */
-export function formatQuoteChange(value: number, decimals: number): string {
-    const formatted = numberFormat(decimals, true).format(value);
+export function formatQuoteChange(value: number, decimals: number, locale: 'es' | 'en' = 'es'): string {
+    const formatted = numberFormat(decimals, true, locale).format(value);
     if (value !== 0 && ZERO_PATTERN.test(formatted)) {
-        return numberFormat(Math.min(decimals + 2, 8), true).format(value);
+        return numberFormat(Math.min(decimals + 2, 8), true, locale).format(value);
     }
     return formatted;
 }
@@ -280,16 +295,26 @@ export function formatQuoteChange(value: number, decimals: number): string {
  * decimales para que signo y magnitud sean reales (un cruce moviendose
  * un pip no es "no moverse").
  */
-export function formatQuoteChangePercent(value: number): string {
-    const formatted = numberFormat(2, true).format(value);
+export function formatQuoteChangePercent(value: number, locale: 'es' | 'en' = 'es'): string {
+    const formatted = numberFormat(2, true, locale).format(value);
     if (value !== 0 && ZERO_PATTERN.test(formatted)) {
-        return numberFormat(4, true).format(value);
+        return numberFormat(4, true, locale).format(value);
     }
     return formatted;
 }
 
 /** Tipo de instrumento localizado; null si Yahoo informa uno desconocido (no se inventa). */
-export function localizeInstrumentType(instrumentType: string | null): string | null {
+export function localizeInstrumentType(instrumentType: string | null, locale: 'es' | 'en' = 'es'): string | null {
+    if (locale === 'en') {
+        switch (instrumentType) {
+            case 'FUTURE': return 'future';
+            case 'EQUITY': return 'stock';
+            case 'INDEX': return 'index';
+            case 'CURRENCY': return 'currency';
+            case 'ETF': return 'ETF';
+            default: return null;
+        }
+    }
     switch (instrumentType) {
         case 'FUTURE': return 'futuro';
         case 'EQUITY': return 'acción';

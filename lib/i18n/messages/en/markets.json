@@ -1,1 +1,27 @@
-{}
+{
+  "live": {
+    "tabs": {
+      "indice": "Indices",
+      "futuro": "Futures",
+      "accion": "Spanish stocks",
+      "materia": "Commodities",
+      "divisa": "Currencies"
+    },
+    "notes": {
+      "indice": "Index level in points.",
+      "futuro": "Futures on US indices, in points.",
+      "accion": "A selection of IBEX 35 stocks. It is not a volume ranking: without a free source for «most traded» we do not use that label.",
+      "materia": "Benchmark futures in dollars.",
+      "divisa": "Exchange rate between currencies."
+    },
+    "premarket": "pre-market",
+    "postmarket": "after-hours",
+    "noTime": "time unknown",
+    "updatedAt": "Updated at {time} (Madrid time)",
+    "noData": "No data yet",
+    "lastFailed": " · the last update failed; retrying every minute",
+    "refresh": "Refresh now",
+    "groupEmpty": "Data is not available right now. Retrying every minute.",
+    "footer": "Each row shows the time reported by the provider and how old it was when the source was checked (Madrid time); the panel refreshes every minute. This is not official market data and is not meant for trading with guarantees."
+  }
+}
