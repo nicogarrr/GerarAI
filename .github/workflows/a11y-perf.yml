@@ -56,8 +56,11 @@ jobs:
           ref: ${{ inputs.ref || '' }}
           fetch-depth: 1
       - name: Slug del ref para artefactos
+        env:
+          MEASURE_REF: ${{ inputs.ref }}
         run: |
-          echo "REF_SLUG=$(echo "${{ inputs.ref }}" | tr '/:' '--')" >> "$GITHUB_ENV"
+          REF_SLUG=$(printf '%s' "$MEASURE_REF" | tr -cs 'A-Za-z0-9._-' '-')
+          printf 'REF_SLUG=%s\n' "$REF_SLUG" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
@@ -131,8 +134,11 @@ jobs:
           ref: ${{ inputs.ref || '' }}
           fetch-depth: 1
       - name: Slug del ref para artefactos
+        env:
+          MEASURE_REF: ${{ inputs.ref }}
         run: |
-          echo "REF_SLUG=$(echo "${{ inputs.ref }}" | tr '/:' '--')" >> "$GITHUB_ENV"
+          REF_SLUG=$(printf '%s' "$MEASURE_REF" | tr -cs 'A-Za-z0-9._-' '-')
+          printf 'REF_SLUG=%s\n' "$REF_SLUG" >> "$GITHUB_ENV"
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
