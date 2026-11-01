@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useT } from '@/lib/i18n/client';
+import { isIos, isStandalone } from '@/lib/pwa/platform';
 import { Button } from '@/components/ui/button';
 
 // Evento no estandarizado de Chromium (Chrome, Edge, Android). Safari/iOS y
@@ -12,17 +13,6 @@ type BeforeInstallPromptEvent = Event & {
 };
 
 type Mode = 'checking' | 'installed' | 'prompt' | 'ios' | 'manual';
-
-function isStandalone(): boolean {
-    const nav = window.navigator as Navigator & { standalone?: boolean };
-    return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true;
-}
-
-function isIos(): boolean {
-    const ua = window.navigator.userAgent;
-    // iPadOS 13+ se presenta como Mac: se distingue por la pantalla tactil.
-    return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && window.navigator.maxTouchPoints > 1);
-}
 
 export default function InstallApp() {
     const t = useT();

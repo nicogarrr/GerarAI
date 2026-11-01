@@ -12,6 +12,7 @@ import {
     type PushEventType,
     type PushStatus,
 } from '@/lib/actions/push.actions';
+import { isIos, isStandalone } from '@/lib/pwa/platform';
 
 // Etiquetas es enlazadas al diccionario: export de compatibilidad para los
 // tests; la vista pinta con useT() via PUSH_TYPE_LABEL_KEYS.
@@ -40,16 +41,6 @@ const PUSH_TYPE_LABEL_KEYS: Record<PushEventType, TranslationKey> = {
 };
 
 type Support = 'checking' | 'unsupported' | 'ios-install' | 'denied' | 'ready';
-
-function isIos(): boolean {
-    const ua = window.navigator.userAgent;
-    return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && window.navigator.maxTouchPoints > 1);
-}
-
-function isStandalone(): boolean {
-    const nav = window.navigator as Navigator & { standalone?: boolean };
-    return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true;
-}
 
 /** Clave VAPID (base64url) a bytes, como pide pushManager.subscribe. */
 export function urlBase64ToBytes(value: string): Uint8Array {
