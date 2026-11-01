@@ -27,7 +27,10 @@ export type AccessRequestParse =
     | { ok: true; value: AccessRequestInput }
     /** `spam`: el campo trampa vino relleno; se responde como si fuera bien, sin guardar. */
     | { ok: false; reason: 'spam' }
-    | { ok: false; reason: 'invalid'; field: 'name' | 'email' | 'note'; message: string };
+    | { ok: false; reason: 'invalid'; field: 'name' | 'email' | 'note'; code: AccessRequestInvalidCode; message: string };
+
+/** Motivo estable del rechazo: la server action elige con él la copia en el idioma de la petición. */
+export type AccessRequestInvalidCode = 'nameMissing' | 'nameTooLong' | 'emailInvalid' | 'noteTooLong';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -40,16 +43,17 @@ export function parseAccessRequest(raw: unknown): AccessRequestParse {
     const email = str(o.email).toLowerCase();
     const note = str(o.note);
 
-    if (name.length < 2) return { ok: false, reason: 'invalid', field: 'name', message: 'Escribe tu nombre.' };
+    if (name.length < 2) return { ok: false, reason: 'invalid', field: 'name', code: 'nameMissing', message: 'Escribe tu nombre.' };
     if (name.length > ACCESS_REQUEST_LIMITS.nameMax)
-        return { ok: false, reason: 'invalid', field: 'name', message: 'El nombre es demasiado largo.' };
+        return { ok: false, reason: 'invalid', field: 'name', code: 'nameTooLong', message: 'El nombre es demasiado largo.' };
     if (email.length > ACCESS_REQUEST_LIMITS.emailMax || !EMAIL_RE.test(email))
-        return { ok: false, reason: 'invalid', field: 'email', message: 'Introduce un email válido.' };
+        return { ok: false, reason: 'invalid', field: 'email', code: 'emailInvalid', message: 'Introduce un email válido.' };
     if (note.length > ACCESS_REQUEST_LIMITS.noteMax)
         return {
             ok: false,
             reason: 'invalid',
             field: 'note',
+            code: 'noteTooLong',
             message: `La nota admite hasta ${ACCESS_REQUEST_LIMITS.noteMax} caracteres.`,
         };
     return { ok: true, value: { name, email, note } };
