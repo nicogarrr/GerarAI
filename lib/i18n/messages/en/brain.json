@@ -145,7 +145,12 @@
       "statusError": "Unavailable.",
       "conflicts": "Disagreements between experts",
       "verdict": "Judge's verdict",
-      "sources": "Sources"
+      "sources": "Sources",
+      "history": "Earlier runs",
+      "historyVerdict": "Verdict: {label}",
+      "historyNoVerdict": "No verdict",
+      "historyAnswered": "Answered: {experts}",
+      "historyTimedOut": "Did not answer in time: {experts}"
     }
   }
 }

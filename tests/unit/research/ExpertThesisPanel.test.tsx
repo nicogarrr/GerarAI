@@ -58,6 +58,44 @@ describe('tesis guardada del equipo de expertos', () => {
         expect(screen.getByText('Sources')).toBeInTheDocument();
     });
 
+    it('historial corto de corridas anteriores, la más reciente primero', () => {
+        const withHistory: ExpertThesis = {
+            ...thesis,
+            history: [
+                { run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'neutral', answered: ['fundamental', 'valuation'], timed_out: ['risk'] },
+                { run_id: 3, finished_at: '2026-10-20T09:00:00Z', verdict: null, answered: ['fundamental'], timed_out: [] },
+            ],
+        };
+        render(<ExpertThesisPanel thesis={withHistory} t={createTranslator('es')} formatDate={(iso) => iso.slice(0, 10)} />);
+        const history = screen.getByTestId('expert-thesis-history');
+        expect(history).toHaveTextContent('Corridas anteriores');
+        const items = within(history).getAllByRole('listitem');
+        expect(items.map((li) => li.getAttribute('data-testid'))).toEqual(['expert-thesis-run-5', 'expert-thesis-run-3']);
+        expect(items[0]).toHaveTextContent('2026-10-31');
+        expect(items[0]).toHaveTextContent('Veredicto: neutral');
+        expect(items[0]).toHaveTextContent('Respondieron: Fundamental · Valoración');
+        expect(items[0]).toHaveTextContent('Sin respuesta a tiempo: Riesgo');
+        expect(items[1]).toHaveTextContent('Sin veredicto');
+        expect(items[1]).not.toHaveTextContent('Sin respuesta a tiempo');
+    });
+
+    it('historial en inglés y oculto si no hay corridas anteriores', () => {
+        const withHistory: ExpertThesis = {
+            ...thesis,
+            history: [{ run_id: 5, finished_at: '2026-10-31T09:00:00Z', verdict: 'positive', answered: ['news'], timed_out: ['tax'] }],
+        };
+        const { unmount } = render(<ExpertThesisPanel thesis={withHistory} t={createTranslator('en')} />);
+        const history = screen.getByTestId('expert-thesis-history');
+        expect(history).toHaveTextContent('Earlier runs');
+        expect(history).toHaveTextContent('2026-10-31');
+        expect(history).toHaveTextContent('Verdict: positive');
+        expect(history).toHaveTextContent('Answered: News');
+        expect(history).toHaveTextContent('Did not answer in time: Tax');
+        unmount();
+        render(<ExpertThesisPanel thesis={{ ...thesis, history: [] }} t={createTranslator('es')} />);
+        expect(screen.queryByTestId('expert-thesis-history')).toBeNull();
+    });
+
     it('sin tesis (flag apagado o ninguna guardada) no pinta nada', () => {
         const { container } = render(<ExpertThesisPanel thesis={null} t={createTranslator('es')} />);
         expect(container).toBeEmptyDOMElement();
