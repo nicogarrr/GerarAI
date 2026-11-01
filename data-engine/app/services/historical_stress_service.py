@@ -24,6 +24,7 @@ from app.services.data_source_health import get_data_source_registry
 
 _REGISTRY_KEY = "yahoo_finance"
 from app.services.propicks_price_service import yahoo_symbol
+from app.valuation.currency import normalize_currency
 
 YEARS = (2008, 2020, 2022)
 _CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
@@ -234,7 +235,9 @@ class HistoricalStressService:
                     return tick, {**empty, "failure": "provider_error"}
             expected = instrument["currency"]
             got = (history.get("currency") or "").strip().upper() or None
-            if expected and got != expected:
+            # Misma divisa principal: GBX/GBp (peniques) y GBP son la misma linea
+            # de Londres; el estres usa rendimientos, que no dependen de la escala.
+            if expected and normalize_currency(got)[0] != normalize_currency(expected)[0]:
                 # Otra linea de cotizacion u otro emisor: nunca un sustituto.
                 return tick, {
                     **empty,
