@@ -86,8 +86,8 @@ void test('las etiquetas funcionan: conocida traduce, desconocida no se oculta',
 
 void test('el componente usa las etiquetas y no puede pintar claves crudas', () => {
     const source = readFileSync(COMPONENT, 'utf8');
-    assert.match(source, /reviewStatusLabel\(review\.status\)/, 'estado via helper');
-    assert.match(source, /expectationMetricLabel\(review\.metric\)/, 'métrica via helper');
+    assert.match(source, /reviewStatusLabel\(review\.status, ti\)/, 'estado via helper');
+    assert.match(source, /expectationMetricLabel\(review\.metric, ti\)/, 'métrica via helper');
     assert.ok(!source.includes('REVIEW_STATUS_LABELS: Record<string, string> = {'), 'sin mapa local duplicado');
     assert.ok(!/\{review\.metric\}/.test(source), 'ninguna métrica se pinta cruda');
 });

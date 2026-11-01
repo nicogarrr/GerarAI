@@ -108,8 +108,9 @@ const PROSE_ES: Record<string, string> = {
   'net income + D&A - maintenance capex - normalized change in working capital':
     'beneficio neto + D&A − capex de mantenimiento − cambio normalizado del capital de trabajo',
 };
-const DECISION_LABELS: Record<string, string> = {
-  buy: 'Comprar', hold: 'Mantener', trim: 'Reducir', sell: 'Vender', watch: 'Vigilar', avoid: 'Evitar',
+const DECISION_LABELS: Record<string, TranslationKey> = {
+  buy: 'research.journal.decisionName.buy', hold: 'research.journal.decisionName.hold', trim: 'research.journal.decisionName.trim',
+  sell: 'research.journal.decisionName.sell', watch: 'research.journal.decisionName.watch', avoid: 'research.journal.decisionName.avoid',
 };
 const MODEL_STATUS_LABELS: Record<string, TranslationKey> = {
   // Catálogo cerrado de long_term_model_service: ok, insufficient_data,
@@ -283,7 +284,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
               </tbody>
             </table>
           </div>
-          <ScenarioAssumptions />
+          <ScenarioAssumptions ti={ti} />
         </div>
         ) : null}
 
@@ -296,7 +297,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
               <div className="flex justify-between gap-3"><span className="text-gray-400"><GlossaryTerm k="roic" icon={false}>ROIC</GlossaryTerm> / <GlossaryTerm k="wacc" icon={false}>WACC</GlossaryTerm></span><span className="text-gray-200">{pctv(terminal?.roic)} / {waccDisplay(model.assumptions.wacc, fmt)}</span></div>
             </div>
             <p className="mt-3 text-xs leading-5 text-gray-500">
-              {ti('research.model.revenueSources')} <AssumptionSources fuentes={growthAssumption?.fuentes} /> · {ti('research.model.fcfSources')} <AssumptionSources fuentes={marginAssumption?.fuentes} />
+              {ti('research.model.revenueSources')} <AssumptionSources fuentes={growthAssumption?.fuentes} ti={ti} /> · {ti('research.model.fcfSources')} <AssumptionSources fuentes={marginAssumption?.fuentes} ti={ti} />
             </p>
           </div>
           <div className="rounded-md border border-gray-800 p-3 text-sm">
@@ -351,7 +352,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
             {model.what_must_be_true.map((item) => (
               <li key={item.id} className="flex gap-2 text-gray-300">
                 <CircleHelp aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
-                <span><span className="block text-xs text-amber-300">{modelConditionState(item, waccHasSource(model.assumptions.wacc))}</span>{conditionInSpanish(item, model.market_opportunity?.constraints?.binding_constraint, waccHasSource(model.assumptions.wacc), ti, fmt, locale)}</span>
+                <span><span className="block text-xs text-amber-300">{modelConditionState(item, waccHasSource(model.assumptions.wacc), ti)}</span>{conditionInSpanish(item, model.market_opportunity?.constraints?.binding_constraint, waccHasSource(model.assumptions.wacc), ti, fmt, locale)}</span>
               </li>
             ))}
           </ul>
@@ -377,17 +378,17 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
   );
 }
 
-function expectationRows(reviews: ResearchExpectationReview[]): ExpectationRow[] {
+function expectationRows(reviews: ResearchExpectationReview[], ti: TiFn = esT, fmt: Formatters = esFormat): ExpectationRow[] {
   const year = new Date().getUTCFullYear();
   return reviews.map((review) => {
     const comparable = review.expected_value != null && review.actual_value != null && Number.isFinite(review.expected_value) && Number.isFinite(review.actual_value);
     return {
       id: review.id,
       year: review.fiscal_year,
-      metric: expectationMetricLabel(review.metric),
-      expected: compactNumber(review.expected_value),
-      actual: compactNumber(review.actual_value),
-      status: comparable ? reviewStatusLabel(review.status) : 'Sin comparación: falta dato',
+      metric: expectationMetricLabel(review.metric, ti),
+      expected: compactNumber(review.expected_value, fmt),
+      actual: compactNumber(review.actual_value, fmt),
+      status: comparable ? reviewStatusLabel(review.status, ti) : ti('research.expect.noComparison'),
       pending: !comparable && review.actual_value == null && review.fiscal_year >= year,
     };
   });
@@ -398,11 +399,17 @@ function expectationRows(reviews: ResearchExpectationReview[]): ExpectationRow[]
  * `metadata` al registrar la decisión; los `*_version_id` son claves internas
  * y no se muestran.
  */
-export function journalVersionLabel(entry: Pick<ResearchDecisionJournalEntry, 'thesis_version_id' | 'model_version_id' | 'metadata'>): string {
+export function journalVersionLabel(entry: Pick<ResearchDecisionJournalEntry, 'thesis_version_id' | 'model_version_id' | 'metadata'>, ti: TiFn = esT): string {
   const number = (value: unknown) => (typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : null);
-  const part = (label: string, linked: string, id: number | null, version: number | null) =>
-    version !== null ? `${label} v${version}` : id !== null ? `${label} ${linked}` : `sin ${label}`;
-  return `Contra ${part('tesis', 'registrada', entry.thesis_version_id, number(entry.metadata?.thesis_version))} · ${part('modelo', 'registrado', entry.model_version_id, number(entry.metadata?.model_version))}`;
+  const thesisVersion = number(entry.metadata?.thesis_version);
+  const modelVersion = number(entry.metadata?.model_version);
+  const thesis = thesisVersion !== null
+    ? ti('research.journal.thesisVersion', { version: thesisVersion })
+    : entry.thesis_version_id !== null ? ti('research.journal.thesisRecorded') : ti('research.journal.thesisNone');
+  const model = modelVersion !== null
+    ? ti('research.journal.modelVersion', { version: modelVersion })
+    : entry.model_version_id !== null ? ti('research.journal.modelRecorded') : ti('research.journal.modelNone');
+  return ti('research.journal.versionAgainst', { thesis, model });
 }
 
 export function DecisionAndRealityPanel({
@@ -410,108 +417,110 @@ export function DecisionAndRealityPanel({
   decisions,
   reviews,
   trades = [],
+  t: ti = esT,
+  locale = 'es',
 }: {
   ticker: string;
   decisions: ResearchDecisionJournalEntry[];
   reviews: ResearchExpectationReview[];
   /** Compras/ventas del ticker (IBKR o manuales) que se pueden enlazar. */
   trades?: JournalTrade[];
+  /** Traductor y locale del idioma elegido (por defecto español). */
+  t?: TiFn;
+  locale?: Locale;
 }) {
+  const fmt = locale === 'es' ? esFormat : createFormatters(locale);
+  const trade = (item: JournalTrade) => describeTrade(item, ti, locale);
   const selectClass = 'h-11 rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 sm:h-10 sm:text-sm';
   return (
     <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <div className="scroll-mt-24 rounded-lg border border-gray-800 bg-surface-1 p-5" id="diario-decisiones">
         <div className="mb-4 flex items-center gap-2">
           <GitBranch aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Diario de decisiones</h2>
+          <h2 className="text-lg font-semibold text-gray-100">{ti('research.journal.title')}</h2>
         </div>
         <MutationForm
           action={createResearchDecision.bind(null, ticker)}
           className="grid grid-cols-1 gap-3"
           resetOnSuccess
-          successMessage="Decisión registrada contra la tesis vigente"
+          successMessage={ti('research.journal.recorded')}
         >
-          <select aria-label="Decisión" className="h-11 rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 sm:h-10 sm:text-sm" defaultValue="hold" name="decision">
-            <option value="buy">Comprar</option>
-            <option value="hold">Mantener</option>
-            <option value="trim">Reducir</option>
-            <option value="sell">Vender</option>
-            <option value="watch">Vigilar</option>
-            <option value="avoid">Evitar</option>
+          <select aria-label={ti('research.journal.decision')} className="h-11 rounded-md border border-gray-700 bg-gray-900 px-3 text-base text-gray-200 sm:h-10 sm:text-sm" defaultValue="hold" name="decision">
+            {Object.entries(DECISION_LABELS).map(([value, key]) => <option key={value} value={value}>{ti(key)}</option>)}
           </select>
-          <Textarea aria-label="Motivo de la decisión" className="border-gray-700 bg-transparent text-gray-100" name="rationale" placeholder="Qué evidencia justifica esta decisión" required />
-          <Textarea aria-label="Qué debe cumplirse" className="border-gray-700 bg-transparent text-gray-100" name="what_must_be_true" placeholder="Una condición verificable por línea" />
+          <Textarea aria-label={ti('research.journal.rationale')} className="border-gray-700 bg-transparent text-gray-100" name="rationale" placeholder={ti('research.journal.rationalePh')} required />
+          <Textarea aria-label={ti('research.journal.mustBeTrue')} className="border-gray-700 bg-transparent text-gray-100" name="what_must_be_true" placeholder={ti('research.journal.mustBeTruePh')} />
           {trades.length > 0 ? (
-            <select aria-label="Operación ejecutada (opcional)" className={selectClass} defaultValue="" name="transaction_id">
-              <option value="">Sin operación (solo la decisión)</option>
-              {trades.map((trade) => (
-                <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
+            <select aria-label={ti('research.journal.trade')} className={selectClass} defaultValue="" name="transaction_id">
+              <option value="">{ti('research.journal.noTrade')}</option>
+              {trades.map((item) => (
+                <option key={item.id} value={item.id}>{trade(item)}</option>
               ))}
             </select>
           ) : null}
-          <Button type="submit">Registrar decisión</Button>
+          <Button type="submit">{ti('research.journal.submit')}</Button>
         </MutationForm>
         <div className="mt-5 space-y-3">
           {decisions.length === 0 ? (
-            <p className="text-sm text-gray-500">Todavía no hay decisiones registradas.</p>
+            <p className="text-sm text-gray-500">{ti('research.journal.empty')}</p>
           ) : decisions.slice(0, 8).map((entry) => (
             <div className="rounded-md border border-gray-800 p-3" key={entry.id}>
               <div className="flex items-center justify-between gap-3">
-                <Badge variant="outline">{DECISION_LABELS[entry.decision] ?? entry.decision}</Badge>
+                <Badge variant="outline">{DECISION_LABELS[entry.decision] ? ti(DECISION_LABELS[entry.decision]) : entry.decision}</Badge>
                 <span className="text-xs text-gray-500">{entry.decision_date}</span>
               </div>
               <p className="mt-2 text-sm text-gray-300">{entry.rationale}</p>
-              <p className="mt-2 text-xs text-gray-500">{journalVersionLabel(entry)}</p>
+              <p className="mt-2 text-xs text-gray-500">{journalVersionLabel(entry, ti)}</p>
               {entry.transaction ? (
                 <div className="mt-2 rounded border border-teal-900/50 bg-teal-950/10 p-2 text-xs leading-5 text-gray-300">
-                  <p><span className="text-teal-300">Operación:</span> {describeTrade(entry.transaction)}</p>
+                  <p><span className="text-teal-300">{ti('research.journal.tradeLabel')}</span> {trade(entry.transaction)}</p>
                   {isAutoLinked(entry.metadata) ? (
                     <div className="text-amber-200" data-testid="journal-auto-link-badge">
-                      <Badge variant="outline">Enlace detectado automáticamente</Badge>{' '}
-                      Coincide en empresa, sentido y fecha (hasta 3 días después), sin otra candidata. No confirma cantidad ni cuenta: corrígelo si no es esa operación.
+                      <Badge variant="outline">{ti('research.journal.autoLinked')}</Badge>{' '}
+                      {ti('research.journal.autoLinkedHelp')}
                     </div>
-                  ) : <p className="text-teal-300" data-testid="journal-confirmed-link">Enlace confirmado manualmente</p>}
-                  <p className="text-gray-400" title="Margen = valor justo / precio de ejecución − 1">{describeFairValue(entry.fair_value_on_day)}</p>
-                  <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Operación desenlazada">
+                  ) : <p className="text-teal-300" data-testid="journal-confirmed-link">{ti('research.journal.confirmed')}</p>}
+                  <p className="text-gray-400" title={ti('research.journal.marginHint')}>{describeFairValue(entry.fair_value_on_day, ti, locale)}</p>
+                  <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage={ti('research.journal.unlinked')}>
                     <input name="transaction_id" type="hidden" value="" />
-                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">{isAutoLinked(entry.metadata) ? 'Corregir / desenlazar' : 'Desenlazar'}</button>
+                    <button className="text-gray-500 underline hover:text-gray-300" type="submit">{isAutoLinked(entry.metadata) ? ti('research.journal.fixUnlink') : ti('research.journal.unlink')}</button>
                   </MutationForm>
                 </div>
               ) : trades.length > 0 ? (
-                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage="Decisión enlazada a la operación">
+                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-2 flex flex-wrap items-center gap-2" successMessage={ti('research.journal.linked')}>
                   {ambiguousCandidateIds(entry.metadata) && tradesForEntry(trades, entry.metadata).length === 0 ? (
                     <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-unavailable-link" role="status">
-                      Las operaciones sugeridas ya no están disponibles; no se ha enlazado ninguna.
+                      {ti('research.journal.unavailable')}
                     </p>
                   ) : isSuggested(entry.metadata) ? (
                     <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-suggested-link" role="status">
-                      Sugerencia sin confirmar: una operación coincide en empresa, sentido y fecha (hasta 3 días después). No se conoce cantidad ni cuenta, así que no se ha enlazado. Confírmala o deja la decisión sin operación.
+                      {ti('research.journal.suggested')}
                     </p>
                   ) : ambiguousCandidateIds(entry.metadata) ? (
                     <p className="w-full text-xs leading-5 text-amber-200" data-testid="journal-ambiguous-link" role="status">
-                      Hay varias operaciones posibles para esta decisión y no se ha enlazado ninguna sola. Elige cuál la ejecutó, o deja la decisión sin operación.
+                      {ti('research.journal.ambiguous')}
                     </p>
                   ) : null}
                   {tradesForEntry(trades, entry.metadata).length > 0 ? (
                     <>
-                  <select aria-label="Enlazar a una operación" className={`${selectClass} h-8 text-xs`} defaultValue="" name="transaction_id" required>
-                    <option disabled value="">Enlazar a una operación…</option>
-                    {tradesForEntry(trades, entry.metadata).map((trade) => (
-                      <option key={trade.id} value={trade.id}>{describeTrade(trade)}</option>
+                  <select aria-label={ti('research.journal.linkLabel')} className={`${selectClass} h-8 text-xs`} defaultValue="" name="transaction_id" required>
+                    <option disabled value="">{ti('research.journal.linkPlaceholder')}</option>
+                    {tradesForEntry(trades, entry.metadata).map((item) => (
+                      <option key={item.id} value={item.id}>{trade(item)}</option>
                     ))}
                   </select>
-                  <Button size="sm" type="submit" variant="outline">{isSuggested(entry.metadata) ? 'Confirmar enlace' : 'Enlazar'}</Button>
+                  <Button size="sm" type="submit" variant="outline">{isSuggested(entry.metadata) ? ti('research.journal.confirmLink') : ti('research.journal.link')}</Button>
                     </>
                   ) : null}
                 </MutationForm>
               ) : null}
               {!entry.transaction && (entry.metadata?.auto_link as { status?: unknown } | undefined)?.status === 'user_unlinked' ? (
-                <p className="mt-2 text-xs text-gray-400" data-testid="journal-no-operation">Sin operación por elección del usuario. No se enlazará automáticamente.</p>
+                <p className="mt-2 text-xs text-gray-400" data-testid="journal-no-operation">{ti('research.journal.userNoTrade')}</p>
               ) : null}
               {!entry.transaction && ambiguousCandidateIds(entry.metadata) ? (
-                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage="Decisión marcada sin operación">
+                <MutationForm action={linkResearchDecisionTrade.bind(null, ticker, entry.id)} className="mt-1" successMessage={ti('research.journal.markedNoTrade')}>
                   <input name="transaction_id" type="hidden" value="" />
-                  <button className="text-gray-500 underline hover:text-gray-300" type="submit">No enlazar (sin operación)</button>
+                  <button className="text-gray-500 underline hover:text-gray-300" type="submit">{ti('research.journal.noLink')}</button>
                 </MutationForm>
               ) : null}
             </div>
@@ -522,23 +531,23 @@ export function DecisionAndRealityPanel({
       <div className="rounded-lg border border-gray-800 bg-surface-1 p-5">
         <div className="mb-4 flex items-center gap-2">
           <BarChart3 aria-hidden="true" className="h-5 w-5 text-teal-300" />
-          <h2 className="text-lg font-semibold text-gray-100">Expectativa vs realidad</h2>
-          <MutationForm action={reviewResearchExpectations.bind(null, ticker)} className="ml-auto" successMessage="Forecasts comparados con los hechos disponibles">
-            <Button size="sm" type="submit" variant="outline">Comparar ahora</Button>
+          <h2 className="text-lg font-semibold text-gray-100">{ti('research.expect.title')}</h2>
+          <MutationForm action={reviewResearchExpectations.bind(null, ticker)} className="ml-auto" successMessage={ti('research.expect.compared')}>
+            <Button size="sm" type="submit" variant="outline">{ti('research.expect.compareNow')}</Button>
           </MutationForm>
         </div>
         {reviews.length === 0 ? (
-          <p className="text-sm text-gray-500">Sin comparaciones persistidas. Solo se pueden contrastar previsiones que tengan datos esperados y reales.</p>
+          <p className="text-sm text-gray-500">{ti('research.expect.empty')}</p>
         ) : (
-          <ExpectationsList rows={expectationRows(reviews)} />
+          <ExpectationsList rows={expectationRows(reviews, ti, fmt)} />
         )}
       </div>
     </section>
   );
 }
 
-function AssumptionSources({ fuentes }: { fuentes?: Array<{ fact_id: number; titulo: string | null; url: string | null; fecha: string | null }> }) {
-  if (!fuentes || fuentes.length === 0) return <>sin fuente</>;
+function AssumptionSources({ fuentes, ti = esT }: { fuentes?: Array<{ fact_id: number; titulo: string | null; url: string | null; fecha: string | null }>; ti?: TiFn }) {
+  if (!fuentes || fuentes.length === 0) return <>{ti('research.modelSources.none')}</>;
   return (
     <>
       {fuentes.map((fuente, index) => (
@@ -546,10 +555,10 @@ function AssumptionSources({ fuentes }: { fuentes?: Array<{ fact_id: number; tit
           {index > 0 ? ', ' : ''}
           {fuente.url && /^https:\/\//.test(fuente.url) ? (
             <a href={fuente.url} target="_blank" rel="noopener noreferrer" className="text-teal-400 underline">
-              {fuente.titulo ?? 'Fuente oficial'}
+              {fuente.titulo ?? ti('research.modelSources.official')}
             </a>
           ) : (
-            (fuente.titulo ?? 'Fuente oficial')
+            (fuente.titulo ?? ti('research.modelSources.official'))
           )}
           {fuente.fecha ? ` (${fuente.fecha})` : ''}
         </span>

@@ -29,7 +29,8 @@ describe('entrada al diario de decisiones desde la ficha', () => {
     it('el ancla existe en el panel que contiene el formulario «Decisión»', () => {
         assert.match(panels, /id="diario-decisiones"/);
         const anchor = panels.indexOf('id="diario-decisiones"');
-        const form = panels.indexOf('aria-label="Decisión"');
+        const form = panels.indexOf("aria-label={ti('research.journal.decision')}");
+        assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).journal.decision, 'Decisión');
         assert.ok(anchor > 0 && form > anchor, 'el ancla debe preceder al select «Decisión»');
     });
     it('la vista changes sigue pintando el panel del diario', () => {
