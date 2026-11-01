@@ -66,6 +66,19 @@ TICK_LOCK_SECONDS = 240
 _RESULT_TTL_SECONDS = 900
 
 
+def max_sample_gap_seconds() -> float:
+    """Hueco maximo entre muestreos para afirmar presencia continua en ready.
+
+    Pasado este hueco (watchdog apagado, ticks perdidos) el avistamiento
+    previo no prueba continuidad: el mensaje pudo consumirse y reinsertarse
+    con el mismo id. La edad reinicia en la reanudacion.
+    """
+    try:
+        return max(60.0, float(os.getenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "600")))
+    except ValueError:
+        return 600.0
+
+
 def max_age_seconds() -> float:
     """Tiempo en cabeza de la lista ready a partir del cual se evalua atasco."""
     try:
@@ -115,8 +128,19 @@ def _ready_head_age(client: Any, base: str, queue: str, now_ms: float) -> float 
     cabeza subestimaba la edad real con drenaje parcial: la cabeza avanza
     cada tick y su "edad como cabeza" vuelve a 0 aunque el mensaje que la
     releva llevara minutos listo (medido con scripts/ingest_load_lab: edad
-    real 840 s, edad de cabeza 0, alerta NUNCA). La edad puede subestimar
-    como mucho un tick (el avistamiento es discreto), nunca sobrestimar.
+    real 840 s, edad de cabeza 0, alerta NUNCA).
+
+    Cotas honestas. Nunca SOBREestima la edad... salvo que un mensaje salga
+    y se reinserte con el mismo id DENTRO de un mismo intervalo de muestreo
+    (indistinguible de presencia continua: el avistamiento no se poda entre
+    ticks); los avistamientos expiran tras un hueco de muestreo
+    (QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS) para no afirmar "ready continuo"
+    durante huecos mas largos. Puede SUBestimar: con backlog <= K, como
+    mucho un tick (avistamiento discreto); con backlog > K, ademas el tiempo
+    que el id paso fuera de la ventana antes de entrar en los K mas viejos
+    (sin cota fija; el id mas viejo siempre esta en la ventana, asi que la
+    edad reportada del mas antiguo solo arrastra el lag de su propia entrada
+    en ventana).
     """
     ids = client.lrange(base, 0, _SEEN_WINDOW - 1)
     key = f"{_SEEN_PREFIX}{queue}"
@@ -124,22 +148,31 @@ def _ready_head_age(client: Any, base: str, queue: str, now_ms: float) -> float 
         client.delete(key)
         return None
     seen = client.hgetall(key)
+    max_gap_ms = max_sample_gap_seconds() * 1000
     pipe = client.pipeline()
-    stale = [mid for mid in seen if mid not in ids]
-    for mid in stale:
-        pipe.hdel(key, mid)
+    for mid in seen:
+        if mid not in ids:
+            pipe.hdel(key, mid)  # consumido o fuera de la ventana: se poda
     first_seen: list[float] = []
-    present = set()
     for mid in ids:
-        ts = seen.get(mid)
-        if ts is None:
-            pipe.hset(key, mid, str(int(now_ms)))
-        else:
-            present.add(mid)
-            first_seen.append(float(ts))
+        raw = seen.get(mid)
+        first_ms = None
+        if raw is not None:
+            first_raw, _, last_raw = _as_str(raw).partition(":")
+            first_ms = float(first_raw)
+            if now_ms - float(last_raw) > max_gap_ms:
+                # Hueco de muestreo: sin evidencia de presencia continua
+                # durante el hueco (pudo salir y reinsertarse con el mismo
+                # id). El avistamiento reinicia; no se afirma "ready continuo".
+                first_ms = None
+        if first_ms is None:
+            first_ms = now_ms
+        pipe.hset(key, mid, f"{int(first_ms)}:{int(now_ms)}")
+        first_seen.append(first_ms)
     pipe.execute()
-    if not first_seen:
-        return 0.0  # toda la ventana es nueva en este tick
+    if all(t == now_ms for t in first_seen):
+        # Toda la ventana es nueva en este tick (o reiniciada por hueco).
+        return 0.0
     return max(0.0, (now_ms - min(first_seen)) / 1000.0)
 
 
