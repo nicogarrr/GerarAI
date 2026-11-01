@@ -10,13 +10,8 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 from app.llm import run_guard
-from app.services.expert_team.experts import (
-    ExpertSpec,
-    Reasoner,
-    Validator,
-    basic_citation_check,
-    run_expert,
-)
+from app.services.expert_team.citations import citation_validator
+from app.services.expert_team.experts import ExpertSpec, Reasoner, Validator, run_expert
 from app.services.expert_team.ledger import EvidenceLedger
 from app.services.expert_team.models import ExpertReport, RunContext, TeamResult, ToolSpec
 
@@ -41,7 +36,7 @@ class ExpertTeam:
         *,
         max_parallel: int = 3,
         total_timeout_s: float = 120.0,
-        validator: Validator = basic_citation_check,
+        validator: Validator | None = None,
         guard: run_guard.LLMRunGuard | None = None,
         judge_prompt: str = "thesis_debate_judge",
     ) -> None:
@@ -56,7 +51,7 @@ class ExpertTeam:
         self.reasoner = reasoner
         self.max_parallel = max_parallel
         self.total_timeout_s = total_timeout_s
-        self.validator = validator
+        self.validator = validator or citation_validator()
         self.guard = guard
         self.judge_prompt = judge_prompt
 
@@ -119,6 +114,8 @@ class ExpertTeam:
         seen: dict[str, dict[str, Any]] = {}
         for report in reports:
             for claim in report.claims:
+                if claim.reason:  # marcada «sin fuente»: no aporta fuentes
+                    continue
                 for cid in claim.citations:
                     evidence = ledger.get(cid)
                     if evidence is not None and cid not in seen:

@@ -54,7 +54,9 @@ def _num_en(value: float, digits: int = 2) -> str:
     return f"{value:,.{digits}f}"
 
 
-def _money(value: float, currency: str | None, *, signed: bool = False, english: bool = False) -> str:
+def _money(value: float | None, currency: str | None, *, signed: bool = False, english: bool = False) -> str:
+    if value is None:
+        return "N/A" if english else "N/D"
     if not english:
         return money_es(value, _symbol(currency), signed=signed)
     text = _num_en(value)
@@ -142,13 +144,13 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
         .limit(1)
     )
     currency = latest.base_currency
-    total = float(latest.total_value_base or 0)
+    total = float(latest.total_value_base) if latest.total_value_base is not None else None
     day = latest.snapshot_date
     is_today = day == local_today()
     when = (_date_en(day) if english else fecha_es(day))
     sources = [_source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(day)}", "/portfolio")]
     ret = latest.daily_return
-    if ret is None or previous is None or not previous.total_value_base:
+    if total is None or ret is None or previous is None or not previous.total_value_base:
         if english:
             lead = f"Today ({when})" if is_today else f"There is no snapshot of your portfolio for today yet. Last saved day ({when})"
             text = (f"{lead}: value {_money(total, currency, english=True)}, but I can't calculate the change: "
@@ -305,9 +307,9 @@ def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
         elif gross:
             lines.append(
                 f"- Dividends received: {_money(gross, 'EUR', english=True)} gross, "
-                f"{_money(withheld or 0, 'EUR', english=True)} withheld at source." if english else
+                f"{_money(withheld, 'EUR', english=True)} withheld at source." if english else
                 f"- Dividendos cobrados: {_money(gross, 'EUR')} brutos, "
-                f"{_money(withheld or 0, 'EUR')} de retención en origen.")
+                f"{_money(withheld, 'EUR')} de retención en origen.")
     if year == today.year:
         latent = _unrealized(db, tenant)
         if latent is not None:
@@ -582,14 +584,15 @@ def _cash_answer(db: Session, tenant: int) -> ChatResponse:
         text = ("You have no cash balance saved. You can add it in Portfolio." if english
                 else "No tienes efectivo guardado. Puedes añadirlo en Cartera.")
         return _response(text, [], "account_cash")
-    totals: dict[str, Decimal] = {}
+    totals: dict[str, Decimal | None] = {}
     for row in rows:
-        totals[row.currency] = totals.get(row.currency, Decimal("0")) + Decimal(row.balance or 0)
+        known = totals.get(row.currency, Decimal("0"))
+        totals[row.currency] = None if known is None or row.balance is None else known + Decimal(row.balance)
     as_of = max(row.as_of for row in rows)
     day = _date_en(as_of) if english else fecha_es(as_of)
-    parts = [_money(float(v), c, english=english) for c, v in sorted(totals.items())]
+    parts = [_money(float(v) if v is not None else None, c, english=english) for c, v in sorted(totals.items())]
     text = (f"Your saved cash (as of {day}): " if english else f"Tu efectivo guardado (a {day}): ") + ", ".join(parts) + "."
-    if any(v < 0 for v in totals.values()):
+    if any(v is not None and v < 0 for v in totals.values()):
         text += (" A negative balance is margin debt." if english else " Un saldo negativo es deuda de margen.")
     if len(totals) > 1:
         text += (" Each currency is shown as is, not converted." if english
@@ -689,7 +692,7 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
     english = _english()
     years = [year] if year is not None else _withholding_years(db, tenant, only)
     # (año o ticker, divisa) -> [retenido, bruto]
-    rows: dict[tuple[str, str], list[Decimal]] = {}
+    rows: dict[tuple[str, str], list[Decimal | None]] = {}
     for current in years:
         report = _tax_data(db, current) or {}
         for item in report.get("dividends") or []:
@@ -698,9 +701,12 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
                 continue
             key = (ticker if year is not None else str(current), (item.get("currency") or "EUR").upper())
             bucket = rows.setdefault(key, [Decimal("0"), Decimal("0")])
-            bucket[0] += Decimal(str(item.get("withholding_native") or 0))
-            bucket[1] += Decimal(str(item.get("dividends_native") or 0))
-    sources = [_source("tax_report", None, "Impuestos", "/tax")]
+            for index, field in enumerate(("withholding_native", "dividends_native")):
+                value = item.get(field)
+                known = bucket[index]
+                bucket[index] = None if known is None or value is None else known + Decimal(str(value))
+    sources = [_source("tax_report", None, "Impuestos", "/taxes")]
+
     names = ", ".join(sorted(only))
     if not rows:
         what = names or (str(year) if year is not None else "")
@@ -709,18 +715,19 @@ def _withholding_answer(db: Session, tenant: int, year: int | None, only: set[st
         else:
             text = f"No tienes dividendos ni retenciones guardados{' de ' + what if names else (' en ' + what if what else '')}."
         return _response(text, sources, "account_withholding")
-    totals: dict[str, list[Decimal]] = {}
+    totals: dict[str, list[Decimal | None]] = {}
     for (_, currency), (held, gross) in rows.items():
         total = totals.setdefault(currency, [Decimal("0"), Decimal("0")])
-        total[0] += held
-        total[1] += gross
+        for index, value in enumerate((held, gross)):
+            known = total[index]
+            total[index] = None if known is None or value is None else known + value
 
-    def part(held: Decimal, gross: Decimal, currency: str) -> str:
+    def part(held: Decimal | None, gross: Decimal | None, currency: str) -> str:
         on = "on" if english else "sobre"
-        return f"{_money(float(held), currency, english=english)} {on} {_money(float(gross), currency, english=english)}"
+        return f"{_money(float(held) if held is not None else None, currency, english=english)} {on} {_money(float(gross) if gross is not None else None, currency, english=english)}"
 
-    def rate(held: Decimal, gross: Decimal) -> str:
-        return f" ({_pct(float(held / gross), english=english)})" if gross > 0 else ""
+    def rate(held: Decimal | None, gross: Decimal | None) -> str:
+        return f" ({_pct(float(held / gross), english=english)})" if held is not None and gross is not None and gross > 0 else ""
 
     head = " + ".join(f"{part(h, g, c)} {'gross' if english else 'brutos'}{rate(h, g)}" for c, (h, g) in sorted(totals.items()))
     if names:
@@ -808,6 +815,299 @@ def _plan_answer(db: Session, tenant: int, text: str) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_plan")
 
 
+_N_WORDS = {"un": 1, "una": 1, "a": 1, "one": 1, "dos": 2, "two": 2, "tres": 3, "three": 3, "seis": 6, "six": 6}
+_HIST_AGO = re.compile(
+    r"\bhace\s+(un|una|dos|tres|seis|\d+)\s+(dias?|semanas?|mes|meses|anos?)\b"
+    r"|\b(?:el|los|la|las)\s+ultim[oa]s?\s+(?:(\d+|dos|tres|seis)\s+)?(dias?|semanas?|mes|meses)\b"
+    r"|\b(a|one|two|three|six|\d+)\s+(days?|weeks?|months?|years?)\s+ago\b"
+    r"|\b(?:the\s+)?(?:last|past)\s+(?:(\d+|two|three|six)\s+)?(days?|weeks?|months?)\b"
+)
+_HIST_THIS = re.compile(r"\b(?:est[ae]|this)\s+(semana|mes|week|month)\b")
+_HIST_VERB = re.compile(r"\b(?:valia|subido|bajado|ido|evolucion\w*|variado|cambiado|rentabilidad|ganado|perdido|"
+                        r"worth|done|changed|gone|grown|evolved|return|gained|lost|up|down)\b")
+_UNIT = {"dia": "d", "dias": "d", "day": "d", "days": "d", "semana": "w", "semanas": "w", "week": "w", "weeks": "w",
+         "mes": "m", "meses": "m", "month": "m", "months": "m", "ano": "y", "anos": "y", "year": "y", "years": "y"}
+
+
+def _months_back(day, months: int):
+    from calendar import monthrange
+
+    year, month = divmod(day.year * 12 + day.month - 1 - months, 12)
+    return day.replace(year=year, month=month + 1, day=min(day.day, monthrange(year, month + 1)[1]))
+
+
+def _history_target(text: str):
+    """(fecha de comparación, es_este_periodo) o None si la frase no pide un pasado."""
+    from datetime import timedelta
+
+    today = local_today()
+    this = _HIST_THIS.search(text)
+    if this:
+        if this.group(1) in {"semana", "week"}:
+            return today - timedelta(days=today.weekday() + 1), True
+        return today.replace(day=1) - timedelta(days=1), True
+    match = _HIST_AGO.search(text)
+    if not match:
+        return None
+    groups = [g for g in match.groups()]
+    pairs = [(groups[i], groups[i + 1]) for i in range(0, len(groups), 2) if groups[i + 1]]
+    raw, unit_word = pairs[0]
+    count = int(raw) if raw and raw.isdigit() else _N_WORDS.get(raw or "", 1)
+    unit = _UNIT.get(unit_word, "d")
+    if unit == "d":
+        return today - timedelta(days=count), False
+    if unit == "w":
+        return today - timedelta(days=7 * count), False
+    return _months_back(today, count * (12 if unit == "y" else 1)), False
+
+
+def _asks_history(text: str, question: str) -> bool:
+    return bool((_HIST_AGO.search(text) or _HIST_THIS.search(text)) and _PORTFOLIO_WORD.search(text)
+                and _HIST_VERB.search(text) and not _tickers_in(question) and not re.search(r"\bsi\b|\bif\b", text))
+
+
+def _history_answer(db: Session, tenant: int, text: str) -> ChatResponse:
+    english = _english()
+    target, this_period = _history_target(text) or (local_today(), False)
+    when = (lambda day: _date_en(day)) if english else (lambda day: fecha_es(day))
+    base = select(PortfolioDailySnapshot).where(PortfolioDailySnapshot.tenant_id == tenant)
+    latest = db.scalar(base.order_by(PortfolioDailySnapshot.snapshot_date.desc(),
+                                     PortfolioDailySnapshot.id.desc()).limit(1))
+    if latest is None:
+        return _response(
+            "There is no daily history of your portfolio yet (a snapshot is saved each day when prices refresh)."
+            if english else
+            "Aún no hay histórico diario de tu cartera (se guarda una foto cada día al actualizar precios).",
+            [], "portfolio_history")
+    same = base.where(PortfolioDailySnapshot.portfolio_id == latest.portfolio_id)
+    past = db.scalar(same.where(PortfolioDailySnapshot.snapshot_date <= target)
+                     .order_by(PortfolioDailySnapshot.snapshot_date.desc()).limit(1))
+    sources = [_source("portfolio_snapshot", latest.id, f"Cartera {fecha_es(latest.snapshot_date)}", "/portfolio")]
+    if past is None:
+        first = db.scalar(same.order_by(PortfolioDailySnapshot.snapshot_date.asc()).limit(1))
+        first_day = when(first.snapshot_date) if first else when(latest.snapshot_date)
+        text_out = (f"I have no snapshot of your portfolio on or before {when(target)}: the first one is from {first_day}."
+                    if english else
+                    f"No tengo foto de tu cartera del {when(target)} ni anterior: la primera es del {first_day}.")
+        return _response(text_out, sources, "portfolio_history")
+    if past.id == latest.id or past.snapshot_date >= latest.snapshot_date:
+        if this_period:
+            text_out = (f"There is no snapshot of your portfolio for this period yet (the latest is from "
+                        f"{when(latest.snapshot_date)})." if english else
+                        f"Aún no hay ninguna foto de tu cartera de este {'mes' if 'mes' in text else 'periodo'} "
+                        f"(la última es del {when(latest.snapshot_date)}).")
+        else:
+            text_out = (f"The latest snapshot of your portfolio is from {when(latest.snapshot_date)}; there is nothing "
+                        "newer to compare." if english else
+                        f"La última foto de tu cartera es del {when(latest.snapshot_date)}; no hay nada más nuevo con "
+                        "que comparar.")
+        return _response(text_out, sources, "portfolio_history")
+    currency = latest.base_currency
+    if latest.total_value_base is None or past.total_value_base is None:
+        text_out = ("Portfolio comparison: N/A (a snapshot has an unknown total value)." if english else
+                    "Comparación de cartera: N/D (una foto tiene el valor total desconocido).")
+        return _response(text_out, sources, "portfolio_history")
+    now_value, then_value = float(latest.total_value_base), float(past.total_value_base)
+    flows = db.scalars(same.where(PortfolioDailySnapshot.snapshot_date > past.snapshot_date,
+                                  PortfolioDailySnapshot.snapshot_date <= latest.snapshot_date)).all()
+    flow = (None if any(s.net_external_flow_base is None for s in flows) else
+            float(sum((Decimal(s.net_external_flow_base) for s in flows), Decimal("0"))))
+    change = now_value - then_value
+    m = (lambda value, signed=False: _money(value, currency, signed=signed, english=english))
+    if english:
+        lines = [f"On {when(past.snapshot_date)} your portfolio was worth {m(then_value)}; in the latest snapshot "
+                 f"({when(latest.snapshot_date)}), {m(now_value)}: {m(change, True)}."]
+    else:
+        lines = [f"El {when(past.snapshot_date)} tu cartera valía {m(then_value)}; en la última foto "
+                 f"({when(latest.snapshot_date)}), {m(now_value)}: {m(change, True)}."]
+    if flow is None:
+        lines.append("Net deposits/withdrawals: N/A; cannot separate cash flows from performance." if english else
+                     "Aportaciones/retiradas netas: N/D; no se pueden separar los flujos de la rentabilidad.")
+        lines.append("Saved daily snapshots, not live prices." if english else
+                     "Fotos diarias guardadas, no cotización en directo.")
+        return _response("\n".join(lines), sources, "portfolio_history")
+    if latest.cumulative_twr is not None and past.cumulative_twr is not None:
+        ret = (1 + float(latest.cumulative_twr)) / (1 + float(past.cumulative_twr)) - 1
+        label = "TWR"
+    else:
+        ret = (change - flow) / then_value if then_value else None
+        label = "approx." if english else "aprox."
+    pct = f" ({_pct(ret, signed=True, english=english)} {label})" if ret is not None else ""
+    if abs(flow) >= 0.005:
+        lines.append(f"Net deposits/withdrawals in that time: {m(flow, True)}; without them, {m(change - flow, True)}{pct}."
+                     if english else
+                     f"Aportaciones/retiradas netas en ese tiempo: {m(flow, True)}; sin ellas, {m(change - flow, True)}{pct}.")
+    elif pct:
+        lines.append(f"No deposits or withdrawals in that time{pct}." if english
+                     else f"Sin aportaciones ni retiradas en ese tiempo{pct}.")
+    lines.append("Saved daily snapshots, not live prices." if english
+                 else "Fotos diarias guardadas, no cotización en directo.")
+    return _response("\n".join(lines), sources, "portfolio_history")
+
+
+_RULES_ASK = re.compile(
+    r"\b(?:que|cuales|cuantas)\s+(?:alertas|avisos)\s+tengo\s+(?:configurad|puest|activ|cread|programad)\w*"
+    r"|\bmis\s+reglas\s+de\s+(?:aviso|alerta)s?\b|\blista\w*\s+(?:de\s+)?(?:mis\s+)?(?:alertas|avisos)\b"
+    r"|\bmis\s+(?:alertas|avisos)\s+(?:configurad|puest|activ|cread|programad)\w*"
+    r"|\bmy\s+alert\s+rules\b|\bwhat\s+alerts\s+(?:do\s+)?i\s+have\b|\blist\s+(?:all\s+)?my\s+alerts\b"
+)
+
+
+def _asks_alert_rules(text: str, question: str) -> bool:
+    return bool(_RULES_ASK.search(text) and not _tickers_in(question))
+
+
+def _rule_text(kind: str, condition: dict, currency: str | None, english: bool) -> str:
+    op = str((condition or {}).get("operator") or "")
+    raw = (condition or {}).get("value")
+    try:
+        value = float(str(raw))
+        number = _num_en(value, 2).rstrip("0").rstrip(".") if english else num_es(value, 2).rstrip("0").rstrip(",")
+    except (TypeError, ValueError):
+        value, number = None, str(raw)
+    cur = f" {currency}" if currency else ""
+    if kind == "price_below" or (kind.startswith("price") and kind != "price_change" and op in {"<", "<="}):
+        return f"price below {number}{cur}" if english else f"precio por debajo de {number}{cur}"
+    if kind == "price_above" or (kind.startswith("price") and kind != "price_change" and op in {">", ">="}):
+        return f"price above {number}{cur}" if english else f"precio por encima de {number}{cur}"
+    if kind == "price_change":
+        more = op in {">", ">="}
+        if english:
+            return f"daily change of {number}% or {'more' if more else 'less'}"
+        return f"variación del día de {number} % o {'más' if more else 'menos'}"
+    if kind in {"news", "news_event"}:
+        return "new news" if english else "noticias nuevas"
+    if kind in {"earnings", "earnings_run"}:
+        return "new earnings" if english else "resultados nuevos"
+    return f"{kind} {op} {number}".strip()
+
+
+def _alert_rules_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import AlertRule, Company
+
+    english = _english()
+    rows = db.execute(
+        select(AlertRule, Company.ticker, Company.currency)
+        .outerjoin(Company, Company.id == AlertRule.company_id)
+        .where(AlertRule.tenant_id == tenant, AlertRule.active.is_(True))
+        .order_by(AlertRule.id)
+    ).all()
+    sources = [_source("alert_rule", None, "Alertas", "/alerts")]
+    if not rows:
+        return _response("You have no active alerts. You can create them in Alerts." if english
+                         else "No tienes alertas activas. Puedes crearlas en Alertas.", sources, "account_alert_rules")
+    count = len(rows)
+    lines = [(f"You have {count} active alert{'s' if count != 1 else ''}:" if english
+              else f"Tienes {count} alerta{'s' if count != 1 else ''} activa{'s' if count != 1 else ''}:")]
+    for rule, ticker, currency in rows[:20]:
+        line = f"- {ticker or '?'}: {_rule_text(rule.rule_type or '', rule.condition or {}, currency, english)}"
+        if rule.last_triggered_at is not None:
+            fired = rule.last_triggered_at.date()
+            line += (f" (last triggered {_date_en(fired)})" if english
+                     else f" (saltó por última vez el {fecha_es(fired)})")
+        lines.append(line)
+    if count > 20:
+        lines.append(f"And {count - 20} more in Alerts." if english else f"Y {count - 20} más en Alertas.")
+    lines.append("To create, pause or delete alerts, go to Alerts." if english
+                 else "Para crear, pausar o borrar alertas, ve a Alertas.")
+    return _response("\n".join(lines), sources, "account_alert_rules")
+
+
+_SCREENS = re.compile(
+    r"\b(?:pantallas|screens?|screeners?|filtros)\s+(?:que\s+tengo\s+)?(?:guardad\w*|del\s+screener|en\s+el\s+screener)"
+    r"|\bmis\s+(?:pantallas|screens?|screeners?)\b|\btengo\s+guardad\w+\s+en\s+el\s+screener\b"
+    r"|\bmy\s+(?:saved\s+)?screens?\b|\bsaved\s+screens?\b"
+)
+
+
+def _asks_saved_screens(text: str, question: str) -> bool:
+    return bool(_SCREENS.search(text) and not _tickers_in(question)
+                and (re.search(r"\b(?:mis|mi|tengo|my|i)\b", text)))
+
+
+def _saved_screens_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import Company, SavedScreen, SavedScreenMatch
+
+    english = _english()
+    screens = db.scalars(select(SavedScreen).where(SavedScreen.tenant_id == tenant, SavedScreen.active.is_(True))
+                         .order_by(SavedScreen.id)).all()
+    sources = [_source("saved_screen", None, "Screeners", "/screeners")]
+    if not screens:
+        return _response("You have no saved screens. You can create them in Screeners." if english else
+                         "No tienes pantallas guardadas en el screener. Puedes crearlas en Screeners.",
+                         sources, "account_saved_screens")
+    count = len(screens)
+    lines = [f"You have {count} saved screen{'s' if count != 1 else ''}:" if english else
+             f"Tienes {count} pantalla{'s' if count != 1 else ''} guardada{'s' if count != 1 else ''} en el screener:"]
+    for screen in screens[:15]:
+        tickers = list(db.scalars(
+            select(Company.ticker).join(SavedScreenMatch, SavedScreenMatch.company_id == Company.id)
+            .where(SavedScreenMatch.tenant_id == tenant, SavedScreenMatch.saved_screen_id == screen.id,
+                   SavedScreenMatch.active.is_(True))
+            .order_by(SavedScreenMatch.id)
+        ).all())
+        n = len(screen.criteria or [])
+        if english:
+            crit = f"{n} criteri{'a' if n != 1 else 'on'}"
+            match = (f"{len(tickers)} compan{'ies' if len(tickers) != 1 else 'y'} match now ({', '.join(tickers[:8])}"
+                     f"{', …' if len(tickers) > 8 else ''})" if tickers else "no company matches now")
+            ran = f"; last run {_date_en(screen.last_run_at.date())}" if screen.last_run_at else ""
+        else:
+            crit = f"{n} criterio{'s' if n != 1 else ''}"
+            match = (f"la cumple{'n' if len(tickers) != 1 else ''} ahora {len(tickers)} empresa"
+                     f"{'s' if len(tickers) != 1 else ''} ({', '.join(tickers[:8])}{', …' if len(tickers) > 8 else ''})"
+                     if tickers else "ninguna empresa la cumple ahora")
+            ran = f"; última ejecución el {fecha_es(screen.last_run_at.date())}" if screen.last_run_at else ""
+        lines.append(f"- «{screen.name}»: {crit}; {match}{ran}.")
+    if count > 15:
+        lines.append(f"And {count - 15} more in Screeners." if english else f"Y {count - 15} más en Screeners.")
+    lines.append("To see or change them, go to Screeners." if english else "Para verlas o cambiarlas, ve a Screeners.")
+    return _response("\n".join(lines), sources, "account_saved_screens")
+
+
+_DOCS = re.compile(
+    r"\b(?:que|cuantos)\s+documentos\s+tengo\b(?!\s+que)|\bmis\s+documentos\b"
+    r"|\bdocumentos\s+(?:que\s+tengo\s+)?(?:en\s+(?:la|mi)\s+biblioteca|guardados|subidos)\b|\bque\s+hay\s+en\s+mi\s+biblioteca\b"
+    r"|\bmy\s+(?:documents|library)\b|\bwhat\s+documents\s+do\s+i\s+have\b"
+)
+
+
+def _asks_documents(text: str, question: str) -> bool:
+    return bool(_DOCS.search(text) and not _tickers_in(question)
+                and not re.search(r"\b(?:necesito|hacienda|para\s+declarar|need)\b", text))
+
+
+def _documents_answer(db: Session, tenant: int) -> ChatResponse:
+    from sqlalchemy import func
+
+    from app.models import KnowledgeDocument
+
+    english = _english()
+    ready = (KnowledgeDocument.tenant_id == tenant, KnowledgeDocument.status != "failed")
+    by_type = db.execute(select(KnowledgeDocument.document_type, func.count()).where(*ready)
+                         .group_by(KnowledgeDocument.document_type)).all()
+    sources = [_source("knowledge_document", None, "Biblioteca", "/knowledge")]
+    total = sum(int(n) for _, n in by_type)
+    if not total:
+        return _response("You have no documents in the library. You can upload them in Library." if english else
+                         "No tienes documentos en la biblioteca. Puedes subirlos en Biblioteca.",
+                         sources, "account_documents")
+    kinds = ", ".join(f"{kind or '?'} {n}" for kind, n in sorted(by_type, key=lambda row: str(row[0])))
+    latest = db.scalars(select(KnowledgeDocument).where(*ready)
+                        .order_by(KnowledgeDocument.publication_date.desc().nulls_last(),
+                                  KnowledgeDocument.id.desc()).limit(8)).all()
+    noun = ("document" if total == 1 else "documents") if english else ("documento" if total == 1 else "documentos")
+    lines = [f"You have {total} {noun} in the library ({kinds}). Latest:" if english else
+             f"Tienes {total} {noun} en la biblioteca ({kinds}). Los últimos:"]
+    for doc in latest:
+        bits = [b for b in (doc.ticker, (_date_en(doc.publication_date) if english else fecha_es(doc.publication_date))
+                            if doc.publication_date else None) if b]
+        lines.append(f"- «{doc.title}»" + (f" ({', '.join(bits)})" if bits else ""))
+    lines.append("To open them or upload more, go to Library." if english
+                 else "Para abrirlos o subir más, ve a Biblioteca.")
+    return _response("\n".join(lines), sources, "account_documents")
+
+
 def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     """Respuesta de datos de la cuenta, o None si la pregunta no es de este módulo."""
     tenant = _tenant(db)
@@ -816,8 +1116,16 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     text = _fold(question)
     if _asks_daily_change(text):
         return _daily_change_answer(db, tenant)
+    if _asks_history(text, question):
+        return _history_answer(db, tenant, text)
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
+    if _asks_documents(text, question):
+        return _documents_answer(db, tenant)
+    if _asks_saved_screens(text, question):
+        return _saved_screens_answer(db, tenant)
+    if _asks_alert_rules(text, question):
+        return _alert_rules_answer(db, tenant)
     if _asks_plan(text, question):
         return _plan_answer(db, tenant, text)
     if _asks_return_ranking(text, question):

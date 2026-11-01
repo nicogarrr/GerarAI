@@ -375,7 +375,9 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
     if not lines:
         raise ValueError("El archivo CSV está vacío")
 
-    first_line = lines[0]
+    # La cabecera es la primera línea con texto: una fila vaciada en Excel
+    # («;;;» o «,,,») antes de ella no decide el separador.
+    first_line = next((line for line in lines if re.search(r"\w", line)), lines[0])
     delimiter = ","
     if first_line.count(";") > first_line.count(","):
         delimiter = ";"
@@ -392,11 +394,14 @@ def parse_file_rows(file_bytes: bytes, filename: str = "") -> tuple[list[str], l
         raise ValueError(
             "El archivo CSV está mal formado y no se puede leer; guárdalo de nuevo como CSV (UTF-8)"
         ) from exc
+    # Líneas en blanco (o filas vaciadas) antes de la cabecera: la cabecera
+    # es el primer registro con contenido, no una línea vacía.
+    all_rows = [row for row in all_rows if any(c.strip() for c in row)]
     if not all_rows:
         raise ValueError("El archivo CSV no contiene registros válidos")
 
     headers = [h.strip() for h in all_rows[0]]
-    data_rows = [[cell.strip() for cell in row] for row in all_rows[1:] if any(c.strip() for c in row)]
+    data_rows = [[cell.strip() for cell in row] for row in all_rows[1:]]
     if len(data_rows) > MAX_IMPORT_ROWS:
         raise ValueError(
             f"El archivo supera el máximo de {MAX_IMPORT_ROWS} filas; divídelo en varios lotes"
@@ -443,7 +448,11 @@ class TransactionImportService:
                 errors=errors,
             )
 
-        header_indices = {h: i for i, h in enumerate(headers)}
+        # Con dos columnas del mismo nombre gana la PRIMERA, la misma que eligió
+        # auto_detect_columns (un dict por comprensión se quedaba con la última).
+        header_indices: dict[str, int] = {}
+        for i, h in enumerate(headers):
+            header_indices.setdefault(h, i)
         col_indices = {k: header_indices.get(v, -1) for k, v in detected_mapping.items()}
 
         preview_items: list[ParsedTransaction] = []

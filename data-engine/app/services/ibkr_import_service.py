@@ -344,6 +344,24 @@ def _csv_rows(csv_text: str) -> list[list[str]]:
         ) from exc
 
 
+def _numbered_csv_rows(csv_text: str) -> list[tuple[int, list[str]]]:
+    """Filas con contenido y su número de fila en la hoja (1 = primera línea).
+
+    Las filas vacías (línea en blanco o «,,,,» de una fila vaciada en Excel)
+    se descartan DESPUÉS de numerar: así «Fila N» de un error es la fila N
+    que el usuario ve al abrir el fichero. ``_csv_rows`` lee el texto sin los
+    saltos de línea iniciales; se suman aquí. Una celda entrecomillada con
+    salto de línea sigue siendo una sola fila, como en la hoja.
+    """
+    leading = csv_text[: len(csv_text) - len(csv_text.lstrip())]
+    offset = len(re.findall(r"\r\n|\r|\n", leading))
+    return [
+        (number, row)
+        for number, row in enumerate(_csv_rows(csv_text), start=1 + offset)
+        if any(cell.strip() for cell in row)
+    ]
+
+
 _SLASH_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{2}|\d{4})$")
 
 
@@ -403,13 +421,13 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
     if not csv_text or not csv_text.strip():
         return ["El fichero está vacío: exporta de nuevo la actividad desde IBKR en formato CSV."]
     try:
-        rows = _csv_rows(csv_text)
+        numbered = _numbered_csv_rows(csv_text)
     except csv.Error as exc:
         return [
             f"El CSV no se puede leer ({exc}): revisa que el fichero use comas como separador "
             "y que no esté corrupto."
         ]
-    rows = [row for row in rows if any(cell.strip() for cell in row)]
+    rows = [row for _, row in numbered]
     if len(rows) < 2:
         return [
             "El CSV no contiene filas de datos: debe tener una fila de cabecera "
@@ -433,7 +451,7 @@ def validate_ibkr_csv(csv_text: str) -> list[str]:
             "nuevo con fechas AAAA-MM-DD."
         ]
     errors: list[str] = []
-    for line_number, row in enumerate(rows[1:], start=2):
+    for line_number, row in numbered[1:]:
         symbol = row[mapping["symbol"]].strip() if mapping["symbol"] < len(row) else ""
         if not symbol:
             errors.append(
@@ -2095,7 +2113,8 @@ class IBKRImportService:
         row_errors = [error for error in errors if error.startswith("Fila ")]
         bad_lines = {int(error.split(" ")[1]) for error in row_errors if error.split(" ")[1].isdigit()}
 
-        data_rows = [row for row in _csv_rows(csv_text) if any(cell.strip() for cell in row)]
+        numbered_rows = _numbered_csv_rows(csv_text)
+        data_rows = [row for _, row in numbered_rows]
         mapping = _map_csv_columns(data_rows[0])
         assert mapping is not None  # garantizado por validate_ibkr_csv
         delimiter = _csv_delimiter(csv_text.strip())
@@ -2207,7 +2226,7 @@ class IBKRImportService:
             )
             return (day, 0 if kind == "buy" else 1, line_no)
 
-        for line_number, row in sorted(enumerate(data_rows[1:], start=2), key=_row_sort_key):
+        for line_number, row in sorted(numbered_rows[1:], key=_row_sort_key):
             if line_number in bad_lines:
                 continue
             def _cell(name: str) -> str:
