@@ -92,7 +92,7 @@ def test_history_missing_amount_does_not_invent_comparison(monkeypatch, english,
     past = SimpleNamespace(id=1, portfolio_id=1, total_value_base=Decimal("100"),
                            snapshot_date=date(2026, 10, 1), cumulative_twr=None)
     if missing in ("latest", "past"):
-        setattr(latest if missing == "latest" else past, "total_value_base", None)
+        (latest if missing == "latest" else past).total_value_base = None
     db = Mock()
     db.scalar.side_effect = [latest, past]
     db.scalars.return_value.all.return_value = [SimpleNamespace(
