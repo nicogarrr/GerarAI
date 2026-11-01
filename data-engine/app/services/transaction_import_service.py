@@ -23,7 +23,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -66,9 +66,33 @@ class TransactionImportPreviewResponse(BaseModel):
     warnings: list[RowValidationError] = []
 
 
+# Topes de Transaction (Numeric(20, 6) / Numeric(20, 2)): los mismos que
+# POST/PUT /transactions (#2606).
+_MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
+_MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+
+
 class TransactionImportCommitRequest(BaseModel):
     transactions: list[ParsedTransaction] = Field(min_length=1, max_length=2000)
     source_filename: str | None = None
+
+    @model_validator(mode="after")
+    def _amounts_fit_the_ledger(self) -> TransactionImportCommitRequest:
+        # El commit recibe las filas del cliente: la vista previa ya rechaza
+        # «1e23», pero aquí nadie lo volvía a mirar y un precio imposible, un
+        # NaN o un negativo entraban en la cartera (en Postgres, 500).
+        for tx in self.transactions:
+            for field, value, ceiling in (
+                ("cantidad", tx.quantity, _MAX_NUMERIC_20_6),
+                ("precio", tx.price, _MAX_NUMERIC_20_6),
+                ("comisión", tx.fees, _MAX_NUMERIC_20_2),
+            ):
+                if not math.isfinite(value) or value < 0 or Decimal(str(value)) > ceiling:
+                    raise ValueError(
+                        f"Fila {tx.row_number}: {field} fuera de rango ({value}); "
+                        "revisa el archivo y vuelve a generar la vista previa"
+                    )
+        return self
 
 
 # Limites duros de ingesta para archivos subidos por el usuario: el parseo es
