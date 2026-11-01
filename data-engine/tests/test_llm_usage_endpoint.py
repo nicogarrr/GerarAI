@@ -178,3 +178,11 @@ def test_breaker_abierto_marca_la_pata_como_limited(monkeypatch):
         body = _run(settings_route.get_llm_usage(db))
     free = next(leg for leg in body["legs"] if leg["id"] == "opencode-free")
     assert free["state"] == "limited" and free["limited_until"] is not None
+
+
+@pytest.mark.parametrize("percent", [float("nan"), float("inf"), float("-inf")])
+def test_quota_percent_rejects_nonfinite(percent):
+    import json
+    quota = settings_route._sanitize_go_quota({"usage": {"weekly": {"percent": percent}}})
+    assert quota == {"weekly": {}}
+    json.dumps(quota, allow_nan=False)

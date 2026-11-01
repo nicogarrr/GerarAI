@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, date, datetime
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
@@ -200,7 +201,11 @@ def _sanitize_go_quota(raw: object) -> dict | None:
             continue
         entry: dict = {}
         percent_value = data.get("percent")
-        if isinstance(percent_value, (int, float)) and not isinstance(percent_value, bool):
+        if (
+            isinstance(percent_value, (int, float))
+            and not isinstance(percent_value, bool)
+            and math.isfinite(percent_value)
+        ):
             entry["percent"] = percent_value
         for field in ("status", "resetsAt"):
             value = data.get(field)
