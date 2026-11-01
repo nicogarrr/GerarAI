@@ -18,6 +18,7 @@ const ThesisMarkdown = dynamic(() => import('@/components/research/ThesisMarkdow
   ),
 });
 import { Button } from '@/components/ui/button';
+import { useT } from '@/lib/i18n/client';
 import type { MemoPage } from '@/lib/research/memo-pages';
 
 /**
@@ -26,6 +27,7 @@ import type { MemoPage } from '@/lib/research/memo-pages';
  * recoloca el inicio del memorando si ya quedó fuera de vista.
  */
 export default function ThesisMarkdownPager({ pages }: { pages: MemoPage[] }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
   const top = useRef<HTMLDivElement>(null);
   const selectId = useId();
@@ -42,10 +44,10 @@ export default function ThesisMarkdownPager({ pages }: { pages: MemoPage[] }) {
   return (
     <div ref={top} className="scroll-mt-16">
       <div className="sticky top-0 z-10 -mx-1 flex items-center gap-2 border-b border-gray-800 bg-gray-950/95 px-1 py-2 backdrop-blur">
-        <Button aria-label="Sección anterior" disabled={safeIndex === 0} onClick={() => go(safeIndex - 1)} size="icon" type="button" variant="outline">
+        <Button aria-label={t('research.memoPager.previous')} disabled={safeIndex === 0} onClick={() => go(safeIndex - 1)} size="icon" type="button" variant="outline">
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <label className="sr-only" htmlFor={selectId}>Sección del memorando</label>
+        <label className="sr-only" htmlFor={selectId}>{t('research.memoPager.select')}</label>
         <select
           className="h-11 min-w-0 flex-1 rounded-md border border-gray-700 bg-gray-900 px-2 text-base text-gray-100 sm:h-9 sm:text-sm"
           id={selectId}
@@ -57,7 +59,7 @@ export default function ThesisMarkdownPager({ pages }: { pages: MemoPage[] }) {
           ))}
         </select>
         <span className="shrink-0 text-xs tabular-nums text-gray-500">{safeIndex + 1}/{pages.length}</span>
-        <Button aria-label="Sección siguiente" disabled={safeIndex === pages.length - 1} onClick={() => go(safeIndex + 1)} size="icon" type="button" variant="outline">
+        <Button aria-label={t('research.memoPager.next')} disabled={safeIndex === pages.length - 1} onClick={() => go(safeIndex + 1)} size="icon" type="button" variant="outline">
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>

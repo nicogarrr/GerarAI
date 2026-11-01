@@ -1599,5 +1599,57 @@
     "year": "Fiscal year",
     "unverifiedCurrency": "Issuer currency not verified.",
     "source": "Model projection {model} v{version}, as of {date}."
+  },
+  "thesisAudio": {
+    "group": "Listen to the thesis",
+    "generating": "Generating audio…",
+    "generate": "Generate audio",
+    "unpublished": "No audio: there is no published thesis yet.",
+    "failed": "Couldn't generate the audio.",
+    "retry": "Retry"
+  },
+  "thesisDebate": {
+    "failedFallback": "Couldn't generate the debate",
+    "running": "Debating…",
+    "retryDebate": "Retry debate",
+    "generate": "Generate bull/bear debate",
+    "degraded": "degraded · deterministic verdict",
+    "llmJudge": "LLM judge",
+    "calls": "{count} LLM calls · model {model}",
+    "deterministic": "deterministic",
+    "failed": "The debate failed: {error}",
+    "retry": "Retry",
+    "bullTitle": "Bull case",
+    "bullEmpty": "Bull case not recorded.",
+    "bearTitle": "Bear case",
+    "bearEmpty": "Bear case not recorded.",
+    "verdict": "verdict: {verdict}",
+    "notPersisted": "verdict not saved (shown anyway)",
+    "empty": "Debate not saved yet. Generate the debate to test the thesis against its bear case before approving it."
+  },
+  "memoPager": {
+    "previous": "Previous section",
+    "select": "Memo section",
+    "next": "Next section",
+    "loadingSection": "Loading section"
+  },
+  "participation": {
+    "title": "Major shareholders (13D/G)",
+    "intro": "Ownership filings with the SEC, not purchases or sales. The filer may represent only some entities in the group. The position date is not the filing date.",
+    "loadError": "Couldn't load the filings right now.",
+    "empty": "No 13D/G filings synced. That doesn't prove there are no major shareholders.",
+    "holderUnknown": "Filer N/A",
+    "shares": "{shares} shares · {percent}",
+    "positionAt": "Position as of {date}",
+    "filedOn": "Filed {date}",
+    "pending": "Document not fully read yet; unverified fields show as N/A.",
+    "secDocument": "SEC document",
+    "sourceUnknown": "Source N/A"
+  },
+  "tickerNotFound": {
+    "title": "Stock not found",
+    "body": "We couldn't find data for this symbol. The ticker may be wrong, or it may not have research coverage yet.",
+    "backResearch": "Back to Research",
+    "watchlist": "Go to the watchlist"
   }
 }

@@ -25,7 +25,10 @@ describe('feedback único del panel de debate', () => {
         assert.match(source, /role="alert"/);
         // El bloque de error lleva el mensaje y su propio botón Reintentar
         // que invoca la misma acción que generaba el debate.
-        assert.match(source, /El debate falló: \{error\}[\s\S]*?onClick=\{run\}[\s\S]*?Reintentar/);
+        assert.match(source, /t\('research\.thesisDebate\.failed', \{ error \}\)[\s\S]*?onClick=\{run\}[\s\S]*?t\('research\.thesisDebate\.retry'\)/);
+        const debateEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).thesisDebate;
+        assert.equal(debateEs.failed, 'El debate falló: {error}');
+        assert.equal(debateEs.retry, 'Reintentar');
     });
 
     it('conserva el re-lanzado de redirects de Next (navegación, no error)', () => {

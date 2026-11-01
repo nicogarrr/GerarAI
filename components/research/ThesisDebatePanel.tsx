@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { useT } from '@/lib/i18n/client';
 import { runThesisDebate, type ThesisDebateResult } from '@/lib/actions/thesis-jobs.actions';
 import { isNextRedirectError } from '@/lib/types/errors';
 
@@ -19,6 +20,7 @@ interface ThesisDebatePanelProps {
  * disponible. Los fallos muestran el error con reintento, nunca un 500.
  */
 export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDebatePanelProps) {
+    const t = useT();
     const [debate, setDebate] = useState<ThesisDebateResult | null>(null);
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
             }
         } catch (exc) {
             if (isNextRedirectError(exc)) throw exc;
-            setError(exc instanceof Error ? exc.message : 'No se pudo generar el debate');
+            setError(exc instanceof Error ? exc.message : t('research.thesisDebate.failedFallback'));
         } finally {
             setRunning(false);
         }
@@ -46,27 +48,27 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
             <div className="flex flex-wrap items-center gap-3">
                 <Button type="button" variant="outline" onClick={run} disabled={running} aria-busy={running}>
                     <Scale aria-hidden="true" className="mr-2 h-4 w-4" />
-                    {running ? 'Debatiendo…' : debate ? 'Reintentar debate' : 'Generar debate bull/bear'}
+                    {running ? t('research.thesisDebate.running') : debate ? t('research.thesisDebate.retryDebate') : t('research.thesisDebate.generate')}
                 </Button>
                 {debate?.degraded ? (
                     <Badge variant="outline" className="border-amber-800/60 text-amber-300">
-                        degradado · veredicto determinista
+                        {t('research.thesisDebate.degraded')}
                     </Badge>
                 ) : debate ? (
-                    <Badge>juez LLM</Badge>
+                    <Badge>{t('research.thesisDebate.llmJudge')}</Badge>
                 ) : null}
                 {debate ? (
                     <span className="text-xs text-gray-500">
-                        {debate.llm_calls} llamadas LLM · modelo {debate.model ?? 'determinista'}
+                        {t('research.thesisDebate.calls', { count: debate.llm_calls, model: debate.model ?? t('research.thesisDebate.deterministic') })}
                     </span>
                 ) : null}
             </div>
 
             {error ? (
                 <div className="rounded-lg border border-red-900/50 bg-red-950/20 p-4" role="alert">
-                    <p className="text-sm text-red-200">El debate falló: {error}</p>
+                    <p className="text-sm text-red-200">{t('research.thesisDebate.failed', { error })}</p>
                     <Button type="button" size="sm" variant="outline" onClick={run} className="mt-3">
-                        Reintentar
+                        {t('research.thesisDebate.retry')}
                     </Button>
                 </div>
             ) : null}
@@ -75,18 +77,18 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
                 <div className="grid gap-3 md:grid-cols-2">
                     <div className="rounded-lg border border-teal-900/60 bg-teal-950/10 p-4">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-teal-300">
-                            Caso alcista
+                            {t('research.thesisDebate.bullTitle')}
                         </h4>
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">
-                            {debate.bull_case || 'Sin caso alcista registrado.'}
+                            {debate.bull_case || t('research.thesisDebate.bullEmpty')}
                         </p>
                     </div>
                     <div className="rounded-lg border border-red-900/50 bg-red-950/10 p-4">
                         <h4 className="text-xs font-semibold uppercase tracking-wide text-red-300">
-                            Caso bajista
+                            {t('research.thesisDebate.bearTitle')}
                         </h4>
                         <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-300">
-                            {debate.bear_case || 'Sin caso bajista registrado.'}
+                            {debate.bear_case || t('research.thesisDebate.bearEmpty')}
                         </p>
                     </div>
                     <div className="rounded-lg border border-gray-800 bg-black/20 p-4 md:col-span-2">
@@ -94,11 +96,11 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
                             <Badge
                                 variant={debate.verdict === 'bearish' ? 'outline' : 'default'}
                             >
-                                veredicto: {debate.verdict}
+                                {t('research.thesisDebate.verdict', { verdict: debate.verdict })}
                             </Badge>
                             {debate.persisted === false ? (
                                 <span className="text-xs text-amber-300">
-                                    veredicto no persistido (se muestra igual)
+                                    {t('research.thesisDebate.notPersisted')}
                                 </span>
                             ) : null}
                         </div>
@@ -113,8 +115,7 @@ export default function ThesisDebatePanel({ ticker, initialVerdict }: ThesisDeba
                 </p>
             ) : (
                 <p className="text-sm text-gray-500">
-                    Sin debate persistido. Genera el debate para contrastar la tesis con su
-                    contraparte bajista antes de aprobarla.
+                    {t('research.thesisDebate.empty')}
                 </p>
             )}
         </div>

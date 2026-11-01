@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097: node --experimental-strip-types necesita la extensión.
+import { naFor } from '../format.ts';
+
 export type ParticipationFiling = {
   accession_number: string;
   form: string;
@@ -10,9 +13,9 @@ export type ParticipationFiling = {
   status: string;
 };
 export type ParticipationResponse = { ticker: string; count: number; filings: ParticipationFiling[] };
-export const participationNumber = (value: number | null, percent = false): string =>
-  value === null || !Number.isFinite(value) ? 'N/D' :
-    new Intl.NumberFormat('es-ES', { maximumFractionDigits: percent ? 4 : 0, useGrouping: true }).format(value) + (percent ? ' %' : '');
+export const participationNumber = (value: number | null, percent = false, locale: 'es' | 'en' = 'es'): string =>
+  value === null || !Number.isFinite(value) ? naFor(locale) :
+    new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'es-ES', { maximumFractionDigits: percent ? 4 : 0, useGrouping: true }).format(value) + (percent ? (locale === 'en' ? '%' : ' %') : '');
 export function participationSource(url: string | null): string | null {
   if (!url) return null;
   try {

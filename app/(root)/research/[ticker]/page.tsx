@@ -1467,7 +1467,7 @@ export default async function ResearchCompanyPage({ params, searchParams }: Page
     ]);
     return (
       <div className="space-y-6">
-        <ParticipationFilingsPanel data={participation} />
+        <ParticipationFilingsPanel data={participation} locale={locale} />
         {holders === null ? (
           <EmptyState title={t('research.fichaHoldersLoadError')} />
         ) : holders.status === 'sin_identificador' ? (
