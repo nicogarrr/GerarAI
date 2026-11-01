@@ -125,12 +125,60 @@ def auto_detect_columns(headers: list[str]) -> dict[str, str]:
     return mapping
 
 
-def _parse_decimal(raw: Any) -> Decimal | None:
-    """Parsea un número localizado devolviendo Decimal con su signo."""
+_AMBIGUOUS_GROUP = re.compile(r"^[1-9]\d{0,2}([.,])\d{3}$")
+
+
+def _bare_number(raw: Any) -> str:
+    """Cifra sin signo, paréntesis ni espacios, para decidir el separador."""
+    return re.sub(r"[\s\u00a0()+\-\u2212]", "", str(raw or ""))
+
+
+def detect_decimal_mark(cells: list[str]) -> str | None:
+    """Separador decimal del fichero («,» o «.»), o None si no se puede saber.
+
+    Una celda con un solo separador y tres cifras («3,450», «1.234») es
+    ambigua; las demás lo delatan: «34,12», «-2,00» o «1.234,56» escriben la
+    coma como decimal y «34.12» o «1,234.56» el punto. Si el fichero solo da
+    pistas de un lado, ese es su separador; sin pistas o con pistas de los dos
+    lados, None (cada celda se lee como siempre).
+    """
+    comma = point = False
+    for raw in cells:
+        token = _bare_number(raw)
+        if not re.fullmatch(r"\d[\d.,]*", token):
+            continue
+        if "," in token and "." in token:
+            if token.rindex(",") > token.rindex("."):
+                comma = True
+            else:
+                point = True
+            continue
+        for separator in (",", "."):
+            if token.count(separator) == 1 and not _AMBIGUOUS_GROUP.match(token):
+                if separator == ",":
+                    comma = True
+                else:
+                    point = True
+    if comma != point:
+        return "," if comma else "."
+    return None
+
+
+def _parse_decimal(raw: Any, decimal_mark: str | None = None) -> Decimal | None:
+    """Parsea un número localizado devolviendo Decimal con su signo.
+
+    ``decimal_mark``: separador decimal del fichero (``detect_decimal_mark``).
+    Una celda ambigua («3,450») escrita con ese separador es decimal (3,45),
+    no un grupo de miles (3.450): el parser, sin contexto, la lee como miles.
+    """
     res = parse_localized_number(raw)
     if res is None:
         return None
     val, _ = res
+    ambiguous = _AMBIGUOUS_GROUP.match(_bare_number(raw))
+    if decimal_mark is not None and ambiguous and ambiguous.group(1) == decimal_mark:
+        # Lectura de miles (3450) -> lectura decimal (3,450): exactamente /1000.
+        return val / 1000
     return val
 
 
@@ -338,6 +386,13 @@ class TransactionImportService:
         month_first = detect_month_first(
             [row[date_idx] for row in data_rows if 0 <= date_idx < len(row)]
         )
+        number_cells = [
+            row[col_indices[key]]
+            for key in ("quantity", "price", "fees")
+            for row in data_rows
+            if 0 <= col_indices.get(key, -1) < len(row)
+        ]
+        decimal_mark = detect_decimal_mark(number_cells)
 
         for row_idx, row in enumerate(data_rows, start=2):
             row_has_error = False
@@ -425,7 +480,7 @@ class TransactionImportService:
             # Cantidad
             qty_raw = get_val("quantity")
             qty_num = 0.0
-            parsed_qty = _parse_decimal(qty_raw)
+            parsed_qty = _parse_decimal(qty_raw, decimal_mark)
             if parsed_qty is None:
                 errors.append(RowValidationError(row_number=row_idx, field="quantity", message="Cantidad no numérica o ausente", raw_value=qty_raw))
                 row_has_error = True
@@ -438,7 +493,7 @@ class TransactionImportService:
             # Precio
             price_raw = get_val("price")
             price_num = 0.0
-            parsed_price = _parse_decimal(price_raw)
+            parsed_price = _parse_decimal(price_raw, decimal_mark)
             if parsed_price is None:
                 errors.append(RowValidationError(row_number=row_idx, field="price", message="Precio no numérico o ausente", raw_value=price_raw))
                 row_has_error = True
@@ -452,7 +507,7 @@ class TransactionImportService:
             fees_raw = get_val("fees")
             fees_num = 0.0
             if fees_raw:
-                pf = _parse_decimal(fees_raw)
+                pf = _parse_decimal(fees_raw, decimal_mark)
                 if pf is None:
                     # Una comisión ilegible no puede pasar a 0 en silencio: el
                     # coste de adquisición quedaría por debajo del real.
