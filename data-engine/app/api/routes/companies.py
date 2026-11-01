@@ -275,7 +275,7 @@ def sync_company_kpi_registry(
 
 
 class CompanyEnsureRequest(BaseModel):
-    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
+    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*$")
     name: str | None = Field(default=None, max_length=255)
     exchange: str | None = Field(default=None, max_length=50)
     currency: str | None = Field(default=None, min_length=3, max_length=10)
@@ -441,7 +441,7 @@ def ensure_company(payload: CompanyEnsureRequest, db: Session = Depends(get_db))
 
 
 class IdentityVerificationRequest(BaseModel):
-    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
+    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*$")
 
 
 class IdentityVerificationResponse(BaseModel):
@@ -561,7 +561,7 @@ def _identity_verdict(db: Session, ticker: str) -> tuple[IdentityVerificationRes
 
 @router.get("/identity-verification", response_model=IdentityVerificationResponse)
 def get_identity_verification(
-    ticker: Annotated[str, Query(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")],
+    ticker: Annotated[str, Query(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*$")],
     db: Session = Depends(get_db),
 ) -> IdentityVerificationResponse:
     """Veredicto de identidad de un ticker fuera del maestro. SOLO LECTURA.

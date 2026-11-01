@@ -215,7 +215,7 @@ MIN_NUMERIC_20_10 = Decimal("0.0000000001")
 
 
 class PortfolioTransactionInput(BaseModel):
-    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9.\-]+$")
+    ticker: str = Field(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*$")
     action: Literal["buy", "sell", "dividend", "interest", "fee", "cash_misc"]
     # Topes = lo que cabe en Transaction (Numeric(20, 6) / Numeric(20, 4) en fees).
     # Sin ellos, "1e400" pasaba la validación, se guardaba como precio nulo y

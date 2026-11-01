@@ -53,7 +53,8 @@ class ParsedTransaction(BaseModel):
     price: float
     fees: float = 0.0
     currency: str = "EUR"
-    notes: str | None = None
+    # Mismo tope que POST /transactions: la nota va al raw_payload de cada pata.
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class TransactionImportPreviewResponse(BaseModel):
@@ -71,6 +72,16 @@ class TransactionImportPreviewResponse(BaseModel):
 # POST/PUT /transactions (#2606).
 _MAX_NUMERIC_20_6 = Decimal("99999999999999.999999")
 _MAX_NUMERIC_20_2 = Decimal("999999999999999999.99")
+
+
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
+# Letras/cifras separadas por un solo «.», «_» o «-» (BRK.B, BF-B): «.», «-»,
+# «A..B» o «AAPL.» no son tickers (mismo criterio que la watchlist, #4067).
+_TICKER_SHAPE_RE = re.compile(r"^[A-Z0-9]+(?:[._\-][A-Z0-9]+)*$")
+
+
+def _is_ticker_shape(value: str) -> bool:
+    return len(value) <= 20 and _TICKER_SHAPE_RE.fullmatch(value) is not None
 
 
 class TransactionImportCommitRequest(BaseModel):
@@ -93,6 +104,33 @@ class TransactionImportCommitRequest(BaseModel):
                         f"Fila {tx.row_number}: {field} fuera de rango ({value}); "
                         "revisa el archivo y vuelve a generar la vista previa"
                     )
+            # Ni las reglas de fecha de la vista previa: «1800-01-01» entraba
+            # como compra de hace dos siglos.
+            try:
+                trade_day = date.fromisoformat(tx.date)
+            except ValueError:
+                raise ValueError(
+                    f"Fila {tx.row_number}: fecha no válida ({tx.date!r}); "
+                    "revisa el archivo y vuelve a generar la vista previa"
+                ) from None
+            if trade_day.year < _MIN_TRADE_YEAR:
+                raise ValueError(
+                    f"Fila {tx.row_number}: la fecha es anterior a {_MIN_TRADE_YEAR} "
+                    f"({trade_day.isoformat()}): revisa el año"
+                )
+            if trade_day > local_today():
+                raise ValueError(
+                    f"Fila {tx.row_number}: la fecha de operación no puede ser futura ({trade_day.isoformat()})"
+                )
+            # El ticker tampoco se volvía a mirar: uno de 25 caracteres o con
+            # salto de línea llegaba a Company.ticker (String(20)) y en
+            # Postgres el commit entero daba 500.
+            ticker = tx.ticker.upper()
+            if not (_ISIN_RE.fullmatch(ticker) or _is_ticker_shape(ticker)):
+                raise ValueError(
+                    f"Fila {tx.row_number}: ticker no válido ({tx.ticker!r}); "
+                    "revisa el archivo y vuelve a generar la vista previa"
+                )
             # Igual con la divisa: «EURO» o «1e30» dejaban la posición sin
             # tipo de cambio para siempre.
             if not is_currency_code(tx.currency):
@@ -556,7 +594,7 @@ class TransactionImportService:
                             raw_value=ticker_raw,
                         )
                     )
-            elif not re.match(r"^[A-Z0-9_\.-]{1,20}$", ticker_raw):
+            elif not _is_ticker_shape(ticker_raw):
                 errors.append(RowValidationError(row_number=row_idx, field="ticker", message="Formato de ticker no válido", raw_value=ticker_raw))
                 row_has_error = True
 
