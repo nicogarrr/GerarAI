@@ -1703,5 +1703,6 @@
   },
   "assistantMetaTitle": "Asistente de investigación",
   "assistantMetaDescription": "La guía de investigación vive en el Cerebro.",
-  "sourcesMetaTitle": "Fuentes"
+  "sourcesMetaTitle": "Fuentes",
+  "metricPerShare": "{amount}/acción"
 }

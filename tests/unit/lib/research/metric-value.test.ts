@@ -27,4 +27,17 @@ describe('formatResearchMetric', () => {
     it('porcentajes y ratios conocidos se muestran con unidad', () => {
         expect(formatResearchMetric(0.144, 'decimal')).toContain('14');
     });
+    it('en inglés: «$3.10/share», separadores en inglés y N/A', () => {
+        expect(formatResearchMetric(3.1, 'USD/share', 'en')).toBe('$3.10/share');
+        expect(formatResearchMetric(3.1, 'EUR/shares', 'en')).toBe('€3.10/share');
+        expect(formatResearchMetric(1234.5, 'USD', 'en')).toBe('$1,234.50');
+        expect(formatResearchMetric(148_401_000_000, 'USD', 'en')).toBe('$148.40B');
+        expect(formatResearchMetric(0.144, 'decimal', 'en')).toBe('14.4%');
+        expect(formatResearchMetric(19_240_000_000, 'shares', 'en')).toMatch(/shares$/);
+        expect(formatResearchMetric(null, 'USD', 'en')).toBe('N/A');
+        expect(formatResearchMetric('abc', 'USD', 'en')).toBe('N/A');
+    });
+    it('el español no cambia al pasar «es» explícito', () => {
+        expect(formatResearchMetric(3.1, 'USD/share', 'es')).toBe(formatResearchMetric(3.1, 'USD/share'));
+    });
 });

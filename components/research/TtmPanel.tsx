@@ -38,7 +38,7 @@ export function TtmPanel({ ttm, locale = DEFAULT_LOCALE }: { ttm: ResearchTtm | 
                 <Badge className="shrink-0" variant="outline">{ttmProvenanceLabel(metric.provenance, locale)}</Badge>
               </div>
               <div className="mt-2 text-xl text-teal-300">
-                {metric.value === null ? naFor(locale) : formatResearchMetric(metric.value, metric.unit ?? '')}
+                {metric.value === null ? naFor(locale) : formatResearchMetric(metric.value, metric.unit ?? '', locale)}
               </div>
               <div className="mt-2 text-xs text-gray-500">{ttmPeriodText(metric, locale)}</div>
               {quarters ? <div className="mt-1 text-xs leading-5 text-gray-500">{t('research.ttm.sumOf', { quarters })}</div> : null}

@@ -15,7 +15,7 @@ function metricValue(value: number | string | null | undefined, unit: string, lo
   const unknown = createTranslator(locale)('research.facts.unknown');
   if (value === null || value === undefined) return unknown;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? formatResearchMetric(parsed, unit) : unknown;
+  return Number.isFinite(parsed) ? formatResearchMetric(parsed, unit, locale) : unknown;
 }
 
 /** Hechos visibles en móvil antes de paginar */
