@@ -233,6 +233,7 @@ def _distinct_facts_metrics(db: Session) -> list[str]:
                 select(FinancialFact.metric).where(*tenant_filters(db, FinancialFact)).distinct()
             ).all()
         )
+    # nosemgrep: gerarai-tenant-raw-sql -- ambas lecturas filtran tenant_id=:tenant; bind desde db.info, aislamiento probado en test_cold_endpoints_skip_scan.
     sql = sa.text("""
         WITH RECURSIVE m(metric) AS (
           SELECT * FROM (SELECT metric FROM financial_facts WHERE tenant_id = :tenant ORDER BY metric LIMIT 1)

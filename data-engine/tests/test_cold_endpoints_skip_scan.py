@@ -238,3 +238,18 @@ def test_facts_distinct_mismo_conjunto(db):
     cobertura = ScreenerService()._metric_coverage_uncached(db)
     assert "sales" in cobertura and "ebit" in cobertura
     assert "otra_tenant" not in cobertura  # tenant 2 no se cuela
+
+
+def test_distinct_fact_metrics_keeps_tenant_on_seed_and_recursive_steps(db):
+    """An interleaved other tenant must not seed or leak into later probes."""
+    from app.services.screener_service import _distinct_facts_metrics
+
+    now = datetime.now(UTC)
+    db.info.pop("tenant_id")
+    for tenant, names in ((1, ("bbb", "ddd")), (2, ("aaa", "ccc", "eee"))):
+        for name in names:
+            db.add(_fact(1, tenant, "SEC", now, metric=name))
+    db.commit()
+    for tenant, expected in ((1, ["bbb", "ddd"]), (2, ["aaa", "ccc", "eee"]), (3, [])):
+        db.info["tenant_id"] = tenant
+        assert _distinct_facts_metrics(db) == expected
