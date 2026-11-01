@@ -12,6 +12,10 @@
  * por un aviso genérico en español; el español del motor pasa intacto.
  */
 
+// Ruta relativa con extensión .ts: este módulo se importa desde tests con node --test.
+// @ts-expect-error TS5097
+import { knownBackendMessageEn } from './backend-error-en.ts';
+
 const GENERIC = 'No se pudo completar la operación. Inténtalo de nuevo.';
 const ENGINE_DOWN = 'El motor de análisis no responde ahora mismo. Reintenta en unos segundos.';
 const NOT_FOUND_GENERIC = 'No se encontró lo que buscas (puede que se haya borrado). Recarga la página.';
@@ -163,6 +167,8 @@ export function backendMessage(
   if (status) return englishByStatus(Number(status[1]));
   if (/^research engine unavailable\b/i.test(text)) return EN_ENGINE_DOWN;
   if (/^[a-z0-9]+(_[a-z0-9]+)+$/.test(text)) return englishFallback;
+  const known = knownBackendMessageEn(text);
+  if (known) return known;
   if (SPANISH_MARKS.test(text)) return text;
   const sentence = text.charAt(0).toUpperCase() + text.slice(1);
   return /[.!?)]$/.test(sentence) ? sentence : `${sentence}.`;
