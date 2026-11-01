@@ -1,7 +1,8 @@
 'use client';
 
 import { use, useEffect, useRef, useState } from 'react';
-import { NA, formatMarketDate, formatMoney, formatPercent, formatPrice, isValidCurrencyCode } from '@/lib/format';
+import { isValidCurrencyCode, type Formatters } from '@/lib/format';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { extendedQuoteLabel, quoteDate, quoteTime, quoteSessionDate, type ExtendedQuote } from '@/lib/market/extended-quote';
 import { quoteSymbolFor } from '@/lib/market/quote-symbol';
 import { chartFallbackCurrency } from '@/lib/market/chart-fallback-currency';
@@ -14,16 +15,25 @@ import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actio
  * USD seguía el estilo inglés por decisión de Instinct; Nico la revocó el
  * 29-oct-2026 para no mezclar formatos en la misma ficha.
  */
-function headerMoney(value: number | null | undefined, currency: string): string {
-    return formatMoney(value, currency);
+function headerMoney(fmt: Formatters, value: number | null | undefined, currency: string): string {
+    return fmt.formatMoney(value, currency);
 }
 
 /** Variación en divisa: magnitudes < 0,01 con dígitos significativos (F35),
  *  nunca un «0» redondeado junto a un porcentaje distinto de cero (TEF:
  *  «0 · -0,06 %» cuando la variación real era -0,002 €). */
-function headerChangeMoney(value: number, currency: string): string {
-    return formatPrice(value, currency, { signDisplay: 'exceptZero' });
+function headerChangeMoney(fmt: Formatters, value: number, currency: string): string {
+    return fmt.formatPrice(value, currency, { signDisplay: 'exceptZero' });
 }
+
+// Las métricas de la franja se identifican por su nombre en español (las
+// guardas leen esas filas); el texto visible sale de research.headerQuote.*.
+const METRIC_KEYS = {
+    Apertura: 'research.headerQuote.open',
+    'Máximo': 'research.headerQuote.high',
+    'Mínimo': 'research.headerQuote.low',
+    'Cierre anterior': 'research.headerQuote.previousClose',
+} as const;
 
 /** One timestamped Yahoo payload supplies the price and all header metrics. */
 export function CompanyHeaderQuote({
@@ -37,6 +47,10 @@ export function CompanyHeaderQuote({
     /** Lectura de cotizacion lanzada en servidor al conocer el listado (nunca rechaza: null = fallo). */
     initialQuote?: Promise<ExtendedQuote | null>;
 }) {
+    const t = useT();
+    const locale = useLocale();
+    const fmt = useFormat();
+    const { formatMarketDate, formatPercent, na: NA } = fmt;
     // Una cotizacion de servidor valida evita la espera de hidratar + pedirla
     // desde el cliente. Sin ella (null/undefined) todo sigue como antes.
     const serverRead = initialQuote ? use(initialQuote) : null;
@@ -116,7 +130,7 @@ export function CompanyHeaderQuote({
         return () => window.clearTimeout(timer);
     }, [settled, requestTicker]);
     const quoteCurrency = quote?.currency ?? null;
-    const label = extendedQuoteLabel(quote);
+    const label = extendedQuoteLabel(quote, locale);
     const showPrice = label !== NA && quote?.price != null && isValidCurrencyCode(quoteCurrency);
     const signBase = quote?.change ?? quote?.change_percent ?? 0;
     // Fallback honesto: último cierre de las velas del gráfico (mismo dato que
@@ -142,11 +156,11 @@ export function CompanyHeaderQuote({
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
             <div>
-                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? 'Último cierre del gráfico' : 'Última vela del gráfico (puede ser parcial)'} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
+                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? t('research.headerQuote.chartClose') : t('research.headerQuote.chartLastCandle')} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
                 <div className={compact ? 'text-3xl font-semibold tracking-tight text-gray-100' : 'text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl'} aria-busy={loading || undefined}>
-                    {showPrice ? headerMoney(quote!.price, currency) : useFallback ? headerMoney(fallbackPrice, fallbackCurrency!) : loading ? (
+                    {showPrice ? headerMoney(fmt, quote!.price, currency) : useFallback ? headerMoney(fmt, fallbackPrice, fallbackCurrency!) : loading ? (
                         <>
-                            <span className="sr-only">Cargando precio…</span>
+                            <span className="sr-only">{t('research.headerQuote.loadingPrice')}</span>
                             <span aria-hidden="true" className="inline-block h-10 w-44 animate-pulse rounded bg-gray-800 align-middle sm:h-12" />
                         </>
                     ) : NA}
@@ -154,7 +168,7 @@ export function CompanyHeaderQuote({
                 {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) && signBase !== 0 ? (
                     <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                         {[
-                            quote.change != null ? headerChangeMoney(quote.change, currency) : null,
+                            quote.change != null ? headerChangeMoney(fmt, quote.change, currency) : null,
                             quote.change_percent != null ? formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }) : null,
                         ].filter(Boolean).join(' · ')}
                     </div>
@@ -163,13 +177,13 @@ export function CompanyHeaderQuote({
                     <div data-testid="close-change">
                         <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${quote.close_change_percent > 0 ? 'bg-emerald-500/10 text-emerald-300' : quote.close_change_percent < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                             {[
-                                quote.close_change != null ? headerChangeMoney(quote.close_change, currency) : null,
+                                quote.close_change != null ? headerChangeMoney(fmt, quote.close_change, currency) : null,
                                 formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
                             ].filter(Boolean).join(' · ')}
                         </div>
                     </div>
                 ) : null}
-                {useFallback ? <p className="mt-1 text-xs text-gray-500">Cotización en vivo no disponible ahora</p> : null}
+                {useFallback ? <p className="mt-1 text-xs text-gray-500">{t('research.headerQuote.liveUnavailable')}</p> : null}
             </div>
             {compact ? null : <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
@@ -185,10 +199,10 @@ export function CompanyHeaderQuote({
                         ['Cierre anterior', quote?.previous_close_timestamp || quote?.previous_close_date ? quote.previous_close : null],
                     ]).map(([metricLabel, value]) => (
                         <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
-                            <dt className="text-xs text-gray-500">{metricLabel}</dt>
-                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{loading ? <span aria-hidden="true" className="inline-block h-4 w-16 animate-pulse rounded bg-gray-800 align-middle" /> : value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(value as number, currency)}</dd>
+                            <dt className="text-xs text-gray-500">{t(METRIC_KEYS[String(metricLabel) as keyof typeof METRIC_KEYS])}</dt>
+                            <dd className="mt-1 break-words text-sm font-medium text-gray-200">{loading ? <span aria-hidden="true" className="inline-block h-4 w-16 animate-pulse rounded bg-gray-800 align-middle" /> : value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(fmt, value as number, currency)}</dd>
                             {useFallback && metricLabel === 'Cierre anterior' && prev ? <dd className="break-words text-[11px] text-gray-500">{formatMarketDate(prev.date)}</dd> : null}
-                            {!useFallback && metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <dd className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp)} · ${quoteTime(quote.previous_close_timestamp)}` : quoteSessionDate(quote.previous_close_date)}</dd> : null}
+                            {!useFallback && metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <dd className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp, locale)} · ${quoteTime(quote.previous_close_timestamp, locale)}` : quoteSessionDate(quote.previous_close_date, locale)}</dd> : null}
                         </div>
                     ))}
                 </dl>

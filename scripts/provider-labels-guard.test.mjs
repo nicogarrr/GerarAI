@@ -17,7 +17,8 @@ const keyStats = readFileSync('data-engine/app/services/key_stats_service.py', '
 test('cabecera de ficha: aviso de cierre SIN etiqueta de fuente', () => {
     assert.doesNotMatch(header, /\$\{snapshot\.historySource\}/, 'la cabecera no pinta el nombre del proveedor');
     assert.doesNotMatch(header, /Cotización en vivo no disponible ahora ·/, 'sin etiqueta tras el aviso');
-    assert.match(header, /Cotización en vivo no disponible ahora/);
+    assert.equal(esResearch.headerQuote.liveUnavailable, 'Cotización en vivo no disponible ahora');
+    assert.match(header, /research\.headerQuote\.liveUnavailable/);
 });
 
 test('vistazo: sin etiqueta de fuente; las notas de calidad no nombran proveedor', () => {

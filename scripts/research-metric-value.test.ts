@@ -19,8 +19,8 @@ test('quote header formats every currency in es-ES, never the listing currency s
  const src=readFileSync('components/research/CompanyHeaderQuote.tsx','utf8');
  // Nico (29-oct-2026): el USD ya no va en inglés.
  assert.ok(!src.includes("'en-US'"));
- assert.ok(src.includes('return formatMoney(value, currency'));
- assert.ok(src.includes('headerMoney(quote!.price, currency)'));
+ assert.ok(src.includes('return fmt.formatMoney(value, currency'));
+ assert.ok(src.includes('headerMoney(fmt, quote!.price, currency)'));
 });
 
 test('formulas cannot invent USD and per-share figures retain cents', () => {
