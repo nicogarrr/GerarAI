@@ -280,8 +280,12 @@ class DrillEnvironment:
             [
                 "docker",
                 "exec",
+                "--env",
+                f"PGPASSWORD={PG_PASSWORD}",
                 self.containers["postgres"],
                 "psql",
+                "--host",
+                "127.0.0.1",
                 "--username",
                 PG_USER,
                 "--dbname",
