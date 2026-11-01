@@ -12,6 +12,7 @@ suficiente no se escribe metrica.
 from __future__ import annotations
 
 import math
+import time
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
@@ -561,6 +562,10 @@ def latest_run_top_companies(db: Session, *, top_n: int = 40) -> list[Company]:
     return list(rows)
 
 
+# Simbolos por tanda (descarga + upsert + commit).
+PROPICKS_PRICE_CHUNK = 50
+
+
 def refresh_propicks_prices(
     db: Session,
     *,
@@ -569,6 +574,8 @@ def refresh_propicks_prices(
     period: str = "2y",  # 12m de momentum exige > 365 dias de historia
     fetcher: Callable[..., dict[str, list[PriceBar]]] = fetch_history_yfinance,
     as_of: date | None = None,
+    budget_seconds: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
     """Job F2: precios diarios + momentum del embudo.
 
@@ -584,20 +591,31 @@ def refresh_propicks_prices(
     companies = latest_run_passed_companies(db, limit=max_companies)
     if not companies:
         return {"status": "skipped", "reason": "no completed propick run", "companies": 0}
-    symbols = {s: c for c in companies if (s := yahoo_symbol(c)) is not None}
-    history = fetcher(list(symbols), period=period)
+    symbols = list({s: c for c in companies if (s := yahoo_symbol(c)) is not None}.items())
     bars_written = 0
     covered: list[Company] = []
-    for symbol, company in symbols.items():
-        bars = history.get(symbol) or []
-        if not bars:
-            continue
-        bars_written += upsert_prices(db, company, bars)
-        covered.append(company)
+    started = clock()
+    truncated = False
+    # Por tandas confirmadas: una sola descarga de todo el universo no cabia
+    # en el TimeLimit y al matarla se perdia entera (prod, 1-nov-2026).
+    for start in range(0, len(symbols), PROPICKS_PRICE_CHUNK):
+        if start and budget_seconds is not None and clock() - started > budget_seconds:
+            truncated = True
+            break
+        chunk = symbols[start : start + PROPICKS_PRICE_CHUNK]
+        history = fetcher([symbol for symbol, _ in chunk], period=period)
+        for symbol, company in chunk:
+            bars = history.get(symbol) or []
+            if not bars:
+                continue
+            bars_written += upsert_prices(db, company, bars)
+            covered.append(company)
+        db.commit()
     momentum = compute_momentum_metrics(db, covered, as_of=as_of)
     db.commit()
     return {
-        "status": "ok",
+        "status": "partial" if truncated else "ok",
+        "truncated": truncated,
         "companies": len(companies),
         "covered": len(covered),
         "bars_written": bars_written,
