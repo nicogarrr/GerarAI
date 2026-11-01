@@ -1218,7 +1218,12 @@ class TaxReportService:
             # El saldo de RCM son dividendos MÁS intereses cobrados (art. 25.2
             # y 46.b LIRPF), igual que en la compensación de pérdidas.
             "net_taxable_base": None if (incomplete_fx or dividend_ambiguous or realized_unreliable or interest_received is None) else _money(integrate_savings_base(total_dividends + interest_received, total_gain)),
-            "dividend_count": len(dividends),
+            # Cobros, no empresas: dos dividendos de la misma empresa son 2
+            # («Dividendos (nº)» en Impuestos). Retenciones y pagos especiales
+            # (in lieu, devolución de capital) no son dividendos cobrados.
+            "dividend_count": sum(
+                1 for b in dividends for payment in b["payments"] if payment["type"] == "dividend"
+            ),
             "unattributed_tickers": sorted(
                 b["ticker"] for b in dividends if b.get("unattributed")
             ),
