@@ -165,3 +165,25 @@ def test_declarant_input_rechaza_longitud_absurda_y_controles():
 ])
 def test_foreign_declarant_nif_separators_normalized(db, raw, clean):
     assert svc.write(db, {"nif": raw})["nif"] == clean
+
+
+@pytest.mark.parametrize("payload", [
+    # Dígitos de ancho completo y arábigo-índicos: \d los aceptaba, pero el campo
+    # numérico del fichero del 720 solo admite 0-9 ASCII.
+    {"telefono": "６００１２３４５６"},
+    {"telefono": "٦٠٠١٢٣٤٥٦"},
+    {"numero_declaracion": "720１２３４５６７８９０"},
+    # Un nombre con caracteres de control rompe el registro de ancho fijo.
+    {"apellidos_nombre": "GARCIA\x00, ANA"},
+    {"apellidos_nombre": "GARCIA\tLOPEZ, ANA"},
+])
+def test_declarante_solo_digitos_ascii_y_sin_controles(db, payload):
+    with pytest.raises(ValueError):
+        svc.write(db, payload)
+    assert (db.get(Tenant, db.info["tenant_id"]).metadata_ or {}).get("tax_declarant") is None
+
+
+def test_declarante_ascii_valido_sigue_entrando(db):
+    out = svc.write(db, {"telefono": "600123456", "numero_declaracion": "7201234567890", "apellidos_nombre": "GARCÍA LÓPEZ, ANA"})
+    assert out["telefono"] == "600123456" and out["numero_declaracion"] == "7201234567890"
+    assert out["apellidos_nombre"] == "GARCÍA LÓPEZ, ANA"

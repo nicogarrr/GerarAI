@@ -20,8 +20,11 @@ from app.models import CashBalance, Company, Position, Tenant
 KEY = "tax_declarant"
 IDENTITY_FIELDS = ("nif", "apellidos_nombre", "numero_declaracion", "telefono")
 _NIF = re.compile(r"^[A-Z0-9]{5,20}$")
-_NUMERO = re.compile(r"^720\d{10}$")
-_TELEFONO = re.compile(r"^\d{9,15}$")
+# [0-9] y no \d: \d acepta dígitos Unicode («６００…», «٦٠٠…») que el campo
+# numérico del fichero del 720 no admite.
+_NUMERO = re.compile(r"^720[0-9]{10}$")
+_TELEFONO = re.compile(r"^[0-9]{9,15}$")
+_APELLIDOS_NOMBRE = re.compile(r"^[^\x00-\x1f\x7f]{2,100}$")
 _COUNTRY = re.compile(r"^[A-Z]{2}$")
 _ISIN = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}\d$")
 ENTITY_REQUIRED = ("name", "nif", "street", "city", "zip", "country")
@@ -112,7 +115,7 @@ def write(db: Session, payload: dict) -> dict:
 
     rules = {
         "nif": (_NIF, "NIF no válido", True),
-        "apellidos_nombre": (re.compile(r"^.{2,100}$"), "Apellidos y nombre no válidos", False),
+        "apellidos_nombre": (_APELLIDOS_NOMBRE, "Apellidos y nombre no válidos", False),
         "numero_declaracion": (_NUMERO, "El número de declaración son 13 dígitos y empieza por 720", False),
         "telefono": (_TELEFONO, "Teléfono no válido", False),
     }
