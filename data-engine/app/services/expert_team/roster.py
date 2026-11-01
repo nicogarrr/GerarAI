@@ -45,14 +45,16 @@ def default_experts() -> list[ExpertSpec]:
             prompt_name="expert_valuation",
             tools=("valuation_engine",),
             keywords=("valoracion", "valorar", "dcf", "multiplo", "precio objetivo", "valor razonable",
-                      "margen de seguridad", "cara", "barata", "valuation", "fair value", "cheap", "expensive"),
+                      "margen de seguridad", "cara", "barata", "valuation", "fair value", "cheap", "expensive",
+                      "sobrevalor", "infravalor", "overvalu", "undervalu"),
         ),
         ExpertSpec(
             name="risk",
             broad=True,
             prompt_name="expert_risk",
             tools=("risk_events", "portfolio_concentration"),
-            keywords=("riesgo", "peligro", "concentracion", "deuda", "risk", "downside", "concentration"),
+            keywords=("riesgo", "peligro", "concentracion", "deuda", "risk", "downside", "concentration",
+                      "arriesgad", "volatil"),
         ),
         ExpertSpec(
             name="news",

@@ -36,6 +36,15 @@ _BROAD_RE = re.compile(
     r"|\bgood\s+(?:investment|buy|company|stock)\b"
     r"|\bwhat\s+do\s+you\s+think\s+(?:of|about)\b|\bthoughts\s+on\b"
     r"|\banaly[sz]e\b|\banalysis\s+of\b|\binvest\s+in\b"
+    # Más formas (#lead expertos-4): futuro, pros/contras, condicional, recomendación, perspectivas.
+    r"|\btiene\s+futuro\b|\bpros\s+y\s+contras\b|\bpuntos\s+fuertes\b|\bventajas\s+y\s+(?:desventajas|riesgos)\b"
+    r"|\b(?:comprarias|entrarias|invertirias|venderias|mantendrias)\b"
+    r"|\bbuen\s+momento\s+para\s+(?:comprar|entrar|invertir|vender|salir)\b"
+    r"|\b(?:me\s+|la\s+|lo\s+)?recomiendas\b|\bopinion\s+(?:de|sobre)\b|\bperspectivas\b|\bbuen\s+negocio\b"
+    r"|\bis\b[^?.!]{0,30}\ba\s+(?:buy|good\s+buy)\b|\bbuy\s+or\s+sell\b"
+    r"|\bwould\s+you\s+(?:buy|invest|hold|sell|recommend)\b|\bdo\s+you\s+recommend\b"
+    r"|\bpros\s+and\s+cons\b|\b(?:bull|bear)(?:\s+and\s+bear)?\s+case\b|\boutlook\b|\bprospects\b"
+    r"|\bdeep\s+dive\b"
 )
 
 
