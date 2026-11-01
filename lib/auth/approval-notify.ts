@@ -7,6 +7,7 @@ import {
     createAdminListToken,
     createDecisionToken,
 } from '@/lib/auth/account-approval';
+import { singleLineName } from '@/lib/auth/profile-input';
 
 /**
  * Base pública para los enlaces del correo. Replica la preferencia de
@@ -59,7 +60,8 @@ export async function notifyPendingAccount(args: {
     const smtp = smtpConfig(process.env);
     if (!to || !smtp) return false;
     const links = buildApprovalLinks({ approvalId: args.approvalId, secret: args.secret });
-    const displayName = args.name?.trim() || '(sin nombre)';
+    // Una sola línea: un nombre con saltos colaba un «Aprobar:» falso en este correo.
+    const displayName = singleLineName(args.name) || '(sin nombre)';
     try {
         const transport = nodemailer.createTransport({
             host: smtp.host,
@@ -107,7 +109,8 @@ export async function notifyAccountApproved(args: {
     const smtp = smtpConfig(process.env);
     if (!smtp) return false;
     const base = publicBaseUrl(process.env);
-    const greeting = args.name?.trim() ? `Hola, ${args.name.trim()}:` : 'Hola:';
+    const name = singleLineName(args.name);
+    const greeting = name ? `Hola, ${name}:` : 'Hola:';
     try {
         const transport = nodemailer.createTransport({
             host: smtp.host,

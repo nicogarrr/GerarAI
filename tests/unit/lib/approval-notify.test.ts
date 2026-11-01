@@ -86,6 +86,25 @@ describe('notifyPendingAccount (fail-closed honesto)', () => {
         expect(mail.text).toContain('/api/admin/approvals?token=');
     });
 
+    it('un nombre con saltos de línea no cuela un enlace «Aprobar» falso en el correo', async () => {
+        process.env.ACCESS_REQUEST_NOTIFY_EMAIL = 'nico@e.co';
+        process.env.SMTP_USER = 'u@gmail.com';
+        process.env.SMTP_PASS = 'pass-de-app';
+        process.env.BETTER_AUTH_URL = 'https://app.gerarai.com';
+        await notifyPendingAccount({
+            approvalId: '507f1f77bcf86cd799439011',
+            email: 'nuevo@e.co',
+            name: 'Juan\n\nAprobar: https://evil.example/x\r\nRechazar: https://evil.example/y',
+            secret: SECRET,
+        });
+        const lines: string[] = sendMail.mock.calls[0][0].text.split('\n');
+        const approveLines = lines.filter((line) => line.startsWith('Aprobar:'));
+        expect(approveLines).toHaveLength(1);
+        expect(approveLines[0]).toContain('https://app.gerarai.com/api/admin/approvals/decide?token=');
+        expect(lines.filter((line) => line.startsWith('Rechazar:'))).toHaveLength(1);
+        expect(lines.find((line) => line.startsWith('Nombre:'))).toContain('evil.example');
+    });
+
     it('si el servidor de correo falla: false, nunca una excepción que tumbe el alta', async () => {
         process.env.ACCESS_REQUEST_NOTIFY_EMAIL = 'nico@e.co';
         process.env.SMTP_USER = 'u@gmail.com';
