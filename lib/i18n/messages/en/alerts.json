@@ -148,6 +148,7 @@
     "changeAria": "Target change in percent",
     "priceAria": "Target price in {currency}",
     "create": "+ Alert",
-    "viewAlerts": "View alerts"
+    "viewAlerts": "View alerts",
+    "loadingAria": "Loading the alert form"
   }
 }

@@ -122,7 +122,8 @@
     "confidence": "Confianza {value}",
     "truncated": "Mostrando 30 de {total} relaciones: filtra para acotar el ámbito.",
     "edgesCaption": "Relaciones del grafo de conocimiento: nodo de origen, tipo de relación, nodo de destino, confianza y procedencia",
-    "colProvenance": "Procedencia"
+    "colProvenance": "Procedencia",
+    "edgesTableCaption": "Relaciones del grafo de conocimiento: nodo de origen, tipo de relación, nodo de destino y confianza"
   },
   "nodeType": {
     "company": "Empresa",

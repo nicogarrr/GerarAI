@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097
+import { createTranslator } from '../i18n/translate.ts';
+
 /**
  * PER (TTM) de la ficha: solo con dato verificable. Finnhub se pide únicamente
  * para el listado US del propio emisor (en uno no-US sería del ADR o de un
@@ -14,15 +17,16 @@ export function perState(input: {
     providerAvailable: boolean;
     /** Linea US derivada de bolsa/divisa (isUsQuoteLine). Si se informa manda sobre la igualdad simbolo==ticker. */
     usLine?: boolean;
-}): PerState {
+}, locale: 'es' | 'en' = 'es'): PerState {
     const { quoteSymbol, ticker, peTTM, providerAvailable, usLine } = input;
-    if (!quoteSymbol) return { value: null, note: 'Sin listado de cotización verificado' };
+    const t = createTranslator(locale);
+    if (!quoteSymbol) return { value: null, note: t('research.per.noListing') };
     if (usLine === false || quoteSymbol !== ticker.trim().toUpperCase()) {
-        return { value: null, note: 'Cotiza fuera de EE. UU.: sin PER verificable' };
+        return { value: null, note: t('research.per.nonUs') };
     }
-    if (!providerAvailable) return { value: null, note: 'Proveedor de métricas no disponible' };
+    if (!providerAvailable) return { value: null, note: t('research.per.providerDown') };
     if (typeof peTTM === 'number' && Number.isFinite(peTTM) && peTTM > 0) {
-        return { value: peTTM, note: 'Finnhub · últimos 12 meses' };
+        return { value: peTTM, note: t('research.per.ttm') };
     }
-    return { value: null, note: 'El proveedor no informa PER (p. ej. beneficio negativo)' };
+    return { value: null, note: t('research.per.notReported') };
 }

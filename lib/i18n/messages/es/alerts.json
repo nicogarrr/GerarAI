@@ -148,6 +148,7 @@
     "changeAria": "Variación objetivo en porcentaje",
     "priceAria": "Precio objetivo en {currency}",
     "create": "+ Alerta",
-    "viewAlerts": "Ver alertas"
+    "viewAlerts": "Ver alertas",
+    "loadingAria": "Cargando el formulario de alerta"
   }
 }

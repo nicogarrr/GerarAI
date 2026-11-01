@@ -841,7 +841,8 @@
     "moveMaybe": "Possibly related:",
     "moveNoNews": "No saved news that day (or the day before or after).",
     "moveTitle": "Why did it move? {parts}",
-    "moveSource": "GerarAI calculation from daily prices"
+    "moveSource": "GerarAI calculation from daily prices",
+    "loadingAria": "Loading price chart"
   },
   "memo": {
     "ratingBuy": "buy",
@@ -1713,5 +1714,21 @@
     "affectsClaims": "Affects {count} claims and these areas of the thesis: {areas}",
     "affectsNoClaim": "Doesn't affect any specific claim; touches these areas of the thesis: {areas}",
     "affectsOneClaim": "Affects 1 claim and these areas of the thesis: {areas}"
+  },
+  "debateErrors": {
+    "freeExhausted": "The free AI quota is used up; try again later",
+    "freeUnavailable": "The free AI model isn't available; try again later",
+    "budgetExhausted": "The AI budget is used up; try again later",
+    "timeout": "The debate took too long; try again later",
+    "invalidAnswer": "The debate returned an invalid answer; try again later",
+    "generic": "The debate couldn't be generated; try again.",
+    "discarded": "The debate returned an invalid answer; it was discarded."
+  },
+  "per": {
+    "noListing": "No verified quote listing",
+    "nonUs": "Listed outside the US: no verifiable P/E",
+    "providerDown": "Metrics provider unavailable",
+    "ttm": "Finnhub · trailing 12 months",
+    "notReported": "The provider doesn't report a P/E (e.g. negative earnings)"
   }
 }

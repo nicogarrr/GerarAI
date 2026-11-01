@@ -4,6 +4,8 @@ import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { researchRequest } from '@/lib/research/client';
 import { sanitizeDebate, type SanitizedDebate } from '@/lib/research/debate-sanitize';
 import { debateErrorMessage } from '@/lib/research/debate-error';
+import { requestLocale } from '@/lib/research/backend-error-locale';
+import { createTranslator } from '@/lib/i18n/translate';
 import { assertPositiveInt } from '@/lib/validation/pathParams';
 import type { components } from '@/lib/research/openapi.generated';
 
@@ -82,10 +84,10 @@ export async function runThesisDebate(ticker: string): Promise<ThesisDebateOutco
             timeoutMs: DEBATE_TIMEOUT_MS,
         });
         const debate = sanitizeDebate(raw);
-        if (!debate) return { ok: false, error: 'El debate devolvió una respuesta no válida; se descarta.' };
+        if (!debate) return { ok: false, error: createTranslator(await requestLocale())('research.debateErrors.discarded') };
         return { ok: true, debate };
     } catch (exc) {
-        return { ok: false, error: debateErrorMessage(exc) };
+        return { ok: false, error: debateErrorMessage(exc, await requestLocale()) };
     }
 }
 
