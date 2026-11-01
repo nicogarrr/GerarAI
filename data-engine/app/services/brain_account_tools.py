@@ -194,6 +194,184 @@ def _daily_change_answer(db: Session, tenant: int) -> ChatResponse:
     return _response(text, sources, "portfolio_daily_change")
 
 
+# ------------------------------------------------------ ganado / vendido en el año
+
+_YEAR_EXPR = r"(?:este\s+ano|en\s+lo\s+que\s+va\s+de\s+ano|este\s+ejercicio|(?:en|de|del?\s+ano)\s+(?:19|20)\d\d|this\s+year|so\s+far\s+this\s+year|year\s+to\s+date|ytd|in\s+(?:19|20)\d\d)"
+_YEAR_GAINS = re.compile(
+    r"\b(?:cuanto\s+(?:he|hemos|llevo|llevamos)\s+(?:ganado|perdido)|cuanto\s+(?:gane|perdi)"
+    r"|how\s+much\s+(?:have\s+i|did\s+i)\s+(?:made|make|earned|earn|gained|gain|lost|lose))\b"
+)
+_SALES = re.compile(
+    r"\b(?:que\s+(?:he\s+|hemos\s+)?(?:vendido|vendi|vendimos)|mis\s+ventas|ventas\s+(?:de|del)\s+(?:este|mi)"
+    r"|plusvalias?\s+(?:he\s+)?realizadas?|(?:he|hemos)\s+realizado|ganancias?\s+realizadas?"
+    r"|what\s+(?:did\s+i\s+sell|have\s+i\s+sold)|my\s+sales|realized\s+gains?)\b"
+)
+_TICKER_TOKEN = re.compile(r"\b[A-Z][A-Z0-9.]{0,5}\b")
+_NOT_TICKERS = {"IRPF", "EUR", "USD", "DCA", "ETF", "YTD", "I", "A", "Y", "O"}
+
+
+def _asked_year(text: str) -> int | None:
+    """Año pedido: «en 2025» o «este año» (Madrid). None si la frase no habla de un año."""
+    if not re.search(_YEAR_EXPR, text):
+        return None
+    explicit = re.search(r"\b((?:19|20)\d\d)\b", text)
+    return int(explicit.group(1)) if explicit else local_today().year
+
+
+def _tickers_in(question: str) -> set[str]:
+    return {t for t in _TICKER_TOKEN.findall(question or "") if t not in _NOT_TICKERS}
+
+
+def _tax_data(db: Session, year: int) -> dict | None:
+    from app.services.tax_report_service import TaxReportService
+
+    try:
+        # En memoria: el mismo FIFO del informe fiscal con tus operaciones de
+        # ahora (un informe guardado hace días no llevaría la última venta).
+        return TaxReportService().compute_report(db, year, include_filing=False)
+    except Exception:  # noqa: BLE001 - el informe nunca rompe el chat
+        db.rollback()
+        return None
+
+
+def _fdate(value: str, english: bool) -> str:
+    from datetime import date
+
+    day = date.fromisoformat(value)
+    return _date_en(day) if english else fecha_es(day)
+
+
+def _qty(value: float, english: bool) -> str:
+    if float(value).is_integer():
+        return _num_en(value, 0) if english else num_es(value, 0)
+    return f"{value:,.4f}".rstrip("0").rstrip(".") if english else num_es(value, 4).rstrip("0").rstrip(",")
+
+
+def _unrealized(db: Session, tenant: int) -> tuple[float, float, str, object] | None:
+    """(ganancia latente, coste, divisa, fecha) de las posiciones abiertas, en su divisa base."""
+    from app.models import Position
+
+    rows = list(db.scalars(select(Position).where(Position.tenant_id == tenant, Position.quantity > 0)))
+    known = [p for p in rows if p.market_value_base is not None and p.cost_basis_base is not None]
+    currencies = {p.base_currency or "EUR" for p in known}
+    if not known or len(currencies) != 1:
+        return None
+    cost = sum(float(p.cost_basis_base) for p in known)
+    value = sum(float(p.market_value_base) for p in known)
+    if cost <= 0:
+        return None
+    return value - cost, cost, currencies.pop(), max(p.as_of for p in known)
+
+
+def _year_gains_answer(db: Session, tenant: int, year: int) -> ChatResponse:
+    english = _english()
+    today = local_today()
+    data = _tax_data(db, year)
+    sources = [_source("tax_report", year, f"Informe fiscal {year}", "/taxes")]
+    if year > today.year:
+        text = (f"{year} hasn't started yet: there are no gains to report." if english
+                else f"{year} aún no ha empezado: no hay ganancias que contar.")
+        return _response(text, [], "account_year_gains")
+    if english:
+        head = f"In {year} (to {_date_en(today)}):" if year == today.year else f"In {year}:"
+    else:
+        head = f"En {year} (hasta el {fecha_es(today)}):" if year == today.year else f"En {year}:"
+    lines = [head]
+    if data is None:
+        lines.append("- I couldn't calculate your sales and dividends right now (tax report)." if english
+                     else "- No he podido calcular ahora tus ventas y dividendos (informe fiscal).")
+    else:
+        summary = data.get("summary") or {}
+        realized = [b for b in data.get("realized") or [] if b.get("sale_count")]
+        gain = summary.get("total_realized_gain_base")
+        names = ", ".join(b["ticker"] for b in realized[:8]) + ("…" if len(realized) > 8 else "")
+        count = sum(b["sale_count"] for b in realized)
+        if not realized:
+            lines.append("- Realized from sales: nothing, no sales recorded." if english
+                         else "- Realizado con ventas: nada, no hay ventas guardadas.")
+        elif gain is None:
+            lines.append(f"- Realized from sales ({names}): no reliable figure (see Taxes for the warning)." if english
+                         else f"- Realizado con ventas ({names}): sin dato fiable (el aviso está en Impuestos).")
+        else:
+            noun = ("sale" if count == 1 else "sales") if english else ("venta" if count == 1 else "ventas")
+            lines.append(f"- Realized from sales: {_money(gain, 'EUR', signed=True, english=english)} ({count} {noun}: {names})."
+                         if english else
+                         f"- Realizado con ventas: {_money(gain, 'EUR', signed=True)} ({count} {noun}: {names}).")
+        gross = summary.get("total_dividends_base")
+        withheld = summary.get("total_withholding_base")
+        if gross is None:
+            lines.append("- Dividends received: no reliable figure." if english
+                         else "- Dividendos cobrados: sin dato fiable.")
+        elif gross:
+            lines.append(
+                f"- Dividends received: {_money(gross, 'EUR', english=True)} gross, "
+                f"{_money(withheld or 0, 'EUR', english=True)} withheld at source." if english else
+                f"- Dividendos cobrados: {_money(gross, 'EUR')} brutos, "
+                f"{_money(withheld or 0, 'EUR')} de retención en origen.")
+    if year == today.year:
+        latent = _unrealized(db, tenant)
+        if latent is not None:
+            amount, cost, currency, as_of = latent
+            day = _date_en(as_of) if english else fecha_es(as_of)
+            lines.append(
+                f"- Unrealized (still open, not sold): {_money(amount, currency, signed=True, english=True)} "
+                f"({_pct(amount / cost, signed=True, english=True)}) on a cost of {_money(cost, currency, english=True)}, "
+                f"data as of {day}; this is the total since purchase, not just this year." if english else
+                f"- Latente (lo que sigue abierto, no vendido): {_money(amount, currency, signed=True)} "
+                f"({_pct(amount / cost, signed=True)}) sobre un coste de {_money(cost, currency)}, "
+                f"con datos a {day}; es desde la compra, no solo de este año.")
+            sources.append(_source("position", None, "Posiciones abiertas", "/portfolio"))
+            lines.append("They are not added up: the unrealized part isn't a gain until you sell." if english
+                         else "No se suman: lo latente no es ganancia hasta que vendes.")
+    lines.append("Realized and dividends in euros, as in the tax report (draft, not tax advice)." if english
+                 else "Realizado y dividendos en euros, como en el informe fiscal (borrador, no asesoría fiscal).")
+    return _response("\n".join(lines), sources, "account_year_gains")
+
+
+def _sales_answer(db: Session, year: int, only: set[str]) -> ChatResponse:
+    english = _english()
+    data = _tax_data(db, year)
+    sources = [_source("tax_report", year, f"Informe fiscal {year}", "/taxes")]
+    if data is None:
+        text = ("I couldn't read your sales right now; they're in Taxes." if english
+                else "No he podido leer tus ventas ahora; están en Impuestos.")
+        return _response(text, sources, "account_sales")
+    realized = [b for b in data.get("realized") or [] if b.get("sale_count")]
+    if only:
+        realized = [b for b in realized if b["ticker"] in only] or realized
+    if not realized:
+        text = (f"In {year} there are no sales in your saved trades." if english
+                else f"En {year} no hay ventas en tus operaciones guardadas.")
+        return _response(text, sources, "account_sales")
+    lines = [f"In {year} you sold:" if english else f"En {year} vendiste:"]
+    shown = 0
+    for bucket in realized:
+        for sale in bucket.get("sales") or []:
+            if shown >= 20:
+                break
+            shown += 1
+            qty = _qty(float(sale["quantity"]), english)
+            proceeds = sale.get("proceeds_base")
+            gain = sale.get("gain_base")
+            if english:
+                line = f"- {bucket['ticker']}: {qty} shares on {_fdate(sale['date'], True)}"
+                line += f", for {_money(proceeds, 'EUR', english=True)}" if proceeds is not None else ""
+                line += f"; gain {_money(gain, 'EUR', signed=True, english=True)}" if gain is not None else "; gain: no reliable figure"
+            else:
+                line = f"- {bucket['ticker']}: {qty} acciones el {_fdate(sale['date'], False)}"
+                line += f", por {_money(proceeds, 'EUR')}" if proceeds is not None else ""
+                line += f"; ganancia {_money(gain, 'EUR', signed=True)}" if gain is not None else "; ganancia: sin dato fiable"
+            lines.append(line + ".")
+    total = sum(float(b["gain_base"]) for b in realized if b.get("gain_base") is not None)
+    reliable = all(b.get("gain_base") is not None for b in realized)
+    if reliable:
+        lines.append(f"Total realized: {_money(total, 'EUR', signed=True, english=True)}." if english
+                     else f"Total realizado: {_money(total, 'EUR', signed=True)}.")
+    lines.append("FIFO in euros, as in Taxes (draft, not tax advice)." if english
+                 else "FIFO en euros, como en Impuestos (borrador, no asesoría fiscal).")
+    return _response("\n".join(lines), sources, "account_sales")
+
+
 # ------------------------------------------------------------------ router
 
 
@@ -205,6 +383,13 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     text = _fold(question)
     if _asks_daily_change(text):
         return _daily_change_answer(db, tenant)
+    year = _asked_year(text)
+    if year is not None and _SALES.search(text):
+        return _sales_answer(db, year, _tickers_in(question))
+    # Solo el año en curso: un ejercicio pasado ya lo responde el bloque fiscal (#3952).
+    if (year == local_today().year and _YEAR_GAINS.search(text) and not _tickers_in(question)
+            and not re.search(r"\bsi\b", text)):
+        return _year_gains_answer(db, tenant, year)
     return None
 
 
