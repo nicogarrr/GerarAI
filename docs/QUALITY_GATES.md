@@ -68,9 +68,9 @@ el runner falla si alguno pasa.
 | Dataset | Fichero | Casos | Medidos | Controles negativos | Checks | Familia de origen |
 |---|---|---:|---:|---:|---:|---|
 | `rag_golden_v1` | `data-engine/evals/rag/rag_golden_v1.json` | 55 | 50 | **5** | 6 metricas sobre 34 casos respondidos + 16 de abstention | 17 documentos reales del repo (`rag_corpus_v1`), 19 chunks |
-| `valuation_engines_v1` | `data-engine/evals/valuation/valuation_engines_v1.json` | 144 | 127 | **17** | 989 | 8 motores: standard_dcf, bank, insurer, reit, sotp, holding_company, pre_revenue, commodity |
+| `valuation_engines_v1` | `data-engine/evals/valuation/valuation_engines_v1.json` | 145 | 128 | **17** | 989 | 8 motores: standard_dcf, bank, insurer, reit, sotp, holding_company, pre_revenue, commodity |
 | `llm_layers_v1` | `data-engine/evals/llm/llm_layers_v1.json` | 56 | 25 | **31** | 517 | 4 capas del pipeline LLM |
-| `ingest_v1` | `data-engine/evals/ingest/ingest_v1.json` | 79 | 64 | **15** | 630 | 3 familias: sec (42), esef (18), fmp (19) |
+| `ingest_v1` | `data-engine/evals/ingest/ingest_v1.json` | 85 | 74 | **11** | 630 | 3 familias: sec (46), esef (18), fmp (21) |
 
 Detalle de los controles negativos por dataset:
 
@@ -86,7 +86,7 @@ Detalle de los controles negativos por dataset:
   tres datasets, aqui no hay categoria `negative_control`: el caso que tiene que
   fallar lleva la puerta nombrada). Los `[FAIL]` que imprime el runner **son estos
   casos**: el gate esta en verde cuando el gate muerde.
-- **Ingest**: 15 controles negativos y 11 casos de "degradacion honesta" (el
+- **Ingest**: 11 controles negativos y 11 casos de "degradacion honesta" (el
   servicio se cae y lo que hay que afirmar).
 
 ---
