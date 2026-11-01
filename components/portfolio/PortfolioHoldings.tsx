@@ -347,7 +347,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colAverage')}</dt><dd className="text-gray-200">{holding.avgPrice > 0 ? format(holding.avgPrice, holding.nativeCurrency) : ti('common.na')}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colCurrent')}</dt><dd className="font-medium text-gray-200">{holding.currentPrice === null ? ti('common.na') : format(holding.currentPrice, holding.nativeCurrency)}</dd></div>
                       <div className="-mt-1 flex justify-end"><ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} /></div>
-                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colValue')}</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold) : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? ti('portfolio.holdings.valueNoConversion') : format(holding.value, holding.baseCurrency)}</dd></div>
+                      <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colValue')}</dt><dd className="font-semibold text-gray-100">{holding.valuationHold ? valuationHoldLabel(holding.valuationHold, locale) : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? ti('portfolio.holdings.valueNoConversion') : format(holding.value, holding.baseCurrency)}</dd></div>
                       <div className="flex justify-between gap-2"><dt className="text-gray-500">{ti('portfolio.holdings.colWeight')}</dt><dd className="font-semibold text-gray-100">{weight(holding.symbol)}</dd></div>
                       <div className="flex items-center justify-between gap-2">
                         <dt className="text-gray-500">{ti('portfolio.holdings.colGain')}</dt>
@@ -467,7 +467,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
                         <ExtendedHoursLine symbol={holding.symbol} currency={holding.nativeCurrency} />
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-100">
-                        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold)}</Badge> : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? <Badge variant="outline">{ti('portfolio.holdings.valueNoConversion')}</Badge> : format(holding.value, holding.baseCurrency)}
+                        {holding.valuationHold ? <Badge variant="outline">{valuationHoldLabel(holding.valuationHold, locale)}</Badge> : holding.costReviewMessage ? (holding.valueMissing ? ti('common.na') : format(holding.value, holding.baseCurrency)) : holding.fxMissing ? <Badge variant="outline">{ti('portfolio.holdings.valueNoConversion')}</Badge> : format(holding.value, holding.baseCurrency)}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-gray-100">{weight(holding.symbol)}</TableCell>
                       <TableCell className="text-right">

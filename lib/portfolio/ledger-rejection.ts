@@ -1,3 +1,4 @@
+import { createTranslator } from '@/lib/i18n/translate';
 import { AppError } from '@/lib/types/errors';
 
 /**
@@ -7,22 +8,23 @@ import { AppError } from '@/lib/types/errors';
  * server action, así que una venta por encima de lo que tienes acababa como
  * «El motor de análisis no responde» (y en desarrollo, en inglés:
  * «Insufficient shares for sale»). Estos rechazos se devuelven como
- * resultado con el motivo en español para que el formulario siga abierto.
+ * resultado con el motivo en el idioma elegido (español por defecto) para que el formulario siga abierto.
  * Devuelve null si el error no es un rechazo conocido (se relanza).
  */
-export function ledgerRejection(error: unknown, operation: 'save' | 'delete' = 'save'): string | null {
+export function ledgerRejection(error: unknown, operation: 'save' | 'delete' = 'save', locale: 'es' | 'en' = 'es'): string | null {
     if (!(error instanceof AppError) || error.code !== 'RESEARCH_API_ERROR') return null;
+    const t = createTranslator(locale);
     const message = error.message;
     if (error.statusCode === 409 && /insufficient shares/i.test(message)) {
         return operation === 'delete'
-            ? 'No se puede borrar: una venta posterior se quedaría sin acciones. Borra o corrige antes esa venta.'
-            : 'No puedes vender más acciones de las que tienes en cartera. Revisa la cantidad o registra antes la compra.';
+            ? t('portfolio.ledgerRejection.deleteInsufficient')
+            : t('portfolio.ledgerRejection.sellInsufficient');
     }
     if (error.statusCode === 422 && /mix transaction currencies/i.test(message)) {
-        return 'Esta posición ya tiene movimientos en otra divisa: registra este en la misma divisa que los anteriores.';
+        return t('portfolio.ledgerRejection.mixedCurrency');
     }
     if (error.statusCode === 404 && /transaction not found/i.test(message)) {
-        return 'Ese movimiento ya no existe (quizá se borró en otra pestaña). Recarga la página.';
+        return t('portfolio.ledgerRejection.notFound');
     }
     // trade_date llega como 422 con lista pydantic y researchErrorDetail
     // conserva el CAMPO, no el motivo: con el mismo campo fallan la fecha
@@ -31,7 +33,7 @@ export function ledgerRejection(error: unknown, operation: 'save' | 'delete' = '
     // cualquier validador). Sin motivo distinguible no se puede afirmar
     // 'futura': mensaje de fecha invalida que cubre todos los casos.
     if (error.statusCode === 422 && /\btrade_date\b/.test(message)) {
-        return 'La fecha de la operación no es válida: comprueba que existe y que no es posterior a hoy.';
+        return t('portfolio.ledgerRejection.invalidDate');
     }
     return null;
 }

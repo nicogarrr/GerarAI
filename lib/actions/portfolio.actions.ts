@@ -16,6 +16,7 @@ import { buildAllocationSlices } from '@/lib/portfolio-allocation';
 import { partitionSettledRefreshes } from '@/lib/portfolio/refresh-settled';
 import { importRejection, type ImportRejection } from '@/lib/portfolio/import-rejection';
 import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
+import { requestLocale } from '@/lib/research/backend-error-locale';
 import { transactionFiltersQuery, type TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
@@ -168,7 +169,7 @@ export async function addTransaction(
             }),
         });
     } catch (error) {
-        const rejection = ledgerRejection(error);
+        const rejection = ledgerRejection(error, 'save', await requestLocale());
         if (rejection) return { success: false, error: rejection };
         throw error;
     }
@@ -406,7 +407,7 @@ export async function updateTransaction(
             },
         );
     } catch (error) {
-        const rejection = ledgerRejection(error);
+        const rejection = ledgerRejection(error, 'save', await requestLocale());
         if (rejection) return { success: false, error: rejection };
         throw error;
     }
@@ -422,7 +423,7 @@ export async function deleteTransaction(userId: string, transactionId: string): 
         });
     } catch (error) {
         // Borrar una compra que respalda una venta posterior → 409 del ledger.
-        const rejection = ledgerRejection(error, 'delete');
+        const rejection = ledgerRejection(error, 'delete', await requestLocale());
         if (rejection) return { success: false, error: rejection };
         throw error;
     }

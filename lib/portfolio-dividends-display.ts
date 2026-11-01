@@ -5,6 +5,8 @@
  * Regla de veracidad: los null del backend se propagan como null (la vista
  * los pinta N/D); las notas de veracidad del payload nunca se descartan.
  */
+// @ts-expect-error TS5097
+import { createTranslator } from './i18n/translate.ts';
 import type {
   DividendProjectionDeclaredFuture,
   DividendProjectionFiscalYear,
@@ -51,15 +53,16 @@ export type FiscalCardRow = {
  * backend deja en null (base no EUR, año sin cobertura...) se devuelven como
  * null para que la tarjeta pinte N/D y la nota del año lo explique.
  */
-export function fiscalCardRows(data: DividendProjectionFiscalYear): FiscalCardRow[] {
+export function fiscalCardRows(data: DividendProjectionFiscalYear, locale: 'es' | 'en' = 'es'): FiscalCardRow[] {
+  const t = createTranslator(locale);
   return [
-    { label: 'Bruto', value: data.gross_base },
-    { label: 'Retenido en origen', value: data.source_withheld_foreign },
-    { label: 'Deducción doble imposición', value: data.double_tax_deduction },
-    { label: 'A cuenta (ES)', value: data.retencion_a_cuenta_es },
-    { label: 'IRPF (escenario)', value: data.irpf_scenario },
-    { label: 'Cuota pendiente estimada', value: data.cuota_pendiente_estimada },
-    { label: 'Neto (escenario)', value: data.net_scenario },
+    { label: t('portfolio.dividendFiscal.gross'), value: data.gross_base },
+    { label: t('portfolio.dividendFiscal.sourceWithheld'), value: data.source_withheld_foreign },
+    { label: t('portfolio.dividendFiscal.doubleTaxRelief'), value: data.double_tax_deduction },
+    { label: t('portfolio.dividendFiscal.spanishWithholding'), value: data.retencion_a_cuenta_es },
+    { label: t('portfolio.dividendFiscal.irpfScenario'), value: data.irpf_scenario },
+    { label: t('portfolio.dividendFiscal.taxDue'), value: data.cuota_pendiente_estimada },
+    { label: t('portfolio.dividendFiscal.netScenario'), value: data.net_scenario },
   ];
 }
 
