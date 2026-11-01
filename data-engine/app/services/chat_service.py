@@ -201,6 +201,42 @@ def _fmt_date_es(iso_date: str | None) -> str:
     return f"{int(day)} {_MONTHS_ES[month_index]} {year}"
 
 
+_MONTHS_EN = (
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)
+
+
+def _english() -> bool:
+    """True si la petición pide inglés (Ajustes → Idioma, con la generación multidioma activa)."""
+    from app.core.i18n import current_language
+
+    return current_language() == "en"
+
+
+def _fmt_number_en(number: float, digits: int = 2) -> str:
+    """1,234,567.89 al estilo en-US (comas de miles, punto decimal), sin ceros sobrantes."""
+    return f"{number:,.{digits}f}".rstrip("0").rstrip(".")
+
+
+def _fmt_money_en(number: float, digits: int = 2) -> str:
+    """Importe con decimales fijos en en-US: 7,933.60."""
+    return f"{number:,.{digits}f}"
+
+
+def _fmt_date_en(iso_date: str | None) -> str:
+    """'2026-10-16' -> 'Oct 16, 2026'."""
+    text = (iso_date or "").strip()
+    match = re.match(r"^(\d{4})-(\d{2})-(\d{2})(?:[T ].*)?$", text)
+    if not match:
+        return text or "no date"
+    year, month, day = match.groups()
+    month_index = int(month) - 1
+    if not 0 <= month_index < 12:
+        return text
+    return f"{_MONTHS_EN[month_index]} {int(day)}, {year}"
+
+
 _INLINE_REF_RE = re.compile(r"\[([a-z_]+:[^\]\s]+)\]")
 
 
@@ -832,6 +868,55 @@ _NET_WORTH_CUE_RE = re.compile(r"(?i)\b(?:patrimonio|caja|margen|neto)\b")
 
 
 _UNVALUED_TEXT = "sin valor en {base} (falta tipo de cambio o la valoración está suspendida)"
+_UNVALUED_TEXT_EN = "no value in {base} (missing exchange rate or the valuation is suspended)"
+
+# Inglés (Ajustes → Idioma = English): las mismas preguntas de posición y
+# rentabilidad con las formas habituales en inglés. Solo se miran con el
+# inglés elegido; en español el enrutado es exactamente el de siempre.
+_POSITION_QUERY_EN_RE = re.compile(
+    r"(?i)\b(?:how\s+many\s+(?:\S+\s+)?shares|shares\s+(?:of\s+\S+\s+)?(?:do\s+)?I\s+(?:have|own|hold)"
+    r"|my\s+(?:position|stake|holding)s?\s+(?:in|of|on)"
+    r"|weight\s+of|how\s+much\s+(?:is|does)\s+\S+\s+(?:weighs?|of\s+my\s+portfolio)"
+    r"|(?:percent(?:age)?|share|part)\s+of\s+my\s+portfolio)\b"
+)
+_PURCHASE_COST_EN_RE = re.compile(
+    r"(?i)\b(?:average\s+(?:cost|price|purchase\s+price)|avg\.?\s+(?:cost|price)|cost\s+basis"
+    r"|what\s+did\s+I\s+pay|how\s+much\s+did\s+I\s+pay)\b"
+)
+_PERFORMANCE_EN_RE = re.compile(
+    r"(?i)\b(?:(?:my|the)\s+return|return\s+on\s+my"
+    r"|how\s+much\s+(?:money\s+)?(?:have|did)\s+I\s+(?:made|make|gained|gain|lost|lose|earned|earn)"
+    r"|(?:my|what(?:'s|\s+is)\s+my)\s+(?:profit|gain|loss|p&l|performance)"
+    r"|am\s+I\s+(?:up|down)|unreali[sz]ed\s+(?:gains?|loss(?:es)?|p&l))\b"
+    r"(?![^.!?\n]*\bif\b)"
+)
+_CONCEPT_QUESTION_EN_RE = re.compile(
+    r"(?i)\b(?:what\s+does\s+.{1,40}\s+mean|how\s+(?:is|are)\s+.{1,40}\s+calculated|what\s+is\s+an?\s)"
+)
+
+
+def _asks_position(question: str) -> bool:
+    if _POSITION_QUERY_RE.search(question):
+        return True
+    return _english() and bool(
+        _POSITION_QUERY_EN_RE.search(question) or _PURCHASE_COST_EN_RE.search(question)
+    )
+
+
+def _asks_purchase_cost(question: str) -> bool:
+    if _PURCHASE_COST_RE.search(question):
+        return True
+    return _english() and bool(_PURCHASE_COST_EN_RE.search(question))
+
+
+def _asks_performance(question: str) -> bool:
+    if _PERFORMANCE_RE.search(question) and not _CONCEPT_QUESTION_RE.search(question):
+        return True
+    return (
+        _english()
+        and bool(_PERFORMANCE_EN_RE.search(question))
+        and not _CONCEPT_QUESTION_EN_RE.search(question)
+    )
 
 
 class ChatService:
@@ -1393,10 +1478,10 @@ class ChatService:
                 return tax_answer
         if (
             company is not None
-            and _POSITION_QUERY_RE.search(question or "")
+            and _asks_position(question or "")
             and (
                 not _ORDER_VERB_RE.search(question or "")
-                or _PURCHASE_COST_RE.search(question or "")
+                or _asks_purchase_cost(question or "")
             )
         ):
             position_answer = self._position_answer(db, company, question or "")
@@ -1434,8 +1519,7 @@ class ChatService:
                 return ranking_answer
         if (
             not ticker
-            and _PERFORMANCE_RE.search(question or "")
-            and not _CONCEPT_QUESTION_RE.search(question or "")
+            and _asks_performance(question or "")
             and not _ORDER_VERB_RE.search(question or "")
             and not _asks_fiscal(question or "")
             and not _DIVIDEND_YIELD_RE.search(question or "")
@@ -1975,12 +2059,15 @@ class ChatService:
                 .where(Position.quantity > 0, Position.tenant_id == tenant_id)
             ).all()
         )
+        english = _english()
         if company is not None:
             rows = [row for row in rows if row[0].company_id == company.id]
             if not rows:
                 return ChatResponse(
                     answer=(
-                        f"No tienes ninguna posición abierta en {company.ticker}: "
+                        f"You have no open position in {company.ticker}, so there is no saved return to report."
+                        if english
+                        else f"No tienes ninguna posición abierta en {company.ticker}: "
                         "no hay rentabilidad guardada que contar."
                     ),
                     sources=[],
@@ -2010,7 +2097,10 @@ class ChatService:
         if len(currencies) > 1:
             return ChatResponse(
                 answer=(
-                    "No puedo sumar la rentabilidad: tus posiciones están valoradas en monedas "
+                    "I can't add up the return: your positions are valued in different currencies "
+                    f"({', '.join(currencies)}) and the base-currency figures needed to compare them are missing."
+                    if english
+                    else "No puedo sumar la rentabilidad: tus posiciones están valoradas en monedas "
                     f"distintas ({', '.join(currencies)}) y faltan las cifras en moneda base para compararlas."
                 ),
                 sources=[],
@@ -2027,7 +2117,11 @@ class ChatService:
         total_value = sum(value for _, value in known)
         if total_cost <= 0:
             return ChatResponse(
-                answer="No tengo el coste de compra guardado de tus posiciones: sin él no calculo rentabilidad.",
+                answer=(
+                    "I don't have the purchase cost of your positions saved, so I can't calculate a return."
+                    if english
+                    else "No tengo el coste de compra guardado de tus posiciones: sin él no calculo rentabilidad."
+                ),
                 sources=[],
                 model="deterministic",
                 prompt_version="portfolio-performance-v1",
@@ -2040,8 +2134,23 @@ class ChatService:
         def _signed(value: float) -> str:
             return f"+{_fmt_number_es(value, 2)}" if value >= 0 else _fmt_number_es(value, 2)
 
-        label = "tu cartera" if company is None else f"tu posición en {company.ticker}"
         as_of = max(pos.as_of for pos, _ in rows)
+        if english:
+            answer = self._performance_text_en(
+                company, pct, pnl, total_value, total_cost, cur, as_of.isoformat(), unknown_cost,
+            )
+            return ChatResponse(
+                answer=answer,
+                sources=[
+                    self._source_entry("position", pos.id, f"Position {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))
+                    for pos, comp in rows[:15]
+                ],
+                model="deterministic",
+                prompt_version="portfolio-performance-v1",
+                confidence=0.9,
+                llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
+            )
+        label = "tu cartera" if company is None else f"tu posición en {company.ticker}"
         answer = (
             f"La rentabilidad guardada de {label} es {_signed(pct).replace(' %', '')} % "
             f"sobre el coste de compra: valor {_fmt_money_es(total_value)} {_currency_display(cur)} "
@@ -2069,6 +2178,41 @@ class ChatService:
             confidence=0.9,
             llm_trace={"path": "portfolio_performance", "generated": False, "provider_calls": 0},
         )
+
+    @staticmethod
+    def _performance_text_en(
+        company: Company | None,
+        pct: float,
+        pnl: float,
+        total_value: float,
+        total_cost: float,
+        cur: str,
+        as_of: str,
+        unknown_cost: list[str],
+    ) -> str:
+        """Misma rentabilidad simple que la versión en español, redactada en inglés."""
+
+        def _signed(value: float) -> str:
+            return f"+{_fmt_money_en(value)}" if value >= 0 else _fmt_money_en(value)
+
+        pct_text = f"+{_fmt_number_en(pct)}" if pct >= 0 else _fmt_number_en(pct)
+        label = "your portfolio" if company is None else f"your position in {company.ticker}"
+        money = _currency_display(cur)
+        answer = (
+            f"The saved return on {label} is {pct_text}% on the purchase cost: "
+            f"value {_fmt_money_en(total_value)} {money} against a cost of {_fmt_money_en(total_cost)} {money} "
+            f"({_signed(pnl)} {money}), as of {_fmt_date_en(as_of)}. "
+            "This is a simple return on the cost of open positions, not a time-weighted return (TWR): "
+            "it leaves out cash, dividends and closed sales."
+        )
+        if unknown_cost:
+            answer += (
+                " No purchase cost saved, so left out of the calculation: "
+                + ", ".join(unknown_cost[:10])
+                + (f" and {len(unknown_cost) - 10} more" if len(unknown_cost) > 10 else "")
+                + "."
+            )
+        return answer
 
     def _cash_line(
         self,
@@ -2173,10 +2317,14 @@ class ChatService:
             raw = position_base_value(pos)
             return float(raw) if raw is not None else None
 
+        english = _english()
         found = [(pos, comp) for pos, comp in rows if comp.id == company.id]
         if not found:
             answer = (
-                f"No tienes ninguna posición guardada en {company.ticker}; "
+                f"You have no saved position in {company.ticker}; your saved portfolio has "
+                f"{len(rows)} open position{'' if len(rows) == 1 else 's'} in other tickers."
+                if english
+                else f"No tienes ninguna posición guardada en {company.ticker}; "
                 f"tu cartera guardada tiene {len(rows)} posiciones abiertas en otros tickers."
             )
             return ChatResponse(
@@ -2193,25 +2341,48 @@ class ChatService:
         mixed = len(bases) > 1
         unvalued = any(_value(p) is None for p, _ in rows)
         value = _value(pos)
-        if value is None:
-            weight_text = ""
-        elif total > 0 and not mixed:
-            known = " con valor conocido" if unvalued else ""
-            weight_text = f", un {_fmt_number_es(value / total * 100, 1)} % del valor de tus posiciones{known}"
+        base_label = _currency_display(pos.base_currency or "EUR")
+        if english:
+            if value is None:
+                weight_text = ""
+            elif total > 0 and not mixed:
+                known = " with a known value" if unvalued else ""
+                weight_text = f", {_fmt_number_en(value / total * 100, 1)}% of the value of your positions{known}"
+            else:
+                weight_text = " (no weight: different base currencies)"
+            value_text = (
+                f"value {_fmt_money_en(value)} {base_label}{weight_text}"
+                if value is not None
+                else _UNVALUED_TEXT_EN.format(base=base_label)
+            )
+            quantity = float(pos.quantity)
+            answer = (
+                f"Your saved position in {comp.ticker}: {_fmt_number_en(quantity, 4)} "
+                f"share{'' if quantity == 1 else 's'}, "
+                f"average cost {_fmt_money_en(float(pos.average_cost))} {_currency_display(pos.currency)}, "
+                f"{value_text}, "
+                f"as of {_fmt_date_en(pos.as_of.isoformat())}."
+            )
         else:
-            weight_text = " (sin peso: monedas base distintas)"
-        value_text = (
-            f"valor {_fmt_money_es(value)} {_currency_display(pos.base_currency or 'EUR')}{weight_text}"
-            if value is not None
-            else _UNVALUED_TEXT.format(base=_currency_display(pos.base_currency or "EUR"))
-        )
-        answer = (
-            f"Tu posición guardada en {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
-            f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
-            f"{value_text}, "
-            f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
-        )
-        if _NET_WORTH_CUE_RE.search(question):
+            if value is None:
+                weight_text = ""
+            elif total > 0 and not mixed:
+                known = " con valor conocido" if unvalued else ""
+                weight_text = f", un {_fmt_number_es(value / total * 100, 1)} % del valor de tus posiciones{known}"
+            else:
+                weight_text = " (sin peso: monedas base distintas)"
+            value_text = (
+                f"valor {_fmt_money_es(value)} {base_label}{weight_text}"
+                if value is not None
+                else _UNVALUED_TEXT.format(base=base_label)
+            )
+            answer = (
+                f"Tu posición guardada en {comp.ticker}: {_fmt_number_es(float(pos.quantity), 4)} acciones, "
+                f"coste medio {_fmt_money_es(float(pos.average_cost))} {_currency_display(pos.currency)}, "
+                f"{value_text}, "
+                f"con datos a {_fmt_date_es(pos.as_of.isoformat())}."
+            )
+        if not english and _NET_WORTH_CUE_RE.search(question):
             cash_line = self._cash_line(
                 db, tenant_id, None if mixed else (pos.base_currency or "EUR"),
                 positions_total=None if mixed or unvalued else total,
@@ -2220,7 +2391,10 @@ class ChatService:
                 answer += "\n\n" + cash_line
         return ChatResponse(
             answer=answer,
-            sources=[self._source_entry("position", pos.id, f"Posición {comp.ticker}", url="/portfolio", as_of=str(pos.as_of))],
+            sources=[self._source_entry(
+                "position", pos.id, f"{'Position' if english else 'Posición'} {comp.ticker}",
+                url="/portfolio", as_of=str(pos.as_of),
+            )],
             model="deterministic",
             prompt_version="portfolio-position-v1",
             confidence=0.9,
