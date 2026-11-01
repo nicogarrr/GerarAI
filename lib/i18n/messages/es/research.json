@@ -1510,5 +1510,42 @@
     "noBaseCost": "Sin coste en {currency}: falta el tipo de cambio de alguna compra. No se puede calcular la plusvalía en {currency}.",
     "recordTrade": "Registrar compra o venta",
     "viewInPortfolio": "Ver en la cartera"
+  },
+  "publicShorts": {
+    "metaTitle": "Cortos públicos",
+    "metaDescription": "Posiciones cortas declaradas en registros públicos, con fecha y fuente oficiales.",
+    "title": "Cortos públicos · {ticker}",
+    "back": "Volver a la empresa",
+    "refreshDone": "Consulta terminada",
+    "refresh": "Actualizar fuente",
+    "noData": "Sin datos",
+    "readError": "No se pudo leer la consulta almacenada. No es un recuento de cero posiciones.",
+    "lastLookup": "Última consulta con datos: {date}. Máximo una consulta por hora.",
+    "officialSource": "Fuente oficial · {source}",
+    "publicTotal": "Suma pública: {percent}",
+    "derived": "DERIVADO",
+    "official": "OFICIAL",
+    "noNotifications": "Sin notificaciones en la tabla pública consultada. No implica ausencia de cortos por debajo del umbral.",
+    "positionDate": "Fecha de posición: {date}",
+    "pagesLabel": "Páginas de posiciones",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "tradeDate": "Fecha de negociación",
+    "shortRatio": "Volumen corto / volumen FINRA",
+    "shortVolume": "Volumen corto · OFICIAL",
+    "finraVolume": "Volumen FINRA · OFICIAL"
+  },
+  "ownershipSignals": {
+    "title": "Qué compran y venden directivos y grandes fondos",
+    "loadError": "No se pudo cargar el resumen de insiders y 13F ahora mismo.",
+    "viewOwners": "Ver propietarios",
+    "insidersLabel": "Insiders (Form 4)",
+    "insidersTitle": "Compras y ventas de directivos (Form 4)",
+    "windowDays": " · {days} días",
+    "fundsLabel": "Fondos (13F)",
+    "fundsTitle": "Grandes fondos (informe 13F)",
+    "manager": "gestor",
+    "managers": "gestores",
+    "footer": "Form 4 y 13F ya sincronizados. El 13F es trimestral, con hasta 45 días de retraso y solo posiciones largas. Este resumen entra en la tesis."
   }
 }

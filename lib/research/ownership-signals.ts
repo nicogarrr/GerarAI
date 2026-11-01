@@ -51,14 +51,28 @@ const CHANGE_LABELS: Record<HolderChange, string> = {
   closed: 'sale',
 };
 
-const usd = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+// Mismas etiquetas en inglés (Ajustes → Idioma).
+const CHANGE_LABELS_EN: Record<HolderChange, string> = {
+  new: 'new position',
+  increased: 'adds',
+  decreased: 'trims',
+  unchanged: 'holds',
+  closed: 'exits',
+};
 
-/** Importe en USD con formato es-ES («113.100 US$»). */
-export function ownershipMoney(value: number): string {
-  return usd.format(value);
+/** Idioma de las líneas: «es» (por defecto) o «en». */
+export type OwnershipLocale = 'es' | 'en';
+
+const usd = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const usdEn = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+
+/** Importe en USD con formato es-ES («113.100 US$») o en-US («$113,100»). */
+export function ownershipMoney(value: number, locale: OwnershipLocale = 'es'): string {
+  return (locale === 'en' ? usdEn : usd).format(value);
 }
 
-export function holderChangeLabel(change: HolderChange | null | undefined): string {
+export function holderChangeLabel(change: HolderChange | null | undefined, locale: OwnershipLocale = 'es'): string {
+  if (locale === 'en') return change ? CHANGE_LABELS_EN[change] : 'no comparison';
   return change ? CHANGE_LABELS[change] : 'sin comparación';
 }
 
@@ -81,9 +95,17 @@ export function holdersTone(block: HoldersOwnershipBlock): OwnershipTone {
 }
 
 /** Líneas legibles del bloque insider (o su motivo si no hay datos). */
-export function insiderLines(block: InsiderOwnershipBlock): string[] {
-  if (block.status !== 'ok') return [block.detail ?? 'Sin datos de insiders.'];
+export function insiderLines(block: InsiderOwnershipBlock, locale: OwnershipLocale = 'es'): string[] {
+  if (block.status !== 'ok') return [block.detail ?? (locale === 'en' ? 'No insider data.' : 'Sin datos de insiders.')];
   const planned = block.sells.planned_10b5_1 ?? 0;
+  if (locale === 'en') {
+    const money = (value: number) => ownershipMoney(value, 'en');
+    return [
+      `Buys: ${block.buys.trades} by ${block.buys.insiders} ${block.buys.insiders === 1 ? 'insider' : 'insiders'} for ${money(block.buys.value)}.`,
+      `Sells: ${block.sells.trades} by ${block.sells.insiders} ${block.sells.insiders === 1 ? 'insider' : 'insiders'} for ${money(block.sells.value)}${planned ? ` (${planned} under a 10b5-1 plan)` : ''}.`,
+      `Net: ${money(block.net_value)}${block.last_date ? ` · last trade ${block.last_date}` : ''}.`,
+    ];
+  }
   return [
     `Compras: ${block.buys.trades} de ${block.buys.insiders} insiders por ${ownershipMoney(block.buys.value)}.`,
     `Ventas: ${block.sells.trades} de ${block.sells.insiders} insiders por ${ownershipMoney(block.sells.value)}${planned ? ` (${planned} con plan 10b5-1)` : ''}.`,
@@ -92,9 +114,17 @@ export function insiderLines(block: InsiderOwnershipBlock): string[] {
 }
 
 /** Líneas legibles del bloque 13F (o su motivo si no hay datos). */
-export function holdersLines(block: HoldersOwnershipBlock): string[] {
-  if (block.status !== 'ok') return [block.detail ?? 'Sin datos 13F.'];
+export function holdersLines(block: HoldersOwnershipBlock, locale: OwnershipLocale = 'es'): string[] {
+  if (block.status !== 'ok') return [block.detail ?? (locale === 'en' ? 'No 13F data.' : 'Sin datos 13F.')];
   const { changes } = block;
+  if (locale === 'en') {
+    const lines = [
+      `${block.holders_count} of ${block.managers_with_data} managers reviewed report it${block.report_date ? ` (13F for ${block.report_date})` : ''}${block.total_value_usd ? ` worth ${ownershipMoney(block.total_value_usd, 'en')}` : ''}.`,
+      `Versus the previous quarter: ${changes.new} new, ${changes.increased} adding, ${changes.decreased} trimming, ${changes.closed} exiting.`,
+    ];
+    if (block.exited.length) lines.push(`Exiting: ${block.exited.join(', ')}.`);
+    return lines;
+  }
   const lines = [
     `${block.holders_count} de ${block.managers_with_data} gestores revisados lo declaran${block.report_date ? ` (13F de ${block.report_date})` : ''}${block.total_value_usd ? ` por ${ownershipMoney(block.total_value_usd)}` : ''}.`,
     `Frente al trimestre anterior: ${changes.new} nuevas, ${changes.increased} aumentan, ${changes.decreased} reducen, ${changes.closed} salen.`,
