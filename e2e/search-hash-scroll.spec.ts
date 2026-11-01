@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waitForHydration } from './fixtures/wait-for-hydration';
 // Calentamiento del chunk de la paleta (patrón del repo, cf. 'MSFT ALERT'
 // en search-hash-scroll.spec.ts): con el dev server frío (CI), el primer
 // Ctrl+K compila el chunk del diálogo y los listeners de Escape de Radix se
@@ -48,6 +49,7 @@ test.describe('paleta: comandos de ficha (ancla y destino)', () => {
     test('MSFT ALERT lleva al gestor /alerts con el símbolo pre-rellenado', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 860 });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+        await waitForHydration(page);
         // Pre-compila /alerts en el dev server: la navegación solo compromete
         // la URL cuando llega el payload RSC, y una compilación fría de la
         // ruta superaría el timeout del expect de abajo.
@@ -74,6 +76,7 @@ test.describe('paleta: comandos de ficha (ancla y destino)', () => {
     test('comando sin ancla sigue navegando (MSFT TESIS)', async ({ page }) => {
         await page.setViewportSize({ width: 1280, height: 860 });
         await page.goto('/research/MSFT', { waitUntil: 'networkidle' });
+        await waitForHydration(page);
         await warmUpPalette(page);
         await page.keyboard.press('Control+k');
         const input = page.locator('[role="dialog"] input');
