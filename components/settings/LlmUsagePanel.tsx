@@ -101,7 +101,7 @@ export default function LlmUsagePanel({ usage }: { usage: LlmUsage }) {
             {usage.legs.map((leg) => (
                 <LegCard key={leg.id} leg={leg} t={t} locale={locale} />
             ))}
-            <p className="text-xs text-gray-600">
+            <p className="text-xs text-gray-500">
                 {t('settings.llm.usage.generatedAt', {
                     date: formatDate(usage.generated_at, DATE_TIME_OPTS, undefined, locale),
                 })}

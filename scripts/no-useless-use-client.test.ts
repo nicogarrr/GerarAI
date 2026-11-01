@@ -84,6 +84,8 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
   'components/proPicks/StrategyFactsheet.tsx': 'useT/useLocale/useFormat: textos y números en el idioma elegido (contexto React de locale)',
 
+  'components/settings/LlmUsagePanel.tsx':
+    'useT/useLocale: copy y formato de fechas del panel de uso LLM en el idioma elegido (contexto React de locale)',
   'components/settings/LanguageForm.tsx':
     'selector de idioma: escribe la cookie de locale y router.refresh() (transición)',
   'lib/i18n/client.tsx':
