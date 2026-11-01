@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models import (
     CallClaim,
     Company,
+    Document,
     FinancialFact,
     ManagementPromise,
     Transcript,
@@ -45,6 +46,13 @@ class ManagementCredibilityService:
     ) -> ManagementPromise:
         if target_value is not None and operator not in OPERATORS:
             raise ValueError("A numeric promise requires a supported operator")
+        if source_document_id is not None:
+            # El id llega del cliente: sin comprobarlo, uno inexistente rompía la
+            # FK en Postgres (500) y uno de otro usuario o empresa se enlazaba.
+            # db.get va acotado por tenant.
+            document = db.get(Document, source_document_id)
+            if document is None or document.company_id not in (None, company.id):
+                raise ValueError("Source document not found for this company")
         row = ManagementPromise(
             company_id=company.id,
             source_document_id=source_document_id,

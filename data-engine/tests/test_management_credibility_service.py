@@ -167,3 +167,55 @@ def test_promise_without_target_records_outcome(db):
     [p] = ManagementCredibilityService().reconcile(db, c)
     assert p.status == "outcome_recorded"
     assert p.actual_value == Decimal("110")
+
+
+def _document(db: Session, company_id: int | None) -> int:
+    from app.models.entities import Document
+
+    doc = Document(company_id=company_id, title="10-K", source_type="filing")
+    db.add(doc)
+    db.commit()
+    return doc.id
+
+
+def _register_with_doc(db: Session, company: Company, document_id: int):
+    return ManagementCredibilityService().register(
+        db, company, promise="Revenue above 100", promise_date=date(2025, 1, 10),
+        expected_period="FY2025", metric="revenue", operator=">=",
+        target_value=Decimal("100"), unit="USD", source_document_id=document_id,
+    )
+
+
+def test_promesa_con_documento_inexistente_se_rechaza(db):
+    """Sin comprobar, en Postgres la FK rompía con IntegrityError (500)."""
+    company = _company(db)
+    with pytest.raises(ValueError):
+        _register_with_doc(db, company, 999_999)
+
+
+def test_promesa_con_documento_de_otro_usuario_o_empresa_se_rechaza(db):
+    company = _company(db)
+    other = Company(
+        ticker="OTR", name="OTR", exchange="NYSE", currency="USD",
+        sector="S", industry="I", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(other)
+    db.commit()
+    other_company_doc = _document(db, other.id)
+    with pytest.raises(ValueError):
+        _register_with_doc(db, company, other_company_doc)
+
+    db.info["tenant_id"] = "otro-tenant"
+    foreign_doc = _document(db, company.id)
+    db.info["tenant_id"] = "tenant-test"
+    with pytest.raises(ValueError):
+        _register_with_doc(db, company, foreign_doc)
+
+
+def test_promesa_con_documento_propio_entra(db):
+    company = _company(db)
+    own = _document(db, company.id)
+    general = _document(db, None)
+    assert _register_with_doc(db, company, own).source_document_id == own
+    assert _register_with_doc(db, company, general).source_document_id == general
