@@ -38,6 +38,45 @@ MINOR_UNITS: dict[str, tuple[str, int]] = {
     "ILX": ("ILS", 100),
 }
 
+# ISO 4217 vigentes (lista de la ISO/SIX, 2026) + CNH (yuan offshore: IBKR y
+# Yahoo lo usan como divisa de liquidacion). Tres letras cualesquiera
+# («NaN», «XYZ») ya no pasan: ningun tipo de cambio sabria convertirlas y la
+# posicion quedaria «incompleta» para siempre.
+ISO_4217_CODES: frozenset[str] = frozenset(
+    [
+        "AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN", "BAM", "BBD",
+        "BDT", "BGN", "BHD", "BIF", "BMD", "BND", "BOB", "BOV", "BRL", "BSD", "BTN", "BWP",
+        "BYN", "BZD", "CAD", "CDF", "CHE", "CHF", "CHW", "CLF", "CLP", "CNY", "COP", "COU",
+        "CRC", "CUC", "CUP", "CVE", "CZK", "DJF", "DKK", "DOP", "DZD", "EGP", "ERN", "ETB",
+        "EUR", "FJD", "FKP", "GBP", "GEL", "GHS", "GIP", "GMD", "GNF", "GTQ", "GYD", "HKD",
+        "HNL", "HRK", "HTG", "HUF", "IDR", "ILS", "INR", "IQD", "IRR", "ISK", "JMD", "JOD",
+        "JPY", "KES", "KGS", "KHR", "KMF", "KPW", "KRW", "KWD", "KYD", "KZT", "LAK", "LBP",
+        "LKR", "LRD", "LSL", "LYD", "MAD", "MDL", "MGA", "MKD", "MMK", "MNT", "MOP", "MRU",
+        "MUR", "MVR", "MWK", "MXN", "MXV", "MYR", "MZN", "NAD", "NGN", "NIO", "NOK", "NPR",
+        "NZD", "OMR", "PAB", "PEN", "PGK", "PHP", "PKR", "PLN", "PYG", "QAR", "RON", "RSD",
+        "RUB", "RWF", "SAR", "SBD", "SCR", "SDG", "SEK", "SGD", "SHP", "SLE", "SLL", "SOS",
+        "SRD", "SSP", "STN", "SVC", "SYP", "SZL", "THB", "TJS", "TMT", "TND", "TOP", "TRY",
+        "TTD", "TWD", "TZS", "UAH", "UGX", "USD", "USN", "UYI", "UYU", "UYW", "UZS", "VED",
+        "VES", "VND", "VUV", "WST", "XAF", "XAG", "XAU", "XBA", "XBB", "XBC", "XBD", "XCD",
+        "XCG", "XDR", "XOF", "XPD", "XPF", "XPT", "XSU", "XUA", "YER", "ZAR", "ZMW", "ZWG",
+        "ZWL", "CNH",
+    ]
+)
+
+_MINOR_UNIT_CODES_UPPER = frozenset(code.upper() for code in MINOR_UNITS)
+
+
+def is_currency_code(raw: str | None, *, allow_subunits: bool = True) -> bool:
+    """``True`` si ``raw`` es un codigo ISO 4217 (sin distinguir mayusculas)
+    o, con ``allow_subunits``, una subunidad de cotizacion (GBp, GBX, ZAc...)."""
+    text = (raw or "").strip()
+    if text in MINOR_UNITS:  # «GBp» son peniques aunque en mayusculas sea GBP
+        return allow_subunits
+    if text.upper() in ISO_4217_CODES:
+        return True
+    return allow_subunits and text.upper() in _MINOR_UNIT_CODES_UPPER
+
+
 # Unidad en la que cotiza cada sufijo de Yahoo. Londres, Johannesburgo y Tel
 # Aviv cotizan acciones en subunidad. Solo sufijos con una divisa inequivoca.
 SUFFIX_QUOTE_UNIT: dict[str, str] = {

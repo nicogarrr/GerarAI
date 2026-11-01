@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -18,6 +18,7 @@ from app.services.investment_plan_service import (
     InvestmentPlanService,
     plan_currency_enforced,
 )
+from app.valuation.currency import is_currency_code
 
 router = APIRouter()
 
@@ -39,6 +40,14 @@ class PlanTarget(BaseModel):
         return self
 
 
+def _iso_currency(value: str | None) -> str | None:
+    # «QQQ» o «NaN» pasaban el patron de tres letras y el plan quedaba
+    # «incompleto» para siempre: ningun tipo de cambio los convierte.
+    if value is not None and not is_currency_code(value, allow_subunits=False):
+        raise ValueError("currency must be an ISO 4217 code such as EUR or USD")
+    return value
+
+
 class PlanUpsertInput(BaseModel):
     monthly_contribution: float = Field(gt=0, le=1_000_000)
     # Divisa de la cuota. OMISO (cliente viejo): se preserva la registrada;
@@ -49,6 +58,8 @@ class PlanUpsertInput(BaseModel):
     start_date: date
     horizon_years: int = Field(default=30, ge=1, le=80)
     target_allocations: list[PlanTarget] = Field(default_factory=list)
+
+    _currency_is_iso = field_validator("monthly_contribution_currency")(_iso_currency)
 
     @model_validator(mode="after")
     def _targets_fit_in_each_dimension(self) -> PlanUpsertInput:
@@ -75,6 +86,8 @@ class ContributionInput(BaseModel):
     currency: str = Field(default="EUR", pattern=r"^[A-Za-z]{3}$")
     external_id: str | None = Field(default=None, max_length=120)
     note: str = Field(default="", max_length=500)
+
+    _currency_is_iso = field_validator("currency")(_iso_currency)
 
 
 @router.get("")
