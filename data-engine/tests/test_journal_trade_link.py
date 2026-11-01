@@ -440,3 +440,29 @@ def test_adr_thesis_margin_is_per_adr_and_adr_without_listed_values_is_skipped(d
     assert reading["version"] == 1
     assert reading["value"] == 80.0
     assert reading["margin_vs_trade_price"] == pytest.approx(0.25)
+
+
+def test_london_trade_in_pence_against_value_in_pounds(db):
+    """Compra de Londres en peniques («GBp») y valoración en libras («GBP»).
+
+    En mayúsculas las dos eran «GBP» y el margen salía con 2.650 peniques
+    contra 30 libras: −98,9 % en vez de +13,2 %.
+    """
+    company = _company(db, "PNCJ.L")
+    company.currency = "GBP"
+    db.commit()
+    _engine(db, company, version=1, created=datetime(2026, 3, 1, tzinfo=UTC), expected=30.0)
+    reading = fair_value_on(db, company, date(2026, 3, 12), price=Decimal("2650"), currency="GBp")
+    assert reading is not None
+    assert reading["margin_vs_trade_price"] == pytest.approx(30 / 26.5 - 1)
+    assert reading["note"] is None
+
+
+def test_london_auto_link_compares_pence_with_pounds(db):
+    from app.services.journal_trade_link import _price_compatible
+
+    entry = DecisionJournalEntry(price=Decimal("26.40"))
+    trade = Transaction(price=Decimal("2650"), currency="GBp")
+    assert _price_compatible(entry, trade, "GBP") is True
+    far = Transaction(price=Decimal("5000"), currency="GBp")
+    assert _price_compatible(entry, far, "GBP") is False
