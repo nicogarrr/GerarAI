@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useT } from '@/lib/i18n/client';
 
 type SectorOption = { value: string; label: string };
 
@@ -8,9 +9,10 @@ type SectorOption = { value: string; label: string };
  *  Sustituye a la nube de chips (8 botones ocupaban media pantalla en móvil). */
 export default function SectorSelect({ options, value }: { options: SectorOption[]; value: string }) {
     const router = useRouter();
+    const t = useT();
     return (
         <div className="min-w-0">
-            <label htmlFor="screener-sector" className="sr-only">Filtrar por sector</label>
+            <label htmlFor="screener-sector" className="sr-only">{t('screener.sectorFilterLabel')}</label>
             <select
                 id="screener-sector"
                 value={value}
