@@ -1,13 +1,12 @@
 import { ExternalNewsHeadline } from '@/components/research/ExternalNewsHeadline';
+import { CompanyLogo } from '@/components/calendar/CompanyLogo';
 import { getNews } from '@/lib/actions/finnhub.actions';
-import { newsSummaryToShow } from '@/lib/news-summary';
-import { getT } from '@/lib/i18n/server';
+import { getLocale, getT } from '@/lib/i18n/server';
 import { newsBadge } from '@/lib/newsBadge';
-import { stripLeadingTicker, stripSourceSuffix } from '@/lib/news-display';
-import { formatMarketDateTime } from '@/lib/format';
-import Image from 'next/image';
+import { dedupeArticles, stripLeadingTicker, stripSourceSuffix } from '@/lib/news-display';
+import { formatAgeShort, formatMarketDate } from '@/lib/format';
 import Link from 'next/link';
-import { RefreshCcw } from 'lucide-react';
+import { Newspaper, RefreshCcw } from 'lucide-react';
 
 interface NewsSectionProps {
     symbols?: string[];
@@ -21,6 +20,7 @@ interface NewsSectionProps {
  */
 export default async function NewsSection({ symbols }: NewsSectionProps) {
     const t = await getT();
+    const locale = await getLocale();
     let news;
     try {
         news = await getNews(symbols);
@@ -62,77 +62,60 @@ export default async function NewsSection({ symbols }: NewsSectionProps) {
                         <p>{t('home.news.empty')}</p>
                     </div>
                 ) : (
-                    <div className="space-y-3 sm:space-y-4">
-                        {news.map((article, index) => {
-                            // La insignia del ticker se calcula una vez por tarjeta y
-                            // enlaza a la ficha de la compañía (patrón de enlace
-                            // estirado: la <a> externa cubre la tarjeta y la insignia
-                            // queda por encima con z-10, sin enlaces anidados).
+                    // Filas estilo feed (referencia Quartr, pedido de Nico 1-nov-2026):
+                    // logo de la empresa, nombre, titular y antigüedad compacta. Sin
+                    // imagen, sin fuente pintada y sin duplicados (dedupeArticles).
+                    <ul className="divide-y divide-gray-800">
+                        {dedupeArticles(news).map((article, index) => {
+                            // La insignia del ticker se calcula una vez por fila (F149:
+                            // mencionada vs. cartera) y el bloque logo+nombre ES la
+                            // insignia: enlaza a la ficha con área táctil de 44 px.
                             const badge = newsBadge(article, symbols);
+                            const ticker = badge.kind === 'general' ? null : badge.ticker;
+                            const age =
+                                typeof article.datetime === 'number' && Number.isFinite(article.datetime) && article.datetime > 0
+                                    ? (formatAgeShort(article.datetime, Date.now(), locale) ??
+                                      formatMarketDate(new Date(article.datetime * 1000), { day: 'numeric', month: 'short' }))
+                                    : t('home.news.noDate');
                             return (
-                            <article
-                                key={`${article.id}-${index}`}
-                                className="relative min-w-0 p-4 bg-surface-2 hover:bg-surface-1 rounded-lg border border-gray-800 transition-all duration-200 group"
-                            >
-                            <div className="mb-2 flex justify-end">
-                                {badge.kind === 'general' ? <span className="text-xs text-gray-400">{t('home.news.generalMarket')}</span> : <Link href={`/research/${encodeURIComponent(badge.ticker)}`} className="relative before:absolute before:-inset-3.5 before:content-[''] text-xs text-teal-300">{badge.kind === 'mentioned' ? <>Mencionada · {badge.ticker}</> : badge.ticker}</Link>}
-                            </div>
-                            <div>
-                                <div className="flex flex-col min-[420px]:flex-row gap-3 sm:gap-4">
-                                    {article.image && (
-                                        <div className="h-28 w-full min-w-0 shrink-0 relative rounded-lg overflow-hidden min-[420px]:h-24 min-[420px]:w-32">
-                                            <Image
-                                                src={article.image}
-                                                /* El titular ya está en el <h3> de al lado: con alt
-                                                   textual el lector de pantalla lo anuncia dos veces. */
-                                                alt=""
-                                                fill
-                                                className={
-                                                    /* Logos de fuente (p.ej. Reuters): contain para
-                                                       no cortar la palabra; fotos: cover como antes. */
-                                                    article.image.includes('/logo/')
-                                                        ? 'object-contain bg-black/40 p-2'
-                                                        : 'object-cover'
-                                                }
-                                                sizes="(min-width: 420px) 128px, 100vw"
-                                            />
-                                        </div>
+                                <li key={`${article.id}-${index}`} className="flex items-start gap-3 py-3">
+                                    {ticker ? (
+                                        <Link
+                                            href={`/research/${encodeURIComponent(ticker)}`}
+                                            aria-label={ticker}
+                                            className="mt-0.5 shrink-0"
+                                        >
+                                            <CompanyLogo ticker={ticker} name={ticker} className="size-12 rounded-xl" />
+                                        </Link>
+                                    ) : (
+                                        <span aria-hidden="true" className="mt-0.5 grid size-12 shrink-0 place-items-center rounded-xl bg-gray-800 text-gray-400">
+                                            <Newspaper className="size-5" />
+                                        </span>
                                     )}
-                                    <div className="flex-1 min-w-0">
-                                        <ExternalNewsHeadline
-                                            headline={stripLeadingTicker(stripSourceSuffix(article.headline, article.source), badge.kind === 'general' ? null : badge.ticker)}
-                                            url={article.url}
-                                            className="text-white text-sm sm:text-base font-semibold mb-2 break-words"
-                                        />
-                                        {newsSummaryToShow(article.headline, article.summary) && (
-                                            <p className="text-gray-400 text-sm mb-2 line-clamp-2 break-words">
-                                                {newsSummaryToShow(article.headline, article.summary)}
-                                            </p>
-                                        )}
-                                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
-                                            {article.source && (
-                                                <span className="font-medium text-[#0FEDBE]">
-                                                    {article.source}
-                                                </span>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="flex items-baseline justify-between gap-3">
+                                            {ticker ? (
+                                                <Link
+                                                    href={`/research/${encodeURIComponent(ticker)}`}
+                                                    className="relative truncate text-sm font-semibold text-gray-100 before:absolute before:-inset-3.5 before:content-[''] hover:text-teal-200"
+                                                >
+                                                    {badge.kind === 'mentioned' ? `Mencionada · ${ticker}` : ticker}
+                                                </Link>
+                                            ) : (
+                                                <span className="truncate text-sm font-semibold text-gray-100">{t('home.news.generalMarket')}</span>
                                             )}
-                                            {typeof article.datetime === 'number' && Number.isFinite(article.datetime) && article.datetime > 0 ? (
-                                                <span>
-                                                    {formatMarketDateTime(new Date(article.datetime * 1000), {
-                                                        day: 'numeric',
-                                                        month: 'short',
-                                                        year: 'numeric',
-                                                        hour: '2-digit',
-                                                        minute: '2-digit',
-                                                    })}
-                                                </span>
-                                            ) : <span>{t('home.news.noDate')}</span>}
-                                        </div>
+                                            <span className="shrink-0 text-xs text-gray-500">{age}</span>
+                                        </p>
+                                        <ExternalNewsHeadline
+                                            headline={stripLeadingTicker(stripSourceSuffix(article.headline, article.source), ticker)}
+                                            url={article.url}
+                                            className="mt-1 text-sm leading-6 text-gray-400 line-clamp-3 break-words"
+                                        />
                                     </div>
-                                </div>
-                            </div>
-                            </article>
-                        );})}
-                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
                 )}
             </section>
     );

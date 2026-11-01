@@ -36,11 +36,6 @@ const HEX = /#[0-9a-f]{3,8}\b/i;
  */
 const ALLOWLIST: readonly { file: string; hex: string; why: string }[] = [
     {
-        file: 'components/NewsSection.tsx',
-        hex: '#0FEDBE',
-        why: 'Esmeralda de marca de la seccion de noticias. NO es token: `good`=#5eead4 y `good-strong`=#14b8a6. Decidir si es acento o dato antes de tocarlo.',
-    },
-    {
         file: 'components/research/AstSmaChart.tsx',
         hex: '#0B1414',
         why: 'Fondo del grafico con tinte verde. No existe token equivalente (las superficies son neutras): declararlo en globals.css o aceitarlo aqui.',
