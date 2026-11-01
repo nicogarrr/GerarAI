@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const src = readFileSync(join(root, 'app/(root)/screeners/page.tsx'), 'utf8');
+const src = readFileSync(join(root, 'app/(root)/screeners/page.tsx'), 'utf8') + JSON.stringify(JSON.parse(readFileSync(join(root, 'lib/i18n/messages/es/screener.json'), 'utf8')).screens);
 
 describe('screener alert opt-in guard (F148)', () => {
     it('el checkbox alerts_enabled NO viene premarcado', () => {

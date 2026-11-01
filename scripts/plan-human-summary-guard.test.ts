@@ -28,8 +28,10 @@ test('alert removal requires confirmation before mutation and names its rule',()
  assert.equal(esAlerts.list.deleteAria,'Eliminar alerta: {label}');
 });
 test('screeners pluralize counts; ProPicks uses Spanish score labels',()=>{
- const s=readFileSync('app/(root)/screeners/page.tsx','utf8');
- assert.match(s,/result.match_count === 1 \? 'coincidencia' : 'coincidencias'/);
+ const s=readFileSync('app/(root)/screeners/page.tsx','utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).screens);
+ // Singular y plural vía el diccionario español (sección screens).
+ assert.match(s,/result\.match_count === 1 \? t\('screener\.screens\.matchesOne'/);
+ assert.match(s,/"matchesOne":"\{count\} coincidencia","matchesMany":"\{count\} coincidencias"/);
  const p=readFileSync('components/proPicks/EnhancedProPicksFilters.tsx','utf8');
  assert.doesNotMatch(p,/Score Mínimo|Score General/);
 });

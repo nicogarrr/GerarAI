@@ -31,7 +31,6 @@
   "app/(root)/screener/page.tsx": 33,
   "app/(root)/screeners/[screenId]/not-found.tsx": 5,
   "app/(root)/screeners/[screenId]/page.tsx": 2,
-  "app/(root)/screeners/page.tsx": 41,
   "app/(root)/security/page.tsx": 12,
   "app/(root)/taxes/page.tsx": 1,
   "app/(root)/temas/_components/ThemeBrainButton.tsx": 1,

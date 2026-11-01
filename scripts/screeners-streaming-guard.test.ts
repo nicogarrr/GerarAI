@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 // porque el page hacía await de workspace + cobertura antes de pintar nada.
 // La cabecera debe quedar fuera de los <Suspense> y las dos peticiones se
 // disparan en paralelo.
-const src = readFileSync('app/(root)/screeners/page.tsx', 'utf8');
+const src = readFileSync('app/(root)/screeners/page.tsx', 'utf8') + JSON.stringify(JSON.parse(readFileSync('lib/i18n/messages/es/screener.json', 'utf8')).screens);
 
 test('la cabecera pinta en el primer chunk (antes de cualquier Suspense)', () => {
   assert.ok(src.indexOf('<header') < src.indexOf('<Suspense fallback'), 'el header debe renderizarse antes del primer Suspense');
