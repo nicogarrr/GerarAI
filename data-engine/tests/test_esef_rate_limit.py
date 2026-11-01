@@ -87,6 +87,41 @@ def test_ventana_larga_no_se_duerme_en_linea(waits):
     assert caught.value.retry_after == 3600
 
 
+# ---------- Retry-After: solo delay-seconds finito y no negativo ----------
+
+# RFC 9110 10.2.3: Retry-After es delay-seconds (entero >= 0) o HTTP-date.
+# Un servidor roto u hostil puede mandar "inf"/"nan": float() los acepta y una
+# espera infinita o NaN colgaria el worker. Se ignoran y cae al backoff.
+
+
+@pytest.mark.parametrize("raw", ["inf", "-inf", "Infinity", "-Infinity", "nan", "NaN"])
+def test_retry_after_no_finito_se_ignora(raw):
+    resp = httpx.Response(429, headers={"Retry-After": raw})
+    assert esef._retry_after_header(resp) is None
+
+
+@pytest.mark.parametrize("raw", ["-5", "-0.5", "-1e3"])
+def test_retry_after_negativo_se_ignora(raw):
+    resp = httpx.Response(429, headers={"Retry-After": raw})
+    assert esef._retry_after_header(resp) is None
+
+
+@pytest.mark.parametrize("raw,esperado", [("0", 0.0), ("7", 7.0), ("2.5", 2.5), ("3600", 3600.0)])
+def test_retry_after_valido_se_respeta(raw, esperado):
+    resp = httpx.Response(429, headers={"Retry-After": raw})
+    assert esef._retry_after_header(resp) == esperado
+
+
+def test_429_con_retry_after_infinito_cae_al_backoff_y_reintenta(waits):
+    ok = httpx.Response(200, json={"ok": True})
+    client, calls = _client([httpx.Response(429, headers={"Retry-After": "inf"}), ok])
+    assert asyncio.run(client._get_json("/api/filings")) == {"ok": True}
+    assert calls["n"] == 2
+    # backoff exponencial del primer intento (10-12 s), nunca una espera infinita
+    assert len(waits) == 1
+    assert 10.0 <= waits[0] <= 13.0
+
+
 # ---------- actor ----------
 
 

@@ -25,6 +25,7 @@ converts that into an honest degraded state.
 from __future__ import annotations
 
 import asyncio
+import math
 import random
 import re
 import time
@@ -86,7 +87,7 @@ def _retry_after_header(response: httpx.Response) -> float | None:
         value = float(raw)
     except ValueError:
         return None
-    return value if value >= 0 and value != float("inf") else None
+    return value if math.isfinite(value) and value >= 0 else None
 
 
 def _wait_for_429(attempt: int, server: float | None) -> float:
