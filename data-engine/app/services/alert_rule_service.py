@@ -19,6 +19,7 @@ from app.models import (
     ResearchAlert,
 )
 from app.services.notification_service import NotificationService
+from app.services.portfolio_ledger_service import trade_price_fallbacks
 from app.services.price_freshness import close_is_stale
 from app.services.price_units import close_in_company_currency, listing_price
 from app.services.review_alert_service import ReviewAlertService
@@ -337,6 +338,13 @@ class AlertRuleService:
                 .order_by(desc(Position.as_of))
                 .limit(1)
             )
+            if position is not None and position.company_id in trade_price_fallbacks(
+                db, [position], tenant_id=position.tenant_id
+            ):
+                # Sin cotización real: el «precio» de la posición es el de tu
+                # propia compra/venta (auditoría A3), no un precio de mercado.
+                # Con él, «avísame si baja de 13» saltaba nada más comprar a 12,50.
+                return None, {"kind": kind, "status": "missing", "position_id": position.id}
             position_price = (
                 self._price_in_threshold_unit(
                     db, rule, Decimal(position.market_price), unit=position.currency, on=position.as_of
