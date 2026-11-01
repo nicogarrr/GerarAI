@@ -35,3 +35,23 @@ describe('fromBackendValue: inverso intacto', () => {
         expect(fromBackendValue('0.15', 'ratio')).toBe('15');
     });
 });
+
+describe('fromBackendValue: lo que muestra se relee igual al guardar', () => {
+    it.each([
+        ['1.234', 'number'],
+        ['0.12345', 'ratio'],
+        ['12.345', 'number'],
+        ['-2.125', 'number'],
+        ['0.125', 'number'],
+        ['0.15', 'ratio'],
+        ['1234.5', 'number'],
+        ['42', 'number'],
+    ] as const)('%s (%s) ida y vuelta sin cambiar', (raw, unit) => {
+        expect(toBackendValue(fromBackendValue(raw, unit), unit)).toBe(raw);
+    });
+
+    it('usa la coma decimal es-ES', () => {
+        expect(fromBackendValue('0.125', 'ratio')).toBe('12,5');
+        expect(fromBackendValue('1.234', 'number')).toBe('1,2340');
+    });
+});

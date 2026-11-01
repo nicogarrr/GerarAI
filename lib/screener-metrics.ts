@@ -1,5 +1,5 @@
 // @ts-expect-error TS5097: extensión explícita requerida por los guards node strip-types.
-import { parseLocalizedNumberDetailed } from './format.ts';
+import { formatNumberForInput, parseLocalizedNumberDetailed } from './format.ts';
 
 /** Unidad en la que el backend guarda la métrica y cómo la escribe una persona. */
 export type MetricUnit = { suffix: string; factor: number; step: string };
@@ -91,5 +91,8 @@ export function shownValueError(shown: string): 'ambiguous' | 'invalid' | null {
 export function fromBackendValue(raw: string, unit: UnitKind): string {
   const n = Number(raw);
   if (!raw.trim() || !Number.isFinite(n)) return '';
-  return String(Number((n / UNITS[unit].factor).toPrecision(12)));
+  // Se escribe como lo relee toBackendValue (gramática es-ES): con String() salía
+  // «1.234» con punto, que es-ES lee como MILES, y editar un screen guardado
+  // convertía el valor 1,234 en 1234 sin tocar nada.
+  return formatNumberForInput(Number((n / UNITS[unit].factor).toPrecision(12)));
 }
