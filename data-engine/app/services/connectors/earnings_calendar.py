@@ -192,7 +192,7 @@ async def fetch_dividends_day(
 
 def _check_range(desde: date, hasta: date) -> None:
     if desde > hasta:
-        raise ValueError("desde no puede ser posterior a hasta")
+        raise ValueError('"desde" no puede ser posterior a "hasta"')
     if (hasta - desde).days + 1 > MAX_DAYS_PER_REQUEST:
         raise ValueError(f"rango máximo: {MAX_DAYS_PER_REQUEST} días")
 

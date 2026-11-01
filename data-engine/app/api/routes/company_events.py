@@ -128,7 +128,7 @@ def get_company_timeline_events(
         end = hasta or local_today()  # día de Madrid, no el UTC del servidor
         start = desde or end - timedelta(days=183)
         if start > end:
-            raise HTTPException(status_code=400, detail="desde no puede ser posterior a hasta")
+            raise HTTPException(status_code=400, detail='"desde" no puede ser posterior a "hasta"')
         if (end - start).days > TIMELINE_MAX_DAYS:
             start = end - timedelta(days=TIMELINE_MAX_DAYS)
         events = stored_timeline_events(db, company, start, end)

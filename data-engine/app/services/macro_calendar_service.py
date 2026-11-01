@@ -88,7 +88,7 @@ async def get_macro_events(
 ) -> dict[str, Any]:
     """Eventos entre ``start`` y ``end`` (ambos incluidos), ordenados por fecha."""
     if start > end:
-        raise ValueError("desde no puede ser posterior a hasta")
+        raise ValueError('"desde" no puede ser posterior a "hasta"')
     if (end - start).days + 1 > MAX_RANGE_DAYS:
         raise ValueError(f"rango máximo: {MAX_RANGE_DAYS} días")
     agent = get_settings().sec_user_agent
