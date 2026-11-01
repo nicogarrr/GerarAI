@@ -40,17 +40,37 @@ function composeLine(script: string, verb: 'stop' | 'start'): string {
 const producers = servicesWithAppEnv(compose);
 assert.ok(producers.length >= 8, 'el parseo del compose no encontro los servicios esperados');
 
+// Comparacion por tokens exactos: con substring, «worker» pasaria si solo
+// quedara «worker-thesis», y «worker-yahoo» si quedara «worker-yahoo-news».
+function lineCovers(line: string, service: string): boolean {
+  return new Set(line.trim().split(/\s+/)).has(service);
+}
+
 describe('backup.sh --stop-storage cubre todos los servicios con x-app-env', () => {
   for (const svc of producers) {
     it(`para y rearranca ${svc}`, () => {
-      assert.ok(
-        composeLine(backup, 'stop').includes(` ${svc}`) || composeLine(backup, 'stop').endsWith(` ${svc}`),
-        `${svc} no esta en la parada de --stop-storage`,
-      );
-      assert.ok(
-        composeLine(backup, 'start').includes(` ${svc}`) || composeLine(backup, 'start').endsWith(` ${svc}`),
-        `${svc} no esta en el rearranque tras el backup`,
-      );
+      assert.ok(lineCovers(composeLine(backup, 'stop'), svc), `${svc} no esta en la parada de --stop-storage`);
+      assert.ok(lineCovers(composeLine(backup, 'start'), svc), `${svc} no esta en el rearranque tras el backup`);
     });
   }
+});
+
+describe('la comparacion es por tokens (mutaciones)', () => {
+  const stop = composeLine(backup, 'stop');
+
+  it('sin «worker» aunque queden otros worker-*, el guard falla', () => {
+    const mutated = stop.replace(/ worker( |$)/, '$1');
+    assert.ok(!stop.includes('worker-thesis') || !lineCovers(mutated, 'worker'));
+    assert.equal(lineCovers(mutated, 'worker'), false);
+  });
+
+  it('«worker-yahoo-news» no cubre «worker-yahoo»', () => {
+    const soloNews = '${COMPOSE} stop backend worker-yahoo-news scheduler';
+    assert.equal(lineCovers(soloNews, 'worker-yahoo'), false);
+    assert.equal(lineCovers(soloNews, 'worker-yahoo-news'), true);
+  });
+
+  it('el ultimo token de la linea tambien cuenta', () => {
+    assert.equal(lineCovers('${COMPOSE} stop backend worker', 'worker'), true);
+  });
 });
