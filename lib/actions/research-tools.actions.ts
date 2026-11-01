@@ -604,7 +604,7 @@ export async function searchResearchLibrary(input: {
   includeVector?: boolean;
 }): Promise<UniversalSearchResponse> {
   if (!input.query.trim()) return { query: '', total: 0, retrieval: {}, results: [] };
-  return requestJson('/api/search', {
+  const raw = await requestJson<UniversalSearchWire>('/api/search', {
     method: 'POST',
     body: JSON.stringify({
       query: input.query.trim(),
@@ -619,6 +619,27 @@ export async function searchResearchLibrary(input: {
       include_vector: input.includeVector !== false,
     }),
   });
+  return toUniversalSearchResponse(raw);
+}
+
+// POST /api/search responde paginado ({ items, page_info, ... }) desde la
+// paginación de endpoints; la página /search lee `results` y `total`. Sin este
+// adaptador `results` llegaba undefined y la página reventaba al pintar.
+type UniversalSearchWire = Partial<UniversalSearchResponse> & {
+  items?: UniversalSearchResult[];
+  page_info?: { total_items?: number };
+};
+
+function toUniversalSearchResponse(raw: UniversalSearchWire): UniversalSearchResponse {
+  const results = raw.results ?? raw.items ?? [];
+  return {
+    query: raw.query ?? '',
+    ...(raw.status !== undefined ? { status: raw.status } : {}),
+    ...(raw.filters !== undefined ? { filters: raw.filters } : {}),
+    retrieval: raw.retrieval ?? {},
+    total: raw.total ?? raw.page_info?.total_items ?? results.length,
+    results,
+  };
 }
 
 function criteriaFromForm(formData: FormData): ScreenCriterion[] {
