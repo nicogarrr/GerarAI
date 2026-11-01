@@ -45,8 +45,10 @@ Reglas que valen para todas las filas:
 | **Valuation engines** | 13 puertas deterministas sobre 8 motores: estado publicable, banda bear/base/bull, valor contra forma cerrada, probabilidades, sensibilidad, entradas ausentes declaradas, cero de deuda neta silencioso, signo del FCF negativo, routing, trazabilidad de evidencia, base ADR, y que ninguna puerta pueda omitirse | **989 checks, 0 fallos** (log del job `evals`, 2026-10-02) | cualquier fallo = exit 1 | `data-engine/scripts/run_valuation_evals.py` | `ci.yml` job `evals` |
 | **Thesis release matrix** | 12 casos heterogéneos: contratos `publicable`/`insufficient_data`, ADR, unidades, FX presente/ausente/viejo/futuro, sin FCF y PDF de borrador sin valores inventados | **12/12 casos** en tests deterministas | cualquier fallo = exit 1 | `data-engine/tests/release_thesis_matrix` + `tests/unit/api/thesis-pdf-route.test.ts` | `ci.yml` (`backend` + `frontend`) |
 | **LLM layers** | 12 puertas sobre 4 capas (`kpi_extraction`, `narrative`, `principles`, `debate`): schema de salida, etiquetas conocidas, confianza en rango, sin cifras alucinadas, toda afirmacion con evidencia, veredicto de debate permitido, orden de escenarios, probabilidades que suman 1, fallo de proveedor degradado y no contestado, abstention con evidencia insuficiente, capas cubiertas, controles negativos presentes | **517 checks, 0 fallos** | cualquier fallo = exit 1 | `data-engine/scripts/run_llm_evals.py` | `ci.yml` job `evals` + [`llm-evals.yml`](../.github/workflows/llm-evals.yml) |
+| **Evidence contract** | Frontera `evidence.v1`: cada caso aporta candidato y fuentes y la salida (o el error) tiene que ser la esperada; dataset sintetico adversarial, no una muestra de calibracion | **39 casos** | cualquier fallo = exit 1 | `data-engine/scripts/run_evidence_evals.py` | `ci.yml` job `evals` (runner requerido) |
+| **Financial semantics** | `MetricSemanticsRegistry.classify` clasifica cada caso como `beat`, `miss` u `outside_tolerance` segun lo esperado; los estados adversos son los controles: un miss no puede salir como beat | **6 casos, 6 metricas** | cualquier fallo = exit 1 | `data-engine/scripts/run_financial_evals.py` | `ci.yml` job `backend` (ultimo paso) |
 
-Los tres ultimos no tienen un "umbral decimal": el dataset **es** el umbral. Cada
+Las filas sin metrica decimal (thesis matrix, LLM layers, evidence, financial) no tienen un "umbral decimal": el dataset **es** el umbral. Cada
 caso lleva el valor o el comportamiento exacto que se espera, incluidas las
 condiciones en las que el motor **tiene que negarse a publicar**. Un caso que
 falla es un fallo, sin margen.
@@ -59,11 +61,14 @@ filtros: corre en cada push y cada PR.
 
 ---
 
-## 2. Los 4 datasets
+## 2. Los 6 datasets
 
 Un gate sin controles negativos es un gate que nadie ha probado que muerda. Por
-eso los 4 datasets llevan casos escritos a mano que **deben** fallar su puerta, y
-el runner falla si alguno pasa.
+eso los 4 datasets originales llevan casos escritos a mano que **deben** fallar
+su puerta, y el runner falla si alguno pasa. Los dos mas nuevos controlan lo
+mismo de otra forma: evidence fija la salida o el **error** exacto de cada caso
+y financial incluye estados adversos (`miss`, `outside_tolerance`) que la
+puerta tiene que producir.
 
 | Dataset | Fichero | Casos | Medidos | Controles negativos | Checks | Familia de origen |
 |---|---|---:|---:|---:|---:|---|
@@ -71,6 +76,8 @@ el runner falla si alguno pasa.
 | `valuation_engines_v1` | `data-engine/evals/valuation/valuation_engines_v1.json` | 145 | 128 | **17** | 989 | 8 motores: standard_dcf, bank, insurer, reit, sotp, holding_company, pre_revenue, commodity |
 | `llm_layers_v1` | `data-engine/evals/llm/llm_layers_v1.json` | 56 | 25 | **31** | 517 | 4 capas del pipeline LLM |
 | `ingest_v1` | `data-engine/evals/ingest/ingest_v1.json` | 85 | 74 | **11** | 630 | 3 familias: sec (46), esef (18), fmp (21) |
+| `evidence_v1` | `data-engine/evals/evidence/evidence_v1.json` | 39 | 39 | 0 (el contrato fija salida o error exacto por caso) | 39 | Frontera `evidence.v1` (`app.services.evidence_contract`) |
+| `financial_engine_v1` | `data-engine/evals/financial_engine_v1.json` | 6 | 6 | 3 (los casos `miss`/`outside_tolerance`) | 6 | `MetricSemanticsRegistry.classify` |
 
 Detalle de los controles negativos por dataset:
 
@@ -95,8 +102,8 @@ Detalle de los controles negativos por dataset:
 
 | Workflow | Job | Quando | Que ejecuta |
 |---|---|---|---|
-| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | `evals` | cada push y cada PR, sin filtros | Los runners `run_rag_evals`, `run_valuation_evals`, `run_llm_evals` y `run_ingest_evals` (ver el bucle del job en `ci.yml`; es la fuente de verdad de que runners son bloqueantes). Publica los logs `run_*_evals.log` como artefacto. |
-| `ci.yml` | `backend` | cada push y cada PR | Suite completa, ruff, pyright, y el gate fail-closed de `tests/test_rag_activation.py` contra Qdrant real. |
+| [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | `evals` | cada push y cada PR, sin filtros | Los runners `run_rag_evals`, `run_valuation_evals`, `run_llm_evals`, `run_ingest_evals` y `run_evidence_evals` (los cinco son `required` en el bucle del job; `ci.yml` es la fuente de verdad de que runners son bloqueantes). Publica los logs `run_*_evals.log` como artefacto. |
+| `ci.yml` | `backend` | cada push y cada PR | Suite completa, ruff, pyright, el gate fail-closed de `tests/test_rag_activation.py` contra Qdrant real, y `run_financial_evals.py` como ultimo paso. |
 | [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | push/PR que tocan `data-engine/**` | `run_coverage_gate.py` con `branch=True`, sin Qdrant (la medicion tiene que ser determinista). Publica `htmlcov/` y el `.coverage` como artefacto. |
 | [`llm-evals.yml`](../.github/workflows/llm-evals.yml) | `llm-layer-evals` | push/PR filtrados por paths de evals | `run_llm_evals.py` + contratos, sin `requirements.txt` ni red. |
 | [`ingest-evals.yml`](../.github/workflows/ingest-evals.yml) | `ingest-precision` | cada push y cada PR | `run_ingest_evals.py` + contratos de puerta y guardian de red. |
