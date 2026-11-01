@@ -24,6 +24,7 @@ from app.services.brain_service import resolve_page_context
 from app.services.document_ingestion_service import MAX_DOCUMENT_BYTES
 from app.services.knowledge_library_service import (
     KNOWLEDGE_DOCUMENT_TYPES,
+    KnowledgeCollectionExistsError,
     KnowledgeLibraryService,
     normalize_knowledge_ticker,
 )
@@ -226,10 +227,15 @@ def create_collection(payload: CollectionCreate, db: Session = Depends(get_db)) 
                 collection_type=payload.collection_type,
             )
         )
-    except ValueError as exc:
+    except KnowledgeCollectionExistsError as exc:
         # 409 fijo: el nombre ya existe. Sin filtrar internos.
         raise HTTPException(
             status_code=409, detail="Knowledge collection already exists"
+        ) from exc
+    except ValueError as exc:
+        # «!!» o «日本株» no dan slug: antes salia el 409 «ya existe» sin existir.
+        raise HTTPException(
+            status_code=422, detail="Collection name must contain letters or numbers"
         ) from exc
 
 

@@ -90,6 +90,10 @@ def normalize_knowledge_ticker(value: str | None) -> str | None:
     return normalized
 
 
+class KnowledgeCollectionExistsError(ValueError):
+    """Ya hay una coleccion con ese nombre (mismo slug) en el tenant."""
+
+
 def _slug(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower()).strip("-")
     if not normalized:
@@ -159,7 +163,7 @@ class KnowledgeLibraryService:
     ) -> KnowledgeCollection:
         slug = _slug(name)
         if db.scalar(select(KnowledgeCollection).where(KnowledgeCollection.slug == slug)):
-            raise ValueError(f"Knowledge collection {name!r} already exists")
+            raise KnowledgeCollectionExistsError(f"Knowledge collection {name!r} already exists")
         collection = KnowledgeCollection(
             name=name.strip(),
             slug=slug,
