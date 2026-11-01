@@ -262,6 +262,9 @@ function isPence(currency: string | null | undefined): boolean {
 }
 
 function formatCurrencyParts(value: number, currency: string, options: Intl.NumberFormatOptions, locale: Locale = DEFAULT_LOCALE): string {
+  // Un importe que redondea a cero es cero, sin signo (-0,004 € salía «-0,00 €»),
+  // como en formatNumber; quien pida otro signDisplay lo conserva.
+  options = { signDisplay: 'negative', ...options };
   if (!isPence(currency)) {
     return new Intl.NumberFormat(intlLocale(locale), { ...options, style: 'currency', currency }).format(value);
   }
@@ -406,6 +409,7 @@ export function formatMoneyCompact(
       currency,
       notation: 'compact',
       maximumFractionDigits: 2,
+      signDisplay: 'negative',
       ...options,
     }).format(parsed);
   }
