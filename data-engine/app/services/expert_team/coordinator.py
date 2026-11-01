@@ -39,6 +39,11 @@ _BROAD_RE = re.compile(
 )
 
 
+def fold(text: str) -> str:
+    """Minúsculas y sin tildes, igual que el plan (lo usa también la plantilla)."""
+    return _fold(text)
+
+
 def is_broad_question(question: str) -> bool:
     return bool(_BROAD_RE.search(_fold(question)))
 
