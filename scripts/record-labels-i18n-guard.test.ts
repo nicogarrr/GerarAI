@@ -152,7 +152,9 @@ void test('los valores anidados no se serializan como JSON crudo en la celda', (
   assert.ok(!recordViews.includes('JSON.stringify(value)'));
   assert.match(recordViews, /function describeValue\(value: unknown, depth: number(, t\?: TranslateFn)?\): string \{/);
   // Y lo que no cabe se cuenta, no desaparece sin aviso.
-  assert.match(recordViews, /\+\$\{rest\} más/);
+  // En el idioma elegido («+N more» en inglés); sin traductor, en español.
+  assert.match(recordViews, /t\('data\.moreItems', \{ count \}\)/);
+  assert.match(recordViews, /\+\$\{count\} más/);
 });
 
 void test('una fila mutada se actualiza con la respuesta del backend', () => {

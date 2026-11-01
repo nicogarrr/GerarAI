@@ -2,6 +2,10 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import ImportImageButton from '@/components/portfolio/ImportImageButton';
 import { imageFileError, imageRowsPending, normalizeImageQuantity } from '@/lib/portfolio/image-import';
+import { createTranslator } from '@/lib/i18n/translate';
+
+const es = createTranslator('es');
+const en = createTranslator('en');
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock('@/lib/actions/portfolio-image.actions', () => ({
@@ -14,9 +18,9 @@ import { confirmPortfolioImage, previewPortfolioImage, reviewPortfolioImage } fr
 
 describe('captura de cartera', () => {
     it('bloquea tipos y tamaños no soportados', () => {
-        expect(imageFileError({type:'image/svg+xml',size:100})).toContain('PNG');
-        expect(imageFileError({type:'image/png',size:4*1024*1024})).toContain('2 MB');
-        expect(imageFileError({type:'image/png',size:100})).toBeNull();
+        expect(imageFileError({type:'image/svg+xml',size:100}, es)).toContain('PNG');
+        expect(imageFileError({type:'image/png',size:4*1024*1024}, es)).toContain('2 MB');
+        expect(imageFileError({type:'image/png',size:100}, es)).toBeNull();
     });
     it('no guarda al subir ni antes de seleccionar instrumento y revisar', async () => {
         render(<ImportImageButton />);
@@ -59,8 +63,8 @@ describe('captura de cartera', () => {
         expect(normalizeImageQuantity('1.250,5')).toBeNull();
         expect(normalizeImageQuantity('0')).toBeNull();
         expect(normalizeImageQuantity('abc')).toBeNull();
-        expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '1,2,3' }])).toBe('Falta: 1 cantidad no válida.');
-        expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '3' }])).toBeNull();
+        expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '1,2,3' }], es)).toBe('Falta: 1 cantidad no válida.');
+        expect(imageRowsPending([{ instrument: {}, checked: true, quantity: '3' }], es)).toBeNull();
     });
     it('un rechazo del backend se ve con su motivo en español (no el mensaje genérico de Next)', async () => {
         vi.mocked(previewPortfolioImage).mockResolvedValueOnce({ ok: false, error: 'No se pudo leer la captura. Prueba con un recorte más nítido o importa un fichero' } as never);
@@ -68,5 +72,14 @@ describe('captura de cartera', () => {
         fireEvent.click(screen.getByRole('button', {name:'Importar captura'}));
         fireEvent.change(screen.getByLabelText('Elegir captura'), {target:{files:[new File(['png'], 'test.png', {type:'image/png'})]}});
         expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo leer la captura. Prueba con un recorte más nítido');
+    });
+    it('en inglés, los avisos de fichero y de filas pendientes salen en inglés', () => {
+        expect(imageFileError({type:'image/gif',size:100}, en)).toBe('Use a PNG, JPEG or WebP image');
+        expect(imageFileError({type:'image/png',size:4*1024*1024}, en)).toBe('The image must be 2 MB or smaller');
+        expect(imageFileError({type:'image/png',size:4*1024*1024}, es)).toBe('La imagen debe ocupar como máximo 2 MB');
+        expect(imageRowsPending([], en)).toBe('Add at least one row.');
+        expect(imageRowsPending([{ instrument: null, checked: false, quantity: 'x' }, { instrument: {}, checked: false, quantity: '2' }, { instrument: {}, checked: false, quantity: '3' }], en))
+            .toBe('Still needed: 1 row with no instrument chosen, 1 invalid quantity, 2 rows not marked as reviewed.');
+        expect(imageRowsPending([{ instrument: null, checked: false, quantity: 'x' }], es)).toBe('Falta: 1 fila sin instrumento elegido, 1 cantidad no válida.');
     });
 });

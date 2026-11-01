@@ -398,7 +398,17 @@
     "importedOne": "{n} position imported",
     "importedMany": "{n} positions imported",
     "errorGeneric": "The import could not be completed",
-    "errorOpen": "The image could not be opened"
+    "errorOpen": "The image could not be opened",
+    "fileType": "Use a PNG, JPEG or WebP image",
+    "fileSize": "The image must be 2 MB or smaller",
+    "pendingNoRows": "Add at least one row.",
+    "pendingNoInstrumentOne": "{n} row with no instrument chosen",
+    "pendingNoInstrumentMany": "{n} rows with no instrument chosen",
+    "pendingBadQuantityOne": "{n} invalid quantity",
+    "pendingBadQuantityMany": "{n} invalid quantities",
+    "pendingUncheckedOne": "{n} row not marked as reviewed",
+    "pendingUncheckedMany": "{n} rows not marked as reviewed",
+    "pendingMissing": "Still needed: {items}."
   },
   "savings": {
     "title": "Your long-term savings",

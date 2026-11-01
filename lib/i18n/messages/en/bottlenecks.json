@@ -36,5 +36,13 @@
     "prev": "Previous",
     "next": "Next",
     "page": "Page {page}"
+  },
+  "themeNames": {
+    "semiconductors": "Semiconductors",
+    "energy": "Energy",
+    "minerals": "Minerals",
+    "transport": "Transportation",
+    "dataCenters": "Data centers",
+    "aerospace": "Aerospace industry"
   }
 }

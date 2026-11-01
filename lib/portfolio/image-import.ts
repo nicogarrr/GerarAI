@@ -1,3 +1,5 @@
+import type { TranslateFn } from '@/lib/i18n/translate';
+
 export type ImageRow = { raw: string; identity: string; quantity: string | null; currency: string | null; warning: string };
 export type ConfirmedImageRow = { ticker: string; quantity: string; currency: string; confirmed: boolean };
 export type ImagePreview = { image_hash: string; rows: ImageRow[]; message: string };
@@ -17,9 +19,9 @@ export function unwrapImageResult<T>(result: ImageActionResult<T>): T {
 
 export type ImageReview = { review_id: number; can_confirm: boolean; base_currency: string; already_imported: boolean; rows: Array<ConfirmedImageRow & { name: string; exchange: string; price: string | null; timestamp: number | null; source: string; value_native: string | null; value_base: string | null; weight_percent: string | null }> };
 
-export function imageFileError(file: Pick<File, 'size' | 'type'>): string | null {
-    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return 'Usa una imagen PNG, JPEG o WebP';
-    if (file.size === 0 || file.size > 2 * 1024 * 1024) return 'La imagen debe ocupar como máximo 2 MB';
+export function imageFileError(file: Pick<File, 'size' | 'type'>, t: TranslateFn): string | null {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) return t('portfolio.importImage.fileType');
+    if (file.size === 0 || file.size > 2 * 1024 * 1024) return t('portfolio.importImage.fileSize');
     return null;
 }
 
@@ -37,15 +39,14 @@ export function normalizeImageQuantity(input: string): string | null {
 }
 
 /** Qué falta para poder consultar precios, o null si está todo listo. */
-export function imageRowsPending(rows: Array<{ instrument: unknown; checked: boolean; quantity: string }>): string | null {
-    if (rows.length === 0) return 'Añade al menos una fila.';
+export function imageRowsPending(rows: Array<{ instrument: unknown; checked: boolean; quantity: string }>, t: TranslateFn): string | null {
+    if (rows.length === 0) return t('portfolio.importImage.pendingNoRows');
     const missing: string[] = [];
     const noInstrument = rows.filter(row => !row.instrument).length;
     const badQuantity = rows.filter(row => normalizeImageQuantity(row.quantity) === null).length;
     const unchecked = rows.filter(row => row.instrument && !row.checked).length;
-    const n = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
-    if (noInstrument) missing.push(n(noInstrument, 'fila sin instrumento elegido', 'filas sin instrumento elegido'));
-    if (badQuantity) missing.push(n(badQuantity, 'cantidad no válida', 'cantidades no válidas'));
-    if (unchecked) missing.push(n(unchecked, 'fila sin marcar como revisada', 'filas sin marcar como revisadas'));
-    return missing.length ? `Falta: ${missing.join(', ')}.` : null;
+    if (noInstrument) missing.push(t(noInstrument === 1 ? 'portfolio.importImage.pendingNoInstrumentOne' : 'portfolio.importImage.pendingNoInstrumentMany', { n: noInstrument }));
+    if (badQuantity) missing.push(t(badQuantity === 1 ? 'portfolio.importImage.pendingBadQuantityOne' : 'portfolio.importImage.pendingBadQuantityMany', { n: badQuantity }));
+    if (unchecked) missing.push(t(unchecked === 1 ? 'portfolio.importImage.pendingUncheckedOne' : 'portfolio.importImage.pendingUncheckedMany', { n: unchecked }));
+    return missing.length ? t('portfolio.importImage.pendingMissing', { items: missing.join(', ') }) : null;
 }
