@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, Field, field_validator, model_validator
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -228,7 +228,11 @@ def savings_projection(
     db: Session = Depends(get_db),
     monthly: Annotated[float | None, Query(ge=0, le=1_000_000)] = None,
     years: Annotated[int | None, Query(ge=1, le=80)] = None,
-    currency: Annotated[str | None, Query(pattern=r"^[A-Za-z]{3}$")] = None,
+    # Misma regla que la divisa del plan: «QQQ», «NaN» o «GBp» (peniques, que
+    # se subian a «GBP») no rotulan una vista previa como si fueran divisas.
+    currency: Annotated[
+        str | None, Query(pattern=r"^[A-Za-z]{3}$"), AfterValidator(_iso_currency)
+    ] = None,
     annual_return: Annotated[float | None, Query(ge=-0.99, le=1)] = None,
     dividend_yield: Annotated[float, Query(ge=0, le=0.5)] = 0.03,
     inflation: Annotated[float, Query(ge=-0.99, le=1)] = 0.02,
