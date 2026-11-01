@@ -45,7 +45,9 @@ describe('ProPicks sin estados intermedios (ficha, backtest, rebalanceo)', () =>
     assert.match(factsheet, /El embudo persiste un único run \(el último\)/);
     assert.match(factsheet, /no se sustituye por una estimación/i);
     // Y declara que el único backtest medido NO es de la estrategia.
-    assert.match(factsheet, /Backtesting<\/span>\s*\(momentum 12-1M/);
+    assert.match(factsheet, /<span className="font-medium text-gray-300">\{t\('propicks\.factsheet\.backtestTab'\)\}<\/span>/);
+    assert.match(factsheet, /"backtestTab": "Backtesting"/);
+    assert.match(factsheet, /"onlyBacktestAfter": "\(momentum 12-1M/);
     assert.match(factsheet, /es independiente de esta estrategia/i);
   });
 

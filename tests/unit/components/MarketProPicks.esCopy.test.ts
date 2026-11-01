@@ -20,7 +20,9 @@ describe('trainingSessionsText', () => {
 
 describe('WalkForwardResults: tildes', () => {
     it('«mismo período» con tilde en métrica y metodología', () => {
-        const source = readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8');
+        const source =
+            readFileSync('components/proPicks/WalkForwardResults.tsx', 'utf8') +
+            readFileSync('lib/i18n/messages/es/propicks.json', 'utf8');
         expect(source).not.toContain('mismo periodo');
         expect(source).toContain('mismo período');
     });

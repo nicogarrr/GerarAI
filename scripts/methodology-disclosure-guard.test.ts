@@ -74,7 +74,8 @@ test('risk: el kicker no duplica el H1', () => {
 });
 
 test('el backtesting colapsa su bloque Metodología', () => {
-    assert.match(walkforward, /<MethodologyDisclosure title="Metodología del backtest">/);
+    assert.match(walkforward, /<MethodologyDisclosure title=\{t\('propicks\.walkForward\.methodologyTitle'\)\}>/);
+    assert.match(walkforward, /"methodologyTitle": "Metodología del backtest"/);
     assert.match(walkforward, /Walk-forward mensual: cada corte usa únicamente precios de cierre anteriores/);
     // Sin cabecera duplicada del bloque antiguo.
     assert.ok(!/<h4 className="text-sm font-semibold text-gray-300">Metodología<\/h4>/.test(walkforward));

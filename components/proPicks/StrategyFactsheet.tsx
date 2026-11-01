@@ -2,9 +2,9 @@
 
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { formatNumber, formatPercent, formatUserDate } from '@/lib/format';
+import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { getStrategyById } from '@/lib/utils/proPicksStrategies';
-import { CATEGORY_KEYS, CATEGORY_LABEL_ES } from './category-display';
+import { CATEGORY_KEYS, CATEGORY_LABEL_EN, CATEGORY_LABEL_ES } from './category-display';
 import type { WalkForwardBacktestResult } from '@/lib/actions/propicks-backtest.actions';
 
 /** El backtest walk-forward llega completo desde `runWalkForwardBacktest`. */
@@ -61,24 +61,19 @@ function Metric({
     value: string | undefined;
     footnote?: string;
 }) {
+    const t = useT();
     return (
         <div className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3">
             <div className="mb-1 text-xs text-gray-500">{label}</div>
             {value !== undefined ? (
                 <div className="text-lg font-bold text-gray-100">{value}</div>
             ) : (
-                <div className="text-sm font-medium text-gray-500">Sin dato</div>
+                <div className="text-sm font-medium text-gray-500">{t('propicks.factsheet.noData')}</div>
             )}
             {footnote && <div className="mt-1 text-[11px] text-gray-500">{footnote}</div>}
         </div>
     );
 }
-
-/** El backtest entrega porcentajes ya multiplicados por 100 (puntos, no ratio). */
-const fmtPct = (v: number | undefined, digits = 2) =>
-    v === undefined
-        ? undefined
-        : formatPercent(v, { fromRatio: false, digits, signDisplay: 'always' });
 
 /**
  * Ficha de una estrategia: lo que la estrategia DECIDE (pesos por categoría y
@@ -103,20 +98,27 @@ export default function StrategyFactsheet({
     error,
 }: StrategyFactsheetProps) {
     const strategy = getStrategyById(strategyId);
+    const t = useT();
+    const locale = useLocale();
+    const { formatNumber, formatPercent, formatUserDate } = useFormat();
+    const categoryLabels = locale === 'en' ? CATEGORY_LABEL_EN : CATEGORY_LABEL_ES;
+    /** El backtest entrega porcentajes ya multiplicados por 100 (puntos, no ratio). */
+    const fmtPct = (v: number | undefined, digits = 2) =>
+        v === undefined
+            ? undefined
+            : formatPercent(v, { fromRatio: false, digits, signDisplay: 'always' });
 
     if (!available) {
         return (
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
                 <Badge variant="outline" className="mb-3 border-amber-500/50 text-amber-300">
-                    Sin datos
+                    {t('propicks.factsheet.unavailableBadge')}
                 </Badge>
                 <h3 className="text-lg font-semibold text-gray-100">{name}</h3>
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-gray-400">{description}</p>
                 <p className="mx-auto mt-3 max-w-xl text-xs leading-5 text-gray-500">
-                    El catálogo define esta estrategia (identificador <span className="font-mono">{strategyId}</span>)
-                    pero el motor no la ofrece: no hay selección ni métricas que mostrar de ella. Para verla
-                    haría falta que el embudo la ejecutara y devolviera su ranking; sin eso, el selector de
-                    arriba es la lista de estrategias que sí tienen selección.
+                    {t('propicks.factsheet.unavailableBefore')}<span className="font-mono">{strategyId}</span>
+                    {t('propicks.factsheet.unavailableAfter')}
                 </p>
             </Card>
         );
@@ -125,7 +127,7 @@ export default function StrategyFactsheet({
     if (loading && !backtest) {
         return (
             <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
-                <p className="text-sm text-gray-400">Calculando métricas de {name}…</p>
+                <p className="text-sm text-gray-400">{t('propicks.factsheet.loading', { name })}</p>
             </Card>
         );
     }
@@ -139,7 +141,7 @@ export default function StrategyFactsheet({
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-semibold text-gray-100">{name}</h3>
                     <Badge variant="outline" className="border-gray-600 text-gray-300">
-                        Sin métricas de desempeño
+                        {t('propicks.factsheet.noMetricsBadge')}
                     </Badge>
                 </div>
                 <p className="text-sm leading-6 text-gray-400">{description}</p>
@@ -149,14 +151,14 @@ export default function StrategyFactsheet({
 
                 {strategy ? (
                     <div className="mt-4">
-                        <h4 className="text-sm font-semibold text-gray-300">Qué decide esta estrategia</h4>
+                        <h4 className="text-sm font-semibold text-gray-300">{t('propicks.factsheet.decidesTitle')}</h4>
                         <div className="mt-2 grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
                             {CATEGORY_KEYS.map((key) => (
                                 <div
                                     key={key}
                                     className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-700/50 py-1.5 text-sm last:border-0 sm:[&:nth-last-child(-n+2)]:border-0"
                                 >
-                                    <span className="text-gray-400">{CATEGORY_LABEL_ES[key]}</span>
+                                    <span className="text-gray-400">{categoryLabels[key]}</span>
                                     <span className="font-medium text-gray-200">
                                         {formatPercent(strategy.categoryWeights[key], { digits: 0 })}
                                     </span>
@@ -164,29 +166,22 @@ export default function StrategyFactsheet({
                             ))}
                         </div>
                         <p className="mt-2 text-xs leading-5 text-gray-500">
-                            Puntuación mínima de entrada: {formatNumber(strategy.filters.minScore ?? 0, { maximumFractionDigits: 0 })}/100.
-                            Los pesos son la regla real de la estrategia (así calcula el embudo su{' '}
-                            <span>puntuación de estrategia</span>). Una categoría sin datos en la ejecución
-                            entra neutra (50) y no aporta nada a la clasificación: en las tarjetas de la pestaña «Selección IA»
-                            aparece como <span className="font-mono">n/d</span>.
+                            {t('propicks.factsheet.weightsNote', { score: formatNumber(strategy.filters.minScore ?? 0, { maximumFractionDigits: 0 }) })}
+                            <span className="font-mono">{t('propicks.factsheet.naMarker')}</span>.
                         </p>
                     </div>
                 ) : null}
 
                 <div className="mt-4 rounded-lg border border-gray-700/50 bg-gray-900/50 p-3">
-                    <h4 className="text-sm font-semibold text-gray-300">Por qué no hay cifras aquí</h4>
+                    <h4 className="text-sm font-semibold text-gray-300">{t('propicks.factsheet.whyNoFiguresTitle')}</h4>
                     <p className="mt-1 text-xs leading-5 text-gray-500">
-                        Un backtest por estrategia necesita los fundamentales <em>con la fecha de cada corte</em>{' '}
-                        para no mirar el futuro. El embudo persiste un único run (el último) y en él la
-                        valoración necesita CFROI y WACC por empresa, datos que hoy no cubren todo el universo:
-                        sin esa serie con fecha no hay nada que medir, y sin mediciones no hay cifras
-                        que publicar. No se sustituye por una estimación.
+                        {t('propicks.factsheet.whyNoFiguresBefore')}<em>{t('propicks.factsheet.whyNoFiguresEmphasis')}</em>{' '}
+                        {t('propicks.factsheet.whyNoFiguresAfter')}
                     </p>
                     <p className="mt-2 text-xs leading-5 text-gray-500">
-                        El único backtest medido del producto es el baseline global de la pestaña{' '}
-                        <span className="font-medium text-gray-300">Backtesting</span> (momentum 12-1M sobre 30
-                        valores, 15 pb por pata, SPY como referencia). Es independiente de esta estrategia: mide
-                        el motor point-in-time, no su rulebook.
+                        {t('propicks.factsheet.onlyBacktestBefore')}{' '}
+                        <span className="font-medium text-gray-300">{t('propicks.factsheet.backtestTab')}</span>{' '}
+                        {t('propicks.factsheet.onlyBacktestAfter')}
                     </p>
                 </div>
             </Card>
@@ -201,20 +196,21 @@ export default function StrategyFactsheet({
             <div className="mb-1 flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-semibold text-gray-100">{name}</h3>
                 <Badge variant="outline" className="border-teal-500/50 text-teal-300">
-                    Backtest global, no de la estrategia
+                    {t('propicks.factsheet.globalBadge')}
                 </Badge>
             </div>
             <p className="text-sm leading-6 text-gray-400">{description}</p>
             <p className="mt-1 text-xs text-gray-500">
-                Período:{' '}
-                {period?.start ? formatUserDate(period.start) : 'Sin dato'} —{' '}
-                {period?.end ? formatUserDate(period.end) : 'Sin dato'}
+                {t('propicks.factsheet.period', {
+                    from: period?.start ? formatUserDate(period.start) : t('propicks.factsheet.noData'),
+                    to: period?.end ? formatUserDate(period.end) : t('propicks.factsheet.noData'),
+                })}
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-                <Metric label="Retorno neto" value={fmtPct(m.retorno)} footnote="Descontados los costes" />
-                <Metric label="SPY (referencia)" value={fmtPct(m.benchmark)} footnote="Mismo período" />
+                <Metric label={t('propicks.factsheet.netReturn')} value={fmtPct(m.retorno)} footnote={t('propicks.factsheet.netReturnNote')} />
+                <Metric label={t('propicks.factsheet.spyBenchmark')} value={fmtPct(m.benchmark)} footnote={t('propicks.factsheet.samePeriod')} />
                 <Metric
-                    label="Sharpe neto"
+                    label={t('propicks.factsheet.netSharpe')}
                     value={
                         m.sharpe === undefined
                             ? undefined
@@ -222,19 +218,18 @@ export default function StrategyFactsheet({
                     }
                 />
                 <Metric
-                    label="Caída máxima neta"
+                    label={t('propicks.factsheet.maxDrawdown')}
                     value={m.maxDD === undefined ? undefined : formatPercent(m.maxDD, { fromRatio: false, digits: 2 })}
                 />
                 <Metric
-                    label="Rotación media"
+                    label={t('propicks.factsheet.avgTurnover')}
                     value={m.turnover === undefined ? undefined : formatPercent(m.turnover, { fromRatio: false, digits: 0 })}
                     footnote="Turnover"
                 />
-                <Metric label="Exceso vs SPY" value={fmtPct(m.exceso)} footnote="Retorno neto − SPY" />
+                <Metric label={t('propicks.factsheet.excessVsSpy')} value={fmtPct(m.exceso)} footnote={t('propicks.factsheet.excessNote')} />
             </div>
             <p className="mt-4 text-xs leading-5 text-gray-500">
-                Son cifras del baseline walk-forward global (momentum 12-1M), no de la regla de esta estrategia:
-                el «Sin dato» de una métrica significa que el backtest no la trae, y se omite en vez de estimarse.
+                {t('propicks.factsheet.footer')}
             </p>
         </Card>
     );

@@ -153,8 +153,8 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
     // Estado MEDIDO de las categorías en la ejecución visible: se deriva de estos
     // picks (categoryDisplay honra el flag de ausencia de cada categoría).
     const neutralNote = useMemo(
-        () => categoryNeutralNote(CATEGORY_KEYS.filter((key) => allNeutralCategory(picks, key)), picks.length),
-        [picks],
+        () => categoryNeutralNote(CATEGORY_KEYS.filter((key) => allNeutralCategory(picks, key)), picks.length, locale),
+        [picks, locale],
     );
 
     // Un run existente con 0 candidatos aptos NO ofrece «Actualizar»: releer
