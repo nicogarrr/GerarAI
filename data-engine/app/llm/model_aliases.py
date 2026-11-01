@@ -230,10 +230,11 @@ class ModelAliasRegistry:
         if not alias.enabled:
             raise ValueError(f"Model alias {model!r} is disabled")
         if alias.provider != provider:
-            # La suscripcion Go es el mismo proveedor logico con otro nombre de
-            # adaptador (opencode-go-subscription); sus modelos aprobados son
-            # los del registro de opencode-go.
-            if provider == "opencode-go-subscription" and alias.provider == "opencode-go":
+            # La suscripcion Go y la capa free de Zen son el mismo proveedor
+            # logico con otro nombre de adaptador (opencode-go-subscription /
+            # opencode-free); sus modelos aprobados son los del registro de
+            # opencode-go.
+            if provider in {"opencode-go-subscription", "opencode-free"} and alias.provider == "opencode-go":
                 return alias.provider_model_id
             raise ValueError(
                 f"Model alias {model!r} belongs to provider {alias.provider!r}, "

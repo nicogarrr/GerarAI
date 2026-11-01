@@ -1,4 +1,4 @@
-"""Cadena de chat y respaldo (OpenCode Go -> Groq -> Gemini).
+"""Cadena de chat y respaldo (OpenCode Go -> OpenCode free -> Gemini).
 
 Chat: carrera acotada (ChatFallbackProvider). Trabajos en segundo plano
 (extracción de principios): secuencial con UN reintento transitorio
@@ -39,6 +39,9 @@ GROQ_MODEL = "openai/gpt-oss-120b"
 #: CHAT_GO_SUBSCRIPTION_ENABLED). Id verificado en /zen/go/v1/models.
 GO_SUBSCRIPTION_MODEL = "deepseek-v4.1-flash"
 GO_SUBSCRIPTION_PROVIDER = "opencode-go-subscription"
+#: Respaldo por la capa free de OpenCode Zen (/zen/v1): misma clave Go de la
+#: plataforma, modelo free (deepseek), gasto 0. Entre Go y Gemini.
+OPENCODE_FREE_PROVIDER = "opencode-free"
 GEMINI_MODEL = "gemini-3.5-flash-lite"
 GEMINI_MODEL_2 = "gemini-3.8-flash"
 GEMINI_MODELS = (GEMINI_MODEL, GEMINI_MODEL_2)
@@ -164,8 +167,8 @@ class ChatFallbackProvider(LLMProvider):
     async def complete_cjk_retry(self, request: LLMRequest) -> LLMResponse:
         """Reintento del llm_output_guard tras rechazo CJK del primario.
 
-        Salta directo a la cadena de respaldo verificada (Groq, luego
-        Gemini) con la peticion ya anotada con el RETRY_HINT, en vez de
+        Salta directo a la cadena de respaldo verificada (OpenCode free,
+        luego Gemini) con la peticion ya anotada con el RETRY_HINT, en vez de
         repetir la carrera lenta con el modelo gratuito que acaba de fallar
         (chat real medido: 94,6 s).
         """
@@ -175,7 +178,7 @@ class ChatFallbackProvider(LLMProvider):
             raise ProviderTransportError(self.name, "timeout", 1) from None
 
     async def _backup_chain(self, request: LLMRequest) -> LLMResponse:
-        """Groq gpt-oss-120b, then Gemini 3.5 Flash-Lite and Gemini 3.8 Flash (when configured); sequential, never in parallel."""
+        """Cadena de respaldo en orden (OpenCode free, luego Gemini 3.5 Flash-Lite y 3.8 Flash cuando estan configurados); secuencial, nunca en paralelo."""
         members = [(self.backup, self.backup_model)] + ([(self.backup2, model) for model in GEMINI_MODELS] if self.backup2 is not None else []) + list(self.extra_backups)
         # Do not re-probe exhausted members until their cooldown expires.
         ready = [m for m in members if not _is_cooling(*m)]
@@ -263,7 +266,13 @@ class ChatFallbackProvider(LLMProvider):
 
 
 _GO_PROVIDER_NAMES = frozenset({"opencode-go", GO_SUBSCRIPTION_PROVIDER})
-_PROVIDER_LABELS = {"groq": "Groq", "gemini": "Gemini", "openrouter": "OpenRouter"}
+_PROVIDER_LABELS = {
+    GO_SUBSCRIPTION_PROVIDER: "OpenCode Go",
+    OPENCODE_FREE_PROVIDER: "OpenCode free",
+    "groq": "Groq",
+    "gemini": "Gemini",
+    "openrouter": "OpenRouter",
+}
 
 
 def _reason_es(reason: str) -> str:
@@ -356,8 +365,9 @@ class SequentialFallbackProvider(LLMProvider):
 
     name = "background-sequential-fallback"
 
-    def __init__(self, primary: LLMProvider, backup: LLMProvider | None = None, backup2: LLMProvider | None = None, *, retry_pause: float = 2.0) -> None:
+    def __init__(self, primary: LLMProvider, backup: LLMProvider | None = None, backup2: LLMProvider | None = None, *, backup_models: tuple[str, ...] = (GROQ_MODEL,), backup2_models: tuple[str, ...] = GEMINI_MODELS, retry_pause: float = 2.0) -> None:
         self.primary, self.backup, self.backup2 = primary, backup, backup2
+        self.backup_models, self.backup2_models = backup_models, backup2_models
         self.retry_pause = retry_pause
         members = tuple(p for p in (primary, backup, backup2) if p is not None)
         self.supported_capabilities = frozenset.intersection(*(m.supported_capabilities for m in members))
@@ -376,7 +386,7 @@ class SequentialFallbackProvider(LLMProvider):
                 return await self.primary.complete(request)
             except _FALL_THROUGH as exc:
                 last = exc
-        for provider, models in ((self.backup, (GROQ_MODEL,)), (self.backup2, GEMINI_MODELS)):
+        for provider, models in ((self.backup, self.backup_models), (self.backup2, self.backup2_models)):
             if provider is None:
                 continue
             for model in models:
@@ -472,6 +482,48 @@ def _go_subscription_primary(settings: Settings, client: httpx.AsyncClient | Non
         timeout_seconds=min(settings.llm_timeout_seconds, settings.chat_total_timeout_seconds),
         total_timeout_seconds=settings.chat_total_timeout_seconds,
         response_cache=build_response_cache(settings),
+        client=client,
+    )
+
+
+def _opencode_free_backup(
+    settings: Settings,
+    client: httpx.AsyncClient | None,
+    *,
+    timeout_seconds: float = 15,
+    total_timeout_seconds: float = 18,
+    max_output_tokens: int = 4000,
+) -> OpenAICompatibleProvider | None:
+    """Respaldo por la capa free de OpenCode Zen (/zen/v1), tras Go y antes de Gemini.
+
+    Misma clave Go de la plataforma y misma cabecera de sesion; modelo free
+    (deepseek), gasto 0. Un intento por llamada (la cuota free agotada abre
+    el breaker hasta el Retry-After del proveedor, no se re-sondea). None si
+    el flag esta apagado o falta la clave Go.
+    """
+    if not settings.opencode_free_chat_fallback_active:
+        return None
+    if not (settings.opencode_go_api_key and settings.opencode_go_api_key.strip()):
+        return None
+    model = (settings.opencode_free_model or "").strip()
+    if not is_owner_approved_model(model, settings):
+        raise ValueError("OpenCode free chat fallback requires an owner-approved free model")
+    return GoSubscriptionChatProvider(
+        api_key=settings.opencode_go_api_key,
+        base_url=settings.opencode_free_base_url,
+        default_model=model,
+        provider_name=OPENCODE_FREE_PROVIDER,
+        model_overrides=_pin_to_model(model),
+        extra_headers={
+            "User-Agent": "GerarAI-chat/1.0",
+            "x-opencode-session": settings.opencode_go_session,
+        },
+        reasoning_effort="low",
+        reasoning_effort_models={model},
+        max_output_tokens=max_output_tokens,
+        max_retries=0,
+        timeout_seconds=timeout_seconds,
+        total_timeout_seconds=total_timeout_seconds,
         client=client,
     )
 
@@ -607,31 +659,37 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
             return DisabledProvider("chat_override_not_verified_free")
     if primary.name == "disabled":
         return primary
+    # Cadena de plataforma (decision del dueno, 2026-11-01): OpenCode Go
+    # (clave de GerarAI) -> OpenCode free (deepseek, /zen/v1) -> Gemini.
+    # Groq/OpenRouter quedan fuera de la cadena; sus builders se conservan.
+    free_backup = _opencode_free_backup(settings, client)
+    if free_backup is not None:
+        free_backup.interactive_quota_breaker = True
     backup2 = _gemini_backup(settings, client)
     if backup2 is not None:
         backup2.interactive_quota_breaker = True
-    if not settings.groq_chat_fallback_active:
-        if backup2 is None:
-            return primary
-        return ChatFallbackProvider(
-            primary, backup2, backup_model=GEMINI_MODEL,
-            total=settings.chat_total_timeout_seconds,
-            extra_backups=((backup2, GEMINI_MODEL_2),),
-            settings=settings,
-        )
-    if primary.name not in {"opencode-go", GO_SUBSCRIPTION_PROVIDER}:
-        raise ValueError("Groq chat fallback requires the verified OpenCode primary")
-    backup = _groq_backup(settings, client)
-    assert backup is not None  # el flag de arriba lo garantiza
+    members: list[tuple[LLMProvider, str]] = []
+    if free_backup is not None:
+        members.append((free_backup, (settings.opencode_free_model or "").strip()))
+    if backup2 is not None:
+        members.append((backup2, GEMINI_MODEL))
+        members.append((backup2, GEMINI_MODEL_2))
+    if not members:
+        return primary
+    first_provider, first_model = members[0]
     # Sin carrera: Go tiene su plazo completo y el respaldo arranca solo si
-    # Go falla o lo agota (antes Groq arrancaba a los 2 s y solia ganar).
-    return ChatFallbackProvider(primary, backup, total=settings.chat_total_timeout_seconds, backup2=backup2,
-                                extra_backups=_openrouter_backup(settings, client), settings=settings)
+    # Go falla o lo agota; luego cada miembro en orden, nunca en paralelo.
+    return ChatFallbackProvider(
+        primary, first_provider, backup_model=first_model,
+        total=settings.chat_total_timeout_seconds,
+        extra_backups=tuple(members[1:]),
+        settings=settings,
+    )
 
 
 def create_background_llm_provider(settings: Settings | None = None, *, client: httpx.AsyncClient | None = None) -> LLMProvider:
     """Proveedor para trabajos en segundo plano: primario con reintento
-    transitorio y la cadena gratuita Groq/Gemini en secuencia.
+    transitorio y la cadena de plataforma OpenCode free/Gemini en secuencia.
 
     Reutiliza las mismas claves y flags verificados del chat. Un respaldo mal
     configurado se salta con un aviso en el log en vez de romper el trabajo:
@@ -654,11 +712,11 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
     # los respaldos gratuitos caian en read timeout y el job de principios
     # moria como «La extracción tardó demasiado» (prod, 18 oct 2026).
     try:
-        backup = _groq_backup(
+        backup = _opencode_free_backup(
             settings, client, timeout_seconds=60, total_timeout_seconds=75,
         )
     except ValueError:
-        logger.warning("background LLM fallback: Groq mal configurado; se omite el respaldo")
+        logger.warning("background LLM fallback: OpenCode free mal configurado; se omite el respaldo")
         backup = None
     try:
         backup2 = _gemini_backup(
@@ -669,4 +727,8 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
         backup2 = None
     if backup is None and backup2 is None:
         return primary
-    return SequentialFallbackProvider(primary, backup, backup2)
+    return SequentialFallbackProvider(
+        primary, backup, backup2,
+        backup_models=((settings.opencode_free_model or "").strip(),),
+        backup2_models=GEMINI_MODELS,
+    )

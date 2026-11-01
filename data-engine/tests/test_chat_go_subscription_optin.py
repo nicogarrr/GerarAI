@@ -104,17 +104,13 @@ def test_sin_response_format_el_texto_no_se_toca():
     assert run_async(probe()).text == "```texto```"
 
 
-def test_encendido_construye_cadena_con_respaldo_groq():
-    settings = _settings(
-        chat_go_subscription_enabled=True,
-        groq_chat_fallback_enabled=True,
-        groq_api_key="g-test",
-        groq_free_plan_confirmed=True,
-        groq_zdr_confirmed=True,
-    )
+def test_encendido_construye_cadena_con_respaldo_free():
+    # Cadena 2026-11-01: Go -> OpenCode free (misma clave Go) -> Gemini.
+    settings = _settings(chat_go_subscription_enabled=True)
     provider = create_chat_llm_provider(settings)
     assert provider.primary.name == GO_SUBSCRIPTION_PROVIDER
-    assert provider.backup.name == "groq"
+    assert provider.backup.name == "opencode-free"
+    assert provider.backup_model == "deepseek-v4.1-flash-free"
 
 
 # --- Carrera Go (primario) vs Groq (respaldo): ventaja, errores y citas -----------
@@ -179,13 +175,13 @@ def test_go_tiene_dos_tercios_del_plazo_antes_del_respaldo():
     assert chain.primary.name == GO_SUBSCRIPTION_PROVIDER
     # Sin carrera: Go tiene 2/3 del presupuesto del chat antes del respaldo.
     assert chain.delay == settings.chat_total_timeout_seconds * 2 / 3
+    # Con la suscripcion apagada (ruta legacy free) el primario ES ya el
+    # modelo free: no hay pata free extra y, sin Gemini, queda a secas.
     off = create_chat_llm_provider(_settings(
         chat_go_subscription_enabled=False,
         opencode_go_model="deepseek-v4.1-flash-free",
-        groq_chat_fallback_enabled=True, groq_api_key="g-test",
-        groq_free_plan_confirmed=True, groq_zdr_confirmed=True,
     ))
-    assert off.delay == off.total * 2 / 3
+    assert off.name == "opencode-go"
 
 
 def test_go_primario_eleva_max_tokens_a_2600_sin_tocar_otros_proveedores():

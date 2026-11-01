@@ -204,10 +204,18 @@ def isolate_llm_free_tier_breaker():
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
     base._interactive_quota_breaker.clear()
+    base._free_quota_breaker.clear()
+    base._free_tier_breaker_until.clear()
+    base._interactive_quota_breaker_until.clear()
+    base._free_quota_breaker_until.clear()
     yield
     base._free_tier_breaker.clear()
     base._free_tier_breaker_status.clear()
     base._interactive_quota_breaker.clear()
+    base._free_quota_breaker.clear()
+    base._free_tier_breaker_until.clear()
+    base._interactive_quota_breaker_until.clear()
+    base._free_quota_breaker_until.clear()
 
 
 @pytest.fixture(autouse=True)

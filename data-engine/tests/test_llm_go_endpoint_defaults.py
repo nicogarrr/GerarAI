@@ -69,7 +69,9 @@ def test_all_task_routes_resolve_to_the_go_model() -> None:
 
 def test_default_chat_provider_is_not_self_disabled() -> None:
     provider = create_chat_llm_provider(_settings())
-    assert provider.name == "opencode-go-subscription"
+    # Con la pata free en auto el chat es la cadena; el primario sigue siendo Go.
+    primary = getattr(provider, "primary", provider)
+    assert primary.name == "opencode-go-subscription"
 
 
 def test_go_model_is_accepted_only_with_the_subscription_confirmed() -> None:

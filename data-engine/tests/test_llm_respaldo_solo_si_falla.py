@@ -1,9 +1,10 @@
 """Respaldo SOLO si falla OpenCode Go, nunca en carrera, y siempre etiquetado.
 
-Decision del dueno (2026-10-27): Go es siempre el primario. Groq/Gemini/
-OpenRouter entran unicamente despues de un error o del plazo agotado de Go, si
-tienen clave; la respuesta lo dice («Respondido por respaldo (Groq) porque
-OpenCode Go falló: ...») y el flag a false los apaga del todo.
+Decision del dueno (2026-11-01): la cadena de plataforma es OpenCode Go ->
+OpenCode free (deepseek, /zen/v1, misma clave Go) -> Gemini. Los respaldos
+entran unicamente despues de un error o del plazo agotado de Go; la
+respuesta lo dice («Respondido por respaldo (...) porque OpenCode Go
+falló: ...») y el flag a false los apaga del todo.
 """
 
 from __future__ import annotations
@@ -96,11 +97,22 @@ def test_auto_con_claves_deja_los_respaldos_listos_para_cuando_falle_go():
     assert chat.delay == settings.chat_total_timeout_seconds * 2 / 3
 
 
-def test_auto_sin_clave_no_hay_respaldo():
+def test_auto_sin_claves_externas_queda_la_pata_free_con_la_clave_go():
     settings = _settings(groq_api_key=None, gemini_api_key=None, openrouter_api_key=None)
     assert settings.groq_chat_fallback_active is False
     assert settings.gemini_chat_fallback_active is False
     assert settings.openrouter_chat_fallback_active is False
+    # La pata free usa la misma clave Go (gasto 0): entra en modo auto.
+    chat = create_chat_llm_provider(settings)
+    assert getattr(chat, "backup", None) is not None
+    assert chat.backup.name == "opencode-free"
+
+
+def test_sin_ningun_respaldo_disponible_queda_el_primario():
+    settings = _settings(
+        gemini_api_key=None,
+        opencode_free_chat_fallback_enabled=False,
+    )
     assert getattr(create_chat_llm_provider(settings), "backup", None) is None
 
 
@@ -109,6 +121,7 @@ def test_flags_false_apagan_todos_los_respaldos():
         groq_chat_fallback_enabled=False,
         gemini_chat_fallback_enabled=False,
         openrouter_chat_fallback_enabled=False,
+        opencode_free_chat_fallback_enabled=False,
     )
     chat = create_chat_llm_provider(settings)
     assert getattr(chat, "backup", None) is None
@@ -192,8 +205,18 @@ def test_sin_respaldo_y_go_caido_el_chat_da_respuesta_degradada_en_espanol():
 # --- Debate de tesis: sin modelos free detras del Go del dueno ---
 
 
-def test_debate_usa_solo_el_modelo_go_sin_free_de_respaldo():
+def test_debate_go_luego_free_sin_gemini():
     provider = create_free_interactive_provider(_settings(gemini_chat_fallback_enabled=False))
+    assert isinstance(provider, FreeInteractiveProvider)
+    models = [member.model_router.default_model for member in provider.members]
+    assert models == ["deepseek-v4.1-flash", "deepseek-v4.1-flash-free"]
+
+
+def test_debate_con_la_pata_free_apagada_usa_solo_el_modelo_go():
+    provider = create_free_interactive_provider(_settings(
+        gemini_chat_fallback_enabled=False,
+        opencode_free_chat_fallback_enabled=False,
+    ))
     assert isinstance(provider, FreeInteractiveProvider)
     models = [member.model_router.default_model for member in provider.members]
     assert models == ["deepseek-v4.1-flash"]

@@ -1,8 +1,9 @@
 """Bounded owner-approved debate chain.
 
 Orden: modelo Go aprobado (si la suscripcion esta confirmada) y su fallback
-explicito -> AI Studio solo con GEMINI_CHAT_FALLBACK_ENABLED=true. Los free
-reales solo entran cuando el modelo configurado es free (bridge legacy).
+explicito -> OpenCode free (deepseek, /zen/v1) -> AI Studio solo con
+GEMINI_CHAT_FALLBACK_ENABLED=true. Los free reales solo entran cuando el
+modelo configurado es free (bridge legacy).
 Con clave propia del tenant se usa su proveedor, sin respaldos.
 Nunca usa la cascada generica Gemini/OpenRouter ni overrides de pago.
 """
@@ -14,7 +15,7 @@ import httpx
 
 from app.core.config import Settings, get_settings
 from app.llm.cascade import _FALL_THROUGH, CascadeProvider
-from app.llm.chat_provider import GEMINI_MODELS, _gemini_backup
+from app.llm.chat_provider import GEMINI_MODELS, _gemini_backup, _opencode_free_backup
 from app.llm.contracts import LLMRequest
 from app.llm.errors import LLMError, ProviderHTTPError, ProviderResponseError, ProviderTransportError
 from app.llm.factory import _opencode_go, _pin_to_model, create_llm_provider
@@ -95,6 +96,19 @@ def create_free_interactive_provider(settings: Settings | None = None, *, client
                                     )))
     for member in members:
         member.interactive_quota_breaker = True
+    # OpenCode free (deepseek, /zen/v1): respaldo de plataforma entre Go y
+    # Gemini, gasto 0. No en el bridge legacy (el modelo configurado YA es
+    # free) ni si duplica un miembro ya presente.
+    if not legacy_free and settings.opencode_free_chat_fallback_active:
+        free_model = (settings.opencode_free_model or "").strip()
+        if free_model and free_model not in models:
+            free_member = _opencode_free_backup(
+                settings, client, timeout_seconds=8,
+                total_timeout_seconds=9, max_output_tokens=4000,
+            )
+            if free_member is not None:
+                free_member.interactive_quota_breaker = True
+                members.append(free_member)
     # AI Studio is free only with confirmed no billing, not merely by model ID.
     # Reuse the existing guard; never add Gemini to the OpenCode free registry.
     if settings.gemini_chat_fallback_active:

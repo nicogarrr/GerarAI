@@ -164,7 +164,25 @@
     "testHelpNoKey": " Introduce una clave para habilitarla. No necesitas una clave propia para usar la IA de GerarAI.",
     "saving": "Guardando...",
     "testing": "Probando...",
-    "test": "Probar conexión"
+    "test": "Probar conexión",
+    "usage": {
+      "subtitle": "Cadena de IA de la plataforma: OpenCode Go, luego OpenCode free y por último Gemini. Sin coste por uso.",
+      "state": {
+        "ok": "Operativo",
+        "limited": "Cuota agotada",
+        "off": "Desactivado"
+      },
+      "limitedUntil": "sin cuota hasta {date}",
+      "estimated": "Estimado",
+      "providerData": "Dato del proveedor",
+      "weekly": "Semanal",
+      "monthly": "Mensual",
+      "resetsAt": "se renueva {date}",
+      "today": "Hoy: {calls} llamadas · {tokens} tokens",
+      "publishedLimits": "Tope gratuito publicado: hasta {rpd} solicitudes/día según el modelo",
+      "tenant": "Usas tu propia clave: tu consumo lo gestiona tu proveedor y no aparece aquí.",
+      "generatedAt": "Actualizado {date}"
+    }
   },
   "tax": {
     "title": "Datos fiscales del declarante",

@@ -194,23 +194,23 @@ async def test_cjk_retry_respects_total_deadline():
 
 
 @run_async
-async def test_groq_and_gemini_payloads_bump_max_tokens_for_reasoning():
-    """gpt-oss/Gemini 3.x razonan: max_tokens=600 (chat general) se eleva al
-    minimo de razonamiento oculto en vez de truncar la respuesta visible."""
+async def test_free_and_gemini_backup_payloads_keep_their_contracts():
+    """La pata free fija el modelo deepseek free con effort low, y Gemini 3.x
+    (que razona) eleva max_tokens=600 al minimo de razonamiento oculto en vez
+    de truncar la respuesta visible."""
     from app.core.config import Settings
     from app.llm.chat_provider import create_chat_llm_provider
 
     settings = Settings(_env_file=None, llm_enabled=True, llm_provider="opencode-go",
-                        opencode_go_api_key="fake", groq_chat_fallback_enabled=True,
-                        groq_api_key="fake", groq_free_plan_confirmed=True,
-                        groq_zdr_confirmed=True, gemini_api_key="fake",
+                        opencode_go_api_key="fake", gemini_api_key="fake",
                         gemini_chat_fallback_enabled=True, gemini_free_plan_confirmed=True)
     provider = create_chat_llm_provider(settings)
     assert isinstance(provider, ChatFallbackProvider)
     request = LLMRequest([Message("user", "hola")], task="chat", max_tokens=600)
-    groq_payload = provider.backup._build_payload(request, GROQ_MODEL)
-    assert groq_payload["max_tokens"] >= 1024
-    gemini_payload = provider.backup2._build_payload(request, GEMINI_MODEL)
+    free_payload = provider.backup._build_payload(request, "deepseek-v4.1-flash-free")
+    assert free_payload["model"] == "deepseek-v4.1-flash-free"
+    assert free_payload["reasoning_effort"] == "low"
+    gemini_payload = provider.extra_backups[0][0]._build_payload(request, GEMINI_MODEL)
     assert gemini_payload["max_tokens"] >= 1024
 
 

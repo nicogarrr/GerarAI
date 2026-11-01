@@ -8,9 +8,10 @@ import type { IBKRConnection } from '@/lib/actions/ibkr-settings.actions';
 import SettingsSection from '@/components/settings/SettingsSection';
 import BaseCurrencyForm from '@/components/settings/BaseCurrencyForm';
 import LlmSettingsForm from '@/components/settings/LlmSettingsForm';
+import LlmUsagePanel from '@/components/settings/LlmUsagePanel';
 import TaxDeclarantForm from '@/components/settings/TaxDeclarantForm';
 import { Panel } from '@/components/ui/panel';
-import type { LlmSettings } from '@/lib/actions/llm-settings.actions';
+import type { LlmSettings, LlmUsage } from '@/lib/actions/llm-settings.actions';
 import type { PortfolioCurrencySettings } from '@/lib/actions/portfolio-settings.actions';
 import type { TaxDeclarant } from '@/lib/actions/taxes.actions';
 
@@ -18,11 +19,12 @@ export type SettingsContentProps = {
   dca?: DcaAlertSettings | null;
   declarant: TaxDeclarant | null;
   llm: LlmSettings | null;
+  llmUsage?: LlmUsage | null;
   currency: PortfolioCurrencySettings | null;
   ibkr: IBKRConnection | null;
 };
 
-export default async function SettingsContent({ declarant, llm, currency, ibkr, dca }: SettingsContentProps) {
+export default async function SettingsContent({ declarant, llm, llmUsage, currency, ibkr, dca }: SettingsContentProps) {
   const t = await getT();
   const unavailable = <p className="text-sm text-gray-400">{t('settings.unavailable')}</p>;
   return (
@@ -66,6 +68,7 @@ export default async function SettingsContent({ declarant, llm, currency, ibkr, 
         title={t('settings.llm.title')}
       >
         {llm ? <LlmSettingsForm initial={llm} /> : unavailable}
+        {llmUsage ? <div className="mt-4"><LlmUsagePanel usage={llmUsage} /></div> : null}
       </SettingsSection>
       <SettingsSection
         description={t('settings.tax.description')}
