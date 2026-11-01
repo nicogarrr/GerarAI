@@ -1,3 +1,7 @@
+import { getLocale, getT } from '@/lib/i18n/server';
+import type { Locale } from '@/lib/i18n/locale';
+import type { TranslateFn } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
 import { canShowThesisText, WithheldThesisText } from '@/components/research/ThesisSummary';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -9,7 +13,7 @@ import { buttonVariants } from '@/components/ui/button';
 import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { AppError } from '@/lib/types/errors';
-import { formatGeneratedDate, formatPercent, formatUserDate } from '@/lib/format';
+import { createFormatters, naFor } from '@/lib/format';
 import {
   getResearchCompanySnapshot,
   getResearchThesisWorkspace,
@@ -20,7 +24,7 @@ import { readingSections } from '@/lib/research/thesis-reading-sections';
 import { isValidCurrencyCode } from '@/lib/format';
 import PrintButton from '@/components/research/PrintButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { PROVENANCE_GROUPS, provenanceBasisEs, provenanceGroup } from '@/lib/research/provenance-groups';
+import { PROVENANCE_GROUPS, provenanceBasis, provenanceGroup } from '@/lib/research/provenance-groups';
 import { isVerifiedOficial, provenanceUrls } from '@/lib/research/provenance-item';
 import { capitalizeLabel, formatProvenanceValue } from '@/lib/research/provenance-format';
 import { metricLabel } from '@/lib/research/metric-labels';
@@ -29,10 +33,10 @@ import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: 'Tesis de inversión',
-  description: 'Documento de lectura de la tesis publicada, con cifras, procedencia y márgenes.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT();
+  return { title: t('research.thesisDoc.metaTitle'), description: t('research.thesisDoc.metaDescription') };
+}
 
 type PageProps = { params: Promise<{ ticker: string }> };
 
@@ -49,9 +53,36 @@ const STATUS_LABELS: Record<string, string> = {
   insufficient_data: 'datos insuficientes',
 };
 
-function statusLabel(status: string | null | undefined): string {
-  if (!status) return 'desconocido';
+const STATUS_KEYS: Record<string, TranslationKey> = {
+  final: 'research.memo.statusFinal', draft: 'research.memo.statusDraft', review: 'research.memo.statusReview',
+  approved: 'research.memo.statusApproved', published: 'research.memo.statusPublished', rejected: 'research.memo.statusRejected',
+  stale: 'research.memo.statusStale', draft_failed_audit: 'research.memo.statusDraftFailedAudit',
+  superseded: 'research.thesisDoc.statusSuperseded', insufficient_data: 'research.memo.insufficientData',
+};
+
+const RATING_KEYS: Record<string, TranslationKey> = {
+  buy: 'research.memo.ratingBuy', accumulate: 'research.memo.ratingAccumulate', overweight: 'research.memo.ratingOverweight',
+  hold: 'research.memo.ratingHold', underweight: 'research.memo.ratingUnderweight', trim: 'research.memo.ratingTrim',
+  sell: 'research.memo.ratingSell', avoid: 'research.memo.ratingAvoid', watch: 'research.memo.ratingWatch',
+  attractive: 'research.memo.ratingAttractive', expensive: 'research.memo.ratingExpensive',
+  incomplete_price: 'research.memo.ratingIncompletePrice', blocked: 'research.memo.ratingBlocked', insufficient_data: 'research.memo.insufficientData',
+};
+
+const PROVENANCE_GROUP_KEYS: Record<string, TranslationKey> = {
+  reportado: 'research.memo.provReported', sin_verificar: 'research.memo.provUnverified',
+  calculado: 'research.memo.provCalculated', supuesto: 'research.memo.provAssumption',
+};
+
+/** En español, los mapas de arriba tal cual; en inglés, las claves del memo. */
+function statusLabel(status: string | null | undefined, t: TranslateFn, locale: Locale): string {
+  if (!status) return t('research.thesisDoc.statusUnknown');
+  if (locale === 'en') return Object.hasOwn(STATUS_KEYS, status) ? t(STATUS_KEYS[status]) : t('research.thesisDoc.statusUnknown');
   return STATUS_LABELS[status] ?? 'desconocido';
+}
+
+function ratingLabel(rating: string, t: TranslateFn, locale: Locale): string {
+  if (locale === 'en') return Object.hasOwn(RATING_KEYS, rating) ? t(RATING_KEYS[rating]) : rating.replaceAll('_', ' ');
+  return RATING_LABELS[rating] ?? rating;
 }
 
 const RATING_LABELS: Record<string, string> = {
@@ -63,11 +94,11 @@ const RATING_LABELS: Record<string, string> = {
   insufficient_data: 'datos insuficientes',
 };
 
-function money(value: string | null, currency: string | null | undefined): string {
-  if (value === null) return 'N/D';
+function money(value: string | null, currency: string | null | undefined, locale: Locale = 'es'): string {
+  if (value === null) return naFor(locale);
   const parsed = Number(value);
-  if (Number.isNaN(parsed) || !isValidCurrencyCode(currency)) return 'N/D';
-  return thesisMoney(parsed, currency);
+  if (Number.isNaN(parsed) || !isValidCurrencyCode(currency)) return naFor(locale);
+  return thesisMoney(parsed, currency, locale);
 }
 
 /*
@@ -96,7 +127,7 @@ function SectionTitle({ id, children }: { id: string; children: ReactNode }) {
  * texto; en movil, un desplegable cerrado bajo la cabecera (no empuja la
  * lectura). No se imprime: el papel ya tiene su orden.
  */
-function ThesisToc({ items, variant }: { items: TocItem[]; variant: 'aside' | 'inline' }) {
+function ThesisToc({ items, variant, t }: { items: TocItem[]; variant: 'aside' | 'inline'; t: TranslateFn }) {
   if (items.length < 3) return null;
   const list = (
     <ol className="space-y-1 text-sm">
@@ -116,7 +147,7 @@ function ThesisToc({ items, variant }: { items: TocItem[]; variant: 'aside' | 'i
     return (
       <details className="group rounded-lg border border-gray-800 print:hidden lg:hidden">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-sm text-gray-300 [&::-webkit-details-marker]:hidden">
-          Índice del documento
+          {t('research.thesisDoc.tocToggle')}
           <ChevronDown aria-hidden="true" className="h-4 w-4 text-gray-500 transition-transform group-open:rotate-180" />
         </summary>
         <nav aria-label="Índice de la tesis" className="border-t border-gray-800 px-1 py-2">{list}</nav>
@@ -126,7 +157,7 @@ function ThesisToc({ items, variant }: { items: TocItem[]; variant: 'aside' | 'i
   return (
     <aside className="hidden print:hidden lg:block">
       <nav aria-label="Índice de la tesis" className="sticky top-[calc(var(--shell-top)+1.5rem)]">
-        <p className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">En este documento</p>
+        <p className="px-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{t('research.thesisDoc.tocTitle')}</p>
         <div className="mt-2 border-l border-gray-800 pl-2">{list}</div>
       </nav>
     </aside>
@@ -153,16 +184,16 @@ type ThesisLike = {
 
 const narrativeId = (index: number) => `seccion-${index + 1}`;
 
-function tocFor(thesis: ThesisLike, extra: { provenance: boolean; fromMarkdown?: boolean }): TocItem[] {
+function tocFor(thesis: ThesisLike, extra: { provenance: boolean; fromMarkdown?: boolean }, t: TranslateFn): TocItem[] {
   const sections = extra.fromMarkdown ? readingSections(thesis) : (thesis.narrative_sections ?? []);
   return [
-    thesis.executive_summary ? { id: 'resumen', title: 'Resumen ejecutivo' } : null,
-    thesis.hypothesis ? { id: 'hipotesis', title: 'Hipótesis' } : null,
-    { id: 'escenarios', title: 'Escenarios y valoración' },
-    extra.provenance ? { id: 'procedencia', title: 'Procedencia de las cifras' } : null,
+    thesis.executive_summary ? { id: 'resumen', title: t('research.thesisDoc.summary') } : null,
+    thesis.hypothesis ? { id: 'hipotesis', title: t('research.thesisDoc.hypothesis') } : null,
+    { id: 'escenarios', title: t('research.thesisDoc.scenarios') },
+    extra.provenance ? { id: 'procedencia', title: t('research.thesisDoc.provenance') } : null,
     ...sections.map((section, index) => ({ id: narrativeId(index), title: section.titulo })),
-    (thesis.catalysts ?? []).length > 0 ? { id: 'catalizadores', title: 'Catalizadores' } : null,
-    (thesis.invalidation_criteria ?? []).length > 0 ? { id: 'invalidacion', title: 'Qué invalidaría la tesis' } : null,
+    (thesis.catalysts ?? []).length > 0 ? { id: 'catalizadores', title: t('research.thesisDoc.catalysts') } : null,
+    (thesis.invalidation_criteria ?? []).length > 0 ? { id: 'invalidacion', title: t('research.thesisDoc.invalidation') } : null,
   ].filter((item): item is TocItem => item !== null);
 }
 
@@ -172,6 +203,8 @@ function tocFor(thesis: ThesisLike, extra: { provenance: boolean; fromMarkdown?:
  * un borrador mas reciente se anuncia sin cifras ni margen (regla vigente).
  */
 export default async function ThesisReadingPage({ params }: PageProps) {
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
+  const { formatGeneratedDate, formatPercent, formatUserDate } = createFormatters(locale);
   const { ticker: rawTicker } = await params;
   const ticker = rawTicker.toUpperCase();
 
@@ -211,8 +244,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   // el motor la persistió en valuation_basis; si no, sin fecha (no se inventa).
   const priceAsOf = published?.valuation_basis?.price_as_of ?? null;
   const modelPriceLabel = priceAsOf
-    ? `Precio del modelo al ${formatUserDate(priceAsOf)}`
-    : 'Precio del modelo';
+    ? t('research.thesisDoc.modelPriceAt', { date: formatUserDate(priceAsOf) })
+    : t('research.thesisDoc.modelPrice');
   // La columna Probabilidad solo se muestra cuando el motor persistio
   // probabilidades: sin ellas seria un «N/D» triple que aparenta un dato
   // que no existe (regla de veracidad: no inventar ni insinuar datos).
@@ -248,10 +281,10 @@ export default async function ThesisReadingPage({ params }: PageProps) {
     return (
       <main id="content" className={`print-document min-h-screen bg-surface-0 text-gray-100 ${publicEditorial.variable}`}>
         <div className="mx-auto max-w-[40rem]">
-          <Link href={`/research/${encoded}?view=thesis`} className="text-sm text-teal-300 underline">Ficha de {ticker}</Link>
+          <Link href={`/research/${encoded}?view=thesis`} className="text-sm text-teal-300 underline">{t('research.thesisDoc.backToFicha', { ticker })}</Link>
           <h1 className="mt-8 text-3xl text-gray-50">{ticker} · {name}</h1>
           <WithheldThesisText thesis={displayedVersion} model={snapshot?.model_summary} />
-          <p className="mt-4 text-sm leading-6 text-gray-400">Sin valoración ni texto de inversión verificables para esta vista. Revisa las fuentes y los datos pendientes en la ficha antes de publicar una nueva versión.</p>
+          <p className="mt-4 text-sm leading-6 text-gray-400">{t('research.thesisDoc.withheldNote')}</p>
           {/*
               Salida del callejón (auditoría 29-oct-2026): la nota de archivo
               sin acción dejaba la página sin ruta a seguir. Acción principal:
@@ -260,8 +293,8 @@ export default async function ThesisReadingPage({ params }: PageProps) {
               honestos de job que ofrece la ficha.
           */}
           <div className="mt-6 flex flex-wrap items-center gap-2">
-            <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la tesis en la ficha</EmptyLink>
-            <ThesisGenerateButton ticker={ticker} label="Regenerar tesis" />
+            <EmptyLink href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.reviewInFicha')}</EmptyLink>
+            <ThesisGenerateButton ticker={ticker} label={t('research.thesisDoc.regenerate')} />
           </div>
         </div>
       </main>
@@ -269,9 +302,9 @@ export default async function ThesisReadingPage({ params }: PageProps) {
   }
 
   const toc = published
-    ? tocFor(published, { provenance: Boolean(provenance && provenance.length > 0), fromMarkdown: true })
+    ? tocFor(published, { provenance: Boolean(provenance && provenance.length > 0), fromMarkdown: true }, t)
     : latest
-      ? tocFor(latest, { provenance: false })
+      ? tocFor(latest, { provenance: false }, t)
       : [];
 
   return (
@@ -282,7 +315,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
             href={`/research/${encoded}?view=thesis`}
             className="inline-flex min-h-[44px] items-center text-sm text-gray-500 hover:text-gray-200 sm:min-h-0"
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />Ficha de {ticker}
+            <ArrowLeft className="mr-2 h-4 w-4" />{t('research.thesisDoc.backToFicha', { ticker })}
           </Link>
         </div>
 
@@ -291,12 +324,12 @@ export default async function ThesisReadingPage({ params }: PageProps) {
             <EmptyState
               action={(
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                  <EmptyLink href={`/research/${encoded}`}>Comprobar {ticker} en su ficha</EmptyLink>
-                  <EmptyLink href="/search">Buscar otra empresa</EmptyLink>
+                  <EmptyLink href={`/research/${encoded}`}>{t('research.thesisDoc.checkTicker', { ticker })}</EmptyLink>
+                  <EmptyLink href="/search">{t('research.thesisDoc.searchOther')}</EmptyLink>
                 </div>
               )}
-              description={`${ticker} no está en la cobertura verificada de GerarAI, así que no tiene tesis. Su ficha comprueba si el símbolo es correcto y a qué emisor corresponde.`}
-              title={`No hay tesis de ${ticker}`}
+              description={t('research.thesisDoc.notCoveredDescription', { ticker })}
+              title={t('research.thesisDoc.notCoveredTitle', { ticker })}
               titleAs="h1"
             />
           </div>
@@ -305,12 +338,12 @@ export default async function ThesisReadingPage({ params }: PageProps) {
             <ErrorState
               action={(
                 <>
-                  <a className={EXPORT_LINK} href={`/research/${encoded}/tesis`}>Reintentar</a>
-                  <Link className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'font-medium')} href={`/research/${encoded}?view=thesis`}>Ir a la ficha</Link>
+                  <a className={EXPORT_LINK} href={`/research/${encoded}/tesis`}>{t('research.thesisDoc.retry')}</a>
+                  <Link className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'font-medium')} href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.goToFicha')}</Link>
                 </>
               )}
-              description={`El servicio de research no respondió al pedir la tesis de ${ticker}. No significa que no exista: vuelve a intentarlo en unos segundos.`}
-              title={`No se pudo cargar la tesis de ${ticker}`}
+              description={t('research.thesisDoc.loadFailedDescription', { ticker })}
+              title={t('research.thesisDoc.loadFailedTitle', { ticker })}
               titleAs="h1"
             />
           </div>
@@ -318,21 +351,18 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,40rem)_13rem] lg:justify-between lg:gap-12">
           <article className="min-w-0 max-w-full space-y-10 [overflow-wrap:anywhere]">
             <header className="space-y-4 border-b border-gray-800 pb-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tesis de inversión</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t('research.thesisDoc.eyebrow')}</p>
               <h1 style={EDITORIAL} className="text-3xl leading-tight text-gray-50 sm:text-4xl">
                 {ticker} · {name}
               </h1>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="thesis-meta-badge" variant="outline">PROVISIONAL — no publicada</Badge>
-                <Badge className="thesis-meta-badge" variant="outline">{statusLabel(latest.status)}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">{t('research.thesisDoc.provisionalBadge')}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">{statusLabel(latest.status, t, locale)}</Badge>
                 <Badge className="thesis-meta-badge" variant="outline">v{latest.version}</Badge>
-                {latest.created_at ? <span className="text-xs text-gray-500">generada el {formatGeneratedDate(latest.created_at)}</span> : null}
+                {latest.created_at ? <span className="text-xs text-gray-500">{t('research.thesisDoc.generatedOn', { date: formatGeneratedDate(latest.created_at) ?? '' })}</span> : null}
               </div>
               <p role="status" className="rounded-lg border border-amber-800/60 bg-amber-950/20 px-3 py-2 text-sm text-amber-200">
-                Documento provisional generado con la evidencia disponible: no es una versión
-                publicada. El modelo no produjo una valoración calculable (la causa exacta está
-                declarada en el memo, secciones 13 y 21): esta vista no contiene cifras de
-                valoración porque no existen, no porque se oculten.
+                {t('research.thesisDoc.provisionalNote')}
               </p>
               <div className="flex flex-wrap items-center gap-2 print:hidden">
                 <PrintButton />
@@ -341,36 +371,34 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                   download
                   className={EXPORT_LINK}
                 >
-                  <FileDown className="h-4 w-4" />Ficha del borrador (PDF, v{latest.version})
+                  <FileDown className="h-4 w-4" />{t('research.thesisDoc.draftPdf', { version: latest.version })}
                 </a>
-                <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink>
+                <EmptyLink href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.reviewVersion', { version: latest.version })}</EmptyLink>
               </div>
               <p className="text-xs text-gray-500 print:hidden">
-                El PDF solo lleva la ficha del borrador (lista blanca del backend); el documento completo es esta página.
+                {t('research.thesisDoc.draftPdfNote')}
               </p>
-              <ThesisToc items={toc} variant="inline" />
+              <ThesisToc items={toc} variant="inline" t={t} />
             </header>
 
             {latest.executive_summary ? (
               <section>
-                <SectionTitle id="resumen">Resumen ejecutivo</SectionTitle>
+                <SectionTitle id="resumen">{t('research.thesisDoc.summary')}</SectionTitle>
                 <p className={PARAGRAPH}>{cleanThesisText(latest.executive_summary)}</p>
               </section>
             ) : null}
 
             {latest.hypothesis ? (
               <section>
-                <SectionTitle id="hipotesis">Hipótesis</SectionTitle>
+                <SectionTitle id="hipotesis">{t('research.thesisDoc.hypothesis')}</SectionTitle>
                 <p className={PARAGRAPH}>{cleanThesisText(latest.hypothesis)}</p>
               </section>
             ) : null}
 
             <section>
-              <SectionTitle id="escenarios">Escenarios y valoración</SectionTitle>
+              <SectionTitle id="escenarios">{t('research.thesisDoc.scenarios')}</SectionTitle>
               <p className="mt-4 text-sm leading-6 text-gray-400">
-                Sin cifras de valoración en esta vista: el modelo no produjo una valoración
-                calculable con los datos disponibles; la causa exacta está declarada en el memo
-                (sección 13) y los datos pendientes en la sección 21.
+                {t('research.thesisDoc.draftNoFigures')}
               </p>
             </section>
 
@@ -385,11 +413,11 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {(latest.catalysts ?? []).length > 0 ? (
               <section>
-                <SectionTitle id="catalizadores">Catalizadores</SectionTitle>
+                <SectionTitle id="catalizadores">{t('research.thesisDoc.catalysts')}</SectionTitle>
                 <ul className={LIST}>
                   {(latest.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
-                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
+                      {catalyst.label ?? t('research.thesisDoc.catalyst')}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
                     </li>
                   ))}
                 </ul>
@@ -398,7 +426,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {(latest.invalidation_criteria ?? []).length > 0 ? (
               <section>
-                <SectionTitle id="invalidacion">Qué invalidaría la tesis</SectionTitle>
+                <SectionTitle id="invalidacion">{t('research.thesisDoc.invalidation')}</SectionTitle>
                 <ul className={LIST}>
                   {(latest.invalidation_criteria ?? []).map((criterion, index) => (
                     <li key={index}>{criterion}</li>
@@ -409,23 +437,21 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             <footer className="border-t border-gray-800 pt-4 text-xs leading-6 text-gray-500">
               <p>
-                Puntuaciones del pipeline sobre este borrador (no son una medida de la calidad o
-                completitud de la tesis): confianza de datos {latest.data_confidence_score}/100 ·
-                cobertura de fuentes {latest.source_coverage_score}/100 · red-team {latest.red_team_score}/100.
+                {t('research.thesisDoc.draftScores', { data: latest.data_confidence_score ?? '', sources: latest.source_coverage_score ?? '', redTeam: latest.red_team_score ?? '' })}
               </p>
               <p className="mt-2">
-                Documento informativo de investigación, provisional y no publicado. No es asesoramiento financiero ni recomendación de compra o venta.
+                {t('research.thesisDoc.draftDisclaimer')}
               </p>
             </footer>
           </article>
-          <ThesisToc items={toc} variant="aside" />
+          <ThesisToc items={toc} variant="aside" t={t} />
           </div>
         ) : !published ? (
           <div className="mt-10">
             <EmptyState
-              action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>Revisar la v{latest.version} en la ficha</EmptyLink> : <EmptyLink href={`/research/${encoded}`}>Generar la primera tesis desde la ficha</EmptyLink>}
-              description={latest ? `La v${latest.version} está en estado «${statusLabel(latest.status)}»: solo se enseñan las cifras y el margen de una versión publicada.` : `Todavía no se ha generado ninguna tesis de ${ticker}. Puedes generar la primera desde su ficha.`}
-              title={`Aún no hay ninguna tesis publicada de ${ticker}.`}
+              action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.reviewVersion', { version: latest.version })}</EmptyLink> : <EmptyLink href={`/research/${encoded}`}>{t('research.thesisDoc.generateFirst')}</EmptyLink>}
+              description={latest ? t('research.thesisDoc.notPublishedDescription', { version: latest.version, status: statusLabel(latest.status, t, locale) }) : t('research.thesisDoc.noneDescription', { ticker })}
+              title={t('research.thesisDoc.noPublishedTitle', { ticker })}
               titleAs="h1"
             />
           </div>
@@ -433,18 +459,18 @@ export default async function ThesisReadingPage({ params }: PageProps) {
           <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,40rem)_13rem] lg:justify-between lg:gap-12">
           <article className="min-w-0 max-w-full space-y-10 [overflow-wrap:anywhere]">
             <header className="space-y-4 border-b border-gray-800 pb-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Tesis de inversión</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{t('research.thesisDoc.eyebrow')}</p>
               <h1 style={EDITORIAL} className="text-3xl leading-tight text-gray-50 sm:text-4xl">
                 {ticker} · {name}
               </h1>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="thesis-meta-badge" variant="outline">Rating: {RATING_LABELS[published.rating] ?? published.rating}</Badge>
+                <Badge className="thesis-meta-badge" variant="outline">{t('research.thesisDoc.ratingBadge', { rating: ratingLabel(published.rating, t, locale) })}</Badge>
                 <Badge className="thesis-meta-badge" variant="outline">v{published.version}</Badge>
-                {generated ? <span className="text-xs text-gray-500">generada el {generated}</span> : null}
+                {generated ? <span className="text-xs text-gray-500">{t('research.thesisDoc.generatedOn', { date: generated })}</span> : null}
               </div>
               {latest && latest.version !== published.version ? (
                 <p className="text-xs text-amber-300">
-                  Existe una v{latest.version} en borrador pendiente de aprobación; sus cifras no se muestran hasta publicarse.
+                  {t('research.thesisDoc.newerDraft', { version: latest.version })}
                 </p>
               ) : null}
               {published ? (
@@ -466,46 +492,46 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 <PrintButton />
               </div>
               ) : null}
-              <ThesisToc items={toc} variant="inline" />
+              <ThesisToc items={toc} variant="inline" t={t} />
             </header>
 
             {published.executive_summary ? (
               <section>
-                <SectionTitle id="resumen">Resumen ejecutivo</SectionTitle>
+                <SectionTitle id="resumen">{t('research.thesisDoc.summary')}</SectionTitle>
                 <p className={PARAGRAPH}>{cleanThesisText(published.executive_summary)}</p>
               </section>
             ) : null}
 
             {published.hypothesis ? (
               <section>
-                <SectionTitle id="hipotesis">Hipótesis</SectionTitle>
+                <SectionTitle id="hipotesis">{t('research.thesisDoc.hypothesis')}</SectionTitle>
                 <p className={PARAGRAPH}>{cleanThesisText(published.hypothesis)}</p>
               </section>
             ) : null}
 
             <section>
-              <SectionTitle id="escenarios">Escenarios y valoración</SectionTitle>
+              <SectionTitle id="escenarios">{t('research.thesisDoc.scenarios')}</SectionTitle>
               {hasScenarioValues ? (
               <div className="mt-4 overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-700 text-left text-xs uppercase tracking-wide text-gray-500">
-                      <th scope="col" className="py-2 pr-4 font-medium">Escenario</th>
-                      <th scope="col" className="py-2 pr-4 text-right font-medium">Valor por acción</th>
-                      {hasProbabilities ? <th scope="col" className="py-2 text-right font-medium">Probabilidad</th> : null}
+                      <th scope="col" className="py-2 pr-4 font-medium">{t('research.thesisDoc.colScenario')}</th>
+                      <th scope="col" className="py-2 pr-4 text-right font-medium">{t('research.thesisDoc.colValue')}</th>
+                      {hasProbabilities ? <th scope="col" className="py-2 text-right font-medium">{t('research.thesisDoc.colProbability')}</th> : null}
                     </tr>
                   </thead>
                   <tbody className="text-gray-200">
                     {([
-                      ['Bajista', published.bear_value, published.scenario_probabilities?.bear],
-                      ['Base', published.base_value, published.scenario_probabilities?.base],
-                      ['Alcista', published.bull_value, published.scenario_probabilities?.bull],
+                      [t('research.thesisDoc.bear'), published.bear_value, published.scenario_probabilities?.bear],
+                      [t('research.thesisDoc.base'), published.base_value, published.scenario_probabilities?.base],
+                      [t('research.thesisDoc.bull'), published.bull_value, published.scenario_probabilities?.bull],
                     ] as const).map(([label, value, probability]) => (
                       <tr key={label} className="border-b border-gray-800/70">
                         <th scope="row" className="py-2 pr-4 text-left font-normal text-gray-400">{label}</th>
-                        <td className="py-2 pr-4 text-right font-medium tabular-nums">{money(value, currency)}</td>
+                        <td className="py-2 pr-4 text-right font-medium tabular-nums">{money(value, currency, locale)}</td>
                         {hasProbabilities ? (
-                          <td className="py-2 text-right tabular-nums">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : 'N/D'}</td>
+                          <td className="py-2 text-right tabular-nums">{typeof probability === 'number' ? formatPercent(probability, { digits: 0 }) : naFor(locale)}</td>
                         ) : null}
                       </tr>
                     ))}
@@ -513,20 +539,20 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                 </table>
               </div>
               ) : (
-                <p className="mt-4 text-sm text-gray-400">Sin cifras de valoración.</p>
+                <p className="mt-4 text-sm text-gray-400">{t('research.thesisDoc.noFigures')}</p>
               )}
               <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
                 <div>
                   <dt className="text-xs text-gray-500">{modelPriceLabel}</dt>
-                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.current_price, currency)}</dd>
+                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.current_price, currency, locale)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-gray-500">Valor esperado</dt>
-                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.expected_value, currency)}</dd>
+                  <dt className="text-xs text-gray-500">{t('research.thesisDoc.expectedValue')}</dt>
+                  <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{money(published.expected_value, currency, locale)}</dd>
                 </div>
                 {published.margin_of_safety !== null ? (
                   <div>
-                    <dt className="text-xs text-gray-500">Margen de seguridad</dt>
+                    <dt className="text-xs text-gray-500">{t('research.thesisDoc.marginOfSafety')}</dt>
                     <dd className="mt-0.5 font-medium tabular-nums text-gray-100">{formatPercent(Number(published.margin_of_safety))}</dd>
                   </div>
                 ) : null}
@@ -535,7 +561,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {provenance && provenance.length > 0 ? (
               <section>
-                <SectionTitle id="procedencia">Procedencia de las cifras</SectionTitle>
+                <SectionTitle id="procedencia">{t('research.thesisDoc.provenance')}</SectionTitle>
                 <div className="mt-4 space-y-5">
                   {PROVENANCE_GROUPS.map((group) => {
                     const rows = provenance.filter(
@@ -544,25 +570,25 @@ export default async function ThesisReadingPage({ params }: PageProps) {
                     if (rows.length === 0) return null;
                     return (
                       <div key={group.key}>
-                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{group.title}</h3>
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">{Object.hasOwn(PROVENANCE_GROUP_KEYS, group.key) ? t(PROVENANCE_GROUP_KEYS[group.key]) : group.title}</h3>
                         <dl className="mt-1 divide-y divide-gray-800/70">
                           {rows.map((item) => {
                             const urls = provenanceUrls(item);
-                            const basis = provenanceBasisEs(item.base_inferencia ?? item.method);
-                            const label = capitalizeLabel(metricLabel(item.key));
+                            const basis = provenanceBasis(item.base_inferencia ?? item.method, locale);
+                            const label = capitalizeLabel(metricLabel(item.key, locale));
                             return (
                               <div key={item.key} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 text-sm">
                                 <dt className="text-gray-300">{label}</dt>
                                 <dd className="ml-auto font-medium tabular-nums text-gray-100">{formatProvenanceValue(item.value, item.unit)}</dd>
                                 <dd className="basis-full text-xs leading-5 text-gray-500">
-                                  {basis ?? 'Base no documentada'}
+                                  {basis ?? t('research.thesisDoc.basisUndocumented')}
                                   {urls.map((url, index) => (
                                     <a
                                       key={url}
                                       href={url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      aria-label={`Fuente ${index + 1} de ${label}: ${sourceHost(url)} (se abre en otra pestaña)`}
+                                      aria-label={t('research.thesisDoc.sourceAria', { n: index + 1, label, host: sourceHost(url) })}
                                       className="ml-2 text-gray-300 underline decoration-gray-600 underline-offset-2 hover:text-gray-100 hover:decoration-gray-300 print:text-gray-700 print:no-underline"
                                     >
                                       {sourceHost(url)}
@@ -592,11 +618,11 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {(published.catalysts ?? []).length > 0 ? (
               <section>
-                <SectionTitle id="catalizadores">Catalizadores</SectionTitle>
+                <SectionTitle id="catalizadores">{t('research.thesisDoc.catalysts')}</SectionTitle>
                 <ul className={LIST}>
                   {(published.catalysts ?? []).map((catalyst, index) => (
                     <li key={index}>
-                      {catalyst.label ?? 'Catalizador'}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
+                      {catalyst.label ?? t('research.thesisDoc.catalyst')}{catalyst.date ? ` (${formatUserDate(catalyst.date)})` : ''}
                     </li>
                   ))}
                 </ul>
@@ -605,7 +631,7 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             {(published.invalidation_criteria ?? []).length > 0 ? (
               <section>
-                <SectionTitle id="invalidacion">Qué invalidaría la tesis</SectionTitle>
+                <SectionTitle id="invalidacion">{t('research.thesisDoc.invalidation')}</SectionTitle>
                 <ul className={LIST}>
                   {(published.invalidation_criteria ?? []).map((criterion, index) => (
                     <li key={index}>{criterion}</li>
@@ -616,15 +642,14 @@ export default async function ThesisReadingPage({ params }: PageProps) {
 
             <footer className="border-t border-gray-800 pt-4 text-xs leading-6 text-gray-500">
               <p>
-                Calidad de la evidencia: confianza de datos {published.data_confidence_score}/100 ·
-                cobertura de fuentes {published.source_coverage_score}/100 · red-team {published.red_team_score}/100.
+                {t('research.thesisDoc.evidenceScores', { data: published.data_confidence_score ?? '', sources: published.source_coverage_score ?? '', redTeam: published.red_team_score ?? '' })}
               </p>
               <p className="mt-2">
-                Documento informativo de investigación. No es asesoramiento financiero ni recomendación de compra o venta.
+                {t('research.thesisDoc.disclaimer')}
               </p>
             </footer>
           </article>
-          <ThesisToc items={toc} variant="aside" />
+          <ThesisToc items={toc} variant="aside" t={t} />
           </div>
         )}
       </div>

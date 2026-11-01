@@ -77,5 +77,5 @@ test('el componente paginador es cliente, accesible y conserva el estado', () =>
 
 test('sin tesis publicada la página conserva un H1', () => {
   const page = readFileSync(THESIS_PAGE, 'utf8');
-  assert.match(page, /title=\{`Aún no hay ninguna tesis publicada de \$\{ticker\}\.\`\}\s+titleAs="h1"/);
+  assert.match(page, /title=\{t\('research\.thesisDoc\.noPublishedTitle', \{ ticker \}\)\}\s+titleAs="h1"/);
 });
