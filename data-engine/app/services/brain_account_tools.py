@@ -493,6 +493,110 @@ def _sell_all_answer(db: Session, tenant: int) -> ChatResponse:
     return _response("\n".join(lines), sources, "account_sell_all_tax")
 
 
+# ------------------------------------------------------------ comisiones y efectivo
+
+_FEES = re.compile(
+    r"\b(?:comision\w*|gastos\s+de\s+(?:compraventa|corretaje|broker)|corretaje)\b"
+    r"|\b(?:fees|commissions?)\b"
+)
+_FEES_ASK = re.compile(r"\b(?:cuant\w*|cuales|mis|pagad\w*|pago|pague|total|how\s+much|my|paid|pay)\b")
+_CASH = re.compile(r"\b(?:efectivo|liquidez|caja|saldo|cash)\b")
+_CASH_ASK = re.compile(r"\b(?:cuant\w*|tengo|mi|mis|how\s+much|my|do\s+i\s+have)\b")
+_CASH_NOT = re.compile(r"flujo\s+de\s+caja|caja\s+libre|cash\s*flow|fcf|caja\s+neta\s+de|cash\s+per\s+share")
+
+
+def _asks_fees(text: str) -> bool:
+    return bool(_FEES.search(text) and _FEES_ASK.search(text)
+                and not re.search(r"\bsi\b|\bif\b|\bcobra\w*|\bcharges?\b|\bter\b", text))
+
+
+def _asks_cash(text: str, question: str) -> bool:
+    return bool(_CASH.search(text) and _CASH_ASK.search(text) and not _CASH_NOT.search(text)
+                and not _tickers_in(question))
+
+
+def _fees_answer(db: Session, tenant: int, year: int | None, only: set[str]) -> ChatResponse:
+    from datetime import date
+
+    from app.models import Company, Transaction
+
+    english = _english()
+    query = (select(Transaction, Company.ticker).outerjoin(Company, Company.id == Transaction.company_id)
+             .where(Transaction.tenant_id == tenant))
+    if year is not None:
+        query = query.where(Transaction.trade_date >= date(year, 1, 1), Transaction.trade_date <= date(year, 12, 31))
+    trade: dict[str, Decimal] = {}
+    other: dict[str, Decimal] = {}
+    by_ticker: dict[str, Decimal] = {}
+    count = 0
+    for tx, ticker in db.execute(query).all():
+        if only and (ticker or "") not in only:
+            continue
+        action = (tx.action or "").lower()
+        currency = (tx.currency or "EUR").upper()
+        if action in {"buy", "sell"} and tx.fees:
+            amount = abs(Decimal(tx.fees))
+            trade[currency] = trade.get(currency, Decimal("0")) + amount
+            key = f"{ticker or '?'}|{currency}"
+            by_ticker[key] = by_ticker.get(key, Decimal("0")) + amount
+            count += 1
+        elif action == "fee":
+            from app.services.tax_report_service import cash_amount
+
+            other[currency] = other.get(currency, Decimal("0")) + abs(cash_amount(tx))
+
+    def amounts(totals: dict[str, Decimal]) -> str:
+        return " + ".join(_money(float(v), c, english=english) for c, v in sorted(totals.items()))
+
+    period = (f"in {year}" if english else f"en {year}") if year is not None else (
+        "in total" if english else "en total")
+    sources = [_source("transactions", None, "Operaciones", "/portfolio")]
+    if not trade and not other:
+        text = (f"No commissions recorded {period} in your saved trades." if english
+                else f"No hay comisiones {period} en tus operaciones guardadas.")
+        return _response(text, sources, "account_fees")
+    lines: list[str] = []
+    if trade:
+        noun = ("trade" if count == 1 else "trades") if english else ("operación" if count == 1 else "operaciones")
+        lines.append(f"Commissions on buys and sells {period}: {amounts(trade)} ({count} {noun})." if english
+                     else f"Comisiones de compraventa {period}: {amounts(trade)} ({count} {noun}).")
+        top = sorted(by_ticker.items(), key=lambda kv: kv[1], reverse=True)[:5]
+        if len(by_ticker) > 1:
+            lines.append(("Most: " if english else "Más: ") + ", ".join(
+                f"{key.split('|')[0]} {_money(float(v), key.split('|')[1], english=english)}" for key, v in top) + ".")
+    if other:
+        lines.append(f"Other broker fees (fee rows): {amounts(other)}." if english
+                     else f"Otros cargos del bróker (filas de comisión): {amounts(other)}.")
+    lines.append("In each trade's currency, from your saved trades." if english
+                 else "En la divisa de cada operación, de tus operaciones guardadas.")
+    return _response("\n".join(lines), sources, "account_fees")
+
+
+def _cash_answer(db: Session, tenant: int) -> ChatResponse:
+    from app.models import CashBalance
+
+    english = _english()
+    rows = list(db.scalars(select(CashBalance).where(CashBalance.tenant_id == tenant)
+                           .order_by(CashBalance.currency)))
+    if not rows:
+        text = ("You have no cash balance saved. You can add it in Portfolio." if english
+                else "No tienes efectivo guardado. Puedes añadirlo en Cartera.")
+        return _response(text, [], "account_cash")
+    totals: dict[str, Decimal] = {}
+    for row in rows:
+        totals[row.currency] = totals.get(row.currency, Decimal("0")) + Decimal(row.balance or 0)
+    as_of = max(row.as_of for row in rows)
+    day = _date_en(as_of) if english else fecha_es(as_of)
+    parts = [_money(float(v), c, english=english) for c, v in sorted(totals.items())]
+    text = (f"Your saved cash (as of {day}): " if english else f"Tu efectivo guardado (a {day}): ") + ", ".join(parts) + "."
+    if any(v < 0 for v in totals.values()):
+        text += (" A negative balance is margin debt." if english else " Un saldo negativo es deuda de margen.")
+    if len(totals) > 1:
+        text += (" Each currency is shown as is, not converted." if english
+                 else " Cada divisa va tal cual, sin convertir.")
+    return _response(text, [_source("cash_balance", rows[0].id, "Efectivo", "/portfolio")], "account_cash")
+
+
 # ------------------------------------------------------------------ router
 
 
@@ -507,6 +611,10 @@ def answer_account_question(db: Session, question: str) -> ChatResponse | None:
     if _asks_sell_all_tax(text, question):
         return _sell_all_answer(db, tenant)
     year = _asked_year(text)
+    if _asks_fees(text):
+        return _fees_answer(db, tenant, year, _tickers_in(question))
+    if _asks_cash(text, question):
+        return _cash_answer(db, tenant)
     if year is not None and _SALES.search(text):
         return _sales_answer(db, year, _tickers_in(question))
     # Solo el año en curso: un ejercicio pasado ya lo responde el bloque fiscal (#3952).
