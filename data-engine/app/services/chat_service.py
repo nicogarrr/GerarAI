@@ -630,6 +630,14 @@ _PORTFOLIO_ANALYSIS_RE = re.compile(
     r"c[oó]mo\s+(?:la\s+)?(?:mejorar|veo)|risks?|diversif\w*)\b"
 )
 _ORDER_VERB_RE = re.compile(r"(?i)\b(compra|compro|comprar|vende|vendo|vender|ejecuta|buy|sell)\b")
+# «Avísame si MSFT baja de 300» / «ponme una alerta…»: el chat no crea
+# alertas. Antes caía en el volcado de la empresa, que podía leerse como si
+# la alerta hubiera quedado puesta.
+_ALERT_REQUEST_RE = re.compile(
+    r"(?i)(?:^|[¿¡,.;:]\s*|\b(?:y|por\s+favor|porfa|oye)\s+)(?:av[ií]same|al[eé]rtame|notif[ií]came)\b"
+    r"|\b(?:pon(?:me|er)?|crea(?:r|me)?|cr[eé]ame|configura(?:r|me)?|programa(?:r|me)?|activa(?:r|me)?"
+    r"|a[nñ]ade(?:me)?|a[nñ]adir|quiero|dame)\s+(?:una?\s+)?(?:nueva\s+)?(?:alerta|aviso)\b"
+)
 # "¿Cuál es mi posición con más peso?" / "¿qué posición pesa menos?": ranking
 # directo de posiciones guardadas, no el volcado de la tabla completa.
 _PORTFOLIO_RANKING_RE = re.compile(
@@ -1357,6 +1365,21 @@ class ChatService:
                 prompt_version="capabilities-v1",
                 confidence=0.9,
                 llm_trace={"path": "capabilities", "generated": False, "provider_calls": 0},
+                context=context_echo,
+            )
+        if _ALERT_REQUEST_RE.search(question or ""):
+            target = f"Para que te avise de {company.ticker}" if company is not None else "Para recibir un aviso"
+            return ChatResponse(
+                answer=(
+                    "No puedo crear alertas desde el chat, así que no he puesto ninguna. "
+                    f"{target}, créala en Alertas → Nueva alerta "
+                    "(por precio, cambio, noticias o resultados)."
+                ),
+                sources=[],
+                model="deterministic",
+                prompt_version="alert-request-v1",
+                confidence=0.9,
+                llm_trace={"path": "alert_request", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
         if (
