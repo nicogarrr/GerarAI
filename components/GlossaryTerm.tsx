@@ -3,7 +3,8 @@
 import { HelpCircle } from 'lucide-react';
 
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { glossary, moatGlossaryKey, moatLabel, type GlossaryKey } from '@/lib/glossary';
+import { glossaryFor, moatGlossaryKey, moatLabel, type GlossaryKey } from '@/lib/glossary';
+import { useLocale } from '@/lib/i18n/client';
 
 interface GlossaryTermProps {
   /** Clave del glosario (ver lib/glossary.ts). */
@@ -19,7 +20,7 @@ interface GlossaryTermProps {
  * el ratón o enfocar con teclado. Aceptado por componentes server.
  */
 export function GlossaryTerm({ k, children, icon = true }: GlossaryTermProps) {
-  const entry = glossary[k];
+  const entry = glossaryFor(useLocale())[k];
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -49,11 +50,12 @@ interface MoatTermProps {
  * manda una clave desconocida, muestra el texto sin tooltip (sin inventar).
  */
 export function MoatTerm({ type }: MoatTermProps) {
+  const locale = useLocale();
   const key = moatGlossaryKey[type];
-  if (!key) return <span className="font-medium text-gray-200">{moatLabel(type)}</span>;
+  if (!key) return <span className="font-medium text-gray-200">{moatLabel(type, locale)}</span>;
   return (
     <GlossaryTerm k={key} icon={false}>
-      <span className="font-medium text-gray-200">{moatLabel(type)}</span>
+      <span className="font-medium text-gray-200">{moatLabel(type, locale)}</span>
     </GlossaryTerm>
   );
 }
