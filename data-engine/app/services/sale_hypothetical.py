@@ -109,13 +109,14 @@ class HypoSale:
 
 
 def parse_number(text: str) -> Decimal | None:
-    """«1.234,5» → 1234.5; «150.5» → 150.5; «1.500» → 1500."""
+    """«1.234,5» → 1234.5; «150.5» → 150.5; «1.500» → 1500; «0.125» → 0.125."""
     raw = text.strip()
     if "," in raw and "." in raw:
         raw = raw.replace(".", "").replace(",", ".")
     elif "," in raw:
         raw = raw.replace(",", ".")
-    elif re.fullmatch(r"\d{1,3}(?:\.\d{3})+", raw):
+    elif re.fullmatch(r"[1-9]\d{0,2}(?:\.\d{3})+", raw):
+        # Un grupo de miles nunca empieza por 0: «0.125» es 0,125, no 125.
         raw = raw.replace(".", "")
     try:
         return Decimal(raw)
