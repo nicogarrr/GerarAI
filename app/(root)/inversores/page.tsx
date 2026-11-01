@@ -4,7 +4,7 @@ import Link from 'next/link';
 import BackendOffline from '@/components/system/BackendOffline';
 import { getInvestors } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
-import { formatNumber } from '@/lib/format';
+import { getFormat, getT } from '@/lib/i18n/server';
 
 import { InvestorSelector } from './_components/InvestorSelector';
 import { InvestorAvatar } from './_components/Avatar';
@@ -15,10 +15,10 @@ import { Pagination, paginate } from './_components/Pagination';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export const metadata: Metadata = {
-    title: 'Inversores',
-    description: 'Quién invierte mejor y qué tiene en cartera, con la fuente y la fecha de cada dato.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+    const t = await getT();
+    return { title: t('investors.hub.title'), description: t('investors.hub.description') };
+}
 
 const PAGE_SIZE = 12;
 
@@ -28,12 +28,14 @@ type PageProps = {
 
 export default async function InvestorsPage({ searchParams }: PageProps) {
     const { pagina } = await searchParams;
+    const t = await getT();
+    const { locale, formatNumber, na } = await getFormat();
     let data: Awaited<ReturnType<typeof getInvestors>>;
     try {
         data = await getInvestors();
     } catch (error) {
         if (isBackendUnavailableError(error)) {
-            return <BackendOffline feature="Inversores" retryHref="/inversores" />;
+            return <BackendOffline feature={t('investors.hub.title')} retryHref="/inversores" />;
         }
         throw error;
     }
@@ -46,14 +48,14 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full min-w-0 max-w-5xl flex-col gap-6 overflow-x-clip py-6">
             <header className="flex flex-col gap-3">
-                <h1 className="text-3xl font-semibold text-gray-100">Inversores</h1>
+                <h1 className="text-3xl font-semibold text-gray-100">{t('investors.hub.title')}</h1>
             </header>
 
             <InvestorSelector investors={data.investors} />
 
             {noneSynced ? (
                 <div className="flex flex-col items-center gap-4 rounded-2xl border border-gray-800 bg-surface-1 p-8 text-center">
-                    <p className="text-gray-300">Aún no hay carteras descargadas en esta cuenta.</p>
+                    <p className="text-gray-300">{t('investors.hub.noneSynced')}</p>
                     <SyncPortfoliosButton />
                 </div>
             ) : null}
@@ -75,27 +77,29 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
                             {investor.report_date ? (
                                 <span className="flex items-end justify-between gap-4">
                                     <span>
-                                        <span className="block text-2xl font-semibold text-gray-100">{usd(investor.value_usd_thousands, investor.report_date)}</span>
+                                        <span className="block text-2xl font-semibold text-gray-100">{usd(investor.value_usd_thousands, investor.report_date, locale)}</span>
                                         <span className="block text-xs text-gray-500">
                                             {investor.positions !== null
-                                                ? `${formatNumber(investor.positions, { maximumFractionDigits: 0 })} posiciones`
-                                                : 'N/D'}
+                                                ? t('investors.hub.positions', {
+                                                      count: formatNumber(investor.positions, { maximumFractionDigits: 0 }),
+                                                  })
+                                                : na}
                                         </span>
                                     </span>
                                     <span className="text-right text-xs text-gray-500">
-                                        Cartera a {periodLabel(investor.report_date)}
+                                        {t('investors.hub.portfolioAt', { date: periodLabel(investor.report_date, locale) })}
                                         {investor.coverage === 'partial' ? (
-                                            <span className="block text-amber-300">Datos parciales</span>
+                                            <span className="block text-amber-300">{t('investors.hub.partial')}</span>
                                         ) : null}
                                     </span>
                                 </span>
                             ) : (
                                 <span className="text-sm text-gray-500">
                                     {investor.has_13f
-                                        ? '13F sin sincronizar'
+                                        ? t('investors.hub.unsynced13f')
                                         : investor.has_public_profile
-                                          ? 'Participaciones públicas · ver ficha'
-                                          : 'Sin 13F · ver ficha'}
+                                          ? t('investors.hub.publicHoldings')
+                                          : t('investors.hub.no13f')}
                                 </span>
                             )}
                         </Link>
@@ -105,8 +109,8 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
 
             <Pagination basePath="/inversores" page={paged.page} total={paged.total} />
 
-            <p className="text-xs text-gray-500">Fotos con licencia libre de Wikimedia Commons; autor y licencia en cada ficha. Sin foto libre, inicial.</p>
-            <p className="text-xs text-gray-500">Fuente: SEC, Form 13F (EDGAR). Trimestral, con hasta 45 días de retardo; solo posiciones largas en EE. UU. Valor en dólares tal como se declara. Otras participaciones: fuente y fecha en cada ficha.</p>
+            <p className="text-xs text-gray-500">{t('investors.hub.photosNote')}</p>
+            <p className="text-xs text-gray-500">{t('investors.hub.sourceNote')}</p>
         </main>
     );
 }

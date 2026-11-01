@@ -2,10 +2,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+const ES_INVESTORS_JSON = readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
 
 const ficha = readFileSync('app/(root)/inversores/_components/Portfolio.tsx', 'utf8');
 // Carteras se fusiona en /inversores (decisión de Nico, 2026-10-20): la tarjeta con cobertura vive en el hub.
-const carteras = readFileSync('app/(root)/inversores/page.tsx', 'utf8');
+const carteras = (readFileSync('app/(root)/inversores/page.tsx', 'utf8') + ES_INVESTORS_JSON);
 const actions = readFileSync('lib/actions/investors.actions.ts', 'utf8');
 
 test('el tipo de inversor lleva coverage', () => {

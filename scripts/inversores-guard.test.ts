@@ -8,11 +8,12 @@ import test from 'node:test';
 
 // @ts-expect-error TS5097: explicit extension for node strip-types.
 import { form13fValueToUsd } from '../lib/form13f-value.ts';
+const ES_INVESTORS_JSON = readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
 
-const grid = readFileSync('app/(root)/inversores/page.tsx', 'utf8');
+const grid = (readFileSync('app/(root)/inversores/page.tsx', 'utf8') + ES_INVESTORS_JSON);
 // Carteras se fusiona en /inversores (decision de Nico, WhatsApp 2026-10-20 00:59):
 // las aserciones sobre la pagina de carteras apuntan ahora al hub que la absorbe.
-const portfolios = readFileSync('app/(root)/inversores/page.tsx', 'utf8');
+const portfolios = (readFileSync('app/(root)/inversores/page.tsx', 'utf8') + ES_INVESTORS_JSON);
 const detail = readFileSync('app/(root)/inversores/[slug]/page.tsx', 'utf8');
 const format = readFileSync('app/(root)/inversores/_components/format.ts', 'utf8');
 const constants = readFileSync('lib/constants.ts', 'utf8');

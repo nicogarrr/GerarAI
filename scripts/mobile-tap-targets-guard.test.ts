@@ -1,6 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const ES_INVESTORS_JSON = readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
 
 /**
  * Guard: area tactil minima de 44px en movil (QA ficha 390px, 2026-10-19).
@@ -111,7 +112,7 @@ describe('móvil: 44 px en inicio, índice research, watchlist y ProPicks (recor
         assert.ok(src.includes('flex min-h-[44px] min-w-0 items-center font-medium text-gray-200'), 'título de documento con 44 px');
     });
     it('inversores: paginación Anterior/Siguiente con 44 px en móvil', () => {
-        const src = readFileSync('app/(root)/inversores/_components/Pagination.tsx', 'utf8');
+        const src = (readFileSync('app/(root)/inversores/_components/Pagination.tsx', 'utf8') + readFileSync('app/(root)/inversores/_components/PaginationNav.tsx', 'utf8') + ES_INVESTORS_JSON + readFileSync('lib/i18n/messages/es/ui.json', 'utf8'));
         assert.ok(src.includes('inline-flex min-h-[44px] items-center rounded-lg border border-gray-800'), 'paginación de inversores con 44 px');
     });
     it('calendario de resultados: chips IR y botones de icono con 44 px', () => {

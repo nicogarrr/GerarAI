@@ -5,17 +5,18 @@ import test from 'node:test';
 
 // @ts-expect-error TS5097: explicit extension for node strip-types.
 import { newLabel } from '../app/(root)/inversores/_components/labels.ts';
+const ES_INVESTORS_JSON = readFileSync('lib/i18n/messages/es/investors.json', 'utf8');
 
 const read = (path: string) => readFileSync(path, 'utf8');
 // La jerarquia de migas vive en lib/nav/build-crumbs.ts (funcion pura); el
 // componente solo presenta. La guarda mira ambos.
 const crumbs = read('components/layout/Breadcrumbs.tsx') + read('lib/nav/build-crumbs.ts');
-const grid = read('app/(root)/inversores/page.tsx');
-const portfolios = read('app/(root)/inversores/page.tsx'); // carteras fusionada en el hub (decision de Nico, 2026-10-20)
+const grid = (read('app/(root)/inversores/page.tsx') + ES_INVESTORS_JSON);
+const portfolios = (read('app/(root)/inversores/page.tsx') + ES_INVESTORS_JSON); // carteras fusionada en el hub (decision de Nico, 2026-10-20)
 // Mas compradas es ahora una vista de /ownership (Movimientos 13F) por decision de Nico, WhatsApp 2026-10-20 00:59.
 const bought = read('app/(root)/ownership/_components/MostBought.tsx');
 const ficha = read('app/(root)/inversores/_components/Portfolio.tsx');
-const pagination = read('app/(root)/inversores/_components/Pagination.tsx');
+const pagination = (read('app/(root)/inversores/_components/Pagination.tsx') + readFileSync('app/(root)/inversores/_components/PaginationNav.tsx', 'utf8') + ES_INVESTORS_JSON + readFileSync('lib/i18n/messages/es/ui.json', 'utf8'));
 
 test('las migas no muestran el slug crudo de las subpaginas de Inversores', () => {
     // Ni 'carteras' ni 'mas-compradas' tienen miga propia: ambas rutas se

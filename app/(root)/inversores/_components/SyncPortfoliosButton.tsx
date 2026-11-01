@@ -5,17 +5,19 @@ import { RefreshCw } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { syncInvestorPortfoliosNow } from '@/lib/actions/investors.actions';
+import { useT } from '@/lib/i18n/client';
 
 const AUTO_SYNC_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 // Interactivo (estado + server action en onClick): no puede ser servidor.
 export function SyncPortfoliosButton({
-    label = 'Sincronizar carteras ahora',
-    queuedText = 'Sincronización en curso; recarga la página en unos minutos para ver las carteras.',
+    label,
+    queuedText,
 }: {
     label?: string;
     queuedText?: string;
 }) {
+    const t = useT();
     const [state, setState] = useState<'idle' | 'syncing' | 'queued' | 'error'>('idle');
 
     const handleSync = async () => {
@@ -66,13 +68,13 @@ export function SyncPortfoliosButton({
                 className="gap-2"
             >
                 <RefreshCw aria-hidden="true" className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Encolando sincronización...' : label}
+                {loading ? t('investors.sync.syncing') : (label ?? t('investors.sync.label'))}
             </Button>
             {state === 'queued' ? (
-                <p className="text-sm text-teal-300">{queuedText}</p>
+                <p className="text-sm text-teal-300">{queuedText ?? t('investors.sync.queued')}</p>
             ) : null}
             {state === 'error' ? (
-                <p className="text-sm text-red-400">No se pudo encolar la sincronización. Inténtalo de nuevo.</p>
+                <p className="text-sm text-red-400">{t('investors.sync.error')}</p>
             ) : null}
         </div>
     );
