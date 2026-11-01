@@ -277,6 +277,19 @@ def _pick_return(
     return _pct(Decimal(str(end_row.close)), entry_price)
 
 
+def _exit_index(picks_by_month: list[dict[str, dict]], idx: int, ticker: str) -> int | None:
+    """Primer snapshot posterior a `idx` en el que el ticker ya no esta, o None si sigue.
+
+    Un pick que siguio en el mes siguiente pero salio despues no es «activo»: antes
+    solo se miraba el snapshot siguiente, asi que la fila de su primer mes seguia
+    marcada activa y comparada con el precio de hoy aunque ya hubiera salido.
+    """
+    for later in range(idx + 1, len(picks_by_month)):
+        if ticker not in picks_by_month[later]:
+            return later
+    return None
+
+
 def build_track_record(db: Session, *, today: date | None = None) -> dict[str, Any]:
     """Track record por pick a partir de los snapshots mensuales congelados."""
     today = today or date.today()
@@ -317,7 +330,6 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
     # 2026-10-31); ahora 1 SELECT constante + lookups en memoria.
     price_targets: list[date] = []
     for idx, snapshot in enumerate(snapshots):
-        next_snapshot = snapshots[idx + 1] if idx + 1 < len(snapshots) else None
         for ticker, pick in picks_by_month[idx].items():
             epd = date.fromisoformat(pick["price_date"]) if pick.get("price_date") else None
             if epd is not None:
@@ -325,11 +337,9 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
                 horizon_target = epd + timedelta(days=HORIZON_DAYS)
                 if horizon_target <= today:
                     price_targets.append(horizon_target)
-            if (
-                next_snapshot is not None
-                and ticker not in picks_by_month[idx + 1]
-            ):
-                price_targets.append(next_snapshot.as_of.date())
+            exit_idx = _exit_index(picks_by_month, idx, ticker)
+            if exit_idx is not None:
+                price_targets.append(snapshots[exit_idx].as_of.date())
     series = _preload_prices(
         db,
         [c.id for c in companies.values()],
@@ -338,19 +348,19 @@ def build_track_record(db: Session, *, today: date | None = None) -> dict[str, A
 
     rows: list[dict[str, Any]] = []
     for idx, snapshot in enumerate(snapshots):
-        next_snapshot = snapshots[idx + 1] if idx + 1 < len(snapshots) else None
-        next_tickers = set(picks_by_month[idx + 1]) if next_snapshot is not None else set()
         for ticker, pick in sorted(picks_by_month[idx].items()):
             company = companies.get(ticker)
             entry_price = Decimal(str(pick["price"])) if pick.get("price") else None
             entry_price_date = date.fromisoformat(pick["price_date"]) if pick.get("price_date") else None
 
-            status = "activo" if next_snapshot is None or ticker in next_tickers else "salio"
+            exit_idx = _exit_index(picks_by_month, idx, ticker)
+            exit_snapshot = snapshots[exit_idx] if exit_idx is not None else None
+            status = "activo" if exit_snapshot is None else "salio"
             exit_month = exit_price = exit_price_date = None
             exit_pct = spy_pct_exit = None
-            if status == "salio" and next_snapshot is not None:
-                exit_month = next_snapshot.month
-                exit_target = next_snapshot.as_of.date()
+            if exit_snapshot is not None:
+                exit_month = exit_snapshot.month
+                exit_target = exit_snapshot.as_of.date()
                 if company is not None:
                     row = _series_price_at(series.get(company.id, []), exit_target)
                     if row is not None:
