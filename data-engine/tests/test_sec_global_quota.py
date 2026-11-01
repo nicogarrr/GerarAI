@@ -126,3 +126,14 @@ def test_bad_retry_after_has_safe_finite_floor(monkeypatch, header):
     sec_pacing.rate_limited(httpx.Response(429, headers={'Retry-After': header},
                            request=httpx.Request('GET','https://www.sec.gov/x')))
     assert waits == [60.0]
+
+
+def test_cached_client_preserves_settings_password(monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setattr(get_settings(), 'redis_url', 'redis://:test-only-pass@127.0.0.1:6390/0')
+    sec_pacing._client_for_url.cache_clear()
+    client = sec_pacing._redis()
+    assert client.connection_pool.connection_kwargs['password'] == 'test-only-pass'
+    assert sec_pacing._redis() is client
+    sec_pacing._client_for_url.cache_clear()
