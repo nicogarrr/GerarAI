@@ -133,5 +133,21 @@
     "ruleMatched": "Se cumplió la regla «{title}» para {company}.",
     "fallback": "Alerta de {company}: {title}.",
     "fallbackNoDetail": "sin detalle disponible"
+  },
+  "quick": {
+    "button": "Alerta de precio",
+    "buttonShort": "Alerta",
+    "typeLabel": "Tipo de alerta",
+    "targetPrice": "Precio objetivo",
+    "targetChange": "Variación objetivo %",
+    "invalidChange": "Introduce una variación objetivo válida",
+    "invalidPrice": "Introduce un precio objetivo válido",
+    "createdValue": "Alerta creada: {ticker} {label} {value}",
+    "createdSimple": "Alerta creada: {ticker} · {label}",
+    "duplicate": "Ya tienes esta alerta configurada.",
+    "changeAria": "Variación objetivo en porcentaje",
+    "priceAria": "Precio objetivo en {currency}",
+    "create": "+ Alerta",
+    "viewAlerts": "Ver alertas"
   }
 }

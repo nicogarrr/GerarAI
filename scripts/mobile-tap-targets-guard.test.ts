@@ -21,8 +21,11 @@ describe('ficha movil: objetivos tactiles de al menos 44px', () => {
         const menu = readFileSync('components/research/CompanyActionsMenu.tsx', 'utf8');
         const item = menu.match(/const ITEM = '([^']+)'/)?.[1] ?? '';
         assert.ok(item.includes(AREA), 'enlaces del menu con area tactil');
-        for (const texto of ['Qué ha cambiado', 'Cortos públicos', 'Noticias', 'Insiders', 'Dividendos y splits']) {
-            assert.ok(menu.includes(texto), `${texto} en el menu`);
+        // Los textos viven en research.companyMenu.* (es y en); el menú los pide por clave.
+        const menuEs = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).companyMenu;
+        for (const [clave, texto] of [['whatChanged', 'Qué ha cambiado'], ['publicShorts', 'Cortos públicos'], ['news', 'Noticias'], ['insiders', 'Insiders'], ['dividends', 'Dividendos y splits']]) {
+            assert.equal(menuEs[clave], texto, `${texto} en el menu`);
+            assert.ok(menu.includes(`research.companyMenu.${clave}`), `${clave} en el menu`);
         }
         assert.ok(menu.includes('size-11'), 'boton del menu de 44px');
     });

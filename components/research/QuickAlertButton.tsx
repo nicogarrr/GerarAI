@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { useT } from '@/lib/i18n/client';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { BellPlus } from 'lucide-react';
@@ -24,6 +25,7 @@ const QuickAlertPopoverBody = dynamic(loadQuickAlertPopoverBody, {
  * popover con la creación simple y deep-link a /alerts para tipos complejos.
  */
 export default function QuickAlertButton({ ticker, currency = 'USD', compact = false }: { ticker: string; currency?: string; compact?: boolean }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   // Una vez abierto por primera vez, el cuerpo se queda montado (oculto por
   // Radix al cerrar) para conservar lo escrito si se cierra sin crear.
@@ -41,13 +43,13 @@ export default function QuickAlertButton({ ticker, currency = 'USD', compact = f
         <Button
           size="sm"
           variant={compact ? 'ghost' : 'outline'}
-          aria-label="Alerta de precio"
+          aria-label={t('alerts.quick.button')}
           onPointerDown={() => void loadQuickAlertPopoverBody()}
           onFocus={() => void loadQuickAlertPopoverBody()}
           className={compact ? 'h-11 gap-1.5 px-3 text-gray-300 hover:text-teal-300 sm:h-8 sm:w-auto sm:px-3 sm:text-xs' : 'min-h-[44px] gap-1.5 px-3 text-sm sm:min-h-0 sm:h-8 sm:text-xs'}
         >
           <BellPlus aria-hidden="true" className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-          {compact ? <><span className="sm:hidden">Alerta</span><span className="hidden sm:inline">Alerta de precio</span></> : 'Alerta de precio'}
+          {compact ? <><span className="sm:hidden">{t('alerts.quick.buttonShort')}</span><span className="hidden sm:inline">{t('alerts.quick.button')}</span></> : t('alerts.quick.button')}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 border-gray-700 bg-gray-900">
