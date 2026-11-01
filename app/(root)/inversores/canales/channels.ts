@@ -504,3 +504,33 @@ export const INVESTOR_CHANNELS: InvestorChannel[] = [
         checked_at: '2026-10-11',
     },
 ];
+
+/** Fuente y nota de cada canal en inglés (Ajustes → Idioma); en español se muestran tal cual. */
+const SOURCE_EN: Record<string, string> = {
+    [SUBS]: 'Owner subscriptions, screenshots from 6 Oct 2026',
+    [CHECKED]: 'Channel page loaded on 6 Oct 2026',
+    [VERIFIED_PICK]: 'Checked on YouTube, 2026-10-11',
+    'https://www.numantiapatrimonio.com/ (web oficial de Numantia)': 'https://www.numantiapatrimonio.com/ (official Numantia website)',
+};
+
+const NOTE_EN: Record<string, string> = {
+    'Capital riesgo y tecnología': 'Venture capital and technology',
+    'Economía': 'Economics',
+    'Enlazado desde la web oficial de Numantia': 'Linked from the official Numantia website',
+    'Entrevistas de negocio; generalista': 'Business interviews; general audience',
+    'Probable canal oficial: su web de NYU no enlaza YouTube': 'Likely the official channel: his NYU page does not link to YouTube',
+    'Quality investing': 'Quality investing',
+    'Sugerido': 'Suggested',
+    'Sugerido; probable oficial (archivo de CNBC)': 'Suggested; likely official (CNBC archive)',
+    'Tema AST SpaceMobile': 'AST SpaceMobile topic',
+    'Tema AST SpaceMobile; comunidad, no verificado como oficial de la empresa': 'AST SpaceMobile topic; community channel, not verified as the company’s official one',
+    'Título del canal en YouTube: Jose Luis Cava': 'Channel title on YouTube: Jose Luis Cava',
+};
+
+export function channelSourceLabel(source: string, locale: 'es' | 'en' = 'es'): string {
+    return locale === 'en' ? (SOURCE_EN[source] ?? source) : source;
+}
+
+export function channelNoteLabel(note: string, locale: 'es' | 'en' = 'es'): string {
+    return locale === 'en' ? (NOTE_EN[note] ?? note) : note;
+}

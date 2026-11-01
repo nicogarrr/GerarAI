@@ -5,7 +5,8 @@ import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useT, useFormat } from '@/lib/i18n/client';
+import { useLocale, useT, useFormat } from '@/lib/i18n/client';
+import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
 import { clientOrderIdAfter, parseEsNumber, type SubmitFx } from './submit';
@@ -22,6 +23,7 @@ function newClientOrderId(): string {
  */
 export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?: boolean }) {
     const ti = useT();
+    const locale = useLocale();
     const f = useFormat();
     const uid = useId();
     const router = useRouter();
@@ -107,16 +109,16 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                 } else if (result.outcome === 'duplicate') {
                     setDuplicate(
                         result.reason
-                            ? ti('paperTrading.fx.duplicateRejected', { reason: result.reason })
+                            ? ti('paperTrading.fx.duplicateRejected', { reason: paperTradingMessage(result.reason, locale) })
                             : ti('paperTrading.fx.duplicateFill'),
                     );
                 } else {
-                    setSubmitError(ti('paperTrading.fx.rejected', { reason: result.reason ?? ti('paperTrading.ticket.reasonMissing') }));
+                    setSubmitError(ti('paperTrading.fx.rejected', { reason: result.reason ? paperTradingMessage(result.reason, locale) : ti('paperTrading.ticket.reasonMissing') }));
                 }
                 clientOrderId.current = clientOrderIdAfter(result, clientOrderId.current, newClientOrderId);
             } else {
                 // Fallo desconocido (red/servidor): id CONSERVADO, reintento idempotente.
-                setSubmitError(result.error);
+                setSubmitError(paperTradingMessage(result.error, locale));
             }
         } finally {
             setPending(false);
